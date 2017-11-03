@@ -213,7 +213,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                                     clientRequest.getTargetingNS().db().toString(),
                                     requests,
                                     readPref,
-                                    Shard::RetryPolicy::kNoRetry);
+                                    opCtx->getTxnNumber() ? Shard::RetryPolicy::kIdempotent
+                                                          : Shard::RetryPolicy::kNoRetry);
             numSent += pendingBatches.size();
 
             //

@@ -32,6 +32,7 @@
 
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/logical_session_id.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_test_fixture.h"
@@ -156,6 +157,29 @@ public:
         });
     }
 
+    void expectInsertsReturnError(const std::vector<BSONObj>& expected,
+                                  const BatchedCommandResponse& errResponse) {
+        onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQUALS(nss.db(), request.dbname);
+
+            const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
+            const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
+            ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
+
+            const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
+            ASSERT_EQUALS(expected.size(), inserted.size());
+
+            auto itInserted = inserted.begin();
+            auto itExpected = expected.begin();
+
+            for (; itInserted != inserted.end(); itInserted++, itExpected++) {
+                ASSERT_BSONOBJ_EQ(*itExpected, *itInserted);
+            }
+
+            return errResponse.toBSON();
+        });
+    }
+
     ConnectionString shardHost{kTestShardHost};
     NamespaceString nss{"foo.bar"};
 
@@ -225,27 +249,7 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
         ASSERT_EQUALS(stats.numRounds, 1);
     });
 
-    onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
-        const std::vector<BSONObj> expected{BSON("x" << 1)};
-
-        ASSERT_EQUALS(nss.db(), request.dbname);
-
-        const auto opMsgRequest(OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj));
-        const auto actualBatchedInsert(BatchedCommandRequest::parseInsert(opMsgRequest));
-        ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
-
-        const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
-        ASSERT_EQUALS(expected.size(), inserted.size());
-
-        auto itInserted = inserted.begin();
-        auto itExpected = expected.begin();
-
-        for (; itInserted != inserted.end(); itInserted++, itExpected++) {
-            ASSERT_BSONOBJ_EQ(*itExpected, *itInserted);
-        }
-
-        return errResponse.toBSON();
-    });
+    expectInsertsReturnError({BSON("x" << 1)}, errResponse);
 
     future.timed_get(kFutureTimeout);
 }
@@ -352,6 +356,127 @@ TEST_F(BatchWriteExecTest, TooManyStaleOp) {
     for (int i = 0; i < (1 + kMaxRoundsWithoutProgress); i++) {
         expectInsertsReturnStaleVersionErrors({BSON("x" << 1), BSON("x" << 2)});
     }
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
+    // A retryable error without a txnNumber is not retried.
+
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    BatchedCommandResponse retryableErrResponse;
+    retryableErrResponse.setOk(false);
+    retryableErrResponse.setErrCode(ErrorCodes::NotMaster);
+    retryableErrResponse.setErrMessage("mock retryable error");
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+
+        ASSERT(response.getOk());
+        ASSERT_EQUALS(response.getN(), 0);
+        ASSERT(response.isErrDetailsSet());
+        ASSERT_EQUALS(response.getErrDetailsAt(0)->getErrCode(), retryableErrResponse.getErrCode());
+        ASSERT(response.getErrDetailsAt(0)->getErrMessage().find(
+                   retryableErrResponse.getErrMessage()) != string::npos);
+        ASSERT_EQUALS(stats.numRounds, 1);
+    });
+
+    expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, retryableErrResponse);
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(BatchWriteExecTest, RetryableErrorTxnNumber) {
+    // A retryable error with a txnNumber is automatically retried.
+
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(5);
+
+    BatchedCommandResponse retryableErrResponse;
+    retryableErrResponse.setOk(false);
+    retryableErrResponse.setErrCode(ErrorCodes::NotMaster);
+    retryableErrResponse.setErrMessage("mock retryable error");
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+
+        ASSERT(response.getOk());
+        ASSERT(!response.isErrDetailsSet());
+        ASSERT_EQUALS(stats.numRounds, 1);
+    });
+
+    expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, retryableErrResponse);
+    expectInsertsReturnSuccess({BSON("x" << 1), BSON("x" << 2)});
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
+    // A non-retryable error with a txnNumber is not retried.
+
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments({BSON("x" << 1), BSON("x" << 2)});
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(5);
+
+    BatchedCommandResponse nonRetryableErrResponse;
+    nonRetryableErrResponse.setOk(false);
+    nonRetryableErrResponse.setErrCode(ErrorCodes::UnknownError);
+    nonRetryableErrResponse.setErrMessage("mock non-retryable error");
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+
+        ASSERT(response.getOk());
+        ASSERT_EQUALS(response.getN(), 0);
+        ASSERT(response.isErrDetailsSet());
+        ASSERT_EQUALS(response.getErrDetailsAt(0)->getErrCode(),
+                      nonRetryableErrResponse.getErrCode());
+        ASSERT(response.getErrDetailsAt(0)->getErrMessage().find(
+                   nonRetryableErrResponse.getErrMessage()) != string::npos);
+        ASSERT_EQUALS(stats.numRounds, 1);
+    });
+
+    expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, nonRetryableErrResponse);
 
     future.timed_get(kFutureTimeout);
 }
