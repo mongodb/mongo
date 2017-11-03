@@ -43,6 +43,7 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
     }
 
     let oldPrimary = this.stepdown(primary);
+    this.waitForState(oldPrimary, ReplSetTest.State.SECONDARY);
 
     // stepping down the node can close the connection and lose the authentication state, so
     // re-authenticate here before calling awaitNodesAgreeOnPrimary().
