@@ -5,8 +5,6 @@
 // Tests creation of indexes using applyOps for collections with a non-simple default collation.
 // Indexes created through applyOps should be built exactly according to their index spec, without
 // inheriting the collection default collation, since this is how the oplog entries are replicated.
-// TODO SERVER-31435: Move this test into core once applyOps with createIndexes replicates
-// correctly.
 (function() {
     "use strict";
 
