@@ -29,9 +29,4 @@ structs:
     description: "A struct representing an endSessions command"
     strict: true
     fields:
-      endSessions: int
-      ids: array<object>
-      "$clusterTime":
-        cpp_name: clusterTime
-        type: object
-        optional: true
+      endSessions: array<object>

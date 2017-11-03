@@ -68,4 +68,20 @@
     res = admin.runCommand(refresh);
     assert.commandWorked(res, "failed to refresh");
 
+    // verify that end on the session handle actually ends sessions
+    {
+        var session = conn.startSession();
+
+        assert.commandWorked(session.getDatabase("admin").runCommand(refresh), "failed to refresh");
+        assert.eq(
+            config.system.sessions.count(), 1, "refresh should have written 1 session record");
+
+        session.endSession();
+        assert.commandWorked(admin.runCommand(refresh), "failed to refresh");
+        assert.eq(config.system.sessions.count(),
+                  0,
+                  "endSessions and refresh should result in 0 remaining sessions");
+    }
+
+    MongoRunner.stopMongod(conn);
 }());

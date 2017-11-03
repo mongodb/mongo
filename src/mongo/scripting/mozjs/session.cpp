@@ -76,15 +76,7 @@ void endSession(SessionHolder* holder) {
 
     EndSessions es;
 
-    es.setEndSessions(1);
-    es.setIds({holder->lsid});
-    if (holder->client->isMongos()) {
-        auto clusterTime = MongoBase::getClusterTime();
-
-        if (!clusterTime.isEmpty()) {
-            es.setClusterTime(clusterTime);
-        }
-    }
+    es.setEndSessions({holder->lsid});
 
     BSONObj out;
     holder->client->runCommand("admin", es.toBSON(), out);
