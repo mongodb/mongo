@@ -28,37 +28,34 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
-#include "mongo/transport/service_executor.h"
-#include "mongo/transport/service_executor_task_names.h"
-
 namespace mongo {
 namespace transport {
-
-/**
- * The noop service executor provides the necessary interface for some unittests. Doesn't actually
- * execute any work
- */
-class ServiceExecutorNoop final : public ServiceExecutor {
-public:
-    explicit ServiceExecutorNoop(ServiceContext* ctx) {}
-
-    Status start() override {
-        return Status::OK();
-    }
-    Status shutdown(Milliseconds timeout) override {
-        return Status::OK();
-    }
-    Status schedule(Task task, ScheduleFlags flags, ServiceExecutorTaskName taskName) override {
-        return Status::OK();
-    }
-
-    Mode transportMode() const override {
-        return Mode::kSynchronous;
-    }
-
-    void appendStats(BSONObjBuilder* bob) const override {}
+enum class ServiceExecutorTaskName {
+    kSSMProcessMessage,
+    kSSMSourceMessage,
+    kSSMExhaustMessage,
+    kSSMStartSession,
+    kMaxTaskName
 };
 
+constexpr auto kSSMProcessMessageName = "processMessage"_sd;
+constexpr auto kSSMSourceMessageName = "sourceMessage"_sd;
+constexpr auto kSSMExhaustMessageName = "exhaustMessage"_sd;
+constexpr auto kSSMStartSessionName = "startSession"_sd;
+
+inline StringData taskNameToString(ServiceExecutorTaskName taskName) {
+    switch (taskName) {
+        case ServiceExecutorTaskName::kSSMProcessMessage:
+            return kSSMProcessMessageName;
+        case ServiceExecutorTaskName::kSSMSourceMessage:
+            return kSSMSourceMessageName;
+        case ServiceExecutorTaskName::kSSMExhaustMessage:
+            return kSSMExhaustMessageName;
+        case ServiceExecutorTaskName::kSSMStartSession:
+            return kSSMStartSessionName;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 }  // namespace transport
 }  // namespace mongo

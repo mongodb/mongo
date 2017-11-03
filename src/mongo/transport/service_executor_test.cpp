@@ -35,6 +35,7 @@
 #include "mongo/db/service_context_noop.h"
 #include "mongo/transport/service_executor_adaptive.h"
 #include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/transport/service_executor_task_names.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -114,7 +115,8 @@ void scheduleBasicTask(ServiceExecutor* exec, bool expectSuccess) {
     };
 
     stdx::unique_lock<stdx::mutex> lk(mutex);
-    auto status = exec->schedule(std::move(task), ServiceExecutor::kEmptyFlags);
+    auto status = exec->schedule(
+        std::move(task), ServiceExecutor::kEmptyFlags, ServiceExecutorTaskName::kSSMStartSession);
     if (expectSuccess) {
         ASSERT_OK(status);
         cond.wait(lk);

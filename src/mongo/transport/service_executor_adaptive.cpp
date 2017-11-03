@@ -32,10 +32,12 @@
 
 #include "mongo/transport/service_executor_adaptive.h"
 
+#include <array>
 #include <random>
 
 #include "mongo/db/server_parameters.h"
 #include "mongo/transport/service_entry_point_utils.h"
+#include "mongo/transport/service_executor_task_names.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
@@ -185,7 +187,9 @@ Status ServiceExecutorAdaptive::shutdown(Milliseconds timeout) {
                  "adaptive executor couldn't shutdown all worker threads within time limit.");
 }
 
-Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task, ScheduleFlags flags) {
+Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
+                                         ScheduleFlags flags,
+                                         ServiceExecutorTaskName taskName) {
     auto scheduleTime = _tickSource->getTicks();
     auto pendingCounterPtr = (flags & kDeferredTask) ? &_deferredTasksQueued : &_tasksQueued;
     pendingCounterPtr->addAndFetch(1);
@@ -194,24 +198,32 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task, Sch
         return {ErrorCodes::ShutdownInProgress, "Executor is not running"};
     }
 
-    auto wrappedTask = [ this, task = std::move(task), scheduleTime, pendingCounterPtr ] {
+    auto wrappedTask = [ this, task = std::move(task), scheduleTime, pendingCounterPtr, taskName ] {
         pendingCounterPtr->subtractAndFetch(1);
         auto start = _tickSource->getTicks();
         _totalSpentQueued.addAndFetch(start - scheduleTime);
+
+        _localThreadState->threadMetrics[static_cast<size_t>(taskName)]
+            ._totalSpentQueued.addAndFetch(start - scheduleTime);
 
         if (_localThreadState->recursionDepth++ == 0) {
             _localThreadState->executing.markRunning();
             _threadsInUse.addAndFetch(1);
         }
-        const auto guard = MakeGuard([this, start] {
+        const auto guard = MakeGuard([this, start, taskName] {
             if (--_localThreadState->recursionDepth == 0) {
                 _localThreadState->executingCurRun += _localThreadState->executing.markStopped();
                 _threadsInUse.subtractAndFetch(1);
             }
             _totalExecuted.addAndFetch(1);
+            _localThreadState->threadMetrics[static_cast<size_t>(taskName)]
+                ._totalExecuted.addAndFetch(1);
         });
 
+        TickTimer _localTimer(_tickSource);
         task();
+        _localThreadState->threadMetrics[static_cast<size_t>(taskName)]
+            ._totalSpentExecuting.addAndFetch(_localTimer.sinceStartTicks());
     };
 
     // Dispatching a task on the io_context will run the task immediately, and may run it
@@ -230,6 +242,8 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task, Sch
 
     _lastScheduleTimer.reset();
     _totalQueued.addAndFetch(1);
+
+    _accumulatedMetrics[static_cast<size_t>(taskName)]._totalQueued.addAndFetch(1);
 
     // Deferred tasks never count against the thread starvation avoidance. For other tasks, we
     // notify the controller thread that a task has been scheduled and we should monitor thread
@@ -265,8 +279,10 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
     stdx::unique_lock<stdx::mutex> fakeLk(fakeMutex);
 
     TickTimer sinceLastControlRound(_tickSource);
-    TickSource::Tick lastSpentExecuting = _getThreadTimerTotal(ThreadTimer::Executing);
-    TickSource::Tick lastSpentRunning = _getThreadTimerTotal(ThreadTimer::Running);
+    stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
+    TickSource::Tick lastSpentExecuting = _getThreadTimerTotal(ThreadTimer::Executing, lk);
+    TickSource::Tick lastSpentRunning = _getThreadTimerTotal(ThreadTimer::Running, lk);
+    lk.unlock();
 
     while (_isRunning.load()) {
         // Make sure that the timer gets reset whenever this loop completes
@@ -281,8 +297,11 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
 
         double utilizationPct;
         {
-            auto spentExecuting = _getThreadTimerTotal(ThreadTimer::Executing);
-            auto spentRunning = _getThreadTimerTotal(ThreadTimer::Running);
+
+            stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
+            auto spentExecuting = _getThreadTimerTotal(ThreadTimer::Executing, lk);
+            auto spentRunning = _getThreadTimerTotal(ThreadTimer::Running, lk);
+            lk.unlock();
             auto diffExecuting = spentExecuting - lastSpentExecuting;
             auto diffRunning = spentRunning - lastSpentRunning;
 
@@ -402,7 +421,29 @@ Milliseconds ServiceExecutorAdaptive::_getThreadJitter() const {
     return Milliseconds{jitter};
 }
 
-TickSource::Tick ServiceExecutorAdaptive::_getThreadTimerTotal(ThreadTimer which) const {
+void ServiceExecutorAdaptive::_accumulateTaskMetrics(MetricsArray* outArray,
+                                                     const MetricsArray& inputArray) const {
+    for (auto it = inputArray.begin(); it != inputArray.end(); ++it) {
+        auto taskName = static_cast<ServiceExecutorTaskName>(std::distance(inputArray.begin(), it));
+        auto& output = outArray->at(static_cast<size_t>(taskName));
+
+        output._totalSpentExecuting.addAndFetch(it->_totalSpentExecuting.load());
+        output._totalSpentQueued.addAndFetch(it->_totalSpentQueued.load());
+        output._totalExecuted.addAndFetch(it->_totalExecuted.load());
+        output._totalQueued.addAndFetch(it->_totalQueued.load());
+    }
+}
+
+void ServiceExecutorAdaptive::_accumulateAllTaskMetrics(MetricsArray* outputMetricsArray,
+                                                        stdx::unique_lock<stdx::mutex>& lk) const {
+    _accumulateTaskMetrics(outputMetricsArray, _accumulatedMetrics);
+    for (auto& thread : _threads) {
+        _accumulateTaskMetrics(outputMetricsArray, thread.threadMetrics);
+    }
+}
+
+TickSource::Tick ServiceExecutorAdaptive::_getThreadTimerTotal(
+    ThreadTimer which, stdx::unique_lock<stdx::mutex>& lk) const {
     TickSource::Tick accumulator;
     switch (which) {
         case ThreadTimer::Running:
@@ -413,7 +454,6 @@ TickSource::Tick ServiceExecutorAdaptive::_getThreadTimerTotal(ThreadTimer which
             break;
     }
 
-    stdx::lock_guard<stdx::mutex> lk(_threadsMutex);
     for (auto& thread : _threads) {
         switch (which) {
             case ThreadTimer::Running:
@@ -452,6 +492,7 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
         _pastThreadsSpentRunning.addAndFetch(state->running.totalTime());
         _pastThreadsSpentExecuting.addAndFetch(state->executing.totalTime());
 
+        _accumulateTaskMetrics(&_accumulatedMetrics, state->threadMetrics);
         {
             stdx::lock_guard<stdx::mutex> lk(_threadsMutex);
             _threads.erase(state);
@@ -534,20 +575,40 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
 }
 
 void ServiceExecutorAdaptive::appendStats(BSONObjBuilder* bob) const {
+    stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
     BSONObjBuilder section(bob->subobjStart("serviceExecutorTaskStats"));
-    section << kExecutorLabel << kExecutorName                                             //
-            << kTotalQueued << _totalQueued.load()                                         //
-            << kTotalExecuted << _totalExecuted.load()                                     //
-            << kTasksQueued << _tasksQueued.load()                                         //
-            << kDeferredTasksQueued << _deferredTasksQueued.load()                         //
-            << kThreadsInUse << _threadsInUse.load()                                       //
-            << kTotalTimeRunningUs                                                         //
-            << ticksToMicros(_getThreadTimerTotal(ThreadTimer::Running), _tickSource)      //
-            << kTotalTimeExecutingUs                                                       //
-            << ticksToMicros(_getThreadTimerTotal(ThreadTimer::Executing), _tickSource)    //
-            << kTotalTimeQueuedUs << ticksToMicros(_totalSpentQueued.load(), _tickSource)  //
-            << kThreadsRunning << _threadsRunning.load()                                   //
+    section << kExecutorLabel << kExecutorName                                               //
+            << kTotalQueued << _totalQueued.load()                                           //
+            << kTotalExecuted << _totalExecuted.load()                                       //
+            << kTasksQueued << _tasksQueued.load()                                           //
+            << kDeferredTasksQueued << _deferredTasksQueued.load()                           //
+            << kThreadsInUse << _threadsInUse.load()                                         //
+            << kTotalTimeRunningUs                                                           //
+            << ticksToMicros(_getThreadTimerTotal(ThreadTimer::Running, lk), _tickSource)    //
+            << kTotalTimeExecutingUs                                                         //
+            << ticksToMicros(_getThreadTimerTotal(ThreadTimer::Executing, lk), _tickSource)  //
+            << kTotalTimeQueuedUs << ticksToMicros(_totalSpentQueued.load(), _tickSource)    //
+            << kThreadsRunning << _threadsRunning.load()                                     //
             << kThreadsPending << _threadsPending.load();
+
+    BSONObjBuilder metricsByTask(section.subobjStart("metricsByTask"));
+    MetricsArray totalMetrics;
+    _accumulateAllTaskMetrics(&totalMetrics, lk);
+    lk.unlock();
+    for (auto it = totalMetrics.begin(); it != totalMetrics.end(); ++it) {
+        auto taskName =
+            static_cast<ServiceExecutorTaskName>(std::distance(totalMetrics.begin(), it));
+        auto taskNameString = taskNameToString(taskName);
+        BSONObjBuilder subSection(metricsByTask.subobjStart(taskNameString));
+        subSection << kTotalQueued << it->_totalQueued.load() << kTotalExecuted
+                   << it->_totalExecuted.load() << kTotalTimeExecutingUs
+                   << ticksToMicros(it->_totalSpentExecuting.load(), _tickSource)
+                   << kTotalTimeQueuedUs
+                   << ticksToMicros(it->_totalSpentQueued.load(), _tickSource);
+
+        subSection.doneFast();
+    }
+    metricsByTask.doneFast();
     section.doneFast();
 }
 

@@ -35,6 +35,7 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point_utils.h"
+#include "mongo/transport/service_executor_task_names.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/thread_idle_callback.h"
 #include "mongo/util/processinfo.h"
@@ -88,7 +89,9 @@ Status ServiceExecutorSynchronous::shutdown(Milliseconds timeout) {
                  "passthrough executor couldn't shutdown all worker threads within time limit.");
 }
 
-Status ServiceExecutorSynchronous::schedule(Task task, ScheduleFlags flags) {
+Status ServiceExecutorSynchronous::schedule(Task task,
+                                            ScheduleFlags flags,
+                                            ServiceExecutorTaskName taskName) {
     if (!_stillRunning.load()) {
         return Status{ErrorCodes::ShutdownInProgress, "Executor is not running"};
     }
