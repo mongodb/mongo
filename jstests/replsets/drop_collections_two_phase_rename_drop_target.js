@@ -72,9 +72,7 @@
 
         // Confirm in the logs that the renameCollection dropped the target collection on the
         // secondary using two phase collection drop.
-        checkLog.contains(
-            secondary,
-            'dropCollection: ' + toColl.getFullName() + ' - renaming to drop-pending collection:');
+        checkLog.contains(secondary, 'dropCollection: ' + toColl.getFullName());
 
         // Rename target collection back to source collection. This helps to ensure the collection
         // metadata is updated correctly on both primary and secondary.

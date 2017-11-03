@@ -483,6 +483,9 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         return Status::OK();  // Post condition already met.
     }
 
+    auto uuid = collection->uuid();
+    auto uuidString = uuid ? uuid.get().toString() : "no UUID";
+
     uassertNamespaceNotIndex(fullns.toString(), "dropCollection");
 
     BackgroundOperation::assertNoBgOpInProgForNs(fullns);
@@ -491,7 +494,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     // Use massert() to be consistent with IndexCatalog::dropAllIndexes().
     auto numIndexesInProgress = collection->getIndexCatalog()->numIndexesInProgress(opCtx);
     massert(40461,
-            str::stream() << "cannot drop collection " << fullns.ns() << " when "
+            str::stream() << "cannot drop collection " << fullns.ns() << " (" << uuidString
+                          << ") when "
                           << numIndexesInProgress
                           << " index builds in progress.",
             numIndexesInProgress == 0);
@@ -499,8 +503,6 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     audit::logDropCollection(&cc(), fullns.toString());
 
     Top::get(opCtx->getServiceContext()).collectionDropped(fullns.toString());
-
-    auto uuid = collection->uuid();
 
     // Drop unreplicated collections immediately.
     // If 'dropOpTime' is provided, we should proceed to rename the collection.
@@ -549,7 +551,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
         // Drop the offending indexes.
         for (auto&& index : indexesToDrop) {
-            log() << "dropCollection: " << fullns << " - index namespace '"
+            log() << "dropCollection: " << fullns << " (" << uuidString << ") - index namespace '"
                   << index->indexNamespace()
                   << "' would be too long after drop-pending rename. Dropping index immediately.";
             fassertStatusOK(40463, collection->getIndexCatalog()->dropIndex(opCtx, index));
@@ -565,8 +567,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         // After writing the oplog entry, all errors are fatal. See getNextOpTime() comments in
         // oplog.cpp.
         if (dropOpTime.isNull()) {
-            log() << "dropCollection: " << fullns
-                  << " - no drop optime available for pending-drop. "
+            log() << "dropCollection: " << fullns << " (" << uuidString
+                  << ") - no drop optime available for pending-drop. "
                   << "Dropping collection immediately.";
             fassertStatusOK(40462, _finishDropCollection(opCtx, fullns, collection));
             return Status::OK();
@@ -578,8 +580,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
         // writing to the oplog.
         auto opTime = opObserver->onDropCollection(opCtx, fullns, uuid);
         if (!opTime.isNull()) {
-            severe() << "dropCollection: " << fullns
-                     << " - unexpected oplog entry written to the oplog with optime " << opTime;
+            severe() << "dropCollection: " << fullns << " (" << uuidString
+                     << ") - unexpected oplog entry written to the oplog with optime " << opTime;
             fassertFailed(40468);
         }
     }
@@ -588,8 +590,9 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     // Rename collection using drop-pending namespace generated from drop optime.
     const bool stayTemp = true;
-    log() << "dropCollection: " << fullns << " - renaming to drop-pending collection: " << dpns
-          << " with drop optime " << dropOpTime;
+    log() << "dropCollection: " << fullns << " (" << uuidString
+          << ") - renaming to drop-pending collection: " << dpns << " with drop optime "
+          << dropOpTime;
     fassertStatusOK(40464, renameCollection(opCtx, fullns.ns(), dpns.ns(), stayTemp));
 
     // Register this drop-pending namespace with DropPendingCollectionReaper to remove when the
@@ -612,6 +615,10 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     // RecordStore.
     _clearCollectionCache(
         opCtx, fullns.toString(), "collection dropped", /*collectionGoingAway*/ true);
+
+    auto uuid = collection->uuid();
+    auto uuidString = uuid ? uuid.get().toString() : "no UUID";
+    log() << "Finishing collection drop for " << fullns << " (" << uuidString << ").";
 
     return _dbEntry->dropCollection(opCtx, fullns.toString());
 }
