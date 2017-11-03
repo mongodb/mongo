@@ -186,6 +186,19 @@ struct __wt_ovfl_reuse {
     ",value_format=" WT_UNCHECKED_STRING(QuBu)
 
 /*
+ * WT_PAGE_LOOKASIDE --
+ *	Related information for on-disk pages with lookaside entries.
+ */
+struct __wt_page_lookaside {
+	uint64_t las_pageid;			/* Page ID in lookaside */
+	uint64_t las_max_txn;			/* Maximum transaction ID in
+						   lookaside */
+	WT_DECL_TIMESTAMP(min_timestamp)	/* Min timestamp in lookaside */
+	WT_DECL_TIMESTAMP(onpage_timestamp)	/* Max timestamp on page */
+	bool las_skew_oldest;			/* On-page skewed to oldest */
+};
+
+/*
  * WT_PAGE_MODIFY --
  *	When a page is modified, there's additional information to maintain.
  */
@@ -241,17 +254,14 @@ struct __wt_page_modify {
 		void	*disk_image;
 
 		/* The page has lookaside entries. */
-		uint64_t las_pageid;
-		WT_DECL_TIMESTAMP(las_min_timestamp)
+		WT_PAGE_LOOKASIDE page_las;
 	} r;
 #undef	mod_replace
 #define	mod_replace	u1.r.replace
 #undef	mod_disk_image
 #define	mod_disk_image	u1.r.disk_image
-#undef	mod_replace_las_pageid
-#define	mod_replace_las_pageid	u1.r.las_pageid
-#undef	mod_replace_las_min_timestamp
-#define	mod_replace_las_min_timestamp	u1.r.las_min_timestamp
+#undef	mod_page_las
+#define	mod_page_las	u1.r.page_las
 
 	struct {			/* Multiple replacement blocks */
 	struct __wt_multi {
@@ -297,8 +307,7 @@ struct __wt_page_modify {
 		uint32_t size;
 		uint32_t checksum;
 
-		uint64_t las_pageid;
-		WT_DECL_TIMESTAMP(las_min_timestamp)
+		WT_PAGE_LOOKASIDE page_las;
 	} *multi;
 	uint32_t multi_entries;		/* Multiple blocks element count */
 	} m;
@@ -718,16 +727,6 @@ struct __wt_page_deleted {
 	WT_DECL_TIMESTAMP(timestamp)
 
 	WT_UPDATE **update_list;		/* List of updates for abort */
-};
-
-/*
- * WT_PAGE_LOOKASIDE --
- *	Related information for on-disk pages with lookaside entries.
- */
-struct __wt_page_lookaside {
-	uint64_t las_pageid;			/* Page ID in lookaside */
-	WT_DECL_TIMESTAMP(min_timestamp)	/* Oldest timestamp in
-						   lookaside for the page */
 };
 
 /*

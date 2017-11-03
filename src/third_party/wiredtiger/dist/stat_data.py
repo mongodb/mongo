@@ -257,6 +257,7 @@ connection_stats = [
     CacheStat('cache_lookaside_entries', 'lookaside table entries', 'no_clear,no_scale'),
     CacheStat('cache_lookaside_insert', 'lookaside table insert calls'),
     CacheStat('cache_lookaside_remove', 'lookaside table remove calls'),
+    CacheStat('cache_lookaside_score', 'lookaside score', 'no_clear,no_scale'),
     CacheStat('cache_overhead', 'percentage overhead', 'no_clear,no_scale'),
     CacheStat('cache_pages_dirty', 'tracked dirty pages in the cache', 'no_clear,no_scale'),
     CacheStat('cache_pages_inuse', 'pages currently held in the cache', 'no_clear,no_scale'),

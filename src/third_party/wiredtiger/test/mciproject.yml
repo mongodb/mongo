@@ -65,7 +65,7 @@ tasks:
               ./build_posix/reconf
               ${configure_env_vars|} ./configure --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-verbose
               ${make_command|make} ${smp_command|} 2>&1
-              TESTUTIL_ENABLE_LONG_TESTS=1 ${make_command|make} VERBOSE=1 check 2>&1
+              ${test_env_vars|} TESTUTIL_ENABLE_LONG_TESTS=1 ${make_command|make} VERBOSE=1 check 2>&1
             fi
       - command: archive.targz_pack
         params:
@@ -96,15 +96,9 @@ tasks:
             set -o errexit
             set -o verbose
 
-            # On 10.12, change the binary location with install_name_tool since DYLD_LIBRARY_PATH
-            # appears not to work for dynamic modules loaded by python. For wt, the libtool generated
-            # script has the wrong path for running on test machines.
-            if [ "$(uname -s)" == "Darwin" ]; then
-              WT_VERSION=$(m4 build_posix/aclocal/version.m4)
-              install_name_tool -change /usr/local/lib/libwiredtiger-$WT_VERSION.dylib $(pwd)/.libs/libwiredtiger-$WT_VERSION.dylib lang/python/_wiredtiger.so
-              install_name_tool -change /usr/local/lib/libwiredtiger-$WT_VERSION.dylib $(pwd)/.libs/libwiredtiger-$WT_VERSION.dylib .libs/wt
-            fi
-
+            # Avoid /usr/bin/python, at least on macOS: with System Integrity
+            # Protection enabled, it ignores DYLD_LIBRARY_PATH and hence
+            # doesn't find the WiredTiger library in the local tree.
             ${test_env_vars|} python ./test/suite/run.py -v 2 ${smp_command|} 2>&1
 
   - name: compile-windows-alt
@@ -186,7 +180,7 @@ buildvariants:
     smp_command: -j $(sysctl -n hw.logicalcpu)
     configure_env_vars: PATH=/opt/local/bin:$PATH
     make_command: PATH=/opt/local/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
-    test_env_vars: DYLD_LIBRARY_PATH=`pwd`/.libs
+    test_env_vars: PATH=/opt/local/bin:$PATH DYLD_LIBRARY_PATH=`pwd`/.libs
   tasks:
     - name: compile
     - name: unit-test

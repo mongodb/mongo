@@ -150,6 +150,7 @@ typedef struct {
 	uint32_t c_bloom_hash_count;
 	uint32_t c_bloom_oldest;
 	uint32_t c_cache;
+	uint32_t c_cache_minimum;
 	char	*c_checkpoint;
 	uint32_t c_checkpoint_log_size;
 	uint32_t c_checkpoint_wait;

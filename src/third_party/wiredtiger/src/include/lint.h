@@ -84,8 +84,8 @@ __wt_atomic_cas_ptr(void *vp, void *orig, void *new) {
 	return (false);
 }
 
-static inline void WT_BARRIER(void) { return; }
-static inline void WT_FULL_BARRIER(void) { return; }
-static inline void WT_PAUSE(void) { return; }
-static inline void WT_READ_BARRIER(void) { return; }
-static inline void WT_WRITE_BARRIER(void) { return; }
+static inline void WT_BARRIER(void) { }
+static inline void WT_FULL_BARRIER(void) { }
+static inline void WT_PAUSE(void) { }
+static inline void WT_READ_BARRIER(void) { }
+static inline void WT_WRITE_BARRIER(void) { }

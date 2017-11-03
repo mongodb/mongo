@@ -9,6 +9,81 @@
 #include "wt_internal.h"
 
 /*
+ * __conn_dhandle_config_clear --
+ *	Clear the underlying object's configuration information.
+ */
+static void
+__conn_dhandle_config_clear(WT_SESSION_IMPL *session)
+{
+	WT_DATA_HANDLE *dhandle;
+	const char **a;
+
+	dhandle = session->dhandle;
+
+	if (dhandle->cfg == NULL)
+		return;
+	for (a = dhandle->cfg; *a != NULL; ++a)
+		__wt_free(session, *a);
+	__wt_free(session, dhandle->cfg);
+}
+
+/*
+ * __conn_dhandle_config_set --
+ *	Set up a btree handle's configuration information.
+ */
+static int
+__conn_dhandle_config_set(WT_SESSION_IMPL *session)
+{
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+	char *metaconf;
+
+	dhandle = session->dhandle;
+
+	/*
+	 * Read the object's entry from the metadata file, we're done if we
+	 * don't find one.
+	 */
+	if ((ret =
+	    __wt_metadata_search(session, dhandle->name, &metaconf)) != 0) {
+		if (ret == WT_NOTFOUND)
+			ret = ENOENT;
+		WT_RET(ret);
+	}
+
+	/*
+	 * The defaults are included because persistent configuration
+	 * information is stored in the metadata file and it may be from an
+	 * earlier version of WiredTiger.  If defaults are included in the
+	 * configuration, we can add new configuration strings without
+	 * upgrading the metadata file or writing special code in case a
+	 * configuration string isn't initialized, as long as the new
+	 * configuration string has an appropriate default value.
+	 *
+	 * The error handling is a little odd, but be careful: we're holding a
+	 * chunk of allocated memory in metaconf.  If we fail before we copy a
+	 * reference to it into the object's configuration array, we must free
+	 * it, after the copy, we don't want to free it.
+	 */
+	WT_ERR(__wt_calloc_def(session, 3, &dhandle->cfg));
+	switch (dhandle->type) {
+	case WT_DHANDLE_TYPE_BTREE:
+		WT_ERR(__wt_strdup(session,
+		    WT_CONFIG_BASE(session, file_meta), &dhandle->cfg[0]));
+		break;
+	case WT_DHANDLE_TYPE_TABLE:
+		WT_ERR(__wt_strdup(session,
+		    WT_CONFIG_BASE(session, table_meta), &dhandle->cfg[0]));
+		break;
+	}
+	dhandle->cfg[1] = metaconf;
+	return (0);
+
+err:	__wt_free(session, metaconf);
+	return (ret);
+}
+
+/*
  * __conn_dhandle_destroy --
  *	Destroy a data handle.
  */
@@ -30,6 +105,7 @@ __conn_dhandle_destroy(WT_SESSION_IMPL *session, WT_DATA_HANDLE *dhandle)
 	__wt_rwlock_destroy(session, &dhandle->rwlock);
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
+	__conn_dhandle_config_clear(session);
 	__wt_spin_destroy(session, &dhandle->close_lock);
 	__wt_stat_dsrc_discard(session, dhandle);
 	__wt_overwrite_and_free(session, dhandle);
@@ -312,81 +388,6 @@ err:	__wt_spin_unlock(session, &dhandle->close_lock);
 	if (is_btree)
 		__wt_evict_file_exclusive_off(session);
 
-	return (ret);
-}
-
-/*
- * __conn_dhandle_config_clear --
- *	Clear the underlying object's configuration information.
- */
-static void
-__conn_dhandle_config_clear(WT_SESSION_IMPL *session)
-{
-	WT_DATA_HANDLE *dhandle;
-	const char **a;
-
-	dhandle = session->dhandle;
-
-	if (dhandle->cfg == NULL)
-		return;
-	for (a = dhandle->cfg; *a != NULL; ++a)
-		__wt_free(session, *a);
-	__wt_free(session, dhandle->cfg);
-}
-
-/*
- * __conn_dhandle_config_set --
- *	Set up a btree handle's configuration information.
- */
-static int
-__conn_dhandle_config_set(WT_SESSION_IMPL *session)
-{
-	WT_DATA_HANDLE *dhandle;
-	WT_DECL_RET;
-	char *metaconf;
-
-	dhandle = session->dhandle;
-
-	/*
-	 * Read the object's entry from the metadata file, we're done if we
-	 * don't find one.
-	 */
-	if ((ret =
-	    __wt_metadata_search(session, dhandle->name, &metaconf)) != 0) {
-		if (ret == WT_NOTFOUND)
-			ret = ENOENT;
-		WT_RET(ret);
-	}
-
-	/*
-	 * The defaults are included because persistent configuration
-	 * information is stored in the metadata file and it may be from an
-	 * earlier version of WiredTiger.  If defaults are included in the
-	 * configuration, we can add new configuration strings without
-	 * upgrading the metadata file or writing special code in case a
-	 * configuration string isn't initialized, as long as the new
-	 * configuration string has an appropriate default value.
-	 *
-	 * The error handling is a little odd, but be careful: we're holding a
-	 * chunk of allocated memory in metaconf.  If we fail before we copy a
-	 * reference to it into the object's configuration array, we must free
-	 * it, after the copy, we don't want to free it.
-	 */
-	WT_ERR(__wt_calloc_def(session, 3, &dhandle->cfg));
-	switch (dhandle->type) {
-	case WT_DHANDLE_TYPE_BTREE:
-		WT_ERR(__wt_strdup(session,
-		    WT_CONFIG_BASE(session, file_meta), &dhandle->cfg[0]));
-		break;
-	case WT_DHANDLE_TYPE_TABLE:
-		WT_ERR(__wt_strdup(session,
-		    WT_CONFIG_BASE(session, table_meta), &dhandle->cfg[0]));
-		break;
-	}
-	dhandle->cfg[1] = metaconf;
-	return (0);
-
-err:	__wt_free(session, metaconf);
 	return (ret);
 }
 
@@ -746,7 +747,6 @@ __wt_conn_dhandle_discard_single(
 	 * After successfully removing the handle, clean it up.
 	 */
 	if (ret == 0 || final) {
-		__conn_dhandle_config_clear(session);
 		WT_TRET(__conn_dhandle_destroy(session, dhandle));
 		session->dhandle = NULL;
 	}

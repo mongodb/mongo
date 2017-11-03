@@ -152,20 +152,28 @@ struct __wt_cache {
 #define	WT_EVICT_SCORE_BUMP	10
 #define	WT_EVICT_SCORE_CUTOFF	10
 #define	WT_EVICT_SCORE_MAX	100
-	uint32_t evict_aggressive_score;/* Score of how aggressive eviction
-					   should be about selecting eviction
-					   candidates. If eviction is
-					   struggling to make progress, this
-					   score rises (up to a maximum of
-					   100), at which point the cache is
-					   "stuck" and transaction will be
-					   rolled back. */
-	uint32_t evict_empty_score;	/* Score of how often LRU queues are
-					   empty on refill. This score varies
-					   between 0 (if the queue hasn't been
-					   empty for a long time) and 100 (if
-					   the queue has been empty the last 10
-					   times we filled up. */
+	/*
+	 * Score of how aggressive eviction should be about selecting eviction
+	 * candidates. If eviction is struggling to make progress, this score
+	 * rises (up to a maximum of 100), at which point the cache is "stuck"
+	 * and transaction will be rolled back.
+	 */
+	uint32_t evict_aggressive_score;
+
+	/*
+	 * Score of how often LRU queues are empty on refill. This score varies
+	 * between 0 (if the queue hasn't been empty for a long time) and 100
+	 * (if the queue has been empty the last 10 times we filled up.
+	 */
+	uint32_t evict_empty_score;
+
+	/*
+	 * Score of how much pressure storing historical versions is having on
+	 * eviction.  This score varies between 0, if reconciliation always
+	 * sees updates that are globally visible and hence can be discarded,
+	 * to 100 if no updates are globally visible.
+	 */
+	int32_t evict_lookaside_score;
 
 	/*
 	 * Cache pool information.

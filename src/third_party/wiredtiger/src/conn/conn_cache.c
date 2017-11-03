@@ -266,6 +266,19 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(session, stats, cache_pages_dirty,
 	    cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
+	WT_STAT_CONN_SET(session, cache_eviction_state, cache->flags);
+	WT_STAT_CONN_SET(session,
+	    cache_eviction_aggressive_set, cache->evict_aggressive_score);
+	WT_STAT_CONN_SET(session,
+	    cache_eviction_empty_score, cache->evict_empty_score);
+	WT_STAT_CONN_SET(session,
+	    cache_lookaside_score, __wt_cache_lookaside_score(cache));
+
+	WT_STAT_CONN_SET(session,
+	    cache_eviction_active_workers, conn->evict_threads.current_threads);
+	WT_STAT_CONN_SET(session, cache_eviction_stable_state_workers,
+	    cache->evict_tune_workers_best);
+
 	/*
 	 * The number of files with active walks ~= number of hazard pointers
 	 * in the walk session.  Note: reading without locking.

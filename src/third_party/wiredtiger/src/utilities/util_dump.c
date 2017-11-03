@@ -269,7 +269,7 @@ dump_add_config(WT_SESSION *session, char **bufp, size_t *leftp,
 	if (ret != 0)
 		return (util_err(session, ret, NULL));
 	*bufp += n;
-	*leftp -= (size_t)n;
+	*leftp -= n;
 	return (0);
 }
 

@@ -333,7 +333,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session,
 	insert_cnt = 0;
 
 	btree_id = S2BT(session)->id;
-	las_pageid = multi->las_pageid =
+	las_pageid = multi->page_las.las_pageid =
 	    __wt_atomic_add64(&S2BT(session)->las_pageid, 1);
 
 	/*
@@ -437,6 +437,57 @@ __wt_las_insert_block(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_las_cursor_position --
+ *	Position a lookaside cursor at the beginning of a block.
+ *
+ *	There may be no block of lookaside entries if they have been removed by
+ *	WT_CONNECTION::rollback_to_stable.
+ */
+int
+__wt_las_cursor_position(WT_CURSOR *cursor, uint32_t btree_id, uint64_t pageid)
+{
+	WT_ITEM las_key;
+	uint64_t las_counter, las_pageid;
+	uint32_t las_id;
+	int exact;
+
+	/*
+	 * Because of the special visibility rules for lookaside, a new block
+	 * can appear in between our search and the block of interest.  Keep
+	 * trying until we find it.
+	 */
+	for (;;) {
+		WT_CLEAR(las_key);
+		cursor->set_key(cursor,
+		    btree_id, pageid, (uint64_t)0, &las_key);
+		WT_RET(cursor->search_near(cursor, &exact));
+		if (exact < 0) {
+			WT_RET(cursor->next(cursor));
+
+			/*
+			 * Because of the special visibility rules for
+			 * lookaside, a new block can appear in between our
+			 * search and the block of interest.  Keep trying while
+			 * we have a key lower that we expect.
+			 *
+			 * There may be no block of lookaside entries if they
+			 * have been removed by
+			 * WT_CONNECTION::rollback_to_stable.
+			 */
+			WT_RET(cursor->get_key(cursor,
+			    &las_id, &las_pageid, &las_counter, &las_key));
+			if (las_id < btree_id || (las_id == btree_id &&
+			    pageid != 0 && las_pageid < pageid))
+				continue;
+		}
+
+		return (0);
+	}
+
+	/* NOTREACHED */
+}
+
+/*
  * __wt_las_remove_block --
  *	Remove all records matching a key prefix from the lookaside store.
  */
@@ -448,7 +499,6 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	WT_ITEM las_key;
 	uint64_t las_counter, las_pageid, remove_cnt;
 	uint32_t las_id, session_flags;
-	int exact;
 	bool local_cursor;
 
 	remove_cnt = 0;
@@ -464,10 +514,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	 * Search for the block's unique prefix and step through all matching
 	 * records, removing them.
 	 */
-	las_key.size = 0;
-	cursor->set_key(cursor, btree_id, pageid, (uint64_t)0, &las_key);
-	if ((ret = cursor->search_near(cursor, &exact)) == 0 && exact < 0)
-		ret = cursor->next(cursor);
+	ret = __wt_las_cursor_position(cursor, btree_id, pageid);
 	for (; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor,
 		    &las_id, &las_pageid, &las_counter, &las_key));
