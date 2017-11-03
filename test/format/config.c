@@ -181,6 +181,10 @@ config_setup(void)
 			g.c_cache = g.c_threads;
 	}
 
+	/* Check if a minimum cache size has been specified. */
+	if (g.c_cache_minimum != 0 && g.c_cache < g.c_cache_minimum)
+		g.c_cache = g.c_cache_minimum;
+
 	/* Give Helium configuration a final review. */
 	if (DATASOURCE("helium"))
 		config_helium_reset();
@@ -188,6 +192,25 @@ config_setup(void)
 	/* Give in-memory configuration a final review. */
 	if (g.c_in_memory != 0)
 		config_in_memory_reset();
+
+	/*
+	 * Key/value minimum/maximum are related, correct unless specified by
+	 * the configuration.
+	 */
+	if (!config_is_perm("key_min") && g.c_key_min > g.c_key_max)
+		g.c_key_min = g.c_key_max;
+	if (!config_is_perm("key_max") && g.c_key_max < g.c_key_min)
+		g.c_key_max = g.c_key_min;
+	if (g.c_key_min > g.c_key_max)
+		testutil_die(EINVAL, "key_min may not be larger than key_max");
+
+	if (!config_is_perm("value_min") && g.c_value_min > g.c_value_max)
+		g.c_value_min = g.c_value_max;
+	if (!config_is_perm("value_max") && g.c_value_max < g.c_value_min)
+		g.c_value_max = g.c_value_min;
+	if (g.c_value_min > g.c_value_max)
+		testutil_die(EINVAL,
+		    "value_min may not be larger than value_max");
 
 	/*
 	 * Run-length is configured by a number of operations and a timer.
@@ -212,25 +235,6 @@ config_setup(void)
 		else
 			config_single("timer=360", 0);
 	}
-
-	/*
-	 * Key/value minimum/maximum are related, correct unless specified by
-	 * the configuration.
-	 */
-	if (!config_is_perm("key_min") && g.c_key_min > g.c_key_max)
-		g.c_key_min = g.c_key_max;
-	if (!config_is_perm("key_max") && g.c_key_max < g.c_key_min)
-		g.c_key_max = g.c_key_min;
-	if (g.c_key_min > g.c_key_max)
-		testutil_die(EINVAL, "key_min may not be larger than key_max");
-
-	if (!config_is_perm("value_min") && g.c_value_min > g.c_value_max)
-		g.c_value_min = g.c_value_max;
-	if (!config_is_perm("value_max") && g.c_value_max < g.c_value_min)
-		g.c_value_max = g.c_value_min;
-	if (g.c_value_min > g.c_value_max)
-		testutil_die(EINVAL,
-		    "value_min may not be larger than value_max");
 
 	/* Reset the key count. */
 	g.key_cnt = 0;

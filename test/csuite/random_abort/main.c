@@ -56,6 +56,8 @@ static bool inmem;
 #define	ENV_CONFIG_REC "log=(recover=on)"
 #define	MAX_VAL	4096
 
+static void handler(int)
+    WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void)
     WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
@@ -123,6 +125,8 @@ thread_run(void *arg)
 	/*
 	 * Write our portion of the key space until we're killed.
 	 */
+	printf("Thread %" PRIu32 " starts at %" PRIu64 "\n",
+	    td->id, td->start);
 	for (i = td->start; ; ++i) {
 		testutil_check(__wt_snprintf(
 		    kname, sizeof(kname), "%" PRIu64, i));
@@ -185,7 +189,7 @@ fill_db(uint32_t nth)
 	printf("Create %" PRIu32 " writer threads\n", nth);
 	for (i = 0; i < nth; ++i) {
 		td[i].conn = conn;
-		td[i].start = (UINT64_MAX / nth) * i;
+		td[i].start = WT_BILLION * (uint64_t)i;
 		td[i].id = i;
 		testutil_check(__wt_thread_create(
 		    NULL, &thr[i], thread_run, &td[i]));
@@ -209,9 +213,24 @@ fill_db(uint32_t nth)
 extern int __wt_optind;
 extern char *__wt_optarg;
 
+static void
+handler(int sig)
+{
+	pid_t pid;
+
+	WT_UNUSED(sig);
+	pid = wait(NULL);
+	/*
+	 * The core file will indicate why the child exited. Choose EINVAL here.
+	 */
+	testutil_die(EINVAL,
+	    "Child process %" PRIu64 " abnormally exited", (uint64_t)pid);
+}
+
 int
 main(int argc, char *argv[])
 {
+	struct sigaction sa;
 	struct stat sb;
 	FILE *fp;
 	WT_CONNECTION *conn;
@@ -298,6 +317,9 @@ main(int argc, char *argv[])
 		 * kill the child, run recovery and make sure all items we wrote
 		 * exist after recovery runs.
 		 */
+		memset(&sa, 0, sizeof(sa));
+		sa.sa_handler = handler;
+		testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
 		if ((pid = fork()) < 0)
 			testutil_die(errno, "fork");
 
@@ -311,15 +333,15 @@ main(int argc, char *argv[])
 		 * Sleep for the configured amount of time before killing
 		 * the child.  Start the timeout from the time we notice that
 		 * the table has been created.  That allows the test to run
-		 * correctly on really slow machines.  Verify the process ID
-		 * still exists in case the child aborts for some reason we
-		 * don't stay in this loop forever.
+		 * correctly on really slow machines.
 		 */
 		testutil_check(__wt_snprintf(
 		    buf, sizeof(buf), "%s/%s", home, fs_main));
-		while (stat(buf, &sb) != 0 && kill(pid, 0) == 0)
+		while (stat(buf, &sb) != 0)
 			sleep(1);
 		sleep(timeout);
+		sa.sa_handler = SIG_DFL;
+		testutil_checksys(sigaction(SIGCHLD, &sa, NULL));
 
 		/*
 		 * !!! It should be plenty long enough to make sure more than

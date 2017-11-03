@@ -617,8 +617,6 @@ __evict_update_work(WT_SESSION_IMPL *session)
 		F_CLR(cache, WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_CLEAN_HARD);
 	}
 
-	WT_STAT_CONN_SET(session, cache_eviction_state, cache->flags);
-
 	return (F_ISSET(cache, WT_CACHE_EVICT_ALL | WT_CACHE_EVICT_URGENT));
 }
 
@@ -727,9 +725,6 @@ __evict_pass(WT_SESSION_IMPL *session)
 				    txn_global->current != oldest_id &&
 				    cache->evict_aggressive_score < 100)
 					++cache->evict_aggressive_score;
-				WT_STAT_CONN_SET(session,
-				    cache_eviction_aggressive_set,
-				    cache->evict_aggressive_score);
 				prev = now;
 				prev_oldest_id = oldest_id;
 			}
@@ -761,12 +756,8 @@ __evict_pass(WT_SESSION_IMPL *session)
 			    "%s", "unable to reach eviction goal");
 			break;
 		} else {
-			if (cache->evict_aggressive_score > 0) {
+			if (cache->evict_aggressive_score > 0)
 				--cache->evict_aggressive_score;
-				WT_STAT_CONN_SET(session,
-				    cache_eviction_aggressive_set,
-				    cache->evict_aggressive_score);
-			}
 			loop = 0;
 			eviction_progress = cache->eviction_progress;
 		}
@@ -983,8 +974,6 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 	if (conn->evict_threads_max == conn->evict_threads_min)
 		return;
 
-	eviction_progress_rate = 0;
-
 	__wt_epoch(session, &current_time);
 	time_diff = WT_TIMEDIFF_MS(current_time, cache->evict_tune_last_time);
 
@@ -1098,12 +1087,7 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 				WT_STAT_CONN_INCR(session,
 				    cache_eviction_worker_removed);
 			}
-			WT_STAT_CONN_SET(session,
-			    cache_eviction_stable_state_workers,
-			    cache->evict_tune_workers_best);
 			cache->evict_tune_stable = true;
-			WT_STAT_CONN_SET(session, cache_eviction_active_workers,
-			    conn->evict_threads.current_threads);
 			goto done;
 		}
 	}
@@ -1134,9 +1118,6 @@ __evict_tune_workers(WT_SESSION_IMPL *session)
 		}
 		cache->evict_tune_last_action_time = current_time;
 	}
-
-	WT_STAT_CONN_SET(session, cache_eviction_active_workers,
-	    conn->evict_threads.current_threads);
 
 done:	cache->evict_tune_last_time = current_time;
 	cache->evict_tune_progress_last = eviction_progress;
@@ -1187,11 +1168,8 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	cache = S2C(session)->cache;
 
 	/* Age out the score of how much the queue has been empty recently. */
-	if (cache->evict_empty_score > 0) {
+	if (cache->evict_empty_score > 0)
 		--cache->evict_empty_score;
-		WT_STAT_CONN_SET(session, cache_eviction_empty_score,
-		    cache->evict_empty_score);
-	}
 
 	/* Fill the next queue (that isn't the urgent queue). */
 	queue = cache->evict_fill_queue;
@@ -1221,14 +1199,10 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
 	 */
 	if (__evict_queue_empty(queue, false)) {
 		if (F_ISSET(cache,
-		    WT_CACHE_EVICT_CLEAN_HARD | WT_CACHE_EVICT_DIRTY_HARD)) {
+		    WT_CACHE_EVICT_CLEAN_HARD | WT_CACHE_EVICT_DIRTY_HARD))
 			cache->evict_empty_score = WT_MIN(
 			    cache->evict_empty_score + WT_EVICT_SCORE_BUMP,
 			    WT_EVICT_SCORE_MAX);
-			WT_STAT_CONN_SET(session,
-			    cache_eviction_empty_score,
-			    cache->evict_empty_score);
-		}
 		WT_STAT_CONN_INCR(session, cache_eviction_queue_empty);
 	} else
 		WT_STAT_CONN_INCR(session, cache_eviction_queue_not_empty);
@@ -1896,6 +1870,24 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		    F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
 		    F_ISSET(btree, WT_BTREE_LOOKASIDE))
 			goto fast;
+
+		/*
+		 * If application threads are blocked on eviction of clean
+		 * pages, and the only thing preventing a clean leaf page from
+		 * being evicted is it contains historical data, mark it dirty
+		 * so we can do lookaside eviction.  We also mark the tree
+		 * dirty to avoid an assertion that we don't discard dirty
+		 * pages from a clean tree.
+		 */
+		if (F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD) &&
+		    !F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE) &&
+		    !WT_PAGE_IS_INTERNAL(page) &&
+		    !modified && page->modify != NULL &&
+		    !__wt_txn_visible_all(session, page->modify->rec_max_txn,
+		    WT_TIMESTAMP_NULL(&page->modify->rec_max_timestamp))) {
+			__wt_page_modify_set(session, page);
+			goto fast;
+		}
 
 		/* Skip clean pages if appropriate. */
 		if (!modified && !F_ISSET(cache, WT_CACHE_EVICT_CLEAN))

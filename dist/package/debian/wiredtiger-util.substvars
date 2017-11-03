@@ -1,2 +1,0 @@
-shlibs:Depends=libc6 (>= 2.14), wiredtiger (>> 2.1.2-0), wiredtiger (<< 2.1.2-99)
-misc:Depends=

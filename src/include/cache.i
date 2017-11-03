@@ -79,22 +79,6 @@ __wt_cache_read_gen_new(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_cache_nearly_stuck --
- *      Indicate if the cache is nearly stuck.
- */
-static inline bool
-__wt_cache_nearly_stuck(WT_SESSION_IMPL *session)
-{
-	WT_CACHE *cache;
-
-	cache = S2C(session)->cache;
-	return (cache->evict_aggressive_score >=
-	    (WT_EVICT_SCORE_MAX - WT_EVICT_SCORE_BUMP) &&
-	    F_ISSET(cache,
-		WT_CACHE_EVICT_CLEAN_HARD | WT_CACHE_EVICT_DIRTY_HARD));
-}
-
-/*
  * __wt_cache_stuck --
  *      Indicate if the cache is stuck (i.e., not making progress).
  */
@@ -202,6 +186,43 @@ __wt_cache_bytes_other(WT_CACHE *cache)
 	bytes_inmem = *(volatile uint64_t *)&cache->bytes_inmem;
 	return ((bytes_image > bytes_inmem) ? 0 :
 	    __wt_cache_bytes_plus_overhead(cache, bytes_inmem - bytes_image));
+}
+
+/*
+ * __wt_cache_lookaside_score --
+ *	Get the current lookaside score (between 0 and 100).
+ */
+static inline uint32_t
+__wt_cache_lookaside_score(WT_CACHE *cache)
+{
+	int32_t global_score;
+
+	global_score = cache->evict_lookaside_score;
+	return ((uint32_t)WT_MIN(WT_MAX(global_score, 0), 100));
+}
+
+/*
+ * __wt_cache_update_lookaside_score --
+ *	Update the lookaside score based how many unstable updates are seen.
+ */
+static inline void
+__wt_cache_update_lookaside_score(
+	WT_SESSION_IMPL *session, u_int updates_seen, u_int updates_unstable)
+{
+	WT_CACHE *cache;
+	int32_t global_score, score;
+
+	if (updates_seen == 0)
+		return;
+
+	cache = S2C(session)->cache;
+	score = (int32_t)((100 * updates_unstable) / updates_seen);
+	global_score = cache->evict_lookaside_score;
+
+	if (score > global_score && global_score < 100)
+		__wt_atomic_addi32(&cache->evict_lookaside_score, 1);
+	else if (score < global_score && global_score > 0)
+		__wt_atomic_subi32(&cache->evict_lookaside_score, 1);
 }
 
 /*

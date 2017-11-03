@@ -553,6 +553,7 @@ connection_runtime_config = [
             'api',
             'block',
             'checkpoint',
+            'checkpoint_progress',
             'compact',
             'evict',
             'evict_stuck',

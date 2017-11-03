@@ -364,16 +364,11 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 * re-instantiate the page in memory, else discard the page.
 		 */
 		if (mod->mod_disk_image == NULL) {
-			if (mod->mod_replace_las_pageid != 0) {
+			if (mod->mod_page_las.las_pageid != 0) {
 				WT_RET(
 				    __wt_calloc_one(session, &ref->page_las));
-				ref->page_las->las_pageid =
-				    mod->mod_replace_las_pageid;
-#ifdef HAVE_TIMESTAMPS
-				__wt_timestamp_set(
-				    &ref->page_las->min_timestamp,
-				    &mod->mod_replace_las_min_timestamp);
-#endif
+				*ref->page_las = mod->mod_page_las;
+				__wt_page_modify_clear(session, ref->page);
 				__wt_ref_out(session, ref);
 				WT_PUBLISH(ref->state, WT_REF_LOOKASIDE);
 			} else {
@@ -567,7 +562,7 @@ __evict_review(
 		if (F_ISSET(conn, WT_CONN_IN_MEMORY))
 			LF_SET(WT_REC_IN_MEMORY |
 			    WT_REC_SCRUB | WT_REC_UPDATE_RESTORE);
-		else {
+		else if (!WT_IS_METADATA(session->dhandle)) {
 			if (!WT_SESSION_IS_CHECKPOINT(session)) {
 				LF_SET(WT_REC_UPDATE_RESTORE);
 
@@ -576,18 +571,13 @@ __evict_review(
 			}
 
 			/*
-			 * If the cache is nearly stuck, check if
-			 * reconciliation suggests trying the lookaside table
-			 * unless lookaside eviction is disabled globally.
-			 *
-			 * We don't wait until the cache is completely stuck:
-			 * for workloads where lookaside eviction is necessary
-			 * to make progress, we don't want a single successful
-			 * page eviction to make the cache "unstuck" so we have
-			 * to wait again before evicting the next page.
+			 * If the cache is under pressure with many updates
+			 * that can't be evicted, check if reconciliation
+			 * suggests trying the lookaside table.
 			 */
-			if (__wt_cache_nearly_stuck(session) &&
-			    !F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE))
+			if (!F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE) &&
+			    (__wt_cache_lookaside_score(cache) > 50 ||
+			    __wt_cache_stuck(session)))
 				lookaside_retryp = &lookaside_retry;
 		}
 	}
@@ -596,11 +586,21 @@ __evict_review(
 	ret = __wt_reconcile(session, ref, NULL, flags, lookaside_retryp);
 
 	/*
-	 * If reconciliation fails, eviction is stuck and reconciliation
-	 * reports it might succeed if we use the lookaside table, then
-	 * configure reconciliation to write those updates to the lookaside
-	 * table, allowing the eviction of pages we'd otherwise have to retain
-	 * in cache to support older readers.
+	 * If attempting eviction in service of a checkpoint, we may
+	 * successfully reconcile but then find that there are updates on the
+	 * page too new to evict.  Give up evicting in that case: checkpoint
+	 * will include the reconciled page when it visits the parent.
+	 */
+	if (WT_SESSION_IS_CHECKPOINT(session) && !__wt_page_is_modified(page) &&
+	    !__wt_txn_visible_all(session, page->modify->rec_max_txn,
+	    WT_TIMESTAMP_NULL(&page->modify->rec_max_timestamp)))
+		return (EBUSY);
+
+	/*
+	 * If reconciliation fails but reports it might succeed if we use the
+	 * lookaside table, try again with the lookaside table, allowing the
+	 * eviction of pages we'd otherwise have to retain in cache to support
+	 * older readers.
 	 */
 	if (ret == EBUSY && lookaside_retry) {
 		LF_CLR(WT_REC_SCRUB | WT_REC_UPDATE_RESTORE);
@@ -611,29 +611,16 @@ __evict_review(
 	WT_RET(ret);
 
 	/*
-	 * If attempting eviction in service of a checkpoint, we may
-	 * successfully reconcile but then find that there are updates on the
-	 * page too new to evict.  Give up in that case: checkpoint will
-	 * reconcile the page normally.
-	 */
-	if (WT_SESSION_IS_CHECKPOINT(session) && !__wt_page_is_modified(page) &&
-	    !LF_ISSET(WT_REC_LOOKASIDE) &&
-	    !__wt_txn_visible_all(session, page->modify->rec_max_txn,
-	    WT_TIMESTAMP_NULL(&page->modify->rec_max_timestamp)))
-		return (EBUSY);
-
-	/*
 	 * Success: assert the page is clean or reconciliation was configured
 	 * for update/restore. If the page is clean, assert that reconciliation
 	 * was configured for a lookaside table, or it's not a durable object
 	 * (currently the lookaside table), or all page updates were globally
 	 * visible.
 	 */
-	WT_ASSERT(session,
-	    !__wt_page_is_modified(page) || LF_ISSET(WT_REC_UPDATE_RESTORE));
+	WT_ASSERT(session, !__wt_page_is_modified(page) ||
+	    LF_ISSET(WT_REC_LOOKASIDE | WT_REC_UPDATE_RESTORE));
 	WT_ASSERT(session,
 	    __wt_page_is_modified(page) ||
-	    LF_ISSET(WT_REC_LOOKASIDE) ||
 	    __wt_txn_visible_all(session, page->modify->rec_max_txn,
 	    WT_TIMESTAMP_NULL(&page->modify->rec_max_timestamp)));
 

@@ -275,8 +275,8 @@ typedef struct __wt_timestamp_t wt_timestamp_t;
 #define	WT_TIMESTAMP_NULL(x)	(x)
 #else
 typedef void wt_timestamp_t;
-#define	WT_TIMESTAMP_NULL(x)	(NULL)
 #define	WT_DECL_TIMESTAMP(x)
+#define	WT_TIMESTAMP_NULL(x)	(NULL)
 #endif
 
 /*

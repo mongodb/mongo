@@ -66,9 +66,14 @@ compact(void *arg)
 		/*
 		 * Compact can return EBUSY if concurrent with alter or if there
 		 * is eviction pressure, or we collide with checkpoints.
+		 *
+		 * Compact returns ETIMEDOUT if the compaction doesn't finish in
+		 * in some number of seconds. We don't configure a timeout and
+		 * occasionally exceed the default of 1200 seconds.
 		 */
 		ret = session->compact(session, g.uri, NULL);
-		if (ret != 0 && ret != EBUSY && ret != WT_ROLLBACK)
+		if (ret != 0 &&
+		    ret != EBUSY && ret != ETIMEDOUT && ret != WT_ROLLBACK)
 			testutil_die(ret, "session.compact");
 	}
 
