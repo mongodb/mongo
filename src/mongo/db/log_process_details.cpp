@@ -34,6 +34,9 @@
 
 #include "mongo/db/log_process_details.h"
 
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/util/log.h"
@@ -52,6 +55,7 @@ void logProcessDetails() {
     auto&& vii = VersionInfoInterface::instance();
     log() << mongodVersion(vii);
     vii.logBuildInfo();
+
     printCommandLineOpts();
 }
 
@@ -59,6 +63,19 @@ void logProcessDetailsForLogRotate() {
     log() << "pid=" << ProcessId::getCurrent() << " port=" << serverGlobalParams.port
           << (is32bit() ? " 32" : " 64") << "-bit "
           << "host=" << getHostNameCached();
+
+    auto replCoord = repl::getGlobalReplicationCoordinator();
+    if (replCoord != nullptr &&
+        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
+        auto rsConfig = replCoord->getConfig();
+
+        if (rsConfig.isInitialized()) {
+            log() << "Replica Set Config: " << rsConfig.toBSON();
+            log() << "Replica Set Member State: " << (replCoord->getMemberState()).toString();
+        } else {
+            log() << "Node currently has no Replica Set Config.";
+        }
+    }
 
     logProcessDetails();
 }
