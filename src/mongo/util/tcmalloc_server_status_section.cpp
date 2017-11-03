@@ -155,6 +155,23 @@ public:
             appendNumericPropertyIfAvailable(
                 sub, "aggressive_memory_decommit", "tcmalloc.aggressive_memory_decommit");
 
+            appendNumericPropertyIfAvailable(
+                sub, "pageheap_committed_bytes", "tcmalloc.pageheap_committed_bytes");
+            appendNumericPropertyIfAvailable(
+                sub, "pageheap_scavenge_count", "tcmalloc.pageheap_scavenge_count");
+            appendNumericPropertyIfAvailable(
+                sub, "pageheap_commit_count", "tcmalloc.pageheap_commit_count");
+            appendNumericPropertyIfAvailable(
+                sub, "pageheap_total_commit_bytes", "tcmalloc.pageheap_total_commit_bytes");
+            appendNumericPropertyIfAvailable(
+                sub, "pageheap_decommit_count", "tcmalloc.pageheap_decommit_count");
+            appendNumericPropertyIfAvailable(
+                sub, "pageheap_total_decommit_bytes", "tcmalloc.pageheap_total_decommit_bytes");
+            appendNumericPropertyIfAvailable(
+                sub, "pageheap_reserve_count", "tcmalloc.pageheap_reserve_count");
+            appendNumericPropertyIfAvailable(
+                sub, "pageheap_total_reserve_bytes", "tcmalloc.pageheap_total_reserve_bytes");
+
 #if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
             if (verbosity >= 2) {
                 // Size class information

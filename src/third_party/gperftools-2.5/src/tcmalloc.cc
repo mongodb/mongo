@@ -703,6 +703,54 @@ class TCMallocImplementation : public MallocExtension {
       return true;
     }
 
+    if (strcmp(name, "tcmalloc.pageheap_committed_bytes") == 0) {
+      SpinLockHolder l(Static::pageheap_lock());
+      *value = Static::pageheap()->stats().committed_bytes;
+      return true;
+    }
+
+    if (strcmp(name, "tcmalloc.pageheap_scavenge_count") == 0) {
+      SpinLockHolder l(Static::pageheap_lock());
+      *value = Static::pageheap()->stats().scavenge_count;
+      return true;
+    }
+
+    if (strcmp(name, "tcmalloc.pageheap_commit_count") == 0) {
+      SpinLockHolder l(Static::pageheap_lock());
+      *value = Static::pageheap()->stats().commit_count;
+      return true;
+    }
+
+    if (strcmp(name, "tcmalloc.pageheap_total_commit_bytes") == 0) {
+      SpinLockHolder l(Static::pageheap_lock());
+      *value = Static::pageheap()->stats().total_commit_bytes;
+      return true;
+    }
+
+    if (strcmp(name, "tcmalloc.pageheap_decommit_count") == 0) {
+      SpinLockHolder l(Static::pageheap_lock());
+      *value = Static::pageheap()->stats().decommit_count;
+      return true;
+    }
+
+    if (strcmp(name, "tcmalloc.pageheap_total_decommit_bytes") == 0) {
+      SpinLockHolder l(Static::pageheap_lock());
+      *value = Static::pageheap()->stats().total_decommit_bytes;
+      return true;
+    }
+
+    if (strcmp(name, "tcmalloc.pageheap_reserve_count") == 0) {
+      SpinLockHolder l(Static::pageheap_lock());
+      *value = Static::pageheap()->stats().reserve_count;
+      return true;
+    }
+
+    if (strcmp(name, "tcmalloc.pageheap_total_reserve_bytes") == 0) {
+        SpinLockHolder l(Static::pageheap_lock());
+        *value = Static::pageheap()->stats().total_reserve_bytes;
+        return true;
+    }
+
     if (strcmp(name, "tcmalloc.max_total_thread_cache_bytes") == 0) {
       SpinLockHolder l(Static::pageheap_lock());
       *value = ThreadCache::overall_thread_cache_size();
