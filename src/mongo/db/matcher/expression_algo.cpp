@@ -283,11 +283,8 @@ void applyRenamesToExpression(MatchExpression* expr, const StringMap<std::string
     }
 
     if (expr->getCategory() == MatchExpression::MatchCategory::kLeaf) {
-        auto it = renames.find(expr->path());
-        if (it != renames.end()) {
-            LeafMatchExpression* leafExpr = checked_cast<LeafMatchExpression*>(expr);
-            leafExpr->setPath(it->second).transitional_ignore();
-        }
+        LeafMatchExpression* leafExpr = checked_cast<LeafMatchExpression*>(expr);
+        leafExpr->applyRename(renames);
     }
 
     for (size_t i = 0; i < expr->numChildren(); ++i) {
