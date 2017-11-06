@@ -106,6 +106,58 @@ var blacklist = [
     'kill_aggregation.js',
     'kill_rooted_or.js',
     'view_catalog_cycle_with_drop.js',
+
+    'toggle_feature_compatibility.js',  // Sets FCV to 3.4, which will cause session use to fail.
+
+    // Use getmores.
+    'agg_base.js',
+    'create_index_background.js',
+    'indexed_insert_ordered_bulk.js',
+    'indexed_insert_text.js',
+    'indexed_insert_unordered_bulk.js',
+    'indexed_insert_upsert.js',
+    'indexed_insert_where.js',
+    'list_indexes.js',
+    'reindex.js',
+    'reindex_background.js',
+    'remove_multiple_documents.js',
+    'remove_where.js',
+    'touch_base.js',
+    'touch_data.js',
+    'touch_index.js',
+    'touch_no_data_no_index.js',
+    'update_where.js',
+    'yield.js',
+    'yield_fetch.js',
+    'yield_rooted_or.js',
+    'yield_sort.js',
+    'yield_sort_merge.js',
+    'yield_text.js',
+
+    // Use non retryable writes.
+    'remove_and_bulk_insert.js',
+    'update_and_bulk_insert.js',
+    'update_check_index.js',
+    'update_multifield_isolated_multiupdate.js',
+    'update_multifield_isolated_multiupdate_noindex.js',
+    'update_multifield_multiupdate.js',
+    'update_multifield_multiupdate_noindex.js',
+    'update_ordered_bulk_inc.js',
+    'yield_geo_near.js',
+    'yield_geo_near_dedup.js',
+    'yield_id_hack.js',
+
+    // Use non retryable commands.
+    'agg_out.js',
+    'agg_sort.js',
+    'collmod.js',
+    'collmod_separate_collections.js',
+    'view_catalog.js',
+
+    // The auto_retry_on_network_error.js override needs to overwrite the response from drop on
+    // NamespaceNotFound, and since this workload only creates and drops collections there isn't
+    // much value in running it.
+    'drop_collection.js',
 ].map(function(file) {
     return dir + '/' + file;
 });
@@ -115,6 +167,7 @@ runWorkloadsSerially(
         return !Array.contains(blacklist, file);
     }),
     {
-      sharded: {enabled: true, stepdownOptions: {configStepdown: true, shardStepdown: false}},
+      sharded: {enabled: true, stepdownOptions: {configStepdown: true, shardStepdown: true}},
       replication: {enabled: true}
-    });
+    },
+    {sessionOptions: {retryWrites: true}});
