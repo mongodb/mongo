@@ -671,10 +671,10 @@ Status PlanExecutor::executePlan() {
                           str::stream() << "Operation aborted because: " << *_killReason);
         }
 
-        return Status(ErrorCodes::OperationFailed,
-                      str::stream() << "Exec error: " << WorkingSetCommon::toStatusString(obj)
-                                    << ", state: "
-                                    << PlanExecutor::statestr(state));
+        auto errorStatus = WorkingSetCommon::getMemberObjectStatus(obj);
+        invariant(!errorStatus.isOK());
+        return errorStatus.withContext(str::stream() << "Exec error resulting in state "
+                                                     << PlanExecutor::statestr(state));
     }
 
     invariant(!isMarkedAsKilled());
