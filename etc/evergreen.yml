@@ -3881,28 +3881,10 @@ tasks:
   - func: "run tests"
     timeout_secs: 21600 # 6 hour timeout for each test
     vars:
-      resmoke_args: --suites=concurrency_sharded_with_stepdowns --storageEngine=mmapv1
-
-- <<: *task_template
-  name: concurrency_sharded_with_stepdowns_WT
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    timeout_secs: 21600 # 6 hour timeout for each test
-    vars:
       resmoke_args: --suites=concurrency_sharded_with_stepdowns --storageEngine=wiredTiger
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns_and_balancer
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    timeout_secs: 21600 # 6 hour timeout for each test
-    vars:
-      resmoke_args: --suites=concurrency_sharded_with_stepdowns_and_balancer --storageEngine=mmapv1
-
-- <<: *task_template
-  name: concurrency_sharded_with_stepdowns_and_balancer_WT
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5212,8 +5194,8 @@ buildvariants:
   - name: concurrency_sharded_WT
   - name: concurrency_sharded_causal_consistency_WT
   - name: concurrency_sharded_causal_consistency_and_balancer_WT
-  - name: concurrency_sharded_with_stepdowns_WT
-  - name: concurrency_sharded_with_stepdowns_and_balancer_WT
+  - name: concurrency_sharded_with_stepdowns
+  - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous_WT
   - name: dbtest_WT
   - name: disk_WT
@@ -6209,10 +6191,10 @@ buildvariants:
   - name: concurrency_sharded_causal_consistency_and_balancer_WT
     distros:
     - windows-64-vs2015-large
-  - name: concurrency_sharded_with_stepdowns_WT
+  - name: concurrency_sharded_with_stepdowns
     distros:
     - windows-64-vs2015-large
-  - name: concurrency_sharded_with_stepdowns_and_balancer_WT
+  - name: concurrency_sharded_with_stepdowns_and_balancer
     distros:
     - windows-64-vs2015-large
   - name: concurrency_simultaneous_WT
@@ -6705,8 +6687,8 @@ buildvariants:
   - name: concurrency_sharded_WT
   - name: concurrency_sharded_causal_consistency_WT
   - name: concurrency_sharded_causal_consistency_and_balancer_WT
-  - name: concurrency_sharded_with_stepdowns_WT
-  - name: concurrency_sharded_with_stepdowns_and_balancer_WT
+  - name: concurrency_sharded_with_stepdowns
+  - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous_WT
   - name: dbtest_WT
   - name: disk_WT
@@ -6952,8 +6934,8 @@ buildvariants:
   - name: concurrency_sharded_WT
   - name: concurrency_sharded_causal_consistency_WT
   - name: concurrency_sharded_causal_consistency_and_balancer_WT
-  - name: concurrency_sharded_with_stepdowns_WT
-  - name: concurrency_sharded_with_stepdowns_and_balancer_WT
+  - name: concurrency_sharded_with_stepdowns
+  - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous_WT
   - name: dbtest_WT
   - name: disk_WT
@@ -7132,8 +7114,8 @@ buildvariants:
   - name: concurrency_sharded_WT
   - name: concurrency_sharded_causal_consistency_WT
   - name: concurrency_sharded_causal_consistency_and_balancer_WT
-  - name: concurrency_sharded_with_stepdowns_WT
-  - name: concurrency_sharded_with_stepdowns_and_balancer_WT
+  - name: concurrency_sharded_with_stepdowns
+  - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous_WT
   - name: dbtest_WT
   - name: disk_WT
@@ -9248,8 +9230,8 @@ buildvariants:
   - name: concurrency_sharded_WT
   - name: concurrency_sharded_causal_consistency_WT
   - name: concurrency_sharded_causal_consistency_and_balancer_WT
-  - name: concurrency_sharded_with_stepdowns_WT
-  - name: concurrency_sharded_with_stepdowns_and_balancer_WT
+  - name: concurrency_sharded_with_stepdowns
+  - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous_WT
   - name: dbtest_WT
   - name: disk_WT
@@ -9400,8 +9382,8 @@ buildvariants:
   - name: concurrency_sharded_WT
   - name: concurrency_sharded_causal_consistency_WT
   - name: concurrency_sharded_causal_consistency_and_balancer_WT
-  - name: concurrency_sharded_with_stepdowns_WT
-  - name: concurrency_sharded_with_stepdowns_and_balancer_WT
+  - name: concurrency_sharded_with_stepdowns
+  - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous_WT
   - name: dbtest_WT
   - name: disk_WT
@@ -9777,8 +9759,6 @@ buildvariants:
   - name: concurrency_sharded
   - name: concurrency_sharded_causal_consistency
   - name: concurrency_sharded_causal_consistency_and_balancer
-  - name: concurrency_sharded_with_stepdowns
-  - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
   - name: dbtest
   - name: disk
@@ -9902,12 +9882,6 @@ buildvariants:
   - name: concurrency_sharded_causal_consistency_and_balancer
     distros:
     - windows-64-vs2015-large
-  - name: concurrency_sharded_with_stepdowns
-    distros:
-    - windows-64-vs2015-large
-  - name: concurrency_sharded_with_stepdowns_and_balancer
-    distros:
-    - windows-64-vs2015-large
   - name: concurrency_simultaneous
     distros:
     - windows-64-vs2015-large
@@ -10014,8 +9988,6 @@ buildvariants:
   - name: concurrency_sharded
   - name: concurrency_sharded_causal_consistency
   - name: concurrency_sharded_causal_consistency_and_balancer
-  - name: concurrency_sharded_with_stepdowns
-  - name: concurrency_sharded_with_stepdowns_and_balancer
   - name: concurrency_simultaneous
   - name: dbtest
   - name: disk

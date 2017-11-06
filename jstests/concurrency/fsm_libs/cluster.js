@@ -235,6 +235,13 @@ var Cluster = function(options) {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
                 options.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
 
+                // Skip checking uuids in teardown if performing continuous stepdowns. The override
+                // uses cached connections and expects to run commands against primaries, which is
+                // not compatible with stepdowns.
+                if (this.shouldPerformContinuousStepdowns()) {
+                    TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+                }
+
                 st.stop();
             };
 
@@ -244,7 +251,7 @@ var Cluster = function(options) {
                 };
 
                 this.stopContinuousFailover = function() {
-                    st.stopContinuousFailover({waitForPrimary: true});
+                    st.stopContinuousFailover({waitForPrimary: true, waitForMongosRetarget: true});
                 };
             }
 
@@ -393,6 +400,34 @@ var Cluster = function(options) {
     this.shardCollection = function shardCollection() {
         assert(initialized, 'cluster must be initialized first');
         assert(this.isSharded(), 'cluster is not sharded');
+
+        // If we are continuously stepping down shards, the config server may have stale view of the
+        // cluster, so retry on retryable errors, e.g. NotMaster.
+        if (this.shouldPerformContinuousStepdowns()) {
+            assert.soon(() => {
+                try {
+                    st.shardColl.apply(st, arguments);
+                    return true;
+                } catch (e) {
+                    // The shardCollection command requires the config server primary to call
+                    // listCollections and listIndexes on shards before sharding the collection,
+                    // both of which can fail with a retryable error if the config server's view of
+                    // the cluster is stale. This is safe to retry because no actual work has been
+                    // done.
+                    //
+                    // TODO SERVER-30949: Remove this try catch block once listCollections and
+                    // listIndexes automatically retry on NotMaster errors.
+                    if (e.code === 18630 ||  // listCollections failure
+                        e.code === 18631) {  // listIndexes failure
+                        print("Caught retryable error from shardCollection, retrying: " +
+                              tojson(e));
+                        return false;
+                    }
+                    throw e;
+                }
+            });
+        }
+
         st.shardColl.apply(st, arguments);
     };
 
@@ -634,6 +669,11 @@ var Cluster = function(options) {
     this.isSteppingDownConfigServers = function isSteppingDownConfigServers() {
         return this.shouldPerformContinuousStepdowns() &&
             options.sharded.stepdownOptions.configStepdown;
+    };
+
+    this.isSteppingDownShards = function isSteppingDownShards() {
+        return this.shouldPerformContinuousStepdowns() &&
+            options.sharded.stepdownOptions.shardStepdown;
     };
 };
 

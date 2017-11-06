@@ -35,6 +35,7 @@
             return func.apply(conn, funcArgs);
         }
 
+        commandObj = Object.assign({}, commandObj);
         const commandName = Object.keys(commandObj)[0];
         let resPrevious;
         let res;

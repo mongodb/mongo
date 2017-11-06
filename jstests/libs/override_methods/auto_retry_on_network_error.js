@@ -213,7 +213,7 @@
             try {
                 let res = clientFunction.apply(mongo, clientFunctionArguments);
 
-                if (isRetryableWriteCmd && canRetryWrites) {
+                if (isRetryableWriteCmd) {
                     // findAndModify can fail during the find stage and return an executor error.
                     if ((cmdName === "findandmodify" || cmdName === "findAndModify") &&
                         isRetryableExecutorCodeAndMessage(res.code, res.errmsg)) {
@@ -265,9 +265,30 @@
                         }
 
                         if (isRetryableExecutorCodeAndMessage(res.code, res.errmsg)) {
-                            // Don't decrement retries for the same reason as above.
                             print("=-=-=-= Retrying because of executor interruption: " + cmdName +
                                   ", retries remaining: " + numRetries);
+                            continue;
+                        }
+
+                        // listCollections and listIndexes called through mongos may return
+                        // OperationFailed if the request to establish a cursor on the targeted
+                        // shard fails with a network error.
+                        //
+                        // TODO SERVER-30949: Remove this check once those two commands retry on
+                        // retryable errors automatically.
+                        if ((cmdName === "listCollections" || cmdName === "listIndexes") &&
+                            res.code === ErrorCodes.OperationFailed &&
+                            res.hasOwnProperty("errmsg") &&
+                            res.errmsg.indexOf("failed to read command response from shard") >= 0) {
+                            print("=-=-=-= Retrying failed mongos cursor command: " + cmdName +
+                                  ", retries remaining: " + numRetries);
+                            continue;
+                        }
+
+                        // Thrown when an index build is interrupted during its collection scan.
+                        if ((cmdName === "createIndexes" && res.code === 28550)) {
+                            print("=-=-=-= Retrying because of interrupted collection scan: " +
+                                  cmdName + ", retries remaining: " + numRetries);
                             continue;
                         }
                     }
@@ -276,7 +297,7 @@
                     // completed before the connection was closed.
                     if (isAcceptableRetryFailedResponse(cmdName, res)) {
                         print("=-=-=-= Overriding safe failed response for: " + cmdName +
-                              ", retries remaining: " + numRetries);
+                              ", code: " + res.code + ", retries remaining: " + numRetries);
                         res.ok = 1;
                     }
                 }
