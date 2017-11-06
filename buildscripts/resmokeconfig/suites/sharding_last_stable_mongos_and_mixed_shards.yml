@@ -34,6 +34,7 @@ selector:
   - jstests/sharding/advance_logical_time_with_valid_signature.js
   - jstests/sharding/after_cluster_time.js
   - jstests/sharding/change_stream_chunk_migration.js
+  - jstests/sharding/change_stream_enforce_max_time_ms_on_mongos.js
   - jstests/sharding/change_stream_invalidation.js
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/change_stream_remove_shard.js
