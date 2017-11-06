@@ -321,12 +321,28 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, ResponseStatus resp) 
     if (!resp.isOK()) {
         // In the case that resp is not OK, but _inSetup is false, we are using a connection
         // that we got from the pool to execute a command, but it failed for some reason.
-        if (op->command()) {
-            LOG(2) << "Failed to send message: "
-                   << redact(std::string(op->command()->toSend().buf(),
-                                         op->command()->toSend().buf() +
-                                             op->command()->toSend().size()))
-                   << ".  Reason: " << redact(resp.status);
+        if (op->command() && shouldLog(LogstreamBuilder::severityCast(2))) {
+            const auto performLog = [&resp](Message& message) {
+                LOG(2) << "Failed to send message. Reason: " << redact(resp.status) << ". Message: "
+                       << rpc::opMsgRequestFromAnyProtocol(message).body.toString(
+                              logger::globalLogDomain()->shouldRedactLogs());
+            };
+
+            // Message might be compressed, decompress in that case so we can log the body
+            Message& maybeCompressed = op->command()->toSend();
+            if (maybeCompressed.operation() != dbCompressed) {
+                performLog(maybeCompressed);
+            } else {
+                StatusWith<Message> decompressedMessage =
+                    op->command()->conn().getCompressorManager().decompressMessage(maybeCompressed);
+                if (decompressedMessage.isOK()) {
+                    performLog(decompressedMessage.getValue());
+                } else {
+                    LOG(2) << "Failed to execute a command.  Reason: " << redact(resp.status)
+                           << ". Decompression failed with: "
+                           << redact(decompressedMessage.getStatus());
+                }
+            }
         } else {
             LOG(2) << "Failed to execute a command.  Reason: " << redact(resp.status);
         }
