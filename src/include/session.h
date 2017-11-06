@@ -96,6 +96,12 @@ struct __wt_session_impl {
 	size_t	  scratch_cached;	/* Scratch bytes cached */
 #ifdef HAVE_DIAGNOSTIC
 	/*
+	 * Variables used to look for violations of the contract that a
+	 * session is only used by a single session at once.
+	 */
+	volatile uintmax_t api_tid;
+	volatile uint32_t api_enter_refcnt;
+	/*
 	 * It's hard to figure out from where a buffer was allocated after it's
 	 * leaked, so in diagnostic mode we track them; DIAGNOSTIC can't simply
 	 * add additional fields to WT_ITEM structures because they are visible
