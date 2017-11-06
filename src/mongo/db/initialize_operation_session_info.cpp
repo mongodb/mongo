@@ -48,9 +48,12 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
     }
 
     {
-        // If we're using the localhost bypass, logical sessions are disabled
+        // If we're using the localhost bypass, and the client hasn't authenticated,
+        // logical sessions are disabled. A client may authenticate as the __sytem user,
+        // or as an externally authorized user.
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-        if (authSession && authSession->isUsingLocalhostBypass()) {
+        if (authSession && authSession->isUsingLocalhostBypass() &&
+            !authSession->getAuthenticatedUserNames().more()) {
             return;
         }
     }
