@@ -366,7 +366,7 @@ public:
             return {"_id"};  // Collection is not sharded.
         }
 
-        uassert(ErrorCodes::StaleConfig,
+        uassert(ErrorCodes::InvalidUUID,
                 str::stream() << "Collection " << _ctx->ns.ns()
                               << " UUID differs from UUID on change stream operations",
                 scm->uuidMatches(uuid));
