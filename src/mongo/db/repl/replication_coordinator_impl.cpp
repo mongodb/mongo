@@ -1879,7 +1879,10 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
                                                            const NamespaceString& ns) {
     StringData dbName = ns.db();
     bool canWriteToDB = canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
-    if (!canWriteToDB) {
+
+    // Check for system.profile collection, which is never replicated in any database, and thus
+    // follows the write rules for the local database.
+    if (!canWriteToDB && !ns.isSystemDotProfile()) {
         return false;
     }
 
