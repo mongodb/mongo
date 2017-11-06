@@ -243,14 +243,13 @@ public:
             LastError::get(opCtx->getClient()).disable();
         }
 
+        transport::Session::TagMask sessionTagsToSet = 0;
+        transport::Session::TagMask sessionTagsToUnset = 0;
+
         // Tag connections to avoid closing them on stepdown.
         auto hangUpElement = cmdObj["hangUpOnStepDown"];
         if (!hangUpElement.eoo() && !hangUpElement.trueValue()) {
-            auto session = opCtx->getClient()->session();
-            if (session) {
-                session->replaceTags(session->getTags() |
-                                     executor::NetworkInterface::kMessagingPortKeepOpen);
-            }
+            sessionTagsToSet |= transport::Session::kKeepOpen;
         }
 
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
@@ -286,10 +285,7 @@ public:
         // mongod and mongos.
         auto internalClientElement = cmdObj["internalClient"];
         if (internalClientElement) {
-            auto session = opCtx->getClient()->session();
-            if (session) {
-                session->replaceTags(session->getTags() | transport::Session::kInternalClient);
-            }
+            sessionTagsToSet |= transport::Session::kInternalClient;
 
             uassert(ErrorCodes::TypeMismatch,
                     str::stream() << "'internalClient' must be of type Object, but was of type "
@@ -314,17 +310,11 @@ public:
                     // All incoming connections from mongod/mongos of earlier versions should be
                     // closed if the featureCompatibilityVersion is bumped to 3.6.
                     if (elem.numberInt() >= WireSpec::instance().incoming.maxWireVersion) {
-                        if (session) {
-                            session->replaceTags(
-                                session->getTags() |
-                                transport::Session::kLatestVersionInternalClientKeepOpen);
-                        }
+                        sessionTagsToSet |=
+                            transport::Session::kLatestVersionInternalClientKeepOpen;
                     } else {
-                        if (session) {
-                            session->replaceTags(
-                                session->getTags() &
-                                ~transport::Session::kLatestVersionInternalClientKeepOpen);
-                        }
+                        sessionTagsToUnset |=
+                            transport::Session::kLatestVersionInternalClientKeepOpen;
                     }
                 } else {
                     uasserted(ErrorCodes::BadValue,
@@ -338,11 +328,26 @@ public:
                     "Missing required field 'maxWireVersion' of 'internalClient'",
                     foundMaxWireVersion);
         } else {
-            auto session = opCtx->getClient()->session();
-            if (session && !(session->getTags() & transport::Session::kInternalClient)) {
-                session->replaceTags(session->getTags() |
-                                     transport::Session::kExternalClientKeepOpen);
-            }
+            sessionTagsToUnset |= (transport::Session::kInternalClient |
+                                   transport::Session::kLatestVersionInternalClientKeepOpen);
+            sessionTagsToSet |= transport::Session::kExternalClientKeepOpen;
+        }
+
+        auto session = opCtx->getClient()->session();
+        if (session) {
+            session->mutateTags(
+                [sessionTagsToSet, sessionTagsToUnset](transport::Session::TagMask originalTags) {
+                    // After a mongos sends the initial "isMaster" command with its mongos client
+                    // information, it sometimes sends another "isMaster" command that is forwarded
+                    // from its client. Once kInternalClient has been set, we assume that any future
+                    // "isMaster" commands are forwarded in this manner, and we do not update the
+                    // session tags.
+                    if ((originalTags & transport::Session::kInternalClient) == 0) {
+                        return (originalTags | sessionTagsToSet) & ~sessionTagsToUnset;
+                    } else {
+                        return originalTags;
+                    }
+                });
         }
 
         appendReplicationInfo(opCtx, result, 0);

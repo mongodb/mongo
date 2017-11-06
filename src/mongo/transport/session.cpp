@@ -53,10 +53,23 @@ Ticket Session::sinkMessage(const Message& message, Date_t expiration) {
     return getTransportLayer()->sinkMessage(shared_from_this(), message, expiration);
 }
 
-void Session::replaceTags(TagMask tags) {
-    // Don't allow explicit assignment of the pending tag, it's only used to describe a new session
-    // until the tags gets assigned.
-    _tags.store(tags & ~kPending);
+void Session::setTags(TagMask tagsToSet) {
+    mutateTags([tagsToSet](TagMask originalTags) { return (originalTags | tagsToSet); });
+}
+
+void Session::unsetTags(TagMask tagsToUnset) {
+    mutateTags([tagsToUnset](TagMask originalTags) { return (originalTags & ~tagsToUnset); });
+}
+
+void Session::mutateTags(const stdx::function<TagMask(TagMask)>& mutateFunc) {
+    TagMask oldValue, newValue;
+    do {
+        oldValue = _tags.load();
+        newValue = mutateFunc(oldValue);
+
+        // Any change to the session tags automatically clears kPending status.
+        newValue &= ~kPending;
+    } while (_tags.compareAndSwap(oldValue, newValue) != oldValue);
 }
 
 Session::TagMask Session::getTags() const {

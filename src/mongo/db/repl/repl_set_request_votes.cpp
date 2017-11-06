@@ -64,17 +64,15 @@ private:
 
         // We want to keep request vote connection open when relinquishing primary.
         // Tag it here.
-        transport::Session::TagMask originalTag = 0;
         auto session = opCtx->getClient()->session();
         if (session) {
-            originalTag = session->getTags();
-            session->replaceTags(originalTag | transport::Session::kKeepOpen);
+            session->setTags(transport::Session::kKeepOpen);
         }
 
         // Untag the connection on exit.
-        ON_BLOCK_EXIT([session, originalTag]() {
+        ON_BLOCK_EXIT([session]() {
             if (session) {
-                session->replaceTags(originalTag);
+                session->unsetTags(transport::Session::kKeepOpen);
             }
         });
 

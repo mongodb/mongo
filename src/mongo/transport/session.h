@@ -119,10 +119,33 @@ public:
     virtual const HostAndPort& local() const = 0;
 
     /**
-     * Set this session's tags. This Session will register
-     * its new tags with its TransportLayer.
+     * Atomically set all of the session tags specified in the 'tagsToSet' bit field. If the
+     * 'kPending' tag is set, indicating that no tags have yet been specified for the session, this
+     * function also clears that tag as part of the same atomic operation.
+     *
+     * The 'kPending' tag is only for new sessions; callers should not set it directly.
      */
-    virtual void replaceTags(TagMask tags);
+    virtual void setTags(TagMask tagsToSet);
+
+    /**
+     * Atomically clears all of the session tags specified in the 'tagsToUnset' bit field. If the
+     * 'kPending' tag is set, indicating that no tags have yet been specified for the session, this
+     * function also clears that tag as part of the same atomic operation.
+     */
+    virtual void unsetTags(TagMask tagsToUnset);
+
+    /**
+     * Loads the session tags, passes them to 'mutateFunc' and then stores the result of that call
+     * as the new session tags, all in one atomic operation.
+     *
+     * In order to ensure atomicity, 'mutateFunc' may get called multiple times, so it should not
+     * perform expensive computations or operations with side effects.
+     *
+     * If the 'kPending' tag is set originally, mutateTags() will unset it regardless of the result
+     * of the 'mutateFunc' call. The 'kPending' tag is only for new sessions; callers should never
+     * try to set it.
+     */
+    virtual void mutateTags(const stdx::function<TagMask(TagMask)>& mutateFunc);
 
     /**
      * Get this session's tags.
