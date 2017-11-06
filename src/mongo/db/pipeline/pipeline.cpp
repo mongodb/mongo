@@ -459,8 +459,15 @@ BSONObj Pipeline::getInitialQuery() const {
 
 bool Pipeline::needsPrimaryShardMerger() const {
     return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
-        return stage->constraints(_splitState).hostRequirement ==
+        return stage->constraints(SplitState::kSplitForMerge).hostRequirement ==
             HostTypeRequirement::kPrimaryShard;
+    });
+}
+
+bool Pipeline::needsMongosMerger() const {
+    return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
+        return stage->constraints(SplitState::kSplitForMerge).resolvedHostTypeRequirement(pCtx) ==
+            HostTypeRequirement::kMongoS;
     });
 }
 

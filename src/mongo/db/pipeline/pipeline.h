@@ -238,9 +238,14 @@ public:
     BSONObj getInitialQuery() const;
 
     /**
-     * Returns whether or not any DocumentSource in the pipeline needs the primary shard.
+     * Returns 'true' if the pipeline must merge on the primary shard.
      */
     bool needsPrimaryShardMerger() const;
+
+    /**
+     * Returns 'true' if the pipeline must merge on mongoS.
+     */
+    bool needsMongosMerger() const;
 
     /**
      * Returns true if the pipeline can run on mongoS, but is not obliged to; that is, it can run
