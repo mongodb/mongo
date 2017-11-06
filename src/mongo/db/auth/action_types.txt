@@ -47,6 +47,7 @@
 "enableSharding",
 "find",
 "flushRouterConfig",
+"forceUUID",
 "fsync",
 "getCmdLineOpts",
 "getLog",
