@@ -26,7 +26,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/base/data_type_string_data.h"
+#include "mongo/base/data_type.h"
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"

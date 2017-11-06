@@ -28,57 +28,41 @@
 #pragma once
 
 #include <cstring>
+#include <stddef.h>
 
 #include "mongo/base/data_type.h"
+#include "mongo/base/string_data.h"
+
+#ifndef MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
+#error "do not include directly. Use mongo/base/data_type.h"
+#endif  // MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
+
+// Provides a DataType::Handler specialization for StringData.
 
 namespace mongo {
 
 template <>
 struct DataType::Handler<StringData> {
+    // Consumes all available data, producing
+    // a `StringData(ptr,length)`.
     static Status load(StringData* sdata,
                        const char* ptr,
                        size_t length,
                        size_t* advanced,
-                       std::ptrdiff_t debug_offset) {
-        if (sdata) {
-            *sdata = StringData(ptr, length);
-        }
+                       std::ptrdiff_t debug_offset);
 
-        if (advanced) {
-            *advanced = length;
-        }
-
-        return Status::OK();
-    }
-
+    // Copies `sdata` fully into the [ptr,ptr+length) range.
+    // Does nothing and returns an Overflow status if
+    // `sdata` doesn't fit.
     static Status store(const StringData& sdata,
                         char* ptr,
                         size_t length,
                         size_t* advanced,
-                        std::ptrdiff_t debug_offset) {
-        if (sdata.size() > length) {
-            return makeStoreStatus(sdata, length, debug_offset);
-        }
-
-        if (ptr) {
-            std::memcpy(ptr, sdata.rawData(), sdata.size());
-        }
-
-        if (advanced) {
-            *advanced = sdata.size();
-        }
-
-        return Status::OK();
-    }
+                        std::ptrdiff_t debug_offset);
 
     static StringData defaultConstruct() {
         return StringData();
     }
-
-private:
-    static Status makeStoreStatus(const StringData& sdata,
-                                  size_t length,
-                                  std::ptrdiff_t debug_offset);
 };
 
 }  // namespace mongo

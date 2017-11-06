@@ -25,19 +25,56 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/base/data_type_string_data.h"
+#include "mongo/base/data_type.h"
 
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-Status DataType::Handler<StringData>::makeStoreStatus(const StringData& sdata,
-                                                      size_t length,
-                                                      std::ptrdiff_t debug_offset) {
+namespace {
+
+Status makeStoreStatus(const StringData& sdata, size_t length, std::ptrdiff_t debug_offset) {
     str::stream ss;
     ss << "buffer size too small to write StringData(" << sdata.size() << ") bytes into buffer["
        << length << "] at offset: " << debug_offset;
     return Status(ErrorCodes::Overflow, ss);
+}
+}  // namespace
+
+Status DataType::Handler<StringData>::load(StringData* sdata,
+                                           const char* ptr,
+                                           size_t length,
+                                           size_t* advanced,
+                                           std::ptrdiff_t debug_offset) {
+    if (sdata) {
+        *sdata = StringData(ptr, length);
+    }
+
+    if (advanced) {
+        *advanced = length;
+    }
+
+    return Status::OK();
+}
+
+Status DataType::Handler<StringData>::store(const StringData& sdata,
+                                            char* ptr,
+                                            size_t length,
+                                            size_t* advanced,
+                                            std::ptrdiff_t debug_offset) {
+    if (sdata.size() > length) {
+        return makeStoreStatus(sdata, length, debug_offset);
+    }
+
+    if (ptr) {
+        std::memcpy(ptr, sdata.rawData(), sdata.size());
+    }
+
+    if (advanced) {
+        *advanced = sdata.size();
+    }
+
+    return Status::OK();
 }
 
 }  // namespace mongo
