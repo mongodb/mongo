@@ -110,6 +110,7 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
 
     while (getTimestamp(_localOplogValue) > getTimestamp(operation)) {
         _scanned++;
+        LOG(2) << "Local oplog entry to roll back: " << redact(_localOplogValue.first);
         auto status = _rollbackOperation(_localOplogValue.first);
         if (!status.isOK()) {
             invariant(ErrorCodes::NoSuchKey != status.code());
@@ -133,6 +134,8 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollBackLocalOperations
             return StatusWith<RollbackCommonPoint>(
                 std::make_pair(getOpTime(_localOplogValue), _localOplogValue.second));
         }
+
+        LOG(2) << "Local oplog entry to roll back: " << redact(_localOplogValue.first);
         auto status = _rollbackOperation(_localOplogValue.first);
         if (!status.isOK()) {
             invariant(ErrorCodes::NoSuchKey != status.code());

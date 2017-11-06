@@ -238,10 +238,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInf
     auto oplogEntry = OplogEntry(fixedObj);
 
     if (isNestedApplyOpsCommand) {
-        LOG(2) << "Updating rollback FixUpInfo for nested applyOps entry: "
-               << redact(oplogEntry.toBSON());
-    } else {
-        LOG(2) << "Updating rollback FixUpInfo for local oplog entry: "
+        LOG(2) << "Updating rollback FixUpInfo for nested applyOps oplog entry: "
                << redact(oplogEntry.toBSON());
     }
 
