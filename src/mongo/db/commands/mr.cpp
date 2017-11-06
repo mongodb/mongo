@@ -1512,6 +1512,14 @@ public:
                         getExecutor(opCtx, coll, std::move(cq), PlanExecutor::YIELD_AUTO));
                 }
 
+                // Make sure the PlanExecutor is destroyed while holding the necessary locks.
+                ON_BLOCK_EXIT([&exec, &scopedAutoDb, opCtx, &config] {
+                    if (!scopedAutoDb) {
+                        scopedAutoDb = stdx::make_unique<AutoGetDb>(opCtx, config.nss.db(), MODE_S);
+                        exec.reset();
+                    }
+                });
+
                 {
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
                     CurOp::get(opCtx)->setPlanSummary_inlock(Explain::getPlanSummary(exec.get()));
