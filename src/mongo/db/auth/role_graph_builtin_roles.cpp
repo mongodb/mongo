@@ -654,6 +654,12 @@ void addRestorePrivileges(PrivilegeVector* privileges) {
         Privilege(
             ResourcePattern::forExactNamespace(AuthorizationManager::rolesCollectionNamespace),
             ActionType::createIndex));
+
+    // Need to be able to force UUID consistency in sharded restores
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
+        Privilege(ResourcePattern::forClusterResource(),
+                  {ActionType::forceUUID, ActionType::useUUID}));
 }
 
 void addRootRolePrivileges(PrivilegeVector* privileges) {
