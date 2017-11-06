@@ -27,6 +27,8 @@
  */
 #pragma once
 
+#include <list>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/executor/task_executor.h"
@@ -74,8 +76,10 @@ public:
             notification->set(status);
         }
 
-        // Sleeps waiting for notification, and returns notify's argument.
-        // On interruption, throws; calling waitStatus afterward returns failed status.
+        /**
+         * Sleeps waiting for notification, and returns notify's argument. On interruption, throws;
+         * calling waitStatus afterward returns failed status.
+         */
         Status waitStatus(OperationContext* opCtx);
 
         bool ready() const {
@@ -95,7 +99,6 @@ public:
         std::shared_ptr<Notification<Status>> notification;
     };
 
-
     struct Deletion {
         Deletion(ChunkRange r, Date_t when) : range(std::move(r)), whenToDelete(when) {}
 
@@ -104,7 +107,7 @@ public:
         DeleteNotification notification{};
     };
 
-    CollectionRangeDeleter() = default;
+    CollectionRangeDeleter();
     ~CollectionRangeDeleter();
 
     //
@@ -118,7 +121,7 @@ public:
      * Returns the time to begin deletions, if needed, or boost::none if deletions are already
      * scheduled.
      */
-    auto add(std::list<Deletion> ranges) -> boost::optional<Date_t>;
+    boost::optional<Date_t> add(std::list<Deletion> ranges);
 
     /**
      * Reports whether the argument range overlaps any of the ranges to clean.  If there is overlap,
@@ -141,7 +144,7 @@ public:
      * Notifies with the specified status anything waiting on ranges scheduled, and then discards
      * the ranges and notifications.  Is called in the destructor.
      */
-    void clear(Status);
+    void clear(Status status);
 
     /*
      * Append a representation of self to the specified builder.
@@ -159,12 +162,11 @@ public:
      * Argument 'forTestOnly' is used in unit tests that exercise the CollectionRangeDeleter class,
      * so that they do not need to set up CollectionShardingState and MetadataManager objects.
      */
-    static auto cleanUpNextRange(OperationContext*,
-                                 NamespaceString const& nss,
-                                 OID const& epoch,
-                                 int maxToDelete,
-                                 CollectionRangeDeleter* forTestOnly = nullptr)
-        -> boost::optional<Date_t>;
+    static boost::optional<Date_t> cleanUpNextRange(OperationContext*,
+                                                    NamespaceString const& nss,
+                                                    OID const& epoch,
+                                                    int maxToDelete,
+                                                    CollectionRangeDeleter* forTestOnly = nullptr);
 
 private:
     /**

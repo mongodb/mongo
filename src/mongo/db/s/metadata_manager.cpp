@@ -419,8 +419,7 @@ void scheduleCleanup(executor::TaskExecutor* executor,
 auto MetadataManager::_pushRangeToClean(WithLock lock, ChunkRange const& range, Date_t when)
     -> CleanupNotification {
     std::list<Deletion> ranges;
-    auto ownedRange = ChunkRange{range.getMin().getOwned(), range.getMax().getOwned()};
-    ranges.emplace_back(Deletion{std::move(ownedRange), when});
+    ranges.emplace_back(ChunkRange(range.getMin().getOwned(), range.getMax().getOwned()), when);
     auto& notifn = ranges.back().notification;
     _pushListToClean(lock, std::move(ranges));
     return notifn;
@@ -449,9 +448,12 @@ auto MetadataManager::beginReceive(ChunkRange const& range) -> CleanupNotificati
         return Status{ErrorCodes::RangeOverlapConflict,
                       "Documents in target range may still be in use on the destination shard."};
     }
+
     _addToReceiving(scopedLock, range);
+
     log() << "Scheduling deletion of any documents in " << _nss.ns() << " range "
           << redact(range.toString()) << " before migrating in a chunk covering the range";
+
     return _pushRangeToClean(scopedLock, range, Date_t{});
 }
 
@@ -481,8 +483,9 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
     stdx::unique_lock<stdx::mutex> scopedLock(_managerLock);
     invariant(!_metadata.empty());
 
-    auto* activeMetadata = _metadata.back().get();
-    auto* overlapMetadata = _newestOverlappingMetadata(scopedLock, range);
+    auto* const activeMetadata = _metadata.back().get();
+    auto* const overlapMetadata = _newestOverlappingMetadata(scopedLock, range);
+
     if (overlapMetadata == activeMetadata) {
         return Status{ErrorCodes::RangeOverlapConflict,
                       str::stream() << "Requested deletion range overlaps a live shard chunk"};
@@ -494,20 +497,21 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
                                        " migrated in"};
     }
 
-    if (overlapMetadata == nullptr) {
+    if (!overlapMetadata) {
         // No running queries can depend on it, so queue it for deletion immediately.
-        auto whenStr = (whenToDelete == Date_t{}) ? "immediate"_sd : "deferred"_sd;
+        const auto whenStr = (whenToDelete == Date_t{}) ? "immediate"_sd : "deferred"_sd;
         log() << "Scheduling " << whenStr << " deletion of " << _nss.ns() << " range "
               << redact(range.toString());
         return _pushRangeToClean(scopedLock, range, whenToDelete);
     }
 
-    log() << "Scheduling deletion of " << _nss.ns() << " range " << redact(range.toString())
-          << " after all possibly-dependent queries finish";
+    log() << "Deletion of " << _nss.ns() << " range " << redact(range.toString())
+          << " will be scheduled after all possibly dependent queries finish";
+
     // Put it on the oldest metadata permissible; the current one might live a long time.
     auto& orphans = overlapMetadata->_tracker.orphans;
-    ChunkRange ownedRange{range.getMin().getOwned(), range.getMax().getOwned()};
-    orphans.emplace_back(Deletion{std::move(ownedRange), whenToDelete});
+    orphans.emplace_back(
+        Deletion{ChunkRange(range.getMin().getOwned(), range.getMax().getOwned()), whenToDelete});
     return orphans.back().notification;
 }
 

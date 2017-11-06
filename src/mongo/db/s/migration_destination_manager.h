@@ -164,8 +164,10 @@ private:
      * it schedules deletion of any documents in the range, so that process must be seen to be
      * complete before migrating any new documents in.
      */
-    auto _notePending(OperationContext*, NamespaceString const&, OID const&, ChunkRange const&)
-        -> CollectionShardingState::CleanupNotification;
+    CollectionShardingState::CleanupNotification _notePending(OperationContext*,
+                                                              NamespaceString const&,
+                                                              OID const&,
+                                                              ChunkRange const&);
 
     /**
      * Stops tracking a chunk range between 'min' and 'max' that previously was having data

@@ -510,11 +510,11 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                     ShardingCatalogClient::kMajorityWriteConcern)
         .transitional_ignore();
 
-    // Wait for the metadata update to be persisted before attempting to delete orphaned
-    // documents so that metadata changes propagate to secondaries first.
+    // Wait for the metadata update to be persisted before attempting to delete orphaned documents
+    // so that metadata changes propagate to secondaries first
     CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, getNss());
 
-    const auto range = ChunkRange(_args.getMinKey(), _args.getMaxKey());
+    const ChunkRange range(_args.getMinKey(), _args.getMaxKey());
 
     auto notification = [&] {
         auto const whenToClean = _args.getWaitForDelete() ? CollectionShardingState::kNow

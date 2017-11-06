@@ -199,9 +199,12 @@ public:
 
     /**
      * Tracks deletion of any documents within the range, returning when deletion is complete.
-     * Throws if the collection is dropped while it sleeps. Call this with the collection unlocked.
+     * Throws if the collection is dropped while it sleeps.
      */
-    static Status waitForClean(OperationContext*, NamespaceString, OID const& epoch, ChunkRange);
+    static Status waitForClean(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               OID const& epoch,
+                               ChunkRange orphanRange);
 
     /**
      * Reports whether any range still scheduled for deletion overlaps the argument range. If so,

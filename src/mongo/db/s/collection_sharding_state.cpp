@@ -176,7 +176,7 @@ void CollectionShardingState::forgetReceive(const ChunkRange& range) {
 }
 
 auto CollectionShardingState::cleanUpRange(ChunkRange const& range, CleanWhen when)
-    -> MetadataManager::CleanupNotification {
+    -> CleanupNotification {
     Date_t time = (when == kNow) ? Date_t{} : Date_t::now() +
             stdx::chrono::seconds{orphanCleanupDelaySecs.load()};
     return _metadataManager->cleanUpRange(range, time);
@@ -237,41 +237,45 @@ bool CollectionShardingState::collectionIsSharded() {
 // exist anymore at the time of the call, or indeed anytime outside the AutoGetCollection block, so
 // anything that might alias something in it must be copied first.
 
-/* static */
 Status CollectionShardingState::waitForClean(OperationContext* opCtx,
-                                             NamespaceString nss,
+                                             const NamespaceString& nss,
                                              OID const& epoch,
                                              ChunkRange orphanRange) {
-    do {
-        auto stillScheduled = boost::optional<CleanupNotification>();
+    while (true) {
+        boost::optional<CleanupNotification> stillScheduled;
+
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-            // First, see if collection was dropped.
             auto css = CollectionShardingState::get(opCtx, nss);
+
             {
+                // First, see if collection was dropped, but do it in a separate scope in order to
+                // not hold reference on it, which would make it appear in use
                 auto metadata = css->_metadataManager->getActiveMetadata(css->_metadataManager);
                 if (!metadata || metadata->getCollVersion().epoch() != epoch) {
                     return {ErrorCodes::StaleShardVersion, "Collection being migrated was dropped"};
                 }
-            }  // drop metadata
+            }
+
             stillScheduled = css->trackOrphanedDataCleanup(orphanRange);
             if (!stillScheduled) {
                 log() << "Finished deleting " << nss.ns() << " range "
                       << redact(orphanRange.toString());
                 return Status::OK();
             }
-        }  // drop collection lock
+        }
 
         log() << "Waiting for deletion of " << nss.ns() << " range " << orphanRange;
+
         Status result = stillScheduled->waitStatus(opCtx);
         if (!result.isOK()) {
-            return Status{result.code(),
-                          str::stream() << "Failed to delete orphaned " << nss.ns() << " range "
-                                        << orphanRange.toString()
-                                        << ": "
-                                        << result.reason()};
+            return {result.code(),
+                    str::stream() << "Failed to delete orphaned " << nss.ns() << " range "
+                                  << orphanRange.toString()
+                                  << " due to "
+                                  << result.reason()};
         }
-    } while (true);
+    }
     MONGO_UNREACHABLE;
 }
 

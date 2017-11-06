@@ -28,8 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/metadata_manager.h"
-
 #include <boost/optional.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
@@ -42,6 +40,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
@@ -70,11 +69,6 @@ const std::string kOtherShard{"otherShard"};
 const HostAndPort dummyHost("dummy", 123);
 
 class MetadataManagerTest : public ShardingMongodTestFixture {
-public:
-    std::shared_ptr<RemoteCommandTargeterMock> configTargeter() {
-        return RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
-    }
-
 protected:
     void setUp() override {
         ShardingMongodTestFixture::setUp();
@@ -85,6 +79,10 @@ protected:
         configTargeter()->setFindHostReturnValue(dummyHost);
 
         _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor());
+    }
+
+    std::shared_ptr<RemoteCommandTargeterMock> configTargeter() const {
+        return RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
     }
 
     static std::unique_ptr<CollectionMetadata> makeEmptyMetadata() {

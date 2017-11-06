@@ -61,137 +61,168 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-class ChunkRange;
-
-using CallbackArgs = executor::TaskExecutor::CallbackArgs;
-using logger::LogComponent;
-
 namespace {
+
+using Deletion = CollectionRangeDeleter::Deletion;
+using DeleteNotification = CollectionRangeDeleter::DeleteNotification;
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 Seconds(60));
-}  // unnamed namespace
 
-CollectionRangeDeleter::~CollectionRangeDeleter() {
-    // notify anybody still sleeping on orphan ranges
-    clear(Status{ErrorCodes::InterruptedDueToReplStateChange,
-                 "Collection sharding metadata discarded"});
+boost::optional<DeleteNotification> checkOverlap(std::list<Deletion> const& deletions,
+                                                 ChunkRange const& range) {
+    // Start search with newest entries by using reverse iterators
+    auto it = find_if(deletions.rbegin(), deletions.rend(), [&](auto& cleanee) {
+        return bool(cleanee.range.overlapWith(range));
+    });
+
+    if (it != deletions.rend())
+        return it->notification;
+
+    return boost::none;
 }
 
-auto CollectionRangeDeleter::cleanUpNextRange(OperationContext* opCtx,
-                                              NamespaceString const& nss,
-                                              OID const& epoch,
-                                              int maxToDelete,
-                                              CollectionRangeDeleter* forTestOnly)
-    -> boost::optional<Date_t> {
+}  // namespace
+
+CollectionRangeDeleter::CollectionRangeDeleter() = default;
+
+CollectionRangeDeleter::~CollectionRangeDeleter() {
+    // Notify anybody still sleeping on orphan ranges
+    clear({ErrorCodes::InterruptedDueToReplStateChange, "Collection sharding metadata discarded"});
+}
+
+boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
+    OperationContext* opCtx,
+    NamespaceString const& nss,
+    OID const& epoch,
+    int maxToDelete,
+    CollectionRangeDeleter* forTestOnly) {
 
     StatusWith<int> wrote = 0;
 
     auto range = boost::optional<ChunkRange>(boost::none);
     auto notification = DeleteNotification();
+
     {
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        auto* collection = autoColl.getCollection();
-        auto* css = CollectionShardingState::get(opCtx, nss);
+
+        auto* const collection = autoColl.getCollection();
+        auto* const css = CollectionShardingState::get(opCtx, nss);
+        auto* const self = forTestOnly ? forTestOnly : &css->_metadataManager->_rangesToClean;
+
+        auto scopedCollectionMetadata = css->getMetadata();
+
+        if (!forTestOnly && (!collection || !scopedCollectionMetadata)) {
+            if (!collection) {
+                LOG(0) << "Abandoning any range deletions left over from dropped " << nss.ns();
+            } else {
+                LOG(0) << "Abandoning any range deletions left over from previously sharded"
+                       << nss.ns();
+            }
+
+            stdx::lock_guard<stdx::mutex> lk(css->_metadataManager->_managerLock);
+            css->_metadataManager->_clearAllCleanups(lk);
+            return boost::none;
+        }
+
+        if (!forTestOnly && scopedCollectionMetadata->getCollVersion().epoch() != epoch) {
+            LOG(1) << "Range deletion task for " << nss.ns() << " epoch " << epoch << " woke;"
+                   << " (current is " << scopedCollectionMetadata->getCollVersion() << ")";
+            return boost::none;
+        }
+
+        bool writeOpLog = false;
+
         {
-            auto scopedCollectionMetadata = css->getMetadata();
-            if (!forTestOnly && (!collection || !scopedCollectionMetadata)) {
-                if (!collection) {
-                    log() << "Abandoning any range deletions left over from dropped " << nss.ns();
-                } else {
-                    log() << "Abandoning any range deletions left over from previously sharded"
-                          << nss.ns();
-                }
-                stdx::lock_guard<stdx::mutex> lk(css->_metadataManager->_managerLock);
-                css->_metadataManager->_clearAllCleanups(lk);
+            stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
+            if (self->isEmpty()) {
+                LOG(1) << "No further range deletions scheduled on " << nss.ns();
                 return boost::none;
             }
-            if (!forTestOnly && scopedCollectionMetadata->getCollVersion().epoch() != epoch) {
-                LOG(1) << "Range deletion task for " << nss.ns() << " epoch " << epoch << " woke;"
-                       << " (current is " << scopedCollectionMetadata->getCollVersion() << ")";
-                return boost::none;
-            }
-            auto self = forTestOnly ? forTestOnly : &css->_metadataManager->_rangesToClean;
-            bool writeOpLog = false;
-            {
-                stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
-                if (self->isEmpty()) {
-                    LOG(1) << "No further range deletions scheduled on " << nss.ns();
-                    return boost::none;
-                }
-                auto& o = self->_orphans;
-                if (o.empty()) {
-                    // We have delayed deletions; see if any are ready.
-                    auto& df = self->_delayedOrphans.front();
-                    if (df.whenToDelete > Date_t::now()) {
-                        log() << "Deferring deletion of " << nss.ns() << " range "
-                              << redact(df.range.toString()) << " until " << df.whenToDelete;
-                        return df.whenToDelete;
-                    }
-                    // Move a single range from _delayedOrphans to _orphans:
-                    o.splice(o.end(), self->_delayedOrphans, self->_delayedOrphans.begin());
-                    LOG(1) << "Proceeding with deferred deletion of " << nss.ns() << " range "
-                           << redact(o.front().range.toString());
-                    writeOpLog = true;
-                }
-                invariant(!o.empty());
-                const auto& frontRange = o.front().range;
-                range.emplace(frontRange.getMin().getOwned(), frontRange.getMax().getOwned());
-                notification = o.front().notification;
-            }
-            invariant(range);
 
-            if (writeOpLog) {
-                // clang-format off
-                // Secondaries will watch for this update, and kill any queries that may depend on
-                // documents in the range -- excepting any queries with a read-concern option
-                // 'ignoreChunkMigration'
-                try {
-                    auto& serverConfigurationNss = NamespaceString::kServerConfigurationNamespace;
-                    auto epoch = scopedCollectionMetadata->getCollVersion().epoch();
-                    AutoGetCollection autoAdmin(opCtx, serverConfigurationNss, MODE_IX);
-
-                    Helpers::upsert(opCtx, serverConfigurationNss.ns(),
-                        BSON("_id" << "startRangeDeletion" << "ns" << nss.ns() << "epoch" << epoch
-                          << "min" << range->getMin() << "max" << range->getMax()));
-
-                } catch (DBException const& e) {
-                    stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
-                    css->_metadataManager->_clearAllCleanups(
-                        scopedLock,
-                        {e.code(),
-                         str::stream() << "cannot push startRangeDeletion record to Op Log,"
-                                          " abandoning scheduled range deletions: " << e.what()});
-                    return boost::none;
+            auto& orphans = self->_orphans;
+            if (orphans.empty()) {
+                // We have delayed deletions; see if any are ready.
+                auto& df = self->_delayedOrphans.front();
+                if (df.whenToDelete > Date_t::now()) {
+                    LOG(0) << "Deferring deletion of " << nss.ns() << " range "
+                           << redact(df.range.toString()) << " until " << df.whenToDelete;
+                    return df.whenToDelete;
                 }
-                // clang-format on
+
+                // Move a single range from _delayedOrphans to _orphans
+                orphans.splice(orphans.end(), self->_delayedOrphans, self->_delayedOrphans.begin());
+                LOG(1) << "Proceeding with deferred deletion of " << nss.ns() << " range "
+                       << redact(orphans.front().range.toString());
+
+                writeOpLog = true;
             }
 
+            invariant(!orphans.empty());
+            const auto& frontRange = orphans.front().range;
+            range.emplace(frontRange.getMin().getOwned(), frontRange.getMax().getOwned());
+            notification = orphans.front().notification;
+        }
+
+        invariant(range);
+
+        if (writeOpLog) {
+            // Secondaries will watch for this update, and kill any queries that may depend on
+            // documents in the range -- excepting any queries with a read-concern option
+            // 'ignoreChunkMigration'
             try {
-                auto keyPattern = scopedCollectionMetadata->getKeyPattern();
+                AutoGetCollection autoAdmin(
+                    opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
 
-                wrote = self->_doDeletion(opCtx, collection, keyPattern, *range, maxToDelete);
+                Helpers::upsert(opCtx,
+                                NamespaceString::kServerConfigurationNamespace.ns(),
+                                BSON("_id"
+                                     << "startRangeDeletion"
+                                     << "ns"
+                                     << nss.ns()
+                                     << "epoch"
+                                     << epoch
+                                     << "min"
+                                     << range->getMin()
+                                     << "max"
+                                     << range->getMax()));
             } catch (const DBException& e) {
-                wrote = e.toStatus();
-                warning() << e.what();
-            }
-            if (!wrote.isOK() || wrote.getValue() == 0) {
-                if (wrote.isOK()) {
-                    log() << "No documents remain to delete in " << nss << " range "
-                          << redact(range->toString());
-                }
                 stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
-                self->_pop(wrote.getStatus());
-                if (!self->_orphans.empty()) {
-                    LOG(1) << "Deleting " << nss.ns() << " range "
-                           << redact(self->_orphans.front().range.toString()) << " next.";
-                }
-                return Date_t{};
+                css->_metadataManager->_clearAllCleanups(
+                    scopedLock,
+                    {e.code(),
+                     str::stream() << "cannot push startRangeDeletion record to Op Log,"
+                                      " abandoning scheduled range deletions: "
+                                   << e.what()});
+                return boost::none;
             }
-        }  // drop scopedCollectionMetadata
-    }      // drop autoColl
+        }
+
+        try {
+            const auto keyPattern = scopedCollectionMetadata->getKeyPattern();
+            wrote = self->_doDeletion(opCtx, collection, keyPattern, *range, maxToDelete);
+        } catch (const DBException& e) {
+            wrote = e.toStatus();
+            warning() << e.what();
+        }
+
+        if (!wrote.isOK() || wrote.getValue() == 0) {
+            if (wrote.isOK()) {
+                LOG(0) << "No documents remain to delete in " << nss << " range "
+                       << redact(range->toString());
+            }
+
+            stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
+            self->_pop(wrote.getStatus());
+            if (!self->_orphans.empty()) {
+                LOG(1) << "Deleting " << nss.ns() << " range "
+                       << redact(self->_orphans.front().range.toString()) << " next.";
+            }
+
+            return Date_t{};
+        }
+    }  // drop autoColl
 
     invariant(range);
     invariantOK(wrote.getStatus());
@@ -201,33 +232,37 @@ auto CollectionRangeDeleter::cleanUpNextRange(OperationContext* opCtx,
     const auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
     // Wait for replication outside the lock
-    WriteConcernResult unusedWCResult;
-    Status status = Status::OK();
-    try {
-        status = waitForWriteConcern(opCtx, clientOpTime, kMajorityWriteConcern, &unusedWCResult);
-    } catch (const DBException& e) {
-        status = e.toStatus();
-    }
+    const auto status = [&] {
+        try {
+            WriteConcernResult unusedWCResult;
+            return waitForWriteConcern(opCtx, clientOpTime, kMajorityWriteConcern, &unusedWCResult);
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }();
+
     if (!status.isOK()) {
-        log() << "Error when waiting for write concern after removing " << nss << " range "
-              << redact(range->toString()) << " : " << redact(status.reason());
+        LOG(0) << "Error when waiting for write concern after removing " << nss << " range "
+               << redact(range->toString()) << " : " << redact(status.reason());
 
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        auto* css = CollectionShardingState::get(opCtx, nss);
+        auto* const css = CollectionShardingState::get(opCtx, nss);
+
         stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
-        auto* self = &css->_metadataManager->_rangesToClean;
-        // if range were already popped (e.g. by dropping nss during the waitForWriteConcern above)
+        auto* const self = &css->_metadataManager->_rangesToClean;
+
+        // If range were already popped (e.g. by dropping nss during the waitForWriteConcern above)
         // its notification would have been triggered, so this check suffices to ensure that it is
-        // safe to pop the range here.
+        // safe to pop the range here
         if (!notification.ready()) {
             invariant(!self->isEmpty() && self->_orphans.front().notification == notification);
-            log() << "Abandoning deletion of latest range in " << nss.ns() << " after "
-                  << wrote.getValue() << " local deletions because of replication failure";
+            LOG(0) << "Abandoning deletion of latest range in " << nss.ns() << " after "
+                   << wrote.getValue() << " local deletions because of replication failure";
             self->_pop(status);
         }
     } else {
-        log() << "Deleted " << wrote.getValue() << " documents in " << nss.ns() << " range "
-              << redact(range->toString());
+        LOG(0) << "Deleted " << wrote.getValue() << " documents in " << nss.ns() << " range "
+               << redact(range->toString());
     }
 
     notification.abandon();
@@ -248,29 +283,30 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
     // select the index and get the full index keyPattern here.
     auto catalog = collection->getIndexCatalog();
     const IndexDescriptor* idx = catalog->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
-    if (idx == NULL) {
+    if (!idx) {
         std::string msg = str::stream() << "Unable to find shard key index for "
                                         << keyPattern.toString() << " in " << nss.ns();
-        log() << msg;
+        LOG(0) << msg;
         return {ErrorCodes::InternalError, msg};
     }
 
     // Extend bounds to match the index we found
-    KeyPattern indexKeyPattern(idx->keyPattern().getOwned());
-    auto extend = [&](auto& key) {
+    const KeyPattern indexKeyPattern(idx->keyPattern());
+    const auto extend = [&](const auto& key) {
         return Helpers::toKeyFormat(indexKeyPattern.extendRangeBound(key, false));
     };
-    const BSONObj& min = extend(range.getMin());
-    const BSONObj& max = extend(range.getMax());
+
+    const auto min = extend(range.getMin());
+    const auto max = extend(range.getMax());
 
     LOG(1) << "begin removal of " << min << " to " << max << " in " << nss.ns();
 
-    auto indexName = idx->indexName();
+    const auto indexName = idx->indexName();
     IndexDescriptor* descriptor = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     if (!descriptor) {
         std::string msg = str::stream() << "shard key index with name " << indexName << " on '"
                                         << nss.ns() << "' was dropped";
-        log() << msg;
+        LOG(0) << msg;
         return {ErrorCodes::InternalError, msg};
     }
 
@@ -296,10 +332,10 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
             break;
         }
         if (state == PlanExecutor::FAILURE || state == PlanExecutor::DEAD) {
-            warning(LogComponent::kSharding)
-                << PlanExecutor::statestr(state) << " - cursor error while trying to delete " << min
-                << " to " << max << " in " << nss << ": " << WorkingSetCommon::toStatusString(obj)
-                << ", stats: " << Explain::getWinningPlanStats(exec.get());
+            warning() << PlanExecutor::statestr(state) << " - cursor error while trying to delete "
+                      << redact(min) << " to " << redact(max) << " in " << nss << ": "
+                      << WorkingSetCommon::toStatusString(obj)
+                      << ", stats: " << Explain::getWinningPlanStats(exec.get());
             break;
         }
         invariant(PlanExecutor::ADVANCED == state);
@@ -307,7 +343,7 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
         writeConflictRetry(opCtx, "delete range", nss.ns(), [&] {
             WriteUnitOfWork wuow(opCtx);
             if (saver) {
-                saver->goingToDelete(obj).transitional_ignore();
+                uassertStatusOK(saver->goingToDelete(obj));
             }
             collection->deleteDocument(opCtx, kUninitializedStmtId, rloc, nullptr, true);
             wuow.commit();
@@ -316,23 +352,6 @@ StatusWith<int> CollectionRangeDeleter::_doDeletion(OperationContext* opCtx,
 
     return numDeleted;
 }
-
-namespace {
-
-using Deletion = CollectionRangeDeleter::Deletion;
-using DeleteNotification = CollectionRangeDeleter::DeleteNotification;
-using Notif = boost::optional<DeleteNotification>;
-
-auto checkOverlap(std::list<Deletion> const& deletions, ChunkRange const& range)
-    -> boost::optional<DeleteNotification> {
-    // start search with newest entries by using reverse iterators
-    auto it = find_if(deletions.rbegin(), deletions.rend(), [&](auto& cleanee) {
-        return bool(cleanee.range.overlapWith(range));
-    });
-    return (it != deletions.rend()) ? Notif{it->notification} : Notif{boost::none};
-}
-
-}  // namespace
 
 auto CollectionRangeDeleter::overlaps(ChunkRange const& range) const
     -> boost::optional<DeleteNotification> {
@@ -343,11 +362,12 @@ auto CollectionRangeDeleter::overlaps(ChunkRange const& range) const
     return checkOverlap(_delayedOrphans, range);
 }
 
-auto CollectionRangeDeleter::add(std::list<Deletion> ranges) -> boost::optional<Date_t> {
-    // We ignore the case of overlapping, or even equal, ranges.
-    // Deleting overlapping ranges is quick.
-    bool wasScheduledImmediate = !_orphans.empty();
-    bool wasScheduledLater = !_delayedOrphans.empty();
+boost::optional<Date_t> CollectionRangeDeleter::add(std::list<Deletion> ranges) {
+    // We ignore the case of overlapping, or even equal, ranges. Deleting overlapping ranges is
+    // quick.
+    const bool wasScheduledImmediate = !_orphans.empty();
+    const bool wasScheduledLater = !_delayedOrphans.empty();
+
     while (!ranges.empty()) {
         if (ranges.front().whenToDelete != Date_t{}) {
             _delayedOrphans.splice(_delayedOrphans.end(), ranges, ranges.begin());
@@ -355,6 +375,7 @@ auto CollectionRangeDeleter::add(std::list<Deletion> ranges) -> boost::optional<
             _orphans.splice(_orphans.end(), ranges, ranges.begin());
         }
     }
+
     if (wasScheduledImmediate) {
         return boost::none;  // already scheduled
     } else if (!_orphans.empty()) {
@@ -364,6 +385,7 @@ auto CollectionRangeDeleter::add(std::list<Deletion> ranges) -> boost::optional<
     } else if (!_delayedOrphans.empty()) {
         return _delayedOrphans.front().whenToDelete;
     }
+
     return boost::none;
 }
 

@@ -28,8 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/collection_range_deleter.h"
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/query.h"
@@ -41,6 +39,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -51,8 +50,11 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 using unittest::assertGet;
+
+using Deletion = CollectionRangeDeleter::Deletion;
 
 const NamespaceString kNss = NamespaceString("foo", "bar");
 const std::string kPattern = "_id";
@@ -62,78 +64,72 @@ const HostAndPort dummyHost("dummy", 123);
 const NamespaceString kAdminSysVer = NamespaceString("admin", "system.version");
 
 class CollectionRangeDeleterTest : public ShardingMongodTestFixture {
-public:
-    using Deletion = CollectionRangeDeleter::Deletion;
-
 protected:
+    void setUp() override {
+        _epoch = OID::gen();
+        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+        ShardingMongodTestFixture::setUp();
+        replicationCoordinator()->alwaysAllowWrites(true);
+        initializeGlobalShardingStateForMongodForTest(ConnectionString(dummyHost))
+            .transitional_ignore();
+
+        // RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter())
+        //     ->setConnectionStringReturnValue(kConfigConnStr);
+
+        configTargeter()->setFindHostReturnValue(dummyHost);
+
+        DBDirectClient(operationContext()).createCollection(kNss.ns());
+        {
+            AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+            auto collectionShardingState = CollectionShardingState::get(operationContext(), kNss);
+            const KeyPattern skPattern(kKeyPattern);
+            auto cm = ChunkManager::makeNew(
+                kNss,
+                UUID::gen(),
+                kKeyPattern,
+                nullptr,
+                false,
+                epoch(),
+                {ChunkType(kNss,
+                           ChunkRange{skPattern.globalMin(), skPattern.globalMax()},
+                           ChunkVersion(1, 0, epoch()),
+                           ShardId("otherShard"))});
+            collectionShardingState->refreshMetadata(
+                operationContext(),
+                stdx::make_unique<CollectionMetadata>(cm, ShardId("thisShard")));
+        }
+    }
+
+    void tearDown() override {
+        {
+            AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
+            auto collectionShardingState = CollectionShardingState::get(operationContext(), kNss);
+            collectionShardingState->refreshMetadata(operationContext(), nullptr);
+        }
+
+        ShardingMongodTestFixture::tearDown();
+    }
+
     boost::optional<Date_t> next(CollectionRangeDeleter& rangeDeleter, int maxToDelete) {
         return CollectionRangeDeleter::cleanUpNextRange(
             operationContext(), kNss, epoch(), maxToDelete, &rangeDeleter);
     }
 
-    std::shared_ptr<RemoteCommandTargeterMock> configTargeter() {
+    std::shared_ptr<RemoteCommandTargeterMock> configTargeter() const {
         return RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
     }
 
-    OID const& epoch() {
+    OID const& epoch() const {
         return _epoch;
     }
 
-    virtual std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() override {
+    std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() override {
         return stdx::make_unique<BalancerConfiguration>();
     }
 
 private:
-    void setUp() override;
-    void tearDown() override;
-
     OID _epoch;
 };
-
-void CollectionRangeDeleterTest::setUp() {
-    _epoch = OID::gen();
-    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-    ShardingMongodTestFixture::setUp();
-    replicationCoordinator()->alwaysAllowWrites(true);
-    initializeGlobalShardingStateForMongodForTest(ConnectionString(dummyHost))
-        .transitional_ignore();
-
-    // RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter())
-    //     ->setConnectionStringReturnValue(kConfigConnStr);
-
-    configTargeter()->setFindHostReturnValue(dummyHost);
-
-    DBDirectClient(operationContext()).createCollection(kNss.ns());
-    {
-        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
-        auto collectionShardingState = CollectionShardingState::get(operationContext(), kNss);
-        const KeyPattern skPattern(kKeyPattern);
-        auto cm = ChunkManager::makeNew(
-            kNss,
-            UUID::gen(),
-            kKeyPattern,
-            nullptr,
-            false,
-            epoch(),
-            {ChunkType(kNss,
-                       ChunkRange{skPattern.globalMin(), skPattern.globalMax()},
-                       ChunkVersion(1, 0, epoch()),
-                       ShardId("otherShard"))});
-        collectionShardingState->refreshMetadata(
-            operationContext(), stdx::make_unique<CollectionMetadata>(cm, ShardId("thisShard")));
-    }
-}
-
-void CollectionRangeDeleterTest::tearDown() {
-    {
-        AutoGetCollection autoColl(operationContext(), kNss, MODE_IX);
-        auto collectionShardingState = CollectionShardingState::get(operationContext(), kNss);
-        collectionShardingState->refreshMetadata(operationContext(), nullptr);
-    }
-    ShardingMongodTestFixture::tearDown();
-}
-
-namespace {
 
 // Tests the case that there is nothing in the database.
 TEST_F(CollectionRangeDeleterTest, EmptyDatabase) {
@@ -404,5 +400,5 @@ TEST_F(CollectionRangeDeleterTest, MultipleDocumentsInMultipleRangesToClean) {
     ASSERT_FALSE(next(rangeDeleter, 1));
 }
 
-}  // unnamed namespace
+}  // namespace
 }  // namespace mongo

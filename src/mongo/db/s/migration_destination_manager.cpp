@@ -646,15 +646,15 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         // 2. Synchronously delete any data which might have been left orphaned in the range
         // being moved, and wait for completion
 
-        auto footprint = ChunkRange(min, max);
+        const ChunkRange footprint(min, max);
         auto notification = _notePending(opCtx, _nss, epoch, footprint);
-        // wait for the range deletion to report back
+        // Wait for the range deletion to report back
         if (!notification.waitStatus(opCtx).isOK()) {
             setStateFail(notification.waitStatus(opCtx).reason());
             return;
         }
 
-        // wait for any other, overlapping queued deletions to drain
+        // Wait for any other, overlapping queued deletions to drain
         auto status = CollectionShardingState::waitForClean(opCtx, _nss, epoch, footprint);
         if (!status.isOK()) {
             setStateFail(status.reason());
@@ -1019,27 +1019,27 @@ bool MigrationDestinationManager::_flushPendingWrites(OperationContext* opCtx,
     return true;
 }
 
-auto MigrationDestinationManager::_notePending(OperationContext* opCtx,
-                                               NamespaceString const& nss,
-                                               OID const& epoch,
-                                               ChunkRange const& range)
-    -> CollectionShardingState::CleanupNotification {
+CollectionShardingState::CleanupNotification MigrationDestinationManager::_notePending(
+    OperationContext* opCtx,
+    NamespaceString const& nss,
+    OID const& epoch,
+    ChunkRange const& range) {
 
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
     auto css = CollectionShardingState::get(opCtx, nss);
     auto metadata = css->getMetadata();
 
-    // This can currently happen because drops aren't synchronized with in-migrations.  The idea
-    // for checking this here is that in the future we shouldn't have this problem.
+    // This can currently happen because drops aren't synchronized with in-migrations. The idea for
+    // checking this here is that in the future we shouldn't have this problem.
     if (!metadata || metadata->getCollVersion().epoch() != epoch) {
         return Status{ErrorCodes::StaleShardVersion,
-                      str::stream() << "not noting chunk " << redact(range.toString())
+                      str::stream() << "not noting chunk " << range.toString()
                                     << " as pending because the epoch of "
                                     << nss.ns()
                                     << " changed"};
     }
 
-    // start clearing any leftovers that would be in the new chunk
+    // Start clearing any leftovers that would be in the new chunk
     auto notification = css->beginReceive(range);
     if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
         return Status{notification.waitStatus(opCtx).code(),
