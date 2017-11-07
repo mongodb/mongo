@@ -261,7 +261,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
             self->_pop(status);
         }
     } else {
-        LOG(0) << "Deleted " << wrote.getValue() << " documents in " << nss.ns() << " range "
+        LOG(1) << "Deleted " << wrote.getValue() << " documents in " << nss.ns() << " range "
                << redact(range->toString());
     }
 
