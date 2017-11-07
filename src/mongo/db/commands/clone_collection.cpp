@@ -150,7 +150,8 @@ public:
 
         cloner.setConnection(std::move(myconn));
 
-        return cloner.copyCollection(opCtx, collection, query, errmsg, copyIndexes);
+        return cloner.copyCollection(
+            opCtx, collection, query, errmsg, copyIndexes, CollectionOptions::parseForCommand);
     }
 
 } cmdCloneCollection;

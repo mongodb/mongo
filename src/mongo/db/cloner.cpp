@@ -421,14 +421,15 @@ bool Cloner::copyCollection(OperationContext* opCtx,
                             const string& ns,
                             const BSONObj& query,
                             string& errmsg,
-                            bool shouldCopyIndexes) {
+                            bool shouldCopyIndexes,
+                            CollectionOptions::ParseKind optionsParser) {
     const NamespaceString nss(ns);
     const string dbname = nss.db().toString();
 
     // config
     BSONObj filter = BSON("name" << nss.coll().toString());
     list<BSONObj> collList = _conn->getCollectionInfos(dbname, filter);
-    BSONObj options;
+    BSONObjBuilder optionsBob;
     bool shouldCreateCollection = false;
 
     if (!collList.empty()) {
@@ -452,9 +453,16 @@ bool Cloner::copyCollection(OperationContext* opCtx,
         }
 
         if (col["options"].isABSONObj()) {
-            options = col["options"].Obj();
+            optionsBob.appendElements(col["options"].Obj());
+        }
+        if ((optionsParser == CollectionOptions::parseForStorage) && col["info"].isABSONObj()) {
+            auto info = col["info"].Obj();
+            if (info.hasField("uuid")) {
+                optionsBob.append(info.getField("uuid"));
+            }
         }
     }
+    BSONObj options = optionsBob.obj();
 
     auto sourceIndexes = _conn->getIndexSpecs(nss.ns(), QueryOption_SlaveOk);
     auto idIndexSpec = getIdIndexSpec(sourceIndexes);
@@ -474,13 +482,8 @@ bool Cloner::copyCollection(OperationContext* opCtx,
 
             WriteUnitOfWork wunit(opCtx);
             const bool createDefaultIndexes = true;
-            Status status = userCreateNS(opCtx,
-                                         db,
-                                         ns,
-                                         options,
-                                         CollectionOptions::parseForCommand,
-                                         createDefaultIndexes,
-                                         idIndexSpec);
+            Status status = userCreateNS(
+                opCtx, db, ns, options, optionsParser, createDefaultIndexes, idIndexSpec);
             if (!status.isOK()) {
                 errmsg = status.toString();
                 // abort write unit of work

@@ -55,11 +55,16 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 namespace {
+
+// Causes the server to hang when it attempts to assign UUIDs to the provided database (or all
+// databases if none are provided).
+MONGO_FP_DECLARE(hangBeforeDatabaseUpgrade);
 
 struct CollModRequest {
     const IndexDescriptor* idx = nullptr;
@@ -627,6 +632,19 @@ void updateUUIDSchemaVersion(OperationContext* opCtx, bool upgrade) {
 
     for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {
         auto dbName = *it;
+
+        MONGO_FAIL_POINT_BLOCK(hangBeforeDatabaseUpgrade, customArgs) {
+            const auto& data = customArgs.getData();
+            const auto dbElem = data["database"];
+            if (!dbElem || dbElem.checkAndGetStringData() == dbName) {
+                log() << "collMod - hangBeforeDatabaseUpgrade fail point enabled for " << dbName
+                      << ". Blocking until fail point is disabled.";
+                while (MONGO_FAIL_POINT(hangBeforeDatabaseUpgrade)) {
+                    mongo::sleepsecs(1);
+                }
+            }
+        }
+
         _updateDatabaseUUIDSchemaVersion(opCtx, dbName, dbToCollToUUID[dbName], upgrade);
     }
     const WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,

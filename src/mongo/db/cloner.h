@@ -35,6 +35,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/catalog/collection_options.h"
 
 namespace mongo {
 
@@ -69,11 +70,18 @@ public:
                   std::set<std::string>* clonedColls,
                   std::vector<BSONObj> collectionsToClone = std::vector<BSONObj>());
 
+    /**
+     * Copies a collection. The optionsParser indicates how to parse the collection options. If
+     * 'parseForCommand' is provided, then the UUID is ignored and a new UUID is generated. If
+     * 'parseForStorage' is provided, then the UUID will be preserved and parsed out of the
+     * options.
+     */
     bool copyCollection(OperationContext* opCtx,
                         const std::string& ns,
                         const BSONObj& query,
                         std::string& errmsg,
-                        bool copyIndexes);
+                        bool copyIndexes,
+                        CollectionOptions::ParseKind optionsParser);
 
     // Filters a database's collection list and removes collections that should not be cloned.
     // CloneOptions should be populated with a fromDB and a list of collections to ignore, which
