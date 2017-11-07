@@ -35,6 +35,8 @@ _IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
 
 _OPERATIONS = ["shell", "copy_to", "copy_from"]
 
+_SSH_CONNECTION_ERRORS = ["System is booting up.", "Permission denied"]
+
 
 def posix_path(path):
     """ Returns posix path, used on Windows since scp requires posix style paths. """
@@ -100,7 +102,8 @@ class RemoteOperations(object):
         buff = ""
         while True:
             ret, buff = self._call(cmd)
-            if not ret:
+            # Ignore any connection errors before sshd has fully initialized.
+            if not ret and not any(ssh_error in buff for ssh_error in _SSH_CONNECTION_ERRORS):
                 return ret, buff
             attempt_num += 1
             if attempt_num > self.retries:
