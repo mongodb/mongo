@@ -1014,6 +1014,15 @@ def remote_handler(options, operations):
             ret = mongo_validate_canary(
                 mongo, options.db_name, options.collection_name, options.canary_doc)
 
+        elif operation == "set_fcv":
+            mongo = pymongo.MongoClient(host="localhost", port=options.port)
+            try:
+                ret = mongo.admin.command("setFeatureCompatibilityVersion", options.fcv_version)
+                ret = 0 if ret["ok"] == 1 else 1
+            except pymongo.errors.OperationFailure as err:
+                LOGGER.error(err.message)
+                ret = err.code
+
         else:
             LOGGER.error("Unsupported remote option specified '%s'", operation)
             ret = 1
@@ -1562,6 +1571,11 @@ Examples:
                               help="Additional mongod options",
                               default="")
 
+    mongod_options.add_option("--fcv",
+                              dest="fcv_version",
+                              help="Set the FeatureCompatibilityVersion of mongod.",
+                              default=None)
+
     # Program options
     program_options.add_option("--remotePython",
                                dest="remote_python",
@@ -1624,6 +1638,15 @@ Examples:
                                    " file can be specified either in a comma-delimited string,"
                                    " or by specifying this option more than once. If unspecified,"
                                    " then all FSM workload files are executed.",
+                              action="append",
+                              default=[])
+
+    client_options.add_option("--fsmWorkloadBlacklistFiles",
+                              dest="fsm_workload_blacklist_files",
+                              help="A list of the FSM workload files to blacklist. More than one"
+                                   " file can be specified either in a comma-delimited string,"
+                                   " or by specifying this option more than once. Note the"
+                                   " file name is the basename, i.e., 'distinct.js'.",
                               action="append",
                               default=[])
 
@@ -1727,6 +1750,7 @@ Examples:
     if not options.log_path:
         options.log_path = os.path.join(options.root_dir, "log", "mongod.log")
     mongod_options_map = parse_options(options.mongod_options)
+    set_fcv_cmd = "set_fcv" if options.fcv_version is not None else ""
 
     # Error out earlier if these options are not properly specified
     write_concern = yaml.safe_load(options.write_concern)
@@ -1772,6 +1796,9 @@ Examples:
     fsm_workload_files = []
     for fsm_workload_file in options.fsm_workload_files:
         fsm_workload_files += fsm_workload_file.replace(" ", "").split(",")
+    fsm_workload_blacklist_files = []
+    for fsm_workload_blacklist_file in options.fsm_workload_blacklist_files:
+        fsm_workload_blacklist_files += fsm_workload_blacklist_file.replace(" ", "").split(",")
 
     # Setup the mongo_repo_root.
     if options.mongo_repo_root_dir:
@@ -1909,6 +1936,7 @@ Examples:
                             " --mongodPort {port}"
                             " {rsync_cmd}"
                             " start_mongod"
+                            " {set_fcv_cmd}"
                             " {validate_collections_cmd}"
                             " {validate_canary_cmd}"
                             " {seed_docs}").format(
@@ -1916,6 +1944,7 @@ Examples:
                                 canary_opt=canary_opt,
                                 port=secret_port,
                                 rsync_cmd=rsync_cmd,
+                                set_fcv_cmd=set_fcv_cmd if loop_num == 1 else "",
                                 validate_collections_cmd=validate_collections_cmd,
                                 validate_canary_cmd=validate_canary_cmd,
                                 seed_docs=seed_docs if loop_num == 1 else "")
@@ -2025,6 +2054,8 @@ Examples:
             test_data = {"fsmDbBlacklist": [options.db_name]}
             if fsm_workload_files:
                 test_data["workloadFiles"] = fsm_workload_files
+            if fsm_workload_blacklist_files:
+                test_data["workloadBlacklistFiles"] = fsm_workload_blacklist_files
 
             for i in xrange(options.num_fsm_clients):
                 fsm_config_file = NamedTempFile.create(suffix=".yml")

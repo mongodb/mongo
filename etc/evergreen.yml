@@ -4114,6 +4114,27 @@ tasks:
       <<: *powercycle_test
       mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 
+- name: powercycle_fcv3.4_WT
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up virtualenv"
+  - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_ec2_instance
+  - command: expansions.update
+    <<: *powercycle_expansions
+  - func: "run powercycle test"
+    vars:
+      <<: *powercycle_test
+      client_options: --numCrudClients 10 --numFsmClients 10 --fsmWorkloadBlacklistFiles toggle_feature_compatibility.js
+      mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath ${db_path} --logPath ${log_path} --fcv 3.4
+      mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+
 - name: idl_tests
   depends_on:
   - name: compile
@@ -5374,6 +5395,7 @@ buildvariants:
   - name: tool_WT
   - name: powercycle
   - name: powercycle_WT
+  - name: powercycle_fcv3.4_WT
   - name: package
     distros:
     - ubuntu1604-packer
