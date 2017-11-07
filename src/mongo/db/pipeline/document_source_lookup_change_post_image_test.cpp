@@ -115,7 +115,8 @@ public:
 
     boost::optional<Document> lookupSingleDocument(const NamespaceString& nss,
                                                    UUID collectionUUID,
-                                                   const Document& documentKey) {
+                                                   const Document& documentKey,
+                                                   boost::optional<BSONObj> readConcern) {
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
         auto swPipeline = makePipeline({BSON("$match" << documentKey)}, expCtx);
         if (swPipeline == ErrorCodes::NamespaceNotFound) {

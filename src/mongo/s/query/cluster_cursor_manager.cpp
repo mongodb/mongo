@@ -139,6 +139,12 @@ bool ClusterCursorManager::PinnedCursor::isTailableAndAwaitData() const {
     return _cursor->isTailableAndAwaitData();
 }
 
+boost::optional<ReadPreferenceSetting> ClusterCursorManager::PinnedCursor::getReadPreference()
+    const {
+    invariant(_cursor);
+    return _cursor->getReadPreference();
+}
+
 UserNameIterator ClusterCursorManager::PinnedCursor::getAuthenticatedUsers() const {
     invariant(_cursor);
     return _cursor->getAuthenticatedUsers();

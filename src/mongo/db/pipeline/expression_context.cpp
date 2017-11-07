@@ -46,6 +46,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      StringMap<ResolvedNamespace> resolvedNamespaces)
     : ExpressionContext(opCtx, collator.get()) {
     explain = request.getExplain();
+    comment = request.getComment();
     fromMongos = request.isFromMongos();
     needsMerge = request.needsMerge();
     allowDiskUse = request.shouldAllowDiskUse();
@@ -131,6 +132,7 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
 
     expCtx->uuid = std::move(uuid);
     expCtx->explain = explain;
+    expCtx->comment = comment;
     expCtx->needsMerge = needsMerge;
     expCtx->fromMongos = fromMongos;
     expCtx->from34Mongos = from34Mongos;

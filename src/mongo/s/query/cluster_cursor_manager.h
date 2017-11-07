@@ -206,6 +206,11 @@ public:
         CursorId getCursorId() const;
 
         /**
+         * Returns the read preference setting for this cursor.
+         */
+        boost::optional<ReadPreferenceSetting> getReadPreference() const;
+
+        /**
          * Returns the number of result documents returned so far by this cursor via the next()
          * method.
          */

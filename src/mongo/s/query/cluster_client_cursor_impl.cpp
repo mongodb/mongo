@@ -146,6 +146,10 @@ boost::optional<LogicalSessionId> ClusterClientCursorImpl::getLsid() const {
     return _lsid;
 }
 
+boost::optional<ReadPreferenceSetting> ClusterClientCursorImpl::getReadPreference() const {
+    return _params.readPreference;
+}
+
 namespace {
 
 /**

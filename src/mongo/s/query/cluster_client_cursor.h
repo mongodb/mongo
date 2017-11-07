@@ -30,6 +30,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/client/read_preference.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_session_id.h"
@@ -137,6 +138,11 @@ public:
      * Returns the logical session id for this cursor.
      */
     virtual boost::optional<LogicalSessionId> getLsid() const = 0;
+
+    /**
+     * Returns the readPreference for this cursor.
+     */
+    virtual boost::optional<ReadPreferenceSetting> getReadPreference() const = 0;
 };
 
 }  // namespace mongo
