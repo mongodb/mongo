@@ -53,7 +53,6 @@
             {rsConfig: {arbiterOnly: true}}
         ],
         useBridge: true,
-        nodeOptions: {setParameter: {rollbackMethod: "rollbackViaRefetch"}}
     });
     let nodes = replTest.startSet();
     replTest.initiate();

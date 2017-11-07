@@ -76,31 +76,6 @@ const Milliseconds kRollbackOplogSocketTimeout(10 * 60 * 1000);
 // 16MB max batch size / 12 byte min doc size * 10 (for good measure) = defaultBatchSize to use.
 const auto defaultBatchSize = (16 * 1024 * 1024) / 12 * 10;
 
-// Valid arguments to the rollbackMethod server parameter.
-constexpr StringData kRollbackViaRefetchNoUUID = "rollbackViaRefetchNoUUID"_sd;
-constexpr StringData kRollbackViaRefetch = "rollbackViaRefetch"_sd;
-constexpr StringData kRollbackToCheckpoint = "default"_sd;
-
-// Set this to force rollback to use a particular implementation.
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(rollbackMethod, std::string, kRollbackViaRefetch.toString());
-
-// Checks that only the valid strings above can be used as a rollbackMethod
-// parameter. Throws an error if an invalid string is passed to the server parameter.
-MONGO_INITIALIZER(rollbackMethod)(InitializerContext*) {
-    std::set<StringData> supportedRollbackMethods = {kRollbackViaRefetchNoUUID,
-                                                     kRollbackViaRefetch};
-
-    // Unsupported rollback method.
-    if (supportedRollbackMethods.count(rollbackMethod) == 0) {
-        std::string errMsg = str::stream()
-            << "Unsupported rollback method: '" + rollbackMethod + "'. "
-            << "Supported rollback methods: "
-            << "'" << kRollbackViaRefetchNoUUID << "' | '" << kRollbackViaRefetch << "'";
-        return Status(ErrorCodes::BadValue, errMsg);
-    }
-    return Status::OK();
-}
-
 // The batchSize to use for the find/getMore queries called by the OplogFetcher
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(bgSyncOplogFetcherBatchSize, int, defaultBatchSize);
 
@@ -672,53 +647,21 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         return connection->get();
     };
 
-    StorageEngine* engine = opCtx->getServiceContext()->getGlobalStorageEngine();
-    bool supportsCheckpointRollback = engine->supportsRecoverToStableTimestamp();
-    if (supportsCheckpointRollback && rollbackMethod == kRollbackToCheckpoint) {
-        // If we are running on a storage engine that supports "roll back to a checkpoint" then
-        // we use the "roll back to a checkpoint" algorithm, regardless of the feature
-        // compatibility version (FCV). If the user specifies a different rollback method,
-        // we will fall back to that.
-        log() << "Rollback using the 'roll back to a checkpoint' method.";
-        _runRollbackViaRecoverToCheckpoint(
-            opCtx, source, &localOplog, storageInterface, getConnection);
-
-    } else if (rollbackMethod != kRollbackViaRefetchNoUUID &&
-               (serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
-        // If the user is in FCV 3.6 and the user did not specify to fall back on "roll back via
-        // refetch" without UUID support, then we use "roll back via refetch" with UUIDs.
-
-        if (rollbackMethod == kRollbackToCheckpoint) {
-            invariant(!supportsCheckpointRollback);
-            log() << "Rollback using the 'rollbackViaRefetch' method because this storage "
-                     "engine does not support 'roll back to a checkpoint'.";
-        } else {
-            invariant(rollbackMethod == kRollbackViaRefetch);
-            log() << "Rollback using the 'rollbackViaRefetch' method due to startup server "
-                     "parameter.";
-        }
+    // Run a rollback algorithm that either uses UUIDs or does not use UUIDs depending on
+    // the FCV. Since collection UUIDs were only added in 3.6, the 3.4 rollback algorithm
+    // remains in place to maintain backwards compatibility.
+    if (serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+        // If the user is fully upgraded to FCV 3.6, use the "rollbackViaRefetch" method.
+        log() << "Rollback using the 'rollbackViaRefetch' method because UUID support "
+                 "is feature compatible with featureCompatibilityVersion 3.6.";
         _fallBackOnRollbackViaRefetch(
             opCtx, source, requiredRBID, &localOplog, true, getConnection);
     } else {
-        if (rollbackMethod == kRollbackToCheckpoint) {
-            invariant(!supportsCheckpointRollback);
-            invariant(serverGlobalParams.featureCompatibility.getVersion() !=
-                      ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-            log() << "Rollback using the 'rollbackViaRefetchNoUUID' method because this storage "
-                     "engine does not support 'roll back to a checkpoint' and we are "
-                     "in featureCompatibilityVersion 3.4.";
-        } else if (rollbackMethod == kRollbackViaRefetch) {
-            invariant(serverGlobalParams.featureCompatibility.getVersion() !=
-                      ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-            log() << "Rollback using the 'rollbackViaRefetchNoUUID' method. 'rollbackViaRefetch' "
-                     "with UUID support is not feature compatible with featureCompatabilityVersion "
-                     "3.4.";
-        } else {
-            invariant(rollbackMethod == kRollbackViaRefetchNoUUID);
-            log() << "Rollback using the 'rollbackViaRefetchNoUUID' method due to "
-                     "startup server parameter.";
-        }
+        // If the user is either fully downgraded to FCV 3.4, downgrading to FCV 3.4,
+        // or upgrading to FCV 3.6, use the "rollbackViaRefetchNoUUID" method.
+        log() << "Rollback using the 'rollbackViaRefetchNoUUID' method because UUID "
+                 "support is not feature compatible with featureCompatibilityVersion 3.4";
         _fallBackOnRollbackViaRefetch(
             opCtx, source, requiredRBID, &localOplog, false, getConnection);
     }
