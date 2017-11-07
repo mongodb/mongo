@@ -123,6 +123,11 @@ public:
                     serverGlobalParams.featureCompatibility.getVersion() !=
                         ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34);
 
+            if (serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+                return true;
+            }
+
             FeatureCompatibilityVersion::setTargetUpgrade(opCtx);
 
             // First put UUIDs in the storage layer metadata. UUIDs will be generated for unsharded
@@ -161,6 +166,11 @@ public:
                     "featureCompatibilityVersion upgrade has not completed",
                     serverGlobalParams.featureCompatibility.getVersion() !=
                         ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
+
+            if (serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
+                return true;
+            }
 
             FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
 

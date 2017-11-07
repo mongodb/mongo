@@ -398,6 +398,30 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.eq(res.featureCompatibilityVersion.targetVersion, null, tojson(res));
     rst.stopSet();
 
+    // Test idempotency for setFeatureCompatibilityVersion.
+    rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: latest}});
+    rst.startSet();
+    rst.initiate();
+
+    // Set FCV to 3.4 so that a 3.4 node can join the set.
+    primary = rst.getPrimary();
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgrade}));
+    rst.awaitReplication();
+
+    // Add a 3.4 node to the set.
+    secondary = rst.add({binVersion: downgrade});
+    rst.reInitiate();
+
+    // Ensure the 3.4 node succeeded its initial sync.
+    assert.writeOK(primary.getDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 3}}));
+
+    // Run {setFCV: "3.4"}. This should be idempotent.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgrade}));
+    rst.awaitReplication();
+
+    // Ensure the secondary is still running.
+    rst.stopSet();
+
     //
     // Sharding tests.
     //
