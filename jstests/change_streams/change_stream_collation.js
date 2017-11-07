@@ -181,4 +181,28 @@
             {cursor: englishCaseSensitiveStream, expectedChanges: [{docId: 1}]});
     }());
 
+    // Test that collation is supported by the shell helper.
+    // Test that creating a change stream with a non-default collation against a collection that has
+    // a simple default collation will use the collation specified on the operation.
+    (function() {
+        const noCollationCollection = db.change_stream_no_collation;
+        noCollationCollection.drop();
+        assert.commandWorked(db.runCommand({create: noCollationCollection.getName()}));
+
+        const cursor = noCollationCollection.watch(
+            [
+              {$match: {"fullDocument.text": "abc"}},
+              {$project: {docId: "$documentKey._id", _id: 0}}
+            ],
+            {collation: caseInsensitive});
+        assert(!cursor.hasNext());
+        assert.writeOK(noCollationCollection.insert({_id: 0, text: "aBc"}));
+        assert.writeOK(noCollationCollection.insert({_id: 1, text: "abc"}));
+        assert(cursor.hasNext());
+        assert.docEq(cursor.next(), {docId: 0});
+        assert(cursor.hasNext());
+        assert.docEq(cursor.next(), {docId: 1});
+        assert(!cursor.hasNext());
+    }());
+
 })();

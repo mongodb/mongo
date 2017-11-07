@@ -215,6 +215,9 @@ var DB;
             delete optcpy['useCursor'];
         }
 
+        const maxAwaitTimeMS = optcpy.maxAwaitTimeMS;
+        delete optcpy.maxAwaitTimeMS;
+
         // Reassign the cleaned-up options.
         aggregateOptions = optcpy;
 
@@ -263,7 +266,7 @@ var DB;
                 batchSizeValue = cmdObj["cursor"]["batchSize"];
             }
 
-            return new DBCommandCursor(this, res, batchSizeValue);
+            return new DBCommandCursor(this, res, batchSizeValue, maxAwaitTimeMS);
         }
 
         return res;

@@ -1641,6 +1641,25 @@ DBCollection.prototype.latencyStats = function(options) {
     return this.aggregate([{$collStats: {latencyStats: options}}]);
 };
 
+DBCollection.prototype.watch = function(pipeline, options) {
+    pipeline = pipeline || [];
+    options = options || {};
+    assert(pipeline instanceof Array, "'pipeline' argument must be an array");
+    assert(options instanceof Object, "'options' argument must be an object");
+
+    let changeStreamStage = {fullDocument: options.fullDocument || "default"};
+    delete options.fullDocument;
+
+    if (options.hasOwnProperty("resumeAfter")) {
+        changeStreamStage.resumeAfter = options.resumeAfter;
+        delete options.resumeAfter;
+    }
+
+    pipeline.unshift({$changeStream: changeStreamStage});
+    // Pass options "batchSize", "collation" and "maxAwaitTimeMS" down to aggregate().
+    return this.aggregate(pipeline, options);
+};
+
 /**
  * PlanCache
  * Holds a reference to the collection.
