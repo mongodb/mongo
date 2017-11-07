@@ -32,6 +32,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
@@ -175,7 +176,8 @@ public:
 
     boost::optional<Document> lookupSingleDocument(const NamespaceString& nss,
                                                    UUID collectionUUID,
-                                                   const Document& filter) final {
+                                                   const Document& filter,
+                                                   boost::optional<BSONObj> readConcern) final {
         auto foreignExpCtx = _expCtx->copyWith(nss, collectionUUID);
 
         // Create the find command to be dispatched to the shard in order to return the post-change
@@ -189,12 +191,16 @@ public:
             cmdBuilder.append("find", nss.coll());
         }
         cmdBuilder.append("filter", filterObj);
+        cmdBuilder.append("comment", _expCtx->comment);
+        if (readConcern) {
+            cmdBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName, *readConcern);
+        }
 
         auto swShardResult = makeStatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>>();
         auto findCmd = cmdBuilder.obj();
         size_t numAttempts = 0;
         do {
-            // Verify that the collection exists, with the UUID passed in the expCtx.
+            // Verify that the collection exists, with the correct UUID.
             auto catalogCache = Grid::get(_expCtx->opCtx)->catalogCache();
             auto swRoutingInfo = getCollectionRoutingInfo(foreignExpCtx);
             if (swRoutingInfo == ErrorCodes::NamespaceNotFound) {

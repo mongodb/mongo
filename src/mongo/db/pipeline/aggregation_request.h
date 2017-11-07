@@ -274,7 +274,7 @@ private:
     // {$hint: <String>}, where <String> is the index name hinted.
     BSONObj _hint;
 
-    // The comment parameter attached to this aggregation.
+    // The comment parameter attached to this aggregation, empty if not set.
     std::string _comment;
 
     BSONObj _readConcern;

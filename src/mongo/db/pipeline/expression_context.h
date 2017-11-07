@@ -165,6 +165,9 @@ public:
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
     boost::optional<ExplainOptions::Verbosity> explain;
 
+    // The comment provided by the user, or the empty string if no comment was provided.
+    std::string comment;
+
     bool fromMongos = false;
     bool needsMerge = false;
     bool inMongos = false;

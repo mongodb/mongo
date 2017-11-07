@@ -386,12 +386,15 @@ public:
 
     boost::optional<Document> lookupSingleDocument(const NamespaceString& nss,
                                                    UUID collectionUUID,
-                                                   const Document& documentKey) final {
+                                                   const Document& documentKey,
+                                                   boost::optional<BSONObj> readConcern) final {
+        invariant(!readConcern);  // We don't currently support a read concern on mongod - it's only
+                                  // expected to be necessary on mongos.
+                                  //
         // Be sure to do the lookup using the collection default collation.
         auto foreignExpCtx =
             _ctx->copyWith(nss, collectionUUID, _getCollectionDefaultCollator(nss, collectionUUID));
         auto swPipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
-
         if (swPipeline == ErrorCodes::NamespaceNotFound) {
             return boost::none;
         }

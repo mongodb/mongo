@@ -422,6 +422,9 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
                               << " was not created by the authenticated user"};
     }
 
+    if (auto readPref = pinnedCursor.getValue().getReadPreference()) {
+        ReadPreferenceSetting::get(opCtx) = *readPref;
+    }
     if (pinnedCursor.getValue().isTailableAndAwaitData()) {
         // Default to 1-second timeout for tailable awaitData cursors. If an explicit maxTimeMS has
         // been specified, do not apply it to the opCtx, since its deadline will already have been

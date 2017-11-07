@@ -847,9 +847,11 @@ public:
          * no matching documents were found, including cases where the given namespace does not
          * exist.
          */
-        virtual boost::optional<Document> lookupSingleDocument(const NamespaceString& nss,
-                                                               UUID collectionUUID,
-                                                               const Document& documentKey) = 0;
+        virtual boost::optional<Document> lookupSingleDocument(
+            const NamespaceString& nss,
+            UUID collectionUUID,
+            const Document& documentKey,
+            boost::optional<BSONObj> readConcern) = 0;
 
         /**
          * Returns a vector of all local cursors.

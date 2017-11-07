@@ -120,7 +120,8 @@ public:
 
     boost::optional<Document> lookupSingleDocument(const NamespaceString& nss,
                                                    UUID collectionUUID,
-                                                   const Document& documentKey) {
+                                                   const Document& documentKey,
+                                                   boost::optional<BSONObj> readConcern) {
         MONGO_UNREACHABLE;
     }
 

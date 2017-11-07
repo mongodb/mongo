@@ -69,6 +69,8 @@ public:
 
     boost::optional<LogicalSessionId> getLsid() const final;
 
+    boost::optional<ReadPreferenceSetting> getReadPreference() const final;
+
     /**
      * Returns true unless marked as having non-exhausted remote cursors via
      * markRemotesNotExhausted().
