@@ -21,21 +21,10 @@ selector:
   # TODO SERVER-31249: getLastError should not be affected by no-op retries.
   - jstests/core/bulk_legacy_enforce_gle.js
 
-  # TODO SERVER-30532: Add lastErrorObject.upserted to findAndModify no-op retry response.
-  - jstests/core/find_and_modify_server6582.js
-
   # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
   - jstests/core/crud_api.js
   - jstests/core/find_and_modify2.js
   - jstests/core/find_and_modify_server6865.js
-
-  # TODO SERVER-31243: No-op retry of a findAndModify upsert of a new document should return null
-  # if new=false.
-  - jstests/core/find_and_modify.js
-  - jstests/core/find_and_modify4.js
-  - jstests/core/find_and_modify_empty_coll.js
-  - jstests/core/find_and_modify_empty_update.js
-  - jstests/core/find_and_modify_server6226.js
 
   # TODO SERVER-31245: Inserts to "system.indexes" bypass the check for retryability.
   - jstests/core/batch_write_command_insert.js

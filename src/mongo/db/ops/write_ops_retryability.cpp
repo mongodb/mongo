@@ -149,7 +149,11 @@ void parseOplogEntryForFindAndModify(OperationContext* opCtx,
     switch (oplogEntry.getOpType()) {
         case repl::OpTypeEnum::kInsert:
             return find_and_modify::serializeUpsert(
-                1, oplogEntry.getObject(), false, oplogEntry.getObject(), builder);
+                1,
+                request.shouldReturnNew() ? oplogEntry.getObject() : boost::optional<BSONObj>(),
+                false,
+                oplogEntry.getObject(),
+                builder);
         case repl::OpTypeEnum::kUpdate:
             return find_and_modify::serializeUpsert(
                 1, extractPreOrPostImage(opCtx, oplogWithCorrectLinks), true, {}, builder);

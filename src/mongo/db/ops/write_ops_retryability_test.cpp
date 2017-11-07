@@ -175,9 +175,10 @@ protected:
 
 const NamespaceString kNs("test.user");
 
-TEST_F(FindAndModifyRetryability, BasicUpsert) {
+TEST_F(FindAndModifyRetryability, BasicUpsertReturnNew) {
     auto request = FindAndModifyRequest::makeUpdate(kNs, BSONObj(), BSONObj());
     request.setUpsert(true);
+    request.setShouldReturnNew(true);
 
     auto insertOplog = makeOplogEntry(repl::OpTime(),             // optime
                                       repl::OpTypeEnum::kInsert,  // op type
@@ -199,9 +200,32 @@ TEST_F(FindAndModifyRetryability, BasicUpsert) {
                       result);
 }
 
+TEST_F(FindAndModifyRetryability, BasicUpsertReturnOld) {
+    auto request = FindAndModifyRequest::makeUpdate(kNs, BSONObj(), BSONObj());
+    request.setUpsert(true);
+    request.setShouldReturnNew(false);
+
+    auto insertOplog = makeOplogEntry(repl::OpTime(),             // optime
+                                      repl::OpTypeEnum::kInsert,  // op type
+                                      kNs,                        // namespace
+                                      BSON("_id"
+                                           << "ID value"
+                                           << "x"
+                                           << 1));  // o
+
+    auto result = constructFindAndModifyRetryResult(opCtx(), request, insertOplog);
+    ASSERT_BSONOBJ_EQ(BSON("lastErrorObject"
+                           << BSON("n" << 1 << "updatedExisting" << false << "upserted"
+                                       << "ID value")
+                           << "value"
+                           << BSONNULL),
+                      result);
+}
+
 TEST_F(FindAndModifyRetryability, NestedUpsert) {
     auto request = FindAndModifyRequest::makeUpdate(kNs, BSONObj(), BSONObj());
     request.setUpsert(true);
+    request.setShouldReturnNew(true);
 
     auto innerOplog = makeOplogEntry(repl::OpTime(),                       // optime
                                      repl::OpTypeEnum::kInsert,            // op type
