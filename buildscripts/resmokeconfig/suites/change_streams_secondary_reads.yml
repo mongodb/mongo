@@ -1,0 +1,50 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/change_streams/**/*.js
+  exclude_files:
+  # This test starts a parallel shell which we want to read from the same node as the change stream,
+  # but the parallel shell performs an insert which will not work against the secondary.
+  - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
+  # This test is not expected to work when run against a mongos.
+  - jstests/change_streams/report_latest_observed_oplog_timestamp.js
+
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: majority
+      eval: >-
+        var testingReplication = true;
+        load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        load('jstests/libs/override_methods/set_read_preference_secondary.js');
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          verbosity: 0
+          command: 1
+          network:
+            verbosity: 1
+            asio: 2
+          tracking: 0
+    mongod_options:
+      nopreallocj: ''
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          verbosity: 0
+          command: 1
+          query: 1
+        numInitialSyncAttempts: 1
+    num_rs_nodes_per_shard: 2
+    enable_sharding:
+    - test
