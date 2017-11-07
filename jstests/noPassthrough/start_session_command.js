@@ -11,7 +11,7 @@
 
     // ensure that the cache is empty
     var serverStatus = assert.commandWorked(admin.adminCommand({serverStatus: 1}));
-    assert.eq(0, serverStatus.logicalSessionRecordCache.records);
+    assert.eq(0, serverStatus.logicalSessionRecordCache.activeSessionsCount);
 
     // test that we can run startSession unauthenticated when the server is running without --auth
 
@@ -25,7 +25,7 @@
 
     // test that startSession added to the cache
     serverStatus = assert.commandWorked(admin.adminCommand({serverStatus: 1}));
-    assert.eq(1, serverStatus.logicalSessionRecordCache.records);
+    assert.eq(1, serverStatus.logicalSessionRecordCache.activeSessionsCount);
 
     // test that we can run startSession authenticated when the server is running without --auth
 

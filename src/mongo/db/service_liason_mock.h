@@ -78,8 +78,8 @@ public:
     int jobs();
 
     const KillAllSessionsByPattern* matchKilled(const LogicalSessionId& lsid);
-    Status killCursorsWithMatchingSessions(OperationContext* opCtx,
-                                           const SessionKiller::Matcher& matcher);
+    std::pair<Status, int> killCursorsWithMatchingSessions(OperationContext* opCtx,
+                                                           const SessionKiller::Matcher& matcher);
 
 private:
     executor::AsyncTimerFactoryMock* _timerFactory;
@@ -120,8 +120,8 @@ public:
         return _impl->join();
     }
 
-    Status killCursorsWithMatchingSessions(OperationContext* opCtx,
-                                           const SessionKiller::Matcher& matcher) {
+    std::pair<Status, int> killCursorsWithMatchingSessions(
+        OperationContext* opCtx, const SessionKiller::Matcher& matcher) override {
         return _impl->killCursorsWithMatchingSessions(opCtx, matcher);
     }
 

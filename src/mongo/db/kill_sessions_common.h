@@ -84,7 +84,7 @@ public:
     KillSessionsCursorManagerVisitor(OperationContext* opCtx,
                                      const SessionKiller::Matcher& matcher,
                                      Eraser&& eraser)
-        : _opCtx(opCtx), _matcher(matcher), _eraser(eraser) {}
+        : _opCtx(opCtx), _matcher(matcher), _cursorsKilled(0), _eraser(eraser) {}
 
     template <typename Mgr>
     void operator()(Mgr& mgr) {
@@ -99,6 +99,7 @@ public:
                 for (const auto& id : cursors) {
                     try {
                         _eraser(mgr, id);
+                        _cursorsKilled++;
                     } catch (...) {
                         _failures.push_back(exceptionToStatus());
                     }
@@ -123,10 +124,15 @@ public:
                                     << _failures.back().reason());
     }
 
+    int getCursorsKilled() const {
+        return _cursorsKilled;
+    }
+
 private:
     OperationContext* _opCtx;
     const SessionKiller::Matcher& _matcher;
     std::vector<Status> _failures;
+    int _cursorsKilled;
     Eraser _eraser;
 };
 

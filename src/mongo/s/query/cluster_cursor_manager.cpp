@@ -520,7 +520,7 @@ std::vector<GenericCursor> ClusterCursorManager::getAllCursors() const {
     return cursors;
 }
 
-Status ClusterCursorManager::killCursorsWithMatchingSessions(
+std::pair<Status, int> ClusterCursorManager::killCursorsWithMatchingSessions(
     OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
     auto eraser = [&](ClusterCursorManager& mgr, CursorId id) {
         uassertStatusOK(mgr.killCursor(getNamespaceForCursorId(id).get(), id));
@@ -528,7 +528,7 @@ Status ClusterCursorManager::killCursorsWithMatchingSessions(
 
     auto visitor = makeKillSessionsCursorManagerVisitor(opCtx, matcher, std::move(eraser));
     visitor(*this);
-    return visitor.getStatus();
+    return std::make_pair(visitor.getStatus(), visitor.getCursorsKilled());
 }
 
 stdx::unordered_set<CursorId> ClusterCursorManager::getCursorsForSession(

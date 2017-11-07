@@ -317,15 +317,16 @@ std::vector<GenericCursor> CursorManager::getAllCursors(OperationContext* opCtx)
     return cursors;
 }
 
-Status CursorManager::killCursorsWithMatchingSessions(OperationContext* opCtx,
-                                                      const SessionKiller::Matcher& matcher) {
+std::pair<Status, int> CursorManager::killCursorsWithMatchingSessions(
+    OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
     auto eraser = [&](CursorManager& mgr, CursorId id) {
         uassertStatusOK(mgr.eraseCursor(opCtx, id, true));
     };
 
     auto visitor = makeKillSessionsCursorManagerVisitor(opCtx, matcher, std::move(eraser));
     globalCursorIdCache->visitAllCursorManagers(opCtx, &visitor);
-    return visitor.getStatus();
+
+    return std::make_pair(visitor.getStatus(), visitor.getCursorsKilled());
 }
 
 std::size_t CursorManager::timeoutCursorsGlobal(OperationContext* opCtx, Date_t now) {

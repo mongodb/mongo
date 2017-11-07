@@ -103,8 +103,8 @@ ServiceContext* ServiceLiasonMongod::_context() {
     return getGlobalServiceContext();
 }
 
-Status ServiceLiasonMongod::killCursorsWithMatchingSessions(OperationContext* opCtx,
-                                                            const SessionKiller::Matcher& matcher) {
+std::pair<Status, int> ServiceLiasonMongod::killCursorsWithMatchingSessions(
+    OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
     return CursorManager::getGlobalCursorManager()->killCursorsWithMatchingSessions(opCtx, matcher);
 }
 

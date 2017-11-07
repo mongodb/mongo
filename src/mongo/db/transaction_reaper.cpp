@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
@@ -40,12 +41,14 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/sessions_collection.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -104,11 +107,12 @@ public:
     TransactionReaperImpl(std::shared_ptr<SessionsCollection> collection)
         : _collection(std::move(collection)) {}
 
-    void reap(OperationContext* opCtx) override {
+    int reap(OperationContext* opCtx) override {
         Handler handler(opCtx, _collection.get());
 
-        Lock::DBLock lk(opCtx, SessionsCollection::kSessionsDb, MODE_IS);
-        Lock::CollectionLock lock(opCtx->lockState(), SessionsCollection::kSessionsFullNS, MODE_IS);
+        Lock::DBLock lk(opCtx, NamespaceString::kSessionTransactionsTableNamespace.db(), MODE_IS);
+        Lock::CollectionLock lock(
+            opCtx->lockState(), NamespaceString::kSessionTransactionsTableNamespace.ns(), MODE_IS);
 
         auto coord = mongo::repl::ReplicationCoordinator::get(opCtx);
         if (coord->canAcceptWritesForDatabase(
@@ -129,17 +133,40 @@ public:
                 handler.handleLsid(transactionSession.get_id());
             }
         }
+
+        // Before the handler goes out of scope, flush its last batch to disk and collect stats.
+        return handler.finalize();
     }
 
 private:
     std::shared_ptr<SessionsCollection> _collection;
 };
 
-void handleBatchHelper(SessionsCollection* sessionsCollection,
-                       OperationContext* opCtx,
-                       const LogicalSessionIdSet& batch) {
+int handleBatchHelper(SessionsCollection* sessionsCollection,
+                      OperationContext* opCtx,
+                      const LogicalSessionIdSet& batch) {
+    if (batch.empty()) {
+        return 0;
+    }
+
+    Locker* locker = opCtx->lockState();
+
+    Locker::LockSnapshot snapshot;
+    invariant(locker->saveLockStateAndUnlock(&snapshot));
+
+    const auto guard = MakeGuard([&] { locker->restoreLockState(snapshot); });
+
+    // Top-level locks are freed, release any potential low-level (storage engine-specific
+    // locks). If we are yielding, we are at a safe place to do so.
+    opCtx->recoveryUnit()->abandonSnapshot();
+
+    // Track the number of yields in CurOp.
+    CurOp::get(opCtx)->yielded();
+
     auto removed = uassertStatusOK(sessionsCollection->findRemovedSessions(opCtx, batch));
     uassertStatusOK(sessionsCollection->removeTransactionRecords(opCtx, removed));
+
+    return removed.size();
 }
 
 /**
@@ -148,18 +175,24 @@ void handleBatchHelper(SessionsCollection* sessionsCollection,
 class ReplHandler {
 public:
     ReplHandler(OperationContext* opCtx, SessionsCollection* collection)
-        : _opCtx(opCtx), _sessionsCollection(collection) {}
+        : _opCtx(opCtx), _sessionsCollection(collection), _numReaped(0), _finalized(false) {}
 
     ~ReplHandler() {
-        DESTRUCTOR_GUARD([&] { handleBatchHelper(_sessionsCollection, _opCtx, _batch); }());
+        invariant(_finalized.load());
     }
 
     void handleLsid(const LogicalSessionId& lsid) {
         _batch.insert(lsid);
         if (_batch.size() > write_ops::kMaxWriteBatchSize) {
-            handleBatchHelper(_sessionsCollection, _opCtx, _batch);
+            _numReaped += handleBatchHelper(_sessionsCollection, _opCtx, _batch);
             _batch.clear();
         }
+    }
+
+    int finalize() {
+        invariant(!_finalized.swap(true));
+        _numReaped += handleBatchHelper(_sessionsCollection, _opCtx, _batch);
+        return _numReaped;
     }
 
 private:
@@ -167,6 +200,10 @@ private:
     SessionsCollection* _sessionsCollection;
 
     LogicalSessionIdSet _batch;
+
+    int _numReaped;
+
+    AtomicBool _finalized;
 };
 
 /**
@@ -176,14 +213,10 @@ private:
 class ShardedHandler {
 public:
     ShardedHandler(OperationContext* opCtx, SessionsCollection* collection)
-        : _opCtx(opCtx), _sessionsCollection(collection) {}
+        : _opCtx(opCtx), _sessionsCollection(collection), _numReaped(0), _finalized(false) {}
 
     ~ShardedHandler() {
-        DESTRUCTOR_GUARD([&] {
-            for (const auto& pair : _shards) {
-                handleBatchHelper(_sessionsCollection, _opCtx, pair.second);
-            }
-        }());
+        invariant(_finalized.load());
     }
 
     void handleLsid(const LogicalSessionId& lsid) {
@@ -210,9 +243,18 @@ public:
         auto& lsids = _shards[shardId];
         lsids.insert(lsid);
         if (lsids.size() > write_ops::kMaxWriteBatchSize) {
-            handleBatchHelper(_sessionsCollection, _opCtx, lsids);
+            _numReaped += handleBatchHelper(_sessionsCollection, _opCtx, lsids);
             _shards.erase(shardId);
         }
+    }
+
+    int finalize() {
+        invariant(!_finalized.swap(true));
+        for (const auto& pair : _shards) {
+            _numReaped += handleBatchHelper(_sessionsCollection, _opCtx, pair.second);
+        }
+
+        return _numReaped;
     }
 
 private:
@@ -221,7 +263,11 @@ private:
     std::shared_ptr<ChunkManager> _cm;
     std::shared_ptr<Shard> _primary;
 
+    int _numReaped;
+
     stdx::unordered_map<ShardId, LogicalSessionIdSet, ShardId::Hasher> _shards;
+
+    AtomicBool _finalized;
 };
 
 }  // namespace

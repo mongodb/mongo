@@ -44,7 +44,8 @@ namespace mongo {
 SessionKiller::Result killSessionsLocalKillCursors(OperationContext* opCtx,
                                                    const SessionKiller::Matcher& matcher) {
 
-    auto status = CursorManager::killCursorsWithMatchingSessions(opCtx, matcher);
+    auto res = CursorManager::killCursorsWithMatchingSessions(opCtx, matcher);
+    auto status = res.first;
 
     if (status.isOK()) {
         return std::vector<HostAndPort>{};

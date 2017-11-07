@@ -108,11 +108,11 @@ const KillAllSessionsByPattern* MockServiceLiasonImpl::matchKilled(const Logical
     return _matcher->match(lsid);
 }
 
-Status MockServiceLiasonImpl::killCursorsWithMatchingSessions(
+std::pair<Status, int> MockServiceLiasonImpl::killCursorsWithMatchingSessions(
     OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
 
     _matcher = matcher;
-    return Status::OK();
+    return std::make_pair(Status::OK(), 0);
 }
 
 }  // namespace mongo

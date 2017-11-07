@@ -224,7 +224,7 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionRS::findRemovedSessions(
 Status SessionsCollectionRS::removeTransactionRecords(OperationContext* opCtx,
                                                       const LogicalSessionIdSet& sessions) {
     return dispatch(
-        kSessionsNamespaceString,
+        NamespaceString::kSessionTransactionsTableNamespace,
         MODE_IX,
         opCtx,
         [&] {
