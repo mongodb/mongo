@@ -120,7 +120,10 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
             hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongod>(
                 opCtx->getServiceContext()));
             return hookList;
-        });
+        },
+        // We only need one task executor here because sharding task executors aren't used for user
+        // queries in mongod.
+        1);
 }
 
 }  // namespace mongo

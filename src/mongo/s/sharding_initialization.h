@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/stdx/functional.h"
@@ -77,7 +79,8 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                                      StringData distLockProcessId,
                                      std::unique_ptr<ShardFactory> shardFactory,
                                      std::unique_ptr<CatalogCache> catalogCache,
-                                     rpc::ShardingEgressMetadataHookBuilder hookBuilder);
+                                     rpc::ShardingEgressMetadataHookBuilder hookBuilder,
+                                     boost::optional<size_t> taskExecutorPoolSize);
 
 
 /**

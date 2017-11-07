@@ -309,7 +309,8 @@ static Status initializeSharding(OperationContext* opCtx) {
             hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(
                 opCtx->getServiceContext()));
             return hookList;
-        });
+        },
+        boost::none);
 
     if (!status.isOK()) {
         return status;

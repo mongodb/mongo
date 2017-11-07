@@ -124,10 +124,13 @@ std::unique_ptr<ShardingCatalogClient> makeCatalogClient(ServiceContext* service
 std::unique_ptr<TaskExecutorPool> makeShardingTaskExecutorPool(
     std::unique_ptr<NetworkInterface> fixedNet,
     rpc::ShardingEgressMetadataHookBuilder metadataHookBuilder,
-    ConnectionPool::Options connPoolOptions) {
+    ConnectionPool::Options connPoolOptions,
+    boost::optional<size_t> taskExecutorPoolSize) {
     std::vector<std::unique_ptr<executor::TaskExecutor>> executors;
 
-    for (size_t i = 0; i < TaskExecutorPool::getSuggestedPoolSize(); ++i) {
+    const auto poolSize = taskExecutorPoolSize.value_or(TaskExecutorPool::getSuggestedPoolSize());
+
+    for (size_t i = 0; i < poolSize; ++i) {
         auto exec = makeShardingTaskExecutor(executor::makeNetworkInterface(
             "NetworkInterfaceASIO-TaskExecutorPool-" + std::to_string(i),
             stdx::make_unique<ShardingNetworkConnectionHook>(),
@@ -171,7 +174,8 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                                      StringData distLockProcessId,
                                      std::unique_ptr<ShardFactory> shardFactory,
                                      std::unique_ptr<CatalogCache> catalogCache,
-                                     rpc::ShardingEgressMetadataHookBuilder hookBuilder) {
+                                     rpc::ShardingEgressMetadataHookBuilder hookBuilder,
+                                     boost::optional<size_t> taskExecutorPoolSize) {
     if (configCS.type() == ConnectionString::INVALID) {
         return {ErrorCodes::BadValue, "Unrecognized connection string."};
     }
@@ -221,8 +225,8 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                                        hookBuilder(),
                                        connPoolOptions);
     auto networkPtr = network.get();
-    auto executorPool =
-        makeShardingTaskExecutorPool(std::move(network), hookBuilder, connPoolOptions);
+    auto executorPool = makeShardingTaskExecutorPool(
+        std::move(network), hookBuilder, connPoolOptions, taskExecutorPoolSize);
     executorPool->startup();
 
     auto const grid = Grid::get(opCtx);
