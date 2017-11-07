@@ -987,22 +987,15 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	if (table->is_simple) {
 		/* Just return a cursor on the underlying data source. */
-		if (table->is_simple_file)
-			ret = __wt_curfile_open(session,
-			    table->cgroups[0]->source, NULL, cfg, cursorp);
-		else
-			ret = __wt_open_cursor(session,
-			    table->cgroups[0]->source, NULL, cfg, cursorp);
+		ret = __wt_open_cursor(session,
+		    table->cgroups[0]->source, NULL, cfg, cursorp);
 
 		WT_TRET(__wt_schema_release_table(session, table));
 		if (ret == 0) {
 			/* Fix up the public URI to match what was passed in. */
 			cursor = *cursorp;
-			if (!F_ISSET(cursor, WT_CURSTD_URI_SHARED))
-				__wt_free(session, cursor->uri);
-			cursor->uri = table->iface.name;
-			WT_ASSERT(session, strcmp(uri, cursor->uri) == 0);
-			F_SET(cursor, WT_CURSTD_URI_SHARED);
+			__wt_free(session, cursor->uri);
+			WT_TRET(__wt_strdup(session, uri, &cursor->uri));
 		}
 		return (ret);
 	}
