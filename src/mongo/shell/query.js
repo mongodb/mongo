@@ -681,6 +681,16 @@ DBQuery.prototype.close = function() {
     this._cursor.close();
 };
 
+DBQuery.prototype.isClosed = function() {
+    this._exec();
+    return this._cursor.isClosed();
+};
+
+DBQuery.prototype.isExhausted = function() {
+    this._exec();
+    return this._cursor.isClosed() && this._cursor.objsLeftInBatch() === 0;
+};
+
 DBQuery.shellBatchSize = 20;
 
 /**
@@ -697,7 +707,7 @@ DBQuery.Option = {
     partial: 0x80
 };
 
-function DBCommandCursor(db, cmdResult, batchSize) {
+function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS) {
     if (cmdResult._mongo) {
         const newSession = new _DelegatingDriverSession(cmdResult._mongo, db.getSession());
         db = newSession.getDatabase(db.getName());
@@ -713,6 +723,7 @@ function DBCommandCursor(db, cmdResult, batchSize) {
         this._useReadCommands = true;
         this._cursorid = cmdResult.cursor.id;
         this._batchSize = batchSize;
+        this._maxAwaitTimeMS = maxAwaitTimeMS;
 
         this._ns = cmdResult.cursor.ns;
         this._db = db;
@@ -732,10 +743,27 @@ function DBCommandCursor(db, cmdResult, batchSize) {
 
 DBCommandCursor.prototype = {};
 
+/**
+ * Returns whether the cursor id is zero.
+ */
+DBCommandCursor.prototype.isClosed = function() {
+    if (this._useReadCommands) {
+        return bsonWoCompare({_: this._cursorid}, {_: NumberLong(0)}) === 0;
+    }
+    return this._cursor.isClosed();
+};
+
+/**
+ * Returns whether the cursor has closed and has nothing in the batch.
+ */
+DBCommandCursor.prototype.isExhausted = function() {
+    return this.isClosed() && this.objsLeftInBatch() === 0;
+};
+
 DBCommandCursor.prototype.close = function() {
     if (!this._useReadCommands) {
         this._cursor.close();
-    } else if (this._cursorid != 0) {
+    } else if (bsonWoCompare({_: this._cursorid}, {_: NumberLong(0)}) !== 0) {
         var killCursorCmd = {
             killCursors: this._collName,
             cursors: [this._cursorid],
@@ -762,6 +790,11 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
 
     if (this._batchSize) {
         getMoreCmd["batchSize"] = this._batchSize;
+    }
+
+    // maxAwaitTimeMS is only supported when using read commands.
+    if (this._maxAwaitTimeMS) {
+        getMoreCmd.maxTimeMS = this._maxAwaitTimeMS;
     }
 
     // Deliver the getMore command, and check for errors in the response.
