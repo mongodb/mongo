@@ -56,6 +56,12 @@ if platform_family? 'debian'
     command 'apt-get update && apt-get -y -f install'
   end
 
+  # the ubuntu 16.04 image does not have python installed by default
+  # and it is required for the install_compass script
+  execute 'install python' do
+    command 'apt-get install -y python'
+  end
+
   execute 'install mongo shell' do
     command 'dpkg -i `find . -name "*shell*.deb"`'
     cwd homedir
