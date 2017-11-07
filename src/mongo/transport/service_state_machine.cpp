@@ -419,18 +419,10 @@ void ServiceStateMachine::_runNextInGuard(ThreadGuard guard) {
                 _processMessage(std::move(guard));
                 break;
             case State::EndSession:
-                // This will get handled below in an if statement. That way if an error occurs
-                // you don't have to call runNext() again to clean up the session.
+                _cleanupSession(std::move(guard));
                 break;
             default:
                 MONGO_UNREACHABLE;
-        }
-
-        if (state() == State::EndSession) {
-            if (!guard) {
-                guard = ThreadGuard(this);
-            }
-            _cleanupSession(std::move(guard));
         }
 
         return;
