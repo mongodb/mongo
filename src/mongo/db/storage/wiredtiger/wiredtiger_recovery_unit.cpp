@@ -119,6 +119,8 @@ void WiredTigerRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
     invariant(!_areWriteUnitOfWorksBanned);
     invariant(!_inUnitOfWork);
     _inUnitOfWork = true;
+    // Begin a new transaction, if one is not already started.
+    getSession();
 }
 
 void WiredTigerRecoveryUnit::commitUnitOfWork() {
