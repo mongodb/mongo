@@ -66,8 +66,6 @@ public:
     /* spawn a thread, etc., then return */
     virtual void accepted(std::unique_ptr<AbstractMessagingPort> mp) = 0;
 
-    const int _port;
-
     /**
      * Allocate sockets for the listener and set _setupSocketsSuccessful to true
      * iff the process was successful.
@@ -83,17 +81,23 @@ public:
 
     void shutdown();
 
+    std::vector<SockAddr> getListenerAddrs() const;
+
 private:
-    std::vector<SockAddr> _mine;
-    std::vector<SOCKET> _socks;
+    struct SockRecord {
+        SockAddr mine;
+        SOCKET sock;
+    };
+
+    std::vector<SockRecord> _socks;
+    const int _port;
     std::string _name;
     std::string _ip;
     bool _setupSocketsSuccessful;
     bool _logConnect;
     mutable stdx::mutex _readyMutex;                   // Protects _ready
     mutable stdx::condition_variable _readyCondition;  // Used to wait for changes to _ready
-    // Boolean that indicates whether this Listener is ready to accept incoming network requests
-    bool _ready;
+    bool _ready;  // Ready to accept incoming network requests?
     AtomicBool _finished{false};
 
     ServiceContext* _ctx;

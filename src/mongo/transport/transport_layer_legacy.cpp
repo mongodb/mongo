@@ -212,6 +212,14 @@ void TransportLayerLegacy::shutdown() {
     }
 }
 
+std::vector<HostAndPort> TransportLayerLegacy::getListeningPorts() const {
+    std::vector<HostAndPort> r;
+    for (const SockAddr& addr : _listener->getListenerAddrs()) {
+        r.push_back(HostAndPort(addr));
+    }
+    return r;
+}
+
 void TransportLayerLegacy::_destroy(LegacySession& session) {
     if (!session.conn()->closed) {
         _closeConnection(session.conn());

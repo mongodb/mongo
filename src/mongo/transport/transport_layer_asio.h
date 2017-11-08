@@ -110,6 +110,8 @@ public:
 
     void shutdown() final;
 
+    std::vector<HostAndPort> getListeningPorts() const final;
+
     const std::shared_ptr<asio::io_context>& getIOContext();
 
 private:
@@ -124,7 +126,7 @@ private:
 
     void _acceptConnection(GenericAcceptor& acceptor);
 
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // There are two IO contexts that are used by TransportLayerASIO. The _workerIOContext
     // contains all the accepted sockets and all normal networking activity. The
