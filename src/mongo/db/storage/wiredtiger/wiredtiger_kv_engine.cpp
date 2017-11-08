@@ -526,7 +526,7 @@ void WiredTigerKVEngine::cleanShutdown() {
             //    shipped with MongoDB 3.4 will always refuse to start up without this reconfigure
             //    being successful. Doing this last prevents MongoDB running in 3.4 with only some
             //    underlying tables being logged.
-            log() << "Downgrading files to FCV 3.4";
+            LOG(1) << "Downgrading WiredTiger tables to release compatibility 2.9";
             WT_CONNECTION* conn;
             std::stringstream openConfig;
             openConfig << _wtOpenConfig << ",log=(archive=false)";
