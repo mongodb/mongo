@@ -29,30 +29,6 @@ selector:
   # TODO SERVER-31245: Inserts to "system.indexes" bypass the check for retryability.
   - jstests/core/batch_write_command_insert.js
 
-  # TODO SERVER-31328: Investigate enabling these workloads once performance of retrying completed
-  # inserts and deletes has improved.
-  #
-  # These tests time out because of too many retryable operations:
-  - jstests/core/batch_write_command_update.js
-  - jstests/core/bulk_insert.js
-  - jstests/core/insert1.js
-  - jstests/core/remove6.js
-  - jstests/core/removea.js
-
-  # These tests time out on slower machines because of too many retryable operations:
-  - jstests/core/explain3.js
-  - jstests/core/geo2.js
-  - jstests/core/geo3.js
-  - jstests/core/geo_polygon3.js
-  - jstests/core/geo_s2explain.js
-  - jstests/core/geo_s2sparse.js
-  - jstests/core/geo_s2twofields.js
-  - jstests/core/mr1.js
-  - jstests/core/queryoptimizer3.js
-  - jstests/core/remove9.js
-  - jstests/core/removeb.js
-  - jstests/core/splitvector.js
-
 executor:
   config:
     shell_options:

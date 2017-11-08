@@ -1482,6 +1482,10 @@ Status WiredTigerRecordStore::touch(OperationContext* opCtx, BSONObjBuilder* out
 }
 
 void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
+    // Make sure that callers do not hold an active snapshot so it will be able to see the oplog
+    // entries it waited for afterwards.
+    invariant(!_getRecoveryUnit(opCtx)->inActiveTxn());
+
     auto oplogManager = _kvEngine->getOplogManager();
     if (oplogManager->isRunning()) {
         oplogManager->waitForAllEarlierOplogWritesToBeVisible(this, opCtx);

@@ -112,7 +112,10 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                 // non-tailable scans are the only case where a meaningful EOF will be seen that
                 // might not include writes that finished before the read started. This also must be
                 // done before we create the cursor as that is when we establish the endpoint for
-                // the cursor.
+                // the cursor. Also call abandonSnapshot to make sure that we are using a fresh
+                // storage engine snapshot while waiting. Otherwise, we will end up reading from
+                // the snapshot where the oplog entries are not yet visible even after the wait.
+                getOpCtx()->recoveryUnit()->abandonSnapshot();
                 _params.collection->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(
                     getOpCtx());
             }
