@@ -120,14 +120,9 @@ TEST(PipelineOptimizationTest, MoveSkipBeforeProject) {
                               "[{$skip : 5}, {$project: {_id: true, a : true}}]");
 }
 
-TEST(PipelineOptimizationTest, MoveLimitBeforeProject) {
+TEST(PipelineOptimizationTest, LimitDoesNotMoveBeforeProject) {
     assertPipelineOptimizesTo("[{$project: {a : 1}}, {$limit : 5}]",
-                              "[{$limit : 5}, {$project: {_id: true, a : true}}]");
-}
-
-TEST(PipelineOptimizationTest, MoveMultipleSkipsAndLimitsBeforeProject) {
-    assertPipelineOptimizesTo("[{$project: {a : 1}}, {$limit : 5}, {$skip : 3}]",
-                              "[{$limit : 5}, {$skip : 3}, {$project: {_id: true, a : true}}]");
+                              "[{$project: {_id: true, a : true}}, {$limit : 5}]");
 }
 
 TEST(PipelineOptimizationTest, MoveMatchBeforeAddFieldsIfInvolvedFieldsNotRelated) {
@@ -190,15 +185,15 @@ TEST(PipelineOptimizationTest, MoveMatchBeforeAddFieldsWhenMatchedFieldIsPrefixO
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
-TEST(PipelineOptimizationTest, SkipSkipLimitBecomesLimitSkip) {
+TEST(PipelineOptimizationTest, LimitDoesNotSwapBeforeSkipWithoutSort) {
     std::string inputPipe =
         "[{$skip : 3}"
         ",{$skip : 5}"
         ",{$limit: 5}"
         "]";
     std::string outputPipe =
-        "[{$limit: 13}"
-        ",{$skip :  8}"
+        "[{$skip : 8}"
+        ",{$limit: 5}"
         "]";
     assertPipelineOptimizesTo(inputPipe, outputPipe);
 }
@@ -1582,6 +1577,151 @@ TEST(PipelineOptimizationTest, ChangeStreamLookupDoesNotSwapWithMatchOnPostImage
     ASSERT(dynamic_cast<DocumentSourceMatch*>(pipeline->getSources().back().get()));
 }
 
+TEST(PipelineOptimizationTest, SortLimProjLimBecomesTopKSortProj) {
+    std::string inputPipe =
+        "[{$sort: {a: 1}}"
+        ",{$limit: 7}"
+        ",{$project : {a: 1}}"
+        ",{$limit: 5}"
+        "]";
+
+    std::string outputPipe =
+        "[{$sort: {sortKey: {a: 1}, limit: 5}}"
+        ",{$project: {_id: true, a: true}}"
+        "]";
+
+    std::string serializedPipe =
+        "[{$sort: {a: 1}}"
+        ",{$limit: 5}"
+        ",{$project : {_id: true, a: true}}"
+        "]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortProjUnwindLimLimBecomesSortProjUnwindLim) {
+    std::string inputPipe =
+        "[{$sort: {a: 1}}"
+        ",{$project : {a: 1}}"
+        ",{$unwind: {path: '$a'}}"
+        ",{$limit: 7}"
+        ",{$limit: 5}"
+        "]";
+
+    std::string outputPipe =
+        "[{$sort: {sortKey: {a: 1}}}"
+        ",{$project: {_id: true, a: true}}"
+        ",{$unwind: {path: '$a'}}"
+        ",{$limit: 5}"
+        "]";
+
+    std::string serializedPipe =
+        "[{$sort: {a: 1}}"
+        ",{$project : {_id: true, a: true}}"
+        ",{$unwind: {path: '$a'}}"
+        ",{$limit: 5}"
+        "]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortSkipLimBecomesTopKSortSkip) {
+    std::string inputPipe =
+        "[{$sort: {a: 1}}"
+        ",{$skip: 2}"
+        ",{$limit: 5}"
+        "]";
+
+    std::string outputPipe =
+        "[{$sort: {sortKey: {a: 1}, limit: 7}}"
+        ",{$skip: 2}"
+        "]";
+
+    std::string serializedPipe =
+        "[{$sort: {a: 1}}"
+        ",{$limit: 7}"
+        ",{$skip: 2}"
+        "]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, LimDoesNotCoalesceWithSortInSortProjGroupLim) {
+    std::string inputPipe =
+        "[{$sort: {a: 1}}"
+        ",{$project : {a: 1}}"
+        ",{$group: {_id: '$a'}}"
+        ",{$limit: 5}"
+        "]";
+
+    std::string outputPipe =
+        "[{$sort: {sortKey: {a: 1}}}"
+        ",{$project: {_id: true, a: true}}"
+        ",{$group: {_id: '$a'}}"
+        ",{$limit: 5}"
+        "]";
+
+    std::string serializedPipe =
+        "[{$sort: {a: 1}}"
+        ",{$project : {_id: true, a: true}}"
+        ",{$group: {_id: '$a'}}"
+        ",{$limit: 5}"
+        "]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortProjSkipLimBecomesTopKSortSkipProj) {
+    std::string inputPipe =
+        "[{$sort: {a: 1}}"
+        ",{$project : {a: 1}}"
+        ",{$skip: 3}"
+        ",{$limit: 5}"
+        "]";
+
+    std::string outputPipe =
+        "[{$sort: {sortKey: {a: 1}, limit: 8}}"
+        ",{$skip: 3}"
+        ",{$project: {_id: true, a: true}}"
+        "]";
+
+    std::string serializedPipe =
+        "[{$sort: {a: 1}}"
+        ",{$limit: 8}"
+        ",{$skip: 3}"
+        ",{$project : {_id: true, a: true}}"
+        "]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
+TEST(PipelineOptimizationTest, SortSkipProjSkipLimSkipLimBecomesTopKSortSkipProj) {
+    std::string inputPipe =
+        "[{$sort: {a: 1}}"
+        ",{$skip: 2}"
+        ",{$project : {a: 1}}"
+        ",{$skip: 4}"
+        ",{$limit: 25}"
+        ",{$skip: 6}"
+        ",{$limit: 3}"
+        "]";
+
+    std::string outputPipe =
+        "[{$sort: {sortKey: {a: 1}, limit: 15}}"
+        ",{$skip: 12}"
+        ",{$project: {_id: true, a: true}}"
+        "]";
+
+    std::string serializedPipe =
+        "[{$sort: {a: 1}}"
+        ",{$limit: 15}"
+        ",{$skip: 12}"
+        ",{$project : {_id: true, a: true}}"
+        "]";
+
+    assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
+}
+
 }  // namespace Local
 
 namespace Sharded {
@@ -1812,6 +1952,86 @@ class ShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj : public Base {
     string mergePipeJson() {
         return "[{$sort: {sortKey: {a: 1}, mergePresorted: true, limit: 8}}"
                ",{$skip: 3}"
+               ",{$project: {_id: true, a: true}}"
+               "]";
+    }
+};
+
+class ShardedMatchProjLimDoesNotBecomeMatchLimProj : public Base {
+    string inputPipeJson() {
+        return "[{$match: {a: 1}}"
+               ",{$project : {a: 1}}"
+               ",{$limit: 5}"
+               "]";
+    }
+    string shardPipeJson() {
+        return "[{$match: {a: {$eq : 1}}}"
+               ",{$project: {_id: true, a: true}}"
+               ",{$limit: 5}"
+               "]";
+    }
+    string mergePipeJson() {
+        return "[{$limit: 5}]";
+    }
+};
+
+class ShardedSortProjLimBecomesTopKSortProj : public Base {
+    string inputPipeJson() {
+        return "[{$sort: {a : 1}}"
+               ",{$project : {a: 1}}"
+               ",{$limit: 5}"
+               "]";
+    }
+    string shardPipeJson() {
+        return "[{$sort: {sortKey: {a: 1}, limit: 5}}"
+               ",{$project: {_id: true, a: true}}"
+               "]";
+    }
+    string mergePipeJson() {
+        return "[{$sort: {sortKey: {a: 1}, mergePresorted: true, limit: 5}}"
+               ",{$project: {_id: true, a: true}}"
+               "]";
+    }
+};
+
+class ShardedSortGroupProjLimDoesNotBecomeTopKSortProjGroup : public Base {
+    string inputPipeJson() {
+        return "[{$sort: {a : 1}}"
+               ",{$group : {_id: {a: '$a'}}}"
+               ",{$project : {a: 1}}"
+               ",{$limit: 5}"
+               "]";
+    }
+    string shardPipeJson() {
+        return "[{$sort: {sortKey: {a: 1}}}"
+               ",{$project : {_id: false, a: true}}"
+               "]";
+    }
+    string mergePipeJson() {
+        return "[{$sort: {sortKey: {a: 1}, mergePresorted: true}}"
+               ",{$group : {_id: {a: '$a'}}}"
+               ",{$project: {_id: true, a: true}}"
+               ",{$limit: 5}"
+               "]";
+    }
+};
+
+class ShardedMatchSortProjLimBecomesMatchTopKSortProj : public Base {
+    string inputPipeJson() {
+        return "[{$match: {a: {$eq : 1}}}"
+               ",{$sort: {a: -1}}"
+               ",{$project : {a: 1}}"
+               ",{$limit: 6}"
+               "]";
+    }
+    string shardPipeJson() {
+        return "[{$match: {a: {$eq : 1}}}"
+               ",{$sort: {sortKey: {a: -1}, limit: 6}}"
+               ",{$project: {_id: true, a: true}}"
+               "]";
+    }
+    string mergePipeJson() {
+        return "[{$sort: {sortKey: {a: -1}, mergePresorted: true, limit: 6}}"
                ",{$project: {_id: true, a: true}}"
                "]";
     }
@@ -2439,6 +2659,14 @@ public:
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
                 ShardedSortMatchProjSkipLimBecomesMatchTopKSortSkipProj>();
+        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
+                ShardedMatchProjLimDoesNotBecomeMatchLimProj>();
+        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
+                ShardedSortProjLimBecomesTopKSortProj>();
+        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
+                ShardedSortGroupProjLimDoesNotBecomeTopKSortProjGroup>();
+        add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::
+                ShardedMatchSortProjLimBecomesMatchTopKSortProj>();
         add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::Out>();
         add<Optimizations::Sharded::needsPrimaryShardMerger::Project>();

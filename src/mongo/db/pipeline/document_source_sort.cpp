@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
+#include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
@@ -188,14 +189,27 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
-    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
+    auto sortItr = std::next(itr);
+    long long skipSum = 0;
+    while (sortItr != container->end()) {
+        auto nextStage = (*sortItr).get();
 
-    if (nextLimit) {
-        // If the following stage is a $limit, we can combine it with ourselves.
-        setLimitSrc(nextLimit);
-        container->erase(std::next(itr));
-        return itr;
+        if (auto nextSkip = dynamic_cast<DocumentSourceSkip*>(nextStage)) {
+            skipSum += nextSkip->getSkip();
+            ++sortItr;
+        } else if (auto nextLimit = dynamic_cast<DocumentSourceLimit*>(nextStage)) {
+            nextLimit->setLimit(nextLimit->getLimit() + skipSum);
+            setLimitSrc(nextLimit);
+            container->erase(sortItr);
+            sortItr = std::next(itr);
+            skipSum = 0;
+        } else if (!nextStage->constraints().canSwapWithLimit && !nextSkip) {
+            return std::next(itr);
+        } else {
+            ++sortItr;
+        }
     }
+
     return std::next(itr);
 }
 

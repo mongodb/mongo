@@ -297,6 +297,10 @@ public:
         // must also override getModifiedPaths() to provide information about which particular
         // $match predicates be swapped before itself.
         bool canSwapWithMatch = false;
+
+        // True if a subsequent $limit stage can be moved before this stage in the pipeline. This is
+        // true if this stage does not add or remove documents from the pipeline.
+        bool canSwapWithLimit = false;
     };
 
     using ChangeStreamRequirement = StageConstraints::ChangeStreamRequirement;

@@ -132,6 +132,7 @@ public:
                  : ChangeStreamRequirement::kWhitelist));
 
         constraints.canSwapWithMatch = true;
+        constraints.canSwapWithLimit = true;
         return constraints;
     }
 

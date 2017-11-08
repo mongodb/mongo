@@ -85,9 +85,8 @@ Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
     auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
-    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
 
-    if (nextSkip || nextLimit) {
+    if (nextSkip) {
         std::swap(*itr, *std::next(itr));
         return itr == container->begin() ? itr : std::prev(itr);
     }
