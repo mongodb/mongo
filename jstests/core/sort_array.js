@@ -161,4 +161,18 @@
 
     testAggAndFindSort(
         {filter: {}, sort: {"d.e.g": 1}, project: {_id: 1}, expected: [{_id: 1}, {_id: 0}]});
+
+    // Test a sort over the trailing field of a compound index, where the two fields of the index
+    // share a path prefix. This is designed as a regression test for SERVER-31858.
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 2, a: [{b: 1, c: 2}, {b: 2, c: 3}]}));
+    assert.writeOK(coll.insert({_id: 0, a: [{b: 2, c: 0}, {b: 1, c: 4}]}));
+    assert.writeOK(coll.insert({_id: 1, a: [{b: 1, c: 5}, {b: 2, c: 1}]}));
+    assert.commandWorked(coll.createIndex({"a.b": 1, "a.c": 1}));
+    testAggAndFindSort({
+        filter: {"a.b": 1},
+        project: {_id: 1},
+        sort: {"a.c": 1},
+        expected: [{_id: 0}, {_id: 1}, {_id: 2}]
+    });
 }());

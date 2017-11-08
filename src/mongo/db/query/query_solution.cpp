@@ -758,7 +758,7 @@ void IndexScanNode::computeProperties() {
     // We cannot provide a sort which involves a multikey field. Prune such sort orders, if the
     // index is multikey.
     if (index.multikey) {
-        auto multikeyFields = getMultikeyFields(index.keyPattern, index.multikeyPaths);
+        multikeyFields = getMultikeyFields(index.keyPattern, index.multikeyPaths);
         for (auto sortsIt = _sorts.begin(); sortsIt != _sorts.end();) {
             bool foundMultikeyField = false;
             for (auto&& elt : *sortsIt) {

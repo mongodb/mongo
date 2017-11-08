@@ -495,6 +495,12 @@ struct IndexScanNode : public QuerySolutionNode {
     IndexBounds bounds;
 
     const CollatorInterface* queryCollator;
+
+    // The set of paths in the index key pattern which have at least one multikey path component, or
+    // empty if the index either is not multikey or does not have path-level multikeyness metadata.
+    //
+    // The correct set of paths is computed and stored here by computeProperties().
+    std::set<StringData> multikeyFields;
 };
 
 struct ProjectionNode : public QuerySolutionNode {
