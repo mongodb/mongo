@@ -3857,57 +3857,6 @@ TEST_F(StableOpTimeTest, CleanupStableOpTimeCandidates) {
     ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
 }
 
-TEST_F(StableOpTimeTest, ClearOpTimeCandidatesAfterRollback) {
-
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "version"
-                            << 1
-                            << "members"
-                            << BSON_ARRAY(BSON("host"
-                                               << "node1:12345"
-                                               << "_id"
-                                               << 0))
-                            << "protocolVersion"
-                            << 1),
-                       HostAndPort("node1", 12345));
-
-    auto repl = getReplCoord();
-    long long term = 0;
-    ASSERT_OK(repl->setFollowerMode(MemberState::RS_SECONDARY));
-
-    OpTime commitPoint = OpTime({1, 2}, term);
-    repl->advanceCommitPoint(commitPoint);
-    ASSERT_EQUALS(SnapshotName::min(), getStorageInterface()->getStableTimestamp());
-
-    repl->setMyLastAppliedOpTime(OpTime({1, 1}, term));
-    repl->setMyLastAppliedOpTime(OpTime({1, 2}, term));
-    repl->setMyLastAppliedOpTime(OpTime({1, 3}, term));
-
-    // The stable timestamp should be equal to the commit point timestamp.
-    const Timestamp stableTimestamp =
-        Timestamp(getStorageInterface()->getStableTimestamp().asU64());
-    Timestamp expectedStableTimestamp = commitPoint.getTimestamp();
-    ASSERT_EQUALS(expectedStableTimestamp, stableTimestamp);
-
-    // The stable optime candidate set should contain optimes >= the stable optime.
-    std::set<OpTime> opTimeCandidates = repl->getStableOpTimeCandidates_forTest();
-    const std::set<OpTime> expectedOpTimeCandidates = {OpTime({1, 2}, term), OpTime({1, 3}, term)};
-    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
-
-    // Transition to ROLLBACK. The set of optime candidates shouldn't have been changed.
-    ASSERT_OK(repl->setFollowerMode(MemberState::RS_ROLLBACK));
-    opTimeCandidates = repl->getStableOpTimeCandidates_forTest();
-    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
-
-    // Transition to SECONDARY from ROLLBACK.
-    ASSERT_OK(repl->setFollowerMode(MemberState::RS_SECONDARY));
-
-    // Make sure the stable optime candidate set has been cleared.
-    opTimeCandidates = repl->getStableOpTimeCandidates_forTest();
-    ASSERT_OPTIME_SET_EQ(std::set<OpTime>(), opTimeCandidates);
-}
-
 
 TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorage) {
 

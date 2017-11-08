@@ -2599,9 +2599,6 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
     if (_memberState.rollback()) {
         // Ensure that no snapshots were created while we were in rollback.
         invariant(!_currentCommittedSnapshot);
-
-        // After executing a rollback, clear the set of stable optime candidates.
-        _stableOpTimeCandidates.clear();
     }
 
     // If we are transitioning from secondary, cancel any scheduled takeovers.
