@@ -158,6 +158,8 @@ public:
      */
     virtual Status setup() = 0;
 
+    virtual std::vector<HostAndPort> getListeningPorts() const = 0;
+
 protected:
     TransportLayer() = default;
 

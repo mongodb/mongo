@@ -87,6 +87,8 @@ public:
 
     void shutdown() override;
 
+    std::vector<HostAndPort> getListeningPorts() const final;
+
 private:
     class LegacySession;
     using LegacySessionHandle = std::shared_ptr<LegacySession>;

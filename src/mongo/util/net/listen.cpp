@@ -168,16 +168,15 @@ bool Listener::setupSockets() {
         checkTicketNumbers();
     }
 
-#if !defined(_WIN32)
-    _mine = ipToAddrs(_ip.c_str(), _port, (!serverGlobalParams.noUnixSocket && useUnixSockets()));
+    const bool withUnix =
+#if defined(_WIN32)
+        false;
 #else
-    _mine = ipToAddrs(_ip.c_str(), _port, false);
+        !serverGlobalParams.noUnixSocket && useUnixSockets();
 #endif
 
-    for (std::vector<SockAddr>::const_iterator it = _mine.begin(), end = _mine.end(); it != end;
-         ++it) {
-        const SockAddr& me = *it;
 
+    for (const SockAddr& me : ipToAddrs(_ip.c_str(), _port, withUnix)) {
         if (!me.isValid()) {
             error() << "listen(): socket is invalid.";
             return _setupSocketsSuccessful;
@@ -234,7 +233,7 @@ bool Listener::setupSockets() {
         }
 #endif
 
-        _socks.push_back(sock);
+        _socks.push_back(SockRecord{me, sock});
         socketGuard.Dismiss();
     }
 
@@ -250,16 +249,16 @@ void Listener::initAndListen() {
     }
 
     SOCKET maxfd = 0;  // needed for select()
-    for (unsigned i = 0; i < _socks.size(); i++) {
-        if (::listen(_socks[i], serverGlobalParams.listenBacklog) != 0) {
+    for (const auto& rec : _socks) {
+        if (::listen(rec.sock, serverGlobalParams.listenBacklog) != 0) {
             error() << "listen(): listen() failed " << errnoWithDescription();
             return;
         }
 
-        ListeningSockets::get()->add(_socks[i]);
+        ListeningSockets::get()->add(rec.sock);
 
-        if (_socks[i] > maxfd) {
-            maxfd = _socks[i];
+        if (rec.sock > maxfd) {
+            maxfd = rec.sock;
         }
     }
 
@@ -289,8 +288,8 @@ void Listener::initAndListen() {
         fd_set fds[1];
         FD_ZERO(fds);
 
-        for (vector<SOCKET>::iterator it = _socks.begin(), end = _socks.end(); it != end; ++it) {
-            FD_SET(*it, fds);
+        for (const auto& rec : _socks) {
+            FD_SET(rec.sock, fds);
         }
 
         maxSelectTime.tv_sec = 0;
@@ -315,11 +314,11 @@ void Listener::initAndListen() {
             return;
         }
 
-        for (vector<SOCKET>::iterator it = _socks.begin(), end = _socks.end(); it != end; ++it) {
-            if (!(FD_ISSET(*it, fds)))
+        for (const auto& rec : _socks) {
+            if (!(FD_ISSET(rec.sock, fds)))
                 continue;
             SockAddr from;
-            int s = accept(*it, from.raw(), &from.addressSize);
+            int s = accept(rec.sock, from.raw(), &from.addressSize);
             if (s < 0) {
                 int x = errno;  // so no global issues
                 if (x == EBADF) {
@@ -429,13 +428,13 @@ void Listener::initAndListen() {
         return;
     }
 
-    for (unsigned i = 0; i < _socks.size(); i++) {
-        if (::listen(_socks[i], serverGlobalParams.listenBacklog) != 0) {
+    for (const auto& rec : _socks) {
+        if (::listen(rec.sock, serverGlobalParams.listenBacklog) != 0) {
             error() << "listen(): listen() failed " << errnoWithDescription();
             return;
         }
 
-        ListeningSockets::get()->add(_socks[i]);
+        ListeningSockets::get()->add(rec.sock);
     }
 
 #ifdef MONGO_CONFIG_SSL
@@ -454,7 +453,6 @@ void Listener::initAndListen() {
     std::vector<std::unique_ptr<EventHolder>> eventHolders;
     std::unique_ptr<WSAEVENT[]> events(new WSAEVENT[_socks.size()]);
 
-
     // Populate events array with an event for each socket we are watching
     for (size_t count = 0; count < _socks.size(); ++count) {
         auto ev = stdx::make_unique<EventHolder>();
@@ -467,7 +465,7 @@ void Listener::initAndListen() {
     while (!globalInShutdownDeprecated() && !_finished.load()) {
         // Turn on listening for accept-ready sockets
         for (size_t count = 0; count < _socks.size(); ++count) {
-            int status = WSAEventSelect(_socks[count], events[count], FD_ACCEPT | FD_CLOSE);
+            int status = WSAEventSelect(_socks[count].sock, events[count], FD_ACCEPT | FD_CLOSE);
             if (status == SOCKET_ERROR) {
                 const int mongo_errno = WSAGetLastError();
 
@@ -501,9 +499,10 @@ void Listener::initAndListen() {
 
         // Determine which socket is ready
         DWORD eventIndex = result - WSA_WAIT_EVENT_0;
+        SOCKET eventSock = _socks[eventIndex].sock;
         WSANETWORKEVENTS networkEvents;
         // Extract event details, and clear event for next pass
-        int status = WSAEnumNetworkEvents(_socks[eventIndex], events[eventIndex], &networkEvents);
+        int status = WSAEnumNetworkEvents(eventSock, events[eventIndex], &networkEvents);
         if (status == SOCKET_ERROR) {
             const int mongo_errno = WSAGetLastError();
             error() << "Windows WSAEnumNetworkEvents returned "
@@ -527,17 +526,17 @@ void Listener::initAndListen() {
             continue;
         }
 
-        status = WSAEventSelect(_socks[eventIndex], NULL, 0);
+        status = WSAEventSelect(eventSock, NULL, 0);
         if (status == SOCKET_ERROR) {
             const int mongo_errno = WSAGetLastError();
             error() << "Windows WSAEventSelect returned " << errnoWithDescription(mongo_errno);
             continue;
         }
 
-        disableNonblockingMode(_socks[eventIndex]);
+        disableNonblockingMode(eventSock);
 
         SockAddr from;
-        int s = accept(_socks[eventIndex], from.raw(), &from.addressSize);
+        int s = accept(eventSock, from.raw(), &from.addressSize);
         if (s < 0) {
             int x = errno;  // so no global issues
             if (x == EBADF) {
@@ -650,6 +649,14 @@ void Listener::checkTicketNumbers() {
 
 void Listener::shutdown() {
     _finished.store(true);
+}
+
+std::vector<SockAddr> Listener::getListenerAddrs() const {
+    std::vector<SockAddr> r;
+    for (const auto& rec : _socks) {
+        r.push_back(rec.mine);
+    }
+    return r;
 }
 
 TicketHolder Listener::globalTicketHolder(DEFAULT_MAX_CONN);
