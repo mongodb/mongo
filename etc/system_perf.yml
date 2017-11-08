@@ -312,8 +312,8 @@ tasks:
           mv src/mongo-tools/* mongodb/bin
           if [ -d jstests/hooks ]
           then
-            echo "Fetching JS test DB correctness checks from directory jstests/hooks"
-            cp -a jstests/hooks/* mongodb/jstests/hooks
+            echo "Fetching JS test DB correctness checks from directory jstests"
+            cp -a jstests/* mongodb/jstests
           fi
           tar cvf mongodb.tar mongodb
           gzip mongodb.tar
