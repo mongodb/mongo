@@ -153,6 +153,8 @@ variables:
 # TODO: Remove psutil from virtualenv_requirements when BUILD-3083 is done
 - &powercycle_ec2_instance
   aws_ec2_yml: aws_ec2.yml
+  monitor_proc_file: proc.json
+  monitor_system_file: system.json
   remote_dir: powercycle
   secret_port: "20001"
   security_groups: mci powercycle_testing
@@ -175,7 +177,7 @@ variables:
        value: ${remote_dir}/mongod.log
 
 - &powercycle_test
-  ec2_artifacts: ${log_path} ${backup_path_after} ${backup_path_before}
+  ec2_artifacts: ${monitor_proc_file} ${monitor_system_file} ${log_path} ${backup_path_after} ${backup_path_before}
   program_options: --logLevel info --backupPathBefore  ${backup_path_before} --backupPathAfter ${backup_path_after}
   connection_options: --sshUserHost ${ip_address} --sshConnection \"${ssh_identity} ${ssh_connection_options}\"
   test_options: --testLoops 25 --seedDocNum 10000 --rsync --validate local --canary local
@@ -1251,6 +1253,56 @@ functions:
               --retries ${ssh_retries|0}                       \
               --commands "$cmds"
           fi
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          set -o errexit
+          ${set_sudo}
+          # Setup curator to collect system & process stats on remote.
+          # TODO: Update command once curator supports displaying all processes.
+          # Note: On Windows using 'process-tree --pid 1' does not work, as it does on Linux.
+          if [ "Windows_NT" = "$OS" ]; then
+            cmds="cygrunsrv --install curator_sys --path $(which curator) --args 'stat system' -1 $HOME/${monitor_system_file}"
+            cmds="$cmds; cygrunsrv --install curator_proc --path $(which curator) --args 'stat process-tree --pid 1' -1 $HOME/${monitor_proc_file}"
+          else
+            cmds="cmd='@reboot ${sudo} $(which curator) stat system >> ${monitor_system_file}'"
+            cmds="$cmds; (crontab -l ; echo \"\$cmd\") | crontab -"
+            cmds="$cmds; cmd='@reboot ${sudo} $(which curator) stat process-tree --pid 1 >> ${monitor_proc_file}'"
+            cmds="$cmds; (crontab -l ; echo "\$cmd") | crontab -"
+          fi
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --commands "$cmds"
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          set -o errexit
+          ${set_sudo}
+          # Start curator to collect system & process stats on remote.
+          if [ "Windows_NT" = "$OS" ]; then
+            cmds="cygrunsrv --start curator_sys"
+            cmds="$cmds; cygrunsrv --start curator_proc"
+          else
+            cmds="{ ${sudo} $(which curator) stat system > ${monitor_system_file} &"
+            cmds="$cmds ${sudo} $(which curator) stat process-tree --pid 1 > ${monitor_proc_file} & } & disown"
+          fi
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --commands "$cmds"
 
   "copy EC2 artifacts":
     - command: shell.exec
