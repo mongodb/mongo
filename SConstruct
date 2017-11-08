@@ -2484,6 +2484,10 @@ def doConfigure(myenv):
         # If possible with the current linker, mark relocations as read-only.
         AddToLINKFLAGSIfSupported(myenv, "-Wl,-z,relro")
 
+    # Avoid deduping symbols on OS X debug builds, as it takes a long time.
+    if not optBuild and myenv.ToolchainIs('clang') and env.TargetOSIs('darwin'):
+        AddToLINKFLAGSIfSupported(myenv, "-Wl,-no_deduplicate")
+
     # Apply any link time optimization settings as selected by the 'lto' option.
     if has_option('lto'):
         if myenv.ToolchainIs('msvc'):
