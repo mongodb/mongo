@@ -272,8 +272,11 @@ def float53_object(target, source, extra_defines=None):
     obj_env = env.Clone()
     defines = (extra_defines or []) + ['T_FLOAT']
     obj_env.Append(CPPDEFINES=defines)
-    for to_remove in ['-Werror', '-Wall', '-W']:
-        removeIfPresent(obj_env['CCFLAGS'], to_remove)
+
+    if env.ToolchainIs('msvc'):
+        removeIfPresent(env['CCFLAGS'], '/W3')
+    else:
+        env.Append(CCFLAGS='-w')
     return obj_env.LibraryObject(target, source)
 
 # Set OS Defines
@@ -338,8 +341,10 @@ if env.TargetOSIs('windows'):
     env.Append(CCFLAGS=['/wd4477'])
 
 
-for to_remove in ['-Werror', '-Wall', '-W', '/W3']:
-    removeIfPresent(env['CCFLAGS'], to_remove)
+if env.ToolchainIs('msvc'):
+    removeIfPresent(env['CCFLAGS'], '/W3')
+else:
+    env.Append(CCFLAGS='-w')
 
 env.Library(
     target='intel_decimal128',
