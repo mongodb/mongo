@@ -70,8 +70,7 @@
         rst.checkReplicatedDataHashes();
     }
 
-    runInitialSync({setFeatureCompatibilityVersion: '3.4'},
-                   'Attempt to assign UUID to replicated collection');
+    runInitialSync({setFeatureCompatibilityVersion: '3.4'}, 'Attempted to create a new collection');
 
     // Modifications to the featureCompatibilityVersion document during initial sync should be
     // caught and cause initial sync to fail.

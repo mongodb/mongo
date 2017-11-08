@@ -74,6 +74,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -87,6 +88,7 @@ MONGO_INITIALIZER(InitializeDatabaseFactory)(InitializerContext* const) {
     });
     return Status::OK();
 }
+MONGO_FP_DECLARE(hangBeforeLoggingCreateCollection);
 }  // namespace
 
 using std::unique_ptr;
@@ -778,19 +780,21 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     if (enableCollectionUUIDs && !optionsWithUUID.uuid &&
         serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
         auto coordinator = repl::ReplicationCoordinator::get(opCtx);
-        bool okayCreation =
-            (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-             (serverGlobalParams.featureCompatibility.getVersion() !=
-              ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) ||
-             coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) ||
-             nss.isSystemDotProfile());  // system.profile is special as it's not replicated
-        if (!okayCreation) {
-            std::string msg = str::stream() << "Attempt to assign UUID to replicated collection: "
-                                            << nss.ns();
+        bool fullyUpgraded = serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36;
+        bool canGenerateUUID =
+            (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) ||
+            coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) || nss.isSystemDotProfile();
+
+        if (fullyUpgraded && !canGenerateUUID) {
+            std::string msg = str::stream() << "Attempted to create a new collection " << nss.ns()
+                                            << " without a UUID";
             severe() << msg;
             uasserted(ErrorCodes::InvalidOptions, msg);
         }
-        optionsWithUUID.uuid.emplace(CollectionUUID::gen());
+        if (canGenerateUUID) {
+            optionsWithUUID.uuid.emplace(CollectionUUID::gen());
+        }
     }
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
@@ -827,6 +831,8 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
             createSystemIndexes(opCtx, collection);
         }
     }
+
+    MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLoggingCreateCollection);
 
     opCtx->getServiceContext()->getOpObserver()->onCreateCollection(
         opCtx, collection, nss, optionsWithUUID, fullIdIndexSpec);

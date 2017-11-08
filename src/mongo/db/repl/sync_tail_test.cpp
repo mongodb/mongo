@@ -701,7 +701,7 @@ TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
 
 DEATH_TEST_F(SyncTailTest,
              MultiSyncApplyFailsWhenCollectionCreationTriesToMakeUUID,
-             "Attempt to assign UUID to replicated collection") {
+             "Attempted to create a new collection") {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
     NamespaceString nss("foo." + _agent.getSuiteName() + "_" + _agent.getTestName());

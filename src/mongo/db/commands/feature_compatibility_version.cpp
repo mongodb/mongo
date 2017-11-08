@@ -222,14 +222,19 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
     UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
     NamespaceString nss(FeatureCompatibilityVersion::kCollection);
 
-    if (storeUpgradeVersion) {
-        // We update the value of the version server parameter so that the admin.system.version
-        // collection gets a UUID.
-        serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
-    }
+    {
+        CollectionOptions options;
+        options.uuid = CollectionUUID::gen();
 
-    uassertStatusOK(storageInterface->createCollection(opCtx, nss, {}));
+        // Only for 3.4 shard servers, we create admin.system.version without UUID on clean startup.
+        // The mention of kFullyDowngradedTo34 below is to ensure this will not compile in 3.8.
+        if (!storeUpgradeVersion &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34)
+            options.uuid.reset();
+
+        uassertStatusOK(storageInterface->createCollection(opCtx, nss, options));
+    }
 
     // We then insert the featureCompatibilityVersion document into the "admin.system.version"
     // collection. The server parameter will be updated on commit by the op observer.
