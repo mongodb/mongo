@@ -311,9 +311,4 @@ void Lock::ResourceLock::unlock() {
     }
 }
 
-void synchronizeOnOplogInFlightResource(Locker* lockState) {
-    dassert(lockState->inAWriteUnitOfWork());
-    Lock::ResourceLock heldUntilEndOfWUOW{lockState, resourceInFlightForOplog, MODE_IX};
-}
-
 }  // namespace mongo

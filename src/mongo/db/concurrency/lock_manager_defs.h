@@ -188,7 +188,6 @@ public:
         SINGLETON_PARALLEL_BATCH_WRITER_MODE,
         SINGLETON_GLOBAL,
         SINGLETON_MMAPV1_FLUSH,
-        SINGLETON_IN_FLIGHT_OPLOG,
     };
 
     ResourceId() : _fullHash(0) {}
@@ -263,13 +262,6 @@ extern const ResourceId resourceIdAdminDB;
 // lock.
 // TODO: Merge this with resourceIdGlobal
 extern const ResourceId resourceIdParallelBatchWriterMode;
-
-// Every place that starts oplog inserts takes this lock in MODE_IX and holds it
-// until the end of their WriteUnitOfWork.
-//
-// Threads that need a consistent view of the world can lock this in MODE_X to prevent
-// concurrent in-flight oplog inserts.
-extern const ResourceId resourceInFlightForOplog;
 
 /**
  * Interface on which granted lock requests will be notified. See the contract for the notify

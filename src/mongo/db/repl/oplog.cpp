@@ -148,7 +148,6 @@ void _getNextOpTimes(OperationContext* opCtx,
                      Collection* oplog,
                      std::size_t count,
                      OplogSlot* slotsOut) {
-    synchronizeOnOplogInFlightResource(opCtx->lockState());
     auto replCoord = ReplicationCoordinator::get(opCtx);
     long long term = OpTime::kUninitializedTerm;
 
