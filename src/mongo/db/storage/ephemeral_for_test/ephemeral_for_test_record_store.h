@@ -188,7 +188,7 @@ private:
             : dataSize(0), recordsMutex(), nextId(1), isOplog(isOplog) {}
 
         int64_t dataSize;
-        stdx::mutex recordsMutex;
+        stdx::recursive_mutex recordsMutex;
         Records records;
         int64_t nextId;
         const bool isOplog;

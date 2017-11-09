@@ -53,7 +53,7 @@ public:
         : _opCtx(opCtx), _data(data), _loc(loc) {}
     virtual void commit() {}
     virtual void rollback() {
-        stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+        stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
         Records::iterator it = _data->records.find(_loc);
         if (it != _data->records.end()) {
@@ -79,7 +79,7 @@ public:
 
     virtual void commit() {}
     virtual void rollback() {
-        stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+        stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
         Records::iterator it = _data->records.find(_loc);
         if (it != _data->records.end()) {
@@ -102,7 +102,7 @@ public:
     TruncateChange(OperationContext* opCtx, Data* data) : _opCtx(opCtx), _data(data), _dataSize(0) {
         using std::swap;
 
-        stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+        stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
         swap(_dataSize, _data->dataSize);
         swap(_records, _data->records);
     }
@@ -111,7 +111,7 @@ public:
     virtual void rollback() {
         using std::swap;
 
-        stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+        stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
         swap(_dataSize, _data->dataSize);
         swap(_records, _data->records);
     }
@@ -298,7 +298,7 @@ const char* EphemeralForTestRecordStore::name() const {
 
 RecordData EphemeralForTestRecordStore::dataFor(OperationContext* opCtx,
                                                 const RecordId& loc) const {
-    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
     return recordFor(loc)->toRecordData();
 }
 
@@ -327,7 +327,7 @@ EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecordStore
 bool EphemeralForTestRecordStore::findRecord(OperationContext* opCtx,
                                              const RecordId& loc,
                                              RecordData* rd) const {
-    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
     Records::const_iterator it = _data->records.find(loc);
     if (it == _data->records.end()) {
@@ -338,7 +338,7 @@ bool EphemeralForTestRecordStore::findRecord(OperationContext* opCtx,
 }
 
 void EphemeralForTestRecordStore::deleteRecord(OperationContext* opCtx, const RecordId& loc) {
-    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
     deleteRecord_inlock(opCtx, loc);
 }
@@ -405,7 +405,7 @@ StatusWith<RecordId> EphemeralForTestRecordStore::insertRecord(
         return StatusWith<RecordId>(ErrorCodes::BadValue, "object to insert exceeds cappedMaxSize");
     }
 
-    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
     EphemeralForTestRecord rec(len);
     memcpy(rec.data.get(), data, len);
 
@@ -433,7 +433,7 @@ Status EphemeralForTestRecordStore::insertRecordsWithDocWriter(OperationContext*
                                                                const Timestamp*,
                                                                size_t nDocs,
                                                                RecordId* idsOut) {
-    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
     for (size_t i = 0; i < nDocs; i++) {
         const int len = docs[i]->documentSize();
@@ -475,7 +475,7 @@ Status EphemeralForTestRecordStore::updateRecord(OperationContext* opCtx,
                                                  int len,
                                                  bool enforceQuota,
                                                  UpdateNotifier* notifier) {
-    stdx::unique_lock<stdx::mutex> lock(_data->recordsMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
     EphemeralForTestRecord* oldRecord = recordFor(loc);
     int oldLen = oldRecord->size;
 
@@ -485,12 +485,10 @@ Status EphemeralForTestRecordStore::updateRecord(OperationContext* opCtx,
     if (notifier) {
         // The in-memory KV engine uses the invalidation framework (does not support
         // doc-locking), and therefore must notify that it is updating a document.
-        lock.unlock();
         Status callbackStatus = notifier->recordStoreGoingToUpdateInPlace(opCtx, loc);
         if (!callbackStatus.isOK()) {
             return callbackStatus;
         }
-        lock.lock();
     }
 
     EphemeralForTestRecord newRecord(len);
@@ -515,7 +513,7 @@ StatusWith<RecordData> EphemeralForTestRecordStore::updateWithDamages(
     const char* damageSource,
     const mutablebson::DamageVector& damages) {
 
-    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
     EphemeralForTestRecord* oldRecord = recordFor(loc);
     const int len = oldRecord->size;
@@ -559,7 +557,7 @@ Status EphemeralForTestRecordStore::truncate(OperationContext* opCtx) {
 void EphemeralForTestRecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                                       RecordId end,
                                                       bool inclusive) {
-    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
     Records::iterator it =
         inclusive ? _data->records.lower_bound(end) : _data->records.upper_bound(end);
     while (it != _data->records.end()) {
@@ -575,7 +573,7 @@ Status EphemeralForTestRecordStore::validate(OperationContext* opCtx,
                                              ValidateAdaptor* adaptor,
                                              ValidateResults* results,
                                              BSONObjBuilder* output) {
-    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
     results->valid = true;
 
@@ -642,7 +640,7 @@ boost::optional<RecordId> EphemeralForTestRecordStore::oplogStartHack(
     if (!_data->isOplog)
         return boost::none;
 
-    stdx::lock_guard<stdx::mutex> lock(_data->recordsMutex);
+    stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
     const Records& records = _data->records;
 
     if (records.empty())
