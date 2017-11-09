@@ -320,10 +320,19 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
     PlanExecutor::ExecState state;
     int retries = 0;  // non-zero when retrying our last document.
     while (retries ||
-           (PlanExecutor::ADVANCED == (state = exec->getNextSnapshotted(&objToIndex, &loc)))) {
+           (PlanExecutor::ADVANCED == (state = exec->getNextSnapshotted(&objToIndex, &loc))) ||
+           MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
         try {
             if (_allowInterruption)
                 _opCtx->checkForInterrupt();
+
+            if (!(retries || (PlanExecutor::ADVANCED == state))) {
+                // The only reason we are still in the loop is hangAfterStartingIndexBuild.
+                log() << "Hanging index build due to 'hangAfterStartingIndexBuild' failpoint";
+                invariant(_allowInterruption);
+                sleepmillis(1000);
+                continue;
+            }
 
             // Make sure we are working with the latest version of the document.
             if (objToIndex.snapshotId() != _opCtx->recoveryUnit()->getSnapshotId() &&
@@ -382,18 +391,6 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
             "Unable to complete index build due to collection scan failure: " +
                 WorkingSetCommon::toStatusString(objToIndex.value()),
             state == PlanExecutor::IS_EOF);
-
-    if (MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
-        // Need the index build to hang before the progress meter is marked as finished so we can
-        // reliably check that the index build has actually started in js tests.
-        while (MONGO_FAIL_POINT(hangAfterStartingIndexBuild)) {
-            log() << "Hanging index build due to 'hangAfterStartingIndexBuild' failpoint";
-            sleepmillis(1000);
-        }
-
-        // Check for interrupt to allow for killop prior to index build completion.
-        _opCtx->checkForInterrupt();
-    }
 
     if (MONGO_FAIL_POINT(hangAfterStartingIndexBuildUnlocked)) {
         // Unlock before hanging so replication recognizes we've completed.
