@@ -59,14 +59,15 @@ HostAndPort testHost{"localhost", 20000};
 
 void initWireSpecMongoD() {
     WireSpec& spec = WireSpec::instance();
-    // accept from any version
-    spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incomingInternalClient.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    // accept from latest internal version
+    spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION;
+    spec.incomingInternalClient.maxWireVersion = LATEST_WIRE_VERSION;
+    // accept from any external version
     spec.incomingExternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.incomingExternalClient.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
-    // connect to any version
-    spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
-    spec.outgoing.maxWireVersion = COMMANDS_ACCEPT_WRITE_CONCERN;
+    spec.incomingExternalClient.maxWireVersion = LATEST_WIRE_VERSION;
+    // connect to latest
+    spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
+    spec.outgoing.maxWireVersion = LATEST_WIRE_VERSION;
 }
 
 // Utility function to use with mock streams
@@ -80,6 +81,16 @@ RemoteCommandResponse simulateIsMaster(RemoteCommandRequest request) {
                               << "maxWireVersion"
                               << mongo::WireSpec::instance().incomingExternalClient.maxWireVersion);
     return response;
+}
+
+BSONObj objConcat(std::initializer_list<BSONObj> objs) {
+    BSONObjBuilder bob;
+
+    for (const auto& obj : objs) {
+        bob.appendElements(obj);
+    }
+
+    return bob.obj();
 }
 
 class NetworkInterfaceASIOTest : public mongo::unittest::Test {
@@ -227,7 +238,7 @@ TEST_F(NetworkInterfaceASIOTest, LateCancel) {
                            });
 
     // Simulate user command
-    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+    stream->simulateServer(rpc::Protocol::kOpMsg,
                            [](RemoteCommandRequest request) -> RemoteCommandResponse {
                                RemoteCommandResponse response;
                                response.data = BSONObj();
@@ -425,9 +436,11 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
                                      << "ok"
                                      << 1.0);
 
+    auto expectedCommandReplyWithMetadata = objConcat({expectedCommandReply, expectedMetadata});
+
     // simulate user command
     stream->simulateServer(
-        rpc::Protocol::kOpCommandV1, [&](RemoteCommandRequest request) -> RemoteCommandResponse {
+        rpc::Protocol::kOpMsg, [&](RemoteCommandRequest request) -> RemoteCommandResponse {
             ASSERT_EQ(std::string{request.cmdObj.firstElementFieldName()}, "foo");
             ASSERT_EQ(request.dbname, "testDB");
 
@@ -440,8 +453,8 @@ TEST_F(NetworkInterfaceASIOTest, StartCommand) {
     auto& res = deferred.get();
     ASSERT(res.elapsedMillis);
     uassertStatusOK(res.status);
-    ASSERT_BSONOBJ_EQ(res.data, expectedCommandReply);
-    ASSERT_BSONOBJ_EQ(res.metadata, expectedMetadata);
+    ASSERT_BSONOBJ_EQ(res.data, expectedCommandReplyWithMetadata);
+    ASSERT_BSONOBJ_EQ(res.metadata, expectedCommandReplyWithMetadata);
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
@@ -486,7 +499,7 @@ public:
         }
 
         // Build a mock reply message
-        auto replyBuilder = rpc::makeReplyBuilder(rpc::Protocol::kOpCommandV1);
+        auto replyBuilder = rpc::makeReplyBuilder(rpc::Protocol::kOpMsg);
         replyBuilder->setCommandReply(BSON("hello!" << 1));
         replyBuilder->setMetadata(BSONObj());
 
@@ -771,6 +784,8 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     auto metadata = BSON("aaa"
                          << "bbb");
 
+    auto commandReplyWithMetadata = objConcat({commandReply, metadata});
+
     RemoteCommandRequest request{testHost, "blah", commandRequest, nullptr};
     auto deferred = startCommand(makeCallbackHandle(), request);
 
@@ -784,7 +799,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
                            });
 
     // Simulate user command.
-    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+    stream->simulateServer(rpc::Protocol::kOpMsg,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
                                ASSERT_BSONOBJ_EQ(commandRequest, request.cmdObj.removeField("$db"));
 
@@ -798,9 +813,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, MakeRequestReturnsNone) {
     auto& result = deferred.get();
 
     ASSERT(result.isOK());
-    ASSERT_BSONOBJ_EQ(commandReply, result.data);
+    ASSERT_BSONOBJ_EQ(commandReplyWithMetadata, result.data);
     ASSERT(result.elapsedMillis);
-    ASSERT_BSONOBJ_EQ(metadata, result.metadata);
+    ASSERT_BSONOBJ_EQ(commandReplyWithMetadata, result.metadata);
     assertNumOps(0u, 0u, 0u, 1u);
 }
 
@@ -818,6 +833,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
                                     << "blah"
                                     << "ok"
                                     << 1.0);
+
     BSONObj hookUnifiedRequest = ([&] {
         BSONObjBuilder bob;
         bob.appendElements(hookCommandRequest);
@@ -825,7 +841,9 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
         bob.append("$db", "foo");
         return bob.obj();
     }());
+
     BSONObj hookReplyMetadata = BSON("1111" << 2222);
+    BSONObj hookCommandReplyWithMetadata = objConcat({hookCommandReply, hookReplyMetadata});
 
     Status handleReplyError{ErrorCodes::AuthSchemaIncompatible, "daowdjkpowkdjpow"};
 
@@ -841,9 +859,10 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
         },
         [&](const HostAndPort& remoteHost, RemoteCommandResponse&& response) {
             handleReplyCalled = true;
-            handleReplyArgumentCorrect =
-                SimpleBSONObjComparator::kInstance.evaluate(response.data == hookCommandReply) &&
-                SimpleBSONObjComparator::kInstance.evaluate(response.metadata == hookReplyMetadata);
+            handleReplyArgumentCorrect = SimpleBSONObjComparator::kInstance.evaluate(
+                                             response.data == hookCommandReplyWithMetadata) &&
+                SimpleBSONObjComparator::kInstance.evaluate(response.metadata ==
+                                                            hookCommandReplyWithMetadata);
             return handleReplyError;
         }));
 
@@ -862,7 +881,7 @@ TEST_F(NetworkInterfaceASIOConnectionHookTest, HandleReplyReturnsError) {
                            });
 
     // Simulate hook reply
-    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+    stream->simulateServer(rpc::Protocol::kOpMsg,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
                                ASSERT_BSONOBJ_EQ(request.cmdObj, hookUnifiedRequest);
                                ASSERT_BSONOBJ_EQ(request.metadata, BSONObj());
@@ -936,7 +955,7 @@ TEST_F(NetworkInterfaceASIOTest, IsMasterRequestContainsOutgoingWireVersionInter
         });
 
     // Simulate ping reply.
-    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+    stream->simulateServer(rpc::Protocol::kOpMsg,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
                                RemoteCommandResponse response;
                                response.data = BSON("ok" << 1);
@@ -965,7 +984,7 @@ TEST_F(NetworkInterfaceASIOTest, IsMasterRequestMissingInternalClientInfoWhenNot
                            });
 
     // Simulate ping reply.
-    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+    stream->simulateServer(rpc::Protocol::kOpMsg,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
                                RemoteCommandResponse response;
                                response.data = BSON("ok" << 1);
@@ -1038,7 +1057,7 @@ TEST_F(NetworkInterfaceASIOMetadataTest, Metadata) {
                            });
 
     // Simulate hook reply
-    stream->simulateServer(rpc::Protocol::kOpCommandV1,
+    stream->simulateServer(rpc::Protocol::kOpMsg,
                            [&](RemoteCommandRequest request) -> RemoteCommandResponse {
                                ASSERT_EQ("bar", request.cmdObj["foo"].str());
                                RemoteCommandResponse response;
