@@ -1186,7 +1186,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             wuow.commit();
 
             LOG(1) << "Resynced collection metadata for collection: " << nss << ", UUID: " << uuid
-                   << ", with: " << redact(options.toBSON())
+                   << ", with: " << redact(info)
                    << ", to: " << redact(cce->getCollectionOptions(opCtx).toBSON());
         }
 

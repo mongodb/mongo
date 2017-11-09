@@ -647,6 +647,11 @@ void updateUUIDSchemaVersion(OperationContext* opCtx, bool upgrade) {
 
         _updateDatabaseUUIDSchemaVersion(opCtx, dbName, dbToCollToUUID[dbName], upgrade);
     }
+
+    std::string upgradeStr = upgrade ? "upgrade" : "downgrade";
+    log() << "Finished updating UUID schema version for " << upgradeStr
+          << ", waiting for all UUIDs to be committed.";
+
     const WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,
                                            WriteConcernOptions::SyncMode::UNSET,
                                            /*timeout*/ INT_MAX);

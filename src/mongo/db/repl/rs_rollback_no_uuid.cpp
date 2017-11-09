@@ -153,6 +153,44 @@ void FixUpInfo::addIndexToDrop(const NamespaceString& nss, const DocID& doc) {
     }
 }
 
+namespace {
+
+bool canRollBackCollMod(BSONObj obj) {
+
+    // If there is only one field, then the collMod is a UUID upgrade/downgrade collMod.
+    if (obj.nFields() == 1) {
+        return true;
+    }
+    for (auto field : obj) {
+        // Example collMod obj
+        // o:{
+        //       collMod : "x",
+        //       validationLevel : "off",
+        //       index: {
+        //                  name: "indexName_1",
+        //                  expireAfterSeconds: 600
+        //              }
+        //    }
+
+        const auto modification = field.fieldNameStringData();
+        if (modification == "collMod") {
+            continue;  // Skips the command name. The first field in the obj will be the
+                       // command name.
+        }
+
+        if (modification == "validator" || modification == "validationAction" ||
+            modification == "validationLevel" || modification == "usePowerOf2Sizes" ||
+            modification == "noPadding") {
+            continue;
+        }
+
+        // Some collMod fields cannot be rolled back, such as the index field.
+        return false;
+    }
+    return true;
+}
+
+}  // namespace
 
 Status rollback_internal_no_uuid::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInfo,
                                                                      const BSONObj& ourObj) {
@@ -274,36 +312,14 @@ Status rollback_internal_no_uuid::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& 
             severe() << message << redact(obj);
             throw RSFatalException(message);
         } else if (cmdname == "collMod") {
-            const auto ns = NamespaceString(cmd->parseNs(nss.db().toString(), obj));
-            for (auto field : obj) {
-                // Example collMod obj
-                // o:{
-                //       collMod : "x",
-                //       validationLevel : "off",
-                //       index: {
-                //                  name: "indexName_1",
-                //                  expireAfterSeconds: 600
-                //              }
-                //    }
-
-                const auto modification = field.fieldNameStringData();
-                if (modification == cmdname) {
-                    continue;  // Skips the command name. The first field in the obj will be the
-                               // command name.
-                }
-
-                if (modification == "validator" || modification == "validationAction" ||
-                    modification == "validationLevel" || modification == "usePowerOf2Sizes" ||
-                    modification == "noPadding") {
-                    fixUpInfo.collectionsToResyncMetadata.insert(ns.ns());
-                    continue;
-                }
-                // Some collMod fields cannot be rolled back, such as the index field.
-                string message = "Cannot roll back a collMod command: ";
-                severe() << message << redact(obj);
-                throw RSFatalException(message);
+            if (canRollBackCollMod(obj)) {
+                const auto ns = NamespaceString(cmd->parseNs(nss.db().toString(), obj));
+                fixUpInfo.collectionsToResyncMetadata.insert(ns.ns());
+                return Status::OK();
             }
-            return Status::OK();
+            string message = "Cannot roll back a collMod command: ";
+            severe() << message << redact(obj);
+            throw RSFatalException(message);
         } else if (cmdname == "applyOps") {
 
             if (first.type() != Array) {
@@ -533,7 +549,8 @@ void syncFixUp(OperationContext* opCtx,
             // Updates the collection flags.
             if (auto optionsField = info["options"]) {
                 if (optionsField.type() != Object) {
-                    throw RSFatalException(str::stream() << "Failed to parse options " << info
+                    throw RSFatalException(str::stream() << "Failed to parse options "
+                                                         << redact(info)
                                                          << ": expected 'options' to be an "
                                                          << "Object, got "
                                                          << typeName(optionsField.type()));
@@ -545,7 +562,6 @@ void syncFixUp(OperationContext* opCtx,
                                                          << ": "
                                                          << status.toString());
                 }
-                // TODO(SERVER-27992): Set options.uuid.
             } else {
                 // Use default options.
             }
@@ -566,7 +582,62 @@ void syncFixUp(OperationContext* opCtx,
             cce->updateValidator(
                 opCtx, options.validator, options.validationLevel, options.validationAction);
 
+            OptionalCollectionUUID originalLocalUUID = collection->uuid();
+            OptionalCollectionUUID remoteUUID = boost::none;
+            if (auto infoField = info["info"]) {
+                if (infoField.type() != Object) {
+                    throw RSFatalException(str::stream() << "Failed to parse collection info "
+                                                         << redact(info)
+                                                         << ": expected 'info' to be an "
+                                                         << "Object, got "
+                                                         << typeName(infoField.type()));
+                }
+                auto infoFieldObj = infoField.Obj();
+                if (infoFieldObj.hasField("uuid")) {
+                    remoteUUID = boost::make_optional(UUID::parse(infoFieldObj));
+                }
+            }
+
+            // If the local collection has a UUID, it must match the remote UUID. If the sync source
+            // has no UUID or they do not match, we remove the local UUID and allow the 'collMod'
+            // operation on the sync source to add the UUID back.
+            if (originalLocalUUID) {
+                if (!remoteUUID) {
+                    log() << "Removing UUID " << originalLocalUUID.get() << " from " << nss.ns()
+                          << " because sync source had no UUID for namespace.";
+                    cce->removeUUID(opCtx);
+                    collection->refreshUUID(opCtx);
+                } else if (originalLocalUUID.get() != remoteUUID.get()) {
+                    log() << "Removing UUID " << originalLocalUUID.get() << " from " << nss.ns()
+                          << " because sync source had different UUID (" << remoteUUID.get()
+                          << ") for collection.";
+                    cce->removeUUID(opCtx);
+                    collection->refreshUUID(opCtx);
+                }
+            } else if (remoteUUID &&
+                       (serverGlobalParams.featureCompatibility.getVersion() ==
+                        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34)) {
+                // If we are in the process of downgrading, and we have no UUID but the sync source
+                // does, then it is possible we will not see a 'collMod' during RECOVERING to add
+                // back in the UUID from the sync source. In that case, we add the sync source's
+                // UUID here.
+                invariant(!originalLocalUUID);
+                log() << "Assigning UUID " << remoteUUID.get() << " to " << nss.ns()
+                      << " because we had no UUID, the sync source had a UUID, and we were in the "
+                         "middle of downgrade.";
+                cce->addUUID(opCtx, remoteUUID.get(), collection);
+                collection->refreshUUID(opCtx);
+            }
+
             wuow.commit();
+
+            auto originalLocalUUIDString =
+                (originalLocalUUID) ? originalLocalUUID.get().toString() : "no UUID";
+            auto remoteUuidString = (remoteUUID) ? remoteUUID.get().toString() : "no UUID";
+            LOG(1) << "Resynced collection metadata for collection: " << nss
+                   << ", original local UUID: " << originalLocalUUIDString
+                   << ", remote UUID: " << remoteUuidString << ", with: " << redact(info)
+                   << ", to: " << redact(cce->getCollectionOptions(opCtx).toBSON());
         }
 
         // Since we read from the sync source to retrieve the metadata of the
