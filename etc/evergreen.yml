@@ -4328,6 +4328,26 @@ tasks:
       <<: *powercycle_test
       mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --syncdelay 10 --storageEngine wiredTiger\"
 
+- name: powercycle_write_concern_majority_WT
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up virtualenv"
+  - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_ec2_instance
+  - command: expansions.update
+    <<: *powercycle_expansions
+  - func: "run powercycle test"
+    vars:
+      <<: *powercycle_test
+      client_options: "--numCrudClients 20 --numFsmClients 20 --writeConcern '{\"w\": \"majority\"}'"
+      mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+
 - name: idl_tests
   depends_on:
   - name: compile
@@ -5595,6 +5615,7 @@ buildvariants:
   - name: powercycle_replication_WT
   - name: powercycle_replication_smalloplog_WT
   - name: powercycle_syncdelay_WT
+  - name: powercycle_write_concern_majority_WT
   - name: package
     distros:
     - ubuntu1604-packer

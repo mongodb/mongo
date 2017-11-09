@@ -3,18 +3,23 @@
  */
 (function() {
     "use strict";
-    var defaultWriteConcern = {
-        w: "majority",
-        // Use a "signature" value that won't typically match a value assigned in normal use. This
-        // way the wtimeout set by this override is distinguishable in the server logs.
-        wtimeout: 5 * 60 * 1000 + 321,  // 300321ms
-    };
+
     if (typeof TestData === "undefined" || !TestData.hasOwnProperty("defaultReadConcernLevel")) {
         throw new Error(
             "The default read-concern level must be set as the 'defaultReadConcernLevel' " +
             "property on TestData");
     }
     var defaultReadConcern = {level: TestData.defaultReadConcernLevel};
+
+    var defaultWriteConcern = {
+        w: "majority",
+        // Use a "signature" value that won't typically match a value assigned in normal use.
+        // This way the wtimeout set by this override is distinguishable in the server logs.
+        wtimeout: 5 * 60 * 1000 + 321,  // 300321ms
+    };
+    if (TestData.hasOwnProperty("defaultWriteConcern")) {
+        defaultWriteConcern = TestData.defaultWriteConcern;
+    }
 
     var originalDBQuery = DBQuery;
 

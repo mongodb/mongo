@@ -19,12 +19,14 @@ var workerThread = (function() {
     // args.globalAssertLevel = the global assertion level to use
     // args.errorLatch = CountDownLatch instance that threads count down when they error
     // args.sessionOptions = the options to start a session with
+    // args.testData = TestData object
     // run = callback that takes a map of workloads to their associated $config
     function main(workloads, args, run) {
         var myDB;
         var configs = {};
 
         globalAssertLevel = args.globalAssertLevel;
+        TestData = args.testData;
 
         try {
             if (Cluster.isStandalone(args.clusterOptions)) {
@@ -91,6 +93,10 @@ var workerThread = (function() {
                 // started by the concurrency framework automatically retry their operation in the
                 // face of this particular error response.
                 load('jstests/libs/override_methods/implicitly_retry_on_database_drop_pending.js');
+            }
+
+            if (TestData.defaultReadConcernLevel || TestData.defaultWriteConcern) {
+                load('jstests/libs/override_methods/set_read_and_write_concerns.js');
             }
 
             workloads.forEach(function(workload) {

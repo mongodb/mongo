@@ -53,17 +53,6 @@ var numLoops = TestData.numLoops || 0;
 print("****Starting CRUD client, namespace", dbName, collectionName, "numLoops", numLoops, "****");
 
 var coll = db.getSiblingDB(dbName)[collectionName];
-var writeConcern = TestData.writeConcern || {};
-if (Object.keys(writeConcern).length) {
-    coll.setWriteConcern = writeConcern;
-}
-
-var readConcern = TestData.readConcern || {};
-var noReadConcern = true;
-if (Object.keys(readConcern).length) {
-    noReadConcern = false;
-}
-
 coll.createIndex({x: 1});
 
 var shouldLoopForever = numLoops <= 0;
@@ -103,28 +92,17 @@ while (shouldLoopForever || numLoops > 0) {
         for (var i = 0; i < bulkNum; i++) {
             bulk.insert({x: (match + i) % baseNum, doc: randString()});
         }
-        print("(" + collectionName + ") Bulk insert",
-              bulkNum,
-              "docs",
-              tojsononeline(writeConcern),
-              tojsononeline(bulk.execute(writeConcern)));
+        print(
+            "(" + collectionName + ") Bulk insert", bulkNum, "docs", tojsononeline(bulk.execute()));
     } else if (operation == "count") {
         var countOpts = {count: collectionName, query: {x: matchQuery}};
-        if (!noReadConcern) {
-            countOpts.readConcern = readConcern;
-        }
         print("(" + collectionName + ") Count docs",
               tojsononeline(matchQuery),
-              tojsononeline(readConcern),
               tojsononeline(db.runCommand(countOpts)));
     } else if (operation == "find") {
         var findOpts = {find: collectionName, singleBatch: true, filter: {x: matchQuery}};
-        if (!noReadConcern) {
-            findOpts.readConcern = readConcern;
-        }
         print("(" + collectionName + ") Find docs",
               tojsononeline(matchQuery),
-              tojsononeline(readConcern),
               "find status",
               db.runCommand(findOpts).ok);
     } else if (operation == "remove multi") {

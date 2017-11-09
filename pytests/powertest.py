@@ -1353,12 +1353,13 @@ def mongo_insert_canary(mongo, db_name, coll_name, doc):
     return 0 if res.inserted_id else 1
 
 
-def new_resmoke_config(config_file, new_config_file, test_data):
+def new_resmoke_config(config_file, new_config_file, test_data, eval_str=""):
     """ Creates 'new_config_file', from 'config_file', with an update from 'test_data'. """
     new_config = {
         "executor": {
             "config": {
                 "shell_options": {
+                    "eval": eval_str,
                     "global_vars": {
                         "TestData": test_data
                     }
@@ -1870,6 +1871,7 @@ Examples:
     if not os.path.isfile(options.config_crud_client):
         LOGGER.error("configCrudClient %s does not exist", options.config_crud_client)
         sys.exit(1)
+    with_external_server = "buildscripts/resmokeconfig/suites/with_external_server.yml"
     fsm_client = "jstests/libs/fsm_serial_client.js"
     fsm_workload_files = []
     for fsm_workload_file in options.fsm_workload_files:
@@ -1877,6 +1879,25 @@ Examples:
     fsm_workload_blacklist_files = []
     for fsm_workload_blacklist_file in options.fsm_workload_blacklist_files:
         fsm_workload_blacklist_files += fsm_workload_blacklist_file.replace(" ", "").split(",")
+    read_concern_level = options.read_concern_level
+    if write_concern and not read_concern_level:
+        read_concern_level = "local"
+    crud_test_data = {}
+    if read_concern_level:
+        crud_test_data["defaultReadConcernLevel"] = read_concern_level
+    if write_concern:
+        crud_test_data["defaultWriteConcern"] = write_concern
+    if read_concern_level or write_concern:
+        eval_str = "load('jstests/libs/override_methods/set_read_and_write_concerns.js');"
+    else:
+        eval_str = ""
+    fsm_test_data = copy.deepcopy(crud_test_data)
+    fsm_test_data["fsmDbBlacklist"] = [options.db_name]
+    if fsm_workload_files:
+        fsm_test_data["workloadFiles"] = fsm_workload_files
+    if fsm_workload_blacklist_files:
+        fsm_test_data["workloadBlacklistFiles"] = fsm_workload_blacklist_files
+    crud_test_data["dbName"] = options.db_name
 
     # Setup the mongo_repo_root.
     if options.mongo_repo_root_dir:
@@ -2044,8 +2065,8 @@ Examples:
             host_port = "{}:{}".format(mongod_host, secret_port)
             new_config_file = NamedTempFile.create(suffix=".yml", dir="tmp")
             temp_client_files.append(new_config_file)
-            test_data = {"skipValidationOnNamespaceNotFound": True}
-            new_resmoke_config(with_external_server, new_config_file, test_data)
+            validation_test_data = {"skipValidationOnNamespaceNotFound": True}
+            new_resmoke_config(with_external_server, new_config_file, validation_test_data)
             ret, output, _ = resmoke_client(
                 mongo_repo_root_dir,
                 mongo_path,
@@ -2102,60 +2123,51 @@ Examples:
             sys.exit(ret)
 
         # Start CRUD clients
+        host_port = "{}:{}".format(mongod_host, standard_port)
         crud_procs = []
-        if options.num_crud_clients > 0:
-            host_port = "{}:{}".format(mongod_host, standard_port)
-            test_data = {"dbName": options.db_name}
-            if options.read_concern_level:
-                test_data["readConcern"] = {"level": options.read_concern_level}
-            if write_concern:
-                test_data["writeConcern"] = write_concern
-
-            for i in xrange(options.num_crud_clients):
+        for i in xrange(options.num_crud_clients):
+            if not options.config_crud_client:
                 crud_config_file = NamedTempFile.create(suffix=".yml", dir="tmp")
-                temp_client_files.append(crud_config_file)
-                test_data["collectionName"] = "{}-{}".format(options.collection_name, i)
-                new_resmoke_config(options.config_crud_client, crud_config_file, test_data)
-                _, _, proc = resmoke_client(
-                    work_dir=mongo_repo_root_dir,
-                    mongo_path=mongo_path,
-                    host_port=host_port,
-                    js_test=options.crud_client,
-                    resmoke_suite=crud_config_file,
-                    repeat_num=100,
-                    no_wait=True,
-                    log_file="crud_{}.log".format(i))
-                crud_procs.append(proc)
+                crud_test_data["collectionName"] = "{}-{}".format(options.collection_name, i)
+                new_resmoke_config(
+                    with_external_server, crud_config_file, crud_test_data, eval_str)
+            else:
+                crud_config_file = options.config_crud_client
+            _, _, proc = resmoke_client(
+                work_dir=mongo_repo_root_dir,
+                mongo_path=options.mongo_path,
+                host_port=host_port,
+                js_test=options.crud_client,
+                resmoke_suite=crud_config_file,
+                repeat_num=100,
+                no_wait=True,
+                log_file="crud_{}.log".format(i))
+            crud_procs.append(proc)
 
-            LOGGER.info("****Started %d CRUD client(s)****", options.num_crud_clients)
+        if crud_procs:
+            LOGGER.info(
+                "****Started %d CRUD client(s)****", options.num_crud_clients)
 
         # Start FSM clients
         fsm_procs = []
-        if options.num_fsm_clients > 0:
-            test_data = {"fsmDbBlacklist": [options.db_name]}
-            if fsm_workload_files:
-                test_data["workloadFiles"] = fsm_workload_files
-            if fsm_workload_blacklist_files:
-                test_data["workloadBlacklistFiles"] = fsm_workload_blacklist_files
+        for i in xrange(options.num_fsm_clients):
+            fsm_config_file = NamedTempFile.create(suffix=".yml", dir="tmp")
+            fsm_test_data["dbNamePrefix"] = "fsm-{}".format(i)
+            # Do collection validation only for the first FSM client.
+            fsm_test_data["validateCollections"] = True if i == 0 else False
+            new_resmoke_config(with_external_server, fsm_config_file, fsm_test_data, eval_str)
+            _, _, proc = resmoke_client(
+                work_dir=mongo_repo_root_dir,
+                mongo_path=options.mongo_path,
+                host_port=host_port,
+                js_test=fsm_client,
+                resmoke_suite=fsm_config_file,
+                repeat_num=100,
+                no_wait=True,
+                log_file="fsm_{}.log".format(i))
+            fsm_procs.append(proc)
 
-            for i in xrange(options.num_fsm_clients):
-                fsm_config_file = NamedTempFile.create(suffix=".yml", dir="tmp")
-                temp_client_files.append(fsm_config_file)
-                test_data["dbNamePrefix"] = "fsm-{}".format(i)
-                # Do collection validation only for the first FSM client.
-                test_data["validateCollections"] = True if i == 0 else False
-                new_resmoke_config(with_external_server, fsm_config_file, test_data)
-                _, _, proc = resmoke_client(
-                    work_dir=mongo_repo_root_dir,
-                    mongo_path=mongo_path,
-                    host_port=host_port,
-                    js_test=fsm_client,
-                    resmoke_suite=fsm_config_file,
-                    repeat_num=100,
-                    no_wait=True,
-                    log_file="fsm_{}.log".format(i))
-                fsm_procs.append(proc)
-
+        if fsm_procs:
             LOGGER.info("****Started %d FSM client(s)****", options.num_fsm_clients)
 
         # Crash the server. A pre-crash canary document is optionally written to the DB.

@@ -119,7 +119,8 @@ var ThreadManager = function(clusterOptions, executionMode = {composed: false}) 
                     seed: Random.randInt(1e13),  // contains range of Date.getTime()
                     globalAssertLevel: globalAssertLevel,
                     errorLatch: errorLatch,
-                    sessionOptions: options.sessionOptions
+                    sessionOptions: options.sessionOptions,
+                    testData: TestData
                 };
 
                 var t = makeThread(workloads, args, options);
