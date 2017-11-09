@@ -431,19 +431,16 @@ void CollectionRangeDeleter::_pop(Status result) {
 // DeleteNotification
 
 CollectionRangeDeleter::DeleteNotification::DeleteNotification()
-    : notification(std::make_shared<Notification<Status>>()) {}
+    : _notification(std::make_shared<Notification<Status>>()) {}
 
 CollectionRangeDeleter::DeleteNotification::DeleteNotification(Status status)
-    : notification(std::make_shared<Notification<Status>>()) {
-    notify(status);
-}
+    : _notification(std::make_shared<Notification<Status>>(std::move(status))) {}
 
 Status CollectionRangeDeleter::DeleteNotification::waitStatus(OperationContext* opCtx) {
     try {
-        return notification->get(opCtx);
-    } catch (...) {
-        notification = std::make_shared<Notification<Status>>();
-        notify({ErrorCodes::Interrupted, "Wait for range delete request completion interrupted"});
+        return _notification->get(opCtx);
+    } catch (const DBException& ex) {
+        _notification = std::make_shared<Notification<Status>>(ex.toStatus());
         throw;
     }
 }

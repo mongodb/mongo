@@ -55,7 +55,8 @@ public:
       * It is an error to destroy a returned CleanupNotification object n unless either n.ready()
       * is true or n.abandon() has been called.  After n.abandon(), n is in a moved-from state.
       */
-    struct DeleteNotification {
+    class DeleteNotification {
+    public:
         DeleteNotification();
         DeleteNotification(Status status);
 
@@ -68,12 +69,12 @@ public:
         DeleteNotification& operator=(DeleteNotification const& notifn) = default;
 
         ~DeleteNotification() {
-            // can be null only if moved from
-            dassert(!notification || *notification || notification.use_count() == 1);
+            // Can be null only if moved from
+            dassert(!_notification || *_notification || _notification.use_count() == 1);
         }
 
         void notify(Status status) const {
-            notification->set(status);
+            _notification->set(status);
         }
 
         /**
@@ -83,20 +84,20 @@ public:
         Status waitStatus(OperationContext* opCtx);
 
         bool ready() const {
-            return bool(*notification);
+            return bool(*_notification);
         }
         void abandon() {
-            notification = nullptr;
+            _notification = nullptr;
         }
         bool operator==(DeleteNotification const& other) const {
-            return notification == other.notification;
+            return _notification == other._notification;
         }
         bool operator!=(DeleteNotification const& other) const {
-            return notification != other.notification;
+            return _notification != other._notification;
         }
 
     private:
-        std::shared_ptr<Notification<Status>> notification;
+        std::shared_ptr<Notification<Status>> _notification;
     };
 
     struct Deletion {

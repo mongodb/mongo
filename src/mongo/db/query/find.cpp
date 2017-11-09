@@ -36,7 +36,6 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
@@ -52,7 +51,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
@@ -297,9 +296,8 @@ Message getMore(OperationContext* opCtx,
         // This checks to make sure the operation is allowed on a replicated node.  Since we are not
         // passing in a query object (necessary to check SlaveOK query option), we allow reads
         // whether we are PRIMARY or SECONDARY.
-        Status status =
-            repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(opCtx, nss, true);
-        uassertStatusOK(status);
+        uassertStatusOK(
+            repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, true));
     }
 
     LOG(5) << "Running getMore, cursorid: " << cursorid;
@@ -564,10 +562,9 @@ std::string runQuery(OperationContext* opCtx,
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
         // TODO(SERVER-31293): Don't set slaveOk for reads with a read pref of "primary".
-        bool slaveOK = qr.isSlaveOk() || qr.hasReadPref();
-        Status serveReadsStatus =
-            repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(opCtx, nss, slaveOK);
-        uassertStatusOK(serveReadsStatus);
+        const bool slaveOK = qr.isSlaveOk() || qr.hasReadPref();
+        uassertStatusOK(
+            repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, slaveOK));
     }
 
     // We have a parsed query. Time to get the execution plan for it.

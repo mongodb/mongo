@@ -510,8 +510,8 @@ auto MetadataManager::cleanUpRange(ChunkRange const& range, Date_t whenToDelete)
 
     // Put it on the oldest metadata permissible; the current one might live a long time.
     auto& orphans = overlapMetadata->_tracker.orphans;
-    orphans.emplace_back(
-        Deletion{ChunkRange(range.getMin().getOwned(), range.getMax().getOwned()), whenToDelete});
+    orphans.emplace_back(ChunkRange(range.getMin().getOwned(), range.getMax().getOwned()),
+                         whenToDelete);
     return orphans.back().notification;
 }
 

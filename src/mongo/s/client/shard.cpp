@@ -103,10 +103,6 @@ bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
 
 Shard::Shard(const ShardId& id) : _id(id) {}
 
-const ShardId Shard::getId() const {
-    return _id;
-}
-
 bool Shard::isConfig() const {
     return _id == "config";
 }

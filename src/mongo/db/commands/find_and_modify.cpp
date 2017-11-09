@@ -311,7 +311,7 @@ public:
             auto css = CollectionShardingState::get(opCtx, nsString);
             css->checkShardVersionOrThrow(opCtx);
 
-            Collection* collection = autoColl.getCollection();
+            Collection* const collection = autoColl.getCollection();
             auto statusWithPlanExecutor =
                 getExecutorUpdate(opCtx, opDebug, collection, &parsedUpdate);
             if (!statusWithPlanExecutor.isOK()) {

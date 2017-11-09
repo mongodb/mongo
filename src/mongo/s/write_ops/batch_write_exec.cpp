@@ -49,6 +49,8 @@
 namespace mongo {
 namespace {
 
+const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
+
 //
 // Map which allows associating ConnectionString hosts with TargetedWriteBatches
 // This is needed since the dispatcher only returns hosts with responses.
@@ -203,16 +205,11 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 pendingBatches.insert(std::make_pair(targetShardId, nextBatch));
             }
 
-            //
-            // Send the requests.
-            //
-
-            const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
             AsyncRequestsSender ars(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                     clientRequest.getTargetingNS().db().toString(),
                                     requests,
-                                    readPref,
+                                    kPrimaryOnlyReadPreference,
                                     opCtx->getTxnNumber() ? Shard::RetryPolicy::kIdempotent
                                                           : Shard::RetryPolicy::kNoRetry);
             numSent += pendingBatches.size();
