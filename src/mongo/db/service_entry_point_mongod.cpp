@@ -87,6 +87,7 @@
 namespace mongo {
 
 MONGO_FP_DECLARE(rsStopGetMore);
+MONGO_FP_DECLARE(respondWithNotPrimaryInCommandDispatch);
 
 namespace {
 using logger::LogComponent;
@@ -658,7 +659,11 @@ void execCommandDatabase(OperationContext* opCtx,
                 uasserted(ErrorCodes::NotMasterNoSlaveOk, "not master and slaveOk=false");
             }
 
-            uassert(ErrorCodes::NotMaster, "not master", canRunHere);
+            if (MONGO_FAIL_POINT(respondWithNotPrimaryInCommandDispatch)) {
+                uassert(ErrorCodes::NotMaster, "not primary", canRunHere);
+            } else {
+                uassert(ErrorCodes::NotMaster, "not master", canRunHere);
+            }
 
             if (!command->maintenanceOk() &&
                 replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet &&

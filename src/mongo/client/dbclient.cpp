@@ -998,7 +998,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientConnection::runCommandWithTar
     if (!_parentReplSetName.empty()) {
         const auto replyBody = out.first->getCommandReply();
         if (!isOk(replyBody)) {
-            handleNotMasterResponse(replyBody["errmsg"]);
+            handleNotMasterResponse(replyBody, "errmsg");
         }
     }
 
@@ -1011,7 +1011,7 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientConnection::r
     if (!_parentReplSetName.empty()) {
         const auto replyBody = out.first->getCommandReply();
         if (!isOk(replyBody)) {
-            handleNotMasterResponse(replyBody["errmsg"]);
+            handleNotMasterResponse(replyBody, "errmsg");
         }
     }
 
@@ -1474,7 +1474,7 @@ void DBClientConnection::checkResponse(const std::vector<BSONObj>& batch,
     *host = _serverAddress.toString();
 
     if (!_parentReplSetName.empty() && !batch.empty()) {
-        handleNotMasterResponse(getErrField(batch[0]));
+        handleNotMasterResponse(batch[0], "$err");
     }
 }
 
@@ -1482,8 +1482,13 @@ void DBClientConnection::setParentReplSetName(const string& replSetName) {
     _parentReplSetName = replSetName;
 }
 
-void DBClientConnection::handleNotMasterResponse(const BSONElement& elemToCheck) {
-    if (!isNotMasterErrorString(elemToCheck)) {
+void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
+                                                 StringData errorMsgFieldName) {
+    const BSONElement errorMsgElem = replyBody[errorMsgFieldName];
+    const BSONElement codeElem = replyBody["code"];
+
+    if (!isNotMasterErrorString(errorMsgElem) &&
+        !ErrorCodes::isNotMasterError(ErrorCodes::Error(codeElem.numberInt()))) {
         return;
     }
 

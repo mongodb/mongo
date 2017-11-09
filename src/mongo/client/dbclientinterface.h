@@ -1084,11 +1084,11 @@ protected:
 
 private:
     /**
-     * Checks the BSONElement for the 'not master' keyword and if it does exist,
-     * try to inform the replica set monitor that the host this connects to is
-     * no longer primary.
+     * Inspects the contents of 'replyBody' and informs the replica set monitor that the host 'this'
+     * is connected with is no longer the primary if a "not master" error message or error code was
+     * returned.
      */
-    void handleNotMasterResponse(const BSONElement& elemToCheck);
+    void handleNotMasterResponse(const BSONObj& replyBody, StringData errorMsgFieldName);
 
     // Contains the string for the replica set name of the host this is connected to.
     // Should be empty if this connection is not pointing to a replica set member.

@@ -88,7 +88,10 @@ const JSFunctionSpec MongoBase::methods[] = {
         isReplicaSetMember, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isMongos, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getClusterTime, MongoLocalInfo, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setClusterTime, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        advanceClusterTime, MongoLocalInfo, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(
+        resetClusterTime_forTesting, MongoLocalInfo, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(_startSession, MongoLocalInfo, MongoExternalInfo),
     JS_FS_END,
 };
@@ -194,9 +197,14 @@ BSONObj MongoBase::getClusterTime() {
     return latestlogicalTime;
 }
 
-void MongoBase::setClusterTime(const BSONObj& newTime) {
+void MongoBase::resetClusterTime_forTesting() {
+    stdx::lock_guard<stdx::mutex> lk(logicalTimeMutex);
+    latestlogicalTime = BSONObj();
+}
+
+void MongoBase::advanceClusterTime(const BSONObj& newTime) {
     if (newTime["clusterTime"].eoo())
-        uasserted(ErrorCodes::BadValue, "missing clusterTime field in setClusterTime argument");
+        uasserted(ErrorCodes::BadValue, "missing clusterTime field in advanceClusterTime argument");
 
     stdx::lock_guard<stdx::mutex> lk(logicalTimeMutex);
     if (latestlogicalTime.isEmpty() ||
@@ -791,17 +799,26 @@ void MongoBase::Functions::getClusterTime::call(JSContext* cx, JS::CallArgs args
     args.rval().setUndefined();
 }
 
-void MongoBase::Functions::setClusterTime::call(JSContext* cx, JS::CallArgs args) {
+void MongoBase::Functions::advanceClusterTime::call(JSContext* cx, JS::CallArgs args) {
     if (args.length() != 1)
-        uasserted(ErrorCodes::BadValue, "setClusterTime takes 1 argument");
+        uasserted(ErrorCodes::BadValue, "advanceClusterTime takes 1 argument");
 
     if (!args.get(0).isObject())
-        uasserted(ErrorCodes::BadValue, "the parameter to setClusterTime must be an object");
+        uasserted(ErrorCodes::BadValue, "the parameter to advanceClusterTime must be an object");
 
     auto newTime = ObjectWrapper(cx, args.get(0)).toBSON();
 
-    MongoBase::setClusterTime(newTime);
+    MongoBase::advanceClusterTime(newTime);
 
+    args.rval().setUndefined();
+}
+
+void MongoBase::Functions::resetClusterTime_forTesting::call(JSContext* cx, JS::CallArgs args) {
+    if (args.length() != 0) {
+        uasserted(ErrorCodes::BadValue, "resetClusterTime_forTesting takes no arguments");
+    }
+
+    MongoBase::resetClusterTime_forTesting();
     args.rval().setUndefined();
 }
 

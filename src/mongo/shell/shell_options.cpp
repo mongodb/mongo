@@ -208,6 +208,12 @@ Status addMongoShellOptions(moe::OptionSection* options) {
                             " commands, compatibility, legacy")
         .hidden();
 
+    options->addOptionChaining(
+        "retryWrites",
+        "retryWrites",
+        moe::Switch,
+        "automatically retry write operations upon transient network errors");
+
     options
         ->addOptionChaining(
             "rpcProtocols", "rpcProtocols", moe::String, " none, opQueryOnly, opCommandOnly, all")
@@ -362,6 +368,9 @@ Status storeMongoShellOptions(const moe::Environment& params,
                           << "'. Valid modes are: {commands, compatibility, legacy}");
         }
         shellGlobalParams.readMode = mode;
+    }
+    if (params.count("retryWrites")) {
+        shellGlobalParams.shouldRetryWrites = true;
     }
     if (params.count("rpcProtocols")) {
         std::string protos = params["rpcProtocols"].as<string>();

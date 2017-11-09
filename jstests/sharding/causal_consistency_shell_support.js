@@ -42,7 +42,7 @@
 
         // Use the latest cluster time returned as a new operationTime and run command.
         const clusterTimeObj = session.getClusterTime();
-        session._operationTime = clusterTimeObj.clusterTime;
+        session.advanceOperationTime(clusterTimeObj.clusterTime);
         const res = assert.commandWorked(testDB.runCommand(cmdObj));
 
         // Verify the response contents and that new operation time is >= passed in time.
@@ -92,13 +92,13 @@
 
     // Verify cluster times are tracked even before causal consistency is set (so the first
     // operation with causal consistency set can use valid cluster times).
-    session._operationTime = undefined;
+    session.resetOperationTime_forTesting();
 
     assert.commandWorked(testDB.runCommand({insert: "foo", documents: [{x: 1}]}));
     assert.neq(session.getOperationTime(), null);
     assert.neq(session.getClusterTime(), null);
 
-    session._operationTime = undefined;
+    session.resetOperationTime_forTesting();
 
     assert.commandWorked(testDB.runCommand({find: "foo"}));
     assert.neq(session.getOperationTime(), null);

@@ -213,6 +213,10 @@ BSONObj readMode(const BSONObj&, void*) {
     return BSON("" << shellGlobalParams.readMode);
 }
 
+BSONObj shouldRetryWrites(const BSONObj&, void* data) {
+    return BSON("" << shellGlobalParams.shouldRetryWrites);
+}
+
 BSONObj interpreterVersion(const BSONObj& a, void* data) {
     uassert(16453, "interpreterVersion accepts no arguments", a.nFields() == 0);
     return BSON("" << getGlobalScriptEngine()->getInterpreterVersionString());
@@ -240,6 +244,7 @@ void initScope(Scope& scope) {
     scope.injectNative("_useWriteCommandsDefault", useWriteCommandsDefault);
     scope.injectNative("_writeMode", writeMode);
     scope.injectNative("_readMode", readMode);
+    scope.injectNative("_shouldRetryWrites", shouldRetryWrites);
     scope.externalSetup();
     mongo::shell_utils::installShellUtils(scope);
     scope.execSetup(JSFiles::servers);

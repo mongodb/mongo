@@ -19,7 +19,7 @@
         const sentinel = {};
         let cmdObjSeen = sentinel;
 
-        Mongo.prototype.runCommand = function runComandSpy(dbName, cmdObj, options) {
+        Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
             cmdObjSeen = cmdObj;
             return mongoRunCommandOriginal.apply(this, arguments);
         };
@@ -82,7 +82,7 @@
 
     testCommandCanBeRetried(function() {
         coll.insertMany([{_id: 4}, {_id: 5}], {ordered: false});
-    }, false);
+    });
 
     testCommandCanBeRetried(function() {
         coll.updateMany({a: {$gt: 0}}, {$set: {c: 7}});
@@ -90,6 +90,22 @@
 
     testCommandCanBeRetried(function() {
         coll.deleteMany({b: {$lt: 5}});
+    }, false);
+
+    //
+    // Tests for writeConcern.
+    //
+
+    testCommandCanBeRetried(function() {
+        coll.insertOne({_id: 1}, {w: 1});
+    });
+
+    testCommandCanBeRetried(function() {
+        coll.insertOne({_id: "majority"}, {w: "majority"});
+    });
+
+    testCommandCanBeRetried(function() {
+        coll.insertOne({_id: 0}, {w: 0});
     }, false);
 
     //
@@ -121,7 +137,7 @@
     testCommandCanBeRetried(function() {
         coll.bulkWrite([{insertOne: {document: {_id: 40}}}, {insertOne: {document: {_id: 50}}}],
                        {ordered: false});
-    }, false);
+    });
 
     testCommandCanBeRetried(function() {
         coll.bulkWrite([{updateMany: {filter: {a: {$gt: 0}}, update: {$set: {c: 7}}}}]);

@@ -44,6 +44,7 @@ selector:
   # inserts and deletes has improved.
   #
   # These tests time out because of too many retryable operations:
+  - jstests/core/batch_write_command_update.js
   - jstests/core/bulk_insert.js
   - jstests/core/insert1.js
   - jstests/core/remove6.js

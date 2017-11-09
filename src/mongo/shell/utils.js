@@ -471,24 +471,35 @@ isMasterStatePrompt = function(isMasterResponse) {
     return state + '> ';
 };
 
-if (typeof(_useWriteCommandsDefault) == 'undefined') {
-    // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
-    _useWriteCommandsDefault = function() {
+if (typeof _useWriteCommandsDefault === "undefined") {
+    // We ensure the _useWriteCommandsDefault() function is always defined, in case the JavaScript
+    // engine is being used from someplace other than the mongo shell (e.g. map-reduce).
+    _useWriteCommandsDefault = function _useWriteCommandsDefault() {
         return false;
     };
 }
 
-if (typeof(_writeMode) == 'undefined') {
-    // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
-    _writeMode = function() {
+if (typeof _writeMode === "undefined") {
+    // We ensure the _writeMode() function is always defined, in case the JavaScript engine is being
+    // used from someplace other than the mongo shell (e.g. map-reduce).
+    _writeMode = function _writeMode() {
         return "commands";
     };
 }
 
-if (typeof(_readMode) == 'undefined') {
-    // This is for cases when the v8 engine is used other than the mongo shell, like map reduce.
-    _readMode = function() {
+if (typeof _readMode === "undefined") {
+    // We ensure the _readMode() function is always defined, in case the JavaScript engine is being
+    // used from someplace other than the mongo shell (e.g. map-reduce).
+    _readMode = function _readMode() {
         return "legacy";
+    };
+}
+
+if (typeof _shouldRetryWrites === 'undefined') {
+    // We ensure the _shouldRetryWrites() function is always defined, in case the JavaScript engine
+    // is being used from someplace other than the mongo shell (e.g. map-reduce).
+    _shouldRetryWrites = function _shouldRetryWrites() {
+        return false;
     };
 }
 

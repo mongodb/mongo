@@ -32,7 +32,7 @@
     let res = testDB.runCommand({insert: "foo", documents: [{_id: 0}]});
     assert.commandWorked(res);
 
-    let clusterTime = res.$clusterTime;
+    let clusterTime = Object.assign({}, res.$clusterTime);
     let clusterTimeTS = new Timestamp(clusterTime.clusterTime.getTime() + 1000, 0);
     clusterTime.clusterTime = clusterTimeTS;
 

@@ -34,7 +34,7 @@
             const sentinel = {};
             let cmdObjSeen = sentinel;
 
-            Mongo.prototype.runCommand = function runComandSpy(dbName, cmdObj, options) {
+            Mongo.prototype.runCommand = function runCommandSpy(dbName, cmdObj, options) {
                 cmdObjSeen = cmdObj;
                 return mongoRunCommandOriginal.apply(this, arguments);
             };
@@ -64,6 +64,10 @@
                 assert(cmdObjSeen.hasOwnProperty("lsid"),
                        "Expected operation " + tojson(cmdObjSeen) +
                            " to have a logical session id: " + func.toString());
+            } else {
+                assert(!cmdObjSeen.hasOwnProperty("lsid"),
+                       "Expected operation " + tojson(cmdObjSeen) +
+                           " to not have a logical session id: " + func.toString());
             }
 
             if (expectedAfterClusterTime) {
@@ -111,9 +115,7 @@
                 cursor.next();
                 assert(!cursor.hasNext());
             }, {
-                // TODO SERVER-30848: Change expectedSession to `withSession` after getMore requests
-                // from the mongo shell use the logical session the cursor was established with.
-                expectedSession: false,
+                expectedSession: withSession,
                 expectedAfterClusterTime: false,
             });
         }
@@ -184,9 +186,7 @@
                 cursor.next();
                 assert(!cursor.hasNext());
             }, {
-                // TODO SERVER-30848: Change expectedSession to `withSession` after getMore requests
-                // from the mongo shell use the logical session the cursor was established with.
-                expectedSession: false,
+                expectedSession: withSession,
                 expectedAfterClusterTime: false,
             });
         }

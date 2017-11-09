@@ -38,24 +38,45 @@ var workerThread = (function() {
                 }
 
                 if (typeof args.sessionOptions !== 'undefined') {
+                    let initialClusterTime;
+                    let initialOperationTime;
+
                     // JavaScript objects backed by C++ objects (e.g. BSON values from a command
                     // response) do not serialize correctly when passed through the ScopedThread
                     // constructor. To work around this behavior, we instead pass a stringified form
                     // of the JavaScript object through the ScopedThread constructor and use eval()
                     // to rehydrate it.
                     if (typeof args.sessionOptions.initialClusterTime === 'string') {
-                        args.sessionOptions.initialClusterTime =
+                        initialClusterTime =
                             eval('(' + args.sessionOptions.initialClusterTime + ')');
+
+                        // The initialClusterTime property was removed from SessionOptions in a
+                        // later revision of the Driver's specification, so we remove the property
+                        // and call advanceClusterTime() ourselves.
+                        delete args.sessionOptions.initialClusterTime;
                     }
 
                     if (typeof args.sessionOptions.initialOperationTime === 'string') {
-                        args.sessionOptions.initialOperationTime =
+                        initialOperationTime =
                             eval('(' + args.sessionOptions.initialOperationTime + ')');
+
+                        // The initialOperationTime property was removed from SessionOptions in a
+                        // later revision of the Driver's specification, so we remove the property
+                        // and call advanceOperationTime() ourselves.
+                        delete args.sessionOptions.initialOperationTime;
                     }
 
-                    myDB = new Mongo(args.host)
-                               .startSession(args.sessionOptions)
-                               .getDatabase(args.dbName);
+                    const session = new Mongo(args.host).startSession(args.sessionOptions);
+
+                    if (typeof initialClusterTime !== 'undefined') {
+                        session.advanceClusterTime(initialClusterTime);
+                    }
+
+                    if (typeof initialOperationTime !== 'undefined') {
+                        session.advanceOperationTime(initialOperationTime);
+                    }
+
+                    myDB = session.getDatabase(args.dbName);
                 } else {
                     myDB = new Mongo(args.host).getDB(args.dbName);
                 }

@@ -750,7 +750,13 @@ int _main(int argc, char* argv[], char** envp) {
         ss << "db = connect( \""
            << getURIFromArgs(
                   shellGlobalParams.url, shellGlobalParams.dbhost, shellGlobalParams.port)
-           << "\")";
+           << "\");";
+
+        if (shellGlobalParams.shouldRetryWrites) {
+            // If the user specified --retryWrites to the mongo shell, then we replace the global
+            // `db` object with a DB object that has retryable writes enabled.
+            ss << "db = db.getMongo().startSession({retryWrites: true}).getDatabase(db.getName());";
+        }
 
         mongo::shell_utils::_dbConnect = ss.str();
 
