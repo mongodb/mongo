@@ -47,9 +47,6 @@
         // Kill the index build.
         assert.commandWorked(testDB.killOp(opId));
 
-        assert.commandWorked(
-            testDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
-
         // Wait for the index build to stop.
         assert.soon(function() {
             return getIndexBuildOpId() == -1;
@@ -62,6 +59,9 @@
         // Check that no new index has been created.  This verifies that the index build was aborted
         // rather than successfully completed.
         assert.eq([{_id: 1}], testDB.test.getIndexKeys());
+
+        assert.commandWorked(
+            testDB.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
     }
 
     testAbortIndexBuild({background: true});
