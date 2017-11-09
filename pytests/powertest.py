@@ -2126,7 +2126,7 @@ Examples:
         host_port = "{}:{}".format(mongod_host, standard_port)
         crud_procs = []
         for i in xrange(options.num_crud_clients):
-            if not options.config_crud_client:
+            if options.config_crud_client == with_external_server:
                 crud_config_file = NamedTempFile.create(suffix=".yml", dir="tmp")
                 crud_test_data["collectionName"] = "{}-{}".format(options.collection_name, i)
                 new_resmoke_config(
@@ -2135,7 +2135,7 @@ Examples:
                 crud_config_file = options.config_crud_client
             _, _, proc = resmoke_client(
                 work_dir=mongo_repo_root_dir,
-                mongo_path=options.mongo_path,
+                mongo_path=mongo_path,
                 host_port=host_port,
                 js_test=options.crud_client,
                 resmoke_suite=crud_config_file,
@@ -2158,7 +2158,7 @@ Examples:
             new_resmoke_config(with_external_server, fsm_config_file, fsm_test_data, eval_str)
             _, _, proc = resmoke_client(
                 work_dir=mongo_repo_root_dir,
-                mongo_path=options.mongo_path,
+                mongo_path=mongo_path,
                 host_port=host_port,
                 js_test=fsm_client,
                 resmoke_suite=fsm_config_file,
