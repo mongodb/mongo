@@ -44,24 +44,39 @@ class AwsEc2(object):
     @staticmethod
     def wait_for_state(instance, state, wait_time_secs=0, show_progress=False):
         """Wait up to 'wait_time_secs' for instance to be in 'state'.
-           Return True if 'state' reached."""
-        end_time = time.time() + wait_time_secs
+           Return 0 if 'state' reached, 1 otherwise."""
         if show_progress:
             print("Waiting for instance {} to reach '{}' state".format(instance, state),
                   end="",
                   file=sys.stdout)
-        while time.time() < end_time:
+        reached_state = False
+        end_time = time.time() + wait_time_secs
+        while True:
             if show_progress:
                 print(".", end="", file=sys.stdout)
                 sys.stdout.flush()
-            time.sleep(5)
-            instance.load()
-            if instance.state["Name"] == state:
-                if show_progress:
-                    print(" Instance {}!".format(state), file=sys.stdout)
-                    sys.stdout.flush()
-                return True
-        return False
+            try:
+                time_left = end_time - time.time()
+                instance.load()
+                if instance.state["Name"] == state:
+                    reached_state = True
+                    break
+                if time_left <= 0:
+                    break
+            except botocore.exceptions.ClientError:
+                # A ClientError exception can sometimes be generated, due to RequestLimitExceeded,
+                # so we ignore it and retry until we time out.
+                pass
+            wait_interval_secs = 15 if time_left > 15 else time_left
+            time.sleep(wait_interval_secs)
+        if show_progress:
+            if reached_state:
+                print(" Instance {}!".format(instance.state["Name"]), file=sys.stdout)
+            else:
+                print(" Instance in state '{}', failed to reach state '{}'!".format(
+                    instance.state["Name"], state), file=sys.stdout)
+            sys.stdout.flush()
+        return 0 if reached_state else 1
 
     def control_instance(self, mode, image_id, wait_time_secs=0, show_progress=False):
         """Controls an AMI instance. Returns 0 & status information, if successful."""
@@ -69,6 +84,7 @@ class AwsEc2(object):
             raise ValueError(
                 "Invalid mode '{}' specified, choose from {}.".format(mode, _MODES))
 
+        sys.stdout.flush()
         instance = self.connection.Instance(image_id)
         try:
             if mode == "start":
@@ -92,8 +108,9 @@ class AwsEc2(object):
         except botocore.exceptions.ClientError as err:
             return 1, err.message
 
+        ret = 0
         if wait_time_secs > 0:
-            self.wait_for_state(
+            ret = self.wait_for_state(
                 instance=instance,
                 state=state,
                 wait_time_secs=wait_time_secs,
@@ -113,7 +130,7 @@ class AwsEc2(object):
         except botocore.exceptions.ClientError as err:
             return 1, err.message
 
-        return 0, status
+        return ret, status
 
     def tag_instance(self, image_id, tags):
         """Tags an AMI instance. """
@@ -208,7 +225,7 @@ def main():
     control_options.add_option("--waitTimeSecs",
                                dest="wait_time_secs",
                                type=int,
-                               default=60,
+                               default=5 * 60,
                                help="Time to wait for EC2 instance to reach it's new state,"
                                     " defaults to '%default'.")
 

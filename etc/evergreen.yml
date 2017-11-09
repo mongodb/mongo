@@ -180,9 +180,9 @@ variables:
   ec2_artifacts: ${monitor_proc_file} ${monitor_system_file} ${log_path} ${backup_path_after} ${backup_path_before}
   program_options: --logLevel info --backupPathBefore  ${backup_path_before} --backupPathAfter ${backup_path_after}
   connection_options: --sshUserHost ${ip_address} --sshConnection \"${ssh_identity} ${ssh_connection_options}\"
-  test_options: --testLoops 25 --seedDocNum 10000 --rsync --validate local --canary local
+  test_options: --testLoops 15 --seedDocNum 10000 --rsync --validate local --canary local
   crash_options: "--crashMethod aws_ec2 --crashOptions ${instance_id}:private_ip_address --crashWaitTime 30 --jitterForCrashWaitTime 5"
-  client_options: --numCrudClients 10 --numFsmClients 10
+  client_options: --numCrudClients 20 --numFsmClients 20
   mongodb_options: --rootDir ${remote_dir}-${task_id} --mongodbBinDir ${remote_dir}
   mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath ${db_path} --logPath ${log_path}
   mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1\"
@@ -1303,6 +1303,77 @@ functions:
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --commands "$cmds"
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          set -o errexit
+          ${set_sudo}
+          # Many systems have the firewall disabled, by default. In case the firewall is
+          # enabled we add rules for the mongod ports on the remote.
+          # RHEL 7 firewall rules
+          if [ ! -z "$(which firewall-cmd 2> /dev/null)" ]; then
+            cmds="$sudo firewall-cmd --permanent --zone=public --add-port=ssh/tcp"
+            cmds="$cmds; $sudo firewall-cmd --permanent --zone=public --add-port=${standard_port}/tcp"
+            cmds="$cmds; $sudo firewall-cmd --permanent --zone=public --add-port=${secret_port}/tcp"
+            cmds="$cmds; $sudo firewall-cmd --reload"
+            cmds="$cmds; $sudo firewall-cmd --list-all"
+          # ArchLinux, Debian, RHEL 6 firewall rules
+          elif [ ! -z "$($sudo iptables --list 2> /dev/null)" ]; then
+            cmds="$sudo iptables -I INPUT 1 -p tcp --dport ssh -j ACCEPT"
+            cmds="$cmds; $sudo iptables -I INPUT 1 -p tcp --dport ${standard_port} -j ACCEPT"
+            cmds="$cmds; $sudo iptables -I INPUT 1 -p tcp --dport ${secret_port} -j ACCEPT"
+            if [ -d /etc/iptables ]; then
+              rules_file=/etc/iptables/iptables.rules
+            elif [ -f /etc/sysconfig/iptables ]; then
+              rules_file=/etc/sysconfig/iptables
+            else
+              rules_file=/etc/iptables.up.rules
+            fi
+            cmds="$cmds; $sudo iptables-save | $sudo tee $rules_file"
+            cmds="$cmds; $sudo iptables --list-rules"
+          elif [ ! -z "$($sudo service iptables status 2> /dev/null)" ]; then
+            cmds="$sudo iptables -I INPUT 1 -p tcp --dport ssh -j ACCEPT"
+            cmds="$cmds; $sudo iptables -I INPUT 1 -p tcp --dport ${standard_port} -j ACCEPT"
+            cmds="$cmds; $sudo iptables -I INPUT 1 -p tcp --dport ${secret_port} -j ACCEPT"
+            cmds="$cmds; $sudo service iptables save"
+            cmds="$cmds; $sudo service iptables status"
+          # Ubuntu firewall rules
+          elif [ ! -z "$($sudo ufw status 2> /dev/null)" ]; then
+            cmds="$sudo ufw allow ssh/tcp"
+            cmds="$cmds; $sudo ufw allow ${standard_port}/tcp"
+            cmds="$cmds; $sudo ufw allow ${secret_port}/tcp"
+            cmds="$cmds; $sudo ufw reload"
+            cmds="$cmds; $sudo ufw status"
+          # SuSE firewall rules
+          # TODO: Add firewall rules using SuSEfirewall2
+          elif [ ! -z "$($sudo /sbin/SuSEfirewall2 help 2> /dev/null)" ]; then
+            cmds="$sudo /sbin/SuSEfirewall2 stop"
+            cmds="$cmds; $sudo /sbin/SuSEfirewall2 off"
+          # Windows firewall rules
+          elif [ ! -z "$(netsh advfirewall show store 2> /dev/null)" ]; then
+            add_rule="netsh advfirewall firewall add rule"
+            cmds="$add_rule name='MongoDB port ${standard_port} in' dir=in action=allow protocol=TCP localport=${standard_port}"
+            cmds="$cmds; $add_rule name='MongoDB port ${standard_port} out' dir=in action=allow protocol=TCP localport=${standard_port}"
+            cmds="$cmds; $add_rule name='MongoDB port ${secret_port} in' dir=in action=allow protocol=TCP localport=${secret_port}"
+            cmds="$cmds; $add_rule name='MongoDB port ${secret_port} out' dir=in action=allow protocol=TCP localport=${secret_port}"
+            cmds="$cmds; netsh advfirewall firewall show rule name=all | grep -A 13 'MongoDB'"
+          else
+            echo "Firewall not active or unknown firewall command on this platform"
+            exit 0
+          fi
+          set -o errexit
+          if [ ! -z "$cmds" ]; then
+            ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+            ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+              --verbose                                        \
+              --userHost $USER@${ip_address}                   \
+              --sshConnectionOptions "$ssh_connection_options" \
+              --retries ${ssh_retries|0}                       \
+              --commands "$cmds"
+          fi
 
   "copy EC2 artifacts":
     - command: shell.exec
@@ -4157,7 +4228,7 @@ tasks:
     # mongod will not start if it crashed mongod while creating a namespace (SERVER-26499).
     vars:
       <<: *powercycle_test
-      client_options: --numCrudClients 10 --numFsmClients 0
+      client_options: --numCrudClients 20 --numFsmClients 0
       mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine mmapv1\"
 
 - name: powercycle_WT
@@ -4196,9 +4267,66 @@ tasks:
   - func: "run powercycle test"
     vars:
       <<: *powercycle_test
-      client_options: --numCrudClients 10 --numFsmClients 10 --fsmWorkloadBlacklistFiles toggle_feature_compatibility.js
+      client_options: --numCrudClients 20 --numFsmClients 20 --fsmWorkloadBlacklistFiles toggle_feature_compatibility.js
       mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath ${db_path} --logPath ${log_path} --fcv 3.4
       mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+
+- name: powercycle_replication_WT
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up virtualenv"
+  - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_ec2_instance
+  - command: expansions.update
+    <<: *powercycle_expansions
+  - func: "run powercycle test"
+    vars:
+      <<: *powercycle_test
+      mongod_extra_options: --replSet powercyle --mongodOptions \"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
+
+- name: powercycle_replication_smalloplog_WT
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up virtualenv"
+  - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_ec2_instance
+  - command: expansions.update
+    <<: *powercycle_expansions
+  - func: "run powercycle test"
+    vars:
+      <<: *powercycle_test
+      mongod_extra_options: --replSet powercyle --mongodOptions \"--setParameter enableTestCommands=1 --oplogSize 1 --storageEngine wiredTiger\"
+
+- name: powercycle_syncdelay_WT
+  depends_on:
+  - name: compile
+  commands:
+  - func: "do setup"
+  - func: "set up remote credentials"
+    vars:
+      <<: *powercycle_remote_credentials
+  - func: "set up virtualenv"
+  - func: "set up EC2 instance"
+    vars:
+      <<: *powercycle_ec2_instance
+  - command: expansions.update
+    <<: *powercycle_expansions
+  - func: "run powercycle test"
+    vars:
+      <<: *powercycle_test
+      mongod_extra_options: --mongodOptions \"--setParameter enableTestCommands=1 --syncdelay 10 --storageEngine wiredTiger\"
 
 - name: idl_tests
   depends_on:
@@ -5464,6 +5592,9 @@ buildvariants:
   - name: powercycle
   - name: powercycle_WT
   - name: powercycle_fcv3.4_WT
+  - name: powercycle_replication_WT
+  - name: powercycle_replication_smalloplog_WT
+  - name: powercycle_syncdelay_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6000,6 +6131,8 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: powercycle
+  - name: powercycle_WT
   - name: package
     distros:
     - ubuntu1604-packer
