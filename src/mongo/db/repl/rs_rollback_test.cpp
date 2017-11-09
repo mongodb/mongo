@@ -1462,11 +1462,10 @@ TEST_F(RSRollbackTest, RollbackDropDatabaseCommand) {
     createOplog(_opCtx.get());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+    // 'dropDatabase' operations are special and do not include a UUID field.
     auto dropDatabaseOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(2), 0) << "h" << 1LL << "op"
                                  << "c"
-                                 << "ui"
-                                 << UUID::gen()
                                  << "ns"
                                  << "test.$cmd"
                                  << "o"
