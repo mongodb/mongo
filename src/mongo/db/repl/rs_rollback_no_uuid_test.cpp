@@ -1213,6 +1213,141 @@ TEST_F(RollbackResyncsCollectionOptionsTest, ChangingTempStatusAlsoChangesOtherC
     resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
 }
 
+TEST_F(RollbackResyncsCollectionOptionsTest, EmptyCollModResyncsCollectionMetadata) {
+    CollectionOptions localCollOptions;
+    localCollOptions.validator = BSON("x" << BSON("$exists" << 1));
+    localCollOptions.validationLevel = "moderate";
+    localCollOptions.validationAction = "warn";
+
+    BSONObj remoteCollOptionsObj = BSONObj();
+
+    resyncCollectionOptionsTest(localCollOptions,
+                                remoteCollOptionsObj,
+                                BSON("collMod"
+                                     << "coll"),
+                                "coll");
+}
+
+void resyncInconsistentUUIDsTest(OperationContext* opCtx,
+                                 ReplicationCoordinator* coordinator,
+                                 ReplicationProcess* replicationProcess,
+                                 OptionalCollectionUUID localUUID,
+                                 OptionalCollectionUUID remoteUUID,
+                                 OptionalCollectionUUID expectedUUIDAfterRollback) {
+    createOplog(opCtx);
+    CollectionOptions localOptions;
+    localOptions.uuid = localUUID;
+    RollbackTest::_createCollection(opCtx, "test.t", localOptions);
+    auto commonOperation =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+    BSONObj collModCmd = BSON("collMod"
+                              << "t"
+                              << "noPadding"
+                              << false);
+    auto collectionModificationOperation =
+        RollbackTest::makeCommandOp(Timestamp(Seconds(2), 0), boost::none, "test.t", collModCmd, 2);
+
+    class RollbackSourceLocal : public RollbackSourceMock {
+    public:
+        RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog, OptionalCollectionUUID uuid)
+            : RollbackSourceMock(std::move(oplog)), called(false), _uuid(uuid) {}
+
+        // Remote collection options are empty.
+        StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const {
+            called = true;
+            if (_uuid) {
+                return BSON("options" << BSONObj() << "info" << BSON("uuid" << _uuid.get()));
+            } else {
+                return BSON("options" << BSONObj());
+            }
+        }
+        mutable bool called;
+
+    private:
+        OptionalCollectionUUID _uuid;
+    };
+
+    RollbackSourceLocal rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
+                                           commonOperation,
+                                       })),
+                                       remoteUUID);
+
+    ASSERT_OK(
+        syncRollbackNoUUID(opCtx,
+                           OplogInterfaceMock({collectionModificationOperation, commonOperation}),
+                           rollbackSource,
+                           {},
+                           coordinator,
+                           replicationProcess));
+    ASSERT_TRUE(rollbackSource.called);
+
+    // Make sure the collection options are correct.
+    AutoGetCollectionForReadCommand autoColl(opCtx, NamespaceString("test.t"));
+    auto collAfterRollbackOptions =
+        autoColl.getCollection()->getCatalogEntry()->getCollectionOptions(opCtx);
+    BSONObjBuilder expectedOptionsBob;
+    if (expectedUUIDAfterRollback) {
+        expectedUUIDAfterRollback.get().appendToBuilder(&expectedOptionsBob, "uuid");
+    }
+    ASSERT_BSONOBJ_EQ(expectedOptionsBob.obj(), collAfterRollbackOptions.toBSON());
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, LocalUUIDGetsRemovedOnConflict) {
+    resyncInconsistentUUIDsTest(_opCtx.get(),
+                                _coordinator,
+                                _replicationProcess.get(),
+                                UUID::gen(),
+                                UUID::gen(),
+                                boost::none);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, LocalUUIDWithNoRemoteUUIDGetsRemoved) {
+    resyncInconsistentUUIDsTest(_opCtx.get(),
+                                _coordinator,
+                                _replicationProcess.get(),
+                                UUID::gen(),
+                                boost::none,
+                                boost::none);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, RemoteUUIDWithNoLocalUUIDGetsAddedWhileDowngrading) {
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34);
+    auto remoteUuid = UUID::gen();
+    resyncInconsistentUUIDsTest(
+        _opCtx.get(), _coordinator, _replicationProcess.get(), boost::none, remoteUuid, remoteUuid);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest,
+       RemoteUUIDWithNoLocalUUIDDoesNotGetAddedWhileUpgrading) {
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
+    resyncInconsistentUUIDsTest(_opCtx.get(),
+                                _coordinator,
+                                _replicationProcess.get(),
+                                boost::none,
+                                UUID::gen(),
+                                boost::none);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest,
+       RemoteUUIDWithNoLocalUUIDDoesNotGetAddedWhileDowngraded) {
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
+    resyncInconsistentUUIDsTest(_opCtx.get(),
+                                _coordinator,
+                                _replicationProcess.get(),
+                                boost::none,
+                                UUID::gen(),
+                                boost::none);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, SameUUIDIsNotChanged) {
+    UUID uuid = UUID::gen();
+    resyncInconsistentUUIDsTest(
+        _opCtx.get(), _coordinator, _replicationProcess.get(), uuid, uuid, uuid);
+}
+
 TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOptions) {
     createOplog(_opCtx.get());
     auto commonOperation =
