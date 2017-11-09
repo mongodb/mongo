@@ -1381,6 +1381,7 @@ Element Element::findNthChild(size_t n) const {
 Element Element::findFirstChildNamed(StringData name) const {
     invariant(ok());
     Document::Impl& impl = _doc->getImpl();
+    invariant(getType() != BSONType::Array);
     Element::RepIdx current = _repIdx;
     current = impl.resolveLeftChild(current);
     // TODO: Could DRY this loop with the identical logic in findElementNamed.

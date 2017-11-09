@@ -395,7 +395,7 @@ TEST_F(AddToSetNodeTest, ApplyNestedArray) {
     mutablebson::Document doc(fromjson("{ _id : 1, a : [ 1, [ ] ] }"));
     setPathTaken("a.1");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["1"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][1]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{ _id : 1, a : [ 1, [ 1 ] ] }"), doc);

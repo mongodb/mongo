@@ -281,7 +281,7 @@ TEST_F(RenameNodeTest, MoveToArrayElement) {
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: [1, 2], b: 2}"));
     setPathTaken("a.1");
     addIndexedPath("a");
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"]["1"])),
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"][1])),
                                 AssertionException,
                                 ErrorCodes::BadValue,
                                 "The destination field cannot be an array element, 'a.1' in doc "

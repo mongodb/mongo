@@ -37,10 +37,12 @@
 #include "mongo/db/json.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
+using namespace mongo;
 namespace mmb = mongo::mutablebson;
 
 TEST(TopologyBuilding, TopDownFromScratch) {
@@ -539,6 +541,26 @@ TEST(ArrayAPI, SimpleNumericArray) {
     ASSERT_EQUALS(size_t(0), mmb::countChildren(e1));
     ASSERT_FALSE(e1[0].ok());
     ASSERT_FALSE(e1[1].ok());
+}
+
+DEATH_TEST(ArrayAPI,
+           FindFirstChildNamedOnDeserializedArray,
+           "Invariant failure getType() != BSONType::Array") {
+    mmb::Document doc;
+    auto array = doc.makeElementArray("a");
+    auto elem0 = doc.makeElementInt("", 0);
+    ASSERT_OK(array.pushBack(elem0));
+    array.findFirstChildNamed("0");
+}
+
+DEATH_TEST(ArrayAPI,
+           FindFirstChildNamedOnSerializedArray,
+           "Invariant failure getType() != BSONType::Array") {
+    auto obj = fromjson("{a: [0, 1]}");
+    mmb::Document doc(obj);
+    auto rootElem = doc.root();
+    auto array = rootElem.leftChild();
+    array.findFirstChildNamed("0");
 }
 
 TEST(Element, setters) {

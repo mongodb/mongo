@@ -210,8 +210,9 @@ public:
     inline Element operator[](size_t n) const;
 
     /** Returns the first child, if any, of this Element named 'name'. If no such Element
-     *  exists, a non-ok Element is returned. This is not a constant time operation. This
-     *  method is also available as operator[] taking a StringData for convenience.
+     *  exists, a non-ok Element is returned. This is not a constant time operation. It is illegal
+     *  to call this on an Array. This method is also available as operator[] taking a StringData
+     *  for convenience.
      */
     Element findFirstChildNamed(StringData name) const;
     inline Element operator[](StringData name) const;
