@@ -9,13 +9,9 @@ var _kill_sessions_api_module = (function() {
     var KillSessionsTestHelper = {};
 
     function isdbgrid(client) {
-        var result = client.getDB("admin").runCommand({isdbgrid: 1});
+        var result = assert.commandWorked(client.getDB("admin").runCommand({ismaster: 1}));
 
-        if (!result.ok) {
-            return false;
-        }
-
-        return result.isdbgrid ? true : false;
+        return result.msg === "isdbgrid";
     }
 
     function Fixture(clientToExecuteVia, clientToKillVia, clientsToVerifyVia) {

@@ -394,6 +394,29 @@ Mongo.prototype.unsetWriteConcern = function() {
     delete this._writeConcern;
 };
 
+Mongo.prototype.advanceClusterTime = function(newTime) {
+    if (!newTime.hasOwnProperty("clusterTime")) {
+        throw new Error("missing clusterTime field in setClusterTime argument");
+    }
+
+    if (typeof this._clusterTime === "object" && this._clusterTime !== null) {
+        this._clusterTime =
+            (bsonWoCompare({_: this._clusterTime.clusterTime}, {_: newTime.clusterTime}) >= 0)
+            ? this._clusterTime
+            : newTime;
+    } else {
+        this._clusterTime = newTime;
+    }
+};
+
+Mongo.prototype.resetClusterTime_forTesting = function() {
+    delete this._clusterTime;
+};
+
+Mongo.prototype.getClusterTime = function() {
+    return this._clusterTime;
+};
+
 Mongo.prototype.startSession = function startSession(options) {
     return new DriverSession(this, options);
 };

@@ -56,11 +56,10 @@
                       function(conn) {
                           const res = conn.adminCommand({listDatabases: 1});
                           if (!res.ok) {
-                              assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
-                              return {
-                                  shouldStop: true,
-                                  reason: "not authorized to run listDatabases"
-                              };
+                              // TODO: SERVER-31916 for the KeyNotFound error
+                              assert.commandFailedWithCode(
+                                  res, [ErrorCodes.Unauthorized, ErrorCodes.KeyNotFound]);
+                              return {shouldStop: true, reason: "cannot run listDatabases"};
                           }
                           assert.commandWorked(res);
                           dbNames = res.databases.map(dbInfo => dbInfo.name);
