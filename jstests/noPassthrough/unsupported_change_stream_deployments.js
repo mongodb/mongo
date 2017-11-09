@@ -4,6 +4,7 @@
     load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
     // For supportsMajorityReadConcern().
     load("jstests/multiVersion/libs/causal_consistency_helpers.js");
+    load("jstests/libs/feature_compatibility_version.js");  // For checkFCV.
 
     if (!supportsMajorityReadConcern()) {
         jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
@@ -28,9 +29,12 @@
     const masterSlaveFixture = new ReplTest("change_stream");
     const master = masterSlaveFixture.start(true, {enableMajorityReadConcern: ""});
     assertChangeStreamNotSupportedOnConnection(master);
-    // Slaves start in the wrong FCV, (SERVER-31218) resulting in the wrong error code.
-    // const slave = masterSlaveFixture.start(false);
-    // assertChangeStreamNotSupportedOnConnection(slave);
+
+    const slave = masterSlaveFixture.start(false);
+    // Slaves start in FCV 3.4; we need to wait for it to sync the FCV document from the master
+    // before trying a change stream, or the change stream will fail for the wrong reason.
+    assert.soonNoExcept(() => checkFCV(slave.getDB("admin"), "3.6") || true);
+    assertChangeStreamNotSupportedOnConnection(slave);
 
     // Test a sharded cluster with standalone shards.
     const clusterWithStandalones = new ShardingTest(
