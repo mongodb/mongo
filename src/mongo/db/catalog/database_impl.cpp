@@ -777,6 +777,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
             OperationShardingState::get(opCtx).allowImplicitCollectionCreation());
 
     CollectionOptions optionsWithUUID = options;
+    bool generatedUUID = false;
     if (enableCollectionUUIDs && !optionsWithUUID.uuid &&
         serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
         auto coordinator = repl::ReplicationCoordinator::get(opCtx);
@@ -794,15 +795,21 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         }
         if (canGenerateUUID) {
             optionsWithUUID.uuid.emplace(CollectionUUID::gen());
+            generatedUUID = true;
         }
     }
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
     audit::logCreateCollection(&cc(), ns);
 
-    std::string uuidString =
-        (optionsWithUUID.uuid) ? optionsWithUUID.uuid.get().toString() : "none";
-    log() << "createCollection: " << ns << " with UUID: " << uuidString;
+    if (optionsWithUUID.uuid) {
+        log() << "createCollection: " << ns << " with "
+              << (generatedUUID ? "generated" : "provided")
+              << " UUID: " << optionsWithUUID.uuid.get();
+    } else {
+        log() << "createCollection: " << ns << " with no UUID.";
+    }
+
     massertStatusOK(
         _dbEntry->createCollection(opCtx, ns, optionsWithUUID, true /*allocateDefaultSpace*/));
 
