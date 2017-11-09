@@ -138,7 +138,7 @@ TEST_F(SetNodeTest, ApplyPositional) {
     setPathTaken("a.1");
     setMatchedField("1");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["1"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][1]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, 6, 2]}"), doc);
@@ -528,7 +528,7 @@ TEST_F(SetNodeTest, ApplyNoOpArrayIndex) {
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a.2.b");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][2]["b"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"), doc);
@@ -544,7 +544,7 @@ TEST_F(SetNodeTest, TypeChangeInArrayIsNotANoOp) {
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2.0}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a.2.b");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][2]["b"]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: NumberInt(2)}]}"), doc);
@@ -575,7 +575,7 @@ TEST_F(SetNodeTest, ApplyInPlaceArrayIndex) {
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a.2.b");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][2]["b"]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"), doc);
@@ -757,7 +757,7 @@ TEST_F(SetNodeTest, ApplyNoOpComplex) {
     mutablebson::Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"));
     setPathTaken("a.1.b");
     addIndexedPath("a.1.b");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["1"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][1]["b"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"), doc);
@@ -773,7 +773,7 @@ TEST_F(SetNodeTest, ApplySameStructure) {
     mutablebson::Document doc(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, xxx: 1}}]}}"));
     setPathTaken("a.1.b");
     addIndexedPath("a.1.b");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["1"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][1]["b"]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{b: {c: 0, d: 0}}, {b: {c: 1, d: 1}}]}}"), doc);
@@ -896,7 +896,7 @@ TEST_F(SetNodeTest, ReplayArrayFieldNotAppendedIntermediateFromReplication) {
     setPathTaken("a.0");
     addIndexedPath("a.1.b");
     setFromOplogApplication(true);
-    auto result = node.apply(getApplyParams(doc.root()["a"]["0"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][0]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{_id: 0, a: [1, {b: [1]}]}"), doc);

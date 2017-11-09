@@ -2513,6 +2513,35 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
     ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.10': 10, 'a.2': 2}}"), getLogDoc().getObject());
 }
 
+TEST_F(UpdateObjectNodeTest, ApplyMultipleUpdatesToDocumentInArray) {
+    auto setUpdate = fromjson("{$set: {'a.2.b': 1, 'a.2.c': 1}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
+    std::set<std::string> foundIdentifiers;
+    UpdateObjectNode root;
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_SET,
+                                              setUpdate["$set"]["a.2.b"],
+                                              expCtx,
+                                              arrayFilters,
+                                              foundIdentifiers));
+    ASSERT_OK(UpdateObjectNode::parseAndMerge(&root,
+                                              modifiertable::ModifierType::MOD_SET,
+                                              setUpdate["$set"]["a.2.c"],
+                                              expCtx,
+                                              arrayFilters,
+                                              foundIdentifiers));
+
+    mutablebson::Document doc(fromjson("{a: []}"));
+    addIndexedPath("a");
+    auto result = root.apply(getApplyParams(doc.root()));
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_FALSE(result.noop);
+    ASSERT_BSONOBJ_EQ(fromjson("{a: [null, null, {b: 1, c: 1}]}"), doc.getObject());
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_BSONOBJ_EQ(fromjson("{$set: {'a.2.b': 1, 'a.2.c': 1}}"), getLogDoc().getObject());
+}
+
 TEST_F(UpdateObjectNodeTest, ApplyUpdateToNonViablePathInArray) {
     auto setUpdate = fromjson("{$set: {'a.b': 3}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

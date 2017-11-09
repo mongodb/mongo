@@ -200,7 +200,7 @@ TEST_F(UnsetNodeTest, UnsetArrayElement) {
     mutablebson::Document doc(fromjson("{a:[1], b:1}"));
     setPathTaken("a.0");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["0"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][0]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[null], b:1}"), doc);
@@ -218,7 +218,7 @@ TEST_F(UnsetNodeTest, UnsetPositional) {
     setPathTaken("a.1");
     setMatchedField("1");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["1"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][1]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, null, 2]}"), doc);
@@ -252,7 +252,7 @@ TEST_F(UnsetNodeTest, UnsetFromObjectInArray) {
     mutablebson::Document doc(fromjson("{a: [{b: 1}]}"));
     setPathTaken("a.0.b");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["0"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][0]["b"]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a:[{}]}"), doc);
@@ -269,7 +269,7 @@ TEST_F(UnsetNodeTest, CanUnsetInvalidField) {
     mutablebson::Document doc(fromjson("{b: 1, a: [{$b: 1}]}"));
     setPathTaken("a.0.$b");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["0"]["$b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][0]["$b"]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 1, a: [{}]}"), doc);
