@@ -34,6 +34,7 @@
 #include <utility>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
@@ -63,72 +64,6 @@ using namespace mongo::repl;
 using namespace mongo::repl::rollback_internal_no_uuid;
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
-
-class RollbackSourceMock : public RollbackSource {
-public:
-    RollbackSourceMock(std::unique_ptr<OplogInterface> oplog);
-    int getRollbackId() const override;
-    const OplogInterface& getOplog() const override;
-    const HostAndPort& getSource() const override;
-    BSONObj getLastOperation() const override;
-    BSONObj findOne(const NamespaceString& nss, const BSONObj& filter) const override;
-    std::pair<BSONObj, NamespaceString> findOneByUUID(const std::string& db,
-                                                      UUID uuid,
-                                                      const BSONObj& filter) const override;
-    void copyCollectionFromRemote(OperationContext* opCtx,
-                                  const NamespaceString& nss) const override;
-    StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
-                                                const UUID& uuid) const override;
-    StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
-
-private:
-    std::unique_ptr<OplogInterface> _oplog;
-    HostAndPort _source;
-};
-
-RollbackSourceMock::RollbackSourceMock(std::unique_ptr<OplogInterface> oplog)
-    : _oplog(std::move(oplog)) {}
-
-const OplogInterface& RollbackSourceMock::getOplog() const {
-    return *_oplog;
-}
-
-const HostAndPort& RollbackSourceMock::getSource() const {
-    return _source;
-}
-
-int RollbackSourceMock::getRollbackId() const {
-    return 0;
-}
-
-BSONObj RollbackSourceMock::getLastOperation() const {
-    auto iter = _oplog->makeIterator();
-    auto result = iter->next();
-    ASSERT_OK(result.getStatus());
-    return result.getValue().first;
-}
-
-BSONObj RollbackSourceMock::findOne(const NamespaceString& nss, const BSONObj& filter) const {
-    return BSONObj();
-}
-
-std::pair<BSONObj, NamespaceString> RollbackSourceMock::findOneByUUID(const std::string& db,
-                                                                      UUID uuid,
-                                                                      const BSONObj& filter) const {
-    return {BSONObj(), NamespaceString()};
-}
-
-void RollbackSourceMock::copyCollectionFromRemote(OperationContext* opCtx,
-                                                  const NamespaceString& nss) const {}
-
-StatusWith<BSONObj> RollbackSourceMock::getCollectionInfoByUUID(const std::string& db,
-                                                                const UUID& uuid) const {
-    return BSON("options" << BSONObj() << "info" << BSON("uuid" << uuid));
-}
-
-StatusWith<BSONObj> RollbackSourceMock::getCollectionInfo(const NamespaceString& nss) const {
-    return BSON("name" << nss.ns() << "options" << BSONObj());
-}
 
 class RSRollbackTest : public RollbackTest {
 private:
@@ -257,30 +192,6 @@ TEST_F(RSRollbackTest, BothOplogsAtCommonPoint) {
         {},
         _coordinator,
         _replicationProcess.get()));
-}
-
-/**
- * Create test collection.
- * Returns collection.
- */
-Collection* _createCollection(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const CollectionOptions& options) {
-    Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
-    mongo::WriteUnitOfWork wuow(opCtx);
-    auto db = dbHolder().openDb(opCtx, nss.db());
-    ASSERT_TRUE(db);
-    db->dropCollection(opCtx, nss.ns()).transitional_ignore();
-    auto coll = db->createCollection(opCtx, nss.ns(), options);
-    ASSERT_TRUE(coll);
-    wuow.commit();
-    return coll;
-}
-
-Collection* _createCollection(OperationContext* opCtx,
-                              const std::string& nss,
-                              const CollectionOptions& options) {
-    return _createCollection(opCtx, NamespaceString(nss), options);
 }
 
 /**
@@ -1153,26 +1064,24 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
 
 TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
     createOplog(_opCtx.get());
+    _createCollection(_opCtx.get(), "test.t", CollectionOptions());
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+    BSONObj collModCmd = BSON("collMod"
+                              << "t"
+                              << "noPadding"
+                              << false);
     auto collectionModificationOperation =
-        std::make_pair(BSON("ts" << Timestamp(Seconds(2), 0) << "h" << 1LL << "op"
-                                 << "c"
-                                 << "ns"
-                                 << "test.t"
-                                 << "o"
-                                 << BSON("collMod"
-                                         << "t"
-                                         << "noPadding"
-                                         << false)),
-                       RecordId(2));
+        makeCommandOp(Timestamp(Seconds(2), 0), boost::none, "test.t", collModCmd, 2);
     class RollbackSourceLocal : public RollbackSourceMock {
     public:
         RollbackSourceLocal(std::unique_ptr<OplogInterface> oplog)
             : RollbackSourceMock(std::move(oplog)), called(false) {}
+
+        // Remote collection options are empty.
         StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const {
             called = true;
-            return RollbackSourceMock::getCollectionInfo(nss);
+            return BSON("options" << BSONObj());
         }
         mutable bool called;
     };
@@ -1194,6 +1103,76 @@ TEST_F(RSRollbackTest, RollbackCollectionModificationCommand) {
         ASSERT_TRUE(message.find("ignoring op with no _id during rollback. ns: test.t") ==
                     std::string::npos);
     }
+
+    // Make sure the collection options are correct.
+    AutoGetCollectionForReadCommand autoColl(_opCtx.get(), NamespaceString("test.t"));
+    auto collAfterRollbackOptions =
+        autoColl.getCollection()->getCatalogEntry()->getCollectionOptions(_opCtx.get());
+    ASSERT(collAfterRollbackOptions.toBSON().isEmpty());
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest,
+       FullRemoteCollectionValidationOptionsAndEmptyLocalValidationOptions) {
+    // Empty local collection options.
+    CollectionOptions localCollOptions;
+
+    // Full remote collection validation options.
+    BSONObj remoteCollOptionsObj =
+        BSON("validator" << BSON("x" << BSON("$exists" << 1)) << "validationLevel"
+                         << "moderate"
+                         << "validationAction"
+                         << "warn");
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest,
+       PartialRemoteCollectionValidationOptionsAndEmptyLocalValidationOptions) {
+    CollectionOptions localCollOptions;
+
+    BSONObj remoteCollOptionsObj = BSON("validationLevel"
+                                        << "moderate"
+                                        << "validationAction"
+                                        << "warn");
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest,
+       PartialRemoteCollectionValidationOptionsAndFullLocalValidationOptions) {
+    CollectionOptions localCollOptions;
+    localCollOptions.validator = BSON("x" << BSON("$exists" << 1));
+    localCollOptions.validationLevel = "moderate";
+    localCollOptions.validationAction = "warn";
+
+    BSONObj remoteCollOptionsObj = BSON("validationLevel"
+                                        << "strict"
+                                        << "validationAction"
+                                        << "error");
+
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest,
+       EmptyRemoteCollectionValidationOptionsAndEmptyLocalValidationOptions) {
+    CollectionOptions localCollOptions;
+
+    BSONObj remoteCollOptionsObj = BSONObj();
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest,
+       EmptyRemoteCollectionValidationOptionsAndFullLocalValidationOptions) {
+    CollectionOptions localCollOptions;
+    localCollOptions.validator = BSON("x" << BSON("$exists" << 1));
+    localCollOptions.validationLevel = "moderate";
+    localCollOptions.validationAction = "warn";
+
+    BSONObj remoteCollOptionsObj = BSONObj();
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
 }
 
 TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOptions) {

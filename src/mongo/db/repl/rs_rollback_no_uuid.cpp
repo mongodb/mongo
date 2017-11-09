@@ -557,22 +557,11 @@ void syncFixUp(OperationContext* opCtx,
                 cce->updateFlags(opCtx, options.flags);
             }
 
-            auto status = collection->setValidator(opCtx, options.validator);
-            if (!status.isOK()) {
-                throw RSFatalException(str::stream() << "Failed to set validator: "
-                                                     << status.toString());
-            }
-            status = collection->setValidationAction(opCtx, options.validationAction);
-            if (!status.isOK()) {
-                throw RSFatalException(str::stream() << "Failed to set validationAction: "
-                                                     << status.toString());
-            }
-
-            status = collection->setValidationLevel(opCtx, options.validationLevel);
-            if (!status.isOK()) {
-                throw RSFatalException(str::stream() << "Failed to set validationLevel: "
-                                                     << status.toString());
-            }
+            // Set any document validation options. We update the validator fields without
+            // parsing/validation, since we fetched the options object directly from the sync
+            // source, and we should set our validation options to match it exactly.
+            cce->updateValidator(
+                opCtx, options.validator, options.validationLevel, options.validationAction);
 
             wuow.commit();
         }

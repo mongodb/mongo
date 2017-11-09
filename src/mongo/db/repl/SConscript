@@ -538,6 +538,7 @@ env.Library(
         'rollback_test_fixture.cpp',
     ],
     LIBDEPS=[
+        'oplog_interface_mock',
         'optime',
         'replication_process',
         'replmocks',
@@ -556,7 +557,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'oplog_interface_local',
-        'oplog_interface_mock',
         'rollback_test_fixture',
         'rs_rollback',
     ],
@@ -569,7 +569,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'oplog_interface_local',
-        'oplog_interface_mock',
         'rollback_test_fixture',
         'rs_rollback_no_uuid',
     ],
