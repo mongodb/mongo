@@ -30,5 +30,6 @@ executor:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
         numInitialSyncConnectAttempts: 60
+        writePeriodicNoops: 1
     num_nodes: 2
     start_initial_sync_node: True

@@ -31,5 +31,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
+        writePeriodicNoops: 1
       verbose: ''
     num_nodes: 2
