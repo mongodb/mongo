@@ -791,6 +791,122 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
                         }],
                         17276);
 
+        // The dotted path offset of a non-object variable is equivalent referencing an undefined
+        // field.
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: "$x"},
+                  pipeline: [
+                      {
+                        $match: {
+                            $expr: {
+                                $eq: [
+                                    "FIELD-IS-NULL",
+                                    {$ifNull: ["$$var1.y.z", "FIELD-IS-NULL"]}
+                                ]
+                            }
+                        }
+                      },
+                  ],
+                  from: "from",
+                  as: "as",
+              }
+            },
+            {$project: {_id: 0}}
+        ];
+
+        expectedResults = [
+            {"x": 1, "as": [{"_id": 1}, {"_id": 2}, {"_id": 3}]},
+            {"x": 2, "as": [{"_id": 1}, {"_id": 2}, {"_id": 3}]},
+            {"x": 3, "as": [{"_id": 1}, {"_id": 2}, {"_id": 3}]}
+        ];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // Comparison where a 'let' variable references an array.
+        coll.drop();
+        assert.writeOK(coll.insert({x: [1, 2, 3]}));
+
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: "$x"},
+                  pipeline: [
+                      {$match: {$expr: {$eq: ["$$var1", [1, 2, 3]]}}},
+                  ],
+                  from: "from",
+                  as: "as",
+              }
+            },
+            {$project: {_id: 0}}
+        ];
+
+        expectedResults = [{"x": [1, 2, 3], "as": [{"_id": 1}, {"_id": 2}, {"_id": 3}]}];
+        testPipeline(pipeline, expectedResults, coll);
+
+        //
+        // Pipeline syntax with nested object.
+        //
+        coll.drop();
+        assert.writeOK(coll.insert({x: {y: {z: 10}}}));
+
+        // Subfields of 'let' variables can be referenced via dotted path.
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: "$x"},
+                  pipeline: [
+                      {$project: {z: "$$var1.y.z"}},
+                  ],
+                  from: "from",
+                  as: "as",
+              }
+            },
+            {$project: {_id: 0}}
+        ];
+
+        expectedResults = [{
+            "x": {"y": {"z": 10}},
+            "as": [{"_id": 1, "z": 10}, {"_id": 2, "z": 10}, {"_id": 3, "z": 10}]
+        }];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // 'let' variable with dotted field path off of $$ROOT.
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: "$$ROOT.x.y.z"},
+                  pipeline:
+                      [{$match: {$expr: {$eq: ["$$var1", "$$ROOT.x.y.z"]}}}, {$project: {_id: 0}}],
+                  from: "lookUp",
+                  as: "as",
+              }
+            },
+            {$project: {_id: 0}}
+        ];
+
+        expectedResults = [{"x": {"y": {"z": 10}}, "as": [{"x": {"y": {"z": 10}}}]}];
+        testPipeline(pipeline, expectedResults, coll);
+
+        // 'let' variable with dotted field path off of $$CURRENT.
+        pipeline = [
+            {
+              $lookup: {
+                  let : {var1: "$$CURRENT.x.y.z"},
+                  pipeline: [
+                      {$match: {$expr: {$eq: ["$$var1", "$$CURRENT.x.y.z"]}}},
+                      {$project: {_id: 0}}
+                  ],
+                  from: "lookUp",
+                  as: "as",
+              }
+            },
+            {$project: {_id: 0}}
+        ];
+
+        expectedResults = [{"x": {"y": {"z": 10}}, "as": [{"x": {"y": {"z": 10}}}]}];
+        testPipeline(pipeline, expectedResults, coll);
+
         //
         // Pipeline syntax with nested $lookup.
         //
