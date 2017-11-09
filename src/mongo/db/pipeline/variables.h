@@ -96,10 +96,12 @@ public:
 
     /**
      * Returns whether a value for 'id' has been stored in this Variables instance.
+     * TODO: This method does not distinguish between missing entries in _valueList and entries that
+     * have been explicitly set to missing.
      */
     bool hasUserDefinedValue(Variables::Id id) const {
         invariant(isUserDefinedVariable(id));
-        return _valueList.size() > static_cast<size_t>(id);
+        return _valueList.size() > static_cast<size_t>(id) && !getUserDefinedValue(id).missing();
     }
 
     /**
