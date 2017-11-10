@@ -339,7 +339,8 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
             .docs;
 
     // Generate and persist a new UUID for each collection that did not have a UUID.
-    LOG(0) << "generating UUIDs for all sharded collections that do not yet have one";
+    LOG(0) << "generating UUIDs for " << shardedColls.size()
+           << " sharded collections that do not yet have a UUID";
     for (auto& coll : shardedColls) {
         auto collType = uassertStatusOK(CollectionType::fromBSON(coll));
         invariant(!collType.getUUID());
