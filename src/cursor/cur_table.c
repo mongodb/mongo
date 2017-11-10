@@ -33,7 +33,8 @@ typedef struct {
  *	Handle a key produced by a custom extractor.
  */
 static int
-__curextract_insert(WT_CURSOR *cursor) {
+__curextract_insert(WT_CURSOR *cursor)
+{
 	WT_CURSOR_EXTRACTOR *cextract;
 	WT_ITEM *key, ikey, pkey;
 	WT_SESSION_IMPL *session;
@@ -135,12 +136,13 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx,
  *	Apply an operation to all indices of a table.
  */
 static int
-__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, bool skip_immutable) {
+__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, bool skip_immutable)
+{
 	WT_CURSOR **cp;
 	WT_INDEX *idx;
 	WT_SESSION_IMPL *session;
-	int (*f)(WT_CURSOR *);
 	u_int i;
+	int (*f)(WT_CURSOR *);
 
 	cp = ctable->idx_cursors;
 	session = (WT_SESSION_IMPL *)ctable->iface.session;

@@ -46,12 +46,12 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 	__wt_las_cursor(session, &cursor, &session_flags);
 
 	/* Discard pages we read as soon as we're done with them. */
-	F_SET(session, WT_SESSION_NO_CACHE);
+	F_SET(session, WT_SESSION_READ_WONT_NEED);
 
 	/* Walk the file. */
 	for (; (ret = cursor->next(cursor)) == 0; ) {
 		WT_ERR(cursor->get_key(cursor,
-		    &las_id, &las_pageid, &las_counter, &las_key));
+		    &las_pageid, &las_id, &las_counter, &las_key));
 
 		/* Check the file ID so we can skip durable tables */
 		if (las_id >= conn->stable_rollback_maxfile)
@@ -79,7 +79,7 @@ __txn_rollback_to_stable_lookaside_fixup(WT_SESSION_IMPL *session)
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 	WT_STAT_CONN_SET(session, cache_lookaside_entries, las_total);
 
-	F_CLR(session, WT_SESSION_NO_CACHE);
+	F_CLR(session, WT_SESSION_READ_WONT_NEED);
 
 	return (ret);
 }

@@ -141,6 +141,9 @@ __split_verify_root(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
 	WT_REF *ref;
+	uint32_t read_flags;
+
+	read_flags = WT_READ_CACHE | WT_READ_NO_EVICT;
 
 	/* The split is complete and live, verify all of the pages involved. */
 	__split_verify_intl_key_order(session, page);
@@ -156,14 +159,14 @@ __split_verify_root(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Ignore pages not in-memory (deleted, on-disk, being read),
 		 * there's no in-memory structure to check.
 		 */
-		if ((ret = __wt_page_in(session,
-		    ref, WT_READ_CACHE | WT_READ_NO_EVICT)) == WT_NOTFOUND)
+		if ((ret =
+		    __wt_page_in(session, ref, read_flags)) == WT_NOTFOUND)
 			continue;
 		WT_ERR(ret);
 
 		__split_verify_intl_key_order(session, ref->page);
 
-		WT_ERR(__wt_page_release(session, ref, WT_READ_NO_EVICT));
+		WT_ERR(__wt_page_release(session, ref, read_flags));
 	} WT_INTL_FOREACH_END;
 
 	return (0);
@@ -1648,6 +1651,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 
 		WT_RET(__wt_calloc_one(session, &ref->page_las));
 		*ref->page_las = multi->page_las;
+		WT_ASSERT(session, ref->page_las->las_max_txn != WT_TXN_NONE);
 		ref->state = WT_REF_LOOKASIDE;
 	}
 

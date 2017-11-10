@@ -612,7 +612,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_OP *op;
 	u_int i;
-	bool did_update, locked;
+	bool locked;
 #ifdef HAVE_TIMESTAMPS
 	wt_timestamp_t prev_commit_timestamp, ts;
 	bool update_timestamp;
@@ -621,11 +621,11 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 	conn = S2C(session);
 	txn_global = &conn->txn_global;
-	did_update = txn->mod_count != 0;
 	locked = false;
 
 	WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
-	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || !did_update);
+	WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) ||
+	    txn->mod_count == 0);
 
 	/*
 	 * Look for a commit timestamp.
@@ -716,7 +716,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/* If we are logging, write a commit log record. */
-	if (did_update &&
+	if (txn->logrec != NULL &&
 	    FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) &&
 	    !F_ISSET(session, WT_SESSION_NO_LOGGING)) {
 		/*
@@ -757,8 +757,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 			 * Writes to the lookaside file can be evicted as soon
 			 * as they commit.
 			 */
-			if (conn->las_fileid != 0 &&
-			    op->fileid == conn->las_fileid) {
+			if (conn->cache->las_fileid != 0 &&
+			    op->fileid == conn->cache->las_fileid) {
 				op->u.upd->txnid = WT_TXN_NONE;
 				break;
 			}
@@ -823,6 +823,20 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * write lock and re-check.
 	 */
 	if (update_timestamp) {
+#if WT_TIMESTAMP_SIZE == 8
+		while (__wt_timestamp_cmp(
+		    &txn->commit_timestamp, &prev_commit_timestamp) > 0) {
+			if (__wt_atomic_cas64(
+			    &txn_global->commit_timestamp.val,
+			    prev_commit_timestamp.val,
+			    txn->commit_timestamp.val)) {
+				txn_global->has_commit_timestamp = true;
+				break;
+			}
+		    __wt_timestamp_set(
+			&prev_commit_timestamp, &txn_global->commit_timestamp);
+		}
+#else
 		__wt_writelock(session, &txn_global->rwlock);
 		if (__wt_timestamp_cmp(&txn->commit_timestamp,
 		    &txn_global->commit_timestamp) > 0) {
@@ -831,6 +845,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 			txn_global->has_commit_timestamp = true;
 		}
 		__wt_writeunlock(session, &txn_global->rwlock);
+#endif
 	}
 #endif
 
@@ -881,8 +896,9 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		case WT_TXN_OP_BASIC_TS:
 		case WT_TXN_OP_INMEM:
 			WT_ASSERT(session, op->u.upd->txnid == txn->id);
-			WT_ASSERT(session, S2C(session)->las_fileid == 0 ||
-			    op->fileid != S2C(session)->las_fileid);
+			WT_ASSERT(session,
+			    S2C(session)->cache->las_fileid == 0 ||
+			    op->fileid != S2C(session)->cache->las_fileid);
 			op->u.upd->txnid = WT_TXN_ABORTED;
 			break;
 		case WT_TXN_OP_REF:
@@ -961,6 +977,15 @@ __wt_txn_stats_update(WT_SESSION_IMPL *session)
 
 	WT_STAT_SET(session, stats, txn_pinned_range,
 	    txn_global->current - txn_global->oldest_id);
+
+#if WT_TIMESTAMP_SIZE == 8
+	WT_STAT_SET(session, stats, txn_pinned_timestamp,
+	    txn_global->commit_timestamp.val -
+	    txn_global->pinned_timestamp.val);
+	WT_STAT_SET(session, stats, txn_pinned_timestamp_oldest,
+	    txn_global->commit_timestamp.val -
+	    txn_global->oldest_timestamp.val);
+#endif
 
 	WT_STAT_SET(session, stats, txn_pinned_snapshot_range,
 	    snapshot_pinned == WT_TXN_NONE ?

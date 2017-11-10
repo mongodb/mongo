@@ -5285,26 +5285,33 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * snapshots
  */
 #define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1278
+/*! transaction: transaction range of timestamps currently pinned */
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1279
+/*!
+ * transaction: transaction range of timestamps pinned by the oldest
+ * timestamp
+ */
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1280
 /*! transaction: transaction sync calls */
-#define	WT_STAT_CONN_TXN_SYNC				1279
+#define	WT_STAT_CONN_TXN_SYNC				1281
 /*! transaction: transactions commit timestamp queue inserts to head */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_HEAD		1280
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_HEAD		1282
 /*! transaction: transactions commit timestamp queue inserts total */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_INSERTS		1281
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_INSERTS		1283
 /*! transaction: transactions commit timestamp queue length */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_LEN		1282
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_LEN		1284
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1283
+#define	WT_STAT_CONN_TXN_COMMIT				1285
 /*! transaction: transactions read timestamp queue inserts to head */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_HEAD		1284
+#define	WT_STAT_CONN_TXN_READ_QUEUE_HEAD		1286
 /*! transaction: transactions read timestamp queue inserts total */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_INSERTS		1285
+#define	WT_STAT_CONN_TXN_READ_QUEUE_INSERTS		1287
 /*! transaction: transactions read timestamp queue length */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_LEN			1286
+#define	WT_STAT_CONN_TXN_READ_QUEUE_LEN			1288
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1287
+#define	WT_STAT_CONN_TXN_ROLLBACK			1289
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1288
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1290
 
 /*!
  * @}

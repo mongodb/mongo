@@ -54,10 +54,11 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	 */
 	if (F_ISSET(dhandle, WT_DHANDLE_DEAD) &&
 	    F_ISSET(S2C(session), WT_CONN_LOOKASIDE_OPEN) &&
-	    !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
-		WT_ASSERT(session, !WT_IS_METADATA(dhandle));
+	    btree->lookaside_entries) {
+		WT_ASSERT(session, !WT_IS_METADATA(dhandle) &&
+		    !F_ISSET(btree, WT_BTREE_LOOKASIDE));
 
-		WT_RET(__wt_las_remove_block(session, NULL, btree->id, 0));
+		WT_RET(__wt_las_save_dropped(session));
 	} else
 		FLD_SET(walk_flags, WT_READ_LOOKASIDE);
 

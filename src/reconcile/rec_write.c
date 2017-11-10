@@ -1461,6 +1461,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	if (uncommitted && !F_ISSET(r, WT_REC_UPDATE_RESTORE))
 		return (EBUSY);
 
+	WT_ASSERT(session, r->max_txn != WT_TXN_NONE);
+
 	/*
 	 * The order of the updates on the list matters, we can't move only the
 	 * unresolved updates, move the entire update list.
@@ -6062,7 +6064,7 @@ __rec_las_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
 		if (multi->supd != NULL)
 			WT_ERR(__wt_las_insert_block(
-			    session, r->page, cursor, multi, key));
+			    session, cursor, r->page, multi, key));
 
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 

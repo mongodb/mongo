@@ -522,6 +522,13 @@ __evict_review(
 		return (0);
 
 	/*
+	 * If reconciliation is disabled for this thread (e.g., during an
+	 * eviction that writes to lookaside), give up.
+	 */
+	if (F_ISSET(session, WT_SESSION_NO_RECONCILE))
+		return (EBUSY);
+
+	/*
 	 * If the page is dirty, reconcile it to decide if we can evict it.
 	 *
 	 * If we have an exclusive lock (we're discarding the tree), assert
@@ -575,9 +582,7 @@ __evict_review(
 			 * that can't be evicted, check if reconciliation
 			 * suggests trying the lookaside table.
 			 */
-			if (!F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE) &&
-			    (__wt_cache_lookaside_score(cache) > 50 ||
-			    __wt_cache_stuck(session)))
+			if (F_ISSET(cache, WT_CACHE_EVICT_LOOKASIDE))
 				lookaside_retryp = &lookaside_retry;
 		}
 	}
