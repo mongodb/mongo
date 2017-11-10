@@ -1341,6 +1341,12 @@ private:
     // The catchup state including all catchup logic. The presence of a non-null pointer indicates
     // that the node is currently in catchup mode.
     std::unique_ptr<CatchupState> _catchupState;  // (X)
+
+    // Atomic-synchronized copy of Topology Coordinator's _term, for use by the public getTerm()
+    // function.
+    // This variable must be written immediately after _term, and thus its value can lag.
+    // Reading this value does not require the replication coordinator mutex to be locked.
+    AtomicInt64 _termShadow;  // (S)
 };
 
 }  // namespace repl

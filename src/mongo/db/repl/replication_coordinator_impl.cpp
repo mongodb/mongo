@@ -354,6 +354,8 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
       _storage(storage),
       _random(prngSeed) {
 
+    _termShadow.store(OpTime::kUninitializedTerm);
+
     invariant(_service);
 
     if (!isReplEnabled()) {
@@ -2825,6 +2827,10 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
     _setConfigState_inlock(kConfigSteady);
 
     _topCoord->updateConfig(newConfig, myIndex, _replExecutor->now());
+
+    // updateConfig() can change terms, so update our term shadow to match.
+    _termShadow.store(_topCoord->getTerm());
+
     const ReplSetConfig oldConfig = _rsConfig;
     _rsConfig = newConfig;
     _protVersion.store(_rsConfig.getProtocolVersion());
@@ -3384,8 +3390,8 @@ void ReplicationCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {
 }
 
 long long ReplicationCoordinatorImpl::getTerm() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    return _topCoord->getTerm();
+    // Note: no mutex acquisition here, as we are reading an Atomic variable.
+    return _termShadow.load();
 }
 
 EventHandle ReplicationCoordinatorImpl::updateTerm_forTest(
@@ -3447,6 +3453,7 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(
     TopologyCoordinator::UpdateTermResult localUpdateTermResult = _topCoord->updateTerm(term, now);
     {
         if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kUpdatedTerm) {
+            _termShadow.store(term);
             _cancelPriorityTakeover_inlock();
             _cancelAndRescheduleElectionTimeout_inlock();
         }
