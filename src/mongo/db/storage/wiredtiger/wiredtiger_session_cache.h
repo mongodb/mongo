@@ -248,6 +248,9 @@ private:
     // Notified when we commit to the journal.
     JournalListener* _journalListener = &NoOpJournalListener::instance;
 
+    WT_SESSION* _waitUntilDurableSession = nullptr;  // owned, and never explicitly closed
+                                                     // (uses connection close to clean up)
+
     /**
      * Returns a session to the cache for later reuse. If closeAll was called between getting this
      * session and releasing it, the session is directly released. This method is thread safe.
