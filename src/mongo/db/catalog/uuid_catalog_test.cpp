@@ -41,14 +41,21 @@ using namespace mongo;
  */
 class UUIDCatalogTest : public unittest::Test {
 public:
-    UUIDCatalogTest() : nss("testdb", "testcol"), col(stdx::make_unique<CollectionMock>(nss)) {
-        std::array<CollectionUUID, 3> sortedUUIDs = {
-            CollectionUUID::gen(), CollectionUUID::gen(), CollectionUUID::gen()};
+    UUIDCatalogTest()
+        : nss("testdb", "testcol"),
+          col(stdx::make_unique<CollectionMock>(nss)),
+          colUUID(CollectionUUID::gen()),
+          nextUUID(CollectionUUID::gen()),
+          prevUUID(CollectionUUID::gen()) {
+        if (prevUUID > colUUID)
+            std::swap(prevUUID, colUUID);
+        if (colUUID > nextUUID)
+            std::swap(colUUID, nextUUID);
+        if (prevUUID > colUUID)
+            std::swap(prevUUID, colUUID);
+        ASSERT_GT(colUUID, prevUUID);
+        ASSERT_GT(nextUUID, colUUID);
 
-        std::sort(sortedUUIDs.begin(), sortedUUIDs.end());
-        colUUID = sortedUUIDs[1];
-        prevUUID = sortedUUIDs[0];
-        nextUUID = sortedUUIDs[2];
         // Register dummy collection in catalog.
         catalog.onCreateCollection(&opCtx, &col, colUUID);
     }

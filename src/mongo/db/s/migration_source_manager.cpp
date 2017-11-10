@@ -164,7 +164,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                 "cannot move chunks for a collection that doesn't exist",
                 autoColl.getCollection());
 
-        UUID collectionUUID;
+        boost::optional<UUID> collectionUUID;
         if (autoColl.getCollection()->uuid()) {
             collectionUUID = autoColl.getCollection()->uuid().value();
         }
