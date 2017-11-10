@@ -552,6 +552,9 @@ void syncFixUp(OperationContext* opCtx,
 
             WriteUnitOfWork wuow(opCtx);
 
+            // Set collection to whatever temp status is on the sync source.
+            cce->setIsTemp(opCtx, options.temp);
+
             // Resets collection user flags such as noPadding and usePowerOf2Sizes.
             if (options.flagsSet || cce->getCollectionOptions(opCtx).flagsSet) {
                 cce->updateFlags(opCtx, options.flags);
