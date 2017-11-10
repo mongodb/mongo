@@ -152,6 +152,37 @@ ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
         return false;
     };
 
+    auto operationContainsUUID = [](const BSONObj& opObj) {
+        auto anyTopLevelElementIsUUID = [](const BSONObj& opObj) {
+            for (const BSONElement opElement : opObj) {
+                if (opElement.type() == BSONType::BinData &&
+                    opElement.binDataType() == BinDataType::newUUID) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        if (anyTopLevelElementIsUUID(opObj)) {
+            return true;
+        }
+
+        BSONElement opTypeElem = opObj["op"];
+        checkBSONType(BSONType::String, opTypeElem);
+        const StringData opType = opTypeElem.checkAndGetStringData();
+
+        if (opType == "c"_sd) {
+            BSONElement oElem = opObj["o"];
+            checkBSONType(BSONType::Object, oElem);
+            BSONObj o = oElem.Obj();
+
+            if (anyTopLevelElementIsUUID(o)) {
+                return true;
+            }
+        }
+
+        return false;
+    };
+
     // Insert the top level applyOps command into the stack.
     toCheck.emplace(std::make_pair(0, cmdObj));
 
@@ -170,6 +201,13 @@ ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
         for (BSONElement element : item.second.firstElement().Array()) {
             checkBSONType(BSONType::Object, element);
             BSONObj elementObj = element.Obj();
+
+            if (serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
+                uassert(ErrorCodes::OplogOperationUnsupported,
+                        "applyOps with UUID requires upgrading to FeatureCompatibilityVersion 3.6",
+                        !operationContainsUUID(elementObj));
+            }
 
             // If the op itself contains an applyOps...
             if (operationContainsApplyOps(elementObj)) {
