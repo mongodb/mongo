@@ -7786,19 +7786,19 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
 
-- name: rhel-70-64-bit-debug
-  display_name: "* RHEL 7.0 DEBUG"
+- name: ubuntu1604-debug
+  display_name: "* Ubuntu 16.04 DEBUG"
   run_on:
-  - rhel70-small
+  - ubuntu1604-test
   expansions:
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
-    compile_flags: MONGO_DISTMOD=rhel70 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     use_scons_cache: true
     build_mongoreplay: true
   tasks:
   - name: compile
     distros:
-    - rhel70
+    - ubuntu1604-build
   - name: jsCore
   - name: jsCore_WT
   - name: read_concern_linearizable_passthrough
