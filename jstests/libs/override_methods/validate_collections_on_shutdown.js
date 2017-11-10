@@ -75,8 +75,9 @@
         load('jstests/hooks/validate_collections.js');  // for validateCollections
 
         const cmds = new CommandSequenceWithRetries(conn);
-        for (let dbName of dbNames) {
-            cmds.then("DEBUG: validating " + dbName, function(conn) {
+        for (let i = 0; i < dbNames.length; ++i) {
+            const dbName = dbNames[i];
+            cmds.then("validating " + dbName, function(conn) {
                 if (!validateCollections(conn.getDB(dbName), {full: true})) {
                     return {shouldStop: true, reason: "collection validation failed"};
                 }
