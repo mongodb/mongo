@@ -12,7 +12,7 @@ set -o errexit
 # parser to hang.
 #
 
-VERSION=2017.05beta10
+VERSION=2017.05
 NAME=timelib
 TARBALL=$VERSION.tar.gz
 TARBALL_DIR=$NAME-$VERSION
@@ -79,6 +79,9 @@ try:
             '-DHAVE_IO_H',
             '-DHAVE_WINSOCK2_H',
         ])
+
+        # C4996: '...': was declared deprecated
+        env.Append(CCFLAGS=['/wd4996'])
     elif env.TargetOSIs('solaris'):
         env.AppendUnique(CCFLAGS=[
             '-DHAVE_DIRENT_H',
