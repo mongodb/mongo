@@ -60,7 +60,7 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
     if (osi.getSessionId()) {
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "cannot pass logical session id unless fully upgraded to "
-                                 "featureCompatibilityVersion 3.4. See "
+                                 "featureCompatibilityVersion 3.6. See "
                               << feature_compatibility_version::kDochubLink
                               << " .",
                 serverGlobalParams.featureCompatibility.getVersion() ==
