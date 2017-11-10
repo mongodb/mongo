@@ -38,6 +38,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -60,6 +61,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_query_knobs.h"
 #include "mongo/s/query/establish_cursors.h"
+#include "mongo/s/query/router_stage_update_on_add_shard.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
@@ -323,6 +325,9 @@ struct DispatchShardPipelineResults {
 
     // The merging half of the pipeline if more than one shard was targeted, otherwise nullptr.
     std::unique_ptr<Pipeline, Pipeline::Deleter> pipelineForMerging;
+
+    // The command object to send to the targeted shards.
+    BSONObj commandForTargetedShards;
 };
 
 /**
@@ -360,6 +365,7 @@ StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
 
     auto pipelineForTargetedShards = std::move(pipeline);
     std::unique_ptr<Pipeline, Pipeline::Deleter> pipelineForMerging;
+    BSONObj targetedCommand;
 
     int numAttempts = 0;
 
@@ -402,7 +408,7 @@ StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
         }
 
         // Generate the command object for the targeted shards.
-        BSONObj targetedCommand =
+        targetedCommand =
             createCommandForTargetedShards(aggRequest, originalCmdObj, pipelineForTargetedShards);
 
         // Refresh the shard registry if we're targeting all shards.  We need the shard registry
@@ -470,7 +476,8 @@ StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
                                         std::move(swCursors.getValue()),
                                         std::move(swShardResults.getValue()),
                                         std::move(pipelineForTargetedShards),
-                                        std::move(pipelineForMerging)};
+                                        std::move(pipelineForMerging),
+                                        targetedCommand};
 }
 
 StatusWith<std::pair<ShardId, Shard::CommandResponse>> establishMergingShardCursor(
@@ -500,6 +507,8 @@ BSONObj establishMergingMongosCursor(
     OperationContext* opCtx,
     const AggregationRequest& request,
     const NamespaceString& requestedNss,
+    BSONObj cmdToRunOnNewShards,
+    const LiteParsedPipeline& liteParsedPipeline,
     std::unique_ptr<Pipeline, Pipeline::Deleter> pipelineForMerging,
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors) {
 
@@ -522,6 +531,16 @@ BSONObj establishMergingMongosCursor(
         ? boost::none
         : boost::optional<long long>(request.getBatchSize());
 
+    if (liteParsedPipeline.hasChangeStream()) {
+        // For change streams, we need to set up a custom stage to establish cursors on new shards
+        // when they are added.
+        params.createCustomCursorSource = [cmdToRunOnNewShards](OperationContext* opCtx,
+                                                                executor::TaskExecutor* executor,
+                                                                ClusterClientCursorParams* params) {
+            return stdx::make_unique<RouterStageUpdateOnAddShard>(
+                opCtx, executor, params, cmdToRunOnNewShards);
+        };
+    }
     auto ccc = ClusterClientCursorImpl::make(
         opCtx, Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(), std::move(params));
 
@@ -625,11 +644,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
 
-    // If this pipeline is on an unsharded collection, is allowed to be forwarded to shards, is not
-    // a collectionless aggregation that needs to run on all shards, and doesn't need transformation
-    // via DocumentSoruce::serialize(), then go ahead and pass it through to the owning shard
+    // If this pipeline is on an unsharded collection, is allowed to be forwarded to shards, does
+    // not need to run on all shards, and doesn't need transformation via
+    // DocumentSource::serialize(), then go ahead and pass it through to the owning shard
     // unmodified.
-    if (!executionNsRoutingInfo.cm() && !namespaces.executionNss.isCollectionlessAggregateNS() &&
+    if (!executionNsRoutingInfo.cm() &&
+        !mustRunOnAllShards(namespaces.executionNss, liteParsedPipeline) &&
         liteParsedPipeline.allowedToForwardFromMongos() &&
         liteParsedPipeline.allowedToPassthroughFromMongos()) {
         return aggPassthrough(opCtx,
@@ -667,8 +687,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                               << " is not capable of producing input",
                 !pipeline->getSources().front()->constraints().requiresInputDocSource);
 
-        auto cursorResponse = establishMergingMongosCursor(
-            opCtx, request, namespaces.requestedNss, std::move(pipeline), {});
+        auto cursorResponse = establishMergingMongosCursor(opCtx,
+                                                           request,
+                                                           namespaces.requestedNss,
+                                                           cmdObj,
+                                                           liteParsedPipeline,
+                                                           std::move(pipeline),
+                                                           {});
         Command::filterCommandReplyForPassthrough(cursorResponse, result);
         return getStatusFromCommandResult(result->asTempObj());
     }
@@ -726,6 +751,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             establishMergingMongosCursor(opCtx,
                                          request,
                                          namespaces.requestedNss,
+                                         dispatchResults.commandForTargetedShards,
+                                         liteParsedPipeline,
                                          std::move(mergingPipeline),
                                          std::move(dispatchResults.remoteCursors));
 

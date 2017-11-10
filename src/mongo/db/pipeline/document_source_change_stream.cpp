@@ -78,7 +78,7 @@ constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
 constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
 constexpr StringData DocumentSourceChangeStream::kInsertOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
-constexpr StringData DocumentSourceChangeStream::kRetryNeededOpType;
+constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 
 const BSONObj DocumentSourceChangeStream::kSortSpec =
     BSON("_id.clusterTime.ts" << 1 << "_id.uuid" << 1 << "_id.documentKey" << 1);
@@ -218,8 +218,7 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
     const auto& kOperationTypeField = DocumentSourceChangeStream::kOperationTypeField;
     checkValueType(doc[kOperationTypeField], kOperationTypeField, BSONType::String);
     auto operationType = doc[kOperationTypeField].getString();
-    if (operationType == DocumentSourceChangeStream::kInvalidateOpType ||
-        operationType == DocumentSourceChangeStream::kRetryNeededOpType) {
+    if (operationType == DocumentSourceChangeStream::kInvalidateOpType) {
         // Pass the invalidation forward, so that it can be included in the results, or
         // filtered/transformed by further stages in the pipeline, then throw an exception
         // to close the cursor on the next call to getNext().
@@ -377,6 +376,28 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     return stages;
 }
 
+BSONObj DocumentSourceChangeStream::replaceResumeTokenInCommand(const BSONObj originalCmdObj,
+                                                                const BSONObj resumeToken) {
+    Document originalCmd(originalCmdObj);
+    auto pipeline = originalCmd[AggregationRequest::kPipelineName].getArray();
+    // A $changeStream must be the first element of the pipeline in order to be able
+    // to replace (or add) a resume token.
+    invariant(!pipeline[0][DocumentSourceChangeStream::kStageName].missing());
+
+    MutableDocument changeStreamStage(
+        pipeline[0][DocumentSourceChangeStream::kStageName].getDocument());
+    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterFieldName] = Value(resumeToken);
+
+    // If the command was initially specified with a resumeAfterClusterTime, we need to remove it
+    // to use the new resume token.
+    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName] = Value();
+    pipeline[0] =
+        Value(Document{{DocumentSourceChangeStream::kStageName, changeStreamStage.freeze()}});
+    MutableDocument newCmd(originalCmd);
+    newCmd[AggregationRequest::kPipelineName] = Value(pipeline);
+    return newCmd.freeze().toBson();
+}
+
 intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationStage(
     BSONObj changeStreamSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
     return intrusive_ptr<DocumentSource>(new DocumentSourceSingleDocumentTransformation(
@@ -463,9 +484,9 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
             break;
         }
         case repl::OpTypeEnum::kNoop: {
-            operationType = kRetryNeededOpType;
-            // Generate a fake document Id for RetryNeeded operation so that we can resume after
-            // this operation.
+            operationType = kNewShardDetectedOpType;
+            // Generate a fake document Id for NewShardDetected operation so that we can resume
+            // after this operation.
             documentKey = Value(Document{{kIdField, input[repl::OplogEntry::kObject2FieldName]}});
             break;
         }
@@ -499,8 +520,8 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         doc.setSortKeyMetaField(BSON("" << ts << "" << uuid << "" << documentKey));
     }
 
-    // "invalidate" and "retryNeeded" entries have fewer fields.
-    if (operationType == kInvalidateOpType || operationType == kRetryNeededOpType) {
+    // "invalidate" and "newShardDetected" entries have fewer fields.
+    if (operationType == kInvalidateOpType || operationType == kNewShardDetectedOpType) {
         return doc.freeze();
     }
 

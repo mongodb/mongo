@@ -70,13 +70,14 @@
     }));
     assert.writeOK(mongosColl.insert({_id: -1}));
 
-    // Since a moveChunk was requested, the cursor results should indicate a retry is needed.
-    // TODO: SERVER-30834 this result will get swallowed and the change stream cursor should see
-    // the inserted document.
+    // Make sure the change stream cursor sees the inserted document even after the moveChunk.
     cst.assertNextChangesEqual({
         cursor: cursor,
         expectedChanges: [{
-            operationType: "retryNeeded",
+            documentKey: {_id: -1},
+            fullDocument: {_id: -1},
+            ns: {db: mongosDB.getName(), coll: mongosColl.getName()},
+            operationType: "insert",
         }]
     });
 

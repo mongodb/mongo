@@ -154,6 +154,16 @@ void AsyncResultsMerger::reattachToOperationContext(OperationContext* opCtx) {
     _opCtx = opCtx;
 }
 
+void AsyncResultsMerger::addNewShardCursors(
+    const std::vector<ClusterClientCursorParams::RemoteCursor>& newCursors) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    for (auto&& remote : newCursors) {
+        _remotes.emplace_back(remote.hostAndPort,
+                              remote.cursorResponse.getNSS(),
+                              remote.cursorResponse.getCursorId());
+    }
+}
+
 bool AsyncResultsMerger::_ready(WithLock lk) {
     if (_lifecycleState != kAlive) {
         return true;

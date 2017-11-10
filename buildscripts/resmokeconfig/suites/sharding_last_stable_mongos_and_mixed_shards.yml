@@ -36,13 +36,13 @@ selector:
   - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js
   - jstests/sharding/lookup_change_stream_post_image_hashed_shard_key.js
   - jstests/sharding/lookup_change_stream_post_image_compound_shard_key.js
+  - jstests/sharding/change_stream_chunk_migration.js
   - jstests/sharding/change_stream_invalidation.js
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/change_stream_remove_shard.js
   - jstests/sharding/change_streams.js
   - jstests/sharding/change_streams_shards_start_in_sync.js
   - jstests/sharding/change_streams_unsharded_becomes_sharded.js
-  - jstests/sharding/close_cursor_on_chunk_migration_to_new_shards.js
   - jstests/sharding/enable_sharding_basic.js
   - jstests/sharding/key_rotation.js
   - jstests/sharding/kill_sessions.js

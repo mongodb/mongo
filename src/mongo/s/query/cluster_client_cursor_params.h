@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -44,8 +45,12 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+namespace executor {
+class TaskExecutor;
+}
 
 class OperationContext;
+class RouterExecStage;
 
 /**
  * The resulting ClusterClientCursor will take ownership of the existing remote cursor, generating
@@ -121,6 +126,12 @@ struct ClusterClientCursorParams {
 
     // Set if a readPreference must be respected throughout the lifetime of the cursor.
     boost::optional<ReadPreferenceSetting> readPreference;
+
+    // If valid, is called to return the RouterExecStage which becomes the initial source in this
+    // cursor's execution plan. Otherwise, a RouterStageMerge is used.
+    stdx::function<std::unique_ptr<RouterExecStage>(
+        OperationContext*, executor::TaskExecutor*, ClusterClientCursorParams*)>
+        createCustomCursorSource;
 
     // Whether the client indicated that it is willing to receive partial results in the case of an
     // unreachable host.
