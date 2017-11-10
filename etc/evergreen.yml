@@ -4166,7 +4166,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=retryable_writes_jscore_passthrough --storageEngine=mmapv1
+      resmoke_args: --suites=retryable_writes_jscore_passthrough --storageEngine=mmapv1 --excludeWithAnyTags=skip_in_retryable_writes_mmapv1_passthrough
       run_multiple_jobs: true
 
 - <<: *task_template

@@ -1,7 +1,10 @@
 // Cannot implicitly shard accessed collections because of following errmsg: A single
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
-// @tags: [assumes_unsharded_collection]
+// MMap doesn't implement RecordStore::oplogStartHack so it uses the OplogStart stage instead when
+// performing ts queries on the oplog during retry. This is considerable slower since it will
+// have to perform table scans within an extent.
+// @tags: [assumes_unsharded_collection, skip_in_retryable_writes_mmapv1_passthrough]
 
 //
 // Ensures that mongod respects the batch write protocols for updates
