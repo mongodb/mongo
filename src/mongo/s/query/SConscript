@@ -39,10 +39,14 @@ env.Library(
         "router_stage_pipeline.cpp",
         "router_stage_remove_metadata_fields.cpp",
         "router_stage_skip.cpp",
+        "router_stage_update_on_add_shard.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/query_common",
         "async_results_merger",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/pipeline/document_source_lookup",
     ],
 )
 

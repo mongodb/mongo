@@ -560,6 +560,22 @@ TEST_F(ChangeStreamStageTest, TransformInvalidateRenameDropTarget) {
     checkTransformation(rename, expectedInvalidate);
 }
 
+TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
+    auto o2Field = D{{"type", "migrateChunkToNewShard"_sd}};
+    auto newShardDetected = makeOplogEntry(OpTypeEnum::kNoop,
+                                           nss,
+                                           testUuid(),
+                                           boost::none,  // fromMigrate
+                                           BSONObj(),
+                                           o2Field.toBson());
+
+    Document expectedNewShardDetected{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), BSON("_id" << o2Field))},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kNewShardDetectedOpType},
+    };
+    checkTransformation(newShardDetected, expectedNewShardDetected);
+}
+
 TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollection) {
     auto collSpec =
         D{{"create", "foo"_sd},
@@ -669,30 +685,6 @@ TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) 
 
     // Throw an exception on the call of getNext().
     ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
-}
-
-TEST_F(ChangeStreamStageTest, CloseCursorOnRetryNeededEntries) {
-    auto o2Field = D{{"type", "migrateChunkToNewShard"_sd}};
-    auto retryNeeded = makeOplogEntry(OpTypeEnum::kNoop,  // op type
-                                      nss,                // namespace
-                                      testUuid(),         // uuid
-                                      boost::none,        // fromMigrate
-                                      {},                 // o
-                                      o2Field.toBson());  // o2
-
-    auto stages = makeStages(retryNeeded);
-    auto closeCursor = stages.back();
-
-    Document expectedRetryNeeded{
-        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), BSON("_id" << o2Field))},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kRetryNeededOpType},
-    };
-
-    auto next = closeCursor->getNext();
-    // Transform into RetryNeeded entry.
-    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedRetryNeeded);
-    // Then throw an exception on the next call of getNext().
-    ASSERT_THROWS(closeCursor->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
 }
 
 }  // namespace

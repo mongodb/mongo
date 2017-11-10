@@ -127,4 +127,10 @@ Status RouterStageMerge::doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) {
     return _arm.setAwaitDataTimeout(awaitDataTimeout);
 }
 
+void RouterStageMerge::addNewShardCursors(
+    std::vector<ClusterClientCursorParams::RemoteCursor>&& newShards) {
+    _arm.addNewShardCursors(newShards);
+    std::move(newShards.begin(), newShards.end(), std::back_inserter(_params->remotes));
+}
+
 }  // namespace mongo
