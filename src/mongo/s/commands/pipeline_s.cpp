@@ -177,14 +177,20 @@ public:
         // construct the MongosProcessInterface, but both should be using the same opCtx.
         invariant(expCtx->opCtx == _expCtx->opCtx);
 
-        // Create a QueryRequest from the given filter. This will be used to generate the find
-        // command to be dispatched to the shard in order to return the post-change document.
+        // Create the find command to be dispatched to the shard in order to return the post-change
+        // document.
         auto filterObj = filter.toBson();
-        QueryRequest qr(expCtx->ns);
-        qr.setFilter(filterObj);
+        BSONObjBuilder cmdBuilder;
+        bool findCmdIsByUuid(expCtx->uuid);
+        if (findCmdIsByUuid) {
+            expCtx->uuid->appendToBuilder(&cmdBuilder, "find");
+        } else {
+            cmdBuilder.append("find", expCtx->ns.coll());
+        }
+        cmdBuilder.append("filter", filterObj);
 
         auto swShardResult = makeStatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>>();
-        auto findCmd = qr.asFindCommand();
+        auto findCmd = cmdBuilder.obj();
         size_t numAttempts = 0;
         do {
             // Verify that the collection exists, with the UUID passed in the expCtx.
@@ -194,6 +200,16 @@ public:
                 return boost::none;
             }
             auto routingInfo = uassertStatusOK(std::move(swRoutingInfo));
+            if (findCmdIsByUuid && routingInfo.cm()) {
+                // Find by UUID and shard versioning do not work together (SERVER-31946).  In the
+                // sharded case we've already checked the UUID, so find by namespace is safe.  In
+                // the unlikely case that the collection has been deleted and a new collection with
+                // the same name created through a different mongos, the shard version will be
+                // detected as stale, as shard versions contain an 'epoch' field unique to the
+                // collection.
+                findCmd = findCmd.addField(BSON("find" << expCtx->ns.coll()).firstElement());
+                findCmdIsByUuid = false;
+            }
 
             // Get the ID and version of the single shard to which this query will be sent.
             auto shardInfo = getSingleTargetedShardForQuery(expCtx->opCtx, routingInfo, filterObj);
@@ -210,6 +226,11 @@ public:
                 false,
                 nullptr);
 
+            // If it's an unsharded collection which has been deleted and re-created, we may get a
+            // NamespaceNotFound error when looking up by UUID.
+            if (swShardResult.getStatus().code() == ErrorCodes::NamespaceNotFound) {
+                return boost::none;
+            }
             // If we hit a stale shardVersion exception, invalidate the routing table cache.
             if (ErrorCodes::isStaleShardingError(swShardResult.getStatus().code())) {
                 catalogCache->onStaleConfigError(std::move(routingInfo));
