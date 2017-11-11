@@ -34,6 +34,7 @@
 
 #include <boost/intrusive_ptr.hpp>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -605,6 +606,33 @@ BSONObj establishMergingMongosCursor(
     return cursorResponse.obj();
 }
 
+BSONObj getDefaultCollationForUnshardedCollection(const Shard* primaryShard,
+                                                  const NamespaceString& nss) {
+    ScopedDbConnection conn(primaryShard->getConnString());
+    BSONObj defaultCollation;
+    std::list<BSONObj> all =
+        conn->getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
+    if (all.empty()) {
+        return defaultCollation;
+    }
+    BSONObj collectionInfo = all.front();
+    if (collectionInfo["options"].type() == BSONType::Object) {
+        BSONObj collectionOptions = collectionInfo["options"].Obj();
+        BSONElement collationElement;
+        auto status = bsonExtractTypedField(
+            collectionOptions, "collation", BSONType::Object, &collationElement);
+        if (status.isOK()) {
+            defaultCollation = collationElement.Obj().getOwned();
+            uassert(ErrorCodes::BadValue,
+                    "Default collation in collection metadata cannot be empty.",
+                    !defaultCollation.isEmpty());
+        } else if (status != ErrorCodes::NoSuchKey) {
+            uassertStatusOK(status);
+        }
+    }
+    return defaultCollation;
+}
+
 }  // namespace
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
@@ -668,6 +696,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     } else if (const auto chunkMgr = executionNsRoutingInfo.cm()) {
         if (chunkMgr->getDefaultCollator()) {
             collation = chunkMgr->getDefaultCollator()->clone();
+        }
+    } else {
+        // Unsharded collection.  Get collection metadata from primary chunk.
+        auto collationObj = getDefaultCollationForUnshardedCollection(
+            executionNsRoutingInfo.primary().get(), namespaces.executionNss);
+        if (!collationObj.isEmpty()) {
+            collation = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
+                                            ->makeFromBSON(collationObj));
         }
     }
 
