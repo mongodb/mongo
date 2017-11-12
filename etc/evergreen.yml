@@ -2890,6 +2890,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: change_streams_sharded_collections_passthrough_WT
+  depends_on:
+  - name: change_streams_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=change_streams_sharded_collections_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: dbtest
   commands:
   - func: "do setup"
@@ -4940,6 +4951,7 @@ buildvariants:
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
   - name: change_streams_secondary_reads_WT
+  - name: change_streams_sharded_collections_passthrough_WT
   - name: dbtest
   - name: dbtest_WT
   - name: disk
@@ -5109,6 +5121,7 @@ buildvariants:
   - name: causally_consistent_jscore_passthrough_auth_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency
   - name: concurrency_WT
   - name: concurrency_replication
@@ -6329,6 +6342,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_sharded_collections_passthrough_WT
   - name: dbtest
   - name: dbtest_WT
   - name: disk
@@ -7017,6 +7031,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency
   - name: concurrency_WT
   - name: concurrency_replication
@@ -7336,6 +7351,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency
   - name: concurrency_WT
   - name: concurrency_replication
@@ -7592,6 +7608,7 @@ buildvariants:
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
   - name: change_streams_secondary_reads_WT
+  - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency
   - name: concurrency_WT
   - name: concurrency_replication
@@ -9698,6 +9715,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
@@ -10096,6 +10114,7 @@ buildvariants:
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
   - name: change_streams_secondary_reads_WT
+  - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency
   - name: concurrency_WT
   - name: concurrency_replication
@@ -10308,6 +10327,7 @@ buildvariants:
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
   - name: change_streams_secondary_reads_WT
+  - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency
   - name: concurrency_WT
   - name: concurrency_replication

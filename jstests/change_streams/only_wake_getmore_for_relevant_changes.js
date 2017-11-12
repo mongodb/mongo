@@ -4,7 +4,8 @@
     "use strict";
 
     load('jstests/libs/uuid_util.js');
-    load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
+    load("jstests/libs/fixture_helpers.js");           // For 'FixtureHelpers'.
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
     /**
      * Uses a parallel shell to execute the javascript function 'event' at the same time as an
@@ -20,11 +21,13 @@
         // the getMore to run. To prevent this from happening, the main thread waits for an insert
         // into "sentinel", to signal that the parallel shell has started and is waiting for the
         // getMore to appear in currentOp.
-        const shellSentinelCollection = db.shell_sentinel;
-        shellSentinelCollection.drop();
+        const shellSentinelCollection = assertDropAndRecreateCollection(db, "shell_sentinel");
 
-        const awaitShellDoingEventDuringGetMore =
-            startParallelShell(`
+        const port =
+            (collection.stats().sharded ? collection.getMongo().port
+                                        : FixtureHelpers.getPrimaryForNodeHostingDatabase(db).port);
+
+        const awaitShellDoingEventDuringGetMore = startParallelShell(`
 // Signal that the parallel shell has started.
 assert.writeOK(db.getCollection("${ shellSentinelCollection.getName() }").insert({}));
 
@@ -34,12 +37,12 @@ assert.soon(function() {
                  op: "getmore",
                  "command.collection": "${collection.getName()}",
                  "originatingCommand.comment": "${identifyingComment}",
-             }).inprog.length === 1;
+             }).inprog.length > 0;
 });
 
 const eventFn = ${ event.toString() };
 eventFn();`,
-                               FixtureHelpers.getPrimaryForNodeHostingDatabase(db).port);
+                                                                     port);
 
         // Wait for the shell to start.
         assert.soon(() => shellSentinelCollection.findOne() != null);
@@ -104,9 +107,7 @@ eventFn();`,
         return result;
     }
 
-    const changesCollection = db.changes;
-    changesCollection.drop();
-    assert.commandWorked(db.createCollection(changesCollection.getName()));
+    const changesCollection = assertDropAndRecreateCollection(db, "changes");
 
     // Start a change stream cursor.
     const wholeCollectionStreamComment = "change stream on entire collection";
@@ -130,7 +131,6 @@ eventFn();`,
         event: () => assert.writeOK(db.changes.insert({_id: "wake up"}))
     });
     assert.eq(getMoreResponse.cursor.nextBatch.length, 1);
-    const changesCollectionUuid = getUUIDFromListCollections(db, changesCollection.getName());
     assert.docEq(getMoreResponse.cursor.nextBatch[0], {
         documentKey: {_id: "wake up"},
         fullDocument: {_id: "wake up"},
@@ -140,7 +140,7 @@ eventFn();`,
 
     // Test that an insert to an unrelated collection will not cause the change stream to wake up
     // and return an empty batch before reaching the maxTimeMS.
-    db.unrelated_collection.drop();
+    assertDropCollection(db, "unrelated_collection");
     assertEventDoesNotWakeCursor({
         collection: changesCollection,
         awaitDataCursorId: changeCursorId,

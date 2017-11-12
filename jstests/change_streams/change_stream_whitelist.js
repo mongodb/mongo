@@ -5,11 +5,13 @@
 (function() {
     "use strict";
 
-    load('jstests/aggregation/extras/utils.js');  // For assertErrorCode().
+    load('jstests/aggregation/extras/utils.js');       // For assertErrorCode.
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+
+    const coll = assertDropAndRecreateCollection(db, "change_stream_whitelist");
 
     // Bare-bones $changeStream pipeline which will be augmented during tests.
     const changeStream = [{$changeStream: {}}];
-    const coll = db[jsTestName()];
 
     // List of non-$changeStream stages which are explicitly whitelisted.
     const whitelist = [
