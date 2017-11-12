@@ -80,13 +80,15 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                 adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
                 "3.6",
                 "expected 3.6 mongod with no data files to start up with featureCompatibilityVersion 3.6");
+            removeFCVDocument(adminDB);
         } else {
             assert.eq(
                 adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
                 "3.4",
                 "expected 3.4 mongod with no data files to start up with featureCompatibilityVersion 3.4");
+            assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
         }
-        assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
+
         MongoRunner.stopMongod(conn);
         return conn;
     };
@@ -374,28 +376,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.writeOK(primaryAdminDB.getSiblingDB("test").coll.insert({shouldReplicate: false}));
     assert.eq(secondaryAdminDB.getSiblingDB("test").coll.find({shouldReplicate: false}).itcount(),
               0);
-    rst.stopSet();
-
-    // A mixed 3.4/3.6 replica set without a featureCompatibilityVersion document unfortunately
-    // reports mixed 3.2/3.4 featureCompatibilityVersion.
-    rst = new ReplSetTest({nodes: [{binVersion: downgrade}, {binVersion: latest}]});
-    rstConns = rst.startSet();
-    replSetConfig = rst.getReplSetConfig();
-    replSetConfig.members[1].priority = 0;
-    replSetConfig.members[1].votes = 0;
-    rst.initiate(replSetConfig);
-
-    primaryAdminDB = rst.getPrimary().getDB("admin");
-    secondaryAdminDB = rst.getSecondary().getDB("admin");
-    assert.writeOK(primaryAdminDB.system.version.remove({_id: "featureCompatibilityVersion"},
-                                                        {writeConcern: {w: 2}}));
-    res = primaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.2");
-    res = secondaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion.version, "3.4", tojson(res));
-    assert.eq(res.featureCompatibilityVersion.targetVersion, null, tojson(res));
     rst.stopSet();
 
     // Test idempotency for setFeatureCompatibilityVersion.

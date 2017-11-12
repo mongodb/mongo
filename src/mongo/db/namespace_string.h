@@ -192,6 +192,9 @@ public:
     bool isSystemDotViews() const {
         return coll() == kSystemDotViewsCollectionName;
     }
+    bool isAdminDotSystemDotVersion() const {
+        return ((db() == "admin") && (coll() == "system.version"));
+    }
     bool isConfigDB() const {
         return db() == "config";
     }

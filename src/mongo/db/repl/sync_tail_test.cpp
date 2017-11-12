@@ -1664,29 +1664,6 @@ TEST_F(SyncTailTest, FailOnDropFCVCollectionInRecovering) {
     ASSERT_EQUALS(runOpSteadyState(op), ErrorCodes::OplogOperationUnsupported);
 }
 
-TEST_F(SyncTailTest, FailOnDeleteFCVDocumentInRecovering) {
-    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, options);
-
-    // Insert the fCV document.
-    ASSERT_OK(
-        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
-    auto insertCmd = BSON("_id" << FeatureCompatibilityVersion::kParameterName
-                                << FeatureCompatibilityVersion::kVersionField
-                                << FeatureCompatibilityVersionCommandParser::kVersion36);
-    auto insertOp = makeInsertDocumentOplogEntry(nextOpTime(), fcvNS, insertCmd);
-    ASSERT_OK(runOpSteadyState(insertOp));
-
-    ASSERT_OK(
-        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
-
-    auto cmd = BSON("_id" << FeatureCompatibilityVersion::kParameterName);
-    auto op = makeDeleteDocumentOplogEntry(nextOpTime(), fcvNS, cmd);
-    ASSERT_EQUALS(runOpSteadyState(op), ErrorCodes::OplogOperationUnsupported);
-}
-
 TEST_F(SyncTailTest, SuccessOnUpdateFCV34TargetVersionUnsetDocumentInRecovering) {
     auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
     ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
@@ -1729,26 +1706,6 @@ TEST_F(SyncTailTest, SuccessOnDropFCVCollectionInSecondary) {
 
     auto cmd = BSON("drop" << fcvNS.coll());
     auto op = makeCommandOplogEntry(nextOpTime(), fcvNS, cmd);
-    ASSERT_OK(runOpSteadyState(op));
-}
-
-TEST_F(SyncTailTest, SuccessOnDeleteFCVDocumentInSecondary) {
-    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
-    CollectionOptions options;
-    options.uuid = UUID::gen();
-    ::mongo::repl::createCollection(_opCtx.get(), fcvNS, options);
-    ASSERT_OK(
-        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
-
-    // Insert the fCV document.
-    auto insertCmd = BSON("_id" << FeatureCompatibilityVersion::kParameterName
-                                << FeatureCompatibilityVersion::kVersionField
-                                << FeatureCompatibilityVersionCommandParser::kVersion36);
-    auto insertOp = makeInsertDocumentOplogEntry(nextOpTime(), fcvNS, insertCmd);
-    ASSERT_OK(runOpSteadyState(insertOp));
-
-    auto cmd = BSON("_id" << FeatureCompatibilityVersion::kParameterName);
-    auto op = makeDeleteDocumentOplogEntry(nextOpTime(), fcvNS, cmd);
     ASSERT_OK(runOpSteadyState(op));
 }
 

@@ -437,8 +437,11 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         Scope::storedFuncMod(opCtx);
     } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, nss);
-    } else if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
-        FeatureCompatibilityVersion::onDelete(opCtx, deleteState.documentKey);
+    } else if (nss.isAdminDotSystemDotVersion()) {
+        auto _id = deleteState.documentKey["_id"];
+        if (_id.type() == BSONType::String &&
+            _id.String() == FeatureCompatibilityVersion::kParameterName)
+            uasserted(40670, "removing FeatureCompatibilityVersion document is not allowed");
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
         SessionCatalog::get(opCtx)->invalidateSessions(opCtx, deleteState.documentKey);

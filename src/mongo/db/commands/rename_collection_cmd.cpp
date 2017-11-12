@@ -144,6 +144,13 @@ public:
             return false;
         }
 
+        if (source.isAdminDotSystemDotVersion()) {
+            appendCommandStatus(result,
+                                Status(ErrorCodes::IllegalOperation,
+                                       "renaming admin.system.version is not allowed"));
+            return false;
+        }
+
         RenameCollectionOptions options;
         options.dropTarget = cmdObj["dropTarget"].trueValue();
         options.stayTemp = cmdObj["stayTemp"].trueValue();
