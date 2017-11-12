@@ -358,23 +358,6 @@ struct __wt_connection_impl {
 	uint64_t         sweep_interval;   /* Handle sweep interval */
 	uint64_t         sweep_handles_min;/* Handle sweep minimum open */
 
-	/*
-	 * Shared lookaside lock, session and cursor, used by threads accessing
-	 * the lookaside table (other than eviction server and worker threads
-	 * and the sweep thread, all of which have their own lookaside cursors).
-	 */
-	WT_SPINLOCK	 las_lock;	/* Lookaside table spinlock */
-	WT_SESSION_IMPL *las_session;	/* Lookaside table session */
-	uint32_t         las_fileid;    /* Lookaside table file ID */
-
-	/*
-	 * The "lookaside_activity" verbose messages are throttled to once per
-	 * checkpoint. To accomplish this we track the checkpoint generation
-	 * for the most recent read and write verbose messages.
-	 */
-	uint64_t las_verb_gen_read;
-	uint64_t las_verb_gen_write;
-
 	/* Set of btree IDs not being rolled back */
 	uint8_t *stable_rollback_bitstring;
 	uint32_t stable_rollback_maxfile;

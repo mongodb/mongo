@@ -171,7 +171,6 @@ static const char * const list[] = {
 	",verbose=(\"salvage\")",
 	",verbose=(\"shared_cache\")",
 	",verbose=(\"split\")",
-	",verbose=(\"temporary\")",
 	",verbose=(\"transaction\")",
 	",verbose=(\"verify\")",
 	",verbose=(\"version\")",

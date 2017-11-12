@@ -446,7 +446,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	}
 
 	/* Discard pages we read as soon as we're done with them. */
-	F_SET(session, WT_SESSION_NO_CACHE);
+	F_SET(session, WT_SESSION_READ_WONT_NEED);
 
 	cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_open_cursor);
 	cfg[1] = "bulk,raw,skip_sort_check";
@@ -498,14 +498,14 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	WT_TRET(dest->close(dest));
 	src = dest = NULL;
 
-	F_CLR(session, WT_SESSION_NO_CACHE);
+	F_CLR(session, WT_SESSION_READ_WONT_NEED);
 
 	/*
 	 * We're doing advisory reads to fault the new trees into cache.
 	 * Don't block if the cache is full: our next unit of work may be to
 	 * discard some trees to free space.
 	 */
-	F_SET(session, WT_SESSION_NO_EVICTION);
+	F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
 
 	if (create_bloom) {
 		if (ret == 0)
@@ -626,6 +626,7 @@ err:	if (locked)
 			    "Merge failed with %s",
 			    __wt_strerror(session, ret, NULL, 0));
 	}
-	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
+	F_CLR(session,
+	    WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_READ_WONT_NEED);
 	return (ret);
 }

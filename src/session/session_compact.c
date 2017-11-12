@@ -349,23 +349,21 @@ __wt_session_compact(
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	u_int i;
-	bool no_eviction_set;
+	bool ignore_cache_size_set;
 
-	no_eviction_set = false;
+	ignore_cache_size_set = false;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, compact, config, cfg);
 
 	/*
-	 * Don't highjack the compaction thread for eviction; it's holding locks
-	 * blocking checkpoints and once an application is tapped for eviction,
-	 * it can spend a long time doing nothing else. (And, if we're tapping
-	 * application threads for eviction, compaction should quit, it's not
-	 * making anything better.)
+	 * The compaction thread should not block when the cache is full: it is
+	 * holding locks blocking checkpoints and once the cache is full, it can
+	 * spend a long time doing eviction.
 	 */
-	if (!F_ISSET(session, WT_SESSION_NO_EVICTION)) {
-		no_eviction_set = true;
-		F_SET(session, WT_SESSION_NO_EVICTION);
+	if (!F_ISSET(session, WT_SESSION_IGNORE_CACHE_SIZE)) {
+		ignore_cache_size_set = true;
+		F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
 	}
 
 	/* In-memory ignores compaction operations. */
@@ -437,8 +435,8 @@ err:	session->compact = NULL;
 	 */
 	WT_TRET(__wt_session_release_resources(session));
 
-	if (no_eviction_set)
-		F_CLR(session, WT_SESSION_NO_EVICTION);
+	if (ignore_cache_size_set)
+		F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
 
 	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_compact_fail);

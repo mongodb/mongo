@@ -259,9 +259,9 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	ret = __wt_config_getones(session, config, "ignore_cache_size", &cval);
 	if (ret == 0) {
 		if (cval.val)
-			F_SET(session, WT_SESSION_NO_EVICTION);
+			F_SET(session, WT_SESSION_IGNORE_CACHE_SIZE);
 		else
-			F_CLR(session, WT_SESSION_NO_EVICTION);
+			F_CLR(session, WT_SESSION_IGNORE_CACHE_SIZE);
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -1489,7 +1489,12 @@ __session_timestamp_transaction(WT_SESSION *wt_session, const char *config)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+#ifdef HAVE_DIAGNOSTIC
 	SESSION_API_CALL(session, timestamp_transaction, config, cfg);
+#else
+	SESSION_API_CALL(session, timestamp_transaction, NULL, cfg);
+	cfg[1] = config;
+#endif
 	WT_TRET(__wt_txn_set_timestamp(session, cfg));
 err:	API_END_RET(session, ret);
 }

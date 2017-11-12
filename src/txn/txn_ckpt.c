@@ -122,7 +122,7 @@ __checkpoint_update_generation(WT_SESSION_IMPL *session)
  */
 static int
 __checkpoint_apply_all(WT_SESSION_IMPL *session, const char *cfg[],
-	int (*op)(WT_SESSION_IMPL *, const char *[]), bool *fullp)
+    int (*op)(WT_SESSION_IMPL *, const char *[]), bool *fullp)
 {
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
@@ -205,7 +205,7 @@ err:	__wt_scr_free(session, &tmp);
  */
 static int
 __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
-	int (*op)(WT_SESSION_IMPL *, const char *[]))
+    int (*op)(WT_SESSION_IMPL *, const char *[]))
 {
 	WT_DECL_RET;
 	u_int i;
@@ -438,6 +438,13 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 		current_dirty =
 		    (100.0 * __wt_cache_dirty_leaf_inuse(cache)) / cache_size;
 		if (current_dirty <= (double)cache->eviction_checkpoint_target)
+			break;
+
+		/*
+		 * Don't scrub when the lookaside table is in use: scrubbing is
+		 * counter-productive in that case.
+		 */
+		if (F_ISSET(cache, WT_CACHE_EVICT_LOOKASIDE))
 			break;
 
 		__wt_sleep(0, stepdown_us / 10);
@@ -1080,7 +1087,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
 	 */
 #undef WT_CHECKPOINT_SESSION_FLAGS
 #define	WT_CHECKPOINT_SESSION_FLAGS \
-	(WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION)
+	(WT_SESSION_CAN_WAIT | WT_SESSION_IGNORE_CACHE_SIZE)
 #undef WT_CHECKPOINT_SESSION_FLAGS_OFF
 #define	WT_CHECKPOINT_SESSION_FLAGS_OFF \
 	(WT_SESSION_LOOKASIDE_CURSOR)

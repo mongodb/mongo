@@ -7,6 +7,12 @@
  */
 
 /*
+ * Helper: in order to read without any calls to eviction, we have to ignore
+ * the cache size and disable splits.
+ */
+#define	WT_READ_NO_EVICT	(WT_READ_IGNORE_CACHE_SIZE | WT_READ_NO_SPLIT)
+
+/*
  * Tuning constants: I hesitate to call this tuning, but we want to review some
  * number of pages from each file's in-memory tree for each page we evict.
  */
@@ -176,6 +182,38 @@ struct __wt_cache {
 	int32_t evict_lookaside_score;
 
 	/*
+	 * Shared lookaside lock, session and cursor, used by threads accessing
+	 * the lookaside table (other than eviction server and worker threads
+	 * and the sweep thread, all of which have their own lookaside cursors).
+	 */
+#define	WT_LAS_NUM_SESSIONS 5
+	WT_SPINLOCK	 las_lock;
+	WT_SESSION_IMPL *las_session[WT_LAS_NUM_SESSIONS];
+	bool las_session_inuse[WT_LAS_NUM_SESSIONS];
+
+	uint32_t las_fileid;            /* Lookaside table file ID */
+	uint64_t las_entry_count;       /* Count of entries in lookaside */
+	uint64_t las_pageid;		/* Lookaside table page ID counter */
+
+	WT_SPINLOCK	 las_sweep_lock;
+	WT_ITEM las_sweep_key;		/* Track sweep position. */
+	uint32_t las_sweep_dropmin;	/* Minimum btree ID in current set. */
+	uint8_t *las_sweep_dropmap;	/* Bitmap of dropped btree IDs. */
+	uint32_t las_sweep_dropmax;	/* Maximum btree ID in current set. */
+
+	uint32_t *las_dropped;		/* List of dropped btree IDs. */
+	size_t las_dropped_next;	/* Next index into drop list. */
+	size_t las_dropped_alloc;	/* Allocated size of drop list. */
+
+	/*
+	 * The "lookaside_activity" verbose messages are throttled to once per
+	 * checkpoint. To accomplish this we track the checkpoint generation
+	 * for the most recent read and write verbose messages.
+	 */
+	uint64_t las_verb_gen_read;
+	uint64_t las_verb_gen_write;
+
+	/*
 	 * Cache pool information.
 	 */
 	uint64_t cp_pass_pressure;	/* Calculated pressure from this pass */
@@ -200,8 +238,9 @@ struct __wt_cache {
 #define	WT_CACHE_EVICT_CLEAN_HARD 0x002 /* Clean % blocking app threads */
 #define	WT_CACHE_EVICT_DIRTY	  0x004 /* Evict dirty pages */
 #define	WT_CACHE_EVICT_DIRTY_HARD 0x008 /* Dirty % blocking app threads */
-#define	WT_CACHE_EVICT_SCRUB	  0x010 /* Scrub dirty pages */
-#define	WT_CACHE_EVICT_URGENT	  0x020 /* Pages are in the urgent queue */
+#define	WT_CACHE_EVICT_LOOKASIDE  0x010 /* Try lookaside eviction */
+#define	WT_CACHE_EVICT_SCRUB	  0x020 /* Scrub dirty pages */
+#define	WT_CACHE_EVICT_URGENT	  0x040 /* Pages are in the urgent queue */
 #define	WT_CACHE_EVICT_ALL	(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY)
 	uint32_t flags;
 };

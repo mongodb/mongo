@@ -1004,6 +1004,8 @@ static const char * const __stats_connection_desc[] = {
 	"transaction: transaction range of IDs currently pinned",
 	"transaction: transaction range of IDs currently pinned by a checkpoint",
 	"transaction: transaction range of IDs currently pinned by named snapshots",
+	"transaction: transaction range of timestamps currently pinned",
+	"transaction: transaction range of timestamps pinned by the oldest timestamp",
 	"transaction: transaction sync calls",
 	"transaction: transactions commit timestamp queue inserts to head",
 	"transaction: transactions commit timestamp queue inserts total",
@@ -1335,6 +1337,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 		/* not clearing txn_pinned_range */
 		/* not clearing txn_pinned_checkpoint_range */
 		/* not clearing txn_pinned_snapshot_range */
+		/* not clearing txn_pinned_timestamp */
+		/* not clearing txn_pinned_timestamp_oldest */
 	stats->txn_sync = 0;
 	stats->txn_commit_queue_head = 0;
 	stats->txn_commit_queue_inserts = 0;
@@ -1769,6 +1773,9 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, txn_pinned_checkpoint_range);
 	to->txn_pinned_snapshot_range +=
 	    WT_STAT_READ(from, txn_pinned_snapshot_range);
+	to->txn_pinned_timestamp += WT_STAT_READ(from, txn_pinned_timestamp);
+	to->txn_pinned_timestamp_oldest +=
+	    WT_STAT_READ(from, txn_pinned_timestamp_oldest);
 	to->txn_sync += WT_STAT_READ(from, txn_sync);
 	to->txn_commit_queue_head +=
 	    WT_STAT_READ(from, txn_commit_queue_head);

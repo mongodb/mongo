@@ -453,6 +453,8 @@ connection_stats = [
     TxnStat('txn_pinned_checkpoint_range', 'transaction range of IDs currently pinned by a checkpoint', 'no_clear,no_scale'),
     TxnStat('txn_pinned_range', 'transaction range of IDs currently pinned', 'no_clear,no_scale'),
     TxnStat('txn_pinned_snapshot_range', 'transaction range of IDs currently pinned by named snapshots', 'no_clear,no_scale'),
+    TxnStat('txn_pinned_timestamp', 'transaction range of timestamps currently pinned', 'no_clear,no_scale'),
+    TxnStat('txn_pinned_timestamp_oldest', 'transaction range of timestamps pinned by the oldest timestamp', 'no_clear,no_scale'),
     TxnStat('txn_read_queue_head', 'transactions read timestamp queue inserts to head'),
     TxnStat('txn_read_queue_inserts', 'transactions read timestamp queue inserts total'),
     TxnStat('txn_read_queue_len', 'transactions read timestamp queue length'),

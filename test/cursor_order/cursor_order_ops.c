@@ -221,7 +221,7 @@ reverse_scan(void *arg)
 	id = (uintmax_t)arg;
 	s = &run_info[id];
 	cfg = s->cfg;
-	testutil_check(__wt_thread_id(tid, sizeof(tid)));
+	testutil_check(__wt_thread_str(tid, sizeof(tid)));
 	__wt_random_init(&s->rnd);
 
 	printf(" reverse scan thread %2" PRIuMAX
@@ -305,7 +305,7 @@ append_insert(void *arg)
 	id = (uintmax_t)arg;
 	s = &run_info[id];
 	cfg = s->cfg;
-	testutil_check(__wt_thread_id(tid, sizeof(tid)));
+	testutil_check(__wt_thread_str(tid, sizeof(tid)));
 	__wt_random_init(&s->rnd);
 
 	printf("write thread %2" PRIuMAX " starting: tid: %s, file: %s\n",

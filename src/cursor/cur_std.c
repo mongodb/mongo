@@ -570,8 +570,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	__wt_buf_free(session, &cursor->value);
 
 	__wt_free(session, cursor->internal_uri);
-	if (!F_ISSET(cursor, WT_CURSTD_URI_SHARED))
-		__wt_free(session, cursor->uri);
+	__wt_free(session, cursor->uri);
 	__wt_overwrite_and_free(session, cursor);
 	return (0);
 }

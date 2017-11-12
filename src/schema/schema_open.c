@@ -106,8 +106,6 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	}
 
 	table->cg_complete = true;
-	table->is_simple_file = (table->is_simple &&
-	    WT_PREFIX_MATCH(table->cgroups[0]->source, "file:"));
 
 err:	__wt_scr_free(session, &buf);
 	__wt_schema_destroy_colgroup(session, &colgroup);

@@ -217,7 +217,7 @@ __wt_eventv(WT_SESSION_IMPL *session, bool msg_event, int error,
 	 * followed by a colon.
 	 */
 	__wt_epoch(session, &ts);
-	WT_ERR(__wt_thread_id(tid, sizeof(tid)));
+	WT_ERR(__wt_thread_str(tid, sizeof(tid)));
 	WT_ERROR_APPEND(p, remain,
 	    "[%" PRIuMAX ":%" PRIuMAX "][%s]",
 	    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / WT_THOUSAND, tid);
