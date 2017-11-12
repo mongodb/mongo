@@ -30,10 +30,14 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
             pipeline.push(self.oplogProjection);
         }
 
+        // The 'collection' argument may be either a collection name or DBCollection object.
+        assert(collection instanceof DBCollection || typeof collection === "string");
+        const collName = (collection instanceof DBCollection ? collection.getName() : collection);
+
         let res = assert.commandWorked(_db.runCommand(
-            Object.merge({aggregate: collection.getName(), pipeline: pipeline}, aggregateOptions)));
+            Object.merge({aggregate: collName, pipeline: pipeline}, aggregateOptions)));
         assert.neq(res.cursor.id, 0);
-        _allCursors.push({db: _db.getName(), coll: collection.getName(), cursorId: res.cursor.id});
+        _allCursors.push({db: _db.getName(), coll: collName, cursorId: res.cursor.id});
         return res.cursor;
     };
 
@@ -41,10 +45,9 @@ function ChangeStreamTest(_db, name = "ChangeStreamTest") {
      * Issues a 'getMore' on the provided cursor and returns the cursor returned.
      */
     self.getNextBatch = function(cursor) {
-        let collection = _db.getMongo().getCollection(cursor.ns);
+        const collName = cursor.ns.split(/\.(.+)/)[1];
         return assert
-            .commandWorked(_db.runCommand(
-                {getMore: cursor.id, collection: collection.getName(), batchSize: 1}))
+            .commandWorked(_db.runCommand({getMore: cursor.id, collection: collName, batchSize: 1}))
             .cursor;
     };
 

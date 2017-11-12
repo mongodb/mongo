@@ -4,29 +4,30 @@
 (function() {
     "use strict";
 
-    const collName = "change_stream_ban_from_views";
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+
+    const coll = assertDropAndRecreateCollection(db, "change_stream_ban_from_views");
+    assert.writeOK(coll.insert({_id: 1}));
+
     const normalViewName = "nonChangeStreamView";
     const csViewName = "changeStreamView";
 
-    db[normalViewName].drop();
-    db[csViewName].drop();
-    db[collName].drop();
-
-    assert.writeOK(db[collName].insert({_id: 1}));
+    assertDropCollection(db, normalViewName);
+    assertDropCollection(db, csViewName);
 
     const csPipe = [{$changeStream: {}}];
 
     // Create one valid view for testing purposes.
-    assert.commandWorked(
-        db.runCommand({create: normalViewName, viewOn: collName, pipeline: [{$match: {_id: 1}}]}));
+    assert.commandWorked(db.runCommand(
+        {create: normalViewName, viewOn: coll.getName(), pipeline: [{$match: {_id: 1}}]}));
 
     // Verify that we cannot create a view using a pipeline which begins with $changeStream.
     assert.commandFailedWithCode(
-        db.runCommand({create: csViewName, viewOn: collName, pipeline: csPipe}),
+        db.runCommand({create: csViewName, viewOn: coll.getName(), pipeline: csPipe}),
         ErrorCodes.OptionNotSupportedOnView);
 
     // We also cannot update an existing view to use a $changeStream pipeline.
     assert.commandFailedWithCode(
-        db.runCommand({collMod: normalViewName, viewOn: collName, pipeline: csPipe}),
+        db.runCommand({collMod: normalViewName, viewOn: coll.getName(), pipeline: csPipe}),
         ErrorCodes.OptionNotSupportedOnView);
 })();

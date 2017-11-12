@@ -1,20 +1,18 @@
 /**
  * Tests that a change stream can use a user-specified, or collection-default collation.
- *
- * This test assumes that it will be able to drop and then re-create a collection with non-default
- * options.
- * @tags: [assumes_no_implicit_collection_creation_after_drop]
  */
 (function() {
     "use strict";
 
-    load("jstests/libs/change_stream_util.js");  // For 'ChangeStreamTest'.
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+    load("jstests/libs/change_stream_util.js");        // For 'ChangeStreamTest'.
 
     let cst = new ChangeStreamTest(db);
 
     const caseInsensitive = {locale: "en_US", strength: 2};
-    const caseInsensitiveCollection = db.change_stream_case_insensitive;
-    caseInsensitiveCollection.drop();
+
+    let caseInsensitiveCollection = "change_stream_case_insensitive";
+    assertDropCollection(db, caseInsensitiveCollection);
 
     // Test that you can open a change stream before the collection exists, and it will use the
     // simple collation.
@@ -23,8 +21,8 @@
 
     // Create the collection with a non-default collation - this should invalidate the stream we
     // opened before it existed.
-    assert.commandWorked(
-        db.runCommand({create: caseInsensitiveCollection.getName(), collation: caseInsensitive}));
+    caseInsensitiveCollection =
+        assertCreateCollection(db, caseInsensitiveCollection, {collation: caseInsensitive});
     cst.assertNextChangesEqual({
         cursor: simpleCollationStream,
         expectedChanges: [{operationType: "invalidate"}],
@@ -60,10 +58,8 @@
         {cursor: explicitCaseInsensitiveStream, expectedChanges: [{docId: 0}, {docId: 1}]});
 
     // Test that the collation does not apply to the scan over the oplog.
-    const similarNameCollection = db.cHaNgE_sTrEaM_cAsE_iNsEnSiTiVe;
-    similarNameCollection.drop();
-    assert.commandWorked(
-        db.runCommand({create: similarNameCollection.getName(), collation: {locale: "en_US"}}));
+    const similarNameCollection = assertDropAndRecreateCollection(
+        db, "cHaNgE_sTrEaM_cAsE_iNsEnSiTiVe", {collation: {locale: "en_US"}});
 
     assert.writeOK(similarNameCollection.insert({_id: 0, text: "aBc"}));
 
@@ -79,15 +75,15 @@
     // Test that creating a collection without a collation does not invalidate any change streams
     // that were opened before the collection existed.
     (function() {
-        const noCollationCollection = db.change_stream_no_collation;
-        noCollationCollection.drop();
+        let noCollationCollection = "change_stream_no_collation";
+        assertDropCollection(db, noCollationCollection);
 
         const streamCreatedBeforeNoCollationCollection = cst.startWatchingChanges({
             pipeline: [{$changeStream: {}}, {$project: {docId: "$documentKey._id"}}],
             collection: noCollationCollection
         });
 
-        assert.commandWorked(db.runCommand({create: noCollationCollection.getName()}));
+        noCollationCollection = assertCreateCollection(db, noCollationCollection);
         assert.writeOK(noCollationCollection.insert({_id: 0}));
 
         cst.assertNextChangesEqual(
@@ -97,16 +93,16 @@
     // Test that creating a collection and explicitly specifying the simple collation does not
     // invalidate any change streams that were opened before the collection existed.
     (function() {
-        const simpleCollationCollection = db.change_stream_simple_collation;
-        simpleCollationCollection.drop();
+        let simpleCollationCollection = "change_stream_simple_collation";
+        assertDropCollection(db, simpleCollationCollection);
 
         const streamCreatedBeforeSimpleCollationCollection = cst.startWatchingChanges({
             pipeline: [{$changeStream: {}}, {$project: {docId: "$documentKey._id"}}],
             collection: simpleCollationCollection
         });
 
-        assert.commandWorked(db.runCommand(
-            {create: simpleCollationCollection.getName(), collation: {locale: "simple"}}));
+        simpleCollationCollection =
+            assertCreateCollection(db, simpleCollationCollection, {collation: {locale: "simple"}});
         assert.writeOK(simpleCollationCollection.insert({_id: 0}));
 
         cst.assertNextChangesEqual(
@@ -116,8 +112,8 @@
     // Test that creating a change stream with a non-default collation, then creating a collection
     // with the same collation will not invalidate the change stream.
     (function() {
-        const frenchCollection = db.change_stream_french_collation;
-        frenchCollection.drop();
+        let frenchCollection = "change_stream_french_collation";
+        assertDropCollection(db, frenchCollection);
 
         const frenchChangeStream = cst.startWatchingChanges({
             pipeline: [{$changeStream: {}}, {$project: {docId: "$documentKey._id"}}],
@@ -125,8 +121,8 @@
             collection: frenchCollection
         });
 
-        assert.commandWorked(
-            db.runCommand({create: frenchCollection.getName(), collation: {locale: "fr"}}));
+        frenchCollection =
+            assertCreateCollection(db, frenchCollection, {collation: {locale: "fr"}});
         assert.writeOK(frenchCollection.insert({_id: 0}));
 
         cst.assertNextChangesEqual({cursor: frenchChangeStream, expectedChanges: [{docId: 0}]});
@@ -135,8 +131,8 @@
     // Test that creating a change stream with a non-default collation, then creating a collection
     // with *a different* collation will not invalidate the change stream.
     (function() {
-        const germanCollection = db.change_stream_german_collation;
-        germanCollection.drop();
+        let germanCollection = "change_stream_german_collation";
+        assertDropCollection(db, germanCollection);
 
         const englishCaseInsensitiveStream = cst.startWatchingChanges({
             pipeline: [
@@ -148,8 +144,8 @@
             collection: germanCollection
         });
 
-        assert.commandWorked(
-            db.runCommand({create: germanCollection.getName(), collation: {locale: "de"}}));
+        germanCollection =
+            assertCreateCollection(db, germanCollection, {collation: {locale: "de"}});
         assert.writeOK(germanCollection.insert({_id: 0, text: "aBc"}));
 
         cst.assertNextChangesEqual(
@@ -159,10 +155,8 @@
     // Test that creating a change stream with a non-default collation against a collection that has
     // a non-simple default collation will use the collation specified on the operation.
     (function() {
-        const caseInsensitiveCollection = db.change_stream_case_insensitive;
-        caseInsensitiveCollection.drop();
-        assert.commandWorked(db.runCommand(
-            {create: caseInsensitiveCollection.getName(), collation: caseInsensitive}));
+        const caseInsensitiveCollection = assertDropAndRecreateCollection(
+            db, "change_stream_case_insensitive", {collation: caseInsensitive});
 
         const englishCaseSensitiveStream = cst.startWatchingChanges({
             pipeline: [
@@ -185,9 +179,8 @@
     // Test that creating a change stream with a non-default collation against a collection that has
     // a simple default collation will use the collation specified on the operation.
     (function() {
-        const noCollationCollection = db.change_stream_no_collation;
-        noCollationCollection.drop();
-        assert.commandWorked(db.runCommand({create: noCollationCollection.getName()}));
+        const noCollationCollection =
+            assertDropAndRecreateCollection(db, "change_stream_no_collation");
 
         const cursor = noCollationCollection.watch(
             [
@@ -198,7 +191,7 @@
         assert(!cursor.hasNext());
         assert.writeOK(noCollationCollection.insert({_id: 0, text: "aBc"}));
         assert.writeOK(noCollationCollection.insert({_id: 1, text: "abc"}));
-        assert(cursor.hasNext());
+        assert.soon(() => cursor.hasNext());
         assert.docEq(cursor.next(), {docId: 0});
         assert(cursor.hasNext());
         assert.docEq(cursor.next(), {docId: 1});

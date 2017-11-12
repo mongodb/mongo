@@ -6,6 +6,7 @@
     load("jstests/libs/change_stream_util.js");
     load('jstests/libs/uuid_util.js');
     load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
     let cst = new ChangeStreamTest(db);
 
@@ -13,7 +14,7 @@
 
     // Write a document to the collection and test that the change stream returns it
     // and getMore command closes the cursor afterwards.
-    const collGetMore = db.change_stream_getmore_invalidations;
+    const collGetMore = assertDropAndRecreateCollection(db, "change_stream_getmore_invalidations");
     // We awaited the replication of the first write, so the change stream shouldn't return it.
     // Use { w: "majority" } to deal with journaling correctly, even though we only have one node.
     assert.writeOK(collGetMore.insert({_id: 0, a: 1}, {writeConcern: {w: "majority"}}));
@@ -47,8 +48,7 @@
     });
 
     jsTestLog("Testing aggregate command closes cursor for invalidate entries");
-    const collAgg = db.change_stream_agg_invalidations;
-    db.createCollection(collAgg.getName());
+    const collAgg = assertDropAndRecreateCollection(db, "change_stream_agg_invalidations");
     const collAggUuid = getUUIDFromListCollections(db, collAgg.getName());
     // Get a valid resume token that the next aggregate command can use.
     aggcursor = cst.startWatchingChanges(
@@ -61,7 +61,7 @@
 
     // It should not possible to resume a change stream after a collection drop, even if the
     // invalidate has not been received.
-    assert(collAgg.drop());
+    assertDropCollection(db, collAgg.getName());
     // Wait for two-phase drop to complete, so that the UUID no longer exists.
     assert.soon(function() {
         return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(db, collAgg.getName());
@@ -75,13 +75,14 @@
     // Test that it is possible to open a new change stream cursor on a collection that does not
     // exist.
     jsTestLog("Testing aggregate command on nonexistent collection");
-    const collDoesNotExist = db.change_stream_agg_invalidations_does_not_exist;
-    db.runCommand({drop: collDoesNotExist.getName(), writeConcern: {j: true}});
+    const collDoesNotExistName = "change_stream_agg_invalidations_does_not_exist";
+    assertDropCollection(db, collDoesNotExistName);
 
     // Cursor creation succeeds, but there are no results.
     aggcursor = cst.startWatchingChanges({
-        collection: collDoesNotExist,
+        collection: collDoesNotExistName,
         pipeline: [{$changeStream: {}}],
+        includeToken: true,
     });
 
     // We explicitly test getMore, to ensure that the getMore command for a non-existent collection
@@ -91,7 +92,8 @@
     assert.eq(aggcursor.nextBatch.length, 0, tojson(aggcursor.nextBatch));
 
     // After collection creation, we see oplog entries for the collection.
-    assert.writeOK(collDoesNotExist.insert({_id: 0}, {writeConcern: {j: true}}));
+    const collNowExists = assertCreateCollection(db, collDoesNotExistName);
+    assert.writeOK(collNowExists.insert({_id: 0}, {writeConcern: {j: true}}));
     change = cst.getOneChange(aggcursor);
     assert.eq(change.operationType, "insert", tojson(change));
 

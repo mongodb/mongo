@@ -325,10 +325,8 @@ var DB;
         var options = opt || {};
 
         // We have special handling for the 'flags' field, and provide sugar for specific flags. If
-        // the
-        // user specifies any flags we send the field in the command. Otherwise, we leave it blank
-        // and
-        // use the server's defaults.
+        // the user specifies any flags we send the field in the command. Otherwise, we leave it
+        // blank and use the server's defaults.
         var sendFlags = false;
         var flags = 0;
         if (options.usePowerOf2Sizes != undefined) {

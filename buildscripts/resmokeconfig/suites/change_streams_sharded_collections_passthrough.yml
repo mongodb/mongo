@@ -4,8 +4,7 @@ selector:
   roots:
   - jstests/change_streams/**/*.js
   exclude_files:
-  # This test exercises an internal detail of mongos<->mongod communication and is not expected
-  # to work against a mongos.
+  # Exercises an internal detail of mongos<->mongod communication. Not expected to work on mongos.
   - jstests/change_streams/report_latest_observed_oplog_timestamp.js
 executor:
   config:
@@ -14,7 +13,10 @@ executor:
         TestData:
           defaultReadConcernLevel: majority
           enableMajorityReadConcern: ''
-      eval: "var testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');"
+      eval: >-
+        var testingReplication = true;
+        load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
       readMode: commands
   hooks:
   - class: ValidateCollections
@@ -31,9 +33,10 @@ executor:
       nopreallocj: ''
       set_parameters:
         enableTestCommands: 1
+        writePeriodicNoops: 1
+        periodicNoopIntervalSecs: 1
         numInitialSyncAttempts: 1
     num_rs_nodes_per_shard: 1
-    # This test suite doesn't actually shard any collections, but enabling sharding will prevent
-    # read commands against non-existent databases from unconditionally returning a CursorId of 0.
+    num_shards: 2
     enable_sharding:
     - test

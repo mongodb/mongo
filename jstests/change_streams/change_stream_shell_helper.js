@@ -3,12 +3,12 @@
 (function() {
     "use strict";
 
-    const collName = "change_stream_shell_helper";
-    const coll = db[collName];
-    coll.drop();
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+
+    const coll = assertDropAndRecreateCollection(db, "change_stream_shell_helper");
 
     function checkNextChange(cursor, expected) {
-        assert(cursor.hasNext());
+        assert.soon(() => cursor.hasNext());
         assert.docEq(cursor.next(), expected);
     }
 
@@ -41,13 +41,13 @@
     let cursor = coll.watch();
     assert(!cursor.hasNext());
     assert.writeOK(coll.insert({_id: 0, x: 1}));
-    assert(cursor.hasNext());
+    assert.soon(() => cursor.hasNext());
     let change = cursor.next();
     assert(!cursor.hasNext());
     let expected = {
         documentKey: {_id: 0},
         fullDocument: {_id: 0, x: 1},
-        ns: {db: "test", coll: collName},
+        ns: {db: "test", coll: coll.getName()},
         operationType: "insert",
     };
     assert("_id" in change, "Got unexpected change: " + tojson(change));
@@ -72,7 +72,7 @@
     expected = {
         documentKey: {_id: 0},
         fullDocument: {_id: 0, x: 10},
-        ns: {db: "test", coll: collName},
+        ns: {db: "test", coll: coll.getName()},
         operationType: "update",
         updateDescription: {removedFields: [], updatedFields: {x: 10}},
     };
@@ -135,15 +135,15 @@
     expected = {
         documentKey: {_id: 2},
         fullDocument: {_id: 2, x: 1},
-        ns: {db: "test", coll: collName},
+        ns: {db: "test", coll: coll.getName()},
         operationType: "insert",
     };
     checkNextChange(cursor, expected);
     assert(!cursor.hasNext());
     assert(!cursor.isClosed());
     assert(!cursor.isExhausted());
-    coll.drop();
-    assert(cursor.hasNext());
+    assertDropCollection(db, coll.getName());
+    assert.soon(() => cursor.hasNext());
     assert(cursor.isClosed());
     assert(!cursor.isExhausted());
     expected = {operationType: "invalidate"};
