@@ -12,11 +12,6 @@
      */
     let checkFCVDocumentMissing = function(adminDB) {
         assert.eq(null, adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}));
-
-        let res = adminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-        assert.commandWorked(res);
-        assert.eq("3.4", res.featureCompatibilityVersion.version, tojson(res));
-        assert.eq(null, res.featureCompatibilityVersion.targetVersion, tojson(res));
     };
 
     const conn = MongoRunner.runMongod({});
@@ -65,7 +60,7 @@
 
     // Deleting the featureCompatibilityVersion document changes the featureCompatibilityVersion
     // server parameter to 3.4.
-    assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
+    removeFCVDocument(adminDB);
     checkFCVDocumentMissing(adminDB);
 
     // Inserting a featureCompatibilityVersion document with an invalid version fails.
@@ -90,29 +85,6 @@
         adminDB.system.version.insert(
             {_id: "featureCompatibilityVersion", version: "3.6", targetVersion: "3.6"}),
         ErrorCodes.BadValue);
-    checkFCVDocumentMissing(adminDB);
-
-    // Inserting the featureCompatibilityVersion document changes the featureCompatibilityVersion
-    // server parameter.
-    assert.writeOK(
-        adminDB.system.version.insert({_id: "featureCompatibilityVersion", version: "3.4"}));
-    checkFCV(adminDB, "3.4");
-
-    assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
-    checkFCVDocumentMissing(adminDB);
-
-    assert.writeOK(adminDB.system.version.insert(
-        {_id: "featureCompatibilityVersion", version: "3.4", targetVersion: "3.6"}));
-    checkFCV(adminDB, "3.4", "3.6");
-
-    assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
-    checkFCVDocumentMissing(adminDB);
-
-    assert.writeOK(adminDB.system.version.insert(
-        {_id: "featureCompatibilityVersion", version: "3.4", targetVersion: "3.4"}));
-    checkFCV(adminDB, "3.4", "3.4");
-
-    assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
     checkFCVDocumentMissing(adminDB);
 
     assert.writeOK(
