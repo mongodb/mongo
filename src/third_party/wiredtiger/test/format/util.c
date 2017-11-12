@@ -591,7 +591,7 @@ timestamp(void *arg)
 	WT_SESSION *session;
 	TINFO **tinfo_list, *tinfo;
 	time_t last, now;
-	uint64_t oldest_timestamp, usecs;
+	uint64_t oldest_timestamp, this_ts, usecs;
 	uint32_t i;
 	char config_buf[64];
 
@@ -614,9 +614,10 @@ timestamp(void *arg)
 		oldest_timestamp = UINT64_MAX;
 		for (i = 0; i < g.c_threads; ++i) {
 			tinfo = tinfo_list[i];
-			if (tinfo->timestamp != 0 &&
-			    tinfo->timestamp < oldest_timestamp)
-				oldest_timestamp = tinfo->timestamp;
+			this_ts = tinfo->timestamp;
+			if (this_ts != 0 &&
+			    this_ts < oldest_timestamp)
+				oldest_timestamp = this_ts;
 		}
 		if (oldest_timestamp == UINT64_MAX) {
 			__wt_sleep(1, 0);

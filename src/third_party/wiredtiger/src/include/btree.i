@@ -149,7 +149,8 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 		if (WT_PAGE_IS_INTERNAL(page)) {
 			(void)__wt_atomic_add64(&btree->bytes_dirty_intl, size);
 			(void)__wt_atomic_add64(&cache->bytes_dirty_intl, size);
-		} else if (!btree->lsm_primary) {
+		} else if (!btree->lsm_primary &&
+		    !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
 			(void)__wt_atomic_add64(&btree->bytes_dirty_leaf, size);
 			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
 		}
@@ -189,7 +190,7 @@ __wt_cache_decr_check_size(
  */
 static inline void
 __wt_cache_decr_check_uint64(
-    WT_SESSION_IMPL *session, uint64_t *vp, size_t v, const char *fld)
+    WT_SESSION_IMPL *session, uint64_t *vp, uint64_t v, const char *fld)
 {
 	if (__wt_atomic_sub64(vp, v) < WT_EXABYTE)
 		return;
@@ -200,7 +201,7 @@ __wt_cache_decr_check_uint64(
 	 */
 	*vp = 0;
 	__wt_errx(session,
-	    "%s went negative with decrement of %" WT_SIZET_FMT, fld, v);
+	    "%s went negative with decrement of %" PRIu64, fld, v);
 
 #ifdef HAVE_DIAGNOSTIC
 	__wt_abort(session);
@@ -261,7 +262,7 @@ __wt_cache_page_byte_dirty_decr(
 		    decr, "WT_BTREE.bytes_dirty_intl");
 		__wt_cache_decr_check_uint64(session, &cache->bytes_dirty_intl,
 		    decr, "WT_CACHE.bytes_dirty_intl");
-	} else if (!btree->lsm_primary) {
+	} else if (!btree->lsm_primary && !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
 		__wt_cache_decr_check_uint64(session, &btree->bytes_dirty_leaf,
 		    decr, "WT_BTREE.bytes_dirty_leaf");
 		__wt_cache_decr_check_uint64(session, &cache->bytes_dirty_leaf,
@@ -321,7 +322,8 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 		(void)__wt_atomic_add64(&cache->bytes_dirty_intl, size);
 		(void)__wt_atomic_add64(&cache->pages_dirty_intl, 1);
 	} else {
-		if (!btree->lsm_primary) {
+		if (!btree->lsm_primary &&
+		    !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
 			(void)__wt_atomic_add64(&btree->bytes_dirty_leaf, size);
 			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
 		}
@@ -420,7 +422,8 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page, bool rewrite)
 			__wt_cache_decr_check_uint64(session,
 			    &cache->bytes_dirty_intl,
 			    modify->bytes_dirty, "WT_CACHE.bytes_dirty_intl");
-		} else if (!btree->lsm_primary) {
+		} else if (!btree->lsm_primary &&
+		    !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
 			__wt_cache_decr_check_uint64(session,
 			    &btree->bytes_dirty_leaf,
 			    modify->bytes_dirty, "WT_BTREE.bytes_dirty_leaf");
@@ -1359,6 +1362,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
+	bool inmem_split;
 
 	btree = S2BT(session);
 
@@ -1387,10 +1391,10 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 */
 	page = ref->page;
 	if (!WT_READGEN_EVICT_SOON(page->read_gen) ||
-	    LF_ISSET(WT_READ_NO_EVICT) ||
-	    F_ISSET(session, WT_SESSION_NO_EVICTION) ||
+	    LF_ISSET(WT_READ_NO_SPLIT) ||
 	    btree->evict_disabled > 0 ||
-	    !__wt_page_can_evict(session, ref, NULL))
+	    !__wt_page_can_evict(session, ref, &inmem_split) ||
+	    (F_ISSET(session, WT_SESSION_NO_RECONCILE) && !inmem_split))
 		return (__wt_hazard_clear(session, ref));
 
 	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
@@ -1622,6 +1626,6 @@ __wt_ref_state_yield_sleep(uint64_t *yield_count, uint64_t *sleep_count)
 		return;
 	}
 
-	(*sleep_count) = WT_MIN((*sleep_count) + WT_THOUSAND, 10 * WT_THOUSAND);
+	(*sleep_count) = WT_MIN((*sleep_count) + 100, WT_THOUSAND);
 	__wt_sleep(0, (*sleep_count));
 }

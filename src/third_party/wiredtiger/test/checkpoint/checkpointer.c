@@ -67,7 +67,7 @@ checkpointer(void *arg)
 
 	WT_UNUSED(arg);
 
-	testutil_check(__wt_thread_id(tid, sizeof(tid)));
+	testutil_check(__wt_thread_str(tid, sizeof(tid)));
 	printf("checkpointer thread starting: tid: %s\n", tid);
 
 	(void)real_checkpointer();

@@ -1068,7 +1068,8 @@ __wt_lsm_tree_readlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * Diagnostic: avoid deadlocks with the schema lock: if we need it for
 	 * an operation, we should already have it.
 	 */
-	F_SET(session, WT_SESSION_NO_EVICTION | WT_SESSION_NO_SCHEMA_LOCK);
+	F_SET(session,
+	    WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_NO_SCHEMA_LOCK);
 }
 
 /*
@@ -1078,7 +1079,8 @@ __wt_lsm_tree_readlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 void
 __wt_lsm_tree_readunlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	F_CLR(session, WT_SESSION_NO_EVICTION | WT_SESSION_NO_SCHEMA_LOCK);
+	F_CLR(session,
+	    WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_NO_SCHEMA_LOCK);
 
 	__wt_readunlock(session, &lsm_tree->rwlock);
 }
@@ -1096,7 +1098,8 @@ __wt_lsm_tree_writelock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * Diagnostic: avoid deadlocks with the schema lock: if we need it for
 	 * an operation, we should already have it.
 	 */
-	F_SET(session, WT_SESSION_NO_EVICTION | WT_SESSION_NO_SCHEMA_LOCK);
+	F_SET(session,
+	    WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_NO_SCHEMA_LOCK);
 }
 
 /*
@@ -1106,7 +1109,8 @@ __wt_lsm_tree_writelock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 void
 __wt_lsm_tree_writeunlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	F_CLR(session, WT_SESSION_NO_EVICTION | WT_SESSION_NO_SCHEMA_LOCK);
+	F_CLR(session,
+	    WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_NO_SCHEMA_LOCK);
 
 	__wt_writeunlock(session, &lsm_tree->rwlock);
 }

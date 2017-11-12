@@ -687,9 +687,8 @@ struct __wt_cursor {
 #define	WT_CURSTD_OVERWRITE	0x00400
 #define	WT_CURSTD_RAW		0x00800
 #define	WT_CURSTD_RAW_SEARCH	0x01000
-#define	WT_CURSTD_URI_SHARED	0x02000
-#define	WT_CURSTD_VALUE_EXT	0x04000	/* Value points out of the tree. */
-#define	WT_CURSTD_VALUE_INT	0x08000	/* Value points into the tree. */
+#define	WT_CURSTD_VALUE_EXT	0x02000	/* Value points out of the tree. */
+#define	WT_CURSTD_VALUE_INT	0x04000	/* Value points into the tree. */
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
 	uint32_t flags;
 #endif
@@ -2203,11 +2202,11 @@ struct __wt_connection {
 	 * list\, with values chosen from the following options: \c "api"\, \c
 	 * "block"\, \c "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\,
 	 * \c "evict"\, \c "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c
-	 * "handleops"\, \c "log"\, \c "lookaside_activity"\, \c "lsm"\, \c
-	 * "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
-	 * "read"\, \c "rebalance"\, \c "reconcile"\, \c "recovery"\, \c
-	 * "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c "split"\,
-	 * \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c
+	 * "handleops"\, \c "log"\, \c "lookaside"\, \c "lookaside_activity"\,
+	 * \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c "mutex"\, \c
+	 * "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c
+	 * "recovery"\, \c "recovery_progress"\, \c "salvage"\, \c
+	 * "shared_cache"\, \c "split"\, \c "thread_group"\, \c "timestamp"\, \c
 	 * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default
 	 * empty.}
 	 * @configend
@@ -2843,10 +2842,10 @@ struct __wt_connection {
  * values chosen from the following options: \c "api"\, \c "block"\, \c
  * "checkpoint"\, \c "checkpoint_progress"\, \c "compact"\, \c "evict"\, \c
  * "evict_stuck"\, \c "evictserver"\, \c "fileops"\, \c "handleops"\, \c "log"\,
- * \c "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c "metadata"\, \c
- * "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c "reconcile"\, \c
- * "recovery"\, \c "recovery_progress"\, \c "salvage"\, \c "shared_cache"\, \c
- * "split"\, \c "temporary"\, \c "thread_group"\, \c "timestamp"\, \c
+ * \c "lookaside"\, \c "lookaside_activity"\, \c "lsm"\, \c "lsm_manager"\, \c
+ * "metadata"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "rebalance"\, \c
+ * "reconcile"\, \c "recovery"\, \c "recovery_progress"\, \c "salvage"\, \c
+ * "shared_cache"\, \c "split"\, \c "thread_group"\, \c "timestamp"\, \c
  * "transaction"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
  * @config{write_through, Use \c FILE_FLAG_WRITE_THROUGH on Windows to write to
  * files.  Ignored on non-Windows systems.  Options are given as a list\, such
@@ -5286,26 +5285,33 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
  * snapshots
  */
 #define	WT_STAT_CONN_TXN_PINNED_SNAPSHOT_RANGE		1278
+/*! transaction: transaction range of timestamps currently pinned */
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1279
+/*!
+ * transaction: transaction range of timestamps pinned by the oldest
+ * timestamp
+ */
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1280
 /*! transaction: transaction sync calls */
-#define	WT_STAT_CONN_TXN_SYNC				1279
+#define	WT_STAT_CONN_TXN_SYNC				1281
 /*! transaction: transactions commit timestamp queue inserts to head */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_HEAD		1280
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_HEAD		1282
 /*! transaction: transactions commit timestamp queue inserts total */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_INSERTS		1281
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_INSERTS		1283
 /*! transaction: transactions commit timestamp queue length */
-#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_LEN		1282
+#define	WT_STAT_CONN_TXN_COMMIT_QUEUE_LEN		1284
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1283
+#define	WT_STAT_CONN_TXN_COMMIT				1285
 /*! transaction: transactions read timestamp queue inserts to head */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_HEAD		1284
+#define	WT_STAT_CONN_TXN_READ_QUEUE_HEAD		1286
 /*! transaction: transactions read timestamp queue inserts total */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_INSERTS		1285
+#define	WT_STAT_CONN_TXN_READ_QUEUE_INSERTS		1287
 /*! transaction: transactions read timestamp queue length */
-#define	WT_STAT_CONN_TXN_READ_QUEUE_LEN			1286
+#define	WT_STAT_CONN_TXN_READ_QUEUE_LEN			1288
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1287
+#define	WT_STAT_CONN_TXN_ROLLBACK			1289
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1288
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1290
 
 /*!
  * @}

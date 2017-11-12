@@ -407,6 +407,18 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 	 */
 	WT_PAGE_LOCK(session, page);
 
+	/*
+	 * Now that the page is locked, if attempting to evict it, check again
+	 * whether eviction is permitted. The page's state could have changed
+	 * while we were waiting to acquire the lock (e.g., the page could have
+	 * split).
+	 */
+	if (LF_ISSET(WT_REC_EVICT) &&
+	    !__wt_page_can_evict(session, ref, NULL)) {
+		WT_PAGE_UNLOCK(session, page);
+		return (EBUSY);
+	}
+
 	oldest_id = __wt_txn_oldest_id(session);
 	if (LF_ISSET(WT_REC_EVICT))
 		mod->last_eviction_id = oldest_id;
@@ -1448,6 +1460,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		return (EBUSY);
 	if (uncommitted && !F_ISSET(r, WT_REC_UPDATE_RESTORE))
 		return (EBUSY);
+
+	WT_ASSERT(session, r->max_txn != WT_TXN_NONE);
 
 	/*
 	 * The order of the updates on the list matters, we can't move only the
@@ -6050,7 +6064,7 @@ __rec_las_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
 		if (multi->supd != NULL)
 			WT_ERR(__wt_las_insert_block(
-			    session, r->page, cursor, multi, key));
+			    session, cursor, r->page, multi, key));
 
 err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 

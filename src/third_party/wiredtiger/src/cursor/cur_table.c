@@ -33,7 +33,8 @@ typedef struct {
  *	Handle a key produced by a custom extractor.
  */
 static int
-__curextract_insert(WT_CURSOR *cursor) {
+__curextract_insert(WT_CURSOR *cursor)
+{
 	WT_CURSOR_EXTRACTOR *cextract;
 	WT_ITEM *key, ikey, pkey;
 	WT_SESSION_IMPL *session;
@@ -135,12 +136,13 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx,
  *	Apply an operation to all indices of a table.
  */
 static int
-__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, bool skip_immutable) {
+__apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off, bool skip_immutable)
+{
 	WT_CURSOR **cp;
 	WT_INDEX *idx;
 	WT_SESSION_IMPL *session;
-	int (*f)(WT_CURSOR *);
 	u_int i;
+	int (*f)(WT_CURSOR *);
 
 	cp = ctable->idx_cursors;
 	session = (WT_SESSION_IMPL *)ctable->iface.session;
@@ -987,22 +989,15 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	if (table->is_simple) {
 		/* Just return a cursor on the underlying data source. */
-		if (table->is_simple_file)
-			ret = __wt_curfile_open(session,
-			    table->cgroups[0]->source, NULL, cfg, cursorp);
-		else
-			ret = __wt_open_cursor(session,
-			    table->cgroups[0]->source, NULL, cfg, cursorp);
+		ret = __wt_open_cursor(session,
+		    table->cgroups[0]->source, NULL, cfg, cursorp);
 
 		WT_TRET(__wt_schema_release_table(session, table));
 		if (ret == 0) {
 			/* Fix up the public URI to match what was passed in. */
 			cursor = *cursorp;
-			if (!F_ISSET(cursor, WT_CURSTD_URI_SHARED))
-				__wt_free(session, cursor->uri);
-			cursor->uri = table->iface.name;
-			WT_ASSERT(session, strcmp(uri, cursor->uri) == 0);
-			F_SET(cursor, WT_CURSTD_URI_SHARED);
+			__wt_free(session, cursor->uri);
+			WT_TRET(__wt_strdup(session, uri, &cursor->uri));
 		}
 		return (ret);
 	}

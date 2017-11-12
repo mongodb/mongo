@@ -536,6 +536,8 @@ struct __wt_connection_stats {
 	int64_t txn_pinned_range;
 	int64_t txn_pinned_checkpoint_range;
 	int64_t txn_pinned_snapshot_range;
+	int64_t txn_pinned_timestamp;
+	int64_t txn_pinned_timestamp_oldest;
 	int64_t txn_sync;
 	int64_t txn_commit_queue_head;
 	int64_t txn_commit_queue_inserts;

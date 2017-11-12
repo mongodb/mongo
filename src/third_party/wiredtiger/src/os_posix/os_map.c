@@ -88,7 +88,7 @@ __wt_posix_map_preload(WT_FILE_HANDLE *fh,
 	length += WT_PTRDIFF(map, blk);
 
 	/* XXX proxy for "am I doing a scan?" -- manual read-ahead */
-	if (F_ISSET(session, WT_SESSION_NO_CACHE)) {
+	if (F_ISSET(session, WT_SESSION_READ_WONT_NEED)) {
 		/* Read in 2MB blocks every 1MB of data. */
 		if (((uintptr_t)((uint8_t *)blk + length) &
 		    (uintptr_t)((1<<20) - 1)) < (uintptr_t)blk)
