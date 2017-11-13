@@ -1852,6 +1852,48 @@ TEST_F(RollbackResyncsCollectionOptionsTest,
     resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
 }
 
+TEST_F(RollbackResyncsCollectionOptionsTest, LocalTempCollectionRemotePermanentCollection) {
+    CollectionOptions localCollOptions;
+    localCollOptions.uuid = UUID::gen();
+    localCollOptions.temp = true;
+
+    BSONObj remoteCollOptionsObj = BSONObj();
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, LocalPermanentCollectionRemoteTempCollection) {
+    CollectionOptions localCollOptions;
+    localCollOptions.uuid = UUID::gen();
+
+    BSONObj remoteCollOptionsObj = BSON("temp" << true);
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, BothCollectionsTemp) {
+    CollectionOptions localCollOptions;
+    localCollOptions.uuid = UUID::gen();
+    localCollOptions.temp = true;
+
+    BSONObj remoteCollOptionsObj = BSON("temp" << true);
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, ChangingTempStatusAlsoChangesOtherCollectionOptions) {
+    CollectionOptions localCollOptions;
+    localCollOptions.uuid = UUID::gen();
+    localCollOptions.temp = true;
+
+    BSONObj remoteCollOptionsObj = BSON("validationLevel"
+                                        << "strict"
+                                        << "validationAction"
+                                        << "error");
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
 TEST_F(RSRollbackTest, RollbackCollectionModificationCommandInvalidCollectionOptions) {
     createOplog(_opCtx.get());
     CollectionOptions options;

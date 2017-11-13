@@ -1169,11 +1169,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
             WriteUnitOfWork wuow(opCtx);
 
-            // If the collection is temporary, we set the temp field to true. Otherwise, we do not
-            // add the the temp field.
-            if (options.temp) {
-                cce->setIsTemp(opCtx, options.temp);
-            }
+            // Set collection to whatever temp status is on the sync source.
+            cce->setIsTemp(opCtx, options.temp);
 
             // Resets collection user flags such as noPadding and usePowerOf2Sizes.
             if (options.flagsSet || cce->getCollectionOptions(opCtx).flagsSet) {
