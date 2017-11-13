@@ -34,6 +34,7 @@
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -326,6 +327,16 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
             resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(token));
         }
     }
+    if (auto resumeAfterClusterTime = spec.getResumeAfterClusterTime()) {
+        uassert(50656,
+                str::stream() << "Do not specify both "
+                              << DocumentSourceChangeStreamSpec::kResumeAfterFieldName
+                              << " and "
+                              << DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName
+                              << " in a $changeStream stage.",
+                !resumeStage);
+        startFrom = resumeAfterClusterTime->getTimestamp();
+    }
     const bool changeStreamIsResuming = (resumeStage != nullptr);
 
     auto fullDocOption = spec.getFullDocument();
@@ -505,7 +516,22 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
 
 Document DocumentSourceChangeStream::Transformation::serializeStageOptions(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Document(_changeStreamSpec);
+    Document changeStreamOptions(_changeStreamSpec);
+    // If we're on a mongos and no other start time is specified, we want to start at the current
+    // cluster time on the mongos.  This ensures all shards use the same start time.
+    if (_expCtx->inMongos &&
+        changeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterFieldName].missing() &&
+        changeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName]
+            .missing()) {
+        MutableDocument newChangeStreamOptions(changeStreamOptions);
+        newChangeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName]
+                              [ResumeTokenClusterTime::kTimestampFieldName] =
+                                  Value(LogicalClock::get(_expCtx->opCtx)
+                                            ->getClusterTime()
+                                            .asTimestamp());
+        changeStreamOptions = newChangeStreamOptions.freeze();
+    }
+    return changeStreamOptions;
 }
 
 DocumentSource::GetDepsReturn DocumentSourceChangeStream::Transformation::addDependencies(

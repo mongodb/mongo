@@ -405,6 +405,16 @@ StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
         BSONObj targetedCommand =
             createCommandForTargetedShards(aggRequest, originalCmdObj, pipelineForTargetedShards);
 
+        // Refresh the shard registry if we're targeting all shards.  We need the shard registry
+        // to be at least as current as the logical time used when creating the command for
+        // $changeStream to work reliably, so we do a "hard" reload.
+        if (mustRunOnAllShards(executionNss, liteParsedPipeline)) {
+            auto* shardRegistry = Grid::get(opCtx)->shardRegistry();
+            if (!shardRegistry->reload(opCtx)) {
+                shardRegistry->reload(opCtx);
+            }
+        }
+
         // Explain does not produce a cursor, so instead we scatter-gather commands to the shards.
         if (expCtx->explain) {
             if (mustRunOnAllShards(executionNss, liteParsedPipeline)) {

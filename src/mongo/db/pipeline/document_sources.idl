@@ -56,6 +56,14 @@ types:
 
 
 structs:
+  ResumeTokenClusterTime:
+      description: The IDL type of cluster time
+      fields:
+          ts:
+            cpp_name: timestamp
+            type: timestamp
+            description: The timestamp of the logical time
+
   DocumentSourceChangeStreamSpec:
       description: A document used to specify the $changeStream stage of an aggregation
                    pipeline.
@@ -66,20 +74,19 @@ structs:
               optional: true
               description: An object representing the point at which we should resume reporting
                            changes from.
+          $_resumeAfterClusterTime:
+              cpp_name: resumeAfterClusterTime
+              type: ResumeTokenClusterTime
+              optional: true
+              description: The cluster time after which we should start reporting changes.
+                           Only one of resumeAfter and _resumeAfterClusterTime should be
+                           specified.  For internal use only.
           fullDocument:
               cpp_name: fullDocument
               type: string
               default: '"default"'
               description: A string '"updateLookup"' or '"default"', indicating whether or not we
                            should return a full document or just changes for an update.
-
-  ResumeTokenClusterTime:
-      description: The IDL type of cluster time
-      fields:
-          ts:
-            cpp_name: timestamp
-            type: timestamp
-            description: The timestamp of the logical time
 
   ListSessionsUser:
     description: "A struct representing a $listSessions/$listLocalSessions User"

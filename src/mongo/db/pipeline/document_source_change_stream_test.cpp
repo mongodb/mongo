@@ -33,6 +33,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -246,6 +248,25 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
                                        expCtx),
         AssertionException,
         40575);
+}
+
+TEST_F(ChangeStreamStageTest, ShouldRejectBothResumeAfterClusterTimeAndResumeAfterOptions) {
+    auto expCtx = getExpCtx();
+
+    // Need to put the collection in the UUID catalog so the resume token is valid.
+    Collection collection(stdx::make_unique<CollectionMock>(nss));
+    UUIDCatalog::get(expCtx->opCtx).onCreateCollection(expCtx->opCtx, &collection, testUuid());
+
+    ASSERT_THROWS_CODE(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON(
+                     "resumeAfter" << makeResumeToken(ts, testUuid(), BSON("x" << 2 << "_id" << 1))
+                                   << "$_resumeAfterClusterTime"
+                                   << BSON("ts" << ts)))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        50656);
 }
 
 TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
