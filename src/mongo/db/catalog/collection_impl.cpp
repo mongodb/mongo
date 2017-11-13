@@ -1005,6 +1005,15 @@ void CollectionImpl::informIndexObserver(OperationContext* opCtx,
                                          const IndexDescriptor* descriptor,
                                          const IndexKeyEntry& indexEntry,
                                          const ValidationOperation operation) const {
+    // The index observer was used for a project that would allow concurrent validation of
+    // collection/index consistency while updates were happening to the collection. That project did
+    // not make it in for 3.6. This mutex is in a hot code path, so we're going to avoid locking it
+    // for the time being. See SERVER-31948.
+    const bool unusedReturnEarlyForPerf = true;
+    if (unusedReturnEarlyForPerf) {
+        return;
+    }
+
     stdx::lock_guard<stdx::mutex> lock(_indexObserverMutex);
     if (_indexObserver) {
         _indexObserver->inform(opCtx, descriptor, std::move(indexEntry), operation);
