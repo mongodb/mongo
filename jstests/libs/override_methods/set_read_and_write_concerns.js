@@ -52,6 +52,7 @@
         return originalStartParallelShell(newCode, port, noConnect);
     };
 
+    const originalRunCommand = DB.prototype._runCommandImpl;
     DB.prototype._runCommandImpl = function(dbName, obj, options) {
         var cmdName = "";
         for (var fieldName in obj) {
@@ -178,7 +179,7 @@
             }
         }
 
-        var res = this.getMongo().runCommand(dbName, obj, options);
+        var res = originalRunCommand.call(this, dbName, obj, options);
 
         return res;
     };

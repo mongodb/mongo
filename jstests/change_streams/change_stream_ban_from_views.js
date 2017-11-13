@@ -30,4 +30,9 @@
     assert.commandFailedWithCode(
         db.runCommand({collMod: normalViewName, viewOn: coll.getName(), pipeline: csPipe}),
         ErrorCodes.OptionNotSupportedOnView);
+
+    // Verify change streams cannot be created on views.
+    assert.commandFailedWithCode(
+        db.runCommand({aggregate: normalViewName, pipeline: [{$changeStream: {}}], cursor: {}}),
+        ErrorCodes.CommandNotSupportedOnView);
 })();
