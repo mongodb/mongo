@@ -176,8 +176,12 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
         }
         lastAppliedOpTime = LogicalTime(replCoord->getMyLastAppliedOpTime().getTimestamp());
     }
-    invariant(status.isOK());
-    return status;
+    // This is when the noop write failed but the opLog caught up to clusterTime by replicating.
+    if (!status.isOK()) {
+        LOG(1) << "Reached clusterTime " << lastAppliedOpTime.toString()
+               << " but failed noop write due to " << status.toString();
+    }
+    return Status::OK();
 }
 }  // namespace
 
