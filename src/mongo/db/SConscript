@@ -1536,39 +1536,11 @@ env.Library(
 env.Library(
     target='generic_cursor',
     source=[
-        'generic_cursor_manager.cpp',
         env.Idlc('generic_cursor.idl')[0],
     ],
     LIBDEPS=[
         'service_context',
         '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
-env.Library(
-    target='generic_cursor_mongod',
-    source=[
-        'generic_cursor_manager_mongod.cpp',
-    ],
-    LIBDEPS=[
-        'generic_cursor',
-    ],
-    LIBDEPS_PRIVATE=[
-        'clientcursor',
-    ],
-)
-
-env.Library(
-    target='generic_cursor_mongos',
-    source=[
-        'generic_cursor_manager_mongos.cpp',
-    ],
-    LIBDEPS=[
-        'generic_cursor',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
     ],
 )
 

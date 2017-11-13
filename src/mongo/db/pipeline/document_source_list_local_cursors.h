@@ -44,7 +44,7 @@ namespace mongo {
  * as true, and returns just sessions for the currently logged in user if
  * 'allUsers' is specified as false, or not specified at all.
  */
-class DocumentSourceListLocalCursors final : public DocumentSource {
+class DocumentSourceListLocalCursors final : public DocumentSourceNeedsMongoProcessInterface {
 public:
     static const char* kStageName;
 
@@ -92,6 +92,10 @@ public:
         constraints.isIndependentOfAnyCollection = true;
         constraints.requiresInputDocSource = false;
         return constraints;
+    }
+
+    void doInjectMongoProcessInterface(std::shared_ptr<MongoProcessInterface> mongo) override {
+        _cursors = mongo->getCursors(pExpCtx);
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

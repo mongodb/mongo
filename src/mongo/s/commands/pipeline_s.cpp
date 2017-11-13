@@ -36,6 +36,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/establish_cursors.h"
 
 namespace mongo {
@@ -260,6 +261,13 @@ public:
                 batch.size() <= 1u);
 
         return (!batch.empty() ? Document(batch.front()) : boost::optional<Document>{});
+    }
+
+    std::vector<GenericCursor> getCursors(const intrusive_ptr<ExpressionContext>& expCtx) const {
+        invariant(hasGlobalServiceContext());
+        auto cursorManager = Grid::get(expCtx->opCtx->getServiceContext())->getCursorManager();
+        invariant(cursorManager);
+        return cursorManager->getAllCursors();
     }
 
 private:

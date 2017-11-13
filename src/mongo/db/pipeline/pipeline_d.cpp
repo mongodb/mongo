@@ -411,6 +411,10 @@ public:
         return lookedUpDocument;
     }
 
+    std::vector<GenericCursor> getCursors(const intrusive_ptr<ExpressionContext>& expCtx) const {
+        return CursorManager::getAllCursors(expCtx->opCtx);
+    }
+
 private:
     /**
      * Looks up the collection default collator for the collection given by 'collectionUUID'. A

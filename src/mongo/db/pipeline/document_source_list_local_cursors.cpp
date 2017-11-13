@@ -32,7 +32,6 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/generic_cursor_manager.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/pipeline/document_sources_gen.h"
 
@@ -74,8 +73,5 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListLocalCursors::createFromB
 
 DocumentSourceListLocalCursors::DocumentSourceListLocalCursors(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx) {
-    const auto& opCtx = pExpCtx->opCtx;
-    _cursors = GenericCursorManager::get(opCtx)->getCursors(opCtx);
-}
+    : DocumentSourceNeedsMongoProcessInterface(pExpCtx) {}
 }

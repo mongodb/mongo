@@ -42,6 +42,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/collection_index_usage_tracker.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/generic_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -849,6 +850,12 @@ public:
         virtual boost::optional<Document> lookupSingleDocument(const NamespaceString& nss,
                                                                UUID collectionUUID,
                                                                const Document& documentKey) = 0;
+
+        /**
+         * Returns a vector of all local cursors.
+         */
+        virtual std::vector<GenericCursor> getCursors(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx) const = 0;
 
         // Add new methods as needed.
     };

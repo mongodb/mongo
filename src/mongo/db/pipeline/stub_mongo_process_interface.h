@@ -123,5 +123,10 @@ public:
                                                    const Document& documentKey) {
         MONGO_UNREACHABLE;
     }
+
+    std::vector<GenericCursor> getCursors(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
+        MONGO_UNREACHABLE;
+    }
 };
 }  // namespace mongo
