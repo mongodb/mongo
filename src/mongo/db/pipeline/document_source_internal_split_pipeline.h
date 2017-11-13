@@ -59,11 +59,11 @@ public:
     }
 
     boost::intrusive_ptr<DocumentSource> getShardSource() final {
-        return this;
+        return nullptr;
     }
 
     std::list<boost::intrusive_ptr<DocumentSource>> getMergeSources() final {
-        return {DocumentSourceInternalSplitPipeline::create(pExpCtx, _mergeType)};
+        return {this};
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
