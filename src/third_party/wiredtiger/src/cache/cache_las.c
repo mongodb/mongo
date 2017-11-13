@@ -849,7 +849,9 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
 		 * reconciliation, we can safely remove entries from that point
 		 * on (for the given key) that are visible to all readers.
 		 */
-		if (__bit_test(cache->las_sweep_dropmap,
+		if (las_id >= cache->las_sweep_dropmin &&
+		    las_id <= cache->las_sweep_dropmax &&
+		    __bit_test(cache->las_sweep_dropmap,
 		    las_id - cache->las_sweep_dropmin)) {
 			WT_ERR(cursor->remove(cursor));
 			++remove_cnt;
