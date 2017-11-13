@@ -85,6 +85,14 @@ public:
     virtual void abandonSnapshot() = 0;
 
     /**
+     * Informs the RecoveryUnit that a snapshot will be needed soon, if one was not already
+     * established. This specifically allows the storage engine to preallocate any required
+     * transaction resources while minimizing the critical section between generating a new
+     * timestamp and setting it using setTimestamp.
+     */
+    virtual void prepareSnapshot() {}
+
+    /**
      * Informs this RecoveryUnit that all future reads through it should be from a snapshot
      * marked as Majority Committed. Snapshots should still be separately acquired and newer
      * committed snapshots should be used if available whenever implementations would normally

@@ -178,6 +178,11 @@ void WiredTigerRecoveryUnit::abandonSnapshot() {
     _areWriteUnitOfWorksBanned = false;
 }
 
+void WiredTigerRecoveryUnit::prepareSnapshot() {
+    // Begin a new transaction, if one is not already started.
+    getSession();
+}
+
 void* WiredTigerRecoveryUnit::writingPtr(void* data, size_t len) {
     // This API should not be used for anything other than the MMAP V1 storage engine
     MONGO_UNREACHABLE;

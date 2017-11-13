@@ -158,6 +158,8 @@ void _getNextOpTimes(OperationContext* opCtx,
         term = replCoord->getTerm();
     }
 
+    // Allow the storage engine to start the transaction outside the critical section.
+    opCtx->recoveryUnit()->prepareSnapshot();
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
 
     auto ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();

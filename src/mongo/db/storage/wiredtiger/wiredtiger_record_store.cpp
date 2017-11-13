@@ -1675,7 +1675,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
 
 Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* opCtx,
                                                    const Timestamp& opTime) {
-    // This starts a new transaction and gives it a timestamp.
+    // This labels the current transaction with a timestamp.
     // This is required for oplog visibility to work correctly, as WiredTiger uses the transaction
     // list to determine where there are holes in the oplog.
     return opCtx->recoveryUnit()->setTimestamp(SnapshotName(opTime));
