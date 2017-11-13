@@ -556,8 +556,15 @@ void EphemeralForTestRecordStore::temp_cappedTruncateAfter(OperationContext* txn
     Records::iterator it =
         inclusive ? _data->records.lower_bound(end) : _data->records.upper_bound(end);
     while (it != _data->records.end()) {
-        txn->recoveryUnit()->registerChange(new RemoveChange(txn, _data, it->first, it->second));
-        _data->dataSize -= it->second.size;
+        RecordId id = it->first;
+        EphemeralForTestRecord record = it->second;
+
+        if (_cappedCallback) {
+            uassertStatusOK(_cappedCallback->aboutToDeleteCapped(txn, id, record.toRecordData()));
+        }
+
+        txn->recoveryUnit()->registerChange(new RemoveChange(txn, _data, id, record));
+        _data->dataSize -= record.size;
         _data->records.erase(it++);
     }
 }
