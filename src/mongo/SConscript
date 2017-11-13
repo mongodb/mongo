@@ -334,7 +334,7 @@ if env.TargetOSIs('windows'):
         ])
 
     env.Alias('generated-sources', generatedDbManifest)
-    env.Depends("db/db.rc", generatedDbManifest)
+    env.Depends("db/db.res", generatedDbManifest)
 
 mongod = env.Program(
     target="mongod",
@@ -375,7 +375,7 @@ if env.TargetOSIs('windows'):
         ])
 
     env.Alias('generated-sources', generatedServerManifest)
-    env.Depends("s/server.rc", generatedServerManifest)
+    env.Depends("s/server.res", generatedServerManifest)
 
 # mongos
 env.Install(
@@ -482,7 +482,7 @@ if not has_option('noshell') and usemozjs:
                     ('@mongo_version_extra_str@', version_extra),
                 ])
         shellEnv.Alias('generated-sources', generatedMongoManifest)
-        shellEnv.Depends("shell/shell.rc", generatedMongoManifest)
+        shellEnv.Depends("shell/shell.res", generatedMongoManifest)
 
     mongo_shell = shellEnv.Program(
         "mongo",
