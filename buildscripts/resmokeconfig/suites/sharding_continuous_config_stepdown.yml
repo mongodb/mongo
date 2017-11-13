@@ -145,6 +145,8 @@ selector:
   - jstests/sharding/migration_ignore_interrupts_4.js
   # listCollections is not retryable
   - jstests/sharding/sessions_collection_auto_healing.js
+  # shardCollection is not retryable
+  - jstests/sharding/shard_config_db_collections.js
 
 executor:
   config:
