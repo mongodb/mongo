@@ -362,6 +362,8 @@ Status runAggregate(OperationContext* opCtx,
             // of the collection on which $changeStream was invoked, so that we do not end up
             // resolving the collation on the oplog.
             invariant(!collatorToUse);
+            // Change streams can only be created on collections. An error will be raised in
+            // AutoGetCollection if the given namespace is a view.
             AutoGetCollection origNssCtx(opCtx, origNss, MODE_IS);
             Collection* origColl = origNssCtx.getCollection();
             collatorToUse.emplace(resolveCollator(opCtx, request, origColl));

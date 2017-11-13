@@ -37,6 +37,7 @@
         "parallelCollectionScan",
     ]);
 
+    const originalRunCommand = DB.prototype._runCommandImpl;
     DB.prototype._runCommandImpl = function(dbName, obj, options) {
         const cmdName = Object.keys(obj)[0];
 
@@ -62,7 +63,7 @@
             }
         }
 
-        return this.getMongo().runCommand(dbName, obj, options);
+        return originalRunCommand.call(this, dbName, obj, options);
     };
 
 })();

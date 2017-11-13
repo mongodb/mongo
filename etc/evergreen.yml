@@ -6788,6 +6788,7 @@ buildvariants:
   - name: sharded_causally_consistent_jscore_passthrough_WT
   - name: change_streams_WT
   - name: change_streams_mongos_passthrough_WT
+  - name: change_streams_secondary_reads_WT
   - name: change_streams_sharded_collections_passthrough_WT
   - name: concurrency_WT
   - name: concurrency_replication_WT
