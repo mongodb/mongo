@@ -166,7 +166,7 @@ Status UpdateDriver::parse(
     clear();
 
     // Check if the update expression is a full object replacement.
-    if (*updateExpr.firstElementFieldName() != '$') {
+    if (isDocReplacement(updateExpr)) {
         if (multi) {
             return Status(ErrorCodes::FailedToParse, "multi update only works with $ operators");
         }
@@ -579,6 +579,10 @@ void UpdateDriver::clear() {
     _indexedFields = NULL;
     _replacementMode = false;
     _positional = false;
+}
+
+bool UpdateDriver::isDocReplacement(const BSONObj& updateExpr) {
+    return *updateExpr.firstElementFieldName() != '$';
 }
 
 }  // namespace mongo

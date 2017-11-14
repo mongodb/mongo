@@ -32,9 +32,11 @@
 
 #include "mongo/db/session.h"
 
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
@@ -130,6 +132,9 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
 }
 
 void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequest) {
+    // Current code only supports replacement update.
+    dassert(UpdateDriver::isDocReplacement(updateRequest.getUpdates()));
+
     AutoGetCollection autoColl(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IX);
 
     uassert(40527,
@@ -139,21 +144,69 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
                           << " collection has been manually deleted.",
             autoColl.getCollection());
 
-    try {
-        const auto updateResult = update(opCtx, autoColl.getDb(), updateRequest);
+    WriteUnitOfWork wuow(opCtx);
 
-        if (!updateResult.numDocsModified && updateResult.upserted.isEmpty()) {
+    auto collection = autoColl.getCollection();
+    auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
+
+    uassert(40672,
+            str::stream() << "Failed to fetch _id index for "
+                          << NamespaceString::kSessionTransactionsTableNamespace.ns(),
+            idIndex);
+
+    auto indexAccess = collection->getIndexCatalog()->getIndex(idIndex);
+    // Since we are looking up a key inside the _id index, create a key object consisting of only
+    // the _id field.
+    auto idToFetch = updateRequest.getQuery().firstElement();
+    auto toUpdateIdDoc = idToFetch.wrap();
+    dassert(idToFetch.fieldNameStringData() == "_id"_sd);
+    auto recordId = indexAccess->findSingle(opCtx, toUpdateIdDoc);
+    auto startingSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
+
+    if (recordId.isNull()) {
+        // Upsert case.
+        auto status = collection->insertDocument(
+            opCtx, InsertStatement(updateRequest.getUpdates()), nullptr, true, false);
+
+        if (status == ErrorCodes::DuplicateKey) {
             throw WriteConflictException();
         }
-    } catch (const DBException& excep) {
-        if (excep.code() == ErrorCodes::DuplicateKey) {
-            // Duplicate key means that another thread already created the session this is trying
-            // to upsert. Throw WriteCoflict to make it retry and check the current state again.
-            throw WriteConflictException();
-        }
 
-        throw;
+        uassertStatusOK(status);
+        wuow.commit();
+        return;
     }
+
+    auto originalRecordData = collection->getRecordStore()->dataFor(opCtx, recordId);
+    auto originalDoc = originalRecordData.toBson();
+
+    invariant(collection->getDefaultCollator() == nullptr);
+    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, nullptr));
+
+    auto matcher = fassertStatusOK(
+        40673, MatchExpressionParser::parse(updateRequest.getQuery(), std::move(expCtx)));
+    if (!matcher->matchesBSON(originalDoc)) {
+        // Document no longer match what we expect so throw WCE to make the caller re-examine.
+        throw WriteConflictException();
+    }
+
+    OplogUpdateEntryArgs args;
+    args.nss = NamespaceString::kSessionTransactionsTableNamespace;
+    args.uuid = collection->uuid();
+    args.update = updateRequest.getUpdates();
+    args.criteria = toUpdateIdDoc;
+    args.fromMigrate = false;
+
+    collection->updateDocument(opCtx,
+                               recordId,
+                               Snapshotted<BSONObj>(startingSnapshotId, originalDoc),
+                               updateRequest.getUpdates(),
+                               true,   // enforceQuota
+                               false,  // indexesAffected = false because _id is the only index
+                               nullptr,
+                               &args);
+
+    wuow.commit();
 }
 
 // Failpoint which allows different failure actions to happen after each write. Supports the
@@ -402,6 +455,16 @@ UpdateRequest Session::_makeUpdateRequest(WithLock,
                                           Date_t newLastWriteDate) const {
     UpdateRequest updateRequest(NamespaceString::kSessionTransactionsTableNamespace);
 
+    const auto updateBSON = [&] {
+        SessionTxnRecord newTxnRecord;
+        newTxnRecord.setSessionId(_sessionId);
+        newTxnRecord.setTxnNum(newTxnNumber);
+        newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
+        newTxnRecord.setLastWriteDate(newLastWriteDate);
+        return newTxnRecord.toBSON();
+    }();
+    updateRequest.setUpdates(updateBSON);
+
     if (_lastWrittenSessionRecord) {
         updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName
                                     << _sessionId.toBSON()
@@ -409,24 +472,8 @@ UpdateRequest Session::_makeUpdateRequest(WithLock,
                                     << _lastWrittenSessionRecord->getTxnNum()
                                     << SessionTxnRecord::kLastWriteOpTimeFieldName
                                     << _lastWrittenSessionRecord->getLastWriteOpTime()));
-        updateRequest.setUpdates(BSON("$set" << BSON(SessionTxnRecord::kTxnNumFieldName
-                                                     << newTxnNumber
-                                                     << SessionTxnRecord::kLastWriteOpTimeFieldName
-                                                     << newLastWriteOpTime
-                                                     << SessionTxnRecord::kLastWriteDateFieldName
-                                                     << newLastWriteDate)));
     } else {
-        const auto updateBSON = [&] {
-            SessionTxnRecord newTxnRecord;
-            newTxnRecord.setSessionId(_sessionId);
-            newTxnRecord.setTxnNum(newTxnNumber);
-            newTxnRecord.setLastWriteOpTime(newLastWriteOpTime);
-            newTxnRecord.setLastWriteDate(newLastWriteDate);
-            return newTxnRecord.toBSON();
-        }();
-
         updateRequest.setQuery(updateBSON);
-        updateRequest.setUpdates(updateBSON);
         updateRequest.setUpsert(true);
     }
 
