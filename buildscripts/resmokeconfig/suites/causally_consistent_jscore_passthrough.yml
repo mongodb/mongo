@@ -36,7 +36,6 @@ selector:
   - jstests/core/repair_server12955.js # repairDatabase
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/startup_log.js  # "local" database.
-  - jstests/core/storageDetailsCommand.js  # diskStorageStats.
   - jstests/core/top.js  # top.
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.

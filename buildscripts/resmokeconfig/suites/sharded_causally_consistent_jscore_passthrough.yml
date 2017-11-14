@@ -41,7 +41,6 @@ selector:
   - jstests/core/repair_server12955.js # repairDatabase
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/startup_log.js  # "local" database.
-  - jstests/core/storageDetailsCommand.js  # diskStorageStats.
   - jstests/core/tailable_cursor_invalidation.js # capped collections.
   - jstests/core/tailable_getmore_batch_size.js # capped collections.
   - jstests/core/tailable_skip_limit.js # capped collections.
