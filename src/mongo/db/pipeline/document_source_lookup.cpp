@@ -600,7 +600,7 @@ void DocumentSourceLookUp::resolveLetVariables(const Document& localDoc, Variabl
 
     for (auto& letVar : _letVariables) {
         auto value = letVar.expression->evaluate(localDoc);
-        variables->setValue(letVar.id, value);
+        variables->setConstantValue(letVar.id, value);
     }
 }
 

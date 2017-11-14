@@ -617,7 +617,7 @@ TEST(ExprMatchTest, IdenticalPostOptimizedExpressionsAreEquivalent) {
 TEST(ExprMatchTest, ExpressionOptimizeRewritesVariableDereferenceAsConstant) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto varId = expCtx->variablesParseState.defineVariable("var");
-    expCtx->variables.setValue(varId, Value(4));
+    expCtx->variables.setConstantValue(varId, Value(4));
 
     BSONObj expression = BSON("$expr"
                               << "$$var");
