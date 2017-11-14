@@ -20,6 +20,11 @@
 (function() {
     "use strict";
 
+    if (jsTest.options().storageEngine === "mmapv1") {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     load("jstests/replsets/rslib.js");
 
     function assertSameRecordOnBothConnections(primary, secondary, lsid) {

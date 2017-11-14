@@ -5,6 +5,11 @@
 (function() {
     "use strict";
 
+    if (jsTest.options().storageEngine === "mmapv1") {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     load("jstests/libs/override_methods/auto_retry_on_network_error.js");
     load("jstests/replsets/rslib.js");
 

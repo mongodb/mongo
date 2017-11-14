@@ -1,8 +1,12 @@
 load("jstests/sharding/move_chunk_with_session_helper.js");
 
 (function() {
-
     "use strict";
+
+    if (jsTest.options().storageEngine === "mmapv1") {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
 
     var st = new ShardingTest({shards: {rs0: {nodes: 2}, rs1: {nodes: 2}}});
     assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));

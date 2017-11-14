@@ -4,6 +4,11 @@
 (function() {
     "use strict";
 
+    if (jsTest.options().storageEngine === "mmapv1") {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     /**
      * Asserts the connection has a document in its transaction collection that has the given
      * sessionId, txnNumber, and lastWriteOptimeTs.

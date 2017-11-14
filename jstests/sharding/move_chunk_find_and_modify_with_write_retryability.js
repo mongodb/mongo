@@ -3,6 +3,11 @@ load("jstests/sharding/move_chunk_with_session_helper.js");
 (function() {
     "use strict";
 
+    if (jsTest.options().storageEngine === "mmapv1") {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     var checkFindAndModifyResult = function(expected, toCheck) {
         assert.eq(expected.ok, toCheck.ok);
         assert.eq(expected.value, toCheck.value);

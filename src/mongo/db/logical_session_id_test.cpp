@@ -244,7 +244,7 @@ TEST_F(LogicalSessionIdTest, GenWithoutAuthedUser) {
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_NoSessionIdNoTransactionNumber) {
     addSimpleUser(UserName("simple", "test"));
-    initializeOperationSessionInfo(_opCtx.get(), BSON("TestCmd" << 1), true, true);
+    initializeOperationSessionInfo(_opCtx.get(), BSON("TestCmd" << 1), true, true, true);
 
     ASSERT(!_opCtx->getLogicalSessionId());
     ASSERT(!_opCtx->getTxnNumber());
@@ -258,6 +258,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdNoTransacti
     initializeOperationSessionInfo(_opCtx.get(),
                                    BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "OtherField"
                                                   << "TestField"),
+                                   true,
                                    true,
                                    true);
 
@@ -274,6 +275,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_MissingSessionIdWith
                                        BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
                                                       << "TestField"),
                                        true,
+                                       true,
                                        true),
         AssertionException,
         ErrorCodes::IllegalOperation);
@@ -289,6 +291,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransact
         BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                        << "TestField"),
         true,
+        true,
         true);
 
     ASSERT(_opCtx->getLogicalSessionId());
@@ -298,7 +301,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransact
     ASSERT_EQ(100, *_opCtx->getTxnNumber());
 }
 
-TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_CanAcceptTxnNumberFalse) {
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IsReplSetMemberOrMongosFalse) {
     addSimpleUser(UserName("simple", "test"));
     LogicalSessionFromClient lsid;
     lsid.setId(UUID::gen());
@@ -308,6 +311,24 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_CanAcceptTxnNumberFa
             _opCtx.get(),
             BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                            << "TestField"),
+            true,
+            false,
+            true),
+        AssertionException,
+        ErrorCodes::IllegalOperation);
+}
+
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SupportsDocLockingFalse) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    ASSERT_THROWS_CODE(
+        initializeOperationSessionInfo(
+            _opCtx.get(),
+            BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
+                           << "TestField"),
+            true,
             true,
             false),
         AssertionException,
