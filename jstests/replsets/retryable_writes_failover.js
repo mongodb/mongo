@@ -5,6 +5,11 @@
 (function() {
     "use strict";
 
+    if (jsTest.options().storageEngine === "mmapv1") {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     function stepDownPrimary(replTest) {
         let exception = assert.throws(function() {
             let res = assert.commandWorked(

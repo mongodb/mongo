@@ -4,6 +4,11 @@
 (function() {
     "use strict";
 
+    if (jsTest.options().storageEngine === "mmapv1") {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     const standalone = MongoRunner.runMongod();
     const testDB = standalone.getDB("test");
 

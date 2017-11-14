@@ -5,6 +5,11 @@
 (function() {
     "use strict";
 
+    if (jsTest.options().storageEngine === "mmapv1") {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     load("jstests/replsets/rslib.js");
 
     const rst = new ReplSetTest({nodes: 1});

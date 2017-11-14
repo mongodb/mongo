@@ -42,7 +42,8 @@ namespace mongo {
 void initializeOperationSessionInfo(OperationContext* opCtx,
                                     const BSONObj& requestBody,
                                     bool requiresAuth,
-                                    bool canAcceptTxnNumber) {
+                                    bool isReplSetMemberOrMongos,
+                                    bool supportsDocLocking) {
     if (!requiresAuth) {
         return;
     }
@@ -85,7 +86,11 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
                 opCtx->getLogicalSessionId());
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction numbers are only allowed on a replica set member or mongos",
-                canAcceptTxnNumber);
+                isReplSetMemberOrMongos);
+        uassert(ErrorCodes::IllegalOperation,
+                "Transaction numbers are only allowed on storage engines that support "
+                "document-level locking",
+                supportsDocLocking);
         uassert(ErrorCodes::BadValue,
                 "Transaction number cannot be negative",
                 *osi.getTxnNumber() >= 0);

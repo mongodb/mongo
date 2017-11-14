@@ -32,9 +32,11 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_gen.h"
+#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/migration_session_id.h"
@@ -244,9 +246,15 @@ public:
 
             Client::initThread("test insert thread");
             auto innerOpCtx = Client::getCurrent()->makeOperationContext();
-            DBDirectClient client(innerOpCtx.get());
-            BSONObj result;
-            ASSERT_TRUE(client.runCommand(ns.db().toString(), insertBuilder.obj(), result));
+
+            // The ephemeral for test storage engine doesn't support document-level locking, so
+            // requests with txnNumbers aren't allowed. To get around this, we have to manually set
+            // up the session state and perform the insert.
+            initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
+            OperationContextSession sessionTxnState(innerOpCtx.get(), true);
+            const auto reply = performInserts(innerOpCtx.get(), insertRequest);
+            ASSERT(reply.results.size() == 1);
+            ASSERT(reply.results[0].isOK());
         });
 
         insertThread.join();

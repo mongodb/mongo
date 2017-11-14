@@ -348,6 +348,7 @@ env.CppUnitTest(
         'session_catalog_migration_destination_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
         'sharding',

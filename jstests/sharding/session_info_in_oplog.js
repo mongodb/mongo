@@ -6,6 +6,11 @@
 (function() {
     "use strict";
 
+    if (jsTest.options().storageEngine === "mmapv1") {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     var checkOplog = function(oplog, lsid, uid, txnNum, stmtId, prevTs, prevTerm) {
         assert(oplog != null);
         assert(oplog.lsid != null);

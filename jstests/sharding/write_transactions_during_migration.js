@@ -15,6 +15,11 @@ load('./jstests/libs/chunk_manipulation_util.js');
 (function() {
     "use strict";
 
+    if (jsTest.options().storageEngine === "mmapv1") {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
     var st = new ShardingTest({shards: {rs0: {nodes: 1}, rs1: {nodes: 1}}});
