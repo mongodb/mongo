@@ -65,9 +65,12 @@
 #include "mongo/s/query/router_stage_update_on_add_shard.h"
 #include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+MONGO_FP_DECLARE(clusterAggregateHangBeforeEstablishingShardCursors);
 
 namespace {
 // Given a document representing an aggregation command such as
@@ -283,6 +286,14 @@ StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishShardC
                               !routingInfo->primary()->isConfig()
                                   ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
                                   : cmdObj);
+    }
+
+    if (MONGO_FAIL_POINT(clusterAggregateHangBeforeEstablishingShardCursors)) {
+        log() << "clusterAggregateHangBeforeEstablishingShardCursors fail point enabled.  Blocking "
+                 "until fail point is disabled.";
+        while (MONGO_FAIL_POINT(clusterAggregateHangBeforeEstablishingShardCursors)) {
+            sleepsecs(1);
+        }
     }
 
     // If we reach this point, we're either trying to establish cursors on a sharded execution

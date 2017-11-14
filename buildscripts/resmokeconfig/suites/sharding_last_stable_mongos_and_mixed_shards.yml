@@ -38,6 +38,7 @@ selector:
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
   - jstests/sharding/change_stream_remove_shard.js
   - jstests/sharding/change_streams.js
+  - jstests/sharding/change_streams_establishment_finds_new_shards.js
   - jstests/sharding/change_streams_shards_start_in_sync.js
   - jstests/sharding/change_streams_unsharded_becomes_sharded.js
   - jstests/sharding/change_streams_update_lookup_collation.js
