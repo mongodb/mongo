@@ -126,6 +126,7 @@ public:
     size_t numMods() const;
 
     bool isDocReplacement() const;
+    static bool isDocReplacement(const BSONObj& updateExpr);
 
     bool modsAffectIndices() const;
     void refreshIndexKeys(const UpdateIndexData* indexedFields);
