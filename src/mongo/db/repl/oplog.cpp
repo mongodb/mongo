@@ -1297,12 +1297,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
     } else if (*opType == 'u') {
         opCounters->gotUpdate();
 
-        BSONObj updateCriteria = o2;
-        const bool upsert = valueB || alwaysUpsert;
-
+        auto idField = o2["_id"];
         uassert(ErrorCodes::NoSuchKey,
                 str::stream() << "Failed to apply update due to missing _id: " << op.toString(),
-                updateCriteria.hasField("_id"));
+                !idField.eoo());
+
+        // The o2 field may contain additional fields besides the _id (like the shard key fields),
+        // but we want to do the update by just _id so we can take advantage of the IDHACK.
+        BSONObj updateCriteria = idField.wrap();
+        const bool upsert = valueB || alwaysUpsert;
 
         UpdateRequest request(requestNss);
         request.setQuery(updateCriteria);
@@ -1379,9 +1382,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
     } else if (*opType == 'd') {
         opCounters->gotDelete();
 
+        auto idField = o["_id"];
         uassert(ErrorCodes::NoSuchKey,
                 str::stream() << "Failed to apply delete due to missing _id: " << op.toString(),
-                o.hasField("_id"));
+                !idField.eoo());
+
+        // The o field may contain additional fields besides the _id (like the shard key fields),
+        // but we want to do the delete by just _id so we can take advantage of the IDHACK.
+        BSONObj deleteCriteria = idField.wrap();
 
         SnapshotName timestamp;
         if (assignOperationTimestamp) {
@@ -1396,7 +1404,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
             }
 
             if (opType[1] == 0) {
-                deleteObjects(opCtx, collection, requestNss, o, /*justOne*/ valueB);
+                deleteObjects(opCtx, collection, requestNss, deleteCriteria, /*justOne*/ valueB);
             } else
                 verify(opType[1] == 'b');  // "db" advertisement
             wuow.commit();
