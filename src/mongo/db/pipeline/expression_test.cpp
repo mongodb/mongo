@@ -2228,7 +2228,7 @@ TEST(FieldPath, NoOptimizationOnNormalPath) {
 TEST(FieldPath, OptimizeOnVariableWithConstantScalarValue) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto varId = expCtx->variablesParseState.defineVariable("userVar");
-    expCtx->variables.setValue(varId, Value(123));
+    expCtx->variables.setConstantValue(varId, Value(123));
 
     auto expr = ExpressionFieldPath::parse(expCtx, "$$userVar", expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
@@ -2240,7 +2240,7 @@ TEST(FieldPath, OptimizeOnVariableWithConstantScalarValue) {
 TEST(FieldPath, OptimizeOnVariableWithConstantArrayValue) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto varId = expCtx->variablesParseState.defineVariable("userVar");
-    expCtx->variables.setValue(varId, Value(BSON_ARRAY(1 << 2 << 3)));
+    expCtx->variables.setConstantValue(varId, Value(BSON_ARRAY(1 << 2 << 3)));
 
     auto expr = ExpressionFieldPath::parse(expCtx, "$$userVar", expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
@@ -2254,7 +2254,7 @@ TEST(FieldPath, OptimizeOnVariableWithConstantArrayValue) {
 TEST(FieldPath, OptimizeToEmptyArrayOnNumericalPathComponentAndConstantArrayValue) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto varId = expCtx->variablesParseState.defineVariable("userVar");
-    expCtx->variables.setValue(varId, Value(BSON_ARRAY(1 << 2 << 3)));
+    expCtx->variables.setConstantValue(varId, Value(BSON_ARRAY(1 << 2 << 3)));
 
     auto expr = ExpressionFieldPath::parse(expCtx, "$$userVar.1", expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
@@ -2268,7 +2268,7 @@ TEST(FieldPath, OptimizeToEmptyArrayOnNumericalPathComponentAndConstantArrayValu
 TEST(FieldPath, OptimizeOnVariableWithConstantValueAndDottedPath) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto varId = expCtx->variablesParseState.defineVariable("userVar");
-    expCtx->variables.setValue(varId, Value(Document{{"x", Document{{"y", 123}}}}));
+    expCtx->variables.setConstantValue(varId, Value(Document{{"x", Document{{"y", 123}}}}));
 
     auto expr = ExpressionFieldPath::parse(expCtx, "$$userVar.x.y", expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));
@@ -2305,7 +2305,7 @@ TEST(FieldPath, NoOptimizationOnVariableWithMissingValue) {
 TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue) {
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto varId = expCtx->variablesParseState.defineVariable("userVar");
-    expCtx->variables.setValue(varId, Value(123));
+    expCtx->variables.setConstantValue(varId, Value(123));
 
     auto expr = ExpressionFieldPath::parse(expCtx, "$$userVar.x.y", expCtx->variablesParseState);
     ASSERT_TRUE(dynamic_cast<ExpressionFieldPath*>(expr.get()));

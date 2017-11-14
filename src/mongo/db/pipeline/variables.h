@@ -38,7 +38,7 @@ namespace mongo {
 /**
  * The state used as input and working space for Expressions.
  */
-class Variables {
+class Variables final {
 public:
     // Each unique variable is assigned a unique id of this type. Negative ids are reserved for
     // system variables and non-negative ids are allocated for user variables.
@@ -83,6 +83,12 @@ public:
     void setValue(Variables::Id id, const Value& value);
 
     /**
+     * Same as 'setValue' but marks 'value' as being constant. It is illegal to change a value that
+     * has been marked constant.
+     */
+    void setConstantValue(Variables::Id id, const Value& value);
+
+    /**
      * Gets the value of a user-defined or system variable. If the 'id' provided represents the
      * special ROOT variable, then we return 'root' in Value form.
      */
@@ -95,13 +101,11 @@ public:
     Value getUserDefinedValue(Variables::Id id) const;
 
     /**
-     * Returns whether a value for 'id' has been stored in this Variables instance.
-     * TODO: This method does not distinguish between missing entries in _valueList and entries that
-     * have been explicitly set to missing.
+     * Returns whether a constant value for 'id' has been defined using setConstantValue().
      */
-    bool hasUserDefinedValue(Variables::Id id) const {
-        invariant(isUserDefinedVariable(id));
-        return _valueList.size() > static_cast<size_t>(id) && !getUserDefinedValue(id).missing();
+    bool hasConstantValue(Variables::Id id) const {
+
+        return _valueList.size() > static_cast<size_t>(id) && _valueList[id].isConstant;
     }
 
     /**
@@ -115,8 +119,19 @@ public:
     }
 
 private:
+    struct ValueAndState {
+        ValueAndState() = default;
+
+        ValueAndState(Value val, bool isConst) : value(std::move(val)), isConstant(isConst) {}
+
+        Value value;
+        bool isConstant = false;
+    };
+
+    void setValue(Id id, const Value& value, bool isConstant);
+
     IdGenerator _idGenerator;
-    std::vector<Value> _valueList;
+    std::vector<ValueAndState> _valueList;
 };
 
 /**
@@ -126,7 +141,7 @@ private:
  * and to propagate back to the original instance enough information to correctly construct a
  * Variables instance.
  */
-class VariablesParseState {
+class VariablesParseState final {
 public:
     explicit VariablesParseState(Variables::IdGenerator* variableIdGenerator)
         : _idGenerator(variableIdGenerator) {}

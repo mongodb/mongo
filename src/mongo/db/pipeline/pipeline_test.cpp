@@ -624,10 +624,10 @@ TEST(PipelineOptimizationTest, LookupDoesNotAbsorbUnwindOnSubfieldOfAsButStillMo
 TEST(PipelineOptimizationTest, MatchShouldDuplicateItselfBeforeRedact) {
     string inputPipe = "[{$redact: '$$PRUNE'}, {$match: {a: 1, b:12}}]";
     string outputPipe =
-        "[{$match: {$and: [{a: {$eq: 1}}, {b: {$eq: 12}}]}}, {$redact: {$const: 'prune'}}, "
+        "[{$match: {$and: [{a: {$eq: 1}}, {b: {$eq: 12}}]}}, {$redact: '$$PRUNE'}, "
         "{$match: {$and: [{a: {$eq: 1}}, {b: {$eq: 12}}]}}]";
     string serializedPipe =
-        "[{$match: {a: 1, b: 12}}, {$redact: {$const: 'prune'}}, {$match: {a: 1, b: 12}}]";
+        "[{$match: {a: 1, b: 12}}, {$redact: '$$PRUNE'}, {$match: {a: 1, b: 12}}]";
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
 }
 
