@@ -1618,6 +1618,152 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfOneRemoteHasLowerOp
     executor()->waitForEvent(killEvent);
 }
 
+TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting) {
+    auto params =
+        stdx::make_unique<ClusterClientCursorParams>(_nss, UserNameIterator(), boost::none);
+    std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
+    cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 123, {}));
+    params->remotes = std::move(cursors);
+    params->tailableMode = TailableMode::kTailableAndAwaitData;
+    params->sort = fromjson("{'_id.clusterTime.ts': 1, '_id.uuid': 1, '_id.documentKey': 1}");
+    arm = stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), params.get());
+
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+    ASSERT_FALSE(arm->ready());
+
+    // Schedule one response with an oplog timestamp in it.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {
+        fromjson("{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: 1, documentKey: {_id: 1}}, "
+                 "$sortKey: {'': Timestamp(1, 4), '': 1, '': 1}}")};
+    const Timestamp lastObservedFirstCursor = Timestamp(1, 6);
+    responses.emplace_back(_nss, CursorId(123), batch1, boost::none, lastObservedFirstCursor);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+
+    // Should be ready now.
+    ASSERT_TRUE(arm->ready());
+
+    // Add the new shard.
+    std::vector<ClusterClientCursorParams::RemoteCursor> newCursors;
+    newCursors.emplace_back(kTestShardIds[1], kTestShardHosts[1], CursorResponse(_nss, 456, {}));
+    arm->addNewShardCursors(newCursors);
+
+    // Now shouldn't be ready, we don't have a guarantee from each shard.
+    ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Schedule another response from the other shard.
+    responses.clear();
+    std::vector<BSONObj> batch2 = {
+        fromjson("{_id: {clusterTime: {ts: Timestamp(1, 5)}, uuid: 1, documentKey: {_id: 2}}, "
+                 "$sortKey: {'': Timestamp(1, 5), '': 1, '': 2}}")};
+    const Timestamp lastObservedSecondCursor = Timestamp(1, 5);
+    responses.emplace_back(_nss, CursorId(456), batch2, boost::none, lastObservedSecondCursor);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+    executor()->waitForEvent(readyEvent);
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: 1, documentKey: {_id: 1}}, "
+                 "$sortKey: {'': Timestamp(1, 4), '': 1, '': 1}}"),
+        *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{_id: {clusterTime: {ts: Timestamp(1, 5)}, uuid: 1, documentKey: {_id: 2}}, "
+                 "$sortKey: {'': Timestamp(1, 5), '': 1, '': 2}}"),
+        *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_FALSE(arm->ready());
+
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Clean up the cursors.
+    responses.clear();
+    std::vector<BSONObj> batch3 = {};
+    responses.emplace_back(_nss, CursorId(0), batch3);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+    responses.clear();
+    std::vector<BSONObj> batch4 = {};
+    responses.emplace_back(_nss, CursorId(0), batch4);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+}
+
+TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting) {
+    auto params =
+        stdx::make_unique<ClusterClientCursorParams>(_nss, UserNameIterator(), boost::none);
+    std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
+    cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 123, {}));
+    params->remotes = std::move(cursors);
+    params->tailableMode = TailableMode::kTailableAndAwaitData;
+    params->sort = fromjson("{'_id.clusterTime.ts': 1, '_id.uuid': 1, '_id.documentKey': 1}");
+    arm = stdx::make_unique<AsyncResultsMerger>(operationContext(), executor(), params.get());
+
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+
+    ASSERT_FALSE(arm->ready());
+
+    // Schedule one response with an oplog timestamp in it.
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {
+        fromjson("{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: 1, documentKey: {_id: 1}}, "
+                 "$sortKey: {'': Timestamp(1, 4), '': 1, '': 1}}")};
+    const Timestamp lastObservedFirstCursor = Timestamp(1, 6);
+    responses.emplace_back(_nss, CursorId(123), batch1, boost::none, lastObservedFirstCursor);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+
+    // Should be ready now.
+    ASSERT_TRUE(arm->ready());
+
+    // Add the new shard.
+    std::vector<ClusterClientCursorParams::RemoteCursor> newCursors;
+    newCursors.emplace_back(kTestShardIds[1], kTestShardHosts[1], CursorResponse(_nss, 456, {}));
+    arm->addNewShardCursors(newCursors);
+
+    // Now shouldn't be ready, we don't have a guarantee from each shard.
+    ASSERT_FALSE(arm->ready());
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Schedule another response from the other shard.
+    responses.clear();
+    std::vector<BSONObj> batch2 = {
+        fromjson("{_id: {clusterTime: {ts: Timestamp(1, 3)}, uuid: 1, documentKey: {_id: 2}}, "
+                 "$sortKey: {'': Timestamp(1, 3), '': 1, '': 2}}")};
+    // The last observed time should still be later than the first shard, so we can get the data
+    // from it.
+    const Timestamp lastObservedSecondCursor = Timestamp(1, 5);
+    responses.emplace_back(_nss, CursorId(456), batch2, boost::none, lastObservedSecondCursor);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+    executor()->waitForEvent(readyEvent);
+    ASSERT_TRUE(arm->ready());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{_id: {clusterTime: {ts: Timestamp(1, 3)}, uuid: 1, documentKey: {_id: 2}}, "
+                 "$sortKey: {'': Timestamp(1, 3), '': 1, '': 2}}"),
+        *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_BSONOBJ_EQ(
+        fromjson("{_id: {clusterTime: {ts: Timestamp(1, 4)}, uuid: 1, documentKey: {_id: 1}}, "
+                 "$sortKey: {'': Timestamp(1, 4), '': 1, '': 1}}"),
+        *unittest::assertGet(arm->nextReady()).getResult());
+    ASSERT_FALSE(arm->ready());
+
+    readyEvent = unittest::assertGet(arm->nextEvent());
+
+    // Clean up the cursors.
+    responses.clear();
+    std::vector<BSONObj> batch3 = {};
+    responses.emplace_back(_nss, CursorId(0), batch3);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+    responses.clear();
+    std::vector<BSONObj> batch4 = {};
+    responses.emplace_back(_nss, CursorId(0), batch4);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+}
+
 TEST_F(AsyncResultsMergerTest, GetMoreRequestWithoutTailableCantHaveMaxTime) {
     BSONObj findCmd = fromjson("{find: 'testcoll'}");
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
