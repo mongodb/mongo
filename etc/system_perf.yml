@@ -9,7 +9,7 @@ post:
         working_dir: work
         script: |
           source ./dsienv.sh
-          $DSI_PATH/bin/make_artifact.sh
+          make_artifact.sh
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -33,13 +33,17 @@ post:
     - command: attach.results
       params:
         file_location: work/report.json
+    - command: "json.send"
+      params:
+         name: "perf"
+         file: "work/perf.json"
     - command: shell.exec
       params:
         working_dir: work
         script: |
           source ./dsienv.sh
           if [ -e /data/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
-            $DSI_PATH/bin/mark_idle.sh
+            mark_idle.sh
           fi
 
     - command: shell.exec
@@ -80,6 +84,7 @@ functions:
           storageEngine: ${storageEngine}
           test: ${test}
           production: true
+          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
           EOF
 
           cat > runtime.yml <<EOF
@@ -102,9 +107,6 @@ functions:
           script_flags : ${script_flags}
           dsi_rev: ${dsi_rev}
           workloads_rev: ${workloads_rev}
-
-          # compositions of expansions
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
           EOF
     - command: shell.exec
       params:
@@ -134,21 +136,18 @@ functions:
           virtualenv ./venv
           source ./venv/bin/activate
           pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/bootstrap.py --production
-          ls
-          pwd
+          python ../src/dsi/dsi/bin/bootstrap.py
     - command: shell.exec
       params:
         script: |
           set -v
           set -e
           source work/dsienv.sh
-          $DSI_PATH/bin/setup-dsi-env.sh
+          setup-dsi-env.sh
           ls -a work
 
-  "infrastructure provisioning":
+  "deploy cluster":
     - command: shell.exec
-      # call infrastructure-provisioning.py. This will either create a cluster, or update tags on existing instances.
       params:
         working_dir: work
         script: |
@@ -156,22 +155,12 @@ functions:
           set -v
           source ./dsienv.sh
           source ./venv/bin/activate
-          $DSI_PATH/bin/infrastructure_provisioning.py
-
-  "configure mongodb cluster":
-    - command: shell.exec
-      # bring up the mongod
-      params:
-        working_dir: work
-        script: |
-          set -e
-          set -o verbose
-          source ./dsienv.sh
-          source ./venv/bin/activate
-          $DSI_PATH/bin/mongodb_setup.py && echo "${setup} MongoDB Cluster STARTED."
+          infrastructure_provisioning.py
+          mongodb_setup.py
 
   "run test":
     - command: shell.exec
+      type: test
       params:
         working_dir: work
         script: |
@@ -179,8 +168,7 @@ functions:
           set -v
           source ./dsienv.sh
           source ./venv/bin/activate
-          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
-          $DSI_PATH/bin/run_test.py ${storageEngine} ${test} ${cluster}
+          test_control.py
     - command: "json.send"
       params:
          name: "perf"
@@ -192,7 +180,7 @@ functions:
         working_dir: work
         script: |
           source ./dsienv.sh
-          $DSI_PATH/bin/make_artifact.sh
+          make_artifact.sh
 
   "analyze":
     - command: json.get_history
@@ -327,14 +315,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "ycsb"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "ycsb"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -350,14 +332,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "ycsb"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "ycsb"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -372,14 +348,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "ycsb-wmajority"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "ycsb-wmajority"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -394,14 +364,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "ycsb-wmajority"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "ycsb-wmajority"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -417,14 +381,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "core"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "core"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -438,14 +396,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "core"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "core"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -458,14 +410,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "agg_query_comparison_bestbuy"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "agg_query_comparison_bestbuy"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -478,14 +424,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "agg_query_comparison_bestbuy"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "agg_query_comparison_bestbuy"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -498,14 +438,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "non_sharded"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "non_sharded"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -518,14 +452,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "non_sharded"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "non_sharded"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -538,14 +466,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "mongos"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "mongos"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -559,14 +481,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "mongos"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "mongos"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -579,14 +495,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "move_chunk"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "move_chunk"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -599,14 +509,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "move_chunk"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "move_chunk"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -620,15 +524,8 @@ tasks:
         storageEngine: "wiredTiger"
         test: "secondary_performance"
         setup: "replica-2node"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
-        setup: "replica-2node"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "secondary_performance"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -642,15 +539,8 @@ tasks:
         storageEngine: "mmapv1"
         test: "secondary_performance"
         setup: "replica-2node"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
-        setup: "replica-2node"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "secondary_performance"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -662,15 +552,9 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "wiredTiger"
-        test: "initialSync"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+        test: "initialsync"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "initialSync"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -682,15 +566,9 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "mmapv1"
-        test: "initialSync"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+        test: "initialsync"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "initialSync"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -704,14 +582,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "initialsync-logkeeper"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "initialsync-logkeeper"
     - func: "make test log artifact"
     - func: "analyze"
 
