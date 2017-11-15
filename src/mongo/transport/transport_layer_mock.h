@@ -71,7 +71,9 @@ public:
     void shutdown() override;
     bool inShutdown() const;
 
-    std::vector<HostAndPort> getListeningPorts() const override { return {}; }
+    std::vector<HostAndPort> getListeningPorts() const override {
+        return {};
+    }
 
 private:
     struct Connection {
