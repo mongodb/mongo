@@ -21,16 +21,6 @@ post:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: test-log
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: work/reports/graphs/timeseries-p1.html
-        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-p1-${task_name}-${build_id}.html
-        bucket: mciuploads
-        permissions: public-read
-        content_type: text/html
-        display_name: timeseries-p1.html
     - command: attach.results
       params:
         file_location: work/report.json
