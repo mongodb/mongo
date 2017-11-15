@@ -75,8 +75,6 @@ public:
     void shutdown() override;
     Status setup() override;
 
-    std::vector<HostAndPort> getListeningPorts() const override;
-
     // TODO This method is not called anymore, but may be useful to add new TransportLayers
     // to the manager after it's been created.
     Status addAndStartTransportLayer(std::unique_ptr<TransportLayer> tl);

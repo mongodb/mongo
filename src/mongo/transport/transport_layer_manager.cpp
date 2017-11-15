@@ -102,15 +102,6 @@ void TransportLayerManager::shutdown() {
     _foreach([](TransportLayer* tl) { tl->shutdown(); });
 }
 
-std::vector<HostAndPort> TransportLayerManager::getListeningPorts() const {
-    std::vector<HostAndPort> r;
-    _foreach([&r](TransportLayer* tl) {
-        auto hp = tl->getListeningPorts();
-        r.insert(r.end(), hp.begin(), hp.end());
-    });
-    return r;
-}
-
 // TODO Same comment as start()
 Status TransportLayerManager::setup() {
     for (auto&& tl : _tls) {

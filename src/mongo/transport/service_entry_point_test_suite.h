@@ -115,10 +115,6 @@ public:
         Status start() override;
         void shutdown() override;
 
-        std::vector<HostAndPort> getListeningPorts() const override {
-            return {};
-        }
-
         transport::MockTicket* getMockTicket(const transport::Ticket& ticket);
 
         // Mocked method hooks
