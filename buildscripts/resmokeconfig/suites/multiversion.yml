@@ -14,6 +14,27 @@ selector:
   # TODO: SERVER-30161
   - jstests/multiVersion/dumprestore.js
   - jstests/multiVersion/dumprestore_sharded.js
+  # TODO: SERVER-31985
+  - jstests/multiVersion/set_feature_compatibility_version.js
+  - jstests/multiVersion/causal_consistency_downgrade_cluster.js
+  - jstests/multiVersion/causal_consistency_downgrade_rs.js
+  - jstests/multiVersion/causal_consistency_upgrade_cluster.js
+  - jstests/multiVersion/causal_consistency_upgrade_rs.js
+  - jstests/multiVersion/collection_validator_feature_compatibility_version.js
+  - jstests/multiVersion/downgrade_replset.js
+  - jstests/multiVersion/feature_compatibility_version_lagging_secondary.js
+  - jstests/multiVersion/initial_sync_last_stable_from_latest.js
+  - jstests/multiVersion/initial_sync_latest_from_last_stable.js
+  - jstests/multiVersion/major_version_upgrade.js
+  - jstests/multiVersion/migration_between_mixed_FCV_mixed_version_mongods.js
+  - jstests/multiVersion/rename_across_dbs_last_stable_primary_drop_target.js
+  - jstests/multiVersion/rename_across_dbs_last_stable_primary.js
+  - jstests/multiVersion/rename_across_dbs_last_stable_secondary_drop_target.js
+  - jstests/multiVersion/rename_across_dbs_last_stable_secondary.js
+  - jstests/multiVersion/upgrade_downgrade_while_creating_collection.js
+  # TODO: SERVER-31993
+  - jstests/multiVersion/add_invalid_shard.js
+  - jstests/multiVersion/new_mongos_old_mongod_wire_version_clash.js
 
 # Multiversion tests start their own mongod's.
 executor:

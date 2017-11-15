@@ -930,7 +930,7 @@ functions:
           --linkDir /data/multiversion                                      \
           --edition ${multiversion_edition|base}                            \
           --platformArchitecture ${multiversion_platform_arch|linux/x86_64} \
-          --useLatest 3.0 3.2 3.4
+          --useLatest 3.0 3.2 3.4 3.6
 
   "do snmp setup" :
     command: shell.exec

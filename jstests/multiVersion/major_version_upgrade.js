@@ -34,6 +34,7 @@
         {binVersion: '3.0', testCollection: 'three_zero'},
         {binVersion: '3.2', testCollection: 'three_two'},
         {binVersion: '3.4', testCollection: 'three_four'},
+        {binVersion: '3.6', testCollection: 'three_six'},
         {binVersion: 'last-stable', testCollection: 'last_stable'},
         {binVersion: 'latest', testCollection: 'latest'},
     ];
