@@ -27,19 +27,33 @@
  */
 
 #include "mongo/base/status.h"
+#include "mongo/db/repl/oplog.h"
 
 namespace mongo {
 class BSONObj;
 class BSONObjBuilder;
 class OperationContext;
 
+class ApplyOps {
+public:
+    static constexpr StringData kPreconditionFieldName = "preCondition"_sd;
+    static constexpr StringData kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;
+};
+
 /**
- * Applies ops contained in "applyOpCmd" and populates fields in "result" to be returned to the
- * user.
+ * Applies ops contained in 'applyOpCmd' and populates fields in 'result' to be returned to the
+ * caller. The information contained in 'result' can be returned to the user if called as part
+ * of the execution of an 'applyOps' command.
+ *
+ * The 'oplogApplicationMode' argument determines the semantics of the operations contained within
+ * the given command object. This function may be called as part of a direct user invocation of the
+ * 'applyOps' command, or as part of the application of an 'applyOps' oplog operation. In either
+ * case, the mode can be set to determine how the internal ops are executed.
  */
 Status applyOps(OperationContext* opCtx,
                 const std::string& dbName,
                 const BSONObj& applyOpCmd,
+                repl::OplogApplication::Mode oplogApplicationMode,
                 BSONObjBuilder* result);
 
 }  // namespace mongo

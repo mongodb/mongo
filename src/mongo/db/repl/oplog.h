@@ -168,8 +168,10 @@ std::pair<BSONObj, NamespaceString> prepForApplyOpsIndexInsert(const BSONElement
                                                                const NamespaceString& requestNss);
 
 /**
- * This class encapsulates an enum of the oplog application mode and functions that serialize
- * and parse it.
+ * This class represents the different modes of oplog application that are used within the
+ * replication system. Oplog application semantics may differ depending on the mode.
+ *
+ * It also includes functions to serialize/deserialize the oplog application mode.
  */
 class OplogApplication {
 public:
@@ -177,9 +179,28 @@ public:
     static constexpr StringData kMasterSlaveOplogApplicationMode = "MasterSlave"_sd;
     static constexpr StringData kRecoveringOplogApplicationMode = "Recovering"_sd;
     static constexpr StringData kSecondaryOplogApplicationMode = "Secondary"_sd;
-    static constexpr StringData kApplyOpsOplogApplicationMode = "ApplyOps"_sd;
+    static constexpr StringData kApplyOpsCmdOplogApplicationMode = "ApplyOps"_sd;
 
-    enum class Mode { kInitialSync, kMasterSlave, kRecovering, kSecondary, kApplyOps };
+    enum class Mode {
+        // Used during the oplog application phase of the initial sync process.
+        kInitialSync,
+
+        // Used when a slave is applying operations from a master node in master-slave.
+        kMasterSlave,
+
+        // Used when we are applying oplog operations to recover the database state following an
+        // unclean shutdown, or when we are recovering from the oplog after we rollback to a
+        // checkpoint.
+        kRecovering,
+
+        // Used when a secondary node is applying oplog operations from the primary during steady
+        // state replication.
+        kSecondary,
+
+        // Used when we are applying operations as part of a direct client invocation of the
+        // 'applyOps' command.
+        kApplyOpsCmd
+    };
 
     static StringData modeToString(Mode mode);
 

@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/bson/util/bson_check.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
@@ -333,7 +334,38 @@ public:
         // then we won’t wait for C to be replicated and it could be rolled back, even though B
         // was acknowledged. To fix this, we should wait for replication of the node’s last applied
         // OpTime if the last write operation was a no-op write.
-        auto applyOpsStatus = appendCommandStatus(result, applyOps(opCtx, dbname, cmdObj, &result));
+
+        // We set the OplogApplication::Mode argument based on the mode argument given in the
+        // command object. If no mode is given, default to the 'kApplyOpsCmd' mode.
+        repl::OplogApplication::Mode oplogApplicationMode =
+            repl::OplogApplication::Mode::kApplyOpsCmd;  // the default mode.
+        std::string oplogApplicationModeString;
+        auto status = bsonExtractStringField(
+            cmdObj, ApplyOps::kOplogApplicationModeFieldName, &oplogApplicationModeString);
+
+        if (status.isOK()) {
+            auto modeSW = repl::OplogApplication::parseMode(oplogApplicationModeString);
+            if (!modeSW.isOK()) {
+                // Unable to parse the mode argument.
+                return appendCommandStatus(
+                    result,
+                    modeSW.getStatus().withContext(str::stream() << "Could not parse " +
+                                                       ApplyOps::kOplogApplicationModeFieldName));
+            }
+            oplogApplicationMode = modeSW.getValue();
+        } else if (status != ErrorCodes::NoSuchKey) {
+            // NoSuchKey means the user did not supply a mode.
+            return appendCommandStatus(result,
+                                       Status(status.code(),
+                                              str::stream()
+                                                  << "Could not parse out "
+                                                  << ApplyOps::kOplogApplicationModeFieldName
+                                                  << ": "
+                                                  << status.reason()));
+        }
+
+        auto applyOpsStatus = appendCommandStatus(
+            result, applyOps(opCtx, dbname, cmdObj, oplogApplicationMode, &result));
 
         return applyOpsStatus;
     }
