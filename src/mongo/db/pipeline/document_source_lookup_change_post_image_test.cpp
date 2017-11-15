@@ -113,9 +113,11 @@ public:
         return Status::OK();
     }
 
-    boost::optional<Document> lookupSingleDocument(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, const Document& filter) {
-        auto swPipeline = makePipeline({BSON("$match" << filter)}, expCtx);
+    boost::optional<Document> lookupSingleDocument(const NamespaceString& nss,
+                                                   UUID collectionUUID,
+                                                   const Document& documentKey) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest(nss));
+        auto swPipeline = makePipeline({BSON("$match" << documentKey)}, expCtx);
         if (swPipeline == ErrorCodes::NamespaceNotFound) {
             return boost::none;
         }
@@ -124,11 +126,12 @@ public:
         auto lookedUpDocument = pipeline->getNext();
         if (auto next = pipeline->getNext()) {
             uasserted(ErrorCodes::TooManyMatchingDocuments,
-                      str::stream() << "found more than one document matching " << filter.toString()
+                      str::stream() << "found more than one document matching "
+                                    << documentKey.toString()
                                     << " ["
-                                    << (*lookedUpDocument).toString()
+                                    << lookedUpDocument->toString()
                                     << ", "
-                                    << (*next).toString()
+                                    << next->toString()
                                     << "]");
         }
         return lookedUpDocument;
