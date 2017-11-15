@@ -199,7 +199,7 @@ private:
     // These counters are used to detect stuck threads and high task queuing.
     AtomicWord<int> _threadsRunning{0};
     AtomicWord<int> _threadsPending{0};
-    AtomicWord<int> _tasksExecuting{0};
+    AtomicWord<int> _threadsInUse{0};
     AtomicWord<int> _tasksQueued{0};
     AtomicWord<int> _deferredTasksQueued{0};
     TickTimer _lastScheduleTimer;

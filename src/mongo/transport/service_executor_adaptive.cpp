@@ -82,7 +82,7 @@ constexpr auto kDeferredTasksQueued = "deferredTasksQueued"_sd;
 constexpr auto kTotalTimeExecutingUs = "totalTimeExecutingMicros"_sd;
 constexpr auto kTotalTimeRunningUs = "totalTimeRunningMicros"_sd;
 constexpr auto kTotalTimeQueuedUs = "totalTimeQueuedMicros"_sd;
-constexpr auto kTasksExecuting = "tasksExecuting"_sd;
+constexpr auto kThreadsInUse = "threadsInUse"_sd;
 constexpr auto kThreadsRunning = "threadsRunning"_sd;
 constexpr auto kThreadsPending = "threadsPending"_sd;
 constexpr auto kExecutorLabel = "executor"_sd;
@@ -198,15 +198,15 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task, Sch
         pendingCounterPtr->subtractAndFetch(1);
         auto start = _tickSource->getTicks();
         _totalSpentQueued.addAndFetch(start - scheduleTime);
-        _tasksExecuting.addAndFetch(1);
 
         if (_localThreadState->recursionDepth++ == 0) {
             _localThreadState->executing.markRunning();
+            _threadsInUse.addAndFetch(1);
         }
         const auto guard = MakeGuard([this, start] {
-            _tasksExecuting.subtractAndFetch(1);
             if (--_localThreadState->recursionDepth == 0) {
                 _localThreadState->executingCurRun += _localThreadState->executing.markStopped();
+                _threadsInUse.subtractAndFetch(1);
             }
             _totalExecuted.addAndFetch(1);
         });
@@ -253,7 +253,7 @@ bool ServiceExecutorAdaptive::_isStarved() const {
 
     // The available threads is the number that are running - the number that are currently
     // executing
-    auto available = _threadsRunning.load() - _tasksExecuting.load();
+    auto available = _threadsRunning.load() - _threadsInUse.load();
 
     return (tasksQueued > available);
 }
@@ -311,7 +311,7 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
             // In that case we should start the reserve number of threads so fully unblock the
             // thread pool.
             //
-            if ((_tasksExecuting.load() == _threadsRunning.load()) &&
+            if ((_threadsInUse.load() == _threadsRunning.load()) &&
                 (sinceLastSchedule >= _config->stuckThreadTimeout())) {
                 log() << "Detected blocked worker threads, "
                       << "starting new reserve threads to unblock service executor";
@@ -540,7 +540,7 @@ void ServiceExecutorAdaptive::appendStats(BSONObjBuilder* bob) const {
             << kTotalExecuted << _totalExecuted.load()                                     //
             << kTasksQueued << _tasksQueued.load()                                         //
             << kDeferredTasksQueued << _deferredTasksQueued.load()                         //
-            << kTasksExecuting << _tasksExecuting.load()                                   //
+            << kThreadsInUse << _threadsInUse.load()                                       //
             << kTotalTimeRunningUs                                                         //
             << ticksToMicros(_getThreadTimerTotal(ThreadTimer::Running), _tickSource)      //
             << kTotalTimeExecutingUs                                                       //
