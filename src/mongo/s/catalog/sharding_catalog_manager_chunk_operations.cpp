@@ -229,7 +229,7 @@ BSONObj makeCommitChunkApplyOpsCommand(const NamespaceString& nss,
 }  // namespace
 
 Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
-                                                const NamespaceString& ns,
+                                                const NamespaceString& nss,
                                                 const OID& requestEpoch,
                                                 const ChunkRange& range,
                                                 const std::vector<BSONObj>& splitPoints,
@@ -240,13 +240,15 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     // move chunks on different collections to proceed in parallel
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
 
-    // Get the chunk with highest version for this namespace
+    std::string errmsg;
+
+    // Get the max chunk version for this namespace.
     auto findStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
         NamespaceString(ChunkType::ConfigNS),
-        BSON("ns" << ns.ns()),
+        BSON("ns" << nss.ns()),
         BSON(ChunkType::lastmod << -1),
         1);
 
@@ -255,17 +257,22 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     }
 
     const auto& chunksVector = findStatus.getValue().docs;
-    if (chunksVector.empty())
-        return {ErrorCodes::IllegalOperation,
-                "collection does not exist, isn't sharded, or has no chunks"};
+    if (chunksVector.empty()) {
+        errmsg = str::stream() << "splitChunk cannot split chunk " << range.toString()
+                               << ". Collection '" << nss.ns()
+                               << "' no longer either exists, is sharded, or has chunks";
+        return {ErrorCodes::IllegalOperation, errmsg};
+    }
 
     ChunkVersion collVersion = ChunkVersion::fromBSON(chunksVector.front(), ChunkType::lastmod());
 
-    // Return an error if epoch of chunk does not match epoch of request
+    // Return an error if collection epoch does not match epoch of request.
     if (collVersion.epoch() != requestEpoch) {
-        return {ErrorCodes::StaleEpoch,
-                "epoch of chunk does not match epoch of request. This most likely means "
-                "that the collection was dropped and re-created."};
+        errmsg = str::stream() << "splitChunk cannot split chunk " << range.toString()
+                               << ". Collection '" << nss.ns() << "' was dropped and re-created."
+                               << " Current epoch: " << collVersion.epoch()
+                               << ", cmd epoch: " << requestEpoch;
+        return {ErrorCodes::StaleEpoch, errmsg};
     }
 
     std::vector<ChunkType> newChunks;
@@ -323,9 +330,9 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
 
         // add the modified (new) chunk information as the update object
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), ChunkType::genID(ns.ns(), startKey));
+        n.append(ChunkType::name(), ChunkType::genID(nss.ns(), startKey));
         currentMaxVersion.addToBSON(n, ChunkType::lastmod());
-        n.append(ChunkType::ns(), ns.ns());
+        n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), startKey);
         n.append(ChunkType::max(), endKey);
         n.append(ChunkType::shard(), shardName);
@@ -333,7 +340,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
 
         // add the chunk's _id as the query part of the update statement
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), ChunkType::genID(ns.ns(), startKey));
+        q.append(ChunkType::name(), ChunkType::genID(nss.ns(), startKey));
         q.done();
 
         updates.append(op.obj());
@@ -354,9 +361,9 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         BSONObjBuilder b;
         b.append("ns", ChunkType::ConfigNS);
         b.append("q",
-                 BSON("query" << BSON(ChunkType::ns(ns.ns()) << ChunkType::min() << range.getMin()
-                                                             << ChunkType::max()
-                                                             << range.getMax())
+                 BSON("query" << BSON(ChunkType::ns(nss.ns()) << ChunkType::min() << range.getMin()
+                                                              << ChunkType::max()
+                                                              << range.getMax())
                               << "orderby"
                               << BSON(ChunkType::lastmod() << -1)));
         {
@@ -367,12 +374,12 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         preCond.append(b.obj());
     }
 
-    // apply the batch of updates to remote and local metadata
+    // apply the batch of updates to local metadata.
     Status applyOpsStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
         opCtx,
         updates.arr(),
         preCond.arr(),
-        ns.ns(),
+        nss.ns(),
         currentMaxVersion,
         WriteConcernOptions(),
         repl::ReadConcernLevel::kLocalReadConcern);
@@ -395,7 +402,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
 
         Grid::get(opCtx)
             ->catalogClient()
-            ->logChange(opCtx, "split", ns.ns(), logDetail.obj(), WriteConcernOptions())
+            ->logChange(opCtx, "split", nss.ns(), logDetail.obj(), WriteConcernOptions())
             .transitional_ignore();
     } else {
         BSONObj beforeDetailObj = logDetail.obj();
@@ -411,7 +418,8 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
 
             Grid::get(opCtx)
                 ->catalogClient()
-                ->logChange(opCtx, "multi-split", ns.ns(), chunkDetail.obj(), WriteConcernOptions())
+                ->logChange(
+                    opCtx, "multi-split", nss.ns(), chunkDetail.obj(), WriteConcernOptions())
                 .transitional_ignore();
         }
     }
@@ -495,7 +503,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     auto updates = buildMergeChunksApplyOpsUpdates(chunksToMerge, mergeVersion);
     auto preCond = buildMergeChunksApplyOpsPrecond(chunksToMerge, collVersion);
 
-    // apply the batch of updates to remote and local metadata
+    // apply the batch of updates to local metadata
     Status applyOpsStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
         opCtx,
         updates,

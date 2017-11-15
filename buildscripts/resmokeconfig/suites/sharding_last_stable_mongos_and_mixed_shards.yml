@@ -105,6 +105,8 @@ selector:
   # New failpoint in v3.6 shard mongod.
   - jstests/sharding/cleanup_orphaned_cmd_prereload.js
   - jstests/sharding/pending_chunk.js
+  # Calls a shard command that does not exist in v3.4
+  - jstests/sharding/dump_coll_metadata.js
 
 executor:
   config:
