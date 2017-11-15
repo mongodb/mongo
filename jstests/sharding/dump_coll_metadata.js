@@ -33,14 +33,18 @@
     assert(shardAdmin.runCommand({getShardVersion: coll + "xyz", fullMetadata: true}).metadata !=
            undefined);
 
-    // Make sure we get multiple chunks after a split
-    assert(admin.runCommand({split: coll + "", middle: {_id: 0}}).ok);
+    // Make sure we get multiple chunks after a split and refresh -- splits by themselves do not
+    // cause the shard to refresh.
+    assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
+    assert.commandWorked(
+        st.shard0.getDB('admin').runCommand({forceRoutingTableRefresh: coll + ""}));
 
-    assert(shardAdmin.runCommand({getShardVersion: coll + ""}).ok);
+    assert.commandWorked(shardAdmin.runCommand({getShardVersion: coll + ""}));
     printjson(shardAdmin.runCommand({getShardVersion: coll + "", fullMetadata: true}));
 
     // Make sure we have chunks info
     result = shardAdmin.runCommand({getShardVersion: coll + "", fullMetadata: true});
+    assert.commandWorked(result);
     metadata = result.metadata;
 
     assert.eq(metadata.chunks.length, 2);

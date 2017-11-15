@@ -134,103 +134,38 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     ShardingState* shardingState = ShardingState::get(opCtx);
     std::string errmsg;
 
-    const BSONObj min = chunkRange.getMin();
-    const BSONObj max = chunkRange.getMax();
-
     //
     // Lock the collection's metadata and get highest version for the current shard
     // TODO(SERVER-25086): Remove distLock acquisition from split chunk
     //
     const std::string whyMessage(
-        str::stream() << "splitting chunk [" << min << ", " << max << ") in " << nss.toString());
+        str::stream() << "splitting chunk " << chunkRange.toString() << " in " << nss.toString());
     auto scopedDistLock = Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
         opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
     if (!scopedDistLock.isOK()) {
         errmsg = str::stream() << "could not acquire collection lock for " << nss.toString()
-                               << " to split chunk [" << redact(min) << "," << redact(max) << ") "
-                               << causedBy(redact(scopedDistLock.getStatus()));
-        warning() << errmsg;
-        return scopedDistLock.getStatus();
+                               << " to split chunk " << chunkRange.toString() << " "
+                               << causedBy(scopedDistLock.getStatus());
+        return {scopedDistLock.getStatus().code(), errmsg};
     }
 
-    // Always check our version remotely
-    ChunkVersion shardVersion;
-    Status refreshStatus = shardingState->refreshMetadataNow(opCtx, nss, &shardVersion);
-
-    if (!refreshStatus.isOK()) {
-        errmsg = str::stream() << "splitChunk cannot split chunk "
-                               << "[" << redact(min) << "," << redact(max) << ") "
-                               << causedBy(redact(refreshStatus));
-
-        warning() << errmsg;
-        return refreshStatus;
-    }
-
-    if (shardVersion.majorVersion() == 0) {
-        // It makes no sense to split if our version is zero and we have no chunks
-        errmsg = str::stream() << "splitChunk cannot split chunk "
-                               << "[" << redact(min) << "," << redact(max) << ") "
-                               << " with zero shard version";
-
-        warning() << errmsg;
-        return {ErrorCodes::CannotSplit, errmsg};
-    }
-
-    // Even though the splitChunk command transmits a value in the operation's shardVersion
-    // field, this value does not actually contain the shard version, but the global collection
-    // version.
-    if (expectedCollectionEpoch != shardVersion.epoch()) {
-        std::string msg = str::stream() << "splitChunk cannot split chunk "
-                                        << "[" << redact(min) << "," << redact(max) << "), "
-                                        << "collection '" << nss.ns() << "' may have been dropped. "
-                                        << "current epoch: " << shardVersion.epoch()
-                                        << ", cmd epoch: " << expectedCollectionEpoch;
-        warning() << msg;
-        return {ErrorCodes::StaleEpoch, msg};
-    }
-
-    ScopedCollectionMetadata collMetadata;
-    {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-
-        // Get collection metadata
-        collMetadata = CollectionShardingState::get(opCtx, nss.ns())->getMetadata();
-    }
-
-    // With nonzero shard version, we must have metadata
-    invariant(collMetadata);
-
-    KeyPattern shardKeyPattern(collMetadata->getKeyPattern());
-
-    // If the shard uses a hashed key, then we must make sure that the split point is of
-    // type NumberLong.
-    if (KeyPattern::isHashedKeyPattern(shardKeyPattern.toBSON())) {
+    // If the shard key is hashed, then we must make sure that the split points are of type
+    // NumberLong.
+    if (KeyPattern::isHashedKeyPattern(keyPatternObj)) {
         for (BSONObj splitKey : splitKeys) {
             BSONObjIterator it(splitKey);
             while (it.more()) {
                 BSONElement splitKeyElement = it.next();
                 if (splitKeyElement.type() != NumberLong) {
-                    errmsg = str::stream() << "splitChunk cannot split chunk [" << redact(min)
-                                           << "," << redact(max) << "), split point "
+                    errmsg = str::stream() << "splitChunk cannot split chunk "
+                                           << chunkRange.toString() << ", split point "
                                            << splitKeyElement.toString()
                                            << " must be of type "
                                               "NumberLong for hashed shard key patterns";
-                    warning() << errmsg;
                     return {ErrorCodes::CannotSplit, errmsg};
                 }
             }
         }
-    }
-
-    ChunkVersion collVersion = collMetadata->getCollVersion();
-    // With nonzero shard version, we must have a coll version >= our shard version
-    invariant(collVersion >= shardVersion);
-
-    {
-        ChunkType chunkToMove;
-        chunkToMove.setMin(min);
-        chunkToMove.setMax(max);
-        uassertStatusOK(collMetadata->checkChunkIsValid(chunkToMove));
     }
 
     // Commit the split to the config server.
@@ -248,22 +183,6 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
             configCmdObj,
             Shard::RetryPolicy::kIdempotent);
 
-    //
-    // Refresh chunk metadata regardless of whether or not the split succeeded
-    //
-    {
-        ChunkVersion unusedShardVersion;
-        refreshStatus = shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion);
-
-        if (!refreshStatus.isOK()) {
-            errmsg = str::stream() << "failed to refresh metadata for split chunk [" << redact(min)
-                                   << "," << redact(max) << ") " << causedBy(redact(refreshStatus));
-
-            warning() << errmsg;
-            return refreshStatus;
-        }
-    }
-
     // If we failed to get any response from the config server at all, despite retries, then we
     // should just go ahead and fail the whole operation.
     if (!cmdResponseStatus.isOK()) {
@@ -276,31 +195,41 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
 
     // Send stale epoch if epoch of request did not match epoch of collection
     if (commandStatus == ErrorCodes::StaleEpoch) {
-        std::string msg = str::stream() << "splitChunk cannot split chunk "
-                                        << "[" << redact(min) << "," << redact(max) << "), "
-                                        << "collection '" << nss.ns() << "' may have been dropped. "
-                                        << "current epoch: " << collVersion.epoch()
-                                        << ", cmd epoch: " << expectedCollectionEpoch;
-        warning() << msg;
-
-        return {commandStatus.code(), str::stream() << msg << redact(causedBy(commandStatus))};
+        return commandStatus;
     }
 
     //
-    // If _configsvrCommitChunkSplit returned an error, look at this shard's metadata to
+    // If _configsvrCommitChunkSplit returned an error, refresh and look at the metadata to
     // determine if the split actually did happen. This can happen if there's a network error
     // getting the response from the first call to _configsvrCommitChunkSplit, but it actually
     // succeeds, thus the automatic retry fails with a precondition violation, for example.
     //
-    if ((!commandStatus.isOK() || !writeConcernStatus.isOK()) &&
-        checkMetadataForSuccessfulSplitChunk(opCtx, nss, chunkRange, splitKeys)) {
+    if (!commandStatus.isOK() || !writeConcernStatus.isOK()) {
+        {
+            ChunkVersion unusedShardVersion;
+            Status refreshStatus =
+                shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion);
 
-        LOG(1) << "splitChunk [" << redact(min) << "," << redact(max)
-               << ") has already been committed.";
-    } else if (!commandStatus.isOK()) {
-        return commandStatus;
-    } else if (!writeConcernStatus.isOK()) {
-        return writeConcernStatus;
+            if (!refreshStatus.isOK()) {
+                Status errorStatus = commandStatus.isOK() ? writeConcernStatus : commandStatus;
+                errmsg = str::stream()
+                    << "splitChunk failed for chunk " << chunkRange.toString() << ", collection '"
+                    << nss.ns() << "' due to " << errorStatus.toString()
+                    << ". Attempt to verify if the commit succeeded anyway failed due to: "
+                    << refreshStatus.toString();
+
+                warning() << redact(errmsg);
+                return {errorStatus.code(), errmsg};
+            }
+        }
+
+        if (checkMetadataForSuccessfulSplitChunk(opCtx, nss, chunkRange, splitKeys)) {
+            // Split was committed.
+        } else if (!commandStatus.isOK()) {
+            return commandStatus;
+        } else if (!writeConcernStatus.isOK()) {
+            return writeConcernStatus;
+        }
     }
 
     AutoGetCollection autoColl(opCtx, nss, MODE_IS);
@@ -322,12 +251,13 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
 
     auto backChunk = ChunkType();
     backChunk.setMin(splitKeys.back());
-    backChunk.setMax(max);
+    backChunk.setMax(chunkRange.getMax());
 
     auto frontChunk = ChunkType();
-    frontChunk.setMin(min);
+    frontChunk.setMin(chunkRange.getMin());
     frontChunk.setMax(splitKeys.front());
 
+    KeyPattern shardKeyPattern(keyPatternObj);
     if (shardKeyPattern.globalMax().woCompare(backChunk.getMax()) == 0 &&
         checkIfSingleDoc(opCtx, collection, idx, &backChunk)) {
         return boost::optional<ChunkRange>(ChunkRange(backChunk.getMin(), backChunk.getMax()));

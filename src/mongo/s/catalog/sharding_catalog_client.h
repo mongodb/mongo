@@ -240,7 +240,7 @@ public:
 
     /**
      * Applies oplog entries to the config servers.
-     * Used by mergeChunk, splitChunk, and moveChunk commands.
+     * Used by mergeChunk and splitChunk commands.
      *
      * @param updateOps: documents to write to the chunks collection.
      * @param preCondition: preconditions for applying documents.
