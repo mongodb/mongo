@@ -55,21 +55,6 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData ns, Lock::DBLock lock)
 
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     const UUID& uuid,
-                                     LockMode modeAll)
-    : _viewMode(ViewMode::kViewsForbidden),
-      _autoDb(opCtx, nss.db(), Lock::DBLock(opCtx, nss.db(), modeAll)),
-      _collLock(opCtx->lockState(), nss.ns(), modeAll),
-      _coll(UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid)) {
-    // Wait for a configured amount of time after acquiring locks if the failpoint is enabled.
-    MONGO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
-        const BSONObj& data = customWait.getData();
-        sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
-    }
-}
-
-AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
-                                     const NamespaceString& nss,
                                      LockMode modeDB,
                                      LockMode modeColl,
                                      ViewMode viewMode)
