@@ -407,6 +407,22 @@ intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationSt
 }
 
 Document DocumentSourceChangeStream::Transformation::applyTransformation(const Document& input) {
+    // If we're executing a change stream pipeline that was forwarded from mongos, then we expect it
+    // to "need merge"---we expect to be executing the shards part of a split pipeline. It is never
+    // correct for mongos to pass through the change stream without splitting into into a merging
+    // part executed on mongos and a shards part.
+    //
+    // This is necessary so that mongos can correctly handle "invalidate" and "retryNeeded" change
+    // notifications. See SERVER-31978 for an example of why the pipeline must be split.
+    //
+    // We have to check this invariant at run-time of the change stream rather than parse time,
+    // since a mongos may forward a change stream in an invalid position (e.g. in a nested $lookup
+    // or $facet pipeline). In this case, mongod is responsible for parsing the pipeline and
+    // throwing an error without ever executing the change stream.
+    if (_expCtx->fromMongos) {
+        invariant(_expCtx->needsMerge);
+    }
+
     MutableDocument doc;
 
     // Extract the fields we need.
