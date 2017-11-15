@@ -24,16 +24,6 @@ post:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: work/reports/graphs/timeseries-mongod.0.html
-        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-mongod.0-${task_name}-${build_id}-${execution}.html
-        bucket: mciuploads
-        permissions: public-read
-        content_type: text/html
-        display_name: timeseries-p1.html - Execution ${execution}
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
         local_file: src/workloads/workloads/jsdoc/jsdocs-redirect.html
         remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/workloads-${task_name}-${build_id}.html
         bucket: mciuploads
