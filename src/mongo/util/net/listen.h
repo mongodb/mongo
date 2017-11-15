@@ -97,7 +97,7 @@ private:
     bool _logConnect;
     mutable stdx::mutex _readyMutex;                   // Protects _ready
     mutable stdx::condition_variable _readyCondition;  // Used to wait for changes to _ready
-    bool _ready;  // Ready to accept incoming network requests?
+    bool _ready;                                       // Ready to accept incoming network requests?
     AtomicBool _finished{false};
 
     ServiceContext* _ctx;
