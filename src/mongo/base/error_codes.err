@@ -231,6 +231,7 @@ error_code("DNSHostNotFound", 230)
 error_code("DNSProtocolError", 231)
 error_code("MaxSubPipelineDepthExceeded", 232)
 error_code("TooManyDocumentSequences", 233)
+error_code("RetryChangeStream", 234)
 
 # Error codes 4000-8999 are reserved.
 
