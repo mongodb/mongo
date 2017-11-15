@@ -8,35 +8,22 @@ post:
       params:
         working_dir: work
         script: |
-          set -v
           source ./dsienv.sh
-          $DSI_PATH/bin/make_artifact.sh
+          make_artifact.sh
     - command: s3.put
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: work/reports.tgz
-        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}.${ext|tgz}
+        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/${task_name}-${build_id}-${execution}.${ext|tgz}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
-        display_name: test-log
+        display_name: test-log - Execution ${execution}
     - command: attach.results
       params:
         file_location: work/report.json
-    - command: shell.exec
-      # destroy the cluster
-      params:
-        working_dir: work
-        script: |
-          set -e
-          set -o verbose
-          # call terraform destroy twice to avoid AWS timeout
-          yes yes | ./terraform destroy --var-file=cluster.json
-          yes yes | ./terraform destroy --var-file=cluster.json
-          # clean all file to be safe
-          rm -rf *
-          echo "Cluster DESTROYED."
+    - func: "destroy cluster"
     - command: shell.exec
       params:
         working_dir: src
@@ -74,6 +61,9 @@ functions:
           storageEngine: ${storageEngine}
           test: ${test}.longevity
           production: true
+
+          # compositions of expansions
+          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
           EOF
 
           cat > runtime.yml <<EOF
@@ -95,11 +85,6 @@ functions:
           ext: ${ext}
           script_flags : ${script_flags}
           dsi_rev: ${dsi_rev}
-          compare_task: ${compare_task}
-          workloads_rev: ${workloads_rev}
-
-          # compositions of expansions
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
           EOF
     - command: shell.exec
       params:
@@ -122,8 +107,6 @@ functions:
     - command: shell.exec
       params:
         working_dir: work
-        # setup execution environment
-        # configure environment
         script: |
           set -e
           virtualenv ./venv
@@ -136,12 +119,11 @@ functions:
           set -v
           set -e
           source work/dsienv.sh
-          $DSI_PATH/bin/setup-dsi-env.sh
+          setup-dsi-env.sh
           ls -a work
 
-  "infrastructure provisioning":
+  "deploy cluster":
     - command: shell.exec
-      # call infrastructure-provisioning.py. This will either create a cluster, or update tags on existing instances.
       params:
         working_dir: work
         script: |
@@ -149,22 +131,12 @@ functions:
           set -v
           source ./dsienv.sh
           source ./venv/bin/activate
-          $DSI_PATH/bin/infrastructure_provisioning.py
-
-  "configure mongodb cluster":
-    - command: shell.exec
-      # bring up the mongod
-      params:
-        working_dir: work
-        script: |
-          set -e
-          set -o verbose
-          source ./dsienv.sh
-          source ./venv/bin/activate
-          $DSI_PATH/bin/mongodb_setup.py && echo "${setup} MongoDB Cluster STARTED."
+          infrastructure_provisioning.py
+          mongodb_setup.py
 
   "run test":
     - command: shell.exec
+      type: test
       params:
         working_dir: work
         script: |
@@ -172,9 +144,7 @@ functions:
           set -v
           source ./dsienv.sh
           source ./venv/bin/activate
-          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
-          $DSI_PATH/bin/run_test.py ${storageEngine} ${test} ${cluster}
-          echo "Complete test for ${test} with setup ${setup}!"
+          test_control.py
     - command: "json.send"
       params:
           name: "perf"
@@ -188,13 +158,12 @@ functions:
         script: |
           set -e
           set -o verbose
-          source ./dsienv.sh
           # Longevity runs so rarely, we simply teardown the cluster when done.
           # Note that nowadays infrastructure_teardown.py is actually copying the terraform.tfstate into /data/infrastructure_provisioning
           # but as of this writing the rhel70-perf-longevity distro didn't actually use the teardown hook.
           source ./dsienv.sh
           source ./venv/bin/activate
-          $DSI_PATH/bin/infrastructure_teardown.py
+          infrastructure_teardown.py
           echo "Cluster DESTROYED."
           echo
           echo "All perf results"
@@ -206,9 +175,8 @@ functions:
       params:
         working_dir: work
         script: |
-          set -v
           source ./dsienv.sh
-          $DSI_PATH/bin/make_artifact.sh
+          make_artifact.sh
 
   "analyze":
     - command: json.get_history
@@ -270,17 +238,11 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo mongod mongos
-
-          # strip binaries here
-          strip mongo
-          strip mongos
-          strip mongod
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} mongo${extension} mongod${extension} mongos${extension} MONGO_VERSION=${version}
           mkdir -p mongodb/bin
-          mv mongo mongodb/bin
-          mv mongod mongodb/bin
-          mv mongos mongodb/bin
+          mv mongo${extension|} mongodb/bin
+          mv mongod${extension|} mongodb/bin
+          mv mongos${extension|} mongodb/bin
           tar cvf mongodb.tar mongodb
           gzip mongodb.tar
     - command: s3.put
@@ -303,12 +265,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "ycsb"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "ycsb"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -324,12 +282,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "ycsb"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "ycsb"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -348,6 +302,11 @@ modules:
   prefix: dsi
   branch: master
 
+
+
+#######################################
+#         Linux Buildvariants         #
+#######################################
 
 buildvariants:
 - name: linux-wt-shard
