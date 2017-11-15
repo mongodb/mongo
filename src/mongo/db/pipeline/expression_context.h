@@ -140,9 +140,7 @@ public:
      * separate aggregation pipeline on 'ns' with the optional 'uuid'.
      */
     boost::intrusive_ptr<ExpressionContext> copyWith(
-        NamespaceString ns,
-        boost::optional<UUID> uuid = boost::none,
-        boost::optional<std::unique_ptr<CollatorInterface>> collator = boost::none) const;
+        NamespaceString ns, boost::optional<UUID> uuid = boost::none) const;
 
     /**
      * Returns the ResolvedNamespace corresponding to 'nss'. It is an error to call this method on a

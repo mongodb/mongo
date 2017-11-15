@@ -33,6 +33,9 @@ selector:
   - jstests/sharding/advance_cluster_time_action_type.js
   - jstests/sharding/advance_logical_time_with_valid_signature.js
   - jstests/sharding/after_cluster_time.js
+  - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js
+  - jstests/sharding/lookup_change_stream_post_image_hashed_shard_key.js
+  - jstests/sharding/lookup_change_stream_post_image_compound_shard_key.js
   - jstests/sharding/change_stream_chunk_migration.js
   - jstests/sharding/change_stream_invalidation.js
   - jstests/sharding/change_stream_lookup_single_shard_cluster.js
@@ -41,14 +44,10 @@ selector:
   - jstests/sharding/change_streams_establishment_finds_new_shards.js
   - jstests/sharding/change_streams_shards_start_in_sync.js
   - jstests/sharding/change_streams_unsharded_becomes_sharded.js
-  - jstests/sharding/change_streams_update_lookup_collation.js
   - jstests/sharding/enable_sharding_basic.js
   - jstests/sharding/key_rotation.js
   - jstests/sharding/kill_sessions.js
   - jstests/sharding/logical_time_api.js
-  - jstests/sharding/lookup_change_stream_post_image_compound_shard_key.js
-  - jstests/sharding/lookup_change_stream_post_image_hashed_shard_key.js
-  - jstests/sharding/lookup_change_stream_post_image_id_shard_key.js
   - jstests/sharding/mongos_does_not_gossip_logical_time_without_keys.js
   - jstests/sharding/move_chunk_find_and_modify_with_write_retryability.js
   - jstests/sharding/move_chunk_insert_with_write_retryability.js

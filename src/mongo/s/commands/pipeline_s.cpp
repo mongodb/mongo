@@ -31,7 +31,6 @@
 #include "mongo/s/commands/pipeline_s.h"
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
@@ -55,7 +54,7 @@ std::pair<ShardId, ChunkVersion> getSingleTargetedShardForQuery(
     OperationContext* opCtx, const CachedCollectionRoutingInfo& routingInfo, BSONObj query) {
     if (auto chunkMgr = routingInfo.cm()) {
         std::set<ShardId> shardIds;
-        chunkMgr->getShardIdsForQuery(opCtx, query, CollationSpec::kSimpleSpec, &shardIds);
+        chunkMgr->getShardIdsForQuery(opCtx, query, BSONObj(), &shardIds);
         uassert(ErrorCodes::InternalError,
                 str::stream() << "Unable to target lookup query to a single shard: "
                               << query.toString(),
@@ -173,20 +172,21 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<Document> lookupSingleDocument(const NamespaceString& nss,
-                                                   UUID collectionUUID,
+    boost::optional<Document> lookupSingleDocument(const intrusive_ptr<ExpressionContext>& expCtx,
                                                    const Document& filter) final {
-        auto foreignExpCtx = _expCtx->copyWith(nss, collectionUUID);
+        // The passed ExpressionContext may use a different namespace than the _expCtx used to
+        // construct the MongosProcessInterface, but both should be using the same opCtx.
+        invariant(expCtx->opCtx == _expCtx->opCtx);
 
         // Create the find command to be dispatched to the shard in order to return the post-change
         // document.
         auto filterObj = filter.toBson();
         BSONObjBuilder cmdBuilder;
-        bool findCmdIsByUuid(foreignExpCtx->uuid);
+        bool findCmdIsByUuid(expCtx->uuid);
         if (findCmdIsByUuid) {
-            foreignExpCtx->uuid->appendToBuilder(&cmdBuilder, "find");
+            expCtx->uuid->appendToBuilder(&cmdBuilder, "find");
         } else {
-            cmdBuilder.append("find", nss.coll());
+            cmdBuilder.append("find", expCtx->ns.coll());
         }
         cmdBuilder.append("filter", filterObj);
 
@@ -195,8 +195,8 @@ public:
         size_t numAttempts = 0;
         do {
             // Verify that the collection exists, with the UUID passed in the expCtx.
-            auto catalogCache = Grid::get(_expCtx->opCtx)->catalogCache();
-            auto swRoutingInfo = getCollectionRoutingInfo(foreignExpCtx);
+            auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
+            auto swRoutingInfo = getCollectionRoutingInfo(expCtx);
             if (swRoutingInfo == ErrorCodes::NamespaceNotFound) {
                 return boost::none;
             }
@@ -208,21 +208,21 @@ public:
                 // the same name created through a different mongos, the shard version will be
                 // detected as stale, as shard versions contain an 'epoch' field unique to the
                 // collection.
-                findCmd = findCmd.addField(BSON("find" << nss.coll()).firstElement());
+                findCmd = findCmd.addField(BSON("find" << expCtx->ns.coll()).firstElement());
                 findCmdIsByUuid = false;
             }
 
             // Get the ID and version of the single shard to which this query will be sent.
-            auto shardInfo = getSingleTargetedShardForQuery(_expCtx->opCtx, routingInfo, filterObj);
+            auto shardInfo = getSingleTargetedShardForQuery(expCtx->opCtx, routingInfo, filterObj);
 
             // Dispatch the request. This will only be sent to a single shard and only a single
             // result will be returned. The 'establishCursors' method conveniently prepares the
             // result into a cursor response for us.
             swShardResult = establishCursors(
-                _expCtx->opCtx,
-                Grid::get(_expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                nss,
-                ReadPreferenceSetting::get(_expCtx->opCtx),
+                expCtx->opCtx,
+                Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                expCtx->ns,
+                ReadPreferenceSetting::get(expCtx->opCtx),
                 {{shardInfo.first, appendShardVersion(findCmd, shardInfo.second)}},
                 false,
                 nullptr);
