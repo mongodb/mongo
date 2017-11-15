@@ -118,8 +118,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<Document> lookupSingleDocument(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx, const Document& filter) {
+    boost::optional<Document> lookupSingleDocument(const NamespaceString& nss,
+                                                   UUID collectionUUID,
+                                                   const Document& documentKey) {
         MONGO_UNREACHABLE;
     }
 
