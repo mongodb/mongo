@@ -281,19 +281,6 @@ void TransportLayerASIO::shutdown() {
     }
 }
 
-std::vector<HostAndPort> TransportLayerASIO::getListeningPorts() const {
-    std::vector<HostAndPort> r;
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (!_running.load()) {
-        return r;
-    }
-    for (auto& acceptor : _acceptors) {
-        HostAndPort hp = endpointToHostAndPort(acceptor.local_endpoint());
-        r.push_back(std::move(hp));
-    }
-    return r;
-}
-
 const std::shared_ptr<asio::io_context>& TransportLayerASIO::getIOContext() {
     return _workerIOContext;
 }

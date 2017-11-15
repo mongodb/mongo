@@ -473,7 +473,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
             opts.networkMessageCompressors = jsTestOptions().networkMessageCompressors;
         }
 
-        if (!opts.hasOwnProperty('bind_ip')) {
+        if (!opts.bind_ip) {
             opts.bind_ip = "0.0.0.0";
         }
 
