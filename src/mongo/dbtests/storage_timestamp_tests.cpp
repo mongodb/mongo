@@ -156,7 +156,11 @@ public:
     StatusWith<BSONObj> doAtomicApplyOps(const std::string& dbName,
                                          const std::list<BSONObj>& applyOpsList) {
         BSONObjBuilder result;
-        Status status = applyOps(_opCtx, dbName, BSON("applyOps" << applyOpsList), &result);
+        Status status = applyOps(_opCtx,
+                                 dbName,
+                                 BSON("applyOps" << applyOpsList),
+                                 repl::OplogApplication::Mode::kApplyOpsCmd,
+                                 &result);
         if (!status.isOK()) {
             return status;
         }
@@ -177,7 +181,11 @@ public:
                              << "o"
                              << BSON("applyOps" << BSONArrayBuilder().obj()));
         BSONObjBuilder result;
-        Status status = applyOps(_opCtx, dbName, BSON("applyOps" << builder.arr()), &result);
+        Status status = applyOps(_opCtx,
+                                 dbName,
+                                 BSON("applyOps" << builder.arr()),
+                                 repl::OplogApplication::Mode::kApplyOpsCmd,
+                                 &result);
         if (!status.isOK()) {
             return status;
         }
@@ -233,6 +241,7 @@ public:
                                       << "test.$cmd"
                                       << "o"
                                       << BSON("applyOps" << BSONArrayBuilder().obj())))),
+                repl::OplogApplication::Mode::kApplyOpsCmd,
                 &result));
         }
 
@@ -312,7 +321,11 @@ public:
         applyOpsB.done();
         // Apply the group of inserts.
         BSONObjBuilder result;
-        ASSERT_OK(applyOps(_opCtx, nss.db().toString(), fullCommand.done(), &result));
+        ASSERT_OK(applyOps(_opCtx,
+                           nss.db().toString(),
+                           fullCommand.done(),
+                           repl::OplogApplication::Mode::kApplyOpsCmd,
+                           &result));
 
 
         for (std::uint32_t idx = 0; idx < docsToInsert; ++idx) {
