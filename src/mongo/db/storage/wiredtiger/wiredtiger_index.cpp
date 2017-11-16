@@ -1213,6 +1213,7 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
                 triggerWriteConflictAtPoint(c);
                 return;
             }
+            invariantWTOK(ret);
             WT_ITEM value;
             invariantWTOK(c->get_value(c, &value));
             BufReader br(value.data, value.size);
