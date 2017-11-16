@@ -877,7 +877,7 @@ public:
 int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
     int okResultCode = restartSyncAfterSleep;
     std::string ns = std::string("local.oplog.$") + sourceName();
-    LOG(2) << "sync_pullOpLog " << ns << " syncedTo:" << syncedTo.toStringLong() << '\n';
+    LOG(2) << "sync_pullOpLog " << ns << " syncedTo:" << syncedTo << '\n';
 
     bool tailing = true;
     oplogReader.tailCheck();
@@ -1005,16 +1005,15 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
         if (tailing) {
             if (!(syncedTo < nextOpTime)) {
                 warning() << "ASSERTION failed : syncedTo < nextOpTime" << endl;
-                log() << "syncTo:     " << syncedTo.toStringLong() << endl;
-                log() << "nextOpTime: " << nextOpTime.toStringLong() << endl;
+                log() << "syncTo:     " << syncedTo << endl;
+                log() << "nextOpTime: " << nextOpTime << endl;
                 verify(false);
             }
             oplogReader.putBack(op);          // op will be processed in the loop below
             nextOpTime = Timestamp();         // will reread the op below
         } else if (nextOpTime != syncedTo) {  // didn't get what we queried for - error
-            log() << "nextOpTime " << nextOpTime.toStringLong() << ' '
-                  << ((nextOpTime < syncedTo) ? "<??" : ">") << " syncedTo "
-                  << syncedTo.toStringLong() << '\n'
+            log() << "nextOpTime " << nextOpTime << ' ' << ((nextOpTime < syncedTo) ? "<??" : ">")
+                  << " syncedTo " << syncedTo << '\n'
                   << "time diff: " << (nextOpTime.getSecs() - syncedTo.getSecs()) << "sec\n"
                   << "tailing: " << tailing << '\n'
                   << "data too stale, halting replication" << endl;
@@ -1056,7 +1055,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
                 // can't update local log ts since there are pending operations from our peer
                 save(opCtx);
                 log() << "checkpoint applied " << n << " operations" << endl;
-                log() << "syncedTo: " << syncedTo.toStringLong() << endl;
+                log() << "syncedTo: " << syncedTo << endl;
                 saveLast = time(0);
                 n = 0;
             }
@@ -1080,8 +1079,8 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
                 if (!(last < nextOpTime)) {
                     log() << "sync error: last applied optime at slave >= nextOpTime from master"
                           << endl;
-                    log() << " last:       " << last.toStringLong() << endl;
-                    log() << " nextOpTime: " << nextOpTime.toStringLong() << endl;
+                    log() << " last:       " << last << endl;
+                    log() << " nextOpTime: " << nextOpTime << endl;
                     log() << " halting replication" << endl;
                     replInfo = replAllDead = "sync error last >= nextOpTime";
                     uassert(
@@ -1103,7 +1102,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
                         save(opCtx);
                     }
                     log() << "applied " << n << " operations" << endl;
-                    log() << "syncedTo: " << syncedTo.toStringLong() << endl;
+                    log() << "syncedTo: " << syncedTo << endl;
                     log() << "waiting until: " << _sleepAdviceTime << " to continue" << endl;
                     return okResultCode;
                 }

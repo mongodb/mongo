@@ -40,6 +40,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -878,9 +879,11 @@ void BSONElement::toString(
             }
         } break;
 
-        case bsonTimestamp:
-            s << "Timestamp " << timestampTime().toMillisSinceEpoch() << "|" << timestampInc();
-            break;
+        case bsonTimestamp: {
+            // Convert from Milliseconds to Seconds for consistent Timestamp printing.
+            auto secs = duration_cast<Seconds>(timestampTime().toDurationSinceEpoch());
+            s << "Timestamp(" << secs.count() << ", " << timestampInc() << ")";
+        } break;
         default:
             s << "?type=" << type();
             break;

@@ -83,5 +83,30 @@ TEST(BSONElement, BinDataToString) {
               "unknownType: BinData(42, "
               "62696E6172792064617461007769746820616E20756E6B6E6F776E2074797065)");
 }
+
+
+TEST(BSONElement, TimestampToString) {
+
+    // Testing default BSONObj Timestamp method, which constructs an empty Timestamp
+    const BSONElement b;
+    auto ts = b.timestamp();
+    ASSERT_EQ(ts.toString(), "Timestamp(0, 0)");
+
+    BSONObjBuilder builder;
+    builder.append("ts0", Timestamp(Seconds(100), 1U));
+    builder.append("ts1", Timestamp(Seconds(50000), 25));
+    builder.append("ts2", Timestamp(Seconds(100000), 1U));
+    // Testing max allowable integer values
+    builder.append("ts3", Timestamp::max());
+
+    // Testing for correct format when printing BSONObj Timestamps
+    // using .toString(includeFieldName = false, full = false)
+    BSONObj obj = builder.obj();
+    ASSERT_EQ(obj["ts0"].toString(false, false), "Timestamp(100, 1)");
+    ASSERT_EQ(obj["ts1"].toString(false, false), "Timestamp(50000, 25)");
+    ASSERT_EQ(obj["ts2"].toString(false, false), "Timestamp(100000, 1)");
+    ASSERT_EQ(obj["ts3"].toString(false, false), "Timestamp(4294967295, 4294967295)");
+}
+
 }  // namespace
 }  // namespace mongo
