@@ -186,16 +186,16 @@ TEST_F(SyncSourceResolverTest, InvalidConstruction) {
                                 AssertionException,
                                 ErrorCodes::BadValue,
                                 "required optime (if provided) must be more recent than last "
-                                "fetched optime. requiredOpTime: { ts: Timestamp 50000|1, t: 1 }, "
-                                "lastOpTimeFetched: { ts: Timestamp 100000|1, t: 1 }");
+                                "fetched optime. requiredOpTime: { ts: Timestamp(50, 1), t: 1 }, "
+                                "lastOpTimeFetched: { ts: Timestamp(100, 1), t: 1 }");
     ASSERT_THROWS_CODE_AND_WHAT(
         SyncSourceResolver(
             &getExecutor(), &selector, lastOpTimeFetched, lastOpTimeFetched, onCompletion),
         AssertionException,
         ErrorCodes::BadValue,
         "required optime (if provided) must be more recent than last fetched optime. "
-        "requiredOpTime: { ts: Timestamp 100000|1, t: 1 }, lastOpTimeFetched: { ts: Timestamp "
-        "100000|1, t: 1 }");
+        "requiredOpTime: { ts: Timestamp(100, 1), t: 1 }, lastOpTimeFetched: { ts: Timestamp("
+        "100, 1), t: 1 }");
 
     // Null callback function.
     ASSERT_THROWS_CODE_AND_WHAT(SyncSourceResolver(&getExecutor(),

@@ -89,8 +89,6 @@ public:
         return secs == 0;
     }
 
-    std::string toStringLong() const;
-
     std::string toStringPretty() const;
 
     std::string toString() const;
