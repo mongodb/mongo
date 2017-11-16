@@ -1553,6 +1553,61 @@ TEST_F(IdempotencyTest, CollModIndexNotFound) {
     testOpsAreIdempotent(ops);
 }
 
+TEST_F(SyncTailTest, FailOnAssigningUUIDToCollectionWithExistingUUID) {
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    auto oldUUID = UUID::gen();
+    CollectionOptions options;
+    options.uuid = oldUUID;
+    createCollection(_opCtx.get(), nss, options);
+
+    auto collModCmd = BSON("collMod" << nss.coll());
+    auto newUUID = UUID::gen();
+    auto collModOp = repl::OplogEntry(nextOpTime(),
+                                      1LL,
+                                      OpTypeEnum::kCommand,
+                                      nss,
+                                      newUUID,
+                                      boost::none,
+                                      repl::OplogEntry::kOplogVersion,
+                                      collModCmd,
+                                      boost::none,
+                                      {},
+                                      boost::none,
+                                      boost::none,
+                                      boost::none,
+                                      boost::none,
+                                      boost::none);
+
+    ASSERT_EQUALS(runOpInitialSync(collModOp), ErrorCodes::duplicateCodeForTest(50658));
+}
+
+TEST_F(SyncTailTest, SuccessOnAssigningUUIDToCollectionWithExistingUUID) {
+    NamespaceString nss("local." + _agent.getSuiteName() + "_" + _agent.getTestName());
+    auto oldUUID = UUID::gen();
+    CollectionOptions options;
+    options.uuid = oldUUID;
+    createCollection(_opCtx.get(), nss, options);
+
+    auto collModCmd = BSON("collMod" << nss.coll());
+    auto collModOp = repl::OplogEntry(nextOpTime(),
+                                      1LL,
+                                      OpTypeEnum::kCommand,
+                                      nss,
+                                      oldUUID,
+                                      boost::none,
+                                      repl::OplogEntry::kOplogVersion,
+                                      collModCmd,
+                                      boost::none,
+                                      {},
+                                      boost::none,
+                                      boost::none,
+                                      boost::none,
+                                      boost::none,
+                                      boost::none);
+
+    ASSERT_OK(runOpInitialSync(collModOp));
+}
+
 TEST_F(SyncTailTest, FailOnDropFCVCollection) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));

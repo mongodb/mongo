@@ -438,6 +438,14 @@ Status _collModInternal(OperationContext* opCtx,
                   << coll->ns();
             CollectionCatalogEntry* cce = coll->getCatalogEntry();
             cce->removeUUID(opCtx);
+        } else if (uuid && coll->uuid() && uuid.get() != coll->uuid().get()) {
+            return Status(ErrorCodes::Error(50658),
+                          str::stream() << "collMod " << redact(cmdObj) << " provides a UUID ("
+                                        << uuid.get().toString()
+                                        << ") that does not match the UUID ("
+                                        << coll->uuid().get().toString()
+                                        << ") of the collection "
+                                        << nss.ns());
         }
         coll->refreshUUID(opCtx);
     }
