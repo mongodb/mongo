@@ -62,7 +62,7 @@ variables:
 # Used to list modules to retrieve from GitHub and apply patches if necessary.
 - &git_get_project
   command: git.get_project
-  params:
+  params: &git_get_project_params
     directory: src
     revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
       enterprise: ${enterprise_rev}
@@ -2180,27 +2180,36 @@ tasks:
   depends_on:
   - name: compile
   commands:
-  - *git_get_project
-  - command: shell.exec
+  - <<: *git_get_project
+    # The repository is cloned in a directory distinct from src for the modified test detection
+    # because the extraction of the artifacts performed in the 'do setup' causes
+    # 'git diff --name-only' to see all tests as modified on Windows (git 1.9.5). See SERVER-30634.
     params:
-      working_dir: src
-      script: |
-        # Remove the empty directory path left over by the git.get_project command as it can cause
-        # a name conflict when copying the binaries over during 'do setup'. See EVG-1954.
-        rmdir -p mongo/db/modules/* 2>/dev/null || true
+      <<: *git_get_project_params
+      directory: burn_in_tests_clonedir
   - func: "do setup"
+  - func: "set up virtualenv"
   - command: shell.exec
     params:
-      working_dir: src
+      working_dir: burn_in_tests_clonedir
       script: |
+        set -o errexit
+        # Create a symbolic link to the venv in the src directory so activate_virtualenv can use it
+        # if it exists.
+        ln -s ../src/venv venv
         ${activate_virtualenv}
-
+        set -o verbose
         # If this is a scheduled build, we check for changes against the last scheduled commit.
         if [ "${is_patch}" != "true" ]; then
           burn_in_args="--checkEvergreen"
         fi
+        # Copy the dbtest executable from the src dir because burn_in_tests.py calls it to get the
+        # list of dbtest suites.
+        cp ../src/dbtest${exe} .
         # Capture a list of new and modified tests.
         $python buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
+        # Copy the results to the src dir.
+        cp jstests/new_tests.json ../src/jstests/new_tests.json
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
@@ -6316,8 +6325,6 @@ buildvariants:
     ext: zip
     use_scons_cache: true
   tasks:
-  # TODO SERVER-30634: Re-enable the burn_in_tests task on Windows after addressing how git detects
-  # all JavaScript tests as having been modified and causes the Evergreen task to time out.
   - name: compile
     distros:
     - windows-64-vs2015-large
@@ -6509,11 +6516,14 @@ buildvariants:
     use_scons_cache: true
   tasks:
   - name: compile
+    requires:
+    - name: burn_in_tests
     distros:
     - windows-64-vs2015-large
   - name: compile_all
     distros:
     - windows-64-vs2015-large
+  - name: burn_in_tests
   - name: audit
   - name: audit_WT
   - name: auth_audit
