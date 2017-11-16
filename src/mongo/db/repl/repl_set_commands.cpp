@@ -256,7 +256,9 @@ HostAndPort someHostAndPortForMe() {
     bool localhost_only = true;
 
     std::vector<std::string> addrs;
-    boost::split(addrs, bind_ip, boost::is_any_of(","), boost::token_compress_on);
+    if (!bind_ip.empty()) {
+        boost::split(addrs, bind_ip, boost::is_any_of(","), boost::token_compress_on);
+    }
     for (const auto& addr : addrs) {
         // Get all addresses associated with each named bind host.
         // If we find any that are valid external identifiers,
