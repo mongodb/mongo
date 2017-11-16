@@ -196,7 +196,7 @@ void LogicalTimeValidator::forceKeyRefreshNow(OperationContext* opCtx) {
 }
 
 void LogicalTimeValidator::resetKeyManagerCache(ServiceContext* service) {
-    log() << "XXX resetting key manager cache";
+    log() << "Resetting key manager cache";
     if (auto keyManager = _getKeyManagerCopy()) {
         keyManager->stopMonitoring();
         keyManager->startMonitoring(service);
@@ -206,7 +206,7 @@ void LogicalTimeValidator::resetKeyManagerCache(ServiceContext* service) {
 }
 
 void LogicalTimeValidator::resetKeyManager() {
-    log() << "XXX resetting key manager";
+    log() << "Resetting key manager";
     stdx::lock_guard<stdx::mutex> lk(_mutexKeyManager);
     if (_keyManager) {
         _keyManager->stopMonitoring();

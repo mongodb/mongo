@@ -9,14 +9,20 @@
     load("jstests/multiVersion/libs/multi_rs.js");
     load("jstests/multiVersion/libs/multi_cluster.js");  // For restartMongoses.
 
-    function assertContainsValidLogicalTime(res) {
+    function assertContainsValidLogicalTime(res, check) {
         assert.hasFields(res, ["$clusterTime"]);
         assert.hasFields(res.$clusterTime, ["signature", "clusterTime"]);
         // clusterTime must be greater than the uninitialzed value.
-        assert.eq(bsonWoCompare(res.$clusterTime.clusterTime, Timestamp(0, 0)), 1);
+        // TODO: SERVER-31986 this check can be done only for authenticated connections that do not
+        // have advance_cluster_time privilege.
+        if (check) {
+            assert.eq(bsonWoCompare(res.$clusterTime.clusterTime, Timestamp(0, 0)), 1);
+        }
         assert.hasFields(res.$clusterTime.signature, ["hash", "keyId"]);
         // The signature must have been signed by a key with a valid generation.
-        assert(res.$clusterTime.signature.keyId > NumberLong(0));
+        if (check) {
+            assert(res.$clusterTime.signature.keyId > NumberLong(0));
+        }
     }
 
     let st = new ShardingTest({shards: {rs0: {nodes: 2}}});
@@ -27,7 +33,7 @@
         assert(st.s.getDB("admin").system.keys.count() >= 2);
 
         let res = assert.commandWorked(st.s.getDB("test").runCommand({isMaster: 1}));
-        assertContainsValidLogicalTime(res);
+        assertContainsValidLogicalTime(res, false);
 
         return true;
     }, "expected keys to be created and for mongos to send signed cluster times");
@@ -64,7 +70,7 @@
 
     // Eventually mongos will discover the new keys, and start signing cluster times.
     assert.soonNoExcept(function() {
-        assertContainsValidLogicalTime(st.s.getDB("test").runCommand({isMaster: 1}));
+        assertContainsValidLogicalTime(st.s.getDB("test").runCommand({isMaster: 1}), false);
         return true;
     }, "expected mongos to eventually start signing cluster times", 60 * 1000);  // 60 seconds.
 
