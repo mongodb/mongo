@@ -10509,13 +10509,12 @@ buildvariants:
   - name: aggregation_facet_unwind_passthrough_WT
   - name: aggregation_read_concern_majority_passthrough_WT
   - name: aggregation_sharded_collections_passthrough_WT
-# TODO Put back when SERVER-30471 is done
-#  - name: audit
-#  - name: audit_WT
-#  - name: auth
-#  - name: auth_WT
-#  - name: auth_audit
-#  - name: auth_audit_WT
+  - name: audit
+  - name: audit_WT
+  - name: auth
+  - name: auth_WT
+  - name: auth_audit
+  - name: auth_audit_WT
   - name: bulk_gle_passthrough
   - name: bulk_gle_passthrough_WT
   - name: causally_consistent_jscore_passthrough_WT
@@ -10582,12 +10581,11 @@ buildvariants:
   - name: read_only_WT
   - name: read_only_sharded
   - name: read_only_sharded_WT
-# TODO Put back when SERVER-30471 is done
-#  - name: replica_sets
-#  - name: replica_sets_WT
-#  - name: replica_sets_WT_ese
-#  - name: replica_sets_auth
-#  - name: replica_sets_pv0
+  - name: replica_sets
+  - name: replica_sets_WT
+  - name: replica_sets_WT_ese
+  - name: replica_sets_auth
+  - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_jscore_passthrough_WT
   - name: replica_sets_initsync_jscore_passthrough
