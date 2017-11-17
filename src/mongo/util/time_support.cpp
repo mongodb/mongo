@@ -41,11 +41,17 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
-#ifdef _WIN32
+#if defined(_WIN32)
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/timer.h"
 #include <boost/date_time/filetime_functions.hpp>
+#include <mmsystem.h>
+#elif defined(__linux__)
+#include <time.h>
+#elif defined(__APPLE__)
+#include <mach/clock.h>
+#include <mach/mach.h>
 #endif
 
 #ifdef __sun
@@ -906,5 +912,64 @@ unsigned long long curTimeMicros64() {
     return (((unsigned long long)tv.tv_sec) * 1000 * 1000) + tv.tv_usec;
 }
 #endif
+
+#if defined(__APPLE__)
+template <typename T>
+class MachPort {
+public:
+    MachPort(T port) : _port(std::move(port)) {}
+    ~MachPort() {
+        mach_port_deallocate(mach_task_self(), _port);
+    }
+    operator T&() {
+        return _port;
+    }
+
+private:
+    T _port;
+};
+#endif
+
+// Find minimum timer resolution of OS
+Nanoseconds getMinimumTimerResolution() {
+    Nanoseconds minTimerResolution;
+#if defined(__linux__)
+    struct timespec tp;
+    clock_getres(CLOCK_REALTIME, &tp);
+    minTimerResolution = Nanoseconds{tp.tv_nsec};
+#elif defined(_WIN32)
+    // see https://msdn.microsoft.com/en-us/library/windows/desktop/dd743626(v=vs.85).aspx
+    TIMECAPS tc;
+    Milliseconds resMillis;
+    if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) != TIMERR_NOERROR) {
+        // failed to grab resolution range
+        resMillis = Milliseconds{1};
+    } else {
+        resMillis = Milliseconds{std::max(std::min(1, int(tc.wPeriodMin)), int(tc.wPeriodMax))};
+    }
+    minTimerResolution = duration_cast<Nanoseconds>(resMillis);
+#elif defined(__APPLE__)
+    // see "Mac OSX Internals: a Systems Approach" for functions and types
+    kern_return_t kr;
+    MachPort<host_name_port_t> myhost(mach_host_self());
+    MachPort<clock_serv_t> clk_system([&myhost] {
+        host_name_port_t clk;
+        invariant(host_get_clock_service(myhost, SYSTEM_CLOCK, &clk) == 0);
+        return clk;
+    }());
+    natural_t attribute[4];
+    mach_msg_type_number_t count;
+
+    count = sizeof(attribute) / sizeof(natural_t);
+    kr = clock_get_attributes(clk_system, CLOCK_GET_TIME_RES, (clock_attr_t)attribute, &count);
+    invariant(kr == 0);
+
+    minTimerResolution = Nanoseconds{attribute[0]};
+#else
+#error Dont know how to get the minimum timer resolution on this platform
+#endif
+    return minTimerResolution;
+}
+
 
 }  // namespace mongo
