@@ -348,11 +348,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     if (o2)
         b.append("o2", *o2);
 
-    if (wallTime != Date_t{} &&
-        (serverGlobalParams.featureCompatibility.getVersion() ==
-         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
-        b.appendDate("wall", wallTime);
-    }
+    invariant(wallTime != Date_t{});
+    b.appendDate("wall", wallTime);
 
     appendSessionInfo(opCtx, &b, statementId, sessionInfo, oplogLink);
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
