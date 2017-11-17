@@ -69,7 +69,7 @@ private:
     void _processAlarms(stdx::unique_lock<stdx::mutex> lk);
 
     stdx::mutex _mutex;
-    Date_t _now;
+    Date_t _now{Date_t::fromMillisSinceEpoch(1)};
     std::vector<Alarm> _alarms;
 };
 

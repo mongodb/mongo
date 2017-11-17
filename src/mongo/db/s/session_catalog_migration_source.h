@@ -83,9 +83,7 @@ public:
         bool shouldWaitForMajority = false;
     };
 
-    explicit SessionCatalogMigrationSource(NamespaceString ns);
-
-    void init(OperationContext* opCtx);
+    SessionCatalogMigrationSource(OperationContext* opCtx, NamespaceString ns);
 
     /**
      * Returns true if there are more oplog entries to fetch at this moment. Note that new writes
@@ -190,14 +188,16 @@ private:
      */
     repl::OplogEntry _getLastFetchedNewWriteOplog();
 
+    // Namespace for which the migration is happening
     const NamespaceString _ns;
 
-    // Protects _alreadyInitialized, _sessionCatalogCursor, _sessionOplogIterators
-    // _currentOplogIterator,  _lastFetchedOplogBuffer, _lastFetchedOplog
-    stdx::mutex _sessionCloneMutex;
-    bool _alreadyInitialized = false;
+    // The rollback id just before migration started. This value is needed so that step-down
+    // followed by step-up situations can be discovered.
+    const int _rollbackIdAtInit;
 
-    int _rollbackIdAtInit = 0;
+    // Protects _sessionCatalogCursor, _sessionOplogIterators, _currentOplogIterator,
+    // _lastFetchedOplogBuffer, _lastFetchedOplog
+    stdx::mutex _sessionCloneMutex;
 
     // List of remaining session records that needs to be cloned.
     std::vector<std::unique_ptr<SessionOplogIterator>> _sessionOplogIterators;

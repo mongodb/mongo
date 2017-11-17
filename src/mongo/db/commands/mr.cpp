@@ -1509,7 +1509,7 @@ public:
                     invariant(coll);
 
                     exec = uassertStatusOK(
-                        getExecutor(opCtx, coll, std::move(cq), PlanExecutor::YIELD_AUTO));
+                        getExecutor(opCtx, coll, std::move(cq), PlanExecutor::YIELD_AUTO, 0));
                 }
 
                 // Make sure the PlanExecutor is destroyed while holding the necessary locks.

@@ -207,8 +207,8 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-        _sessionCatalogSource = stdx::make_unique<SessionCatalogMigrationSource>(_args.getNss());
-        _sessionCatalogSource->init(opCtx);
+        _sessionCatalogSource =
+            stdx::make_unique<SessionCatalogMigrationSource>(opCtx, _args.getNss());
 
         // Prime up the session migration source if there are oplog entries to migrate.
         _sessionCatalogSource->fetchNextOplog(opCtx);

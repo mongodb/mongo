@@ -95,7 +95,7 @@ protected:
         auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
 
         auto exec = uassertStatusOK(
-            getExecutor(opCtx(), ctx.getCollection(), std::move(cq), PlanExecutor::NO_YIELD));
+            getExecutor(opCtx(), ctx.getCollection(), std::move(cq), PlanExecutor::NO_YIELD, 0));
 
         exec->saveState();
         _source = DocumentSourceCursor::create(ctx.getCollection(), std::move(exec), _ctx);
