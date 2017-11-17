@@ -61,7 +61,7 @@ public:
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+        return true;
     }
 
     virtual void help(std::stringstream& help) const {
@@ -99,7 +99,8 @@ public:
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             dbname,
-            BSON("setFeatureCompatibilityVersion" << version),
+            Command::appendMajorityWriteConcern(Command::appendPassthroughFields(
+                cmdObj, BSON("setFeatureCompatibilityVersion" << version))),
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(response.commandStatus);
 
