@@ -376,6 +376,16 @@ public:
                                           const ReadConcernArgs& settings) = 0;
 
     /**
+     * Waits until the deadline or until the optime of the current node is at least the opTime
+     * specified in 'settings'.
+     *
+     * Returns whether the wait was successful.
+     */
+    virtual Status waitUntilOpTimeForReadUntil(OperationContext* opCtx,
+                                               const ReadConcernArgs& settings,
+                                               boost::optional<Date_t> deadline) = 0;
+
+    /**
      * Retrieves and returns the current election id, which is a unique id that is local to
      * this node and changes every time we become primary.
      * TODO(spencer): Use term instead.
