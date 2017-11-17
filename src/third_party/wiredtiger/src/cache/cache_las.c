@@ -518,7 +518,13 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 			cursor->set_value(cursor,
 			    upd->txnid, &las_timestamp, upd->type, &las_value);
 
-			WT_ERR(cursor->insert(cursor));
+			/*
+			 * Using update looks a little strange because the keys
+			 * are guaranteed to not exist, but since we're
+			 * appending, we want the cursor to stay positioned in
+			 * between inserts.
+			 */
+			WT_ERR(cursor->update(cursor));
 			++insert_cnt;
 		} while ((upd = upd->next) != NULL);
 	}
