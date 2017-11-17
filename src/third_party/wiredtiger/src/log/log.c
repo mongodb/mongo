@@ -2658,10 +2658,8 @@ __wt_log_flush(WT_SESSION_IMPL *session, uint32_t flags)
 	 * Wait until all current outstanding writes have been written
 	 * to the file system.
 	 */
-	while (__wt_log_cmp(&last_lsn, &lsn) > 0) {
-		__wt_sleep(0, WT_THOUSAND);
+	while (__wt_log_cmp(&last_lsn, &lsn) > 0)
 		WT_RET(__wt_log_flush_lsn(session, &lsn, false));
-	}
 
 	__wt_verbose(session, WT_VERB_LOG,
 	    "log_flush: flags %#" PRIx32 " LSN %" PRIu32 "/%" PRIu32,

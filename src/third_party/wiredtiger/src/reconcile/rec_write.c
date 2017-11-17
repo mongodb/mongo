@@ -420,15 +420,8 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref,
 	}
 
 	oldest_id = __wt_txn_oldest_id(session);
-	if (LF_ISSET(WT_REC_EVICT)) {
+	if (LF_ISSET(WT_REC_EVICT))
 		mod->last_eviction_id = oldest_id;
-#ifdef HAVE_TIMESTAMPS
-		WT_WITH_TIMESTAMP_READLOCK(session,
-		    &S2C(session)->txn_global.rwlock,
-		    __wt_timestamp_set(&mod->last_eviction_timestamp,
-		    &S2C(session)->txn_global.pinned_timestamp));
-#endif
-	    }
 
 #ifdef HAVE_DIAGNOSTIC
 	/*

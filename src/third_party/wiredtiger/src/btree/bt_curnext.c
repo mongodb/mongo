@@ -592,7 +592,6 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, bool truncating)
 	 * file.
 	 */
 	flags = WT_READ_SKIP_INTL;			/* tree walk flags */
-	LF_SET(WT_READ_NO_SPLIT);			/* don't try to split */
 	if (truncating)
 		LF_SET(WT_READ_TRUNCATE);
 	for (newpage = false;; newpage = true) {

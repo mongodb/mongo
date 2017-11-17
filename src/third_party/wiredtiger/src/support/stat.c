@@ -761,7 +761,6 @@ static const char * const __stats_connection_desc[] = {
 	"cache: application threads page write from cache to disk count",
 	"cache: application threads page write from cache to disk time (usecs)",
 	"cache: bytes belonging to page images in the cache",
-	"cache: bytes belonging to the lookaside table in the cache",
 	"cache: bytes currently in the cache",
 	"cache: bytes not belonging to page images in the cache",
 	"cache: bytes read into cache",
@@ -1095,7 +1094,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_write_app_count = 0;
 	stats->cache_write_app_time = 0;
 		/* not clearing cache_bytes_image */
-		/* not clearing cache_bytes_lookaside */
 		/* not clearing cache_bytes_inuse */
 		/* not clearing cache_bytes_other */
 	stats->cache_bytes_read = 0;
@@ -1411,8 +1409,6 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_write_app_count);
 	to->cache_write_app_time += WT_STAT_READ(from, cache_write_app_time);
 	to->cache_bytes_image += WT_STAT_READ(from, cache_bytes_image);
-	to->cache_bytes_lookaside +=
-	    WT_STAT_READ(from, cache_bytes_lookaside);
 	to->cache_bytes_inuse += WT_STAT_READ(from, cache_bytes_inuse);
 	to->cache_bytes_other += WT_STAT_READ(from, cache_bytes_other);
 	to->cache_bytes_read += WT_STAT_READ(from, cache_bytes_read);

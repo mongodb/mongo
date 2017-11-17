@@ -287,8 +287,7 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 */
 	oldest_id = txn_global->oldest_id;
 	include_checkpoint_txn = btree == NULL ||
-	    (!F_ISSET(btree, WT_BTREE_LOOKASIDE) &&
-	    btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT));
+	    btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT);
 	if (!include_checkpoint_txn)
 		return (oldest_id);
 
@@ -524,9 +523,11 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		if (session->ncursors > 0)
 			WT_RET(__wt_session_copy_values(session));
 
-		/* Stall here if the cache is completely full. */
-		WT_RET(__wt_cache_eviction_check(session, false, true, NULL));
-
+		/*
+		 * We're about to allocate a snapshot: if we need to block for
+		 * eviction, it's better to do it beforehand.
+		 */
+		WT_RET(__wt_cache_eviction_check(session, false, NULL));
 		__wt_txn_get_snapshot(session);
 	}
 
@@ -571,14 +572,11 @@ __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
 
 	/*
 	 * Check the published snap_min because read-uncommitted never sets
-	 * WT_TXN_HAS_SNAPSHOT.  We don't have any transaction information at
-	 * this point, so assume the transaction will be read-only.  The dirty
-	 * cache check will be performed when the transaction completes, if
-	 * necessary.
+	 * WT_TXN_HAS_SNAPSHOT.
 	 */
 	if (F_ISSET(txn, WT_TXN_RUNNING) &&
 	    !F_ISSET(txn, WT_TXN_HAS_ID) && txn_state->pinned_id == WT_TXN_NONE)
-		WT_RET(__wt_cache_eviction_check(session, false, true, NULL));
+		WT_RET(__wt_cache_eviction_check(session, false, NULL));
 
 	return (0);
 }

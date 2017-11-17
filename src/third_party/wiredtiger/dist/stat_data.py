@@ -190,7 +190,6 @@ connection_stats = [
     CacheStat('cache_bytes_internal', 'tracked bytes belonging to internal pages in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_inuse', 'bytes currently in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_leaf', 'tracked bytes belonging to leaf pages in the cache', 'no_clear,no_scale,size'),
-    CacheStat('cache_bytes_lookaside', 'bytes belonging to the lookaside table in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_max', 'maximum bytes configured', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_other', 'bytes not belonging to page images in the cache', 'no_clear,no_scale,size'),
     CacheStat('cache_bytes_read', 'bytes read into cache', 'size'),

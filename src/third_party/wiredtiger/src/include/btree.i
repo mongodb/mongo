@@ -149,7 +149,8 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 		if (WT_PAGE_IS_INTERNAL(page)) {
 			(void)__wt_atomic_add64(&btree->bytes_dirty_intl, size);
 			(void)__wt_atomic_add64(&cache->bytes_dirty_intl, size);
-		} else if (!btree->lsm_primary) {
+		} else if (!btree->lsm_primary &&
+		    !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
 			(void)__wt_atomic_add64(&btree->bytes_dirty_leaf, size);
 			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
 		}
@@ -261,7 +262,7 @@ __wt_cache_page_byte_dirty_decr(
 		    decr, "WT_BTREE.bytes_dirty_intl");
 		__wt_cache_decr_check_uint64(session, &cache->bytes_dirty_intl,
 		    decr, "WT_CACHE.bytes_dirty_intl");
-	} else if (!btree->lsm_primary) {
+	} else if (!btree->lsm_primary && !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
 		__wt_cache_decr_check_uint64(session, &btree->bytes_dirty_leaf,
 		    decr, "WT_BTREE.bytes_dirty_leaf");
 		__wt_cache_decr_check_uint64(session, &cache->bytes_dirty_leaf,
@@ -321,7 +322,8 @@ __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 		(void)__wt_atomic_add64(&cache->bytes_dirty_intl, size);
 		(void)__wt_atomic_add64(&cache->pages_dirty_intl, 1);
 	} else {
-		if (!btree->lsm_primary) {
+		if (!btree->lsm_primary &&
+		    !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
 			(void)__wt_atomic_add64(&btree->bytes_dirty_leaf, size);
 			(void)__wt_atomic_add64(&cache->bytes_dirty_leaf, size);
 		}
@@ -420,7 +422,8 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page, bool rewrite)
 			__wt_cache_decr_check_uint64(session,
 			    &cache->bytes_dirty_intl,
 			    modify->bytes_dirty, "WT_CACHE.bytes_dirty_intl");
-		} else if (!btree->lsm_primary) {
+		} else if (!btree->lsm_primary &&
+		    !F_ISSET(btree, WT_BTREE_LOOKASIDE)) {
 			__wt_cache_decr_check_uint64(session,
 			    &btree->bytes_dirty_leaf,
 			    modify->bytes_dirty, "WT_BTREE.bytes_dirty_leaf");
@@ -1264,44 +1267,6 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 	}
 	return (false);
-}
-
-/*
- * __wt_page_evict_retry --
- *	Check if there has been transaction progress since the last eviction
- *	attempt.
- */
-static inline bool
-__wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_PAGE_MODIFY *mod;
-	WT_TXN_GLOBAL *txn_global;
-
-	txn_global = &S2C(session)->txn_global;
-
-	if ((mod = page->modify) == NULL)
-		return (true);
-
-	if (txn_global->current != txn_global->oldest_id &&
-	    mod->last_eviction_id == __wt_txn_oldest_id(session))
-		return (false);
-
-#ifdef HAVE_TIMESTAMPS
-	{
-	bool same_timestamp;
-
-	if (__wt_timestamp_iszero(&mod->last_eviction_timestamp))
-		return (true);
-
-	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
-	    same_timestamp = __wt_timestamp_cmp(
-	    &mod->last_eviction_timestamp, &txn_global->pinned_timestamp) == 0);
-	if (same_timestamp)
-		return (false);
-	}
-#endif
-
-	return (true);
 }
 
 /*
