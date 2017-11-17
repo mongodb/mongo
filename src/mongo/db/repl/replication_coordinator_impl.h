@@ -167,6 +167,10 @@ public:
     virtual OpTime getMyLastAppliedOpTime() const override;
     virtual OpTime getMyLastDurableOpTime() const override;
 
+    virtual Status waitUntilOpTimeForReadUntil(OperationContext* opCtx,
+                                               const ReadConcernArgs& readConcern,
+                                               boost::optional<Date_t> deadline) override;
+
     virtual Status waitUntilOpTimeForRead(OperationContext* opCtx,
                                           const ReadConcernArgs& readConcern) override;
 
@@ -1111,7 +1115,10 @@ private:
     /**
      * Waits until the optime of the current node is at least the 'opTime'.
      */
-    Status _waitUntilOpTime(OperationContext* opCtx, bool isMajorityReadConcern, OpTime opTime);
+    Status _waitUntilOpTime(OperationContext* opCtx,
+                            bool isMajorityReadConcern,
+                            OpTime opTime,
+                            boost::optional<Date_t> deadline = boost::none);
 
     /**
      * Waits until the optime of the current node is at least the opTime specified in 'readConcern'.
@@ -1122,11 +1129,13 @@ private:
                                              const ReadConcernArgs& readConcern);
 
     /**
-     * Waits until the optime of the current node is at least the clusterTime specified in
-     * 'readConcern'. Supports local and majority readConcern.
+     * Waits until the deadline or until the optime of the current node is at least the clusterTime
+     * specified in 'readConcern'. Supports local and majority readConcern.
+     * If maxTimeMS and deadline are both specified, it waits for min(maxTimeMS, deadline).
      */
     Status _waitUntilClusterTimeForRead(OperationContext* opCtx,
-                                        const ReadConcernArgs& readConcern);
+                                        const ReadConcernArgs& readConcern,
+                                        boost::optional<Date_t> deadline);
 
     /**
      * Returns a pseudorandom number no less than 0 and less than limit (which must be positive).

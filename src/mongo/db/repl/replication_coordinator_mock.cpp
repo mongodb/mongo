@@ -229,6 +229,11 @@ Status ReplicationCoordinatorMock::waitUntilOpTimeForRead(OperationContext* opCt
     return Status::OK();
 }
 
+Status ReplicationCoordinatorMock::waitUntilOpTimeForReadUntil(OperationContext* opCtx,
+                                                               const ReadConcernArgs& settings,
+                                                               boost::optional<Date_t> deadline) {
+    return Status::OK();
+}
 
 OID ReplicationCoordinatorMock::getElectionId() {
     // TODO
