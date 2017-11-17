@@ -194,8 +194,20 @@ var setLogVerbosity;
         var e;
         var master;
         try {
-            assert.commandWorked(admin.runCommand(
-                {replSetReconfig: rs._updateConfigIfNotDurable(config), force: force}));
+            var reconfigCommand = {
+                replSetReconfig: rs._updateConfigIfNotDurable(config),
+                force: force
+            };
+            var res = admin.runCommand(reconfigCommand);
+
+            // Retry reconfig if quorum check failed because not enough voting nodes responded.
+            if (!res.ok && res.code === ErrorCodes.NodeNotFound) {
+                print("Replset reconfig failed because quorum check failed. Retry reconfig once. " +
+                      "Error: " + tojson(res));
+                res = admin.runCommand(reconfigCommand);
+            }
+
+            assert.commandWorked(res);
         } catch (e) {
             if (!isNetworkError(e)) {
                 throw e;
