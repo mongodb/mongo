@@ -608,7 +608,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		 */
 		pressure = cache->cp_pass_pressure / highest_percentile;
 		busy = __wt_eviction_needed(
-		    entry->default_session, false, &pct_full);
+		    entry->default_session, false, true, &pct_full);
 
 		__wt_verbose(session, WT_VERB_SHARED_CACHE,
 		    "\t%5" PRIu64 ", %3" PRIu64 ", %2" PRIu32 ", %d, %2u",
