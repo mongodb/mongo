@@ -311,7 +311,8 @@ __wt_eviction_dirty_needed(WT_SESSION_IMPL *session, u_int *pct_fullp)
  *      percentage as a side-effect.
  */
 static inline bool
-__wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, u_int *pct_fullp)
+__wt_eviction_needed(
+    WT_SESSION_IMPL *session, bool busy, bool readonly, u_int *pct_fullp)
 {
 	WT_CACHE *cache;
 	u_int pct_dirty, pct_full;
@@ -327,7 +328,11 @@ __wt_eviction_needed(WT_SESSION_IMPL *session, bool busy, u_int *pct_fullp)
 		return (false);
 
 	clean_needed = __wt_eviction_clean_needed(session, &pct_full);
-	dirty_needed = __wt_eviction_dirty_needed(session, &pct_dirty);
+	if (readonly) {
+		dirty_needed = false;
+		pct_dirty = 0;
+	} else
+		dirty_needed = __wt_eviction_dirty_needed(session, &pct_dirty);
 
 	/*
 	 * Calculate the cache full percentage; anything over the trigger means
@@ -370,7 +375,8 @@ __wt_cache_full(WT_SESSION_IMPL *session)
  *	Evict pages if the cache crosses its boundaries.
  */
 static inline int
-__wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
+__wt_cache_eviction_check(
+    WT_SESSION_IMPL *session, bool busy, bool readonly, bool *didworkp)
 {
 	WT_BTREE *btree;
 	WT_TXN_GLOBAL *txn_global;
@@ -421,7 +427,7 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 		return (0);
 
 	/* Check if eviction is needed. */
-	if (!__wt_eviction_needed(session, busy, &pct_full))
+	if (!__wt_eviction_needed(session, busy, readonly, &pct_full))
 		return (0);
 
 	/*
@@ -431,5 +437,5 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool *didworkp)
 	if (didworkp != NULL)
 		*didworkp = true;
 
-	return (__wt_cache_eviction_worker(session, busy, pct_full));
+	return (__wt_cache_eviction_worker(session, busy, readonly, pct_full));
 }
