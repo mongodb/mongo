@@ -313,7 +313,7 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
 }
 
 Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationContext* opCtx,
-                                                                      const std::string& version) {
+                                                                      const BSONObj& cmdObj) {
 
     // No shards should be added until we have forwarded featureCompatibilityVersion to all shards.
     Lock::SharedLock lk(opCtx->lockState(), _kShardMembershipLock);
@@ -331,7 +331,7 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             "admin",
-            BSON(FeatureCompatibilityVersion::kCommandName << version),
+            cmdObj,
             Shard::RetryPolicy::kIdempotent);
         if (!response.isOK()) {
             return response.getStatus();

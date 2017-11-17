@@ -660,7 +660,12 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return batchResponseStatus;
     }
 
-    // The featureCompatibilityVersion should be the same throughout the cluster.
+    // The featureCompatibilityVersion should be the same throughout the cluster. We don't
+    // explicitly send writeConcern majority to the added shard, because a 3.4 mongod will reject
+    // it (setFCV did not support writeConcern until 3.6), and a 3.6 mongod will still default to
+    // majority writeConcern.
+    //
+    // TODO SERVER-32045: propagate the user's writeConcern
     auto versionResponse = _runCommandForAddShard(
         opCtx,
         targeter.get(),

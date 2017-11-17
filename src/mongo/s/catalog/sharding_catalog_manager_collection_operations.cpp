@@ -45,6 +45,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
@@ -337,6 +338,18 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
                             boost::none                                                     // limit
                             ))
             .docs;
+
+    if (shardedColls.empty()) {
+        LOG(0) << "all sharded collections already have UUIDs";
+
+        // We did a local read of the collections collection above and found that all sharded
+        // collections already have UUIDs. However, the data may not be majority committed (a
+        // previous setFCV attempt may have failed with a write concern error). Since the current
+        // Client doesn't know the opTime of the last write to the collections collection, make it
+        // wait for the last opTime in the system when we wait for writeConcern.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        return;
+    }
 
     // Generate and persist a new UUID for each collection that did not have a UUID.
     LOG(0) << "generating UUIDs for " << shardedColls.size()

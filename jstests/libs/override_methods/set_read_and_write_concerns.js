@@ -104,6 +104,7 @@
             "revokePriviligesFromRole",
             "revokeRolesFromRole",
             "revokeRolesFromUser",
+            "setFeatureCompatibilityVersion",
             "update",
             "updateRole",
             "updateUser",
