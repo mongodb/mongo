@@ -53,9 +53,32 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
+
+bool checkCOperationType(const BSONObj& opObj, const StringData opName) {
+    BSONElement opTypeElem = opObj["op"];
+    checkBSONType(BSONType::String, opTypeElem);
+    const StringData opType = opTypeElem.checkAndGetStringData();
+
+    if (opType == "c"_sd) {
+        BSONElement oElem = opObj["o"];
+        checkBSONType(BSONType::Object, oElem);
+        BSONObj o = oElem.Obj();
+
+        if (o.firstElement().fieldNameStringData() == opName) {
+            return true;
+        }
+    }
+    return false;
+};
+
+UUID getUUIDFromOplogEntry(const BSONObj& oplogEntry) {
+    BSONElement uiElem = oplogEntry["ui"];
+    return uassertStatusOK(UUID::parse(uiElem));
+};
 
 Status checkOperationAuthorization(OperationContext* opCtx,
                                    const std::string& dbname,
@@ -79,6 +102,14 @@ Status checkOperationAuthorization(OperationContext* opCtx,
     BSONElement nsElem = oplogEntry["ns"];
     checkBSONType(BSONType::String, nsElem);
     NamespaceString ns(oplogEntry["ns"].checkAndGetStringData());
+
+    if (oplogEntry.hasField("ui"_sd)) {
+        // ns by UUID overrides the ns specified if they are different.
+        auto& uuidCatalog = UUIDCatalog::get(opCtx);
+        NamespaceString uuidCollNS = uuidCatalog.lookupNSSByUUID(getUUIDFromOplogEntry(oplogEntry));
+        if (!uuidCollNS.isEmpty() && uuidCollNS != ns)
+            ns = uuidCollNS;
+    }
 
     BSONElement oElem = oplogEntry["o"];
     checkBSONType(BSONType::Object, oElem);
@@ -136,34 +167,19 @@ Status checkOperationAuthorization(OperationContext* opCtx,
     return Status(ErrorCodes::FailedToParse, "Unrecognized opType");
 }
 
-enum class ApplyOpsValidity { kOk, kNeedsForceAndUseUUID, kNeedsSuperuser };
+enum class ApplyOpsValidity { kOk, kNeedsUseUUID, kNeedsForceAndUseUUID, kNeedsSuperuser };
 
 /**
  * Returns kNeedsSuperuser, if the provided applyOps command contains
- * an empty applyOps command. Returns kNeedForceAndUseUUID if an operation contains a UUID,
- * indicating that privileges to manipulate UUIDs are required. Returns kOk if no conditions
+ * an empty applyOps command or createCollection/renameCollection commands are mixed in applyOps
+ * batch. Returns kNeedForceAndUseUUID if an operation contains a UUID, and will create a collection
+ * with the user-specified UUID. Returns
+ * kNeedsUseUUID if the operation contains a UUID. Returns kOk if no conditions
  * which must be specially handled are detected. May throw exceptions if the input is malformed.
  */
 ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
     const size_t maxApplyOpsDepth = 10;
     std::stack<std::pair<size_t, BSONObj>> toCheck;
-
-    auto operationContainsApplyOps = [](const BSONObj& opObj) {
-        BSONElement opTypeElem = opObj["op"];
-        checkBSONType(BSONType::String, opTypeElem);
-        const StringData opType = opTypeElem.checkAndGetStringData();
-
-        if (opType == "c"_sd) {
-            BSONElement oElem = opObj["o"];
-            checkBSONType(BSONType::Object, oElem);
-            BSONObj o = oElem.Obj();
-
-            if (o.firstElement().fieldNameStringData() == "applyOps"_sd) {
-                return true;
-            }
-        }
-        return false;
-    };
 
     auto operationContainsUUID = [](const BSONObj& opObj) {
         auto anyTopLevelElementIsUUID = [](const BSONObj& opObj) {
@@ -214,6 +230,20 @@ ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
             return ApplyOpsValidity::kNeedsSuperuser;
         }
 
+        // createCollection and renameCollection are only allowed to be applied
+        // individually. Ensure there is no create/renameCollection in a batch
+        // of size greater than 1.
+        if (applyOpsObj.firstElement().Array().size() > 1) {
+            for (const BSONElement& e : applyOpsObj.firstElement().Array()) {
+                checkBSONType(BSONType::Object, e);
+                auto oplogEntry = e.Obj();
+                if (checkCOperationType(oplogEntry, "create"_sd) ||
+                    checkCOperationType(oplogEntry, "renameCollection"_sd)) {
+                    return ApplyOpsValidity::kNeedsSuperuser;
+                }
+            }
+        }
+
         // For each applyOps command, iterate the ops.
         for (BSONElement element : applyOpsObj.firstElement().Array()) {
             checkBSONType(BSONType::Object, element);
@@ -229,12 +259,16 @@ ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
             }
 
             // If the op uses any UUIDs at all then the user must possess extra privileges.
-            if (ret == ApplyOpsValidity::kOk && opHasUUIDs) {
+            if (opHasUUIDs && ret == ApplyOpsValidity::kOk)
+                ret = ApplyOpsValidity::kNeedsUseUUID;
+            if (opHasUUIDs && checkCOperationType(opObj, "create"_sd)) {
+                // If the op is 'c' and forces the server to ingest a collection
+                // with a specific, user defined UUID.
                 ret = ApplyOpsValidity::kNeedsForceAndUseUUID;
             }
 
             // If the op contains a nested applyOps...
-            if (operationContainsApplyOps(opObj)) {
+            if (checkCOperationType(opObj, "applyOps"_sd)) {
                 // And we've recursed too far, then bail out.
                 uassert(ErrorCodes::FailedToParse,
                         "Too many nested applyOps",
@@ -287,6 +321,13 @@ public:
             if (!authSession->isAuthorizedForActionsOnResource(
                     ResourcePattern::forClusterResource(),
                     {ActionType::forceUUID, ActionType::useUUID})) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            validity = ApplyOpsValidity::kOk;
+        }
+        if (validity == ApplyOpsValidity::kNeedsUseUUID) {
+            if (!authSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), ActionType::useUUID)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
             validity = ApplyOpsValidity::kOk;
