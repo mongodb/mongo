@@ -199,9 +199,9 @@ private:
 
     void _accumulateTaskMetrics(MetricsArray* outArray, const MetricsArray& inputArray) const;
     void _accumulateAllTaskMetrics(MetricsArray* outputMetricsArray,
-                                   stdx::unique_lock<stdx::mutex>& lk) const;
+                                   const stdx::unique_lock<stdx::mutex>& lk) const;
     TickSource::Tick _getThreadTimerTotal(ThreadTimer which,
-                                          stdx::unique_lock<stdx::mutex>& lk) const;
+                                          const stdx::unique_lock<stdx::mutex>& lk) const;
 
     std::shared_ptr<asio::io_context> _ioContext;
 

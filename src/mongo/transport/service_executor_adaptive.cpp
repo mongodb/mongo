@@ -434,8 +434,8 @@ void ServiceExecutorAdaptive::_accumulateTaskMetrics(MetricsArray* outArray,
     }
 }
 
-void ServiceExecutorAdaptive::_accumulateAllTaskMetrics(MetricsArray* outputMetricsArray,
-                                                        stdx::unique_lock<stdx::mutex>& lk) const {
+void ServiceExecutorAdaptive::_accumulateAllTaskMetrics(
+    MetricsArray* outputMetricsArray, const stdx::unique_lock<stdx::mutex>& lk) const {
     _accumulateTaskMetrics(outputMetricsArray, _accumulatedMetrics);
     for (auto& thread : _threads) {
         _accumulateTaskMetrics(outputMetricsArray, thread.threadMetrics);
@@ -443,7 +443,7 @@ void ServiceExecutorAdaptive::_accumulateAllTaskMetrics(MetricsArray* outputMetr
 }
 
 TickSource::Tick ServiceExecutorAdaptive::_getThreadTimerTotal(
-    ThreadTimer which, stdx::unique_lock<stdx::mutex>& lk) const {
+    ThreadTimer which, const stdx::unique_lock<stdx::mutex>& lk) const {
     TickSource::Tick accumulator;
     switch (which) {
         case ThreadTimer::Running:
