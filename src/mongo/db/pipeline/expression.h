@@ -912,7 +912,7 @@ private:
      * range. If the field is missing or empty, the function returns the defaultValue.
      */
     bool evaluateNumberWithinRange(const Document& root,
-                                   boost::intrusive_ptr<Expression> field,
+                                   const Expression* field,
                                    StringData fieldName,
                                    int defaultValue,
                                    int minValue,
