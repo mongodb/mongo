@@ -160,7 +160,7 @@ __wt_compact(WT_SESSION_IMPL *session)
 		 * checking whether the cache is full.  Check now to throttle
 		 * compact to match eviction speed.
 		 */
-		WT_ERR(__wt_cache_eviction_check(session, false, NULL));
+		WT_ERR(__wt_cache_eviction_check(session, false, false, NULL));
 
 		/*
 		 * Pages read for compaction aren't "useful"; don't update the
