@@ -78,6 +78,8 @@ struct __wt_cache {
 	uint64_t bytes_read;		/* Bytes read into memory */
 	uint64_t bytes_written;
 
+	uint64_t bytes_lookaside;	/* Lookaside bytes inmem */
+
 	volatile uint64_t eviction_progress;	/* Eviction progress count */
 	uint64_t last_eviction_progress;/* Tracked eviction progress */
 
