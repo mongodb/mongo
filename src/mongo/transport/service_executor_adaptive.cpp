@@ -39,6 +39,7 @@
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
@@ -121,7 +122,16 @@ struct ServerParameterOptions : public ServiceExecutorAdaptive::Options {
     }
 
     Microseconds maxQueueLatency() const final {
-        return Microseconds{adaptiveServiceExecutorMaxQueueLatencyMicros.load()};
+        static Nanoseconds minTimerResolution = getMinimumTimerResolution();
+        Microseconds value{adaptiveServiceExecutorMaxQueueLatencyMicros.load()};
+        if (value < minTimerResolution) {
+            log() << "Target MaxQueueLatencyMicros (" << value
+                  << ") is less than minimum timer resolution of OS (" << minTimerResolution
+                  << "). Using " << minTimerResolution;
+            value = duration_cast<Microseconds>(minTimerResolution) + Microseconds{1};
+            adaptiveServiceExecutorMaxQueueLatencyMicros.store(value.count());
+        }
+        return value;
     }
 
     int idlePctThreshold() const final {

@@ -346,4 +346,7 @@ char* ctime(const time_t* timep);
 struct tm* gmtime(const time_t* timep);
 struct tm* localtime(const time_t* timep);
 
+// Find minimum system timer resolution of OS
+Nanoseconds getMinimumTimerResolution();
+
 }  // namespace mongo
