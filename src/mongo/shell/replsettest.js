@@ -1356,8 +1356,23 @@ var ReplSetTest = function(opts) {
             return inAOnly.concat(inBOnly);
         }
 
+        function collectionInfo(node, dbName, collName) {
+            var res = node.getDB(dbName).runCommand({listCollections: 1, filter: {name: collName}});
+            assert.commandWorked(res);
+            var coll = node.getDB(dbName).getCollection(collName);
+            return {
+                ns: dbName + '.' + collName,
+                host: node.host,
+                UUID: res.cursor.firstBatch[0].info.uuid,
+                count: coll.find().itcount()
+            };
+        }
+
         function dumpCollectionDiff(primary, secondary, dbName, collName) {
             print('Dumping collection: ' + dbName + '.' + collName);
+
+            print('primary info: ' + tojsononeline(collectionInfo(primary, dbName, collName)));
+            print('secondary info: ' + tojsononeline(collectionInfo(secondary, dbName, collName)));
 
             var primaryColl = primary.getDB(dbName).getCollection(collName);
             var secondaryColl = secondary.getDB(dbName).getCollection(collName);
@@ -1510,7 +1525,7 @@ var ReplSetTest = function(opts) {
                                 if (!bsonBinaryEqual(secondaryInfo, primaryInfo)) {
                                     print(msgPrefix +
                                           ', the primary and secondary have different ' +
-                                          'attributes for the collection or view' + dbName + '.' +
+                                          'attributes for the collection or view ' + dbName + '.' +
                                           secondaryInfo.name);
                                     print('Collection info on the primary: ' + tojson(primaryInfo));
                                     print('Collection info on the secondary: ' +
@@ -1541,8 +1556,12 @@ var ReplSetTest = function(opts) {
                                   ', the primary and secondary have different stats for the ' +
                                   'collection ' + dbName + '.' + collName);
                             print('Collection stats on the primary: ' + tojson(primaryCollStats));
+                            print('Collection info on the primary: ' +
+                                  tojsononeline(collectionInfo(primary, dbName, collName)));
                             print('Collection stats on the secondary: ' +
                                   tojson(secondaryCollStats));
+                            print('Collection info on the secondary: ' +
+                                  tojsononeline(collectionInfo(secondary, dbName, collName)));
                             success = false;
                         }
                     });
