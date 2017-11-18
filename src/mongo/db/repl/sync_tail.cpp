@@ -33,23 +33,23 @@
 
 #include "mongo/db/repl/sync_tail.h"
 
+#include "third_party/murmurhash3/MurmurHash3.h"
 #include <boost/functional/hash.hpp>
 #include <memory>
-#include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/base/counter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/dbhelpers.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_timestamp.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/prefetch.h"
@@ -708,8 +708,12 @@ private:
 void SyncTail::oplogApplication(StorageInterface* storageInterface) {
     OpQueueBatcher batcher(this, storageInterface);
 
-    OperationContextImpl txn;
-    auto replCoord = ReplicationCoordinator::get(&txn);
+    ReplicationCoordinator* replCoord;
+    {
+        OperationContextImpl txn;
+        replCoord = ReplicationCoordinator::get(&txn);
+    }
+
     std::unique_ptr<ApplyBatchFinalizer> finalizer{
         getGlobalServiceContext()->getGlobalStorageEngine()->isDurable()
             ? new ApplyBatchFinalizerForJournal(replCoord)
@@ -717,6 +721,7 @@ void SyncTail::oplogApplication(StorageInterface* storageInterface) {
 
     while (!inShutdown()) {
         OpQueue ops;
+        OperationContextImpl txn;
 
         do {
             if (BackgroundSync::get()->getInitialSyncRequestedFlag()) {
