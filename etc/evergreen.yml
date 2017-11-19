@@ -9629,9 +9629,6 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough
     distros:
     - rhel62-large
-  - name: retryable_writes_jscore_passthrough
-    distros:
-    - rhel62-large
   - name: rlp
   - name: rollback_fuzzer
   - name: serial_run
@@ -9758,9 +9755,6 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough
     distros:
     - windows-64-vs2015-large
-  - name: retryable_writes_jscore_passthrough
-    distros:
-    - windows-64-vs2015-large
   - name: rollback_fuzzer
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
@@ -9850,7 +9844,6 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_jscore_passthrough
   - name: replica_sets_resync_static_jscore_passthrough
-  - name: retryable_writes_jscore_passthrough
   - name: rollback_fuzzer
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
