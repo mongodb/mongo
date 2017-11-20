@@ -277,6 +277,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 strict: true
                 immutable: true
+                inline_chained_structs: true
                 fields:
                     foo: bar
             """))
@@ -289,6 +290,7 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 immutable: false
+                inline_chained_structs: false
                 fields:
                     foo: bar
             """))
