@@ -230,10 +230,14 @@ class _TestList(object):
         The tests are returned in the same order as they are found in the root tests.
         """
         tests = []
+        excluded = []
         for test in self._roots:
-            if test in self._filtered and test not in tests:
-                tests.append(test)
-        return tests
+            if test in self._filtered:
+                if test not in tests:
+                    tests.append(test)
+            elif test not in excluded:
+                excluded.append(test)
+        return tests, excluded
 
 
 ##############################
@@ -406,6 +410,8 @@ class _Selector(object):
 
         Args:
             selector_config: a _SelectorConfig instance.
+        Returns:
+            A tuple with the list of selected tests and the list of excluded tests.
         """
 
         # 1. Find the root files.
@@ -508,25 +514,27 @@ class _DbTestSelector(_Selector):
         _Selector.__init__(self, test_file_explorer, tests_are_files=False)
 
     def select(self, selector_config):
+        if selector_config.roots:
+            roots = selector_config.roots
+        else:
+            if not self._test_file_explorer.isfile(selector_config.binary):
+                raise IOError(errno.ENOENT, "File not found", selector_config.binary)
+            roots = self._test_file_explorer.list_dbtests(selector_config.binary)
+
         if config.INCLUDE_WITH_ANY_TAGS:
             # The db_tests do not currently support tags so we always return an empty array when the
             # --includeWithAnyTags option is used.
-            return []
+            return [], roots
 
         if selector_config.roots:
             # Tests have been specified on the command line. We use them without additional
             # filtering.
-            return selector_config.roots
-
-        if not self._test_file_explorer.isfile(selector_config.binary):
-            raise IOError(errno.ENOENT, "File not found", selector_config.binary)
-
-        dbtests = self._test_file_explorer.list_dbtests(selector_config.binary)
+            return selector_config.roots, []
 
         if not selector_config.include_suites:
-            return dbtests
+            return roots, []
 
-        test_files = _TestList(self._test_file_explorer, dbtests, tests_are_files=False)
+        test_files = _TestList(self._test_file_explorer, roots, tests_are_files=False)
         test_files.include_any_pattern(selector_config.include_suites)
 
         return test_files.get_tests()

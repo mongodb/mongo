@@ -42,7 +42,7 @@ class Suite(object):
         self._suite_options = suite_options
 
         self.test_kind = self.get_test_kind_config()
-        self.tests = self._get_tests_for_kind(self.test_kind)
+        self.tests, self.excluded = self._get_tests_for_kind(self.test_kind)
 
         self.return_code = None  # Set by the executor.
 
@@ -70,13 +70,13 @@ class Suite(object):
             mongos_options = test_info  # Just for easier reading.
             if not isinstance(mongos_options, dict):
                 raise TypeError("Expected dictionary of arguments to mongos")
-            return [mongos_options]
+            return [mongos_options], []
 
-        tests = _selector.filter_tests(test_kind, test_info)
+        tests, excluded = _selector.filter_tests(test_kind, test_info)
         if _config.ORDER_TESTS_BY_NAME:
-            return sorted(tests, key=str.lower)
+            return sorted(tests, key=str.lower), sorted(excluded, key=str.lower)
 
-        return tests
+        return tests, excluded
 
     def get_name(self):
         """

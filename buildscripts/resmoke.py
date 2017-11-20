@@ -36,10 +36,17 @@ def _execute_suite(suite):
 
     if resmokelib.config.DRY_RUN == "tests":
         sb = []
-        sb.append("Tests that would be run for %ss in suite %s:"
-                  % (suite.test_kind, suite.get_display_name()))
+        sb.append("Tests that would be run in suite %s:" % suite.get_display_name())
         if len(suite.tests) > 0:
             for test in suite.tests:
+                sb.append(test)
+        else:
+            sb.append("(no tests)")
+        logger.info("\n".join(sb))
+        sb = []
+        sb.append("Tests that would be excluded from suite %s:" % suite.get_display_name())
+        if len(suite.excluded) > 0:
+            for test in suite.excluded:
                 sb.append(test)
         else:
             sb.append("(no tests)")
