@@ -106,6 +106,8 @@ public:
                 "Can't issue forceRoutingTableRefresh from 'eval'",
                 !opCtx->getClient()->isInDirectClient());
 
+        auto& oss = OperationShardingState::get(opCtx);
+
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         {
@@ -116,16 +118,16 @@ public:
             // of the commit (and new writes to the committed chunk) that hasn't yet propagated back
             // to this shard. This ensures the read your own writes causal consistency guarantee.
             auto css = CollectionShardingState::get(opCtx, nss);
-            if (css && css->getMigrationSourceManager()) {
+            if (css->getMigrationSourceManager()) {
                 auto criticalSectionSignal =
                     css->getMigrationSourceManager()->getMigrationCriticalSectionSignal(true);
                 if (criticalSectionSignal) {
-                    auto& oss = OperationShardingState::get(opCtx);
                     oss.setMigrationCriticalSectionSignal(criticalSectionSignal);
-                    oss.waitForMigrationCriticalSectionSignal(opCtx);
                 }
             }
         }
+
+        oss.waitForMigrationCriticalSectionSignal(opCtx);
 
         LOG(1) << "Forcing routing table refresh for " << nss;
 
