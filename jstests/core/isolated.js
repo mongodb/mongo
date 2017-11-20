@@ -1,4 +1,6 @@
 // Tests for the $isolated update/delete operator.
+// Uses features that require featureCompatibilityVersion 3.6.
+// @tags: [requires_fcv36]
 (function() {
     "use strict";
 

@@ -42,10 +42,15 @@ res = t.update({}, {$pull: {a: 1}});
 assert.writeOK(res);
 t.remove({});
 
-t.save({_id: 1});
-res = t.update({}, {$pop: {a: true}});
-assert.writeError(res);
-t.remove({});
+// SERVER-29912 intentionally not fixed when the featureCompatibilityVersion is 3.4.
+let fcvDoc = db.getSiblingDB("admin").system.version.findOne({_id: "featureCompatibilityVersion"});
+assert.neq(null, fcvDoc);
+if (fcvDoc.version === "3.6") {
+    t.save({_id: 1});
+    res = t.update({}, {$pop: {a: true}});
+    assert.writeError(res);
+    t.remove({});
+}
 
 t.save({_id: 1});
 res = t.update({}, {$rename: {a: "b"}});

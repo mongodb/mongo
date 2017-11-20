@@ -1,0 +1,40 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  exclude_files:
+  # These tests are not expected to pass with replica-sets:
+  - jstests/core/dbadmin.js
+  - jstests/core/opcounters_write_cmd.js
+  - jstests/core/read_after_optime.js
+  - jstests/core/capped_update.js
+  # JSON Schema is not available in featureCompatibilityVersion 3.4
+  - jstests/core/json_schema/*.js
+  exclude_with_any_tags:
+  - requires_fcv36
+
+executor:
+  config:
+    shell_options:
+      eval: >-
+        testingReplication = true;
+        assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: '3.4'}));
+      readMode: commands
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 511
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1
+    num_nodes: 2

@@ -1,4 +1,6 @@
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
+// Uses features that require featureCompatibilityVersion 3.6.
+// @tags: [requires_fcv36]
 
 (function() {
     "use strict";

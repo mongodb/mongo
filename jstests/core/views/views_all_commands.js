@@ -48,6 +48,9 @@
  *
  *  skipStandalone
  *      If true, do not run this command on a standalone mongod.
+ *
+ * Uses features that require featureCompatibilityVersion 3.6.
+ * @tags: [requires_fcv36]
  */
 
 (function() {

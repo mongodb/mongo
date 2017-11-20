@@ -1,6 +1,7 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// Uses features that require featureCompatibilityVersion 3.6.
+// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_fcv36]
 
 // Tests creation of indexes using applyOps for collections with a non-simple default collation.
 // Indexes created through applyOps should be built exactly according to their index spec, without

@@ -1,6 +1,7 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop]
+// Uses features that require featureCompatibilityVersion 3.6.
+// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_fcv36]
 
 // Verify invalid validator statements won't work and that we
 // can't create validated collections on restricted databases.

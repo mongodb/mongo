@@ -138,6 +138,12 @@
     // Run the test using a normal validator.
     runBypassDocumentValidationTest({a: {$exists: true}});
 
-    // Run the test again with an equivalent JSON Schema validator.
-    runBypassDocumentValidationTest({$jsonSchema: {required: ['a']}});
+    // Run the test again with an equivalent JSON Schema validator if the
+    // featureCompatibilityVersion is 3.6.
+    let fcvDoc =
+        db.getSiblingDB("admin").system.version.findOne({_id: "featureCompatibilityVersion"});
+    assert.neq(null, fcvDoc);
+    if (fcvDoc.version === "3.6") {
+        runBypassDocumentValidationTest({$jsonSchema: {required: ['a']}});
+    }
 })();

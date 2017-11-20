@@ -3373,6 +3373,28 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: replica_sets_jscore_fcv34_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_jscore_fcv34_passthrough --storageEngine=mmapv1
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: replica_sets_jscore_fcv34_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_jscore_fcv34_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: mongosTest
   commands:
   - func: "do setup"
@@ -5087,6 +5109,7 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_pv0
   - name: replica_sets_rollback_refetch_no_uuid
+  - name: replica_sets_jscore_fcv34_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
   - name: master_slave_WT
   - name: master_slave_auth
@@ -6087,6 +6110,9 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
     distros:
     - windows-64-vs2015-large
+  - name: replica_sets_jscore_fcv34_passthrough_WT
+    distros:
+    - windows-64-vs2015-large
   - name: retryable_writes_jscore_passthrough_WT
     distros:
     - windows-64-vs2015-large
@@ -6568,6 +6594,7 @@ buildvariants:
   - name: replica_sets_WT
   - name: replica_sets_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+  - name: replica_sets_jscore_fcv34_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
   - name: rollback_fuzzer_WT
   - name: serial_run_WT
@@ -6863,6 +6890,9 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
     distros:
     - rhel62-large
+  - name: replica_sets_jscore_fcv34_passthrough_WT
+    distros:
+    - rhel62-large
   - name: retryable_writes_jscore_passthrough_WT
     distros:
     - rhel62-large
@@ -7000,6 +7030,7 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough_WT
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+  - name: replica_sets_jscore_fcv34_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
@@ -8718,6 +8749,7 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_fcv34_passthrough
   - name: retryable_writes_jscore_passthrough_WT
   - name: rlp
   - name: rollback_fuzzer_WT
@@ -8804,6 +8836,7 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_fcv34_passthrough
   - name: rollback_fuzzer_WT
   - name: master_slave_WT
   - name: master_slave_auth
@@ -9112,6 +9145,7 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough_WT
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+  - name: replica_sets_jscore_fcv34_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
@@ -9262,6 +9296,7 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough_WT
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
+  - name: replica_sets_jscore_fcv34_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
@@ -9645,6 +9680,9 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
     distros:
     - rhel62-large
+  - name: replica_sets_jscore_fcv34_passthrough
+    distros:
+    - rhel62-large
   - name: replica_sets_resync_static_jscore_passthrough
     distros:
     - rhel62-large
@@ -9770,6 +9808,9 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
     distros:
     - windows-64-vs2015-large
+  - name: replica_sets_jscore_fcv34_passthrough
+    distros:
+    - windows-64-vs2015-large
   - name: replica_sets_resync_static_jscore_passthrough
     distros:
     - windows-64-vs2015-large
@@ -9860,6 +9901,7 @@ buildvariants:
   - name: replica_sets_initsync_jscore_passthrough
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_fcv34_passthrough
   - name: replica_sets_resync_static_jscore_passthrough
   - name: rollback_fuzzer
   - name: serial_run

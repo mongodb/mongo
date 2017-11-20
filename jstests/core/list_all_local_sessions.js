@@ -1,4 +1,6 @@
 // Basic tests for the $listLocalSessions {allUsers: true} aggregation stage.
+// Uses features that require featureCompatibilityVersion 3.6.
+// @tags: [requires_fcv36]
 
 (function() {
     'use strict';
