@@ -232,7 +232,7 @@ functions:
           set -o verbose
           TAG="3.2.1-Baseline"
           PROJECT="mongo-longevity"
-          OVERRIDEFILE="../src/dsi/dsi/analysis/master/longevity_override.json"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/${branch_name}/longevity_override.json"
           python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id $PROJECT --task_name ${task_name} --variant ${build_variant}
 
 tasks:

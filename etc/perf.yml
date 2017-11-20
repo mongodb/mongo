@@ -160,9 +160,8 @@ functions:
           source ./venv/bin/activate
           REFTAGS="3.4.9-Baseline 3.2.17-Baseline 3.0.15-Baseline" # These are project specific
           # Project Opts are  project specific, but don't match expansion from elsewhere.
-          # We could change dsi/analysis/master to dsi/analysis/perf in DSI to get dsi/analysis/${project}/perf_override.json
           # Note project_id performance doesn't match string perf used elsewhere for ${project}
-          PROJECT_OPTS="--overrideFile ../dsi/analysis/master/perf_override.json --project_id performance"
+          PROJECT_OPTS="--overrideFile ../dsi/analysis/${branch_name}/perf_override.json --project_id performance"
           python -u ../dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $REFTAGS $PROJECT_OPTS --variant ${build_variant} --task ${task_name} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
     - command: "json.send"
       params:
@@ -183,7 +182,7 @@ functions:
           reports_analysis_flags="--reports-analysis . --perf-file perf/perf.json"
           cmd_flags=$([ "${reports_analysis}" = "true" ] && echo "$reports_analysis_flags" || echo "")
           REFTAG="3.4.9-Baseline"
-          OVERRIDE="../dsi/analysis/master/perf_override.json" # Note use of master here cannot use ${project}
+          OVERRIDE="../dsi/analysis/${branch_name}/perf_override.json"
           python ../dsi/analysis/perf_regression_check.py $cmd_flags -f history.json --rev ${revision} -t tags.json --refTag $REFTAG --overrideFile $OVERRIDE --variant ${build_variant} --task ${task_name} --threshold 0.075 --threadThreshold 0.12
   "run perf tests":
     - command: shell.exec
