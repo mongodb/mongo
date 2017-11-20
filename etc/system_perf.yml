@@ -338,7 +338,9 @@ tasks:
     - func: "make test log artifact"
     - func: "analyze"
       vars:
-        script_flags: --ycsb-throughput-analysis reports
+        # Disabling --ycsb-throughput-analysis until BF-7153 fixed
+        # script_flags: --ycsb-throughput-analysis reports
+        script_flags: reports
 
 - name: industry_benchmarks_MMAPv1
   depends_on:
