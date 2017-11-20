@@ -202,16 +202,8 @@ void FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(OperationContext
 
 void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
                                                     repl::StorageInterface* storageInterface) {
-    // A clean startup means there are no databases on disk besides the local database.
-    std::vector<std::string> dbNames;
-    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-    storageEngine->listDatabases(&dbNames);
-
-    for (auto&& dbName : dbNames) {
-        if (dbName != "local") {
-            return;
-        }
-    }
+    if (!isCleanStartUp())
+        return;
 
     // If the server was not started with --shardsvr, the default featureCompatibilityVersion on
     // clean startup is the upgrade version. If it was started with --shardsvr, the default
@@ -251,6 +243,19 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
             Timestamp()},
         repl::OpTime::kUninitializedTerm));  // No timestamp or term because this write is not
                                              // replicated.
+}
+
+bool FeatureCompatibilityVersion::isCleanStartUp() {
+    std::vector<std::string> dbNames;
+    StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
+    storageEngine->listDatabases(&dbNames);
+
+    for (auto&& dbName : dbNames) {
+        if (dbName != "local") {
+            return false;
+        }
+    }
+    return true;
 }
 
 namespace {
