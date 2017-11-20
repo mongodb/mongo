@@ -122,7 +122,7 @@ functions:
   "get buildnumber" : &get_buildnumber
     command: keyval.inc
     params:
-      key: "master"
+      key: "v3.6"
       destination: "builder_num"
 
   "setup credentials" : &setup_credentials
@@ -590,9 +590,22 @@ axes:
         variables:
            PYTHON_BINARY: "/opt/python/2.7/bin/python"
            DRIVER_WORKING_DIRECTORY: "mongo-python-driver"
+           DRIVER_TEST_UPLOAD_DIRECTORY: "src/mongo-python-driver/xunit-results/TEST-*.xml"
+      - id: "3.6"
+        display_name: "Python 3.6"
+        variables:
+           PYTHON_BINARY: "/opt/python/3.6/bin/python3"
+           DRIVER_WORKING_DIRECTORY: "mongo-python-driver"
+           DRIVER_TEST_UPLOAD_DIRECTORY: "src/mongo-python-driver/xunit-results/TEST-*.xml"
   - id: python-windows
     display_name: "Windows Visual Studio 2010 Python"
     values:
+      - id: "2.7"
+        display_name: "Python 2.7"
+        variables:
+           PYTHON_BINARY: "/cygdrive/c/python/Python27/python.exe"
+           DRIVER_WORKING_DIRECTORY: "mongo-python-driver"
+           DRIVER_TEST_UPLOAD_DIRECTORY: "src/mongo-python-driver/xunit-results/TEST-*.xml"
       - id: "3.6"
         display_name: "Python 3.6"
         variables:
@@ -611,7 +624,7 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
+  branch: v3.6
 
 # Shared by all drivers projects
 - name: drivers-evergreen-tools
@@ -686,9 +699,9 @@ buildvariants:
 ### DRIVER Test Variants
 ### DRIVERS add your matrix or test variant here
 
-### Python Matrix Linux
-- matrix_name: "python-driver-linux"
-  matrix_spec: {auth: "*", ssl: "*", os: "rhel62", python-linux: "2.6" }
+### Python 2.7 Linux Matrix Secure 
+- matrix_name: "python-driver-2.7-linux-secure"
+  matrix_spec: {auth: "auth", ssl: "ssl", os: "rhel62", python-linux: "2.7" }
   display_name: "Python Driver ${os} ${python-linux} ${auth} ${ssl}"
   modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
   tasks:
@@ -696,9 +709,39 @@ buildvariants:
      - name: "test-nightly-sharded_cluster"
      - name: "test-nightly-standalone"
 
-### Python Matrix Windows
-- matrix_name: "python-driver-windows"
-  matrix_spec: {auth: "*", ssl: "*", os: "windows64", python-windows: "3.6" }
+### Python 2.7 Linux Matrix Insecure
+- matrix_name: "python-driver-2.7-linux-insecure"
+  matrix_spec: {auth: "noauth", ssl: "nossl", os: "rhel62", python-linux: "2.7" }
+  display_name: "Python Driver ${os} ${python-linux} ${auth} ${ssl}"
+  modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
+  tasks:
+     - name: "test-nightly-replica_set"
+     - name: "test-nightly-sharded_cluster"
+     - name: "test-nightly-standalone"
+
+### Python 3.6 Linux Matrix Secure
+- matrix_name: "python-driver-3.6-linux-secure"
+  matrix_spec: {auth: "auth", ssl: "ssl", os: "rhel62", python-linux: "3.6" }
+  display_name: "Python Driver ${os} ${python-linux} ${auth} ${ssl}"
+  modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
+  tasks:
+     - name: "test-nightly-replica_set"
+     - name: "test-nightly-sharded_cluster"
+     - name: "test-nightly-standalone"
+
+### Python 3.6 Linux Matrix Insecure
+- matrix_name: "python-driver-3.6-linux-insecure"
+  matrix_spec: {auth: "noauth", ssl: "nossl", os: "rhel62", python-linux: "3.6" }
+  display_name: "Python Driver ${os} ${python-linux} ${auth} ${ssl}"
+  modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
+  tasks:
+     - name: "test-nightly-replica_set"
+     - name: "test-nightly-sharded_cluster"
+     - name: "test-nightly-standalone"
+
+### Python 2.7 Windows Matrix Secure
+- matrix_name: "python-driver-2.7-windows-secure"
+  matrix_spec: {auth: "auth", ssl: "ssl", os: "windows64", python-windows: "2.7" }
   display_name: "Python Driver ${os} ${python-windows} ${auth} ${ssl}"
   modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
   tasks:
@@ -706,9 +749,49 @@ buildvariants:
      - name: "test-nightly-sharded_cluster"
      - name: "test-nightly-standalone"
 
-### Java Matrix Linux
-- matrix_name: "java-driver-linux"
-  matrix_spec: {auth: "*", ssl: "*", os: "rhel62", jdk: "jdk8" }
+### Python 2.7 Windows Matrix Insecure
+- matrix_name: "python-driver-2.7-windows-insecure"
+  matrix_spec: {auth: "noauth", ssl: "nossl", os: "windows64", python-windows: "2.7" }
+  display_name: "Python Driver ${os} ${python-windows} ${auth} ${ssl}"
+  modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
+  tasks:
+     - name: "test-nightly-replica_set"
+     - name: "test-nightly-sharded_cluster"
+     - name: "test-nightly-standalone"
+
+### Python 3.6 Windows Matrix Secure
+- matrix_name: "python-driver-3.6-windows-secure"
+  matrix_spec: {auth: "auth", ssl: "ssl", os: "windows64", python-windows: "3.6" }
+  display_name: "Python Driver ${os} ${python-windows} ${auth} ${ssl}"
+  modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
+  tasks:
+     - name: "test-nightly-replica_set"
+     - name: "test-nightly-sharded_cluster"
+     - name: "test-nightly-standalone"
+
+### Python 3.6 Windows Matrix Insecure
+- matrix_name: "python-driver-3.6-windows-insecure"
+  matrix_spec: {auth: "noauth", ssl: "nossl", os: "windows64", python-windows: "3.6" }
+  display_name: "Python Driver ${os} ${python-windows} ${auth} ${ssl}"
+  modules: [ "mongo-python-driver", "drivers-evergreen-tools" ]
+  tasks:
+     - name: "test-nightly-replica_set"
+     - name: "test-nightly-sharded_cluster"
+     - name: "test-nightly-standalone"
+
+### Java Linux Matrix Secure 
+- matrix_name: "java-driver-linux-secure"
+  matrix_spec: {auth: "auth", ssl: "ssl", os: "rhel62", jdk: "jdk8" }
+  display_name: "Java Driver ${os} ${jdk} ${auth} ${ssl}"
+  modules: [ "mongo-java-driver", "drivers-evergreen-tools" ]
+  tasks:
+     - name: "test-nightly-replica_set"
+     - name: "test-nightly-sharded_cluster"
+     - name: "test-nightly-standalone"
+
+### Java Linux Matrix Insecure 
+- matrix_name: "java-driver-linux-insecure"
+  matrix_spec: {auth: "noauth", ssl: "nossl", os: "rhel62", jdk: "jdk8" }
   display_name: "Java Driver ${os} ${jdk} ${auth} ${ssl}"
   modules: [ "mongo-java-driver", "drivers-evergreen-tools" ]
   tasks:
