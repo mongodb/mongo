@@ -2172,5 +2172,45 @@ TEST(IDLCommand, TestKnownFieldDuplicate) {
 }
 
 
+// Positive: Test an inline nested chain struct works
+TEST(IDLChainedStruct, TestInline) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("stringField"
+                        << "bar"
+                        << "field3"
+                        << "foo");
+
+    auto testStruct = Chained_struct_inline::parse(ctxt, testDoc);
+    ASSERT_EQUALS(testStruct.getChained_string_inline_basic_type().getStringField(), "bar");
+    ASSERT_EQUALS(testStruct.getField3(), "foo");
+
+    assert_same_types<decltype(testStruct.getChained_string_inline_basic_type().getStringField()),
+                      const StringData>();
+    assert_same_types<decltype(testStruct.getField3()), const StringData>();
+
+    // Positive: Test we can round trip to a document from the just parsed document
+    {
+        BSONObj loopbackDoc = testStruct.toBSON();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        Chained_struct_inline one_new;
+        one_new.setField3("foo");
+
+        Chained_string_inline_basic_type f1;
+        f1.setStringField("bar");
+        one_new.setChained_string_inline_basic_type(f1);
+
+        BSONObj loopbackDoc = one_new.toBSON();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+}
+
 }  // namespace
 }  // namespace mongo
