@@ -63,29 +63,26 @@ std::string toCommaDelimitedList(const std::vector<BSONType>& types) {
 constexpr StringData IDLParserErrorContext::kOpMsgDollarDBDefault;
 constexpr StringData IDLParserErrorContext::kOpMsgDollarDB;
 
-bool IDLParserErrorContext::checkAndAssertType(const BSONElement& element, BSONType type) const {
+bool IDLParserErrorContext::checkAndAssertTypeSlowPath(const BSONElement& element,
+                                                       BSONType type) const {
     auto elementType = element.type();
 
-    if (elementType != type) {
-        // If the type is wrong, ignore Null and Undefined values
-        if (elementType == jstNULL || elementType == Undefined) {
-            return false;
-        }
-
-        std::string path = getElementPath(element);
-        uasserted(ErrorCodes::TypeMismatch,
-                  str::stream() << "BSON field '" << path << "' is the wrong type '"
-                                << typeName(element.type())
-                                << "', expected type '"
-                                << typeName(type)
-                                << "'");
+    // If the type is wrong, ignore Null and Undefined values
+    if (elementType == jstNULL || elementType == Undefined) {
+        return false;
     }
 
-    return true;
+    std::string path = getElementPath(element);
+    uasserted(ErrorCodes::TypeMismatch,
+              str::stream() << "BSON field '" << path << "' is the wrong type '"
+                            << typeName(elementType)
+                            << "', expected type '"
+                            << typeName(type)
+                            << "'");
 }
 
-bool IDLParserErrorContext::checkAndAssertBinDataType(const BSONElement& element,
-                                                      BinDataType type) const {
+bool IDLParserErrorContext::checkAndAssertBinDataTypeSlowPath(const BSONElement& element,
+                                                              BinDataType type) const {
     bool isBinDataType = checkAndAssertType(element, BinData);
     if (!isBinDataType) {
         return false;

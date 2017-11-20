@@ -60,7 +60,7 @@ def _is_required_serializer_field(field):
     Fields that must be set before serialization are fields without default values, that are not
     optional, and are not chained.
     """
-    return not field.ignore and not field.optional and not field.default and not field.chained
+    return not field.ignore and not field.optional and not field.default and not field.chained and not field.chained_struct_field
 
 
 def _get_field_constant_name(field):
@@ -153,7 +153,8 @@ class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
     def add_store(self, field_name):
         # type: (unicode) -> None
         self._writer.write_line('auto push_result = usedFields.insert(%s);' % (field_name))
-        with writer.IndentedScopedBlock(self._writer, 'if (push_result.second == false) {', '}'):
+        with writer.IndentedScopedBlock(self._writer,
+                                        'if (MONGO_unlikely(push_result.second == false)) {', '}'):
             self._writer.write_line('ctxt.throwDuplicateField(%s);' % (field_name))
 
     def add(self, field, bson_element_variable):
@@ -165,9 +166,9 @@ class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
         # type: () -> None
         for field in self._fields:
             if (not field.optional) and (not field.ignore) and (not field.chained):
-                with writer.IndentedScopedBlock(self._writer,
-                                                'if (usedFields.find(%s) == usedFields.end()) {' %
-                                                (_get_field_constant_name(field)), '}'):
+                pred = 'if (MONGO_unlikely(usedFields.find(%s) == usedFields.end())) {' % \
+                    (_get_field_constant_name(field))
+                with writer.IndentedScopedBlock(self._writer, pred, '}'):
                     if field.default:
                         self._writer.write_line('%s = %s;' %
                                                 (_get_field_member_name(field), field.default))
@@ -217,7 +218,7 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
         if not field in self._fields:
             self._fields.append(field)
 
-        with writer.IndentedScopedBlock(self._writer, 'if (usedFields[%s]) {' %
+        with writer.IndentedScopedBlock(self._writer, 'if (MONGO_unlikely(usedFields[%s])) {' %
                                         (_gen_field_usage_constant(field)), '}'):
             self._writer.write_line('ctxt.throwDuplicateField(%s);' % (bson_element_variable))
         self._writer.write_empty_line()
@@ -228,7 +229,8 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
     def add_final_checks(self):
         # type: () -> None
         """Output the code to check for missing fields."""
-        with writer.IndentedScopedBlock(self._writer, 'if (!usedFields.all()) {', '}'):
+        with writer.IndentedScopedBlock(self._writer, 'if (MONGO_unlikely(!usedFields.all())) {',
+                                        '}'):
             for field in self._fields:
                 if (not field.optional) and (not field.ignore):
                     with writer.IndentedScopedBlock(self._writer, 'if (!usedFields[%s]) {' %
@@ -788,7 +790,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('%s = %s;' % (_get_field_member_name(field), expression))
         else:
             # May be an empty block if the type is 'any'
-            with self._predicate(_get_bson_type_check('element', 'ctxt', field)):
+            predicate = _get_bson_type_check('element', 'ctxt', field)
+            if predicate:
+                predicate = "MONGO_likely(%s)" % (predicate)
+            with self._predicate(predicate):
                 object_value = self._gen_field_deserializer_expression('element', field)
                 if field.chained_struct_field:
                     self._writer.write_line('%s.%s(%s);' %
