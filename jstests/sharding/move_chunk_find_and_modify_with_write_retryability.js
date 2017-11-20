@@ -3,7 +3,9 @@ load("jstests/sharding/move_chunk_with_session_helper.js");
 (function() {
     "use strict";
 
-    if (jsTest.options().storageEngine === "mmapv1") {
+    load("jstests/libs/retryable_writes_util.js");
+
+    if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
         jsTestLog("Retryable writes are not supported, skipping test");
         return;
     }
