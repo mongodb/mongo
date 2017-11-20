@@ -410,7 +410,8 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         // addShard, which will add UUIDs to all collections that do not already have them. Here,
         // we add UUIDs to the non-replicated collections on the primary. We add them on the
         // secondaries during InitialSync.
-        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
+            FeatureCompatibilityVersion::isCleanStartUp()) {
             auto schemaStatus = updateUUIDSchemaVersionNonReplicated(opCtx, true);
             if (!schemaStatus.isOK()) {
                 return schemaStatus;
