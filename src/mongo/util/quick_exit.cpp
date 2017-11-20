@@ -101,9 +101,9 @@ void quickExit(int code) {
 #if defined(_WIN32)
     // SERVER-23860: VS 2015 Debug Builds abort and Release builds AV when _exit is called on
     // multiple threads. Each call to _exit shuts down the CRT, and so subsequent calls into the
-    // CRT result in undefined behavior. Bypass _exit CRT shutdown code and call ExitProcess
-    // directly instead.
-    ::ExitProcess(code);
+    // CRT result in undefined behavior. Bypass _exit CRT shutdown code and call TerminateProcess
+    // directly instead to match GLibc's _exit which calls the syscall exit_group.
+    ::TerminateProcess(GetCurrentProcess(), code);
 #else
     ::_exit(code);
 #endif
