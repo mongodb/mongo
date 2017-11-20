@@ -109,15 +109,15 @@ TEST(MongoDnsQuery, srvRecords) {
     } tests[] = {
         {"test1.test.build.10gen.cc.",
          {
-             {"localhost.build.10gen.cc.", 27017}, {"localhost.build.10gen.cc.", 27018},
+             {"localhost.test.build.10gen.cc.", 27017}, {"localhost.test.build.10gen.cc.", 27018},
          }},
         {"test2.test.build.10gen.cc.",
          {
-             {"localhost.build.10gen.cc.", 27018}, {"localhost.build.10gen.cc.", 27019},
+             {"localhost.test.build.10gen.cc.", 27018}, {"localhost.test.build.10gen.cc.", 27019},
          }},
         {"test3.test.build.10gen.cc.",
          {
-             {"localhost.build.10gen.cc.", 27017},
+             {"localhost.test.build.10gen.cc.", 27017},
          }},
 
         // Test case 4 does not exist in the expected DNS records.
@@ -125,11 +125,11 @@ TEST(MongoDnsQuery, srvRecords) {
 
         {"test5.test.build.10gen.cc.",
          {
-             {"localhost.build.10gen.cc.", 27017},
+             {"localhost.test.build.10gen.cc.", 27017},
          }},
         {"test6.test.build.10gen.cc.",
          {
-             {"localhost.build.10gen.cc.", 27017},
+             {"localhost.test.build.10gen.cc.", 27017},
          }},
     };
     for (const auto& test : tests) {
