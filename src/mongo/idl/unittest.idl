@@ -448,6 +448,21 @@ structs:
             field3:
                 type: int
 
+    chained_string_inline_basic_type:
+        description: Base struct type for a chained string
+        strict: true
+        fields:
+            stringField: string
+
+    chained_struct_inline:
+        description: Chained struct with chained structs and fields
+        strict: true
+        inline_chained_structs: true
+        chained_structs:
+            chained_string_inline_basic_type : chained_string_inline_basic_type
+        fields:
+            field3: string
+
 
 ##################################################################################################
 #

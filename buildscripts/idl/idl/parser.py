@@ -334,6 +334,7 @@ def _parse_struct(ctxt, spec, name, node):
         "chained_types": _RuleDesc('mapping', mapping_parser_func=_parse_chained_types),
         "chained_structs": _RuleDesc('mapping', mapping_parser_func=_parse_chained_structs),
         "strict": _RuleDesc("bool_scalar"),
+        "inline_chained_structs": _RuleDesc("bool_scalar"),
         "immutable": _RuleDesc('bool_scalar'),
     })
 

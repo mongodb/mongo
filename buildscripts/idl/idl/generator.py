@@ -40,6 +40,12 @@ def _get_field_member_name(field):
     return '_%s' % (common.camel_case(field.cpp_name))
 
 
+def _get_field_member_setter_name(field):
+    # type: (ast.Field) -> unicode
+    """Get the C++ class setter name for a field."""
+    return "set%s" % (common.title_case(field.cpp_name))
+
+
 def _get_has_field_member_name(field):
     # type: (ast.Field) -> unicode
     """Get the C++ class member name for bool 'has' member field."""
@@ -444,7 +450,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             post_body = '%s = true;' % (_get_has_field_member_name(field))
 
         template_params = {
-            'method_name': common.title_case(field.cpp_name),
+            'method_name': _get_field_member_setter_name(field),
             'member_name': member_name,
             'param_type': param_type,
             'body': cpp_type_info.get_setter_body(member_name),
@@ -452,7 +458,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         }
 
         with self._with_template(template_params):
-            self._writer.write_template('void set${method_name}(${param_type} value) & ' +
+            self._writer.write_template('void ${method_name}(${param_type} value) & ' +
                                         '{ ${body} ${post_body} }')
 
         self._writer.write_empty_line()
@@ -619,7 +625,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                     # Write getters & setters
                     for field in struct.fields:
-                        if not field.ignore:
+                        if not field.ignore and not field.chained_struct_field:
                             if field.description:
                                 self.gen_description_comment(field.description)
                             self.gen_getter(field)
@@ -640,7 +646,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                     # Write member variables
                     for field in struct.fields:
-                        if not field.ignore:
+                        if not field.ignore and not field.chained_struct_field:
                             self.gen_member(field)
 
                     # Write serializer member variables
@@ -784,7 +790,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # May be an empty block if the type is 'any'
             with self._predicate(_get_bson_type_check('element', 'ctxt', field)):
                 object_value = self._gen_field_deserializer_expression('element', field)
-                self._writer.write_line('%s = %s;' % (_get_field_member_name(field), object_value))
+                if field.chained_struct_field:
+                    self._writer.write_line('%s.%s(%s);' %
+                                            (_get_field_member_name(field.chained_struct_field),
+                                             _get_field_member_setter_name(field), object_value))
+                else:
+                    self._writer.write_line('%s = %s;' %
+                                            (_get_field_member_name(field), object_value))
 
     def gen_doc_sequence_deserializer(self, field):
         # type: (ast.Field) -> None
@@ -941,13 +953,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     with self._predicate(command_predicate):
                         self._writer.write_line('ctxt.throwUnknownField(fieldName);')
 
-        # Parse chained types
-        for field in struct.fields:
-            if not field.chained:
-                continue
+        # Parse chained types if not inlined
+        if not struct.inline_chained_structs:
+            for field in struct.fields:
+                if not field.chained:
+                    continue
 
-            # Simply generate deserializers since these are all 'any' types
-            self.gen_field_deserializer(field, bson_object)
+                # Simply generate deserializers since these are all 'any' types
+                self.gen_field_deserializer(field, bson_object)
         self._writer.write_empty_line()
 
         self._writer.write_empty_line()
@@ -1173,6 +1186,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # If fields are meant to be ignored during deserialization, there is no need to
             # serialize. Ignored fields have no backing storage.
             if field.ignore:
+                continue
+
+            if field.chained_struct_field:
                 continue
 
             # The $db injected field should only be inject when serializing to OpMsgRequest. In the
