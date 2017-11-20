@@ -32,13 +32,12 @@
 
 #include "mongo/transport/transport_layer_asio.h"
 
-#include "boost/algorithm/string.hpp"
-
-#include "asio.hpp"
+#include <asio.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "mongo/config.h"
 #ifdef MONGO_CONFIG_SSL
-#include "asio/ssl.hpp"
+#include <asio/ssl.hpp>
 #endif
 
 #include "mongo/base/checked_cast.h"
@@ -145,6 +144,9 @@ Status TransportLayerASIO::setup() {
         listenAddrs.emplace_back(makeUnixSockPath(_listenerOptions.port));
     }
 #endif
+
+    _listenerPort = _listenerOptions.port;
+
     for (auto& ip : listenAddrs) {
         std::error_code ec;
         if (ip.empty()) {
@@ -199,7 +201,21 @@ Status TransportLayerASIO::setup() {
                 }
             }
 #endif
-            _acceptors.emplace_back(std::make_pair(std::move(addr), std::move(acceptor)));
+            if (_listenerOptions.port == 0 &&
+                (addr.getType() == AF_INET || addr.getType() == AF_INET6)) {
+                if (_listenerPort != _listenerOptions.port) {
+                    return Status(ErrorCodes::BadValue,
+                                  "Port 0 (ephemeral port) is not allowed when"
+                                  " listening on multiple IP interfaces");
+                }
+                std::error_code ec;
+                auto endpoint = acceptor.local_endpoint(ec);
+                if (ec) {
+                    return errorCodeToStatus(ec);
+                }
+                _listenerPort = endpointToHostAndPort(endpoint).port();
+            }
+            _acceptors.emplace_back(std::move(addr), std::move(acceptor));
         }
     }
 
@@ -254,7 +270,7 @@ Status TransportLayerASIO::start() {
         ssl = " ssl";
     }
 #endif
-    log() << "waiting for connections on port " << _listenerOptions.port << ssl;
+    log() << "waiting for connections on port " << _listenerPort << ssl;
 
     return Status::OK();
 }

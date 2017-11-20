@@ -31,6 +31,7 @@
 #include <functional>
 #include <string>
 
+#include "mongo/base/status_with.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/condition_variable.h"
@@ -112,6 +113,10 @@ public:
 
     const std::shared_ptr<asio::io_context>& getIOContext();
 
+    int listenerPort() const {
+        return _listenerPort;
+    }
+
 private:
     class ASIOSession;
     class ASIOTicket;
@@ -165,6 +170,8 @@ private:
     ServiceEntryPoint* const _sep = nullptr;
     AtomicWord<bool> _running{false};
     Options _listenerOptions;
+    // The real incoming port in case of _listenerOptions.port==0 (ephemeral).
+    int _listenerPort = 0;
 };
 
 }  // namespace transport
