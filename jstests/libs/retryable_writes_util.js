@@ -12,5 +12,15 @@ var RetryableWritesUtil = (function() {
         return retryableWriteCommands.has(cmdName);
     }
 
-    return {isRetryableWriteCmdName: isRetryableWriteCmdName};
+    const kStorageEnginesWithoutDocumentLocking = new Set(["ephemeralForTest", "mmapv1"]);
+
+    /**
+     * Returns true if the given storage engine supports retryable writes (i.e. supports
+     * document-level locking).
+     */
+    function storageEngineSupportsRetryableWrites(storageEngineName) {
+        return !kStorageEnginesWithoutDocumentLocking.has(storageEngineName);
+    }
+
+    return {isRetryableWriteCmdName, storageEngineSupportsRetryableWrites};
 })();
