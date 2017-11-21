@@ -20,7 +20,8 @@
     var admin = mongos.getDB("admin");
     var config = mongos.getDB("config");
 
-    var dbase = mongos.getDB("test");
+    const dbName = "test";
+    var dbase = mongos.getDB(dbName);
     var coll = dbase.getCollection("foo");
     var dbaseSOk = mongosSOK.getDB("" + dbase);
     var collSOk = mongosSOK.getCollection("" + coll);
@@ -41,7 +42,12 @@
 
     print("2: shard collection");
 
-    shardTest.shardColl(coll, /* shardBy */ {_id: 1}, /* splitAt */ {_id: 0});
+    shardTest.shardColl(coll,
+                        /* shardBy */ {_id: 1},
+                        /* splitAt */ {_id: 0},
+                        /* move chunk */ {_id: 0},
+                        /* dbname */ null,
+                        /* waitForDelete */ true);
 
     print("3: test normal and slaveOk queries");
 
