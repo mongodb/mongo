@@ -35,7 +35,11 @@ _IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
 
 _OPERATIONS = ["shell", "copy_to", "copy_from"]
 
-_SSH_CONNECTION_ERRORS = ["System is booting up.", "Permission denied"]
+_SSH_CONNECTION_ERRORS = [
+    "System is booting up.",
+    "Permission denied",
+    "ssh_exchange_identification: read: Connection reset by peer"
+]
 
 
 def posix_path(path):

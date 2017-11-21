@@ -56,6 +56,7 @@ class AwsEc2(object):
                 print(".", end="", file=sys.stdout)
                 sys.stdout.flush()
             try:
+                client_error = ""
                 time_left = end_time - time.time()
                 instance.load()
                 if instance.state["Name"] == state:
@@ -63,18 +64,19 @@ class AwsEc2(object):
                     break
                 if time_left <= 0:
                     break
-            except botocore.exceptions.ClientError:
+            except botocore.exceptions.ClientError as err:
                 # A ClientError exception can sometimes be generated, due to RequestLimitExceeded,
                 # so we ignore it and retry until we time out.
-                pass
+                client_error = " {}".format(err.message)
+
             wait_interval_secs = 15 if time_left > 15 else time_left
             time.sleep(wait_interval_secs)
         if show_progress:
             if reached_state:
                 print(" Instance {}!".format(instance.state["Name"]), file=sys.stdout)
             else:
-                print(" Instance in state '{}', failed to reach state '{}'!".format(
-                    instance.state["Name"], state), file=sys.stdout)
+                print(" Instance in state '{}', failed to reach state '{}'{}!".format(
+                    instance.state["Name"], state, client_error), file=sys.stdout)
             sys.stdout.flush()
         return 0 if reached_state else 1
 
