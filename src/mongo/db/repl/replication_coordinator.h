@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/sync_source_selector.h"
@@ -47,7 +48,6 @@ class IndexDescriptor;
 class NamespaceString;
 class OperationContext;
 class ServiceContext;
-class SnapshotName;
 class Timestamp;
 struct WriteConcernOptions;
 
@@ -814,15 +814,7 @@ public:
      * A null OperationContext can be used in cases where the snapshot to wait for should not be
      * adjusted.
      */
-    virtual SnapshotName reserveSnapshotName(OperationContext* opCtx) = 0;
-
-    /**
-     * Creates a new snapshot in the storage engine and registers it for use in the replication
-     * coordinator.
-     */
-    virtual void createSnapshot(OperationContext* opCtx,
-                                OpTime timeOfSnapshot,
-                                SnapshotName name) = 0;
+    virtual Timestamp reserveSnapshotName(OperationContext* opCtx) = 0;
 
     /**
      * Blocks until either the current committed snapshot is at least as high as 'untilSnapshot',
@@ -830,7 +822,7 @@ public:
      * 'opCtx' is used to checkForInterrupt and enforce maxTimeMS.
      */
     virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
-                                            const SnapshotName& untilSnapshot) = 0;
+                                            const Timestamp& untilSnapshot) = 0;
 
     /**
      * Resets all information related to snapshotting.

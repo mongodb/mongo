@@ -39,6 +39,7 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
@@ -500,9 +501,8 @@ void scheduleWritesToOplog(OperationContext* opCtx,
             for (size_t i = begin; i < end; i++) {
                 // Add as unowned BSON to avoid unnecessary ref-count bumps.
                 // 'ops' will outlive 'docs' so the BSON lifetime will be guaranteed.
-                docs.emplace_back(InsertStatement{ops[i].raw,
-                                                  SnapshotName(ops[i].getOpTime().getTimestamp()),
-                                                  ops[i].getOpTime().getTerm()});
+                docs.emplace_back(InsertStatement{
+                    ops[i].raw, ops[i].getOpTime().getTimestamp(), ops[i].getOpTime().getTerm()});
             }
 
             fassertStatusOK(40141,

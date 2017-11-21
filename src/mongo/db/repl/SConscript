@@ -958,7 +958,6 @@ env.Library(
     source=[
         'repl_client_info.cpp',
         'replication_coordinator.cpp',
-        'replication_coordinator_external_state.cpp',
     ],
     LIBDEPS=[
         'optime',
@@ -1654,4 +1653,3 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ]
 )
-

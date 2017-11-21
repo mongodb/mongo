@@ -34,6 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/stdx/mutex.h"
@@ -272,13 +273,13 @@ public:
         return upgradeUUIDSchemaVersionNonReplicatedFn(opCtx);
     }
 
-    void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
+    void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override;
 
-    void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
+    void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override;
 
-    SnapshotName getStableTimestamp() const;
+    Timestamp getStableTimestamp() const;
 
-    SnapshotName getInitialDataTimestamp() const;
+    Timestamp getInitialDataTimestamp() const;
 
     Status recoverToStableTimestamp(ServiceContext* serviceCtx) override {
         return Status{ErrorCodes::IllegalOperation, "recoverToStableTimestamp not implemented."};
@@ -363,8 +364,8 @@ private:
     mutable stdx::mutex _mutex;
     int _rbid;
     bool _rbidInitialized = false;
-    SnapshotName _stableTimestamp = SnapshotName::min();
-    SnapshotName _initialDataTimestamp = SnapshotName::min();
+    Timestamp _stableTimestamp = Timestamp::min();
+    Timestamp _initialDataTimestamp = Timestamp::min();
     OptionalCollectionUUID _uuid;
     bool _schemaUpgraded;
 };

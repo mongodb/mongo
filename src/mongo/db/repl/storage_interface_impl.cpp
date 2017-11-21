@@ -127,7 +127,7 @@ Status StorageInterfaceImpl::initializeRollbackID(OperationContext* opCtx) {
 
     BSONObjBuilder bob;
     rbid.serialize(&bob);
-    SnapshotName noTimestamp;  // This write is not replicated.
+    Timestamp noTimestamp;  // This write is not replicated.
     return insertDocument(opCtx,
                           _rollbackIdNss,
                           TimestampedBSONObj{bob.done(), noTimestamp},
@@ -949,13 +949,12 @@ Status StorageInterfaceImpl::upgradeUUIDSchemaVersionNonReplicated(OperationCont
     return updateUUIDSchemaVersionNonReplicated(opCtx, true);
 }
 
-void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx,
-                                              SnapshotName snapshotName) {
+void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) {
     serviceCtx->getGlobalStorageEngine()->setStableTimestamp(snapshotName);
 }
 
 void StorageInterfaceImpl::setInitialDataTimestamp(ServiceContext* serviceCtx,
-                                                   SnapshotName snapshotName) {
+                                                   Timestamp snapshotName) {
     serviceCtx->getGlobalStorageEngine()->setInitialDataTimestamp(snapshotName);
 }
 

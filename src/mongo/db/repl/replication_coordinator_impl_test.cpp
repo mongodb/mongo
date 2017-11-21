@@ -393,8 +393,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     ASSERT_OK(status);
     ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
 
-    ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp().asU64(),
-                  SnapshotName(appliedTS.asULL()).asU64());
+    ASSERT_EQUALS(getStorageInterface()->getInitialDataTimestamp(), appliedTS);
 }
 
 TEST_F(ReplCoordTest,
@@ -3515,7 +3514,6 @@ TEST_F(ReplCoordTest,
 
     getReplCoord()->setMyLastAppliedOpTime(time);
     getReplCoord()->setMyLastDurableOpTime(time);
-    getReplCoord()->createSnapshot(opCtx.get(), time, SnapshotName(1));
     ASSERT_OK(getReplCoord()->setLastAppliedOptime_forTest(2, 1, time));
 
 
@@ -3873,17 +3871,17 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedSetsStableOpTimeForStorage) {
 
     // There should be no stable optime candidates until setMyLastAppliedOpTime is called.
     repl->advanceCommitPoint(OpTime({1, 2}, 0));
-    ASSERT_EQUALS(SnapshotName::min(), getStorageInterface()->getStableTimestamp());
+    ASSERT_EQUALS(Timestamp::min(), getStorageInterface()->getStableTimestamp());
 
     // Check that the stable timestamp is updated for the storage engine when we set the applied
     // optime.
     repl->setMyLastAppliedOpTime(OpTime({1, 1}, 0));
-    stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
+    stableTimestamp = getStorageInterface()->getStableTimestamp();
     ASSERT_EQUALS(Timestamp(1, 1), stableTimestamp);
 
     // Check that timestamp cleanup occurs.
     repl->setMyLastAppliedOpTime(OpTime({1, 2}, 0));
-    stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
+    stableTimestamp = getStorageInterface()->getStableTimestamp();
     ASSERT_EQUALS(Timestamp(1, 2), stableTimestamp);
 
     auto opTimeCandidates = repl->getStableOpTimeCandidates_forTest();
@@ -3910,13 +3908,12 @@ TEST_F(StableOpTimeTest, AdvanceCommitPointSetsStableOpTimeForStorage) {
 
     // Set a commit point and check the stable optime.
     repl->advanceCommitPoint(OpTime({1, 1}, term));
-    stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
+    stableTimestamp = getStorageInterface()->getStableTimestamp();
     ASSERT_EQUALS(Timestamp(1, 1), stableTimestamp);
 
-    // Check that the stable timestamp is updated for the storage engine when we advance the
-    // commit point.
+    // Check that the stable timestamp is updated when we advance the commit point.
     repl->advanceCommitPoint(OpTime({1, 2}, term));
-    stableTimestamp = Timestamp(getStorageInterface()->getStableTimestamp().asU64());
+    stableTimestamp = getStorageInterface()->getStableTimestamp();
     ASSERT_EQUALS(Timestamp(1, 2), stableTimestamp);
 
     // Check that timestamp candidate cleanup occurs.
@@ -4144,7 +4141,6 @@ TEST_F(ReplCoordTest, ReadAfterCommittedGreaterOpTime) {
 
     getReplCoord()->setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 1));
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 1));
-    getReplCoord()->createSnapshot(opCtx.get(), OpTime(Timestamp(100, 0), 1), SnapshotName(1));
 
     ASSERT_OK(getReplCoord()->waitUntilOpTimeForRead(
         opCtx.get(),
@@ -4168,7 +4164,6 @@ TEST_F(ReplCoordTest, ReadAfterCommittedEqualOpTime) {
     OpTime time(Timestamp(100, 0), 1);
     getReplCoord()->setMyLastAppliedOpTime(time);
     getReplCoord()->setMyLastDurableOpTime(time);
-    getReplCoord()->createSnapshot(opCtx.get(), time, SnapshotName(1));
 
     ASSERT_OK(getReplCoord()->waitUntilOpTimeForRead(
         opCtx.get(), ReadConcernArgs(time, ReadConcernLevel::kMajorityReadConcern)));
@@ -4195,7 +4190,6 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredGreaterOpTime) {
         // Not guaranteed to be scheduled after waitUntil blocks...
         getReplCoord()->setMyLastAppliedOpTime(committedOpTime);
         getReplCoord()->setMyLastDurableOpTime(committedOpTime);
-        getReplCoord()->createSnapshot(nullptr, committedOpTime, SnapshotName(1));
     });
 
     ASSERT_OK(getReplCoord()->waitUntilOpTimeForRead(
@@ -4225,7 +4219,6 @@ TEST_F(ReplCoordTest, ReadAfterCommittedDeferredEqualOpTime) {
         // Not guaranteed to be scheduled after waitUntil blocks...
         getReplCoord()->setMyLastAppliedOpTime(opTimeToWait);
         getReplCoord()->setMyLastDurableOpTime(opTimeToWait);
-        getReplCoord()->createSnapshot(nullptr, opTimeToWait, SnapshotName(1));
     });
 
     ASSERT_OK(getReplCoord()->waitUntilOpTimeForRead(
@@ -5223,7 +5216,6 @@ TEST_F(ReplCoordTest, NewStyleUpdatePositionCmdHasMetadata) {
     rpc::ReplSetMetadata syncSourceMetadata(optime.getTerm(), optime, optime, 1, OID(), -1, 1);
     getReplCoord()->processReplSetMetadata(syncSourceMetadata);
     getReplCoord()->advanceCommitPoint(optime);
-    getReplCoord()->createSnapshot(opCtx.get(), optime, SnapshotName(1));
 
     BSONObj cmd = unittest::assertGet(getReplCoord()->prepareReplSetUpdatePositionCommand(
         ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle));

@@ -39,6 +39,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -237,7 +238,7 @@ Status WiredTigerRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
     return Status::OK();
 }
 
-boost::optional<SnapshotName> WiredTigerRecoveryUnit::getMajorityCommittedSnapshot() const {
+boost::optional<Timestamp> WiredTigerRecoveryUnit::getMajorityCommittedSnapshot() const {
     if (!_readFromMajorityCommittedSnapshot)
         return {};
     return _majorityCommittedSnapshot;
@@ -253,7 +254,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     }
     WT_SESSION* session = _session->getSession();
 
-    if (_readAtTimestamp != SnapshotName::min()) {
+    if (_readAtTimestamp != Timestamp::min()) {
         uassertStatusOK(_sessionCache->snapshotManager().beginTransactionAtTimestamp(
             _readAtTimestamp, session));
     } else if (_readFromMajorityCommittedSnapshot) {
@@ -271,7 +272,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
 }
 
 
-Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
+Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
     _ensureSession();
     LOG(3) << "WT set timestamp of future write operations to " << timestamp;
     WT_SESSION* session = _session->getSession();
@@ -280,7 +281,7 @@ Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
     // Starts the WT transaction associated with this session.
     getSession();
 
-    const std::string conf = "commit_timestamp=" + timestamp.toString();
+    const std::string conf = "commit_timestamp=" + integerToHex(timestamp.asULL());
     auto rc = session->timestamp_transaction(session, conf.c_str());
     if (rc == 0) {
         _isTimestamped = true;
@@ -288,7 +289,7 @@ Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
     return wtRCToStatus(rc, "timestamp_transaction");
 }
 
-Status WiredTigerRecoveryUnit::selectSnapshot(SnapshotName timestamp) {
+Status WiredTigerRecoveryUnit::selectSnapshot(Timestamp timestamp) {
     _readAtTimestamp = timestamp;
     return Status::OK();
 }

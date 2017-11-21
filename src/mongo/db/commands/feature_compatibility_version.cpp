@@ -248,7 +248,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
                        << (storeUpgradeVersion
                                ? FeatureCompatibilityVersionCommandParser::kVersion36
                                : FeatureCompatibilityVersionCommandParser::kVersion34)),
-            SnapshotName()},
+            Timestamp()},
         repl::OpTime::kUninitializedTerm));  // No timestamp or term because this write is not
                                              // replicated.
 }

@@ -808,13 +808,13 @@ void ReplicationCoordinatorExternalStateImpl::dropAllSnapshots() {
         manager->dropAllSnapshots();
 }
 
-void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(SnapshotInfo newCommitPoint) {
+void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(
+    const OpTime& newCommitPoint) {
     auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
     if (manager) {
-        manager->setCommittedSnapshot(SnapshotName(newCommitPoint.opTime.getTimestamp()),
-                                      newCommitPoint.opTime.getTimestamp());
+        manager->setCommittedSnapshot(newCommitPoint.getTimestamp());
     }
-    notifyOplogMetadataWaiters(newCommitPoint.opTime);
+    notifyOplogMetadataWaiters(newCommitPoint);
 }
 
 bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {

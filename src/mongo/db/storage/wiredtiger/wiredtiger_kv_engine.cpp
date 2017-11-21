@@ -163,8 +163,8 @@ public:
                                       wiredTigerGlobalOptions.checkpointDelaySecs)));
             }
 
-            const SnapshotName stableTimestamp(_stableTimestamp.load());
-            const SnapshotName initialDataTimestamp(_initialDataTimestamp.load());
+            const Timestamp stableTimestamp(_stableTimestamp.load());
+            const Timestamp initialDataTimestamp(_initialDataTimestamp.load());
             const bool keepOldBehavior = true;
 
             try {
@@ -186,7 +186,7 @@ public:
                     //
                     // Third, stableTimestamp >= initialDataTimestamp: Take stable
                     // checkpoint. Steady state case.
-                    if (initialDataTimestamp.asU64() <= 1) {
+                    if (initialDataTimestamp.asULL() <= 1) {
                         const bool forceCheckpoint = true;
                         const bool stableCheckpoint = false;
                         _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
@@ -234,12 +234,12 @@ public:
         return _stableTimestamp.load() > initialDataTimestamp;
     }
 
-    void setStableTimestamp(SnapshotName stableTimestamp) {
-        _stableTimestamp.store(stableTimestamp.asU64());
+    void setStableTimestamp(Timestamp stableTimestamp) {
+        _stableTimestamp.store(stableTimestamp.asULL());
     }
 
-    void setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
-        _initialDataTimestamp.store(initialDataTimestamp.asU64());
+    void setInitialDataTimestamp(Timestamp initialDataTimestamp) {
+        _initialDataTimestamp.store(initialDataTimestamp.asULL());
     }
 
     void shutdown() {
@@ -995,7 +995,7 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
     return initRsOplogBackgroundThreadCallback(ns);
 }
 
-void WiredTigerKVEngine::setStableTimestamp(SnapshotName stableTimestamp) {
+void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
     const bool keepOldBehavior = true;
     // Communicate to WiredTiger what the "stable timestamp" is. Timestamp-aware checkpoints will
     // only persist to disk transactions committed with a timestamp earlier than the "stable
@@ -1025,8 +1025,8 @@ void WiredTigerKVEngine::setStableTimestamp(SnapshotName stableTimestamp) {
     _setOldestTimestamp(stableTimestamp);
 }
 
-void WiredTigerKVEngine::_setOldestTimestamp(SnapshotName oldestTimestamp) {
-    if (oldestTimestamp == SnapshotName()) {
+void WiredTigerKVEngine::_setOldestTimestamp(Timestamp oldestTimestamp) {
+    if (oldestTimestamp == Timestamp()) {
         // No oldestTimestamp to set, yet.
         return;
     }
@@ -1036,7 +1036,7 @@ void WiredTigerKVEngine::_setOldestTimestamp(SnapshotName oldestTimestamp) {
             // No oplog yet, so don't bother setting oldest_timestamp.
             return;
         }
-        if (_oplogManager->getOplogReadTimestamp() < oldestTimestamp.asU64()) {
+        if (_oplogManager->getOplogReadTimestamp() < oldestTimestamp.asULL()) {
             // For one node replica sets, the commit point might race ahead of the oplog read
             // timestamp.
             // For now, we will simply avoid setting the oldestTimestamp in such cases.
@@ -1045,7 +1045,7 @@ void WiredTigerKVEngine::_setOldestTimestamp(SnapshotName oldestTimestamp) {
     }
     auto timestampToSet = _previousSetOldestTimestamp;
     _previousSetOldestTimestamp = oldestTimestamp;
-    if (timestampToSet == SnapshotName()) {
+    if (timestampToSet == Timestamp()) {
         // Nothing to set yet.
         return;
     }
@@ -1055,7 +1055,7 @@ void WiredTigerKVEngine::_setOldestTimestamp(SnapshotName oldestTimestamp) {
     auto size = std::snprintf(oldestTSConfigString,
                               sizeof(oldestTSConfigString),
                               "oldest_timestamp=%llx",
-                              static_cast<unsigned long long>(timestampToSet.asU64()));
+                              timestampToSet.asULL());
     if (size < 0) {
         int e = errno;
         error() << "error snprintf " << errnoWithDescription(e);
@@ -1063,10 +1063,10 @@ void WiredTigerKVEngine::_setOldestTimestamp(SnapshotName oldestTimestamp) {
     }
     invariant(static_cast<std::size_t>(size) < sizeof(oldestTSConfigString));
     invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString));
-    LOG(2) << "oldest_timestamp set to " << timestampToSet.asU64();
+    LOG(2) << "oldest_timestamp set to " << timestampToSet;
 }
 
-void WiredTigerKVEngine::setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
+void WiredTigerKVEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
     if (_checkpointThread) {
         _checkpointThread->setInitialDataTimestamp(initialDataTimestamp);
     }

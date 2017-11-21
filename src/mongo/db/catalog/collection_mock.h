@@ -265,11 +265,11 @@ public:
         std::abort();
     }
 
-    boost::optional<SnapshotName> getMinimumVisibleSnapshot() {
+    boost::optional<Timestamp> getMinimumVisibleSnapshot() {
         std::abort();
     }
 
-    void setMinimumVisibleSnapshot(SnapshotName name) {
+    void setMinimumVisibleSnapshot(Timestamp name) {
         std::abort();
     }
 

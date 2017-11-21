@@ -727,15 +727,15 @@ TEST_F(InitialSyncerTest, StartupSetsInitialDataTimestampAndStableTimestampOnSuc
 
     // Set initial data timestamp forward first.
     auto serviceCtx = opCtx.get()->getServiceContext();
-    _storageInterface->setInitialDataTimestamp(serviceCtx, SnapshotName(Timestamp(5, 5)));
-    _storageInterface->setStableTimestamp(serviceCtx, SnapshotName(Timestamp(6, 6)));
+    _storageInterface->setInitialDataTimestamp(serviceCtx, Timestamp(5, 5));
+    _storageInterface->setStableTimestamp(serviceCtx, Timestamp(6, 6));
 
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
     ASSERT_TRUE(initialSyncer->isActive());
 
-    ASSERT_EQUALS(SnapshotName(Timestamp::kAllowUnstableCheckpointsSentinel),
+    ASSERT_EQUALS(Timestamp::kAllowUnstableCheckpointsSentinel,
                   _storageInterface->getInitialDataTimestamp());
-    ASSERT_EQUALS(SnapshotName::min(), _storageInterface->getStableTimestamp());
+    ASSERT_EQUALS(Timestamp::min(), _storageInterface->getStableTimestamp());
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerReturnsCallbackCanceledIfShutdownImmediatelyAfterStartup) {
@@ -3480,8 +3480,7 @@ void InitialSyncerTest::doSuccessfulInitialSyncWithOneBatch() {
     ASSERT_EQUALS(lastOp.getOpTime(), unittest::assertGet(_lastApplied).opTime);
     ASSERT_EQUALS(lastOp.getHash(), unittest::assertGet(_lastApplied).value);
 
-    ASSERT_EQUALS(SnapshotName(lastOp.getOpTime().getTimestamp()),
-                  _storageInterface->getInitialDataTimestamp());
+    ASSERT_EQUALS(lastOp.getOpTime().getTimestamp(), _storageInterface->getInitialDataTimestamp());
 }
 
 TEST_F(InitialSyncerTest,

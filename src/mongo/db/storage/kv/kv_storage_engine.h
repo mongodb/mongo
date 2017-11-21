@@ -33,6 +33,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/kv/kv_catalog.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry_base.h"
@@ -112,9 +113,9 @@ public:
 
     virtual void cleanShutdown();
 
-    virtual void setStableTimestamp(SnapshotName stableTimestamp) override;
+    virtual void setStableTimestamp(Timestamp stableTimestamp) override;
 
-    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) override;
+    virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 

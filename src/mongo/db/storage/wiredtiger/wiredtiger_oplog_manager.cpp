@@ -199,7 +199,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         // For master/slave masters, set oldest timestamp here so that we clean up old timestamp
         // data.  SERVER-31802
         if (isMasterSlave) {
-            sessionCache->getKVEngine()->setStableTimestamp(SnapshotName(newTimestamp));
+            sessionCache->getKVEngine()->setStableTimestamp(Timestamp(newTimestamp));
         }
     }
 }

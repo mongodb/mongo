@@ -431,7 +431,7 @@ OpTime ReplicationCoordinatorImpl::getCurrentCommittedSnapshotOpTime() const {
 
 OpTime ReplicationCoordinatorImpl::_getCurrentCommittedSnapshotOpTime_inlock() const {
     if (_currentCommittedSnapshot) {
-        return _currentCommittedSnapshot->opTime;
+        return _currentCommittedSnapshot.get();
     }
     return OpTime();
 }
@@ -1472,7 +1472,7 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
 }
 
 bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
-    const OpTime& opTime, SnapshotName minSnapshot, const WriteConcernOptions& writeConcern) {
+    const OpTime& opTime, Timestamp minSnapshot, const WriteConcernOptions& writeConcern) {
     // The syncMode cannot be unset.
     invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::UNSET);
     Status status = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
@@ -1496,9 +1496,8 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
             }
 
             // Wait for the "current" snapshot to advance to/past the opTime.
-            const auto haveSnapshot =
-                (_currentCommittedSnapshot->opTime >= opTime &&
-                 _currentCommittedSnapshot->opTime.getTimestamp().asULL() >= minSnapshot.asU64());
+            const auto haveSnapshot = (_currentCommittedSnapshot >= opTime &&
+                                       _currentCommittedSnapshot->getTimestamp() >= minSnapshot);
             if (!haveSnapshot) {
                 LOG(1) << "Required snapshot optime: " << opTime << " is not yet part of the "
                        << "current 'committed' snapshot: " << *_currentCommittedSnapshot;
@@ -1526,8 +1525,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
     Timer timer;
     WriteConcernOptions fixedWriteConcern = populateUnsetWriteConcernOptionsSyncMode(writeConcern);
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    auto status =
-        _awaitReplication_inlock(&lock, opCtx, opTime, SnapshotName::min(), fixedWriteConcern);
+    auto status = _awaitReplication_inlock(&lock, opCtx, opTime, Timestamp(), fixedWriteConcern);
     return {std::move(status), duration_cast<Milliseconds>(timer.elapsed())};
 }
 
@@ -1547,7 +1545,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     stdx::unique_lock<stdx::mutex>* lock,
     OperationContext* opCtx,
     const OpTime& opTime,
-    SnapshotName minSnapshot,
+    Timestamp minSnapshot,
     const WriteConcernOptions& writeConcern) {
 
     // We should never wait for replication if we are holding any locks, because this can
@@ -1568,7 +1566,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
         return Status::OK();
     }
 
-    if (opTime.isNull() && minSnapshot == SnapshotName::min()) {
+    if (opTime.isNull() && minSnapshot == Timestamp()) {
         // If waiting for the empty optime, always say it's been replicated.
         return Status::OK();
     }
@@ -2062,8 +2060,8 @@ void ReplicationCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* respon
     OpTime lastOpTime = _getMyLastAppliedOpTime_inlock();
     response->setLastWrite(lastOpTime, lastOpTime.getTimestamp().getSecs());
     if (_currentCommittedSnapshot) {
-        OpTime majorityOpTime = _currentCommittedSnapshot->opTime;
-        response->setLastMajorityWrite(majorityOpTime, majorityOpTime.getTimestamp().getSecs());
+        response->setLastMajorityWrite(_currentCommittedSnapshot.get(),
+                                       _currentCommittedSnapshot->getTimestamp().getSecs());
     }
 
     if (response->isMaster() && !_canAcceptNonLocalWrites) {
@@ -2483,8 +2481,7 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
 
     // Sets the initial data timestamp on the storage engine so it can assign a timestamp
     // to data on disk. We do this after writing the "initiating set" oplog entry.
-    auto initialDataTS = SnapshotName(lastAppliedOpTime.getTimestamp().asULL());
-    _storage->setInitialDataTimestamp(getServiceContext(), initialDataTS);
+    _storage->setInitialDataTimestamp(getServiceContext(), lastAppliedOpTime.getTimestamp());
 
     _finishReplSetInitiate(opCtx, newConfig, myIndex.getValue());
 
@@ -2931,7 +2928,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
 void ReplicationCoordinatorImpl::_wakeReadyWaiters_inlock() {
     _replicationWaiterList.signalAndRemoveIf_inlock([this](Waiter* waiter) {
         return _doneWaitingForReplication_inlock(
-            waiter->opTime, SnapshotName::min(), *waiter->writeConcern);
+            waiter->opTime, Timestamp(), *waiter->writeConcern);
     });
 }
 
@@ -3238,11 +3235,9 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage_inlock() {
         if (!testingSnapshotBehaviorInIsolation) {
             // Update committed snapshot and wake up any threads waiting on read concern or
             // write concern.
-            _updateCommittedSnapshot_inlock(SnapshotInfo{stableOpTime.get(), SnapshotName::min()});
-
+            _updateCommittedSnapshot_inlock(stableOpTime.get());
             // Update the stable timestamp for the storage engine.
-            auto stableTimestamp = SnapshotName(stableOpTime->getTimestamp());
-            _storage->setStableTimestamp(getServiceContext(), stableTimestamp);
+            _storage->setStableTimestamp(getServiceContext(), stableOpTime->getTimestamp());
         }
         _cleanupStableOpTimeCandidates(&_stableOpTimeCandidates, stableOpTime.get());
     }
@@ -3495,21 +3490,20 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(
     return EventHandle();
 }
 
-SnapshotName ReplicationCoordinatorImpl::reserveSnapshotName(OperationContext* opCtx) {
-    SnapshotName reservedName;
+Timestamp ReplicationCoordinatorImpl::reserveSnapshotName(OperationContext* opCtx) {
+    Timestamp reservedName;
     if (getReplicationMode() == Mode::modeReplSet) {
         invariant(opCtx->lockState()->isLocked());
         if (getMemberState().primary()) {
             // Use the current optime on the node, for primary nodes.
-            reservedName = SnapshotName(
-                LogicalClock::get(getServiceContext())->getClusterTime().asTimestamp());
+            reservedName = LogicalClock::get(getServiceContext())->getClusterTime().asTimestamp();
         } else {
             // Use lastApplied time, for secondary nodes.
-            reservedName = SnapshotName(getMyLastAppliedOpTime().getTimestamp());
+            reservedName = getMyLastAppliedOpTime().getTimestamp();
         }
     } else {
         // All snapshots are the same for a standalone node.
-        reservedName = SnapshotName(0);
+        reservedName = Timestamp();
     }
     // This was just in case the snapshot name was different from the lastOp in the client.
     ReplClientInfo::forClient(opCtx->getClient()).setLastSnapshot(reservedName);
@@ -3517,11 +3511,11 @@ SnapshotName ReplicationCoordinatorImpl::reserveSnapshotName(OperationContext* o
 }
 
 void ReplicationCoordinatorImpl::waitUntilSnapshotCommitted(OperationContext* opCtx,
-                                                            const SnapshotName& untilSnapshot) {
+                                                            const Timestamp& untilSnapshot) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
     while (!_currentCommittedSnapshot ||
-           _currentCommittedSnapshot->opTime.getTimestamp().asULL() < untilSnapshot.asU64()) {
+           _currentCommittedSnapshot->getTimestamp() < untilSnapshot) {
         opCtx->waitForConditionOrInterrupt(_currentCommittedSnapshotCond, lock);
     }
 }
@@ -3530,17 +3524,10 @@ size_t ReplicationCoordinatorImpl::getNumUncommittedSnapshots() {
     return _uncommittedSnapshotsSize.load();
 }
 
-void ReplicationCoordinatorImpl::createSnapshot(OperationContext* opCtx,
-                                                OpTime timeOfSnapshot,
-                                                SnapshotName name) {
-    // SERVER-31304: Delete this function.
-    return;
-}
-
 MONGO_FP_DECLARE(disableSnapshotting);
 
 void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
-    SnapshotInfo newCommittedSnapshot) {
+    const OpTime& newCommittedSnapshot) {
     if (testingSnapshotBehaviorInIsolation) {
         return;
     }
@@ -3551,11 +3538,11 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
         log() << "not updating committed snapshot because we are in rollback";
         return;
     }
-    invariant(!newCommittedSnapshot.opTime.isNull());
-    invariant(newCommittedSnapshot.opTime.getTimestamp() <=
+    invariant(!newCommittedSnapshot.isNull());
+    invariant(newCommittedSnapshot.getTimestamp() <=
               _topCoord->getLastCommittedOpTime().getTimestamp());
     if (_currentCommittedSnapshot) {
-        invariant(newCommittedSnapshot.opTime >= _currentCommittedSnapshot->opTime);
+        invariant(newCommittedSnapshot >= _currentCommittedSnapshot);
     }
     if (MONGO_FAIL_POINT(disableSnapshotting))
         return;

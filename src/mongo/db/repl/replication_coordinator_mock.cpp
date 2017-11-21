@@ -31,11 +31,11 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 
 #include "mongo/base/status.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/sync_source_resolver.h"
-#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 
@@ -462,13 +462,9 @@ Status ReplicationCoordinatorMock::updateTerm(OperationContext* opCtx, long long
     return Status::OK();
 }
 
-SnapshotName ReplicationCoordinatorMock::reserveSnapshotName(OperationContext* opCtx) {
-    return SnapshotName(_snapshotNameGenerator.addAndFetch(1));
+Timestamp ReplicationCoordinatorMock::reserveSnapshotName(OperationContext* opCtx) {
+    return Timestamp(_snapshotNameGenerator.addAndFetch(1));
 }
-
-void ReplicationCoordinatorMock::createSnapshot(OperationContext* opCtx,
-                                                OpTime timeOfSnapshot,
-                                                SnapshotName name){};
 
 void ReplicationCoordinatorMock::dropAllSnapshots() {}
 
@@ -477,7 +473,7 @@ OpTime ReplicationCoordinatorMock::getCurrentCommittedSnapshotOpTime() const {
 }
 
 void ReplicationCoordinatorMock::waitUntilSnapshotCommitted(OperationContext* opCtx,
-                                                            const SnapshotName& untilSnapshot) {}
+                                                            const Timestamp& untilSnapshot) {}
 
 size_t ReplicationCoordinatorMock::getNumUncommittedSnapshots() {
     return 0;

@@ -355,9 +355,8 @@ void InitialSyncer::_setUp_inlock(OperationContext* opCtx, std::uint32_t initial
     _replicationProcess->getConsistencyMarkers()->setInitialSyncFlag(opCtx);
 
     auto serviceCtx = opCtx->getServiceContext();
-    _storage->setInitialDataTimestamp(serviceCtx,
-                                      SnapshotName(Timestamp::kAllowUnstableCheckpointsSentinel));
-    _storage->setStableTimestamp(serviceCtx, SnapshotName::min());
+    _storage->setInitialDataTimestamp(serviceCtx, Timestamp::kAllowUnstableCheckpointsSentinel);
+    _storage->setStableTimestamp(serviceCtx, Timestamp::min());
 
     LOG(1) << "Creating oplogBuffer.";
     _oplogBuffer = _dataReplicatorExternalState->makeInitialSyncOplogBuffer(opCtx);
@@ -386,7 +385,7 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
     _storage->waitForAllEarlierOplogWritesToBeVisible(opCtx);
 
     _storage->setInitialDataTimestamp(opCtx->getServiceContext(),
-                                      SnapshotName(lastApplied.getValue().opTime.getTimestamp()));
+                                      lastApplied.getValue().opTime.getTimestamp());
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
     _opts.setMyLastOptime(lastApplied.getValue().opTime);
     log() << "initial sync done; took "
@@ -892,7 +891,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
         auto status = _storage->insertDocument(
             opCtx.get(),
             _opts.localOplogNS,
-            TimestampedBSONObj{oplogSeedDoc, SnapshotName(optimeWithHash.opTime.getTimestamp())},
+            TimestampedBSONObj{oplogSeedDoc, optimeWithHash.opTime.getTimestamp()},
             optimeWithHash.opTime.getTerm());
         if (!status.isOK()) {
             stdx::lock_guard<stdx::mutex> lock(_mutex);

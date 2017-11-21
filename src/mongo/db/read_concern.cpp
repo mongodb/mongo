@@ -256,8 +256,7 @@ Status waitForReadConcern(OperationContext* opCtx,
 
     auto pointInTime = readConcernArgs.getArgsPointInTime();
     if (pointInTime) {
-        fassertStatusOK(
-            39345, opCtx->recoveryUnit()->selectSnapshot(SnapshotName(pointInTime->asTimestamp())));
+        fassertStatusOK(39345, opCtx->recoveryUnit()->selectSnapshot(pointInTime->asTimestamp()));
     }
 
     if (!readConcernArgs.isEmpty()) {
@@ -296,7 +295,7 @@ Status waitForReadConcern(OperationContext* opCtx,
         // Wait until a snapshot is available.
         while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
             LOG(debugLevel) << "Snapshot not available yet.";
-            replCoord->waitUntilSnapshotCommitted(opCtx, SnapshotName::min());
+            replCoord->waitUntilSnapshotCommitted(opCtx, Timestamp());
             status = opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
         }
 

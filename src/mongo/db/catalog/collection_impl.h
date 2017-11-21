@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -341,11 +342,11 @@ public:
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must error.
      */
-    boost::optional<SnapshotName> getMinimumVisibleSnapshot() final {
+    boost::optional<Timestamp> getMinimumVisibleSnapshot() final {
         return _minVisibleSnapshot;
     }
 
-    void setMinimumVisibleSnapshot(SnapshotName name) final {
+    void setMinimumVisibleSnapshot(Timestamp name) final {
         _minVisibleSnapshot = name;
     }
 
@@ -466,7 +467,7 @@ private:
     const std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
 
     // The earliest snapshot that is allowed to use this collection.
-    boost::optional<SnapshotName> _minVisibleSnapshot;
+    boost::optional<Timestamp> _minVisibleSnapshot;
 
     Collection* _this;
 

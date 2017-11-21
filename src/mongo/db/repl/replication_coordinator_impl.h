@@ -45,7 +45,6 @@
 #include "mongo/db/repl/sync_source_resolver.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
-#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
@@ -305,16 +304,12 @@ public:
 
     virtual Status updateTerm(OperationContext* opCtx, long long term) override;
 
-    virtual SnapshotName reserveSnapshotName(OperationContext* opCtx) override;
-
-    virtual void createSnapshot(OperationContext* opCtx,
-                                OpTime timeOfSnapshot,
-                                SnapshotName name) override;
+    virtual Timestamp reserveSnapshotName(OperationContext* opCtx) override;
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 
     virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
-                                            const SnapshotName& untilSnapshot) override;
+                                            const Timestamp& untilSnapshot) override;
 
     virtual void appendDiagnosticBSON(BSONObjBuilder*) override;
 
@@ -625,7 +620,7 @@ private:
     Status _awaitReplication_inlock(stdx::unique_lock<stdx::mutex>* lock,
                                     OperationContext* opCtx,
                                     const OpTime& opTime,
-                                    SnapshotName minSnapshot,
+                                    Timestamp minSnapshot,
                                     const WriteConcernOptions& writeConcern);
 
     /**
@@ -635,7 +630,7 @@ private:
      * minSnapshot.
      */
     bool _doneWaitingForReplication_inlock(const OpTime& opTime,
-                                           SnapshotName minSnapshot,
+                                           Timestamp minSnapshot,
                                            const WriteConcernOptions& writeConcern);
 
     Status _checkIfWriteConcernCanBeSatisfied_inlock(const WriteConcernOptions& writeConcern) const;
@@ -998,7 +993,7 @@ private:
     /**
      * Blesses a snapshot to be used for new committed reads.
      */
-    void _updateCommittedSnapshot_inlock(SnapshotInfo newCommittedSnapshot);
+    void _updateCommittedSnapshot_inlock(const OpTime& newCommittedSnapshot);
 
     /**
      * Calculates the 'stable' replication optime given a set of optime candidates and the
@@ -1280,7 +1275,7 @@ private:
 
     // The OpTimes and SnapshotNames for all snapshots newer than the current commit point, kept in
     // sorted order. Any time this is changed, you must also update _uncommitedSnapshotsSize.
-    std::deque<SnapshotInfo> _uncommittedSnapshots;  // (M)
+    std::deque<OpTime> _uncommittedSnapshots;  // (M)
 
     // A cache of the size of _uncommittedSnaphots that can be read without any locking.
     // May only be written to while holding _mutex.
@@ -1289,7 +1284,7 @@ private:
     // The non-null OpTime and SnapshotName of the current snapshot used for committed reads, if
     // there is one.
     // When engaged, this must be <= _lastCommittedOpTime and < _uncommittedSnapshots.front().
-    boost::optional<SnapshotInfo> _currentCommittedSnapshot;  // (M)
+    boost::optional<OpTime> _currentCommittedSnapshot;  // (M)
 
     // A set of optimes that are used for computing the replication system's current 'stable'
     // optime. Every time a node's applied optime is updated, it will be added to this set.

@@ -113,7 +113,7 @@ TEST_F(ReplicationProcessTest,
                                                 ReplicationProcess::kRollbackProgressNamespace,
                                                 TimestampedBSONObj{BSON("_id"
                                                                         << "not progress"),
-                                                                   SnapshotName()},
+                                                                   Timestamp()},
                                                 OpTime::kUninitializedTerm));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, replicationProcess.getRollbackProgress(opCtx.get()));
 }
@@ -123,7 +123,7 @@ TEST_F(ReplicationProcessTest, GetRollbackProgressReturnsBadStatusIfApplyUntilFi
                                        << "rollbackProgress"
                                        << "applyUntil"
                                        << "not op time!"),
-                                  SnapshotName(0)};
+                                  Timestamp(0)};
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, {}));
@@ -148,7 +148,7 @@ TEST_F(ReplicationProcessTest,
                                                << "not_timestamp"
                                                << "t"
                                                << 1LL)),
-                                  SnapshotName(0)};
+                                  Timestamp(0)};
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, {}));
@@ -171,7 +171,7 @@ TEST_F(ReplicationProcessTest,
                                        << "rollbackProgress"
                                        << "applyUntil"
                                        << applyUntil),
-                                  SnapshotName(0)};
+                                  Timestamp(0)};
     auto opCtx = makeOpCtx();
     ASSERT_OK(_storageInterface->createCollection(
         opCtx.get(), ReplicationProcess::kRollbackProgressNamespace, {}));
