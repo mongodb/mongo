@@ -5404,6 +5404,12 @@ buildvariants:
   - name: master_slave_WT
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough_WT
+  - name: powercycle_WT
+  - name: powercycle_fcv3.4_WT
+  - name: powercycle_replication_WT
+  - name: powercycle_replication_smalloplog_WT
+  - name: powercycle_syncdelay_WT
+  - name: powercycle_write_concern_majority_WT
   - name: sharding_WT
   - name: sharding_auth
   - name: sharding_last_stable_mongos_and_mixed_shards
@@ -5413,13 +5419,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
-  - name: powercycle
-  - name: powercycle_WT
-  - name: powercycle_fcv3.4_WT
-  - name: powercycle_replication_WT
-  - name: powercycle_replication_smalloplog_WT
-  - name: powercycle_syncdelay_WT
-  - name: powercycle_write_concern_majority_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -5881,6 +5880,7 @@ buildvariants:
   - name: replica_sets_WT_ese
   - name: master_slave_auth
   - name: master_slave_WT
+  - name: powercycle_WT
   - name: sasl
   - name: sharding_auth
   - name: sharding_auth_audit_WT
@@ -5894,8 +5894,6 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
-  - name: powercycle
-  - name: powercycle_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6451,6 +6449,10 @@ buildvariants:
   - name: noPassthrough_WT
   - name: parallel_WT
   - name: parallel_compatibility_WT
+  - name: powercycle_WT
+  - name: powercycle_fcv3.4_WT
+  - name: powercycle_replication_WT
+  - name: powercycle_syncdelay_WT
   - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: replica_sets_WT
@@ -6472,11 +6474,6 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
-  - name: powercycle
-  - name: powercycle_WT
-  - name: powercycle_fcv3.4_WT
-  - name: powercycle_replication_WT
-  - name: powercycle_syncdelay_WT
   - name: push
     distros:
     - rhel70-small
@@ -9648,6 +9645,7 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
+  - name: powercycle
   - name: read_concern_linearizable_passthrough
     distros:
     - rhel62-large
@@ -9774,6 +9772,7 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
+  - name: powercycle
   - name: read_concern_linearizable_passthrough
     distros:
     - windows-64-vs2015-large
