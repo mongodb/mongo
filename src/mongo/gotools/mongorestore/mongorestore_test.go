@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongorestore
 
 import (
@@ -26,34 +32,26 @@ var (
 )
 
 func TestMongorestore(t *testing.T) {
-	ssl := testutil.GetSSLOptions()
-	auth := testutil.GetAuthOptions()
-
 	testutil.VerifyTestType(t, testutil.IntegrationTestType)
-	toolOptions := &options.ToolOptions{
-		Connection: &options.Connection{
-			Host: testServer,
-			Port: testPort,
-		},
-		URI:  &options.URI{},
-		Auth: &auth,
-		SSL:  &ssl,
+	_, err := testutil.GetBareSession()
+	if err != nil {
+		t.Fatalf("No server available")
 	}
-	inputOptions := &InputOptions{}
-	outputOptions := &OutputOptions{
-		NumParallelCollections: 1,
-		NumInsertionWorkers:    1,
-		WriteConcern:           "majority",
-	}
-	nsOptions := &NSOptions{}
+
 	Convey("With a test MongoRestore", t, func() {
-		provider, err := db.NewSessionProvider(*toolOptions)
+		inputOptions := &InputOptions{}
+		outputOptions := &OutputOptions{
+			NumParallelCollections: 1,
+			NumInsertionWorkers:    1,
+		}
+		nsOptions := &NSOptions{}
+		provider, toolOpts, err := testutil.GetBareSessionProvider()
 		if err != nil {
 			log.Logvf(log.Always, "error connecting to host: %v", err)
 			os.Exit(util.ExitError)
 		}
 		restore := MongoRestore{
-			ToolOptions:     toolOptions,
+			ToolOptions:     toolOpts,
 			OutputOptions:   outputOptions,
 			InputOptions:    inputOptions,
 			NSOptions:       nsOptions,

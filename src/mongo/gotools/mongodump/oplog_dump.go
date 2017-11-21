@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongodump
 
 import (
@@ -66,6 +72,39 @@ func (dump *MongoDump) checkOplogTimestampExists(ts bson.MongoTimestamp) (bool, 
 	return true, nil
 }
 
+func oplogDocumentFilter(in []byte) ([]byte, error) {
+	var rawD bson.RawD
+	err := bson.Unmarshal(in, &rawD)
+	if err != nil {
+		return nil, err
+	}
+
+	var nsD struct {
+		NS string `bson:"ns"`
+	}
+	err = bson.Unmarshal(in, &nsD)
+	if err != nil {
+		return nil, err
+	}
+
+	if nsD.NS == "admin.system.version" {
+		return nil, fmt.Errorf("cannot dump with oplog if admin.system.version is modified")
+	}
+
+	for i := range rawD {
+		if rawD[i].Name == "o" {
+			var rawO bson.RawD
+			err = bson.Unmarshal(rawD[i].Value.Data, &rawO)
+			for j := range rawO {
+				if rawO[j].Name == "renameCollection" {
+					return nil, fmt.Errorf("cannot dump with oplog while renames occur")
+				}
+			}
+		}
+	}
+	return bson.Marshal(rawD)
+}
+
 // DumpOplogBetweenTimestamps takes two timestamps and writer and dumps all oplog
 // entries between the given timestamp to the writer. Returns any errors that occur.
 func (dump *MongoDump) DumpOplogBetweenTimestamps(start, end bson.MongoTimestamp) error {
@@ -80,7 +119,7 @@ func (dump *MongoDump) DumpOplogBetweenTimestamps(start, end bson.MongoTimestamp
 		bson.M{"ts": bson.M{"$lte": end}},
 	}}
 	oplogQuery := session.DB("local").C(dump.oplogCollection).Find(queryObj).LogReplay()
-	oplogCount, err := dump.dumpQueryToIntent(oplogQuery, dump.manager.Oplog(), dump.getResettableOutputBuffer())
+	oplogCount, err := dump.dumpFilteredQueryToIntent(oplogQuery, dump.manager.Oplog(), dump.getResettableOutputBuffer(), oplogDocumentFilter)
 	if err == nil {
 		log.Logvf(log.Always, "\tdumped %v oplog %v",
 			oplogCount, util.Pluralize(int(oplogCount), "entry", "entries"))

@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 // Package mongodump creates BSON data from the contents of a MongoDB instance.
 package mongodump
 
@@ -584,11 +590,28 @@ func (dump *MongoDump) DumpIntent(intent *intents.Intent, buffer resettableOutpu
 	return nil
 }
 
+type documentFilter func([]byte) ([]byte, error)
+
+func copyDocumentFilter(in []byte) ([]byte, error) {
+	out := make([]byte, len(in))
+	copy(out, in)
+	return out, nil
+}
+
 // dumpQueryToIntent takes an mgo Query, its intent, and a writer, performs the query,
 // and writes the raw bson results to the writer. Returns a final count of documents
 // dumped, and any errors that occured.
 func (dump *MongoDump) dumpQueryToIntent(
 	query *mgo.Query, intent *intents.Intent, buffer resettableOutputBuffer) (dumpCount int64, err error) {
+	return dump.dumpFilteredQueryToIntent(query, intent, buffer, copyDocumentFilter)
+}
+
+// dumpFilterQueryToIntent takes an mgo Query, its intent, a writer, and a document filter, performs the query,
+// passes the results through the filter
+// and writes the raw bson results to the writer. Returns a final count of documents
+// dumped, and any errors that occured.
+func (dump *MongoDump) dumpFilteredQueryToIntent(
+	query *mgo.Query, intent *intents.Intent, buffer resettableOutputBuffer, filter documentFilter) (dumpCount int64, err error) {
 
 	// restore of views from archives require an empty collection as the trigger to create the view
 	// so, we open here before the early return if IsView so that we write an empty collection to the archive
@@ -636,7 +659,7 @@ func (dump *MongoDump) dumpQueryToIntent(
 		}()
 	}
 
-	err = dump.dumpIterToWriter(query.Iter(), f, dumpProgressor)
+	err = dump.dumpFilteredIterToWriter(query.Iter(), f, dumpProgressor, filter)
 	dumpCount, _ = dumpProgressor.Progress()
 	if err != nil {
 		err = fmt.Errorf("error writing data for collection `%v` to disk: %v", intent.Namespace(), err)
@@ -648,6 +671,13 @@ func (dump *MongoDump) dumpQueryToIntent(
 // a counter, and dumps the iterator's contents to the writer.
 func (dump *MongoDump) dumpIterToWriter(
 	iter *mgo.Iter, writer io.Writer, progressCount progress.Updateable) error {
+	return dump.dumpFilteredIterToWriter(iter, writer, progressCount, copyDocumentFilter)
+}
+
+// dumpFilteredIterToWriter takes an mgo iterator, a writer, and a pointer to
+// a counter, and fiters and dumps the iterator's contents to the writer.
+func (dump *MongoDump) dumpFilteredIterToWriter(
+	iter *mgo.Iter, writer io.Writer, progressCount progress.Updateable, filter documentFilter) error {
 	var termErr error
 
 	// We run the result iteration in its own goroutine,
@@ -670,9 +700,13 @@ func (dump *MongoDump) dumpIterToWriter(
 					close(buffChan)
 					return
 				}
-				nextCopy := make([]byte, len(raw.Data))
-				copy(nextCopy, raw.Data)
-				buffChan <- nextCopy
+				out, err := filter(raw.Data)
+				if err != nil {
+					termErr = err
+					close(buffChan)
+					return
+				}
+				buffChan <- out
 			}
 		}
 	}()

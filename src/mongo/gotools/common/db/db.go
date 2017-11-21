@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 // Package db implements generic connection to MongoDB, and contains
 // subpackages for specific methods of connection.
 package db
@@ -45,6 +51,7 @@ const (
 	// so we can only check for this universal prefix
 	ErrReplTimeoutPrefix            = "waiting for replication timed out"
 	ErrCouldNotContactPrimaryPrefix = "could not contact primary for replica set"
+	ErrWriteResultsUnavailable      = "write results unavailable from"
 	ErrCouldNotFindPrimaryPrefix    = `could not find host matching read preference { mode: "primary"`
 	ErrUnableToTargetPrefix         = "unable to target"
 	ErrNotMaster                    = "not master"
@@ -87,8 +94,9 @@ type Oplog struct {
 	Version   int                 `bson:"v"`
 	Operation string              `bson:"op"`
 	Namespace string              `bson:"ns"`
-	Object    bson.D              `bson:"o"`
-	Query     bson.D              `bson:"o2"`
+	Object    bson.RawD           `bson:"o"`
+	Query     bson.RawD           `bson:"o2"`
+	UI        *bson.Binary        `bson:"ui,omitempty"`
 }
 
 // Returns a session connected to the database server for which the
@@ -232,6 +240,7 @@ func IsConnectionError(err error) bool {
 		err.Error() == io.EOF.Error() ||
 		strings.HasPrefix(err.Error(), ErrReplTimeoutPrefix) ||
 		strings.HasPrefix(err.Error(), ErrCouldNotContactPrimaryPrefix) ||
+		strings.HasPrefix(err.Error(), ErrWriteResultsUnavailable) ||
 		strings.HasPrefix(err.Error(), ErrCouldNotFindPrimaryPrefix) ||
 		strings.HasPrefix(err.Error(), ErrUnableToTargetPrefix) ||
 		err.Error() == ErrNotMaster ||

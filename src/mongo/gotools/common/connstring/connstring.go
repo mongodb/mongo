@@ -1,6 +1,13 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package connstring
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -53,6 +60,8 @@ type ConnString struct {
 	W                       string
 	WTimeout                time.Duration
 
+	UsingSRV bool
+
 	Options        map[string][]string
 	UnknownOptions map[string][]string
 }
@@ -79,16 +88,26 @@ type parser struct {
 
 func (p *parser) parse(original string) error {
 	p.Original = original
-
 	uri := original
-	var err error
-	// scheme
-	if !strings.HasPrefix(uri, "mongodb://") {
-		return fmt.Errorf("scheme must be \"mongodb\"")
-	}
 
-	// user info
-	uri = uri[10:]
+	var err error
+	var isSRV bool
+	if strings.HasPrefix(uri, "mongodb+srv://") {
+		isSRV = true
+
+		p.UsingSRV = true
+
+		// SSL should be turned on by default when retrieving hosts from SRV
+		p.UseSSL = true
+
+		// remove the scheme
+		uri = uri[14:]
+	} else if strings.HasPrefix(uri, "mongodb://") {
+		// remove the scheme
+		uri = uri[10:]
+	} else {
+		return fmt.Errorf("scheme must be \"mongodb\" or \"mongodb+srv\"")
+	}
 
 	if idx := strings.Index(uri, "@"); idx != -1 {
 		userInfo := uri[:idx]
@@ -100,6 +119,13 @@ func (p *parser) parse(original string) error {
 		if idx := strings.Index(userInfo, ":"); idx != -1 {
 			username = userInfo[:idx]
 			password = userInfo[idx+1:]
+			p.PasswordSet = true
+		}
+
+		if len(username) > 1 {
+			if strings.Contains(username, "/") {
+				return fmt.Errorf("unescaped slash in username")
+			}
 		}
 
 		p.Username, err = url.QueryUnescape(username)
@@ -110,35 +136,69 @@ func (p *parser) parse(original string) error {
 			if strings.Contains(password, ":") {
 				return fmt.Errorf("unescaped colon in password")
 			}
+			if strings.Contains(password, "/") {
+				return fmt.Errorf("unescaped slash in password")
+			}
 			p.Password, err = url.QueryUnescape(password)
 			if err != nil {
 				return fmt.Errorf("invalid password: %s", err)
 			}
-			p.PasswordSet = true
 		}
 
 	}
 
-	// hosts
+	// fetch the hosts field
 	hosts := uri
 	if idx := strings.IndexAny(uri, "/?@"); idx != -1 {
 		if uri[idx] == '@' {
+
 			return fmt.Errorf("unescaped @ sign in user info")
 		}
 		if uri[idx] == '?' {
 			return fmt.Errorf("must have a / before the query ?")
 		}
-
 		hosts = uri[:idx]
+
 	}
 
-	for _, host := range strings.Split(hosts, ",") {
+	var connectionArgsFromTXT []string
+	parsedHosts := strings.Split(hosts, ",")
+
+	if isSRV {
+
+		parsedHosts = strings.Split(hosts, ",")
+		if len(parsedHosts) != 1 {
+			return fmt.Errorf("URI with SRV must include one and only one hostname")
+		}
+		parsedHosts, err = fetchSeedlistFromSRV(parsedHosts[0])
+		if err != nil {
+
+			return err
+		}
+
+		// error ignored because finding a TXT record should not be
+		// considered an error.
+		recordsFromTXT, _ := net.LookupTXT(hosts)
+		if len(recordsFromTXT) > 1 {
+			return errors.New("multiple records from TXT not supported")
+		}
+		if len(recordsFromTXT) > 0 {
+			connectionArgsFromTXT = strings.FieldsFunc(recordsFromTXT[0], func(r rune) bool { return r == ';' || r == '&' })
+
+			err := validateTXTResult(connectionArgsFromTXT)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, host := range parsedHosts {
+
 		err = p.addHost(host)
 		if err != nil {
 			return fmt.Errorf("invalid host \"%s\": %s", host, err)
 		}
 	}
-
 	if len(p.Hosts) == 0 {
 		return fmt.Errorf("must have at least 1 host")
 	}
@@ -183,7 +243,10 @@ func (p *parser) parse(original string) error {
 		return nil
 	}
 
-	for _, pair := range strings.FieldsFunc(uri, func(r rune) bool { return r == ';' || r == '&' }) {
+	connectionArgsFromQueryString := strings.FieldsFunc(uri, func(r rune) bool { return r == ';' || r == '&' })
+	connectionArgPairs := append(connectionArgsFromTXT, connectionArgsFromQueryString...)
+
+	for _, pair := range connectionArgPairs {
 		err = p.addOption(pair)
 		if err != nil {
 			return err
@@ -191,6 +254,34 @@ func (p *parser) parse(original string) error {
 	}
 
 	return nil
+}
+
+func fetchSeedlistFromSRV(host string) ([]string, error) {
+	var err error
+
+	_, _, err = net.SplitHostPort(host)
+
+	if err == nil {
+		// we were able to successfully extract a port from the host,
+		// but should not be able to when using SRV
+		return nil, fmt.Errorf("URI with srv must not include a port number")
+	}
+
+	_, addresses, err := net.LookupSRV("mongodb", "tcp", host)
+	if err != nil {
+		return nil, err
+	}
+	parsedHosts := make([]string, len(addresses))
+	for i, address := range addresses {
+		trimmedAddressTarget := strings.TrimSuffix(address.Target, ".")
+		err := validateSRVResult(trimmedAddressTarget, host)
+		if err != nil {
+			return nil, err
+		}
+		parsedHosts[i] = fmt.Sprintf("%s:%d", trimmedAddressTarget, address.Port)
+	}
+
+	return parsedHosts, nil
 }
 
 func (p *parser) addHost(host string) error {
@@ -394,5 +485,46 @@ func (p *parser) addOption(pair string) error {
 	}
 	p.Options[lowerKey] = append(p.Options[lowerKey], value)
 
+	return nil
+}
+
+func validateSRVResult(recordFromSRV, inputHostName string) error {
+	separatedInputDomain := strings.Split(inputHostName, ".")
+	separatedRecord := strings.Split(recordFromSRV, ".")
+	if len(separatedRecord) < 2 {
+		return errors.New("DNS name must contain at least 2 labels")
+	}
+	if len(separatedRecord) < len(separatedInputDomain) {
+		return errors.New("Domain suffix from SRV record not matched input domain")
+	}
+
+	inputDomainSuffix := separatedInputDomain[1:]
+	domainSuffixOffset := len(separatedRecord) - (len(separatedInputDomain) - 1)
+
+	recordDomainSuffix := separatedRecord[domainSuffixOffset:]
+	for ix, label := range inputDomainSuffix {
+		if label != recordDomainSuffix[ix] {
+			return errors.New("Domain suffix from SRV record not matched input domain")
+		}
+	}
+	return nil
+}
+
+var allowedTXTOptions map[string]struct{} = map[string]struct{}{
+	"authsource": struct{}{},
+	"replicaset": struct{}{},
+}
+
+func validateTXTResult(paramsFromTXT []string) error {
+	for _, param := range paramsFromTXT {
+		kv := strings.SplitN(param, "=", 2)
+		if len(kv) != 2 {
+			return errors.New("invalid TXT record")
+		}
+		key := strings.ToLower(kv[0])
+		if _, ok := allowedTXTOptions[key]; !ok {
+			return fmt.Errorf("cannot specify option '%s' in TXT record", kv[0])
+		}
+	}
 	return nil
 }
