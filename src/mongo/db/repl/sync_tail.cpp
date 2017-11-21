@@ -63,6 +63,7 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -173,15 +174,17 @@ public:
     ApplyBatchFinalizer(ReplicationCoordinator* replCoord) : _replCoord(replCoord) {}
     virtual ~ApplyBatchFinalizer(){};
 
-    virtual void record(const OpTime& newOpTime) {
-        _recordApplied(newOpTime);
+    virtual void record(const OpTime& newOpTime,
+                        ReplicationCoordinator::DataConsistency consistency) {
+        _recordApplied(newOpTime, consistency);
     };
 
 protected:
-    void _recordApplied(const OpTime& newOpTime) {
+    void _recordApplied(const OpTime& newOpTime,
+                        ReplicationCoordinator::DataConsistency consistency) {
         // We have to use setMyLastAppliedOpTimeForward since this thread races with
         // ReplicationExternalStateImpl::onTransitionToPrimary.
-        _replCoord->setMyLastAppliedOpTimeForward(newOpTime);
+        _replCoord->setMyLastAppliedOpTimeForward(newOpTime, consistency);
     }
 
     void _recordDurable(const OpTime& newOpTime) {
@@ -202,7 +205,8 @@ public:
           _waiterThread{&ApplyBatchFinalizerForJournal::_run, this} {};
     ~ApplyBatchFinalizerForJournal();
 
-    void record(const OpTime& newOpTime) override;
+    void record(const OpTime& newOpTime,
+                ReplicationCoordinator::DataConsistency consistency) override;
 
 private:
     /**
@@ -233,8 +237,9 @@ ApplyBatchFinalizerForJournal::~ApplyBatchFinalizerForJournal() {
     _waiterThread.join();
 }
 
-void ApplyBatchFinalizerForJournal::record(const OpTime& newOpTime) {
-    _recordApplied(newOpTime);
+void ApplyBatchFinalizerForJournal::record(const OpTime& newOpTime,
+                                           ReplicationCoordinator::DataConsistency consistency) {
+    _recordApplied(newOpTime, consistency);
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     _latestOpTime = newOpTime;
@@ -695,8 +700,14 @@ void fillWriterVectorsAndLastestSessionRecords(
 
 }  // namespace
 
-// Applies a batch of oplog entries, by writing the oplog entries to the local oplog
-// and then using a set of threads to apply the operations.
+/**
+ * Applies a batch of oplog entries by writing the oplog entries to the local oplog and then using
+ * a set of threads to apply the operations. If the batch application is successful, returns the
+ * optime of the last op applied, which should be the last op in the batch. To provide crash
+ * resilience, this function will advance the persistent value of 'minValid' to at least the
+ * last optime of the batch. If 'minValid' is already greater than or equal to the last optime of
+ * this batch, it will not be updated.
+ */
 OpTime SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
     auto applyOperation = [this](MultiApplier::OperationPtrs* ops) -> Status {
         _applyFunc(ops, this);
@@ -709,7 +720,9 @@ OpTime SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations op
 }
 
 namespace {
-void tryToGoLiveAsASecondary(OperationContext* opCtx, ReplicationCoordinator* replCoord) {
+void tryToGoLiveAsASecondary(OperationContext* opCtx,
+                             ReplicationCoordinator* replCoord,
+                             OpTime minValid) {
     if (replCoord->isInPrimaryOrSecondaryState()) {
         return;
     }
@@ -718,27 +731,35 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx, ReplicationCoordinator* re
     ON_BLOCK_EXIT([] { attemptsToBecomeSecondary.increment(); });
 
     // Need global X lock to transition to SECONDARY
-    Lock::GlobalWrite readLock(opCtx);
+    Lock::GlobalWrite writeLock(opCtx);
 
+    // Maintenance mode will force us to remain in RECOVERING state, no matter what.
     if (replCoord->getMaintenanceMode()) {
-        LOG(1) << "Can't go live (tryToGoLiveAsASecondary) as maintenance mode is active.";
-        // we're not actually going live
+        LOG(1) << "We cannot transition to SECONDARY state while in maintenance mode.";
         return;
     }
 
-    // Only state RECOVERING can transition to SECONDARY.
+    // We can only transition to SECONDARY from RECOVERING state.
     MemberState state(replCoord->getMemberState());
     if (!state.recovering()) {
-        LOG(2) << "Can't go live (tryToGoLiveAsASecondary) as state != recovering.";
+        LOG(2) << "We cannot transition to SECONDARY state since we are not currently in "
+                  "RECOVERING state. Current state: "
+               << state.toString();
         return;
     }
 
-    // We can't go to SECONDARY until we reach minvalid.
-    if (replCoord->getMyLastAppliedOpTime() <
-        ReplicationProcess::get(opCtx)->getConsistencyMarkers()->getMinValid(opCtx)) {
+    // We can't go to SECONDARY state until we reach 'minValid', since the database may be in an
+    // inconsistent state before this point. If our state is inconsistent, we need to disallow reads
+    // from clients, which is why we stay in RECOVERING state.
+    auto lastApplied = replCoord->getMyLastAppliedOpTime();
+    if (lastApplied < minValid) {
+        LOG(2) << "We cannot transition to SECONDARY state because our 'lastApplied' optime is "
+                  "less than the 'minValid' optime. minValid optime: "
+               << minValid << ", lastApplied optime: " << lastApplied;
         return;
     }
 
+    // Execute the transition to SECONDARY.
     auto status = replCoord->setFollowerMode(MemberState::RS_SECONDARY);
     if (!status.isOK()) {
         warning() << "Failed to transition into " << MemberState(MemberState::RS_SECONDARY)
@@ -859,6 +880,11 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
             ? new ApplyBatchFinalizerForJournal(replCoord)
             : new ApplyBatchFinalizer(replCoord)};
 
+    // Get replication consistency markers.
+    ReplicationProcess* replProcess = ReplicationProcess::get(replCoord->getServiceContext());
+    ReplicationConsistencyMarkers* consistencyMarkers = replProcess->getConsistencyMarkers();
+    OpTime minValid;
+
     while (true) {  // Exits on message from OpQueueBatcher.
         // Use a new operation context each iteration, as otherwise we may appear to use a single
         // collection name to refer to collections with different UUIDs.
@@ -880,7 +906,11 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
             }
         }
 
-        tryToGoLiveAsASecondary(&opCtx, replCoord);
+        // Get the current value of 'minValid'.
+        minValid = consistencyMarkers->getMinValid(&opCtx);
+
+        // Transition to SECONDARY state, if possible.
+        tryToGoLiveAsASecondary(&opCtx, replCoord, minValid);
 
         long long termWhenBufferIsEmpty = replCoord->getTerm();
         // Blocks up to a second waiting for a batch to be ready to apply. If one doesn't become
@@ -888,6 +918,7 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
         OpQueue ops = batcher.getNextBatch(Seconds(1));
         if (ops.empty()) {
             if (ops.mustShutdown()) {
+                // Shut down and exit oplog application loop.
                 return;
             }
             if (MONGO_FAIL_POINT(rsSyncApplyStop)) {
@@ -918,16 +949,34 @@ void SyncTail::oplogApplication(ReplicationCoordinator* replCoord) {
         // Don't allow the fsync+lock thread to see intermediate states of batch application.
         stdx::lock_guard<SimpleMutex> fsynclk(filesLockedFsync);
 
-        // Do the work.
-        multiApply(&opCtx, ops.releaseBatch());
+        // Apply the operations in this batch. 'multiApply' returns the optime of the last op that
+        // was applied, which should be the last optime in the batch.
+        auto lastOpTimeAppliedInBatch = multiApply(&opCtx, ops.releaseBatch());
+        invariant(lastOpTimeAppliedInBatch == lastOpTimeInBatch);
+
+        // In order to provide resilience in the event of a crash in the middle of batch
+        // application, 'multiApply' will update 'minValid' so that it is at least as great as the
+        // last optime that it applied in this batch. If 'minValid' was moved forward, we make sure
+        // to update our view of it here.
+        if (lastOpTimeInBatch > minValid) {
+            minValid = lastOpTimeInBatch;
+        }
 
         // Update various things that care about our last applied optime. Tests rely on 2 happening
         // before 3 even though it isn't strictly necessary. The order of 1 doesn't matter.
-        setNewTimestamp(opCtx.getServiceContext(), lastOpTimeInBatch.getTimestamp());  // 1
-        ReplicationProcess::get(&opCtx)->getConsistencyMarkers()->setAppliedThrough(
-            &opCtx,
-            lastOpTimeInBatch);                // 2
-        finalizer->record(lastOpTimeInBatch);  // 3
+
+        // 1. Update the global timestamp.
+        setNewTimestamp(opCtx.getServiceContext(), lastOpTimeInBatch.getTimestamp());
+
+        // 2. Persist our "applied through" optime to disk.
+        consistencyMarkers->setAppliedThrough(&opCtx, lastOpTimeInBatch);
+
+        // 3. Finalize this batch. We are at a consistent optime if our current optime is >= the
+        // current 'minValid' optime.
+        auto consistency = (lastOpTimeInBatch >= minValid)
+            ? ReplicationCoordinator::DataConsistency::Consistent
+            : ReplicationCoordinator::DataConsistency::Inconsistent;
+        finalizer->record(lastOpTimeInBatch, consistency);
     }
 }
 

@@ -121,7 +121,10 @@ public:
      * clear/reset state
      */
     void reset() {
-        _setMyLastOptime = [this](const OpTime& opTime) { _myLastOpTime = opTime; };
+        _setMyLastOptime = [this](const OpTime& opTime,
+                                  ReplicationCoordinator::DataConsistency consistency) {
+            _myLastOpTime = opTime;
+        };
         _myLastOpTime = OpTime();
         _syncSourceSelector = stdx::make_unique<SyncSourceSelectorMock>();
     }
@@ -357,8 +360,11 @@ protected:
         InitialSyncerOptions options;
         options.initialSyncRetryWait = Milliseconds(1);
         options.getMyLastOptime = [this]() { return _myLastOpTime; };
-        options.setMyLastOptime = [this](const OpTime& opTime) { _setMyLastOptime(opTime); };
-        options.resetOptimes = [this]() { _setMyLastOptime(OpTime()); };
+        options.setMyLastOptime = [this](const OpTime& opTime,
+                                         ReplicationCoordinator::DataConsistency consistency) {
+            _setMyLastOptime(opTime, consistency);
+        };
+        options.resetOptimes = [this]() { _myLastOpTime = OpTime(); };
         options.getSlaveDelay = [this]() { return Seconds(0); };
         options.syncSourceSelector = this;
 
@@ -627,7 +633,8 @@ void InitialSyncerTest::processSuccessfulFCVFetcherResponse(std::vector<BSONObj>
 TEST_F(InitialSyncerTest, InvalidConstruction) {
     InitialSyncerOptions options;
     options.getMyLastOptime = []() { return OpTime(); };
-    options.setMyLastOptime = [](const OpTime&) {};
+    options.setMyLastOptime = [](const OpTime&,
+                                 ReplicationCoordinator::DataConsistency consistency) {};
     options.resetOptimes = []() {};
     options.getSlaveDelay = []() { return Seconds(0); };
     options.syncSourceSelector = this;
@@ -858,9 +865,10 @@ TEST_F(InitialSyncerTest, InitialSyncerResetsOptimesOnNewAttempt) {
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort());
 
-    // Set the last optime to an arbitrary nonzero value.
+    // Set the last optime to an arbitrary nonzero value. The value of the 'consistency' argument
+    // doesn't matter.
     auto origOptime = OpTime(Timestamp(1000, 1), 1);
-    _setMyLastOptime(origOptime);
+    _setMyLastOptime(origOptime, ReplicationCoordinator::DataConsistency::Inconsistent);
 
     // Start initial sync.
     const std::uint32_t initialSyncMaxAttempts = 1U;

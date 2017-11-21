@@ -3941,6 +3941,95 @@ TEST_F(StableOpTimeTest, SetMyLastAppliedDoesntAddTimestampCandidateInMasterSlav
     ASSERT(repl->getStableOpTimeCandidates_forTest().empty());
 }
 
+TEST_F(StableOpTimeTest, ClearOpTimeCandidatesPastCommonPointAfterRollback) {
+
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "version"
+                            << 1
+                            << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id"
+                                               << 0))
+                            << "protocolVersion"
+                            << 1),
+                       HostAndPort("node1", 12345));
+
+    auto repl = getReplCoord();
+    long long term = 0;
+    ASSERT_OK(repl->setFollowerMode(MemberState::RS_SECONDARY));
+
+    OpTime rollbackCommonPoint = OpTime({1, 2}, term);
+    OpTime commitPoint = OpTime({1, 2}, term);
+    repl->advanceCommitPoint(commitPoint);
+    ASSERT_EQUALS(Timestamp::min(), getStorageInterface()->getStableTimestamp());
+
+    repl->setMyLastAppliedOpTime(OpTime({1, 1}, term));
+    repl->setMyLastAppliedOpTime(OpTime({1, 2}, term));
+    repl->setMyLastAppliedOpTime(OpTime({1, 3}, term));
+    repl->setMyLastAppliedOpTime(OpTime({1, 4}, term));
+
+    // The stable timestamp should be equal to the commit point timestamp.
+    const Timestamp stableTimestamp = getStorageInterface()->getStableTimestamp();
+    Timestamp expectedStableTimestamp = commitPoint.getTimestamp();
+    ASSERT_EQUALS(expectedStableTimestamp, stableTimestamp);
+
+    // The stable optime candidate set should contain optimes >= the stable optime.
+    std::set<OpTime> opTimeCandidates = repl->getStableOpTimeCandidates_forTest();
+    std::set<OpTime> expectedOpTimeCandidates = {
+        OpTime({1, 2}, term), OpTime({1, 3}, term), OpTime({1, 4}, term)};
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
+
+    // Transition to ROLLBACK. The set of stable optime candidates should not have changed.
+    ASSERT_OK(repl->setFollowerMode(MemberState::RS_ROLLBACK));
+    opTimeCandidates = repl->getStableOpTimeCandidates_forTest();
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
+
+    // Simulate a rollback to the common point.
+    auto opCtx = makeOperationContext();
+    getExternalState()->setLastOpTime(rollbackCommonPoint);
+    repl->resetLastOpTimesFromOplog(opCtx.get(),
+                                    ReplicationCoordinator::DataConsistency::Inconsistent);
+
+    // Transition to RECOVERING from ROLLBACK.
+    ASSERT_OK(repl->setFollowerMode(MemberState::RS_RECOVERING));
+
+    // Make sure the stable optime candidate set has been cleared of all entries past the common
+    // point.
+    opTimeCandidates = repl->getStableOpTimeCandidates_forTest();
+    auto stableOpTime = repl->getStableOpTime_forTest();
+    ASSERT(stableOpTime);
+    expectedOpTimeCandidates = {*stableOpTime};
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
+}
+
+TEST_F(StableOpTimeTest, OpTimeCandidatesAreNotAddedWhenStateIsNotConsistent) {
+
+    initReplSetMode();
+    auto repl = getReplCoord();
+    long long term = 0;
+
+    OpTime consistentOpTime = OpTime({1, 1}, term);
+    OpTime inconsistentOpTime = OpTime({1, 2}, term);
+    std::set<OpTime> expectedOpTimeCandidates = {OpTime({1, 1}, term)};
+
+    // Set the lastApplied optime forward when data is consistent, and check that it was added to
+    // the candidate set.
+    repl->setMyLastAppliedOpTimeForward(consistentOpTime,
+                                        ReplicationCoordinator::DataConsistency::Consistent);
+    ASSERT_EQUALS(consistentOpTime, repl->getMyLastAppliedOpTime());
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, repl->getStableOpTimeCandidates_forTest());
+
+    // Set the lastApplied optime forward when data is not consistent, and check that it wasn't
+    // added to the candidate set.
+    repl->setMyLastAppliedOpTimeForward(inconsistentOpTime,
+                                        ReplicationCoordinator::DataConsistency::Inconsistent);
+    ASSERT_EQUALS(inconsistentOpTime, repl->getMyLastAppliedOpTime());
+    ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, repl->getStableOpTimeCandidates_forTest());
+}
+
+
 TEST_F(ReplCoordTest, NodeReturnsShutdownInProgressWhenWaitingUntilAnOpTimeDuringShutdown) {
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -5074,11 +5163,12 @@ TEST_F(ReplCoordTest,
     OpTime time2(Timestamp(100, 2), 1);
     OpTime time3(Timestamp(100, 3), 1);
 
+    auto consistency = ReplicationCoordinator::DataConsistency::Consistent;
     getReplCoord()->setMyLastAppliedOpTime(time1);
     ASSERT_EQUALS(time1, getReplCoord()->getMyLastAppliedOpTime());
-    getReplCoord()->setMyLastAppliedOpTimeForward(time3);
+    getReplCoord()->setMyLastAppliedOpTimeForward(time3, consistency);
     ASSERT_EQUALS(time3, getReplCoord()->getMyLastAppliedOpTime());
-    getReplCoord()->setMyLastAppliedOpTimeForward(time2);
+    getReplCoord()->setMyLastAppliedOpTimeForward(time2, consistency);
     getReplCoord()->setMyLastDurableOpTimeForward(time2);
     ASSERT_EQUALS(time3, getReplCoord()->getMyLastAppliedOpTime());
 }

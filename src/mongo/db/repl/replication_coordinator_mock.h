@@ -119,7 +119,7 @@ public:
     virtual void setMyLastAppliedOpTime(const OpTime& opTime);
     virtual void setMyLastDurableOpTime(const OpTime& opTime);
 
-    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime);
+    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime, DataConsistency consistency);
     virtual void setMyLastDurableOpTimeForward(const OpTime& opTime);
 
     virtual void resetMyLastOpTimes();
@@ -220,7 +220,7 @@ public:
 
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
 
-    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx);
+    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx, DataConsistency consistency);
 
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const rpc::ReplSetMetadata& replMetadata,

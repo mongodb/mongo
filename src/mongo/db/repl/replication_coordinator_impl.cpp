@@ -315,8 +315,9 @@ InitialSyncerOptions createInitialSyncerOptions(
     ReplicationCoordinator* replCoord, ReplicationCoordinatorExternalState* externalState) {
     InitialSyncerOptions options;
     options.getMyLastOptime = [replCoord]() { return replCoord->getMyLastAppliedOpTime(); };
-    options.setMyLastOptime = [replCoord, externalState](const OpTime& opTime) {
-        replCoord->setMyLastAppliedOpTime(opTime);
+    options.setMyLastOptime = [replCoord, externalState](
+        const OpTime& opTime, ReplicationCoordinator::DataConsistency consistency) {
+        replCoord->setMyLastAppliedOpTimeForward(opTime, consistency);
         externalState->setGlobalTimestamp(replCoord->getServiceContext(), opTime.getTimestamp());
     };
     options.resetOptimes = [replCoord]() { replCoord->resetMyLastOpTimes(); };
@@ -585,9 +586,21 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     invariant(_rsConfigState == kConfigStartingUp);
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(opCtx.get(), localConfig, myIndex.getValue());
+
+    // Set our last applied and durable optimes to the top of the oplog, if we have one.
     if (!lastOpTime.isNull()) {
-        _setMyLastAppliedOpTime_inlock(lastOpTime, false);
-        _setMyLastDurableOpTime_inlock(lastOpTime, false);
+        bool isRollbackAllowed = false;
+
+        // If we have an oplog, it is still possible that our data is not in a consistent state. For
+        // example, if we are starting up after a crash following a post-rollback RECOVERING state.
+        // To detect this, we see if our last optime is >= the 'minValid' optime, which
+        // should be persistent across node crashes.
+        OpTime minValid = _replicationProcess->getConsistencyMarkers()->getMinValid(opCtx.get());
+        auto consistency =
+            (lastOpTime >= minValid) ? DataConsistency::Consistent : DataConsistency::Inconsistent;
+
+        _setMyLastAppliedOpTime_inlock(lastOpTime, isRollbackAllowed, consistency);
+        _setMyLastDurableOpTime_inlock(lastOpTime, isRollbackAllowed);
         _reportUpstream_inlock(std::move(lock));  // unlocks _mutex.
     } else {
         lock.unlock();
@@ -669,7 +682,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
             }
 
             const auto lastApplied = status.getValue();
-            _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false);
+            _setMyLastAppliedOpTime_inlock(lastApplied.opTime, false, DataConsistency::Consistent);
         }
 
         // Clear maint. mode.
@@ -1037,11 +1050,11 @@ void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
     _topCoord->setMyHeartbeatMessage(_replExecutor->now(), msg);
 }
 
-void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opTime) {
+void ReplicationCoordinatorImpl::setMyLastAppliedOpTimeForward(const OpTime& opTime,
+                                                               DataConsistency consistency) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
     if (opTime > _getMyLastAppliedOpTime_inlock()) {
-        const bool allowRollback = false;
-        _setMyLastAppliedOpTime_inlock(opTime, allowRollback);
+        _setMyLastAppliedOpTime_inlock(opTime, false, consistency);
         _reportUpstream_inlock(std::move(lock));
     }
 }
@@ -1056,7 +1069,8 @@ void ReplicationCoordinatorImpl::setMyLastDurableOpTimeForward(const OpTime& opT
 
 void ReplicationCoordinatorImpl::setMyLastAppliedOpTime(const OpTime& opTime) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _setMyLastAppliedOpTime_inlock(opTime, false);
+    // The optime passed to this function is required to represent a consistent database state.
+    _setMyLastAppliedOpTime_inlock(opTime, false, DataConsistency::Consistent);
     _reportUpstream_inlock(std::move(lock));
 }
 
@@ -1075,8 +1089,9 @@ void ReplicationCoordinatorImpl::resetMyLastOpTimes() {
 void ReplicationCoordinatorImpl::_resetMyLastOpTimes_inlock() {
     LOG(1) << "resetting durable/applied optimes.";
     // Reset to uninitialized OpTime
-    _setMyLastAppliedOpTime_inlock(OpTime(), true);
-    _setMyLastDurableOpTime_inlock(OpTime(), true);
+    bool isRollbackAllowed = true;
+    _setMyLastAppliedOpTime_inlock(OpTime(), isRollbackAllowed, DataConsistency::Inconsistent);
+    _setMyLastDurableOpTime_inlock(OpTime(), isRollbackAllowed);
     _stableOpTimeCandidates.clear();
 }
 
@@ -1097,27 +1112,38 @@ void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<stdx::
 }
 
 void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& opTime,
-                                                                bool isRollbackAllowed) {
+                                                                bool isRollbackAllowed,
+                                                                DataConsistency consistency) {
     auto* myMemberData = _topCoord->getMyMemberData();
-    invariant(isRollbackAllowed || myMemberData->getLastAppliedOpTime() <= opTime);
+    invariant(isRollbackAllowed || opTime >= myMemberData->getLastAppliedOpTime());
     myMemberData->setLastAppliedOpTime(opTime, _replExecutor->now());
     _updateLastCommittedOpTime_inlock();
 
-    // Add the new applied optime to the list of stable optime candidates and then set the
-    // last stable optime. Stable optimes are used to determine the last optime that it is
-    // safe to revert the database to, in the event of a rollback. Note that master-slave mode has
-    // no automatic fail over, and so rollbacks never occur. Additionally, the commit point for a
-    // master-slave set will never advance, since it doesn't use any consensus protocol. Since the
-    // set of stable optime candidates can only get cleaned up when the commit point advances, we
-    // should refrain from updating stable optime candidates in master-slave mode, to avoid the
-    // candidates list from growing unbounded.
-    if (!opTime.isNull() && getReplicationMode() == Mode::modeReplSet) {
+    // Signal anyone waiting on optime changes.
+    _opTimeWaiterList.signalAndRemoveIf_inlock(
+        [opTime](Waiter* waiter) { return waiter->opTime <= opTime; });
+
+
+    // Note that master-slave mode has no automatic fail over, and so rollbacks never occur.
+    // Additionally, the commit point for a master-slave set will never advance, since it doesn't
+    // use any consensus protocol. Since the set of stable optime candidates can only get cleaned up
+    // when the commit point advances, we should refrain from updating stable optime candidates in
+    // master-slave mode, to avoid the candidates list from growing unbounded.
+    if (opTime.isNull() || getReplicationMode() != Mode::modeReplSet) {
+        return;
+    }
+
+    // Add the new applied optime to the list of stable optime candidates and then set the last
+    // stable optime. Stable optimes are used to determine the last optime that it is safe to revert
+    // the database to, in the event of a rollback via the 'recover to timestamp' method. If we are
+    // setting our applied optime to a value that doesn't represent a consistent database state, we
+    // should not add it to the set of stable optime candidates. For example, if we are in
+    // RECOVERING after a rollback using the 'rollbackViaRefetch' algorithm, we will be inconsistent
+    // until we reach the 'minValid' optime.
+    if (consistency == DataConsistency::Consistent) {
         _stableOpTimeCandidates.insert(opTime);
         _setStableTimestampForStorage_inlock();
     }
-
-    _opTimeWaiterList.signalAndRemoveIf_inlock(
-        [opTime](Waiter* waiter) { return waiter->opTime <= opTime; });
 }
 
 void ReplicationCoordinatorImpl::_setMyLastDurableOpTime_inlock(const OpTime& opTime,
@@ -2615,7 +2641,16 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
         _dropAllSnapshots_inlock();
     }
 
+    // Upon transitioning out of ROLLBACK, we must clear any stable optime candidates that may have
+    // been rolled back.
     if (_memberState.rollback()) {
+        // Our 'lastApplied' optime at this point should be the rollback common point. We should
+        // remove any stable optime candidates greater than the common point.
+        auto lastApplied = _getMyLastAppliedOpTime_inlock();
+        // The upper bound will give us the first optime T such that T > lastApplied.
+        auto deletePoint = _stableOpTimeCandidates.upper_bound(lastApplied);
+        _stableOpTimeCandidates.erase(deletePoint, _stableOpTimeCandidates.end());
+
         // Ensure that no snapshots were created while we were in rollback.
         invariant(!_currentCommittedSnapshot);
     }
@@ -3129,7 +3164,8 @@ void ReplicationCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Da
                                host));
 }
 
-void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opCtx) {
+void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opCtx,
+                                                           DataConsistency consistency) {
     StatusWith<OpTime> lastOpTimeStatus = _externalState->loadLastOpTime(opCtx);
     OpTime lastOpTime;
     if (!lastOpTimeStatus.isOK()) {
@@ -3140,8 +3176,9 @@ void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opC
     }
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    _setMyLastAppliedOpTime_inlock(lastOpTime, true);
-    _setMyLastDurableOpTime_inlock(lastOpTime, true);
+    bool isRollbackAllowed = true;
+    _setMyLastAppliedOpTime_inlock(lastOpTime, isRollbackAllowed, consistency);
+    _setMyLastDurableOpTime_inlock(lastOpTime, isRollbackAllowed);
     _reportUpstream_inlock(std::move(lock));
     // Unlocked below.
 
@@ -3219,13 +3256,33 @@ std::set<OpTime> ReplicationCoordinatorImpl::getStableOpTimeCandidates_forTest()
     return _stableOpTimeCandidates;
 }
 
+boost::optional<OpTime> ReplicationCoordinatorImpl::getStableOpTime_forTest() {
+    return _getStableOpTime_inlock();
+}
+
+boost::optional<OpTime> ReplicationCoordinatorImpl::_getStableOpTime_inlock() {
+    auto commitPoint = _topCoord->getLastCommittedOpTime();
+    if (_currentCommittedSnapshot) {
+        auto snapshotOpTime = *_currentCommittedSnapshot;
+        invariant(snapshotOpTime.getTimestamp() <= commitPoint.getTimestamp());
+        invariant(snapshotOpTime <= commitPoint);
+    }
+
+    // Compute the current stable optime.
+    auto stableOpTime = _calculateStableOpTime(_stableOpTimeCandidates, commitPoint);
+    if (stableOpTime) {
+        // By definition, the stable optime should never be greater than the commit point.
+        invariant(stableOpTime->getTimestamp() <= commitPoint.getTimestamp());
+        invariant(*stableOpTime <= commitPoint);
+    }
+
+    return stableOpTime;
+}
+
 void ReplicationCoordinatorImpl::_setStableTimestampForStorage_inlock() {
 
     // Get the current stable optime.
-    auto commitPoint = _topCoord->getLastCommittedOpTime();
-    auto stableOpTime = _calculateStableOpTime(_stableOpTimeCandidates, commitPoint);
-
-    invariant(stableOpTime <= commitPoint);
+    auto stableOpTime = _getStableOpTime_inlock();
 
     // If there is a valid stable optime, set it for the storage engine, and then remove any
     // old, unneeded stable optime candidates.
@@ -3251,7 +3308,9 @@ void ReplicationCoordinatorImpl::advanceCommitPoint(const OpTime& committedOpTim
 void ReplicationCoordinatorImpl::_advanceCommitPoint_inlock(const OpTime& committedOpTime) {
     if (_topCoord->advanceLastCommittedOpTime(committedOpTime)) {
         if (_getMemberState_inlock().arbiter()) {
-            _setMyLastAppliedOpTime_inlock(committedOpTime, false);
+            // Arbiters do not store replicated data, so we consider their data trivially
+            // consistent.
+            _setMyLastAppliedOpTime_inlock(committedOpTime, false, DataConsistency::Consistent);
         }
 
         _setStableTimestampForStorage_inlock();
@@ -3535,13 +3594,19 @@ void ReplicationCoordinatorImpl::_updateCommittedSnapshot_inlock(
     // If we are in ROLLBACK state, do not set any new _currentCommittedSnapshot, as it will be
     // cleared at the end of rollback anyway.
     if (_memberState.rollback()) {
-        log() << "not updating committed snapshot because we are in rollback";
+        log() << "Not updating committed snapshot because we are in rollback";
         return;
     }
     invariant(!newCommittedSnapshot.isNull());
-    invariant(newCommittedSnapshot.getTimestamp() <=
-              _topCoord->getLastCommittedOpTime().getTimestamp());
+
+    // The new committed snapshot should be <= the current replication commit point.
+    OpTime lastCommittedOpTime = _topCoord->getLastCommittedOpTime();
+    invariant(newCommittedSnapshot.getTimestamp() <= lastCommittedOpTime.getTimestamp());
+    invariant(newCommittedSnapshot <= lastCommittedOpTime);
+
+    // The new committed snapshot should be >= the current snapshot.
     if (_currentCommittedSnapshot) {
+        invariant(newCommittedSnapshot.getTimestamp() >= _currentCommittedSnapshot->getTimestamp());
         invariant(newCommittedSnapshot >= _currentCommittedSnapshot);
     }
     if (MONGO_FAIL_POINT(disableSnapshotting))

@@ -387,7 +387,6 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
     _storage->setInitialDataTimestamp(opCtx->getServiceContext(),
                                       lastApplied.getValue().opTime.getTimestamp());
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
-    _opts.setMyLastOptime(lastApplied.getValue().opTime);
     log() << "initial sync done; took "
           << duration_cast<Seconds>(_stats.initialSyncEnd - _stats.initialSyncStart) << ".";
     initialSyncCompletes.increment();
@@ -1021,7 +1020,8 @@ void InitialSyncer::_multiApplierCallback(const Status& multiApplierStatus,
 
     _initialSyncState->appliedOps += numApplied;
     _lastApplied = lastApplied;
-    _opts.setMyLastOptime(_lastApplied.opTime);
+    _opts.setMyLastOptime(_lastApplied.opTime,
+                          ReplicationCoordinator::DataConsistency::Inconsistent);
 
     auto fetchCount = _fetchCount.load();
     if (fetchCount > 0) {
