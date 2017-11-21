@@ -997,6 +997,37 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
     return Status::OK();
 }
 
+Status CollectionImpl::updateValidator(OperationContext* opCtx,
+                                       BSONObj newValidator,
+                                       StringData newLevel,
+                                       StringData newAction) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+
+    _details->updateValidator(opCtx, newValidator, newLevel, newAction);
+    _validatorDoc = std::move(newValidator);
+
+    auto validatorSW =
+        parseValidator(opCtx, _validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures);
+    if (!validatorSW.isOK()) {
+        return validatorSW.getStatus();
+    }
+    _validator = std::move(validatorSW.getValue());
+
+    auto levelSW = parseValidationLevel(newLevel);
+    if (!levelSW.isOK()) {
+        return levelSW.getStatus();
+    }
+    _validationLevel = levelSW.getValue();
+
+    auto actionSW = parseValidationAction(newAction);
+    if (!actionSW.isOK()) {
+        return actionSW.getStatus();
+    }
+    _validationAction = actionSW.getValue();
+
+    return Status::OK();
+}
+
 const CollatorInterface* CollectionImpl::getDefaultCollator() const {
     return _collator.get();
 }
