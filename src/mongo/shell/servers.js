@@ -1105,7 +1105,7 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                         }
                     }
                     if (!hasParam) {
-                        argArray.push(...['--setParameter', 'orphanCleanupDelaySecs=0']);
+                        argArray.push(...['--setParameter', 'orphanCleanupDelaySecs=1']);
                     }
                 }
 

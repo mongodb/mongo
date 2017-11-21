@@ -101,18 +101,7 @@ var blacklist = [
     'yield_and_hashed.js',  // stagedebug can only be run against a standalone mongod
     'yield_and_sorted.js',  // stagedebug can only be run against a standalone mongod
 
-    'reindex_background.js',  // TODO SERVER-30983
-
-    'agg_base.js',  // TODO SERVER-30984
-
-    'indexed_insert_multikey.js',                         // TODO SERVER-31000
-    'indexed_insert_multikey_noindex.js',                 // TODO SERVER-31000
-    'indexed_insert_text_multikey.js',                    // TODO SERVER-31000
-    'update_multifield_multiupdate.js',                   // TODO SERVER-31000
-    'update_multifield_multiupdate_noindex.js',           // TODO SERVER-31000
-    'update_multifield_isolated_multiupdate.js',          // TODO SERVER-31000
-    'update_multifield_isolated_multiupdate_noindex.js',  // TODO SERVER-31000
-    'yield_id_hack.js',                                   // TODO SERVER-31000
+    'reindex_background.js'  // TODO SERVER-30983
 ].map(function(file) {
     return dir + '/' + file;
 });

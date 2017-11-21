@@ -2,15 +2,12 @@
 
 var st = new ShardingTest({shards: 2, mongos: 2});
 
-// Don't balance since we're manually moving chunks
-st.stopBalancer();
-
 var coll = st.s.getCollection(jsTestName() + ".coll");
 
 for (var i = -10; i < 10; i++)
     coll.insert({_id: i});
 
-st.shardColl(coll, {_id: 1}, {_id: 0});
+st.shardColl(coll, {_id: 1}, {_id: 0}, {_id: 0}, null, /* waitForDelete */ true);
 
 jsTestLog("Sharded setup complete");
 
