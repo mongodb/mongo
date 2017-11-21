@@ -157,6 +157,11 @@ public:
     virtual void cleanShutdown();
 
     SnapshotManager* getSnapshotManager() const final {
+        if (!_keepDataHistory) {
+            // Keeping a history of data is required to provide majority reads. Returning null
+            // here communicates majority reads are not supported.
+            return nullptr;
+        }
         return &_sessionCache->snapshotManager();
     }
 
@@ -211,6 +216,15 @@ public:
         return _oplogManager.get();
     }
 
+    /**
+     * Callers to this method must be serialized. A "timestamping" MongoDB can be one of two
+     * modes: supporting majority reads or not. A node that supports majority reads will have its
+     * `oldest_timestamp` updates via replication calling `setStableTimestamp`. Nodes that do not
+     * support majority reads (master-slave or explicitly disabled) will call this method directly
+     * from the WiredTigerOplogManager background thread.
+     */
+    void setOldestTimestamp(SnapshotName oldestTimestamp);
+
     /*
      * This function is called when replication has completed a batch.  In this function, we
      * refresh our oplog visiblity read-at-timestamp value.
@@ -245,9 +259,8 @@ private:
 
     std::string _uri(StringData ident) const;
 
-    // Not threadsafe; callers must be serialized.
-    void _setOldestTimestamp(SnapshotName oldestTimestamp);
     SnapshotName _previousSetOldestTimestamp;
+    const bool _keepDataHistory;
 
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;

@@ -52,10 +52,12 @@ public:
     ~WiredTigerOplogManager() {}
 
     // This method will initialize the oplog read timestamp and start the background thread that
-    // refreshes the value.
+    // refreshes the value. If `updateOldestTimestamp` is true, the background thread will also
+    // take responsibility for updating the oldest timestamp.
     void start(OperationContext* opCtx,
                const std::string& uri,
-               WiredTigerRecordStore* oplogRecordStore);
+               WiredTigerRecordStore* oplogRecordStore,
+               bool updateOldestTimestamp);
 
     void halt();
 

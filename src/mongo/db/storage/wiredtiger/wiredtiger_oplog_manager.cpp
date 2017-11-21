@@ -49,7 +49,8 @@ MONGO_FP_DECLARE(WTPausePrimaryOplogDurabilityLoop);
 
 void WiredTigerOplogManager::start(OperationContext* opCtx,
                                    const std::string& uri,
-                                   WiredTigerRecordStore* oplogRecordStore) {
+                                   WiredTigerRecordStore* oplogRecordStore,
+                                   bool updateOldestTimestamp) {
     invariant(!_isRunning);
     // Prime the oplog read timestamp.
     auto sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
@@ -61,16 +62,17 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
     _oplogMaxAtStartup = lastRecord ? lastRecord->id : RecordId();
 
     auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
-    bool isMasterSlave = false;
     if (replCoord) {
-        isMasterSlave =
+        // In master-slave mode, replication won't update the oldest timestamp. So the
+        // OplogManager thread will assume that responsibility.
+        updateOldestTimestamp = updateOldestTimestamp ||
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeMasterSlave;
     }
     _oplogJournalThread = stdx::thread(&WiredTigerOplogManager::_oplogJournalThreadLoop,
                                        this,
                                        sessionCache,
                                        oplogRecordStore,
-                                       isMasterSlave);
+                                       updateOldestTimestamp);
 
     stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
     _isRunning = true;
@@ -148,7 +150,7 @@ void WiredTigerOplogManager::triggerJournalFlush() {
 
 void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* sessionCache,
                                                      WiredTigerRecordStore* oplogRecordStore,
-                                                     bool isMasterSlave) noexcept {
+                                                     const bool updateOldestTimestamp) noexcept {
     Client::initThread("WTOplogJournalThread");
 
     // This thread updates the oplog read timestamp, the timestamp used to read from the oplog with
@@ -197,9 +199,10 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         oplogRecordStore->notifyCappedWaitersIfNeeded();
 
         // For master/slave masters, set oldest timestamp here so that we clean up old timestamp
-        // data.  SERVER-31802
-        if (isMasterSlave) {
-            sessionCache->getKVEngine()->setStableTimestamp(SnapshotName(newTimestamp));
+        // data. This is also exercised when `majorityReadConcern` is disabled. SERVER-31802,
+        // SERVER-32022.
+        if (updateOldestTimestamp) {
+            sessionCache->getKVEngine()->setOldestTimestamp(SnapshotName(newTimestamp));
         }
     }
 }

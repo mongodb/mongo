@@ -320,7 +320,8 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
                                        bool ephemeral,
                                        bool repair,
                                        bool readOnly)
-    : _eventHandler(WiredTigerUtil::defaultEventHandlers()),
+    : _keepDataHistory(serverGlobalParams.enableMajorityReadConcern),
+      _eventHandler(WiredTigerUtil::defaultEventHandlers()),
       _clockSource(cs),
       _oplogManager(stdx::make_unique<WiredTigerOplogManager>()),
       _canonicalName(canonicalName),
@@ -1019,13 +1020,18 @@ void WiredTigerKVEngine::setStableTimestamp(SnapshotName stableTimestamp) {
         _checkpointThread->setStableTimestamp(stableTimestamp);
     }
 
-    // Communicate to WiredTiger that it can clean up timestamp data earlier than the timestamp
-    // provided.  No future queries will need point-in-time reads at a timestamp prior to the one
-    // provided here.
-    _setOldestTimestamp(stableTimestamp);
+    if (_keepDataHistory) {
+        // If `_keepDataHistory` is false, the OplogManager is responsible for setting the
+        // `oldest_timestamp`.
+        //
+        // Communicate to WiredTiger that it can clean up timestamp data earlier than the
+        // timestamp provided.  No future queries will need point-in-time reads at a timestamp
+        // prior to the one provided here.
+        setOldestTimestamp(stableTimestamp);
+    }
 }
 
-void WiredTigerKVEngine::_setOldestTimestamp(SnapshotName oldestTimestamp) {
+void WiredTigerKVEngine::setOldestTimestamp(SnapshotName oldestTimestamp) {
     if (oldestTimestamp == SnapshotName()) {
         // No oldestTimestamp to set, yet.
         return;
@@ -1084,8 +1090,12 @@ void WiredTigerKVEngine::startOplogManager(OperationContext* opCtx,
                                            const std::string& uri,
                                            WiredTigerRecordStore* oplogRecordStore) {
     stdx::lock_guard<stdx::mutex> lock(_oplogManagerMutex);
-    if (_oplogManagerCount == 0)
-        _oplogManager->start(opCtx, uri, oplogRecordStore);
+    if (_oplogManagerCount == 0) {
+        // If we don't want to keep a long history of data changes, have the OplogManager thread
+        // update the oldest timestamp with the "all committed" timestamp, i.e: the latest time at
+        // which there are no holes.
+        _oplogManager->start(opCtx, uri, oplogRecordStore, !_keepDataHistory);
+    }
     _oplogManagerCount++;
 }
 

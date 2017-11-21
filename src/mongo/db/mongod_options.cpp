@@ -437,15 +437,14 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "specify index prefetching behavior (if secondary) [none|_id_only|all]")
         .format("(:?none)|(:?_id_only)|(:?all)", "(none/_id_only/all)");
 
-    // `enableMajorityReadConcern` is always enabled starting in 3.6, regardless of user
-    // settings. We're leaving the option in to not break existing deployment scripts. A warning
-    // will appear if explicitly set to false.
+    // `enableMajorityReadConcern` is enabled by default starting in 3.6.
     rs_options
         .addOptionChaining("replication.enableMajorityReadConcern",
                            "enableMajorityReadConcern",
-                           moe::Switch,
+                           moe::Bool,
                            "enables majority readConcern")
-        .setDefault(moe::Value(true));
+        .setDefault(moe::Value(true))
+        .setImplicit(moe::Value(true));
 
     // Sharding Options
 
@@ -1134,11 +1133,8 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     if (params.count("replication.enableMajorityReadConcern")) {
-        bool val = params["replication.enableMajorityReadConcern"].as<bool>();
-        if (!val) {
-            warning() << "enableMajorityReadConcern startup parameter was supplied, but its value "
-                         "was ignored; majority read concern cannot be disabled.";
-        }
+        serverGlobalParams.enableMajorityReadConcern =
+            params["replication.enableMajorityReadConcern"].as<bool>();
     }
 
     if (params.count("storage.indexBuildRetry")) {
