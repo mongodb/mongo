@@ -313,13 +313,15 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     const auto opTimeList =
         repl::logInsertOps(opCtx, nss, uuid, session, begin, end, fromMigrate, lastWriteDate);
 
-    auto css = CollectionShardingState::get(opCtx, nss.ns());
+    auto css = (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
+        ? nullptr
+        : CollectionShardingState::get(opCtx, nss.ns());
 
     size_t index = 0;
     for (auto it = begin; it != end; it++, index++) {
         AuthorizationManager::get(opCtx->getServiceContext())
             ->logOp(opCtx, "i", nss, it->doc, nullptr);
-        if (!fromMigrate) {
+        if (css) {
             auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
             css->onInsertOp(opCtx, it->doc, opTime);
         }
@@ -374,14 +376,16 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "u", args.nss, args.update, &args.criteria);
 
-    auto css = CollectionShardingState::get(opCtx, args.nss);
-    if (!args.fromMigrate) {
-        css->onUpdateOp(opCtx,
-                        args.criteria,
-                        args.update,
-                        args.updatedDoc,
-                        opTime.writeOpTime,
-                        opTime.prePostImageOpTime);
+    if (args.nss != NamespaceString::kSessionTransactionsTableNamespace) {
+        if (!args.fromMigrate) {
+            auto css = CollectionShardingState::get(opCtx, args.nss);
+            css->onUpdateOp(opCtx,
+                            args.criteria,
+                            args.update,
+                            args.updatedDoc,
+                            opTime.writeOpTime,
+                            opTime.prePostImageOpTime);
+        }
     }
 
     if (args.nss.coll() == "system.js") {
@@ -428,9 +432,11 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "d", nss, deleteState.documentKey, nullptr);
 
-    auto css = CollectionShardingState::get(opCtx, nss.ns());
-    if (!fromMigrate) {
-        css->onDeleteOp(opCtx, deleteState, opTime.writeOpTime, opTime.prePostImageOpTime);
+    if (nss != NamespaceString::kSessionTransactionsTableNamespace) {
+        if (!fromMigrate) {
+            auto css = CollectionShardingState::get(opCtx, nss.ns());
+            css->onDeleteOp(opCtx, deleteState, opTime.writeOpTime, opTime.prePostImageOpTime);
+        }
     }
 
     if (nss.coll() == "system.js") {
