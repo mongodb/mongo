@@ -398,7 +398,9 @@ void _logOpsInner(OperationContext* opCtx,
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
     opCtx->recoveryUnit()->onCommit([opCtx, replCoord, finalOpTime] {
-        replCoord->setMyLastAppliedOpTimeForward(finalOpTime);
+        // Optimes on the primary should always represent consistent database states.
+        replCoord->setMyLastAppliedOpTimeForward(
+            finalOpTime, ReplicationCoordinator::DataConsistency::Consistent);
         ReplClientInfo::forClient(opCtx->getClient()).setLastOp(finalOpTime);
     });
 }

@@ -312,7 +312,7 @@ public:
      * it is the caller's job to properly synchronize this behavior.  The exception to this rule
      * is that after calls to resetLastOpTimesFromOplog(), the minimum acceptable value for
      * "opTime" is reset based on the contents of the oplog, and may go backwards due to
-     * rollback.
+     * rollback. Additionally, the optime given MUST represent a consistent database state.
      */
     virtual void setMyLastAppliedOpTime(const OpTime& opTime) = 0;
 
@@ -328,14 +328,27 @@ public:
     virtual void setMyLastDurableOpTime(const OpTime& opTime) = 0;
 
     /**
+     * This type is used to represent the "consistency" of a current database state. In
+     * replication, there may be times when our database data is not represented by a single optime,
+     * because we have fetched remote data from different points in time. For example, when we are
+     * in RECOVERING following a refetch based rollback. We never allow external clients to read
+     * from the database if it is not consistent.
+     */
+    enum class DataConsistency { Consistent, Inconsistent };
+
+    /**
      * Updates our internal tracking of the last OpTime applied to this node, but only
      * if the supplied optime is later than the current last OpTime known to the replication
-     * coordinator.
+     * coordinator. The 'consistency' argument must tell whether or not the optime argument
+     * represents a consistent database state.
      *
      * This function is used by logOp() on a primary, since the ops in the oplog do not
-     * necessarily commit in sequential order.
+     * necessarily commit in sequential order. It is also used when we finish oplog batch
+     * application on secondaries, to avoid any potential race conditions around setting the
+     * applied optime from more than one thread.
      */
-    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime) = 0;
+    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime,
+                                               DataConsistency consistency) = 0;
 
     /**
      * Updates our internal tracking of the last OpTime durable to this node, but only
@@ -741,9 +754,11 @@ public:
 
     /**
      * Loads the optime from the last op in the oplog into the coordinator's lastAppliedOpTime and
-     * lastDurableOpTime values.
+     * lastDurableOpTime values. The 'consistency' argument must tell whether or not the optime of
+     * the op in the oplog represents a consistent database state.
      */
-    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx) = 0;
+    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx,
+                                           DataConsistency consistency) = 0;
 
     /**
      * Returns the OpTime of the latest replica set-committed op known to this server.

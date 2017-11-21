@@ -114,7 +114,8 @@ public:
      * Base class implementation triggers an invariant. This function is overridden to be a no-op
      * for rollback tests.
      */
-    void resetLastOpTimesFromOplog(OperationContext* opCtx) override;
+    void resetLastOpTimesFromOplog(OperationContext* opCtx,
+                                   ReplicationCoordinator::DataConsistency consistency) override;
 
     /**
      * Returns IllegalOperation (does not forward call to

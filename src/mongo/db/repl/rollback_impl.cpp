@@ -198,11 +198,23 @@ StatusWith<Timestamp> RollbackImpl::_findCommonPoint() {
         return commonPointSW.getStatus();
     }
 
-    log() << "Rollback common point is " << commonPointSW.getValue().first;
-    invariant(!_replicationCoordinator->isV1ElectionProtocol() ||
-              commonPointSW.getValue().first >= _replicationCoordinator->getLastCommittedOpTime());
+    OpTime commonPoint = commonPointSW.getValue().first;
+    OpTime lastCommittedOpTime = _replicationCoordinator->getLastCommittedOpTime();
+    OpTime committedSnapshot = _replicationCoordinator->getCurrentCommittedSnapshotOpTime();
 
-    return commonPointSW.getValue().first.getTimestamp();
+    log() << "Rollback common point is " << commonPoint;
+
+    // Rollback common point should be >= the replication commit point.
+    invariant(!_replicationCoordinator->isV1ElectionProtocol() ||
+              commonPoint.getTimestamp() >= lastCommittedOpTime.getTimestamp());
+    invariant(!_replicationCoordinator->isV1ElectionProtocol() ||
+              commonPoint >= lastCommittedOpTime);
+
+    // Rollback common point should be >= the committed snapshot optime.
+    invariant(commonPoint.getTimestamp() >= committedSnapshot.getTimestamp());
+    invariant(commonPoint >= committedSnapshot);
+
+    return commonPoint.getTimestamp();
 }
 
 Status RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {

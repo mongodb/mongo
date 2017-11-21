@@ -157,7 +157,7 @@ public:
     virtual void setMyLastAppliedOpTime(const OpTime& opTime);
     virtual void setMyLastDurableOpTime(const OpTime& opTime);
 
-    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime);
+    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime, DataConsistency consistency);
     virtual void setMyLastDurableOpTimeForward(const OpTime& opTime);
 
     virtual void resetMyLastOpTimes();
@@ -265,7 +265,8 @@ public:
 
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) override;
 
-    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx) override;
+    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx,
+                                           DataConsistency consistency) override;
 
     virtual bool shouldChangeSyncSource(
         const HostAndPort& currentSource,
@@ -387,6 +388,7 @@ public:
                                                           const OpTime& commitPoint);
     void cleanupStableOpTimeCandidates_forTest(std::set<OpTime>* candidates, OpTime stableOpTime);
     std::set<OpTime> getStableOpTimeCandidates_forTest();
+    boost::optional<OpTime> getStableOpTime_forTest();
 
     /**
      * Non-blocking version of updateTerm.
@@ -682,7 +684,9 @@ private:
     /**
      * Helpers to set the last applied and durable OpTime.
      */
-    void _setMyLastAppliedOpTime_inlock(const OpTime& opTime, bool isRollbackAllowed);
+    void _setMyLastAppliedOpTime_inlock(const OpTime& opTime,
+                                        bool isRollbackAllowed,
+                                        DataConsistency consistency);
     void _setMyLastDurableOpTime_inlock(const OpTime& opTime, bool isRollbackAllowed);
 
     /**
@@ -999,6 +1003,12 @@ private:
      * Blesses a snapshot to be used for new committed reads.
      */
     void _updateCommittedSnapshot_inlock(SnapshotInfo newCommittedSnapshot);
+
+    /**
+     * A helper method that returns the current stable optime based on the current commit point and
+     * set of stable optime candidates.
+     */
+    boost::optional<OpTime> _getStableOpTime_inlock();
 
     /**
      * Calculates the 'stable' replication optime given a set of optime candidates and the
