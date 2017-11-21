@@ -580,8 +580,6 @@ void ServiceExecutorAdaptive::appendStats(BSONObjBuilder* bob) const {
     section << kExecutorLabel << kExecutorName                                               //
             << kTotalQueued << _totalQueued.load()                                           //
             << kTotalExecuted << _totalExecuted.load()                                       //
-            << kTasksQueued << _tasksQueued.load()                                           //
-            << kDeferredTasksQueued << _deferredTasksQueued.load()                           //
             << kThreadsInUse << _threadsInUse.load()                                         //
             << kTotalTimeRunningUs                                                           //
             << ticksToMicros(_getThreadTimerTotal(ThreadTimer::Running, lk), _tickSource)    //
