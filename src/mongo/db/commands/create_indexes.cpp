@@ -242,6 +242,12 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
+        // Disallow users from creating new indexes on config.transactions since the sessions
+        // code was optimized to not update indexes.
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "not allowed to create index on " << ns.ns(),
+                ns != NamespaceString::kSessionTransactionsTableNamespace);
+
         auto specsWithStatus =
             parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility);
         if (!specsWithStatus.isOK()) {
