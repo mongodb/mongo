@@ -148,7 +148,7 @@
     {
         jsTest.setOption('enableTestCommands', false);
 
-        var st = new ShardingTest({shards: 2});
+        var st = new ShardingTest({shards: 2, rs: true});
         var admin = st.s.getDB('admin');
 
         assert.commandWorked(
