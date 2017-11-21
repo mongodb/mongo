@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongoreplay
 
 import (
@@ -83,6 +89,102 @@ func ReadDocument(r io.Reader) (doc []byte, err error) {
 
 	_, err = io.ReadFull(r, doc[4:])
 	return
+}
+
+func getCursorID(in *bson.Raw) (int64, error) {
+	doc := &struct {
+		Cursor struct {
+			ID int64 `bson:"id"`
+		} `bson:"cursor"`
+	}{}
+	err := in.Unmarshal(doc)
+	if err != nil {
+		// can happen if there's corrupt bson in the doc.
+		return 0, fmt.Errorf("failed to unmarshal bson.Raw into struct: %v", err)
+	}
+	return doc.Cursor.ID, nil
+}
+
+func getCursorDocs(in *bson.Raw) ([]bson.Raw, error) {
+	doc := &struct {
+		Cursor struct {
+			FirstBatch []bson.Raw `bson:"firstBatch"`
+			NextBatch  []bson.Raw `bson:"nextBatch"`
+		} `bson:"cursor"`
+	}{}
+	err := in.Unmarshal(&doc)
+	if err != nil {
+		return []bson.Raw{}, err
+	}
+
+	if len(doc.Cursor.FirstBatch) != 0 {
+		return doc.Cursor.FirstBatch, nil
+	} else if len(doc.Cursor.NextBatch) != 0 {
+		return doc.Cursor.NextBatch, nil
+	}
+	return []bson.Raw{}, nil
+}
+
+func getGetMoreCursorID(in interface{}) (int64, error) {
+	var err error
+	switch t := in.(type) {
+	case *bson.D:
+		for _, bsonDoc := range *t {
+			if bsonDoc.Name == "getMore" {
+				getmoreID, ok := bsonDoc.Value.(int64)
+				if !ok {
+					return 0, fmt.Errorf("cursorID is not int64")
+				}
+				return getmoreID, nil
+			}
+		}
+	case *bson.Raw:
+		doc := &struct {
+			GetMore int64 `bson:"getMore"`
+		}{}
+		err = t.Unmarshal(doc)
+		if err != nil {
+			return 0, fmt.Errorf("failed to unmarshal bson.Raw into struct: %v", err)
+		}
+		return doc.GetMore, nil
+	default:
+		panic("not a *bson.D or *bson.Raw")
+	}
+	return 0, nil
+}
+
+func setCursorID(in interface{}, newCursorIDs []int64) (bson.D, int64, error) {
+	var newCursorID int64
+
+	if len(newCursorIDs) > 1 {
+		return bson.D{}, 0, fmt.Errorf("rewriting getmore command cursorIDs requires 1 id, received: %d", len(newCursorIDs))
+	}
+	if len(newCursorIDs) < 1 {
+		newCursorID = 0
+	} else {
+		newCursorID = newCursorIDs[0]
+	}
+	var doc bson.D
+	switch t := in.(type) {
+	case *bson.D:
+		doc = *t
+	case *bson.Raw:
+		err := t.Unmarshal(&doc)
+		if err != nil {
+			return bson.D{}, 0, fmt.Errorf("failed to unmarshal bson.Raw into struct: %v", err)
+		}
+	default:
+		panic("not a *bson.D or *bson.Raw")
+	}
+
+	// loop over the keys of the bson.D and the set the correct one
+	for i, bsonDoc := range doc {
+		if bsonDoc.Name == "getMore" {
+			doc[i].Value = newCursorID
+			break
+		}
+	}
+	return doc, newCursorID, nil
 }
 
 func getCommandName(rawOp *RawOp) (string, error) {

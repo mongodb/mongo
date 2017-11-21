@@ -1,28 +1,11 @@
-// mgo - MongoDB driver for Go
+// Copyright (C) MongoDB, Inc. 2015-present.
 //
-// Copyright (c) 2010-2012 - Gustavo Niemeyer <gustavo@niemeyer.net>
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 //
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-//    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-// ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Based on gopkg.io/mgo.v2 by Gustavo Niemeyer.
+// See THIRD-PARTY-NOTICES for original license terms.
 
 package mgo
 
@@ -51,9 +34,21 @@ const (
 	dbCommand      = 2010
 	dbCommandReply = 2011
 	dbCompressed   = 2012
+	dbMessage      = 2013
 )
 
-type replyFunc func(err error, rfl *replyFuncLegacyArgs, rfc *replyFuncCommandArgs)
+const (
+	MsgFlagChecksumPresent = 1
+	MsgFlagMoreToCome      = (1 << 1)
+	MsgFlagExhaustAllowed  = (1 << 16)
+)
+
+const (
+	MsgPayload0 = uint8(0)
+	MsgPayload1 = uint8(1)
+)
+
+type replyFunc func(err error, rfl *replyFuncLegacyArgs, rfc *replyFuncCommandArgs, rfm *replyFuncMsgArgs)
 
 type MongoSocket struct {
 	sync.Mutex
@@ -208,6 +203,45 @@ type CommandReplyOp struct {
 	OutputDocs   []interface{}
 }
 
+type MsgOp struct {
+	Flags     uint32
+	Sections  []MsgSection
+	Checksum  uint32
+	replyFunc replyFunc
+}
+
+type MsgSection struct {
+	PayloadType uint8
+	Data        interface{}
+}
+
+// PayloadType1 is a container for the OP_MSG payload data of type 1.
+// There is no definition of the type 0 payload because that is simply a
+// bson document.
+type PayloadType1 struct {
+	Size       int32
+	Identifier string
+	Docs       []interface{}
+}
+
+func (p *PayloadType1) CalculateSize() (int32, error) {
+	docsLen := 0
+	for _, d := range p.Docs {
+		docAsSlice, err := bson.Marshal(d)
+		if err != nil {
+			return 0, err
+		}
+		docsLen += len(docAsSlice)
+	}
+
+	// This math is as follows:
+	// (4 bytes for int32 length)  +
+	// (length of the identifier string) +
+	// (1 for the null byte added to c strings) +
+	// (length of the marshalled documents)
+	return int32(4 + len(p.Identifier) + 1 + docsLen), nil
+}
+
 // replyFuncCommandArgs contains the arguments needed by the replyFunc to complete a CommandReplyOp.
 type replyFuncCommandArgs struct {
 	// op is the newly generated CommandReplyOp
@@ -244,10 +278,25 @@ type replyFuncLegacyArgs struct {
 	docData []byte
 }
 
+// replyFuncMsgArgs contains the arguments needed by the replyFunc to complete a MsgOp
+// as a reply.
+type replyFuncMsgArgs struct {
+	// op is the newly generated MsgOp. It will contain the Flags and Checksum but
+	// not the data of the parsed ops.
+	op *MsgOp
+
+	// docData is a slice of bytes containing the unread bson of reply document being handed to the
+	// replyFunc
+	sectionsData []byte
+}
+
 func (op *GetMoreOp) SetReplyFunc(reply replyFunc) {
 	op.replyFunc = reply
 }
 func (op *CommandOp) SetReplyFunc(reply replyFunc) {
+	op.replyFunc = reply
+}
+func (op *MsgOp) SetReplyFunc(reply replyFunc) {
 	op.replyFunc = reply
 }
 
@@ -428,7 +477,7 @@ func (socket *MongoSocket) kill(err error, abend bool) {
 	socket.Unlock()
 	for _, replyFunc := range replyFuncs {
 		logf("Socket %p to %s: notifying replyFunc of closed socket: %s", socket, socket.addr, err.Error())
-		replyFunc(err, nil, nil)
+		replyFunc(err, nil, nil, nil)
 	}
 	if abend {
 		server.AbendSocket(socket)
@@ -441,7 +490,7 @@ func (socket *MongoSocket) SimpleQuery(op *QueryOp) (data []byte, replyOp *Reply
 	var replyData []byte
 	var replyErr error
 	wait.Lock()
-	op.replyFunc = func(err error, rfl *replyFuncLegacyArgs, rfc *replyFuncCommandArgs) {
+	op.replyFunc = func(err error, rfl *replyFuncLegacyArgs, rfc *replyFuncCommandArgs, rfm *replyFuncMsgArgs) {
 		change.Lock()
 		if !replyDone {
 			replyDone = true
@@ -604,6 +653,47 @@ func (socket *MongoSocket) Query(ops ...interface{}) (err error) {
 					return err
 				}
 			}
+		case *MsgOp:
+			buf = addHeader(buf, dbMessage)
+			buf = addInt32(buf, int32(op.Flags))
+			for _, section := range op.Sections {
+				// Read the payload type
+				switch section.PayloadType {
+				// If it's the simpler type (type 0) write out its type and BSON
+				case MsgPayload0:
+					buf = append(buf, byte(0))
+					buf, err = addBSON(buf, section.Data)
+					if err != nil {
+						return err
+					}
+				case MsgPayload1:
+					// Write the payload type
+					buf = append(buf, byte(1))
+					payload, ok := section.Data.(PayloadType1)
+					if !ok {
+						panic("incorrect type given for payload")
+					}
+
+					//Write out the size
+					buf = addInt32(buf, payload.Size)
+					//Write out the identifier
+					buf = addCString(buf, payload.Identifier)
+					//Write out the docs
+					for _, d := range payload.Docs {
+						buf, err = addBSON(buf, d)
+						if err != nil {
+							return err
+						}
+					}
+				default:
+					return fmt.Errorf("unknown payload type: %d", section.PayloadType)
+				}
+			}
+			// check if the checksum should be present
+			if op.Flags&MsgFlagChecksumPresent != 0 {
+				buf = addInt32(buf, int32(op.Checksum))
+			}
+			replyFunc = op.replyFunc
 
 		default:
 			panic("internal error: unknown operation type")
@@ -631,7 +721,7 @@ func (socket *MongoSocket) Query(ops ...interface{}) (err error) {
 		for i := 0; i != requestCount; i++ {
 			request := &requests[i]
 			if request.replyFunc != nil {
-				request.replyFunc(dead, nil, nil)
+				request.replyFunc(dead, nil, nil, nil)
 			}
 		}
 		return dead
@@ -668,8 +758,8 @@ func (socket *MongoSocket) Query(ops ...interface{}) (err error) {
 // Estimated minimum cost per socket: 1 goroutine + memory for the largest
 // document ever seen.
 func (socket *MongoSocket) readLoop() {
-	headerBuf := make([]byte, 16)        // 16 from header
-	opReplyFieldsBuf := make([]byte, 20) // 20 from OP_REPLY fixed fields
+	headerBuf := make([]byte, 16) // 16 from header
+	bodyBuf := make([]byte, 20)   // 20 from OP_REPLY fixed fields or other general uses
 	for {
 		var r io.Reader = socket.Conn
 
@@ -720,16 +810,16 @@ func (socket *MongoSocket) readLoop() {
 
 		switch opCode {
 		case opReply:
-			_, err := io.ReadFull(r, opReplyFieldsBuf)
+			_, err := io.ReadFull(r, bodyBuf)
 			if err != nil {
 				socket.kill(err, true)
 				return
 			}
 			reply := ReplyOp{
-				Flags:     uint32(getInt32(opReplyFieldsBuf, 0)),
-				CursorId:  getInt64(opReplyFieldsBuf, 4),
-				FirstDoc:  getInt32(opReplyFieldsBuf, 12),
-				ReplyDocs: getInt32(opReplyFieldsBuf, 16),
+				Flags:     uint32(getInt32(bodyBuf, 0)),
+				CursorId:  getInt64(bodyBuf, 4),
+				FirstDoc:  getInt32(bodyBuf, 12),
+				ReplyDocs: getInt32(bodyBuf, 16),
 			}
 			stats.receivedOps(+1)
 			stats.receivedDocs(int(reply.ReplyDocs))
@@ -738,13 +828,13 @@ func (socket *MongoSocket) readLoop() {
 					op:     &reply,
 					docNum: -1,
 				}
-				replyFunc(nil, &rfl, nil)
+				replyFunc(nil, &rfl, nil, nil)
 			} else {
 				for i := 0; i != int(reply.ReplyDocs); i++ {
 					b, err := readDocument(r)
 					if err != nil {
 						if replyFunc != nil {
-							replyFunc(err, &replyFuncLegacyArgs{docNum: -1}, nil)
+							replyFunc(err, &replyFuncLegacyArgs{docNum: -1}, nil, nil)
 						}
 						socket.kill(err, true)
 						return
@@ -756,7 +846,7 @@ func (socket *MongoSocket) readLoop() {
 							docNum:  i,
 							docData: b,
 						}
-						replyFunc(nil, &rfl, nil)
+						replyFunc(nil, &rfl, nil, nil)
 					}
 					// XXX Do bound checking against totalLen.
 				}
@@ -779,7 +869,7 @@ func (socket *MongoSocket) readLoop() {
 			}
 			lengthRead := len(commandReplyAsSlice) + len(metadataAsSlice)
 			if replyFunc != nil && lengthRead+16 >= int(totalLen) {
-				replyFunc(nil, nil, &rfc)
+				replyFunc(nil, nil, &rfc, nil)
 			}
 
 			docLen := 0
@@ -788,19 +878,63 @@ func (socket *MongoSocket) readLoop() {
 				if err != nil {
 					rfc.bytesLeft = 0
 					if replyFunc != nil {
-						replyFunc(err, nil, &rfc)
+						replyFunc(err, nil, &rfc, nil)
 					}
 					socket.kill(err, true)
 					return
 				}
 				rfc.outputDoc = documentBuf
 				if replyFunc != nil {
-					replyFunc(nil, nil, &rfc)
+					replyFunc(nil, nil, &rfc, nil)
 				}
 				docLen += len(documentBuf)
 			}
+		case dbMessage:
+			rfm := replyFuncMsgArgs{}
+			// READ THE FLAGS
+			_, err := io.ReadFull(r, bodyBuf[:4])
+			if err != nil {
+				socket.kill(err, true)
+				return
+			}
+
+			reply := &MsgOp{
+				Flags: uint32(getInt32(bodyBuf, 0)),
+			}
+			rfm.op = reply
+			lengthRead := 4
+			checksumLength := 0
+			checksumPresent := false
+			if (reply.Flags & MsgFlagChecksumPresent) != 0 {
+				checksumPresent = true
+				checksumLength = 4
+			}
+
+			// read the sections into a big buffer.
+			// 16 is used here for the length of the message header.
+			sectionsLength := int(totalLen) - (checksumLength + lengthRead + 16)
+			rfm.sectionsData = make([]byte, sectionsLength)
+			_, err = io.ReadFull(r, rfm.sectionsData)
+			if err != nil {
+				socket.kill(err, true)
+				return
+			}
+			if checksumPresent {
+				//read the checksum
+				_, err := io.ReadFull(r, bodyBuf[:4])
+				if err != nil {
+					socket.kill(err, true)
+					return
+				}
+				rfm.op.Checksum = uint32(getInt32(bodyBuf, 0))
+			}
+
+			if replyFunc != nil {
+				replyFunc(nil, nil, nil, &rfm)
+			}
+
 		default:
-			socket.kill(errors.New("opcode != 1 or 2011, corrupted data?"), true)
+			socket.kill(errors.New("opcode != 1, 2011, or 2013, corrupted data?"), true)
 			return
 		}
 

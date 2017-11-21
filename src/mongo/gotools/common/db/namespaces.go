@@ -1,6 +1,13 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package db
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -13,10 +20,28 @@ type CollectionInfo struct {
 	Name    string  `bson:"name"`
 	Type    string  `bson:"type"`
 	Options *bson.D `bson:"options"`
+	Info    *bson.D `bson:"info"`
 }
 
 func (ci *CollectionInfo) IsView() bool {
 	return ci.Type == "view"
+}
+
+func (ci *CollectionInfo) GetUUID() string {
+	if ci.Info == nil {
+		return ""
+	}
+	for _, v := range *ci.Info {
+		if v.Name == "uuid" {
+			switch x := v.Value.(type) {
+			case bson.Binary:
+				if x.Kind == 4 {
+					return hex.EncodeToString(x.Data)
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // IsNoCmd reeturns true if err indicates a query command is not supported,

@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongoreplay
 
 import (
@@ -117,7 +123,7 @@ func TestPreprocessingFile(t *testing.T) {
 	generator := newRecordedOpGenerator()
 	var err error
 
-	err = generator.generateReply(requestID, testCursorID, 0)
+	err = generator.generateReply(requestID, testCursorID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -229,7 +235,7 @@ func TestSkipOutOfOrderCursor(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = generator.generateReply(requestID, testCursorID, 0)
+	err = generator.generateReply(requestID, testCursorID)
 	if err != nil {
 		t.Error(err)
 	}
@@ -282,7 +288,7 @@ func TestSkipOnMarkFailed(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = generator.generateReply(requestID, testCursorID, 0)
+	err = generator.generateReply(requestID, testCursorID)
 	if err != nil {
 		t.Error(err)
 	}

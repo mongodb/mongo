@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongodump
 
 import (
@@ -129,6 +135,35 @@ func (f *stdoutFile) Close() error {
 	return nil
 }
 
+// isReservedSystemNamespace returns true when a namespace (database +
+// collection name) match certain reserved system namespaces that must
+// not be dumped.
+func (dump *MongoDump) isReservedSystemNamespace(dbName, collName string) bool {
+	// ignore <db>.system.* except for admin; ignore other specific
+	// collections in config and admin databases used for 3.6 features.
+	switch dbName {
+	case "admin":
+		if collName == "system.keys" {
+			return true
+		}
+	case "config":
+		if collName == "transactions" || collName == "system.sessions" {
+			return true
+		}
+	default:
+		if strings.HasPrefix(collName, "system.") {
+			return true
+		}
+	}
+
+	// Skip over indexes since they are also listed in system.namespaces in 2.6 or earlier
+	if strings.Contains(collName, "$") && !strings.Contains(collName, ".oplog.$") {
+		return true
+	}
+
+	return false
+}
+
 // shouldSkipCollection returns true when a collection name is excluded
 // by the mongodump options.
 func (dump *MongoDump) shouldSkipCollection(colName string) bool {
@@ -257,6 +292,11 @@ func (dump *MongoDump) NewIntentFromOptions(dbName string, ci *db.CollectionInfo
 		Options: ci.Options,
 	}
 
+	// If UUID is available, populate the intent with it
+	if uuid := ci.GetUUID(); uuid != "" {
+		intent.UUID = uuid
+	}
+
 	// Setup output location
 	if dump.OutputOptions.Out == "-" { // regular standard output
 		intent.BSONFile = &stdoutFile{Writer: dump.OutputWriter}
@@ -331,28 +371,23 @@ func (dump *MongoDump) CreateIntentsForDatabase(dbName string) error {
 	}
 	defer session.Close()
 
-	colsIter, fullName, err := db.GetCollections(session.DB(dbName), "")
+	colsIter, usesFullNames, err := db.GetCollections(session.DB(dbName), "")
 	if err != nil {
 		return fmt.Errorf("error getting collections for database `%v`: %v", dbName, err)
 	}
 
 	collInfo := &db.CollectionInfo{}
 	for colsIter.Next(collInfo) {
-		// ignore <db>.system.* except for admin
-		if dbName != "admin" && strings.HasPrefix(collInfo.Name, "system.") {
-			log.Logvf(log.DebugHigh, "will not dump system collection '%s.%s'", dbName, collInfo.Name)
-			continue
-		}
-		// Skip over indexes since they are also listed in system.namespaces in 2.6 or earlier
-		if strings.Contains(collInfo.Name, "$") && !strings.Contains(collInfo.Name, ".oplog.$") {
-			continue
-		}
-		if fullName {
+		if usesFullNames {
 			collName, err := db.StripDBFromNamespace(collInfo.Name, dbName)
 			if err != nil {
 				return err
 			}
 			collInfo.Name = collName
+		}
+		if dump.isReservedSystemNamespace(dbName, collInfo.Name) {
+			log.Logvf(log.DebugHigh, "will not dump system collection '%s.%s'", dbName, collInfo.Name)
+			continue
 		}
 		if dump.shouldSkipCollection(collInfo.Name) {
 			log.Logvf(log.DebugLow, "skipping dump of %v.%v, it is excluded", dbName, collInfo.Name)

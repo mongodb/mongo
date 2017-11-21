@@ -1,28 +1,11 @@
-// mgo - MongoDB driver for Go
+// Copyright (C) MongoDB, Inc. 2015-present.
 //
-// Copyright (c) 2010-2012 - Gustavo Niemeyer <gustavo@niemeyer.net>
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 //
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
-//
-// 1. Redistributions of source code must retain the above copyright notice, this
-//    list of conditions and the following disclaimer.
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-//    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-// ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Based on gopkg.io/mgo.v2 by Gustavo Niemeyer.
+// See THIRD-PARTY-NOTICES for original license terms.
 
 package mgo
 
@@ -643,10 +626,13 @@ func (db *Database) Run(cmd interface{}, result interface{}) error {
 	return err
 }
 
-func ExecOpWithReply(socket *MongoSocket, op OpWithReply) (m []byte, c []byte, data [][]byte, reply interface{}, err error) {
+//returns metadata, bodydata, an array of reply documents, a reply, and an error
+func ExecOpWithReply(socket *MongoSocket, op OpWithReply) ([]byte, []byte, [][]byte, interface{}, error) {
 	var wait sync.Mutex
+	var reply interface{}
+	var err error
 	var metaData []byte
-	var commandData []byte
+	var bodyData []byte
 	var replyData [][]byte
 	var replyErr error
 
@@ -654,11 +640,14 @@ func ExecOpWithReply(socket *MongoSocket, op OpWithReply) (m []byte, c []byte, d
 
 	var docCount int32
 
-	replyFunc := func(err error, rfl *replyFuncLegacyArgs, rfc *replyFuncCommandArgs) {
-		debugf("replyFunc %v %#v %#v", err, rfl, rfc)
-		replyErr = err
+	replyFunc := func(err error, rfl *replyFuncLegacyArgs,
+		rfc *replyFuncCommandArgs,
+		rfm *replyFuncMsgArgs) {
 
-		if rfl != nil { // Here, we have a regular reply and need to handle its fields
+		debugf("replyFunc %v %#v %#v %#v", err, rfl, rfc, rfm)
+		replyErr = err
+		switch {
+		case rfl != nil: // Here, we have a regular reply and need to handle its fields
 			reply = rfl.op
 			if err != nil || rfl.op.ReplyDocs == 0 {
 				wait.Unlock()
@@ -669,23 +658,27 @@ func ExecOpWithReply(socket *MongoSocket, op OpWithReply) (m []byte, c []byte, d
 					wait.Unlock()
 				}
 			}
-		} else if rfc != nil {
+		case rfc != nil: // We have a command reply and it's fields need to be handled
 			reply = rfc.op
 			if err == nil {
 				if metaData == nil {
 					metaData = rfc.metadata
 				}
-				if commandData == nil {
-					commandData = rfc.commandReply
+				if bodyData == nil {
+					bodyData = rfc.commandReply
 				}
 				if rfc.bytesLeft != 0 {
 					replyData = append(replyData, rfc.outputDoc)
 				} else {
 					wait.Unlock()
 				}
-			} else {
-				wait.Unlock()
 			}
+		case rfm != nil: // We have received an OpMsg and it's fields need to be received
+			reply = rfm.op
+			bodyData = rfm.sectionsData
+			wait.Unlock()
+		default:
+			wait.Unlock()
 		}
 
 	}
@@ -697,7 +690,7 @@ func ExecOpWithReply(socket *MongoSocket, op OpWithReply) (m []byte, c []byte, d
 	}
 
 	wait.Lock()
-	return metaData, commandData, replyData, reply, replyErr
+	return metaData, bodyData, replyData, reply, replyErr
 }
 
 func ExecOpWithoutReply(socket *MongoSocket, op interface{}) error {
@@ -4272,7 +4265,10 @@ func (s *Session) unsetSocket() {
 }
 
 func (iter *Iter) replyFunc() replyFunc {
-	return func(err error, rfl *replyFuncLegacyArgs, rfc *replyFuncCommandArgs) {
+	return func(err error,
+		rfl *replyFuncLegacyArgs,
+		rfc *replyFuncCommandArgs,
+		rfm *replyFuncMsgArgs) {
 		replyOp := rfl.op
 		iter.m.Lock()
 		iter.docsToReceive--
@@ -4434,7 +4430,10 @@ func (c *Collection) writeOpQuery(socket *MongoSocket, safeOp *QueryOp, op inter
 	mutex.Lock()
 	query := *safeOp // Copy the data.
 	query.Collection = c.Database.Name + ".$cmd"
-	query.replyFunc = func(err error, rfl *replyFuncLegacyArgs, rfc *replyFuncCommandArgs) {
+	query.replyFunc = func(err error,
+		rfl *replyFuncLegacyArgs,
+		rfc *replyFuncCommandArgs,
+		rfm *replyFuncMsgArgs) {
 		replyData = rfl.docData
 		replyErr = err
 		mutex.Unlock()

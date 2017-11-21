@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 // Package intents provides utilities for performing dump/restore operations.
 package intents
 
@@ -54,6 +60,9 @@ type Intent struct {
 
 	// Collection options
 	Options *bson.D
+
+	// UUID (for MongoDB 3.6+) as a big-endian hex string
+	UUID string
 
 	// File/collection size, for some prioritizer implementations.
 	// Units don't matter as long as they are consistent for a given use case.

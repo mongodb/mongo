@@ -1,6 +1,14 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongoreplay
 
 import (
+	"bytes"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -286,6 +294,189 @@ func TestCommandOp(t *testing.T) {
 		if !reflect.DeepEqual(unmarshaled, doc) {
 			t.Errorf("Document from InputDocs not matched. Saw %v -- Expected %v\n", unmarshaled, doc)
 		}
+	}
+}
+
+func TestOpMsg(t *testing.T) {
+	var testDocs []interface{}
+	testDocs = append(testDocs, bson.D{{"doc", 1}})
+	testDocs = append(testDocs, bson.D{{"doc", 2}})
+	payloadType1Tester := mgo.PayloadType1{
+		Identifier: "test op",
+		Docs:       testDocs,
+	}
+	var err error
+	payloadType1Tester.Size, err = payloadType1Tester.CalculateSize()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		name    string
+		inputOp mgo.MsgOp
+
+		expectedDB          string
+		expectedCommandName string
+	}{
+		{
+			name: "Payload type 0 test",
+			inputOp: mgo.MsgOp{
+				Flags: 0,
+				Sections: []mgo.MsgSection{
+					mgo.MsgSection{
+						PayloadType: mgo.MsgPayload0,
+						Data:        bson.D{{"doc", 1}},
+					},
+				},
+			},
+			expectedCommandName: "doc",
+		},
+		{
+			name: "Payload type 1 test",
+			inputOp: mgo.MsgOp{
+				Flags: 0,
+				Sections: []mgo.MsgSection{
+					mgo.MsgSection{
+						PayloadType: mgo.MsgPayload0,
+						Data:        bson.D{{"doc", 1}},
+					},
+					mgo.MsgSection{
+						PayloadType: mgo.MsgPayload1,
+						Data:        payloadType1Tester,
+					},
+				},
+			},
+			expectedCommandName: "doc",
+		},
+		{
+			name: "Payload with checksum test",
+			inputOp: mgo.MsgOp{
+				Flags: mgo.MsgFlagChecksumPresent,
+				Sections: []mgo.MsgSection{
+					mgo.MsgSection{
+						PayloadType: mgo.MsgPayload0,
+						Data:        bson.D{{"doc", 1}},
+					},
+				},
+				Checksum: uint32(123),
+			},
+			expectedCommandName: "doc",
+		},
+		{
+			name: "get DB test",
+			inputOp: mgo.MsgOp{
+				Flags: 0,
+				Sections: []mgo.MsgSection{
+					mgo.MsgSection{
+						PayloadType: mgo.MsgPayload0,
+						Data: bson.D{
+							{"doc", 1},
+							{"$db", "test"},
+						},
+					},
+				},
+			},
+			expectedCommandName: "doc",
+			expectedDB:          "test",
+		},
+	}
+
+	for _, testCase := range testCases {
+		generator := newRecordedOpGenerator()
+		t.Logf("case: %#v\n", testCase.name)
+		result, err := generator.fetchRecordedOpsFromConn(&testCase.inputOp)
+		if err != nil {
+			t.Error(err)
+		}
+		receivedOp, err := result.RawOp.Parse()
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		msgOp := receivedOp.(*MsgOp)
+
+		db, err := msgOp.getDB()
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+		commandName, err := msgOp.getCommandName()
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		t.Log("Comparing parsed Msg to original Msg")
+		switch {
+		case msgOp.Flags != testCase.inputOp.Flags:
+			t.Errorf("Flags not equal. Saw %v -- Expected %v\n",
+				msgOp.Flags, testCase.inputOp.Flags)
+
+		case msgOp.Checksum != testCase.inputOp.Checksum:
+			t.Errorf("Checksums not equal. Saw %v -- Expected %v\n",
+				msgOp.Checksum, testCase.inputOp.Checksum)
+		case len(msgOp.Sections) != len(testCase.inputOp.Sections):
+			t.Errorf("Different numbers of sections seen. Saw %v -- Expected %v\n",
+				len(msgOp.Sections), len(testCase.inputOp.Sections))
+		case msgOp.CommandName != testCase.expectedCommandName:
+			t.Errorf("Command name does not match expected. Saw %v -- Expected %v\n",
+				commandName, testCase.expectedCommandName)
+		case testCase.expectedDB != db:
+			t.Errorf("DB seen does not match expected. Saw %v -- Expected %v\n",
+				db, testCase.expectedDB)
+		}
+		if len(msgOp.Sections) != len(testCase.inputOp.Sections) {
+			continue
+		}
+		for i, section := range msgOp.Sections {
+			if section.PayloadType != testCase.inputOp.Sections[i].PayloadType {
+				t.Errorf("section payloads not equal. Saw %v -- Expected %v\n",
+					section.PayloadType, testCase.inputOp.Sections[i].PayloadType)
+			}
+			switch section.PayloadType {
+			case mgo.MsgPayload0:
+				comparePayloadType0(t, section.Data, testCase.inputOp.Sections[i].Data)
+			case mgo.MsgPayload1:
+				comparePayloadType1(t, section.Data, testCase.inputOp.Sections[i].Data)
+			default:
+				t.Errorf("Unknown payload type %v", section.PayloadType)
+			}
+		}
+	}
+}
+
+func comparePayloadType0(t *testing.T, p1, p2 interface{}) {
+	dataAsRaw, ok := p1.(*bson.Raw)
+	if !ok {
+		t.Errorf("type of section data incorrect")
+	}
+	dataAsD := bson.D{}
+	err := dataAsRaw.Unmarshal(&dataAsD)
+	if err != nil {
+		t.Errorf("error unmarshaling %v", err)
+	}
+	if !reflect.DeepEqual(dataAsD, p2) {
+		t.Errorf("Section documents not matched")
+		t.Logf("parsed section %#v\n", dataAsD)
+		t.Logf("inputOp %#v\n", p2)
+	}
+
+}
+
+func comparePayloadType1(t *testing.T, p1, p2 interface{}) {
+	p1AsPayload, ok := p1.(mgo.PayloadType1)
+	if !ok {
+		t.Error("incorrect type when expecting PayloadType1")
+		return
+	}
+	p2AsPayload, ok := p2.(mgo.PayloadType1)
+	if !ok {
+		t.Error("incorrect type when expecting PayloadType1")
+		return
+	}
+	if p1AsPayload.Size != p2AsPayload.Size {
+		t.Errorf("Payload sizes not matched Saw: %d --- Expected: %d", p1AsPayload.Size, p2AsPayload.Size)
+	}
+	if p1AsPayload.Identifier != p2AsPayload.Identifier {
+		t.Errorf("Payload identifiers not matched Saw: %d --- Expected: %d", p1AsPayload.Identifier, p2AsPayload.Identifier)
 	}
 }
 
@@ -710,4 +901,151 @@ func TestLegacyOpReplyGetCursorID(t *testing.T) {
 	if cursorID != testCursorID {
 		t.Errorf("cursorID did not match expected. Found: %v --- Expected: %v", cursorID, testCursorID)
 	}
+}
+
+func TestFilterCommandOpMetadata(t *testing.T) {
+	testMetadata := &bson.D{{"test", 1}}
+
+	testCases := []struct {
+		name                   string
+		filter                 bool
+		inputMetadata          *bson.D
+		expectedResultMetadata *bson.D
+	}{
+		{
+			name:                   "metadata not filtered",
+			filter:                 false,
+			inputMetadata:          testMetadata,
+			expectedResultMetadata: testMetadata,
+		},
+		{
+			name:                   "metadata filtered",
+			filter:                 true,
+			inputMetadata:          testMetadata,
+			expectedResultMetadata: nil,
+		},
+	}
+
+	for _, c := range testCases {
+		t.Logf("running case: %s", c.name)
+
+		commandOp := &CommandOp{
+			CommandOp: mgo.CommandOp{
+				Metadata: testMetadata,
+			},
+		}
+
+		// This check ensures that the type implements the preprocessable interface
+		asInterface := interface{}(commandOp)
+		asPreprocessable, ok := asInterface.(Preprocessable)
+		if !ok {
+			t.Errorf("command does not implement preprocessable")
+		}
+		if c.filter {
+			asPreprocessable.Preprocess()
+		}
+		if commandOp.Metadata == nil && c.expectedResultMetadata == nil {
+			continue
+		}
+		if !reflect.DeepEqual(commandOp.Metadata, c.expectedResultMetadata) {
+			t.Errorf("expected metadata to be: %v but it was %v", c.expectedResultMetadata, commandOp.Metadata)
+		}
+	}
+}
+func TestReadSection(t *testing.T) {
+	data := bson.D{{"k", "v"}}
+	dataAsSlice, err := bson.Marshal(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	testCases := []struct {
+		name        string
+		testSection mgo.MsgSection
+	}{
+		{
+			name: "payload type 0",
+			testSection: mgo.MsgSection{
+				PayloadType: mgo.MsgPayload0,
+				Data:        bson.D{{"k", "v"}},
+			},
+		},
+		{
+			name: "payload type 1",
+			testSection: mgo.MsgSection{
+				PayloadType: mgo.MsgPayload1,
+				Data: mgo.PayloadType1{
+					Identifier: "test",
+					Size:       int32(len(dataAsSlice) + len("test") + 1 + 4),
+					Docs:       []interface{}{data},
+				},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Logf("running case %v\n", testCase.name)
+		sectionAsSlice, err := sectionToSlice(testCase.testSection)
+		if err != nil {
+			t.Error(err)
+		}
+		r := bytes.NewReader(sectionAsSlice)
+		sectionResult, offset, err := readSection(r)
+		if err != nil {
+			t.Error(err)
+		}
+		if offset != len(sectionAsSlice) {
+			t.Errorf("reported length and slice length not matched. Expected: %d ---- Saw: %d", len(sectionAsSlice), offset)
+		}
+		switch sectionResult.PayloadType {
+		case mgo.MsgPayload0:
+			comparePayloadType0(t, sectionResult.Data, testCase.testSection.Data)
+		case mgo.MsgPayload1:
+			comparePayloadType1(t, sectionResult.Data, testCase.testSection.Data)
+		default:
+			t.Errorf("Unknown payload type %v", sectionResult.PayloadType)
+		}
+	}
+}
+
+func sectionToSlice(section mgo.MsgSection) ([]byte, error) {
+	bufResult := []byte{}
+	// Write a section to the buffer
+	// Read the payload type
+	// If it's the simpler type (type 0) write out its type and BSON
+	if section.PayloadType == mgo.MsgPayload0 {
+		bufResult = append(bufResult, mgo.MsgPayload0)
+		docAsSlice, err := bson.Marshal(section.Data)
+		if err != nil {
+			return []byte{}, nil
+		}
+		bufResult = append(bufResult, docAsSlice...)
+	} else if section.PayloadType == mgo.MsgPayload1 {
+		// Write the payload type
+		bufResult = append(bufResult, mgo.MsgPayload1)
+		payload, ok := section.Data.(mgo.PayloadType1)
+		if !ok {
+			panic("incorrect type given for payload")
+		}
+		offset := len(bufResult)
+
+		bufResult = append(bufResult, []byte{0, 0, 0, 0}...)
+
+		//Write out the size
+		SetInt32(bufResult, offset, payload.Size)
+
+		//Write out the identifier
+		bufResult = append(bufResult, []byte(payload.Identifier)...)
+		bufResult = append(bufResult, 0)
+		//Write out the docs
+
+		for _, d := range payload.Docs {
+			docAsSlice, err := bson.Marshal(d)
+			if err != nil {
+				return []byte{}, err
+			}
+			bufResult = append(bufResult, docAsSlice...)
+		}
+	} else {
+		return []byte{}, fmt.Errorf("unknown payload type: %d", section.PayloadType)
+	}
+	return bufResult, nil
 }

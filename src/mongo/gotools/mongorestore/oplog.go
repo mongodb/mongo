@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongorestore
 
 import (
@@ -81,6 +87,12 @@ func (restore *MongoRestore) RestoreOplog() error {
 			break
 		}
 
+		// TODO: TOOLS-1817 will add support for conditionally keeping UUIDS
+		entryAsOplog, err = filterUUIDs(entryAsOplog)
+		if err != nil {
+			return fmt.Errorf("error filtering UUIDs from oplog: %v", err)
+		}
+
 		totalOps++
 		oplogProgressor.Inc(int64(entrySize))
 		err = restore.ApplyOps(session, []interface{}{entryAsOplog})
@@ -153,4 +165,104 @@ func ParseTimestampFlag(ts string) (bson.MongoTimestamp, error) {
 
 	timestamp := (int64(seconds) << 32) | int64(increment)
 	return bson.MongoTimestamp(timestamp), nil
+}
+
+// filterUUIDs removes 'ui' entries from ops, including nested applyOps ops.
+func filterUUIDs(op db.Oplog) (db.Oplog, error) {
+	// Remove UUIDs from oplog entries
+	if op.UI != nil {
+		op.UI = nil
+	}
+
+	// Check for and filter nested applyOps ops
+	if op.Operation == "c" && isApplyOpsCmd(op.Object) {
+		filtered, err := newFilteredApplyOps(op.Object)
+		if err != nil {
+			return db.Oplog{}, err
+		}
+		op.Object = filtered
+	}
+
+	return op, nil
+}
+
+// isApplyOpsCmd returns true if a document seems to be an applyOps command.
+func isApplyOpsCmd(cmd bson.RawD) bool {
+	for _, v := range cmd {
+		if v.Name == "applyOps" {
+			return true
+		}
+	}
+	return false
+}
+
+// newFilteredApplyOps iterates over nested ops in an applyOps document and
+// returns a new applyOps document that omits the 'ui' field from nested ops.
+func newFilteredApplyOps(cmd bson.RawD) (bson.RawD, error) {
+	ops, err := unwrapNestedApplyOps(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := make([]db.Oplog, len(ops))
+	for i, v := range ops {
+		filtered[i], err = filterUUIDs(v)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	doc, err := wrapNestedApplyOps(filtered)
+	if err != nil {
+		return nil, err
+	}
+
+	return doc, nil
+}
+
+// nestedApplyOps models an applyOps command document
+type nestedApplyOps struct {
+	ApplyOps []db.Oplog `bson:"applyOps"`
+}
+
+// unwrapNestedApplyOps converts a RawD to a typed data structure.
+// Unfortunately, we're forced to convert by marshaling to bytes and
+// unmarshaling.
+func unwrapNestedApplyOps(doc bson.RawD) ([]db.Oplog, error) {
+	// Doc to bytes
+	bs, err := bson.Marshal(doc)
+	if err != nil {
+		return nil, fmt.Errorf("cannot remarshal nested applyOps: %s", err)
+	}
+
+	// Bytes to typed data
+	var cmd nestedApplyOps
+	err = bson.Unmarshal(bs, &cmd)
+	if err != nil {
+		return nil, fmt.Errorf("cannot unwrap nested applyOps: %s", err)
+	}
+
+	return cmd.ApplyOps, nil
+}
+
+// wrapNestedApplyOps converts a typed data structure to a RawD.
+// Unfortunately, we're forced to convert by marshaling to bytes and
+// unmarshaling.
+func wrapNestedApplyOps(ops []db.Oplog) (bson.RawD, error) {
+	cmd := &nestedApplyOps{ApplyOps: ops}
+
+	// Typed data to bytes
+	raw, err := bson.Marshal(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("cannot rewrap nested applyOps op: %s", err)
+	}
+
+	// Bytes to doc
+	var doc bson.RawD
+	err = bson.Unmarshal(raw, &doc)
+	if err != nil {
+		return nil, fmt.Errorf("cannot reunmarshal nested applyOps op: %s", err)
+	}
+
+	return doc, nil
 }

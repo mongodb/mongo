@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongoreplay
 
 import (
@@ -139,14 +145,13 @@ func FindValueByKey(keyName string, document *bson.D) (interface{}, bool) {
 }
 
 func shouldCollectOp(op Op, driverOpsFiltered bool) bool {
-	_, isReplyOp := op.(*ReplyOp)
-	_, isCommandReplyOp := op.(*CommandReplyOp)
+	_, isReplyable := op.(Replyable)
 
 	var isDriverOp bool
 	if !driverOpsFiltered {
 		isDriverOp = IsDriverOp(op)
 	}
-	return !isReplyOp && !isCommandReplyOp && !isDriverOp
+	return !isReplyable && !isDriverOp
 }
 
 // Collect formats the operation statistics as specified by the contained StatGenerator and writes it to
