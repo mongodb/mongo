@@ -306,6 +306,16 @@ public:
     StringData getValidationLevel() const final;
     StringData getValidationAction() const final;
 
+    /**
+     * Sets the validator to exactly what's provided. If newLevel or newAction are empty, this
+     * sets them to the defaults. Any error Status returned by this function should be considered
+     * fatal.
+     */
+    Status updateValidator(OperationContext* opCtx,
+                           BSONObj newValidator,
+                           StringData newLevel,
+                           StringData newAction) final;
+
     // -----------
 
     //

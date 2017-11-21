@@ -245,6 +245,13 @@ public:
         std::abort();
     }
 
+    Status updateValidator(OperationContext* opCtx,
+                           BSONObj newValidator,
+                           StringData newLevel,
+                           StringData newAction) {
+        std::abort();
+    }
+
     bool isCapped() const {
         std::abort();
     }

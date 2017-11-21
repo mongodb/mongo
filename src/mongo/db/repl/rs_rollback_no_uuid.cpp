@@ -579,8 +579,15 @@ void syncFixUp(OperationContext* opCtx,
             // Set any document validation options. We update the validator fields without
             // parsing/validation, since we fetched the options object directly from the sync
             // source, and we should set our validation options to match it exactly.
-            cce->updateValidator(
+            auto validatorStatus = collection->updateValidator(
                 opCtx, options.validator, options.validationLevel, options.validationAction);
+            if (!validatorStatus.isOK()) {
+                throw RSFatalException(
+                    str::stream() << "Failed to update validator for " << nss.toString() << " with "
+                                  << redact(info)
+                                  << ". Got: "
+                                  << validatorStatus.toString());
+            }
 
             OptionalCollectionUUID originalLocalUUID = collection->uuid();
             OptionalCollectionUUID remoteUUID = boost::none;

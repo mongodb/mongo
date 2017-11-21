@@ -315,6 +315,11 @@ public:
         virtual StringData getValidationLevel() const = 0;
         virtual StringData getValidationAction() const = 0;
 
+        virtual Status updateValidator(OperationContext* opCtx,
+                                       BSONObj newValidator,
+                                       StringData newLevel,
+                                       StringData newAction) = 0;
+
         virtual bool isCapped() const = 0;
 
         virtual std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const = 0;
@@ -665,6 +670,13 @@ public:
     }
     inline StringData getValidationAction() const {
         return this->_impl().getValidationAction();
+    }
+
+    inline Status updateValidator(OperationContext* opCtx,
+                                  BSONObj newValidator,
+                                  StringData newLevel,
+                                  StringData newAction) {
+        return this->_impl().updateValidator(opCtx, newValidator, newLevel, newAction);
     }
 
     // -----------
