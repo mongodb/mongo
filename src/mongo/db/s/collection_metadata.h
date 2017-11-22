@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/db/range_arithmetic.h"
-#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
@@ -175,15 +174,6 @@ public:
     }
 
 private:
-    friend class MetadataManager;
-    friend class ScopedCollectionMetadata;
-
-    struct Tracker {
-        uint32_t usageCounter{0};
-        std::list<CollectionRangeDeleter::Deletion> orphans;
-    };
-    Tracker _tracker;
-
     /**
      * Builds _rangesMap from the contents of _chunksMap.
      */

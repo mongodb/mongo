@@ -147,24 +147,6 @@ protected:
     std::shared_ptr<MetadataManager> _manager;
 };
 
-TEST_F(MetadataManagerTest, SetAndGetActiveMetadata) {
-    std::unique_ptr<CollectionMetadata> cm = makeEmptyMetadata();
-    auto cmPtr = cm.get();
-
-    _manager->refreshActiveMetadata(std::move(cm));
-    ScopedCollectionMetadata scopedMetadata = _manager->getActiveMetadata(_manager);
-
-    ASSERT_EQ(cmPtr, scopedMetadata.getMetadata());
-};
-
-
-TEST_F(MetadataManagerTest, ResetActiveMetadata) {
-    _manager->refreshActiveMetadata(makeEmptyMetadata());
-    auto cm2Ptr = addChunk(_manager);
-    ScopedCollectionMetadata scopedMetadata2 = _manager->getActiveMetadata(_manager);
-    ASSERT_EQ(cm2Ptr, scopedMetadata2.getMetadata());
-};
-
 // In the following tests, the ranges-to-clean is not drained by the background deleter thread
 // because the collection involved has no CollectionShardingState, so the task just returns without
 // doing anything.

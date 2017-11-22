@@ -151,6 +151,27 @@ private:
         OperationContext*, NamespaceString const&, OID const&, int, CollectionRangeDeleter*);
 
     /**
+     * Represents an instance of what the filtering metadata for this collection was at a particular
+     * point in time along with a counter of how many queries are still using it.
+     */
+    struct CollectionMetadataTracker {
+        MONGO_DISALLOW_COPYING(CollectionMetadataTracker);
+
+        CollectionMetadataTracker(CollectionMetadata inMetadata)
+            : metadata(std::move(inMetadata)) {}
+
+        ~CollectionMetadataTracker() {
+            invariant(!usageCounter);
+        }
+
+        CollectionMetadata metadata;
+
+        std::list<Deletion> orphans;
+
+        uint32_t usageCounter{0};
+    };
+
+    /**
      * Cancels all scheduled deletions of orphan ranges, notifying listeners with specified status.
      */
     void _clearAllCleanups(WithLock, Status);
@@ -170,20 +191,20 @@ private:
     /**
      * Pushes current set of chunks, if any, to _metadataInUse, replaces it with newMetadata.
      */
-    void _setActiveMetadata(WithLock, std::unique_ptr<CollectionMetadata> newMetadata);
+    void _setActiveMetadata(WithLock wl, CollectionMetadata newMetadata);
 
     /**
      * Finds the most-recently pushed metadata that might depend on `range`, or nullptr if none.
      * The result is usable until the lock is released.
      */
-    CollectionMetadata* _newestOverlappingMetadata(WithLock, ChunkRange const& range) const;
+    CollectionMetadataTracker* _findNewestOverlappingMetadata(WithLock, ChunkRange const& range);
 
     /**
      * Returns true if the specified range overlaps any chunk that might be currently in use by a
      * running query.
      */
 
-    bool _overlapsInUseChunk(WithLock, ChunkRange const& range) const;
+    bool _overlapsInUseChunk(WithLock, ChunkRange const& range);
 
     /**
      * Returns a notification if any range (possibly) still in use, but scheduled for cleanup,
@@ -227,10 +248,11 @@ private:
     // Mutex to protect the state below
     mutable stdx::mutex _managerLock;
 
-    // _metadata.back() is the collection metadata reflecting chunks accessible to new queries.
-    // The rest are previously active collection metadata instances still in use by active server
-    // operations or cursors.
-    std::list<std::shared_ptr<CollectionMetadata>> _metadata;
+    // Contains a list of collection metadata ordered in chronological order based on the refreshes
+    // that occurred. The entry at _metadata.back() is the most recent metadata and is what is
+    // returned to new queries. The rest are previously active collection metadata instances still
+    // in use by active server operations or cursors.
+    std::list<std::shared_ptr<CollectionMetadataTracker>> _metadata;
 
     // Chunk ranges being migrated into to the shard. Indexed by the min key of the range.
     RangeMap _receivingChunks;
@@ -262,14 +284,19 @@ public:
     /**
      * Dereferencing the ScopedCollectionMetadata dereferences the private CollectionMetadata.
      */
-    CollectionMetadata* operator->() const;
     CollectionMetadata* getMetadata() const;
+
+    CollectionMetadata* operator->() const {
+        return getMetadata();
+    }
 
     /**
      * True if the ScopedCollectionMetadata stores a metadata (is not empty) and the collection is
      * sharded.
      */
-    operator bool() const;
+    operator bool() const {
+        return getMetadata() != nullptr;
+    }
 
     /**
      * Returns just the shard key fields, if collection is sharded, and the _id field, from `doc`.
@@ -281,10 +308,10 @@ public:
      * Checks whether both objects refer to the identically the same metadata.
      */
     bool operator==(ScopedCollectionMetadata const& other) const {
-        return _metadata == other._metadata;
+        return _metadataTracker == other._metadataTracker;
     }
     bool operator!=(ScopedCollectionMetadata const& other) const {
-        return _metadata != other._metadata;
+        return _metadataTracker != other._metadataTracker;
     }
 
 private:
@@ -299,17 +326,19 @@ private:
      *
      * Must be called with manager->_managerLock held.  Arguments must be non-null.
      */
-    ScopedCollectionMetadata(WithLock,
-                             std::shared_ptr<MetadataManager> manager,
-                             std::shared_ptr<CollectionMetadata> metadata);
+    ScopedCollectionMetadata(
+        WithLock,
+        std::shared_ptr<MetadataManager> metadataManager,
+        std::shared_ptr<MetadataManager::CollectionMetadataTracker> metadataTracker);
 
     /**
      * Disconnect from the CollectionMetadata, possibly triggering GC of unused CollectionMetadata.
      */
     void _clear();
 
-    std::shared_ptr<MetadataManager> _manager;
-    std::shared_ptr<CollectionMetadata> _metadata;
+    std::shared_ptr<MetadataManager> _metadataManager;
+
+    std::shared_ptr<MetadataManager::CollectionMetadataTracker> _metadataTracker;
 };
 
 }  // namespace mongo
