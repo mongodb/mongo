@@ -1,146 +1,151 @@
 // Cannot implicitly shard accessed collections because of unsupported group operator on sharded
 // collection.
 // @tags: [assumes_unsharded_collection]
+(function() {
+    "use strict";
 
-t = db.group1;
-t.drop();
+    const coll = db.group1;
+    coll.drop();
 
-t.save({n: 1, a: 1});
-t.save({n: 2, a: 1});
-t.save({n: 3, a: 2});
-t.save({n: 4, a: 2});
-t.save({n: 5, a: 2});
+    assert.writeOK(coll.insert({n: 1, a: 1}));
+    assert.writeOK(coll.insert({n: 2, a: 1}));
+    assert.writeOK(coll.insert({n: 3, a: 2}));
+    assert.writeOK(coll.insert({n: 4, a: 2}));
+    assert.writeOK(coll.insert({n: 5, a: 2}));
 
-var p = {
-    key: {a: true},
-    reduce: function(obj, prev) {
-        prev.count++;
-    },
-    initial: {count: 0}
-};
+    let p = {
+        key: {a: true},
+        reduce: function(obj, prev) {
+            prev.count++;
+        },
+        initial: {count: 0}
+    };
 
-res = t.group(p);
-
-assert(res.length == 2, "A");
-assert(res[0].a == 1, "B");
-assert(res[0].count == 2, "C");
-assert(res[1].a == 2, "D");
-assert(res[1].count == 3, "E");
-
-assert.eq(res, t.groupcmd(p), "ZZ");
-
-ret = t.groupcmd({key: {}, reduce: p.reduce, initial: p.initial});
-assert.eq(1, ret.length, "ZZ 2");
-assert.eq(5, ret[0].count, "ZZ 3");
-
-ret = t.groupcmd({
-    key: {},
-    reduce: function(obj, prev) {
-        prev.sum += obj.n;
-    },
-    initial: {sum: 0}
-});
-assert.eq(1, ret.length, "ZZ 4");
-assert.eq(15, ret[0].sum, "ZZ 5");
-
-t.drop();
-
-t.save({"a": 2});
-t.save({"b": 5});
-t.save({"a": 1});
-t.save({"a": 2});
-
-c = {
-    key: {a: 1},
-    cond: {},
-    initial: {"count": 0},
-    reduce: function(obj, prev) {
-        prev.count++;
+    function sortFuncGenerator(key) {
+        return (doc1, doc2) => {
+            if (doc1[key] < doc2[key]) {
+                return -1;
+            } else if (doc1[key] > doc2[key]) {
+                return 1;
+            } else {
+                return 0;
+            }
+        };
     }
-};
 
-assert.eq(t.group(c), t.groupcmd(c), "ZZZZ");
+    const sortOnA = sortFuncGenerator("a");
+    let expected = [{a: 1, count: 2}, {a: 2, count: 3}];
+    let result = coll.group(p).sort(sortOnA);
+    assert.eq(result, expected);
 
-t.drop();
+    result = coll.groupcmd(p).sort(sortOnA);
+    assert.eq(result, expected);
 
-t.save({name: {first: "a", last: "A"}});
-t.save({name: {first: "b", last: "B"}});
-t.save({name: {first: "a", last: "A"}});
+    expected = [{count: 5}];
+    result = coll.groupcmd({key: {}, reduce: p.reduce, initial: p.initial});
+    assert.eq(result, expected);
 
-p = {
-    key: {'name.first': true},
-    reduce: function(obj, prev) {
-        prev.count++;
-    },
-    initial: {count: 0}
-};
+    expected = [{sum: 15}];
+    result = coll.groupcmd({
+        key: {},
+        reduce: function(obj, prev) {
+            prev.sum += obj.n;
+        },
+        initial: {sum: 0}
+    });
+    assert.eq(result, expected);
 
-res = t.group(p);
-assert.eq(2, res.length, "Z1");
-assert.eq("a", res[0]['name.first'], "Z2");
-assert.eq("b", res[1]['name.first'], "Z3");
-assert.eq(2, res[0].count, "Z4");
-assert.eq(1, res[1].count, "Z5");
+    assert(coll.drop());
 
-// SERVER-15851 Test invalid user input.
-p = {
-    ns: "group1",
-    key: {"name.first": true},
-    $reduce: function(obj, prev) {
-        prev.count++;
-    },
-    initial: {count: 0},
-    finalize: "abc"
-};
-assert.commandFailedWithCode(
-    db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal finalize function");
+    assert.writeOK(coll.insert({"a": 2}));
+    assert.writeOK(coll.insert({"b": 5}));
+    assert.writeOK(coll.insert({"a": 1}));
+    assert.writeOK(coll.insert({"a": 2}));
 
-p = {
-    ns: "group1",
-    key: {"name.first": true},
-    $reduce: function(obj, prev) {
-        prev.count++;
-    },
-    initial: {count: 0},
-    finalize: function(obj) {
-        throw new Error("Intentionally throwing exception in finalize function");
-    }
-};
-assert.commandFailedWithCode(
-    db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal finalize function 2");
+    const c = {
+        key: {a: 1},
+        cond: {},
+        initial: {"count": 0},
+        reduce: function(obj, prev) {
+            prev.count++;
+        }
+    };
 
-p = {
-    ns: "group1",
-    $keyf: "a",
-    $reduce: function(obj, prev) {
-        prev.count++;
-    },
-    initial: {count: 0},
-    finalize: function(obj) {
-        throw new Error("Intentionally throwing exception in finalize function");
-    }
-};
-assert.commandFailedWithCode(
-    db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal keyf function");
+    expected = [{a: null, count: 1}, {a: 1, count: 1}, {a: 2, count: 2}];
+    assert.eq(coll.group(c).sort(sortOnA), expected);
+    assert.eq(coll.groupcmd(c).sort(sortOnA), expected);
 
-p = {
-    ns: "group1",
-    key: {"name.first": true},
-    $reduce: "abc",
-    initial: {count: 0}
-};
-assert.commandFailedWithCode(
-    db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal reduce function");
+    assert(coll.drop());
 
-p = {
-    ns: "group1",
-    key: {"name.first": true},
-    $reduce: function(obj, pre) {
-        prev.count++;
-    },
-    initial: {count: 0}
-};
-assert.commandFailedWithCode(
-    db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal reduce function 2");
+    assert.writeOK(coll.insert({name: {first: "a", last: "A"}}));
+    assert.writeOK(coll.insert({name: {first: "b", last: "B"}}));
+    assert.writeOK(coll.insert({name: {first: "a", last: "A"}}));
 
-t.drop();
+    p = {
+        key: {'name.first': true},
+        reduce: function(obj, prev) {
+            prev.count++;
+        },
+        initial: {count: 0}
+    };
+    const sortOnNameDotFirst = sortFuncGenerator("name.first");
+
+    expected = [{"name.first": "a", count: 2}, {"name.first": "b", count: 1}];
+    assert.eq(coll.group(p).sort(sortOnNameDotFirst), expected);
+
+    // SERVER-15851 Test invalid user input.
+    p = {
+        ns: "group1",
+        key: {"name.first": true},
+        $reduce: function(obj, prev) {
+            prev.count++;
+        },
+        initial: {count: 0},
+        finalize: "abc"
+    };
+    assert.commandFailedWithCode(
+        db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal finalize function");
+
+    p = {
+        ns: "group1",
+        key: {"name.first": true},
+        $reduce: function(obj, prev) {
+            prev.count++;
+        },
+        initial: {count: 0},
+        finalize: function(obj) {
+            throw new Error("Intentionally throwing exception in finalize function");
+        }
+    };
+    assert.commandFailedWithCode(
+        db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal finalize function 2");
+
+    p = {
+        ns: "group1",
+        $keyf: "a",
+        $reduce: function(obj, prev) {
+            prev.count++;
+        },
+        initial: {count: 0},
+        finalize: function(obj) {
+            throw new Error("Intentionally throwing exception in finalize function");
+        }
+    };
+    assert.commandFailedWithCode(
+        db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal keyf function");
+
+    p = {ns: "group1", key: {"name.first": true}, $reduce: "abc", initial: {count: 0}};
+    assert.commandFailedWithCode(
+        db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal reduce function");
+
+    p = {
+        ns: "group1",
+        key: {"name.first": true},
+        $reduce: function(obj, pre) {
+            prev.count++;
+        },
+        initial: {count: 0}
+    };
+    assert.commandFailedWithCode(
+        db.runCommand({group: p}), ErrorCodes.JSInterpreterFailure, "Illegal reduce function 2");
+}());

@@ -1,24 +1,27 @@
 // Cannot implicitly shard accessed collections because of extra shard key index in sharded
 // collection.
 // @tags: [assumes_no_implicit_index_creation]
+(function() {
+    "use strict";
 
-load("jstests/libs/fts.js");
+    load("jstests/libs/fts.js");
 
-t = db.text1;
-t.drop();
+    const coll = db.text1;
+    coll.drop();
 
-t.ensureIndex({x: "text"});
+    assert.commandWorked(coll.createIndex({x: "text"}, {name: "x_text"}));
 
-assert.eq([], queryIDS(t, "az"), "A0");
+    assert.eq([], queryIDS(coll, "az"), "A0");
 
-t.save({_id: 1, x: "az b c"});
-t.save({_id: 2, x: "az b"});
-t.save({_id: 3, x: "b c"});
-t.save({_id: 4, x: "b c d"});
+    assert.writeOK(coll.insert({_id: 1, x: "az b c"}));
+    assert.writeOK(coll.insert({_id: 2, x: "az b"}));
+    assert.writeOK(coll.insert({_id: 3, x: "b c"}));
+    assert.writeOK(coll.insert({_id: 4, x: "b c d"}));
 
-assert.eq([1, 2, 3, 4], queryIDS(t, "c az"), "A1");
-assert.eq([4], queryIDS(t, "d"), "A2");
+    assert.eq([1, 2, 3, 4], queryIDS(coll, "c az").sort(), "A1");
+    assert.eq([4], queryIDS(coll, "d"), "A2");
 
-idx = t.getIndexes()[1];
-assert(idx.v >= 1, tojson(idx));
-assert(idx.textIndexVersion >= 1, tojson(idx));
+    const index = coll.getIndexes().find(index => index.name === "x_text");
+    assert.neq(index, undefined);
+    assert.gte(index.textIndexVersion, 1, tojson(index));
+}());
