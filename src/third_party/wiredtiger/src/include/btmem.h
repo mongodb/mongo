@@ -182,9 +182,16 @@ struct __wt_ovfl_reuse {
  * makes the lookaside table's value more likely to overflow the page size when
  * the row-store key is relatively large.
  */
+#ifdef HAVE_BUILTIN_EXTENSION_SNAPPY
+#define	WT_LOOKASIDE_COMPRESSOR	"snappy"
+#else
+#define	WT_LOOKASIDE_COMPRESSOR	"none"
+#endif
 #define	WT_LAS_CONFIG							\
     "key_format=" WT_UNCHECKED_STRING(QIQu)				\
-    ",value_format=" WT_UNCHECKED_STRING(QuBu)
+    ",value_format=" WT_UNCHECKED_STRING(QuBu)				\
+    ",block_compressor=" WT_LOOKASIDE_COMPRESSOR			\
+    ",leaf_value_max=64MB"
 
 /*
  * WT_PAGE_LOOKASIDE --
@@ -218,6 +225,7 @@ struct __wt_page_modify {
 
 	/* Avoid checking for obsolete updates during checkpoints. */
 	uint64_t obsolete_check_txn;
+	WT_DECL_TIMESTAMP(obsolete_check_timestamp)
 
 	/* The largest transaction seen on the page by reconciliation. */
 	uint64_t rec_max_txn;

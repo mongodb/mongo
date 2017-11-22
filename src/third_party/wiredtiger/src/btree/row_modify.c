@@ -299,8 +299,11 @@ WT_UPDATE *
 __wt_update_obsolete_check(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd)
 {
+	WT_TXN_GLOBAL *txn_global;
 	WT_UPDATE *first, *next;
 	u_int count;
+
+	txn_global = &S2C(session)->txn_global;
 
 	/*
 	 * This function identifies obsolete updates, and truncates them from
@@ -313,13 +316,14 @@ __wt_update_obsolete_check(
 	 * Only updates with globally visible, self-contained data can terminate
 	 * update chains.
 	 */
-	for (first = NULL, count = 0; upd != NULL; upd = upd->next, count++)
-		if (WT_UPDATE_DATA_VALUE(upd) &&
-		    __wt_txn_upd_visible_all(session, upd)) {
-			if (first == NULL)
-				first = upd;
-		} else if (upd->txnid != WT_TXN_ABORTED)
+	for (first = NULL, count = 0; upd != NULL; upd = upd->next, count++) {
+		if (upd->txnid == WT_TXN_ABORTED)
+			continue;
+		if (!__wt_txn_upd_visible_all(session, upd))
 			first = NULL;
+		else if (first == NULL && WT_UPDATE_DATA_VALUE(upd))
+			first = upd;
+	}
 
 	/*
 	 * We cannot discard this WT_UPDATE structure, we can only discard
@@ -338,9 +342,16 @@ __wt_update_obsolete_check(
 	 * trim update lists independently of the page state, ensure there
 	 * is a modify structure.
 	 */
-	if (count > 20 && page->modify != NULL)
-		page->modify->obsolete_check_txn =
-		    S2C(session)->txn_global.last_running;
+	if (count > 20 && page->modify != NULL) {
+		page->modify->obsolete_check_txn = txn_global->last_running;
+#ifdef HAVE_TIMESTAMPS
+		if (txn_global->has_pinned_timestamp)
+			WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+			    __wt_timestamp_set(
+				&page->modify->obsolete_check_timestamp,
+				&txn_global->pinned_timestamp));
+#endif
+	}
 
 	return (NULL);
 }
