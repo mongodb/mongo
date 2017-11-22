@@ -55,6 +55,14 @@ public:
             return true;
         }
 
+        bool allowedToForwardFromMongos() const final {
+            return false;
+        }
+
+        bool allowedToPassthroughFromMongos() const final {
+            return false;
+        }
+
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             // TODO SERVER-29138: we need to communicate that this stage will need to look up
             // documents from different collections.

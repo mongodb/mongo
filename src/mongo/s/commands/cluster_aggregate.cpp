@@ -144,8 +144,13 @@ Status appendCursorResponseToCommandResult(const ShardId& shardId,
     return getStatusFromCommandResult(result->asTempObj());
 }
 
-bool mustRunOnAllShards(const NamespaceString& nss, const LiteParsedPipeline& litePipe) {
-    return nss.isCollectionlessAggregateNS() || litePipe.hasChangeStream();
+bool mustRunOnAllShards(const NamespaceString& nss,
+                        const CachedCollectionRoutingInfo& routingInfo,
+                        const LiteParsedPipeline& litePipe) {
+    // Any collectionless aggregation like a $currentOp, and a change stream on a sharded collection
+    // must run on all shards.
+    const bool nsIsSharded = static_cast<bool>(routingInfo.cm());
+    return nss.isCollectionlessAggregateNS() || (nsIsSharded && litePipe.hasChangeStream());
 }
 
 StatusWith<CachedCollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
@@ -175,7 +180,7 @@ std::set<ShardId> getTargetedShards(OperationContext* opCtx,
                                     const CachedCollectionRoutingInfo& routingInfo,
                                     const BSONObj shardQuery,
                                     const BSONObj collation) {
-    if (mustRunOnAllShards(nss, litePipe)) {
+    if (mustRunOnAllShards(nss, routingInfo, litePipe)) {
         // The pipeline begins with a stage which must be run on all shards.
         std::vector<ShardId> shardIds;
         Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
@@ -265,7 +270,7 @@ StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishShardC
         getTargetedShards(opCtx, nss, litePipe, *routingInfo, shardQuery, collation);
     std::vector<std::pair<ShardId, BSONObj>> requests;
 
-    if (mustRunOnAllShards(nss, litePipe)) {
+    if (mustRunOnAllShards(nss, *routingInfo, litePipe)) {
         // The pipeline contains a stage which must be run on all shards. Skip versioning and
         // enqueue the raw command objects.
         for (auto&& shardId : shardIds) {
@@ -426,7 +431,7 @@ StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
         // Refresh the shard registry if we're targeting all shards.  We need the shard registry
         // to be at least as current as the logical time used when creating the command for
         // $changeStream to work reliably, so we do a "hard" reload.
-        if (mustRunOnAllShards(executionNss, liteParsedPipeline)) {
+        if (mustRunOnAllShards(executionNss, executionNsRoutingInfo, liteParsedPipeline)) {
             auto* shardRegistry = Grid::get(opCtx)->shardRegistry();
             if (!shardRegistry->reload(opCtx)) {
                 shardRegistry->reload(opCtx);
@@ -435,7 +440,7 @@ StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
 
         // Explain does not produce a cursor, so instead we scatter-gather commands to the shards.
         if (expCtx->explain) {
-            if (mustRunOnAllShards(executionNss, liteParsedPipeline)) {
+            if (mustRunOnAllShards(executionNss, executionNsRoutingInfo, liteParsedPipeline)) {
                 // Some stages (such as $currentOp) need to be broadcast to all shards, and should
                 // not participate in the shard version protocol.
                 swShardResults =
@@ -688,7 +693,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // DocumentSource::serialize(), then go ahead and pass it through to the owning shard
     // unmodified.
     if (!executionNsRoutingInfo.cm() &&
-        !mustRunOnAllShards(namespaces.executionNss, liteParsedPipeline) &&
+        !mustRunOnAllShards(namespaces.executionNss, executionNsRoutingInfo, liteParsedPipeline) &&
         liteParsedPipeline.allowedToForwardFromMongos() &&
         liteParsedPipeline.allowedToPassthroughFromMongos()) {
         return aggPassthrough(opCtx,
