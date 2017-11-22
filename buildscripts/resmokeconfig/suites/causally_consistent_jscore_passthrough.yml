@@ -111,32 +111,19 @@ selector:
   - jstests/core/or4.js
   - jstests/core/recursion.js
   - jstests/core/temp_cleanup.js
+  # Tests that use $snapshot and expect documents to arrive in some implicit sort order are not
+  # causally consistent.
+  - jstests/core/snapshot_queries.js
+  - jstests/core/find1.js
   # Tests that fail for Causal Consistency with default injected readPreference 'secondary'
   # "TODO SERVER-30384: These tests assume that documents are returned in the same order they are
   # written when no sort is specified; however, the order of documents within a collection can
   # be different across a primary and secondary."
   - jstests/core/coveredIndex1.js
-  - jstests/core/distinct1.js
-  - jstests/core/elemMatchProjection.js
-  - jstests/core/find1.js
-  - jstests/core/find4.js
-  - jstests/core/find5.js
-  - jstests/core/fts1.js
-  - jstests/core/find_dedup.js
   - jstests/core/fts_spanish.js
-  - jstests/core/geo_distinct.js
-  - jstests/core/geo_s2ordering.js
-  - jstests/core/group1.js
-  - jstests/core/group2.js
-  - jstests/core/maxscan.js
-  - jstests/core/nan.js
   - jstests/core/null2.js
-  - jstests/core/not2.js
-  - jstests/core/snapshot_queries.js
   - jstests/core/sorta.js
   - jstests/core/sortc.js
-  - jstests/core/sort3.js
-  - jstests/core/sort4.js
   - jstests/core/ord.js
   # plan_cache tests does not work because they check the plan_cache on the primary while the 
   # cache is created on the secondary.
