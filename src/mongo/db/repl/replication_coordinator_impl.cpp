@@ -1117,7 +1117,10 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     auto* myMemberData = _topCoord->getMyMemberData();
     invariant(isRollbackAllowed || opTime >= myMemberData->getLastAppliedOpTime());
     myMemberData->setLastAppliedOpTime(opTime, _replExecutor->now());
-    _updateLastCommittedOpTime_inlock();
+    // If we are using applied times to calculate the commit level, update it now.
+    if (!_rsConfig.getWriteConcernMajorityShouldJournal()) {
+        _updateLastCommittedOpTime_inlock();
+    }
 
     // Signal anyone waiting on optime changes.
     _opTimeWaiterList.signalAndRemoveIf_inlock(
@@ -1142,7 +1145,10 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
     // until we reach the 'minValid' optime.
     if (consistency == DataConsistency::Consistent) {
         _stableOpTimeCandidates.insert(opTime);
-        _setStableTimestampForStorage_inlock();
+        // If we are lagged behind the commit optime, set a new stable timestamp here.
+        if (opTime <= _topCoord->getLastCommittedOpTime()) {
+            _setStableTimestampForStorage_inlock();
+        }
     }
 }
 
@@ -1151,7 +1157,10 @@ void ReplicationCoordinatorImpl::_setMyLastDurableOpTime_inlock(const OpTime& op
     auto* myMemberData = _topCoord->getMyMemberData();
     invariant(isRollbackAllowed || myMemberData->getLastDurableOpTime() <= opTime);
     myMemberData->setLastDurableOpTime(opTime, _replExecutor->now());
-    _updateLastCommittedOpTime_inlock();
+    // If we are using durable times to calculate the commit level, update it now.
+    if (_rsConfig.getWriteConcernMajorityShouldJournal()) {
+        _updateLastCommittedOpTime_inlock();
+    }
 }
 
 OpTime ReplicationCoordinatorImpl::getMyLastAppliedOpTime() const {

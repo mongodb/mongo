@@ -1042,13 +1042,20 @@ void WiredTigerKVEngine::setOldestTimestamp(SnapshotName oldestTimestamp) {
             // No oplog yet, so don't bother setting oldest_timestamp.
             return;
         }
-        if (_oplogManager->getOplogReadTimestamp() < oldestTimestamp.asU64()) {
+        auto oplogReadTimestamp = _oplogManager->getOplogReadTimestamp();
+        if (oplogReadTimestamp < oldestTimestamp.asU64()) {
             // For one node replica sets, the commit point might race ahead of the oplog read
             // timestamp.
-            // For now, we will simply avoid setting the oldestTimestamp in such cases.
-            return;
+            oldestTimestamp = Timestamp(oplogReadTimestamp);
+            if (_previousSetOldestTimestamp > oldestTimestamp) {
+                // Do not go backwards.
+                return;
+            }
         }
     }
+
+    // Lag the oldest_timestamp by one timestamp set, to give a bit more history.
+    invariant(_previousSetOldestTimestamp <= oldestTimestamp);
     auto timestampToSet = _previousSetOldestTimestamp;
     _previousSetOldestTimestamp = oldestTimestamp;
     if (timestampToSet == SnapshotName()) {
