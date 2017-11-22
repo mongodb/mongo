@@ -169,11 +169,11 @@ TEST(MongoDnsQuery, txtRecords) {
 
         {"test5.test.build.10gen.cc",
          {
-             "connectTimeoutMS=300000&socketTimeoutMS=300000",
+             "replicaSet=repl0&authSource=thisDB",
          }},
         {"test6.test.build.10gen.cc",
          {
-             "connectTimeoutMS=200000", "socketTimeoutMS=200000",
+             "authSource=otherDB", "replicaSet=repl0",
          }},
     };
 
