@@ -87,13 +87,10 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << nss.ns() << " is not a valid namespace",
-                nss.isValid());
 
-        ShardingState* const gss = ShardingState::get(opCtx);
-        if (gss->enabled()) {
-            result.append("configServer", gss->getConfigServer(opCtx).toString());
+        ShardingState* const shardingState = ShardingState::get(opCtx);
+        if (shardingState->enabled()) {
+            result.append("configServer", shardingState->getConfigServer(opCtx).toString());
         } else {
             result.append("configServer", "");
         }
@@ -109,11 +106,7 @@ public:
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         CollectionShardingState* const css = CollectionShardingState::get(opCtx, nss);
 
-        ScopedCollectionMetadata metadata;
-        if (css) {
-            metadata = css->getMetadata();
-        }
-
+        const auto metadata = css->getMetadata();
         if (metadata) {
             result.appendTimestamp("global", metadata->getShardVersion().toLong());
         } else {

@@ -1409,16 +1409,12 @@ public:
         uassert(16149, "cannot run map reduce without the js engine", getGlobalScriptEngine());
 
         // Prevent sharding state from changing during the MR.
-        ScopedCollectionMetadata collMetadata;
-        {
+        const auto collMetadata = [&] {
             // Get metadata before we check our version, to make sure it doesn't increment in the
-            // meantime.
+            // meantime
             AutoGetCollectionForReadCommand autoColl(opCtx, config.nss);
-            auto collection = autoColl.getCollection();
-            if (collection) {
-                collMetadata = CollectionShardingState::get(opCtx, config.nss)->getMetadata();
-            }
-        }
+            return CollectionShardingState::get(opCtx, config.nss)->getMetadata();
+        }();
 
         bool shouldHaveData = false;
 

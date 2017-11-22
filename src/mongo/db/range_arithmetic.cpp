@@ -31,41 +31,10 @@
 #include "mongo/db/range_arithmetic.h"
 
 namespace mongo {
-
-using std::make_pair;
-using std::pair;
-using std::string;
-using std::stringstream;
-
-CachedChunkInfo::CachedChunkInfo(BSONObj maxKey, ChunkVersion version)
-    : _maxKey(std::move(maxKey)), _version(version) {}
-
-bool rangeContains(const BSONObj& inclusiveLower,
-                   const BSONObj& exclusiveUpper,
-                   const BSONObj& point) {
-    return point.woCompare(inclusiveLower) >= 0 && point.woCompare(exclusiveUpper) < 0;
-}
-
-bool rangeOverlaps(const BSONObj& inclusiveLower1,
-                   const BSONObj& exclusiveUpper1,
-                   const BSONObj& inclusiveLower2,
-                   const BSONObj& exclusiveUpper2) {
-    return (exclusiveUpper1.woCompare(inclusiveLower2) > 0) &&
-        (exclusiveUpper2.woCompare(inclusiveLower1) > 0);
-}
-
-int compareRanges(const BSONObj& rangeMin1,
-                  const BSONObj& rangeMax1,
-                  const BSONObj& rangeMin2,
-                  const BSONObj& rangeMax2) {
-    const int minCmp = rangeMin1.woCompare(rangeMin2);
-    if (minCmp != 0)
-        return minCmp;
-    return rangeMax1.woCompare(rangeMax2);
-}
+namespace {
 
 // Represents the start and end of an overlap of a tested range
-typedef pair<RangeMap::const_iterator, RangeMap::const_iterator> OverlapBounds;
+typedef std::pair<RangeMap::const_iterator, RangeMap::const_iterator> OverlapBounds;
 
 // Internal-only, shared functionality
 OverlapBounds rangeMapOverlapBounds(const RangeMap& ranges,
@@ -81,7 +50,7 @@ OverlapBounds rangeMapOverlapBounds(const RangeMap& ranges,
         --low;
 
         // If the previous range's max value is lte our min value
-        if (low->second.getMaxKey().woCompare(inclusiveLower) < 1) {
+        if (low->second.woCompare(inclusiveLower) < 1) {
             low = next;
         }
     }
@@ -93,15 +62,20 @@ OverlapBounds rangeMapOverlapBounds(const RangeMap& ranges,
     return OverlapBounds(low, high);
 }
 
-void getRangeMapOverlap(const RangeMap& ranges,
-                        const BSONObj& inclusiveLower,
-                        const BSONObj& exclusiveUpper,
-                        RangeVector* overlap) {
-    overlap->clear();
-    OverlapBounds bounds = rangeMapOverlapBounds(ranges, inclusiveLower, exclusiveUpper);
-    for (RangeMap::const_iterator it = bounds.first; it != bounds.second; ++it) {
-        overlap->push_back(make_pair(it->first, it->second.getMaxKey()));
-    }
+}  // namespace
+
+bool rangeContains(const BSONObj& inclusiveLower,
+                   const BSONObj& exclusiveUpper,
+                   const BSONObj& point) {
+    return point.woCompare(inclusiveLower) >= 0 && point.woCompare(exclusiveUpper) < 0;
+}
+
+bool rangeOverlaps(const BSONObj& inclusiveLower1,
+                   const BSONObj& exclusiveUpper1,
+                   const BSONObj& inclusiveLower2,
+                   const BSONObj& exclusiveUpper2) {
+    return (exclusiveUpper1.woCompare(inclusiveLower2) > 0) &&
+        (exclusiveUpper2.woCompare(inclusiveLower1) > 0);
 }
 
 bool rangeMapOverlaps(const RangeMap& ranges,
@@ -109,33 +83,6 @@ bool rangeMapOverlaps(const RangeMap& ranges,
                       const BSONObj& exclusiveUpper) {
     OverlapBounds bounds = rangeMapOverlapBounds(ranges, inclusiveLower, exclusiveUpper);
     return bounds.first != bounds.second;
-}
-
-bool rangeMapContains(const RangeMap& ranges,
-                      const BSONObj& inclusiveLower,
-                      const BSONObj& exclusiveUpper) {
-    OverlapBounds bounds = rangeMapOverlapBounds(ranges, inclusiveLower, exclusiveUpper);
-    if (bounds.first == ranges.end())
-        return false;
-
-    return bounds.first->first.woCompare(inclusiveLower) == 0 &&
-        bounds.first->second.getMaxKey().woCompare(exclusiveUpper) == 0;
-}
-
-string rangeToString(const BSONObj& inclusiveLower, const BSONObj& exclusiveUpper) {
-    stringstream ss;
-    ss << "[" << inclusiveLower.toString() << ", " << exclusiveUpper.toString() << ")";
-    return ss.str();
-}
-
-string overlapToString(RangeVector overlap) {
-    stringstream ss;
-    for (RangeVector::const_iterator it = overlap.begin(); it != overlap.end(); ++it) {
-        if (it != overlap.begin())
-            ss << ", ";
-        ss << rangeToString(it->first, it->second);
-    }
-    return ss.str();
 }
 
 }  // namespace mongo

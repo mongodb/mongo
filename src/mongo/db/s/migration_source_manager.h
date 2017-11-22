@@ -28,12 +28,9 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/s/metadata_manager.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/s/move_chunk_request.h"
-#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/timer.h"
 
@@ -157,13 +154,6 @@ public:
     void cleanupOnError(OperationContext* opCtx);
 
     /**
-     * Returns the key pattern object for the stored committed metadata.
-     */
-    BSONObj getKeyPattern() const {
-        return _keyPattern;
-    }
-
-    /**
      * Returns the cloner which is being used for this migration. This value is available only if
      * the migration source manager is currently in the clone phase (i.e. the previous call to
      * startClone has succeeded).
@@ -197,6 +187,14 @@ private:
     enum State { kCreated, kCloning, kCloneCaughtUp, kCriticalSection, kCloneCompleted, kDone };
 
     /**
+     * If this donation moves the first chunk to the recipient (i.e., the recipient didn't have any
+     * chunks), this function writes a no-op message to the oplog, so that change stream will notice
+     * that and close the cursor in order to notify mongos to target the new shard as well.
+     */
+    void _notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
+                                                   const ScopedCollectionMetadata& metadata);
+
+    /**
      * Called when any of the states fails. May only be called once and will put the migration
      * manager into the kDone state.
      */
@@ -217,11 +215,8 @@ private:
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};
 
-    // The cached collection metadata at the time the migration started.
-    ScopedCollectionMetadata _collectionMetadata;
-
-    // The key pattern of the collection whose chunks are being moved.
-    BSONObj _keyPattern;
+    // The version of the collection at the time migration started.
+    OID _collectionEpoch;
 
     // The UUID of the the collection whose chunks are being moved. Default to empty if the
     // collection doesn't have UUID.

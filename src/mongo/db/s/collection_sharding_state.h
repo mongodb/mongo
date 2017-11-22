@@ -40,9 +40,6 @@
 
 namespace mongo {
 
-// How long to wait before starting cleanup of an emigrated chunk range.
-extern AtomicInt32 orphanCleanupDelaySecs;
-
 class BalancerConfiguration;
 class BSONObj;
 struct ChunkVersion;
@@ -158,8 +155,7 @@ public:
      * by running queries that overlap the argument range, suitable for identifying and invalidating
      * those queries.
      */
-    auto overlappingMetadata(ChunkRange const& range) const
-        -> std::vector<ScopedCollectionMetadata>;
+    std::vector<ScopedCollectionMetadata> overlappingMetadata(ChunkRange const& range) const;
 
     /**
      * Returns the active migration source manager, if one is available.
@@ -219,7 +215,7 @@ public:
      * Returns a range _not_ owned by this shard that starts no lower than the specified
      * startingFrom key value, if any, or boost::none if there is no such range.
      */
-    boost::optional<KeyRange> getNextOrphanRange(BSONObj const& startingFrom);
+    boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& startingFrom);
 
     /**
      * Replication oplog OpObserver hooks. Informs the sharding system of changes that may be
