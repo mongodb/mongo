@@ -1,7 +1,8 @@
 // Test that a $changeStream pipeline on a sharded cluster always enforces the user-specified
 // maxTimeMS on mongoS, but caps the maxTimeMS of getMores sent to the shards at one second. Doing
 // so allows the shards to regularly report their advancing optimes in the absence of any new data,
-// which in turn allows the ARM to return sorted results retrieved from the other shards.
+// which in turn allows the AsyncResultsMerger to return sorted results retrieved from the other
+// shards.
 (function() {
     "use strict";
 
@@ -16,8 +17,9 @@
     }
 
     // Create a 2-shard cluster. Enable 'writePeriodicNoops' and set 'periodicNoopIntervalSecs' to 1
-    // second so that each shard is continually advancing its optime, allowing the ARM to return
-    // sorted results even if some shards have not yet produced any data.
+    // second so that each shard is continually advancing its optime, allowing the
+    // AsyncResultsMerger to return sorted results even if some shards have not yet produced any
+    // data.
     const st = new ShardingTest({
         shards: 2,
         rs: {nodes: 1, setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}}
