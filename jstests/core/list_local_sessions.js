@@ -38,9 +38,11 @@
         assert(authUsers[0].db !== undefined);
         return {user: authUsers[0].user, db: authUsers[0].db};
     })();
+
     function listMyLocalSessions() {
         return admin.aggregate([{'$listLocalSessions': {users: [myusername]}}]);
     }
+
     const myArray = assert.doesNotThrow(listMyLocalSessions)
                         .toArray()
                         .map(function(sess) {
@@ -49,5 +51,15 @@
                         .filter(function(id) {
                             return 0 == bsonWoCompare({x: id}, {x: myid});
                         });
-    assert.eq(0, bsonWoCompare(myArray, resultArrayMine));
+    assert.eq(myArray.length, 1);
+
+    print("sessions returned from $listLocalSessions filtered by user:          [ " + myArray +
+          " ]");
+    print("sessions returned from un-filtered $listLocalSessions for this user: [ " +
+          resultArrayMine + " ]");
+
+    assert.eq(
+        0,
+        bsonWoCompare(myArray, resultArrayMine),
+        "set of listed sessions for user contains different sessions from prior $listLocalSessions run");
 })();
