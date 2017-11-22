@@ -38,11 +38,8 @@
 namespace mongo {
 
 class Collection;
-class Cursor;
 class DataProtector;
 class OperationContext;
-struct KeyRange;
-struct WriteConcernOptions;
 
 /**
  * db helpers are helper functions and classes that let us easily manipulate the local

@@ -52,7 +52,6 @@ class ChunkType;
  * This class's chunk mapping is immutable once constructed.
  */
 class CollectionMetadata {
-
 public:
     /**
      * The main way to construct CollectionMetadata is through MetadataLoader or clone() methods.
@@ -61,19 +60,14 @@ public:
      * "does this key belong to this shard"?
      */
     CollectionMetadata(std::shared_ptr<ChunkManager> cm, const ShardId& thisShardId);
-
     ~CollectionMetadata();
 
     /**
-     * Returns a new metadata's instance based on 'this's state;
+     * Returns true if 'key' contains exactly the same fields as the shard key pattern.
      */
-    std::unique_ptr<CollectionMetadata> clone() const;
-
-    /**
-     * Returns true if the document key 'key' is a valid instance of a shard key for this
-     * metadata.  The 'key' must contain exactly the same fields as the shard key pattern.
-     */
-    bool isValidKey(const BSONObj& key) const;
+    bool isValidKey(const BSONObj& key) const {
+        return _cm->getShardKeyPattern().isShardKey(key);
+    }
 
     /**
      * Returns true if the document key 'key' belongs to this chunkset. Recall that documents of
@@ -145,9 +139,13 @@ public:
         return _cm->getShardKeyPattern().getKeyPatternFields();
     }
 
-    BSONObj getMinKey() const;
+    BSONObj getMinKey() const {
+        return _cm->getShardKeyPattern().getKeyPattern().globalMin();
+    }
 
-    BSONObj getMaxKey() const;
+    BSONObj getMaxKey() const {
+        return _cm->getShardKeyPattern().getKeyPattern().globalMax();
+    }
 
     std::size_t getNumChunks() const {
         return _chunksMap.size();
@@ -177,6 +175,9 @@ public:
     }
 
 private:
+    friend class MetadataManager;
+    friend class ScopedCollectionMetadata;
+
     struct Tracker {
         uint32_t usageCounter{0};
         std::list<CollectionRangeDeleter::Deletion> orphans;
@@ -200,13 +201,10 @@ private:
     // Map of chunks tracked by this shard
     RangeMap _chunksMap;
 
-    // A second map from a min key into a range of contiguous chunks. The map is redundant
-    // w.r.t. _chunkMap but we expect high chunk contiguity, especially in small
-    // installations.
+    // A second map from a min key into a range of contiguous chunks. This map is redundant with
+    // respect to the contents of _chunkMap but we expect high chunk contiguity, especially in small
+    // clusters.
     RangeMap _rangesMap;
-
-    friend class ScopedCollectionMetadata;
-    friend class MetadataManager;
 };
 
 }  // namespace mongo

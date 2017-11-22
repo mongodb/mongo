@@ -70,69 +70,6 @@ TEST(BSONRange, EqualRange) {
         rangeOverlaps(BSON("x" << 100), BSON("x" << 200), BSON("x" << 100), BSON("x" << 200)));
 }
 
-TEST(RangeMap, RangeMapOverlap) {
-    const OID epoch = OID::gen();
-
-    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
-    rangeMap.insert(
-        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
-    rangeMap.insert(
-        make_pair(BSON("x" << 200), CachedChunkInfo(BSON("x" << 300), ChunkVersion(2, 0, epoch))));
-    rangeMap.insert(
-        make_pair(BSON("x" << 300), CachedChunkInfo(BSON("x" << 400), ChunkVersion(3, 0, epoch))));
-
-    RangeVector overlap;
-    getRangeMapOverlap(rangeMap, BSON("x" << 50), BSON("x" << 350), &overlap);
-
-    ASSERT(!overlap.empty());
-    ASSERT_EQUALS(overlap.size(), 3u);
-}
-
-TEST(RangeMap, RangeMapOverlapPartial) {
-    const OID epoch = OID::gen();
-
-    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
-    rangeMap.insert(
-        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
-    rangeMap.insert(
-        make_pair(BSON("x" << 200), CachedChunkInfo(BSON("x" << 300), ChunkVersion(2, 0, epoch))));
-
-    RangeVector overlap;
-    getRangeMapOverlap(rangeMap, BSON("x" << 150), BSON("x" << 250), &overlap);
-
-    ASSERT(!overlap.empty());
-    ASSERT_EQUALS(overlap.size(), 2u);
-}
-
-TEST(RangeMap, RangeMapOverlapInner) {
-    const OID epoch = OID::gen();
-
-    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
-    rangeMap.insert(
-        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
-
-    RangeVector overlap;
-    getRangeMapOverlap(rangeMap, BSON("x" << 125), BSON("x" << 150), &overlap);
-
-    ASSERT(!overlap.empty());
-    ASSERT_EQUALS(overlap.size(), 1u);
-}
-
-TEST(RangeMap, RangeMapNoOverlap) {
-    const OID epoch = OID::gen();
-
-    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
-    rangeMap.insert(
-        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
-    rangeMap.insert(
-        make_pair(BSON("x" << 300), CachedChunkInfo(BSON("x" << 400), ChunkVersion(2, 0, epoch))));
-
-    RangeVector overlap;
-    getRangeMapOverlap(rangeMap, BSON("x" << 200), BSON("x" << 300), &overlap);
-
-    ASSERT(overlap.empty());
-}
-
 TEST(RangeMap, RangeMapOverlaps) {
     const OID epoch = OID::gen();
 

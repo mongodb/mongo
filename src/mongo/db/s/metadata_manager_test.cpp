@@ -318,13 +318,11 @@ TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
     auto recreateMetadata = makeEmptyMetadata();
     _manager->refreshActiveMetadata(
         cloneMetadataPlusChunk(*recreateMetadata, BSON("key" << 20), BSON("key" << 30)));
-    ChunkVersion newVersion = _manager->getActiveMetadata(_manager)->getShardVersion();
     ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 1UL);
 
     const auto chunkEntry = _manager->getActiveMetadata(_manager)->getChunks().begin();
     ASSERT_BSONOBJ_EQ(BSON("key" << 20), chunkEntry->first);
     ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second.getMaxKey());
-    ASSERT_EQ(newVersion.epoch(), chunkEntry->second.getVersion().epoch());
 }
 
 // Tests membership functions for _rangesToClean

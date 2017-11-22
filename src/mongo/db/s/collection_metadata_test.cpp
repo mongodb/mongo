@@ -304,21 +304,24 @@ protected:
     }
 };
 
-TEST_F(ThreeChunkWithRangeGapFixture, ChunkVersionsMatch) {
+TEST_F(ThreeChunkWithRangeGapFixture, GetNextChunkMatch) {
     auto metadata(makeCollectionMetadata());
 
     ChunkType chunk;
 
     ASSERT(metadata->getNextChunk(BSON("a" << MINKEY), &chunk));
-    ASSERT_EQ(ChunkVersion(1, 0, metadata->getCollVersion().epoch()), chunk.getVersion());
     ASSERT_BSONOBJ_EQ(metadata->getMinKey(), chunk.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("a" << MINKEY), chunk.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 10), chunk.getMax());
 
     ASSERT(metadata->getNextChunk(BSON("a" << 10), &chunk));
-    ASSERT_EQ(ChunkVersion(2, 0, metadata->getCollVersion().epoch()), chunk.getVersion());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 10), chunk.getMin());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 20), chunk.getMax());
 
     ASSERT(metadata->getNextChunk(BSON("a" << 30), &chunk));
-    ASSERT_EQ(ChunkVersion(4, 0, metadata->getCollVersion().epoch()), chunk.getVersion());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 30), chunk.getMin());
     ASSERT_BSONOBJ_EQ(metadata->getMaxKey(), chunk.getMax());
+    ASSERT_BSONOBJ_EQ(BSON("a" << MAXKEY), chunk.getMax());
 }
 
 TEST_F(ThreeChunkWithRangeGapFixture, ShardOwnsDoc) {

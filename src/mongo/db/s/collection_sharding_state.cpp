@@ -63,12 +63,10 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
-
 namespace {
 
-using std::string;
+// How long to wait before starting cleanup of an emigrated chunk range
+MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
 
 /**
  * Used to perform shard identity initialization once it is certain that the document is committed.
@@ -100,9 +98,10 @@ public:
         : _opCtx(opCtx), _nss(nss) {}
 
     void commit() override {
+        invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+
         CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(_nss);
 
-        invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
         // This is a hack to get around CollectionShardingState::refreshMetadata() requiring the X
         // lock: markNotShardedAtStepdown() doesn't have a lock check. Temporary measure until
         // SERVER-31595 removes the X lock requirement.
@@ -182,8 +181,8 @@ auto CollectionShardingState::cleanUpRange(ChunkRange const& range, CleanWhen wh
     return _metadataManager->cleanUpRange(range, time);
 }
 
-auto CollectionShardingState::overlappingMetadata(ChunkRange const& range) const
-    -> std::vector<ScopedCollectionMetadata> {
+std::vector<ScopedCollectionMetadata> CollectionShardingState::overlappingMetadata(
+    ChunkRange const& range) const {
     return _metadataManager->overlappingMetadata(_metadataManager, range);
 }
 
@@ -209,7 +208,7 @@ void CollectionShardingState::clearMigrationSourceManager(OperationContext* opCt
 }
 
 void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) {
-    string errmsg;
+    std::string errmsg;
     ChunkVersion received;
     ChunkVersion wanted;
     if (!_checkShardVersionOk(opCtx, &errmsg, &received, &wanted)) {
@@ -491,10 +490,10 @@ void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadataAndNotify(
 }
 
 bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
-                                                   string* errmsg,
+                                                   std::string* errmsg,
                                                    ChunkVersion* expectedShardVersion,
                                                    ChunkVersion* actualShardVersion) {
-    Client* client = opCtx->getClient();
+    auto* const client = opCtx->getClient();
 
     auto& oss = OperationShardingState::get(opCtx);
 

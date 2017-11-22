@@ -42,9 +42,9 @@
 namespace mongo {
 
 CollectionMetadata::CollectionMetadata(std::shared_ptr<ChunkManager> cm, const ShardId& thisShardId)
-    : _cm(cm),
+    : _cm(std::move(cm)),
       _thisShardId(thisShardId),
-      _shardVersion(_cm->getVersion(thisShardId)),
+      _shardVersion(_cm->getVersion(_thisShardId)),
       _chunksMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()),
       _rangesMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()) {
 
@@ -108,10 +108,6 @@ void CollectionMetadata::_buildRangesMap() {
     _rangesMap.emplace(min, CachedChunkInfo(max, ChunkVersion::IGNORED()));
 }
 
-std::unique_ptr<CollectionMetadata> CollectionMetadata::clone() const {
-    return stdx::make_unique<CollectionMetadata>(_cm, _thisShardId);
-}
-
 bool CollectionMetadata::keyBelongsToMe(const BSONObj& key) const {
     if (_rangesMap.empty()) {
         return false;
@@ -138,14 +134,12 @@ bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey, ChunkType* chunk
         lowerChunkIt->second.getMaxKey().woCompare(lookupKey) > 0) {
         chunk->setMin(lowerChunkIt->first);
         chunk->setMax(lowerChunkIt->second.getMaxKey());
-        chunk->setVersion(lowerChunkIt->second.getVersion());
         return true;
     }
 
     if (upperChunkIt != _chunksMap.end()) {
         chunk->setMin(upperChunkIt->first);
         chunk->setMax(upperChunkIt->second.getMaxKey());
-        chunk->setVersion(upperChunkIt->second.getVersion());
         return true;
     }
 
@@ -161,7 +155,6 @@ bool CollectionMetadata::getDifferentChunk(const BSONObj& chunkMinKey,
         if (lowerChunkIt->first.woCompare(chunkMinKey) != 0) {
             differentChunk->setMin(lowerChunkIt->first);
             differentChunk->setMax(lowerChunkIt->second.getMaxKey());
-            differentChunk->setVersion(lowerChunkIt->second.getVersion());
             return true;
         }
         ++lowerChunkIt;
@@ -279,18 +272,6 @@ boost::optional<KeyRange> CollectionMetadata::getNextOrphanRange(
     }
 
     return boost::none;
-}
-
-BSONObj CollectionMetadata::getMinKey() const {
-    return _cm->getShardKeyPattern().getKeyPattern().globalMin();
-}
-
-BSONObj CollectionMetadata::getMaxKey() const {
-    return _cm->getShardKeyPattern().getKeyPattern().globalMax();
-}
-
-bool CollectionMetadata::isValidKey(const BSONObj& key) const {
-    return _cm->getShardKeyPattern().isShardKey(key);
 }
 
 }  // namespace mongo

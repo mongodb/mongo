@@ -94,16 +94,6 @@ bool rangeOverlaps(const BSONObj& inclusiveLower1,
                    const BSONObj& exclusiveUpper2);
 
 /**
- * Returns -1 if first range is less than the second range, 0 if equal and 1 if
- * greater. The ordering is based on comparing both the min first and then uses
- * the max as the tie breaker.
- */
-int compareRanges(const BSONObj& rangeMin1,
-                  const BSONObj& rangeMax1,
-                  const BSONObj& rangeMin2,
-                  const BSONObj& rangeMax2);
-
-/**
  * Represents a cached chunk information on the shard.
  */
 class CachedChunkInfo {
@@ -114,13 +104,8 @@ public:
         return _maxKey;
     }
 
-    const ChunkVersion& getVersion() const {
-        return _version;
-    }
-
 private:
     BSONObj _maxKey;
-    ChunkVersion _version;
 };
 
 /**
@@ -137,15 +122,6 @@ typedef BSONObjIndexedMap<CachedChunkInfo> RangeMap;
 typedef std::vector<std::pair<BSONObj, BSONObj>> RangeVector;
 
 /**
- * Returns the overlap of a range [inclusiveLower, exclusiveUpper) with the provided range map
- * as a vector of ranges from the map.
- */
-void getRangeMapOverlap(const RangeMap& ranges,
-                        const BSONObj& inclusiveLower,
-                        const BSONObj& exclusiveUpper,
-                        RangeVector* vector);
-
-/**
  * Returns true if the provided range map has ranges which overlap the provided range
  * [inclusiveLower, exclusiveUpper).
  */
@@ -160,15 +136,5 @@ bool rangeMapOverlaps(const RangeMap& ranges,
 bool rangeMapContains(const RangeMap& ranges,
                       const BSONObj& inclusiveLower,
                       const BSONObj& exclusiveUpper);
-
-/**
- * std::string representation of [inclusiveLower, exclusiveUpper)
- */
-std::string rangeToString(const BSONObj& inclusiveLower, const BSONObj& exclusiveUpper);
-
-/**
- * std::string representation of overlapping ranges as a list "[range1),[range2),..."
- */
-std::string overlapToString(RangeVector overlap);
 
 }  // namespace mongo

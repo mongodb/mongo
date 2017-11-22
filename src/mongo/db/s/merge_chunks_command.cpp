@@ -147,7 +147,8 @@ Status mergeChunks(OperationContext* opCtx,
 
     if (!metadata->isValidKey(minKey) || !metadata->isValidKey(maxKey)) {
         std::string errmsg = stream() << "could not merge chunks, the range "
-                                      << redact(rangeToString(minKey, maxKey)) << " is not valid"
+                                      << redact(ChunkRange(minKey, maxKey).toString())
+                                      << " is not valid"
                                       << " for collection " << nss.ns() << " with key pattern "
                                       << metadata->getKeyPattern().toString();
 
@@ -235,7 +236,7 @@ Status mergeChunks(OperationContext* opCtx,
     if (chunksToMerge.size() == 1) {
         std::string errmsg = stream() << "could not merge chunks, collection " << nss.ns()
                                       << " already contains chunk for "
-                                      << redact(rangeToString(minKey, maxKey));
+                                      << redact(ChunkRange(minKey, maxKey).toString());
 
         warning() << errmsg;
         return Status(ErrorCodes::IllegalOperation, errmsg);
@@ -247,8 +248,9 @@ Status mergeChunks(OperationContext* opCtx,
         if (chunksToMerge[i - 1].getMax().woCompare(chunksToMerge[i].getMin()) != 0) {
             std::string errmsg = stream()
                 << "could not merge chunks, collection " << nss.ns() << " has a hole in the range "
-                << redact(rangeToString(minKey, maxKey)) << " at "
-                << redact(rangeToString(chunksToMerge[i - 1].getMax(), chunksToMerge[i].getMin()));
+                << redact(ChunkRange(minKey, maxKey).toString()) << " at "
+                << redact(ChunkRange(chunksToMerge[i - 1].getMax(), chunksToMerge[i].getMin())
+                              .toString());
 
             warning() << errmsg;
             return Status(ErrorCodes::IllegalOperation, errmsg);
