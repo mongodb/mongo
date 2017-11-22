@@ -6,6 +6,11 @@
  * of 135MB across all sharding tests in mmapv1.
  * @tags: [resource_intensive]
  */
+
+// Shard secondaries are restarted, which may cause that shard's primary to stepdown while it does
+// not see the secondaries. Either the primary connection gets reset, or the primary could change.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     'use strict';
     load("jstests/replsets/rslib.js");
