@@ -6450,9 +6450,17 @@ buildvariants:
   - name: parallel_WT
   - name: parallel_compatibility_WT
   - name: powercycle_WT
+    distros:
+    - windows-64-vs2015-large
   - name: powercycle_fcv3.4_WT
+    distros:
+    - windows-64-vs2015-large
   - name: powercycle_replication_WT
+    distros:
+    - windows-64-vs2015-large
   - name: powercycle_syncdelay_WT
+    distros:
+    - windows-64-vs2015-large
   - name: read_concern_linearizable_passthrough_WT
   - name: read_concern_majority_passthrough_WT
   - name: replica_sets_WT
@@ -9773,6 +9781,8 @@ buildvariants:
   - name: parallel
   - name: parallel_compatibility
   - name: powercycle
+    distros:
+    - windows-64-vs2015-large
   - name: read_concern_linearizable_passthrough
     distros:
     - windows-64-vs2015-large
