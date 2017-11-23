@@ -342,15 +342,20 @@ __pack_write(
 		*pp += pv->size;
 		break;
 	case 'S':
-		s = strlen(pv->u.s);
+		/*
+		 * When preceded by a size, that indicates the maximum number
+		 * of bytes the string can store, this does not include the
+		 * terminating NUL character. In a string with characters
+		 * less than the specified size, the remaining bytes are
+		 * NULL padded.
+		 */
 		if (pv->havesize) {
-			if (pv->size < s) {
-				s = pv->size;
-				pad = 0;
-			} else
-				pad = pv->size - s;
-		} else
+			s = __wt_strnlen(pv->u.s, pv->size);
+			pad = (s < pv->size) ? pv->size - s : 0;
+		} else {
+			s = strlen(pv->u.s);
 			pad = 1;
+		}
 		WT_SIZE_CHECK_PACK(s + pad, maxlen);
 		if (s > 0)
 			memcpy(*pp, pv->u.s, s);
