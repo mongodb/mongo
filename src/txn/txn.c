@@ -287,7 +287,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session, uint32_t flags)
 #ifdef HAVE_TIMESTAMPS
 	/* Try to move the pinned timestamp forward. */
 	if (strict)
-		WT_RET(__wt_txn_update_pinned_timestamp(session));
+		WT_RET(__wt_txn_update_pinned_timestamp(session, false));
 #endif
 
 	/*

@@ -2341,6 +2341,9 @@ struct __wt_connection {
 	 * supplied value should not be older than the current oldest and stable
 	 * timestamps.  See @ref transaction_timestamps., a string; default
 	 * empty.}
+	 * @config{force, set timestamps even if they violate normal ordering
+	 * requirements.  For example allow the \c oldest_timestamp to move
+	 * backwards., a boolean flag; default \c false.}
 	 * @config{oldest_timestamp, future commits and queries will be no
 	 * earlier than the specified timestamp.  Supplied values must be
 	 * monotonically increasing\, any attempt to set the value to older than
