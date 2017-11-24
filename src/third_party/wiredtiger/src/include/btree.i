@@ -1425,15 +1425,19 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * tree, then perform a general check if eviction will be possible.
 	 */
 	page = ref->page;
-	if (!WT_READGEN_EVICT_SOON(page->read_gen) ||
-	    LF_ISSET(WT_READ_NO_SPLIT) ||
-	    btree->evict_disabled > 0 ||
-	    !__wt_page_can_evict(session, ref, &inmem_split) ||
-	    (F_ISSET(session, WT_SESSION_NO_RECONCILE) && !inmem_split))
-		return (__wt_hazard_clear(session, ref));
+	if (WT_READGEN_EVICT_SOON(page->read_gen) &&
+	    btree->evict_disabled == 0 &&
+	    __wt_page_can_evict(session, ref, &inmem_split)) {
+		if ((LF_ISSET(WT_READ_NO_SPLIT) || (!inmem_split &&
+		    F_ISSET(session, WT_SESSION_NO_RECONCILE))))
+			__wt_page_evict_urgent(session, ref);
+		else {
+			WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
+			return (0);
+		}
+	}
 
-	WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
-	return (0);
+	return (__wt_hazard_clear(session, ref));
 }
 
 /*
