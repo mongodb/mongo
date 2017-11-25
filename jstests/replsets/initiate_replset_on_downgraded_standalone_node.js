@@ -1,6 +1,8 @@
 /**
  * Restarting a downgraded standalone node as a replset node
  * shouldn't assign UUID for collections.
+ *
+ * @tags: [requires_persistence]
  */
 (function() {
     "use strict";
