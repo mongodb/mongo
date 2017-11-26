@@ -102,6 +102,9 @@ public:
         // sharded, and anyway "_id". Empty until the first oplog entry with a uuid is encountered.
         // Needed for transforming 'insert' oplog entries.
         std::vector<FieldPath> _documentKeyFields;
+
+        // Set to true if the collection is found to be sharded while retrieving _documentKeyFields.
+        bool _documentKeyFieldsSharded = false;
     };
 
     // The sort pattern used to merge results from multiple change streams on a mongos.

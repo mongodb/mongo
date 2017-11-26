@@ -46,6 +46,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -436,8 +438,24 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
     if (!uuid.missing()) {
         checkValueType(uuid, repl::OplogEntry::kUuidFieldName, BSONType::BinData);
-        if (_mongoProcess && _documentKeyFields.empty()) {
-            _documentKeyFields = _mongoProcess->collectDocumentKeyFields(uuid.getUuid());
+        // We need to retrieve the document key fields if our cached copy has not been populated. If
+        // the collection was unsharded but has now transitioned to a sharded state, we must update
+        // the documentKey fields to include the shard key. We only need to re-check the documentKey
+        // while the collection is unsharded; if the collection is or becomes sharded, then the
+        // documentKey is final and will not change.
+        if (_mongoProcess && !_documentKeyFieldsSharded) {
+            // If this is not a shard server, 'catalogCache' will be nullptr and we will skip the
+            // routing table check.
+            auto catalogCache = Grid::get(_expCtx->opCtx)->catalogCache();
+            const bool collectionIsSharded = catalogCache && [catalogCache, this]() {
+                auto routingInfo =
+                    catalogCache->getCollectionRoutingInfo(_expCtx->opCtx, _expCtx->ns);
+                return routingInfo.isOK() && routingInfo.getValue().cm();
+            }();
+            if (_documentKeyFields.empty() || collectionIsSharded) {
+                _documentKeyFields = _mongoProcess->collectDocumentKeyFields(uuid.getUuid());
+                _documentKeyFieldsSharded = collectionIsSharded;
+            }
         }
     }
     NamespaceString nss(ns.getString());
