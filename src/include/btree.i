@@ -1336,6 +1336,14 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 		return (false);
 
 	/*
+	 * If the page was restored after a truncate, it can't be evicted until
+	 * the truncate completes.
+	 */
+	if (ref->page_del != NULL && !__wt_txn_visible_all(session,
+	    ref->page_del->txnid, WT_TIMESTAMP_NULL(&ref->page_del->timestamp)))
+		return (false);
+
+	/*
 	 * Check for in-memory splits before other eviction tests. If the page
 	 * should split in-memory, return success immediately and skip more
 	 * detailed eviction tests. We don't need further tests since the page
@@ -1423,15 +1431,21 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 *
 	 * Fast checks if eviction is disabled for this handle, operation or
 	 * tree, then perform a general check if eviction will be possible.
+	 *
+	 * Checkpoint should not queue pages for urgent eviction if it cannot
+	 * evict them immediately: there is a special exemption that allows
+	 * checkpoint to evict dirty pages in a tree that is being
+	 * checkpointed, and no other thread can help with that.
 	 */
 	page = ref->page;
 	if (WT_READGEN_EVICT_SOON(page->read_gen) &&
 	    btree->evict_disabled == 0 &&
 	    __wt_page_can_evict(session, ref, &inmem_split)) {
-		if ((LF_ISSET(WT_READ_NO_SPLIT) || (!inmem_split &&
-		    F_ISSET(session, WT_SESSION_NO_RECONCILE))))
-			__wt_page_evict_urgent(session, ref);
-		else {
+		if (LF_ISSET(WT_READ_NO_SPLIT) || (!inmem_split &&
+		    F_ISSET(session, WT_SESSION_NO_RECONCILE))) {
+			if (!WT_SESSION_IS_CHECKPOINT(session))
+				__wt_page_evict_urgent(session, ref);
+		} else {
 			WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
 			return (0);
 		}
