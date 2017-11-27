@@ -840,7 +840,7 @@ env.Library(
         "repl/serveronly",
         "repl/storage_interface",
         "repl/sync_tail",
-        "repl/topology_coordinator_impl",
+        "repl/topology_coordinator",
         "rw_concern_d",
         "s/collection_metadata",
         "s/commands",

@@ -102,7 +102,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -1194,7 +1194,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
         serviceContext, stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
     auto dropPendingCollectionReaper = repl::DropPendingCollectionReaper::get(serviceContext);
 
-    repl::TopologyCoordinatorImpl::Options topoCoordOptions;
+    repl::TopologyCoordinator::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
     topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
 
@@ -1207,7 +1207,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
         stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
             serviceContext, dropPendingCollectionReaper, storageInterface, replicationProcess),
         makeReplicationExecutor(serviceContext),
-        stdx::make_unique<repl::TopologyCoordinatorImpl>(topoCoordOptions),
+        stdx::make_unique<repl::TopologyCoordinator>(topoCoordOptions),
         replicationProcess,
         storageInterface,
         static_cast<int64_t>(curTimeMillis64()));

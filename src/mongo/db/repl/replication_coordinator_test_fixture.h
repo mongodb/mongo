@@ -48,7 +48,7 @@ class ReplSetConfig;
 class ReplicationCoordinatorExternalStateMock;
 class ReplicationCoordinatorImpl;
 class StorageInterfaceMock;
-class TopologyCoordinatorImpl;
+class TopologyCoordinator;
 
 using executor::NetworkInterfaceMock;
 
@@ -120,7 +120,7 @@ protected:
     /**
      * Gets the topology coordinator used by the replication coordinator under test.
      */
-    TopologyCoordinatorImpl& getTopoCoord() {
+    TopologyCoordinator& getTopoCoord() {
         return *_topo;
     }
 
@@ -288,7 +288,7 @@ protected:
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
     // Owned by ReplicationCoordinatorImpl
-    TopologyCoordinatorImpl* _topo = nullptr;
+    TopologyCoordinator* _topo = nullptr;
     // Owned by executor
     executor::NetworkInterfaceMock* _net = nullptr;
     // Owned by ReplicationCoordinatorImpl
