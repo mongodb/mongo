@@ -66,6 +66,8 @@ public:
 
     void getAllIndexes(OperationContext* opCtx, std::vector<std::string>* names) const final;
 
+    void getReadyIndexes(OperationContext* opCtx, std::vector<std::string>* names) const final;
+
     BSONObj getIndexSpec(OperationContext* opCtx, StringData idxName) const final;
 
     bool isIndexMultikey(OperationContext* opCtx,

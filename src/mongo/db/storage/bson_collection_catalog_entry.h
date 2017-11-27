@@ -59,6 +59,8 @@ public:
 
     virtual void getAllIndexes(OperationContext* opCtx, std::vector<std::string>* names) const;
 
+    virtual void getReadyIndexes(OperationContext* opCtx, std::vector<std::string>* names) const;
+
     virtual bool isIndexMultikey(OperationContext* opCtx,
                                  StringData indexName,
                                  MultikeyPaths* multikeyPaths) const;

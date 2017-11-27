@@ -2,6 +2,9 @@
 
 (function() {
     "use strict";
+
+    load("jstests/noPassthrough/libs/index_build.js");
+
     const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
     assert.neq(null, conn, "mongod failed to start.");
     var db = conn.getDB("test");
@@ -57,7 +60,7 @@
             // wait for indexing to start
             print("wait for indexing to start");
             assert.soon(function() {
-                return 2 === t.getIndexes().length;
+                return getIndexBuildOpId(db) != -1;
             }, "no index created", 30000, 50);
             print("started.");
             sleep(1000);  // there is a race between when the index build shows up in curop and
