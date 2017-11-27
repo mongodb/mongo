@@ -97,7 +97,7 @@ const int restartSyncAfterSleep = 1;
 }  // namespace
 
 void pretouchOperation(OperationContext* opCtx, const BSONObj& op);
-void pretouchN(vector<BSONObj>&, unsigned a, unsigned b);
+void pretouchN(const vector<BSONObj>&, unsigned a, unsigned b);
 
 /* if 1 sync() is running */
 AtomicInt32 syncing(0);
@@ -751,7 +751,7 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* opCtx,
                     unsigned b = a + m - 1;  // v[a..b]
                     if (b >= v.size())
                         b = v.size() - 1;
-                    tp->schedule(pretouchN, v, a, b);
+                    tp->schedule([&v, a, b] { pretouchN(v, a, b); });
                     DEV cout << "pretouch task: " << a << ".." << b << endl;
                     a += m;
                 }
@@ -1377,7 +1377,7 @@ void startMasterSlave(OperationContext* opCtx) {
 }
 int _dummy_z;
 
-void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
+void pretouchN(const std::vector<BSONObj>& v, unsigned a, unsigned b) {
     Client::initThreadIfNotAlready("pretouchN");
 
     const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();

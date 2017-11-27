@@ -454,7 +454,7 @@ void prefetchOp(const BSONObj& op) {
 void prefetchOps(const MultiApplier::Operations& ops, OldThreadPool* prefetcherPool) {
     invariant(prefetcherPool);
     for (auto&& op : ops) {
-        prefetcherPool->schedule(&prefetchOp, op.raw);
+        prefetcherPool->schedule([&] { prefetchOp(op.raw); });
     }
     prefetcherPool->join();
 }

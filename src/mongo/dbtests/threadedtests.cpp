@@ -129,7 +129,7 @@ public:
         OldThreadPool tp(nThreads);
 
         for (unsigned i = 0; i < iterations; i++) {
-            tp.schedule(&ThreadPoolTest::increment, this, 2);
+            tp.schedule([=] { increment(2); });
         }
 
         tp.join();

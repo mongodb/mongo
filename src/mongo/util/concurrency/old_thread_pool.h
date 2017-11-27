@@ -46,7 +46,7 @@ class OldThreadPool {
     MONGO_DISALLOW_COPYING(OldThreadPool);
 
 public:
-    typedef stdx::function<void(void)> Task;  // nullary function or functor
+    typedef stdx::function<void()> Task;  // nullary function or functor
     struct DoNotStartThreadsTag {};
 
     explicit OldThreadPool(int nThreads = 8, const std::string& threadNamePrefix = "");
@@ -68,29 +68,6 @@ public:
 
     // task will be copied a few times so make sure it's relatively cheap
     void schedule(Task task);
-
-    // Helpers that wrap schedule and stdx::bind.
-    // Functor and args will be copied a few times so make sure it's relatively cheap
-    template <typename F, typename A>
-    void schedule(F f, A a) {
-        schedule(stdx::bind(f, a));
-    }
-    template <typename F, typename A, typename B>
-    void schedule(F f, A a, B b) {
-        schedule(stdx::bind(f, a, b));
-    }
-    template <typename F, typename A, typename B, typename C>
-    void schedule(F f, A a, B b, C c) {
-        schedule(stdx::bind(f, a, b, c));
-    }
-    template <typename F, typename A, typename B, typename C, typename D>
-    void schedule(F f, A a, B b, C c, D d) {
-        schedule(stdx::bind(f, a, b, c, d));
-    }
-    template <typename F, typename A, typename B, typename C, typename D, typename E>
-    void schedule(F f, A a, B b, C c, D d, E e) {
-        schedule(stdx::bind(f, a, b, c, d, e));
-    }
 
 private:
     ThreadPool _pool;
