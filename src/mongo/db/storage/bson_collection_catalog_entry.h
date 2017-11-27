@@ -58,6 +58,8 @@ public:
 
     virtual void getAllIndexes(OperationContext* txn, std::vector<std::string>* names) const;
 
+    virtual void getReadyIndexes(OperationContext* txn, std::vector<std::string>* names) const;
+
     virtual bool isIndexMultikey(OperationContext* txn,
                                  StringData indexName,
                                  MultikeyPaths* multikeyPaths) const;

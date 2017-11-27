@@ -152,7 +152,7 @@ public:
         vector<string> indexNames;
         MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
             indexNames.clear();
-            cce->getAllIndexes(txn, &indexNames);
+            cce->getReadyIndexes(txn, &indexNames);
         }
         MONGO_WRITE_CONFLICT_RETRY_LOOP_END(txn, "listIndexes", ns.ns());
 

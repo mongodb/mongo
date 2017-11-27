@@ -64,6 +64,8 @@ public:
 
     virtual BSONObj getIndexSpec(OperationContext* txn, StringData idxName) const = 0;
 
+    virtual void getReadyIndexes(OperationContext* txn, std::vector<std::string>* names) const = 0;
+
     /**
      * Returns true if the index identified by 'indexName' is multikey, and returns false otherwise.
      *
