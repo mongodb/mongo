@@ -59,7 +59,7 @@ namespace {
 
 /**
  * Does a linear pass over the information cached in the specified chunk manager and extracts chunk
- * distrubution and chunk placement information which is needed by the balancer policy.
+ * distribution and chunk placement information which is needed by the balancer policy.
  */
 StatusWith<DistributionStatus> createCollectionDistributionStatus(
     OperationContext* opCtx, const ShardStatisticsVector& allShards, ChunkManager* chunkMgr) {
