@@ -27,4 +27,11 @@
     }, [], "");
 
     removeFile(dir);
+
+    // check that other internal path functions do not crash on ""
+    assert(pathExists("") === false, "expected pathExists to return false on empty path");
+    assert(copyDbpath("", "") === undefined,
+           "expected copyDbpath to return undefined on empty path");
+    assert(resetDbpath("") === undefined, "expected resetDbpath to return undefined on empty path");
+
 }());
