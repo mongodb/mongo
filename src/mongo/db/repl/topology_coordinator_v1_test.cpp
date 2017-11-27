@@ -38,7 +38,6 @@
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/topology_coordinator.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/db/server_options.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logger/logger.h"
@@ -74,9 +73,9 @@ bool stringContains(const std::string& haystack, const std::string& needle) {
 class TopoCoordTest : public mongo::unittest::Test {
 public:
     virtual void setUp() {
-        _options = TopologyCoordinatorImpl::Options{};
+        _options = TopologyCoordinator::Options{};
         _options.maxSyncSourceLagSecs = Seconds{100};
-        _topo.reset(new TopologyCoordinatorImpl(_options));
+        _topo.reset(new TopologyCoordinator(_options));
         _now = Date_t();
         _selfIndex = -1;
         _cbData.reset(new executor::TaskExecutor::CallbackArgs(
@@ -89,7 +88,7 @@ public:
     }
 
 protected:
-    TopologyCoordinatorImpl& getTopoCoord() {
+    TopologyCoordinator& getTopoCoord() {
         return *_topo;
     }
     executor::TaskExecutor::CallbackArgs cbData() {
@@ -99,9 +98,9 @@ protected:
         return _now;
     }
 
-    void setOptions(const TopologyCoordinatorImpl::Options& options) {
+    void setOptions(const TopologyCoordinator::Options& options) {
         _options = options;
-        _topo.reset(new TopologyCoordinatorImpl(_options));
+        _topo.reset(new TopologyCoordinator(_options));
     }
 
     int64_t countLogLinesContaining(const std::string& needle) {
@@ -252,12 +251,12 @@ private:
     }
 
 private:
-    unique_ptr<TopologyCoordinatorImpl> _topo;
+    unique_ptr<TopologyCoordinator> _topo;
     unique_ptr<executor::TaskExecutor::CallbackArgs> _cbData;
     ReplSetConfig _currentConfig;
     Date_t _now;
     int _selfIndex;
-    TopologyCoordinatorImpl::Options _options;
+    TopologyCoordinator::Options _options;
 };
 
 TEST_F(TopoCoordTest, NodeReturnsSecondaryWithMostRecentDataAsSyncSource) {
@@ -3179,7 +3178,7 @@ TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
 TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSupport) {
     ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-    TopologyCoordinatorImpl::Options options;
+    TopologyCoordinator::Options options;
     options.clusterRole = ClusterRole::ConfigServer;
     setOptions(options);
     getTopoCoord().setStorageEngineSupportsReadCommitted(false);
@@ -3206,7 +3205,7 @@ TEST_F(TopoCoordTest, NodeTransitionsToRemovedIfCSRSButHaveNoReadCommittedSuppor
 TEST_F(TopoCoordTest, NodeBecomesSecondaryAsNormalWhenReadCommittedSupportedAndCSRS) {
     ON_BLOCK_EXIT([]() { serverGlobalParams.clusterRole = ClusterRole::None; });
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-    TopologyCoordinatorImpl::Options options;
+    TopologyCoordinator::Options options;
     options.clusterRole = ClusterRole::ConfigServer;
     setOptions(options);
     getTopoCoord().setStorageEngineSupportsReadCommitted(true);

@@ -44,7 +44,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -138,8 +138,8 @@ void ReplCoordTest::init() {
     auto logicalClock = stdx::make_unique<LogicalClock>(service);
     LogicalClock::set(service, std::move(logicalClock));
 
-    TopologyCoordinatorImpl::Options settings;
-    auto topo = stdx::make_unique<TopologyCoordinatorImpl>(settings);
+    TopologyCoordinator::Options settings;
+    auto topo = stdx::make_unique<TopologyCoordinator>(settings);
     _topo = topo.get();
     auto net = stdx::make_unique<NetworkInterfaceMock>();
     _net = net.get();

@@ -55,7 +55,7 @@
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
 #include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_noop.h"

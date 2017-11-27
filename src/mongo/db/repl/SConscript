@@ -732,23 +732,13 @@ env.Library('topology_coordinator',
                 'topology_coordinator.cpp',
             ],
             LIBDEPS=[
-                'repl_coordinator_interface',
-                'replica_set_messages',
-                'rslog',
-                '$BUILD_DIR/mongo/rpc/metadata',
-            ])
-
-env.Library('topology_coordinator_impl',
-            [
-                'topology_coordinator_impl.cpp',
-            ],
-            LIBDEPS=[
                 '$BUILD_DIR/mongo/db/audit',
+                '$BUILD_DIR/mongo/rpc/metadata',
+                '$BUILD_DIR/mongo/util/fail_point',
                 'replica_set_messages',
                 'repl_settings',
                 'rslog',
-                'topology_coordinator',
-                '$BUILD_DIR/mongo/util/fail_point',
+                'repl_coordinator_interface',
             ])
 
 env.CppUnitTest('repl_set_heartbeat_response_test',
@@ -756,12 +746,12 @@ env.CppUnitTest('repl_set_heartbeat_response_test',
                 LIBDEPS=['replica_set_messages'])
 
 env.CppUnitTest(
-    target='topology_coordinator_impl_test',
+    target='topology_coordinator_test',
     source=[
-        'topology_coordinator_impl_test.cpp',
+        'topology_coordinator_test.cpp',
     ],
     LIBDEPS=[
-        'topology_coordinator_impl',
+        'topology_coordinator',
         'replica_set_messages',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
@@ -769,12 +759,12 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='topology_coordinator_impl_v1_test',
+    target='topology_coordinator_v1_test',
     source=[
-        'topology_coordinator_impl_v1_test.cpp',
+        'topology_coordinator_v1_test.cpp',
     ],
     LIBDEPS=[
-        'topology_coordinator_impl',
+        'topology_coordinator',
         'replica_set_messages',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
@@ -828,7 +818,7 @@ env.Library(
         'repl_coordinator_impl',
         'replmocks',
         'service_context_repl_mock_init',
-        'topology_coordinator_impl',
+        'topology_coordinator',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/executor/network_interface_mock',

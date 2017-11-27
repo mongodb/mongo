@@ -39,7 +39,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"

@@ -298,7 +298,7 @@ env.Library(
         'db/repair_database',
         'db/repl/repl_set_commands',
         'db/repl/storage_interface_impl',
-        'db/repl/topology_coordinator_impl',
+        'db/repl/topology_coordinator',
         'db/s/balancer',
         'db/serveronly',
         'db/service_context_d',
