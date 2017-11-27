@@ -449,11 +449,12 @@ Status addMongodOptions(moe::OptionSection* options) {
     // Sharding Options
 
     sharding_options
-        .addOptionChaining("configsvr",
-                           "configsvr",
-                           moe::Switch,
-                           "declare this is a config db of a cluster; default port 27019; "
-                           "default dir /data/configdb")
+        .addOptionChaining(
+            "configsvr",
+            "configsvr",
+            moe::Switch,
+            "declare this is a config db of a cluster; default port 27019; "
+            "default dir /data/configdb; requires starting this server as a replica set")
         .setSources(moe::SourceAllLegacy)
         .incompatibleWith("shardsvr")
         .incompatibleWith("nojournal");
@@ -462,7 +463,8 @@ Status addMongodOptions(moe::OptionSection* options) {
         .addOptionChaining("shardsvr",
                            "shardsvr",
                            moe::Switch,
-                           "declare this is a shard db of a cluster; default port 27018")
+                           "declare this is a shard db of a cluster; default port 27018; requires "
+                           "starting this server as a replica set")
         .setSources(moe::SourceAllLegacy)
         .incompatibleWith("configsvr")
         .incompatibleWith("master")
@@ -1198,6 +1200,18 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
     if (params.count("sharding.clusterRole")) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();
+
+        if (!(params.count("replication.replSet") || params.count("replication.replSetName")) &&
+            !Command::testCommandsEnabled) {
+            return {
+                ErrorCodes::InvalidOptions,
+                str::stream()
+                    << "Cannot start a "
+                    << clusterRoleParam
+                    << " as a standalone server. Please start this node as a replica "
+                       "set using --replSet or the config file option replication.replSetName."};
+        }
+
         if (clusterRoleParam == "configsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
 

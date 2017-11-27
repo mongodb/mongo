@@ -414,6 +414,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/storage/mmap_v1/mmap_v1_options',
+        'commands/test_commands_enabled',
         'repl/repl_settings',
         'server_options',
         'storage/storage_options',

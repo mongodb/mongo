@@ -37,14 +37,26 @@ expectedResult = {
 };
 testGetCmdLineOptsMongod({shardsvr: ""}, expectedResult);
 
-jsTest.log("Testing \"sharding.clusterRole\" config file option");
+jsTest.log("Testing \"sharding.clusterRole\" config file option with 'configsvr'");
 expectedResult = {
     "parsed": {
-        "config": "jstests/libs/config_files/set_shardingrole.json",
+        "config": "jstests/libs/config_files/set_shardingrole_configsvr.json",
+        "replication": {"replSetName": "dummy"},
         "sharding": {"clusterRole": "configsvr"}
     }
 };
-testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole.json"},
+testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole_configsvr.json"},
+                         expectedResult);
+
+jsTest.log("Testing \"sharding.clusterRole\" config file option with 'shardsvr'");
+expectedResult = {
+    "parsed": {
+        "config": "jstests/libs/config_files/set_shardingrole_shardsvr.json",
+        "replication": {"replSetName": "dummy"},
+        "sharding": {"clusterRole": "shardsvr"}
+    }
+};
+testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_shardingrole_shardsvr.json"},
                          expectedResult);
 
 // Test that we preserve switches explicitly set to false in config files.  See SERVER-13439.
