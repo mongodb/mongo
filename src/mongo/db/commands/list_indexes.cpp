@@ -154,7 +154,7 @@ public:
         vector<string> indexNames;
         writeConflictRetry(opCtx, "listIndexes", ns.ns(), [&indexNames, &cce, &opCtx] {
             indexNames.clear();
-            cce->getAllIndexes(opCtx, &indexNames);
+            cce->getReadyIndexes(opCtx, &indexNames);
         });
 
         auto ws = make_unique<WorkingSet>();

@@ -2,6 +2,9 @@
 
 (function() {
     "use strict";
+
+    load("jstests/noPassthrough/libs/index_build.js");
+
     const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
     assert.neq(null, conn, "mongod failed to start.");
     var db = conn.getDB("test");
@@ -55,7 +58,7 @@
             try {
                 // wait for indexing to start
                 assert.soon(function() {
-                    return 2 === t.getIndexes().length;
+                    return getIndexBuildOpId(db) != -1;
                 }, "no index created", 30000, 50);
                 assert.writeError(t.save({i: 0, n: true}));  // duplicate key violation
                 assert.writeOK(t.save({i: size - 1, n: true}));
