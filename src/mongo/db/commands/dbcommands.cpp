@@ -61,6 +61,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/shutdown.h"
+#include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -1256,13 +1257,21 @@ namespace {
 
 void _waitForWriteConcernAndAddToCommandResponse(OperationContext* opCtx,
                                                  const std::string& commandName,
+                                                 const repl::OpTime& lastOpBeforeRun,
                                                  BSONObjBuilder* commandResponseBuilder) {
+    auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
+    // Ensures that if we tried to do a write, we wait for write concern, even if that write was
+    // a noop.
+    if ((lastOpAfterRun == lastOpBeforeRun) &&
+        GlobalLockAcquisitionTracker::get(opCtx).getGlobalExclusiveLockTaken()) {
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    }
+
     WriteConcernResult res;
     auto waitForWCStatus =
-        waitForWriteConcern(opCtx,
-                            repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                            opCtx->getWriteConcern(),
-                            &res);
+        waitForWriteConcern(opCtx, lastOpAfterRun, opCtx->getWriteConcern(), &res);
     Command::appendCommandWCStatus(*commandResponseBuilder, waitForWCStatus, res);
 
     // SERVER-22421: This code is to ensure error response backwards compatibility with the
@@ -1558,13 +1567,17 @@ bool Command::run(OperationContext* txn,
             return result;
         }
 
+        auto lastOpBeforeRun = repl::ReplClientInfo::forClient(txn->getClient()).getLastOp();
+
         // Change the write concern while running the command.
         const auto oldWC = txn->getWriteConcern();
         ON_BLOCK_EXIT([&] { txn->setWriteConcern(oldWC); });
         txn->setWriteConcern(wcResult.getValue());
 
-        ON_BLOCK_EXIT(
-            [&] { _waitForWriteConcernAndAddToCommandResponse(txn, getName(), &inPlaceReplyBob); });
+        ON_BLOCK_EXIT([&] {
+            _waitForWriteConcernAndAddToCommandResponse(
+                txn, getName(), lastOpBeforeRun, &inPlaceReplyBob);
+        });
 
         result = run(txn, db, cmd, 0, errmsg, inPlaceReplyBob);
 
