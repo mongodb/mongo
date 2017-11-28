@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/string_data.h"
@@ -39,6 +41,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -119,7 +122,13 @@ Status ReplicationProcess::initializeRollbackID(OperationContext* opCtx) {
     // Leave _rbid uninitialized until the next getRollbackID() to retrieve the actual value
     // from storage.
 
-    return _storageInterface->initializeRollbackID(opCtx);
+    auto initRbidSW = _storageInterface->initializeRollbackID(opCtx);
+    if (initRbidSW.isOK()) {
+        log() << "Initialized the rollback ID to " << initRbidSW.getValue();
+    } else {
+        warning() << "Failed to initialize the rollback ID: " << initRbidSW.getStatus().reason();
+    }
+    return initRbidSW.getStatus();
 }
 
 Status ReplicationProcess::incrementRollbackID(OperationContext* opCtx) {
@@ -131,9 +140,12 @@ Status ReplicationProcess::incrementRollbackID(OperationContext* opCtx) {
     // storage next time getRollbackID() is called.
     if (status.isOK()) {
         _rbid = kUninitializedRollbackId;
+        log() << "Incremented the rollback ID to " << status.getValue();
+    } else {
+        warning() << "Failed to increment the rollback ID: " << status.getStatus().reason();
     }
 
-    return status;
+    return status.getStatus();
 }
 
 StatusWith<OpTime> ReplicationProcess::getRollbackProgress(OperationContext* opCtx) {

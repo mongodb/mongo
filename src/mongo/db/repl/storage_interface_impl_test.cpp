@@ -280,26 +280,28 @@ TEST_F(StorageInterfaceImplTest, RollbackIdInitializesIncrementsAndReadsProperly
     StorageInterfaceImpl storage;
     auto opCtx = getOperationContext();
 
+    // Rollback ID should be initialized to 1.
     ASSERT_OK(storage.initializeRollbackID(opCtx));
-    _assertRollbackIDDocument(opCtx, 0);
-
-    auto rbid = unittest::assertGet(storage.getRollbackID(opCtx));
-    ASSERT_EQUALS(rbid, 0);
-
-    ASSERT_OK(storage.incrementRollbackID(opCtx));
     _assertRollbackIDDocument(opCtx, 1);
 
-    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
+    auto rbid = unittest::assertGet(storage.getRollbackID(opCtx));
     ASSERT_EQUALS(rbid, 1);
 
+    // Rollback ID should increment by exactly 1 each time.
     ASSERT_OK(storage.incrementRollbackID(opCtx));
     _assertRollbackIDDocument(opCtx, 2);
 
     rbid = unittest::assertGet(storage.getRollbackID(opCtx));
     ASSERT_EQUALS(rbid, 2);
+
+    ASSERT_OK(storage.incrementRollbackID(opCtx));
+    _assertRollbackIDDocument(opCtx, 3);
+
+    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
+    ASSERT_EQUALS(rbid, 3);
 }
 
-TEST_F(StorageInterfaceImplTest, IncrementRollbackIDRollsToZeroWhenExceedingMaxInt) {
+TEST_F(StorageInterfaceImplTest, IncrementRollbackIDRollsToOneWhenExceedingMaxInt) {
     StorageInterfaceImpl storage;
     auto opCtx = getOperationContext();
     NamespaceString nss(StorageInterfaceImpl::kDefaultRollbackIdNamespace);
@@ -315,16 +317,16 @@ TEST_F(StorageInterfaceImplTest, IncrementRollbackIDRollsToZeroWhenExceedingMaxI
     ASSERT_EQUALS(rbid, std::numeric_limits<int>::max());
 
     ASSERT_OK(storage.incrementRollbackID(opCtx));
-    _assertRollbackIDDocument(opCtx, 0);
-
-    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
-    ASSERT_EQUALS(rbid, 0);
-
-    ASSERT_OK(storage.incrementRollbackID(opCtx));
     _assertRollbackIDDocument(opCtx, 1);
 
     rbid = unittest::assertGet(storage.getRollbackID(opCtx));
     ASSERT_EQUALS(rbid, 1);
+
+    ASSERT_OK(storage.incrementRollbackID(opCtx));
+    _assertRollbackIDDocument(opCtx, 2);
+
+    rbid = unittest::assertGet(storage.getRollbackID(opCtx));
+    ASSERT_EQUALS(rbid, 2);
 }
 
 TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfDocumentHasBadField) {

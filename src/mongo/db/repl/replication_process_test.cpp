@@ -246,4 +246,21 @@ TEST_F(ReplicationProcessTest,
                   replicationProcess.clearRollbackProgress(opCtx.get()));
 }
 
+TEST_F(ReplicationProcessTest, RollbackIDIncrementsBy1) {
+    auto opCtx = makeOpCtx();
+    ReplicationProcess replicationProcess(
+        _storageInterface.get(),
+        stdx::make_unique<ReplicationConsistencyMarkersImpl>(_storageInterface.get()),
+        stdx::make_unique<ReplicationRecoveryMock>());
+
+    // We make no assumptions about the initial value of the rollback ID.
+    ASSERT_OK(replicationProcess.initializeRollbackID(opCtx.get()));
+    int initRBID = unittest::assertGet(replicationProcess.getRollbackID(opCtx.get()));
+
+    // Make sure the rollback ID is incremented by exactly 1.
+    ASSERT_OK(replicationProcess.incrementRollbackID(opCtx.get()));
+    int rbid = unittest::assertGet(replicationProcess.getRollbackID(opCtx.get()));
+    ASSERT_EQ(rbid, initRBID + 1);
+}
+
 }  // namespace

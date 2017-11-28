@@ -53,8 +53,8 @@ public:
     StorageInterfaceImpl();
 
     StatusWith<int> getRollbackID(OperationContext* opCtx) override;
-    Status initializeRollbackID(OperationContext* opCtx) override;
-    Status incrementRollbackID(OperationContext* opCtx) override;
+    StatusWith<int> initializeRollbackID(OperationContext* opCtx) override;
+    StatusWith<int> incrementRollbackID(OperationContext* opCtx) override;
 
     /**
      *  Allocates a new TaskRunner for use by the passed in collection.
