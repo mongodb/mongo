@@ -6,7 +6,6 @@ t.drop();
 t.ensureIndex({loc: "2dsphere"});
 
 // The test matrix. Some combinations are not supported:
-//     2d       index and minDistance.
 //     2d       index and GeoJSON
 //     2dsphere index and spherical=false
 var indexTypes = ['2d', '2dsphere'], pointTypes = [{type: 'Point', coordinates: [0, 0]}, [0, 0]],
@@ -30,8 +29,7 @@ indexTypes.forEach(function(indexType) {
                 }
 
                 // Unsupported combinations should return errors.
-                if ((indexType == '2d' && optionName == 'minDistance') ||
-                    (indexType == '2d' && !isLegacy) || (indexType == '2dsphere' && !spherical)) {
+                if ((indexType == '2d' && !isLegacy) || (indexType == '2dsphere' && !spherical)) {
                     assert.commandFailed(db.runCommand(makeCommand(1)),
                                          "geoNear with spherical=" + spherical + " and " +
                                              indexType + " index and " + pointDescription +

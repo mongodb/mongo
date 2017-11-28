@@ -20,6 +20,9 @@
 
 (function() {
     "use strict";
+
+    load("jstests/libs/geo_math.js");
+
     const conn = MongoRunner.runMongod({smallfiles: "", nojournal: ""});
     assert.neq(null, conn, "mongod failed to start.");
     const db = conn.getDB("test");
@@ -105,13 +108,6 @@
 
         return {numDocs: numDocs, maxLocs: maxLocs};
     };
-
-    function deg2rad(arg) {
-        return arg * Math.PI / 180.0;
-    }
-    function rad2deg(arg) {
-        return arg * 180.0 / Math.PI;
-    }
 
     function computexscandist(latDegrees, maxDistDegrees) {
         // See s2cap.cc

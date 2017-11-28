@@ -153,7 +153,6 @@ public:
         }
 
         if (!cmdObj["minDistance"].eoo()) {
-            uassert(17298, "minDistance doesn't work on 2d index", !using2DIndex);
             uassert(17300, "minDistance must be a number", cmdObj["minDistance"].isNumber());
             nearBob.append("$minDistance", cmdObj["minDistance"].number());
         }
