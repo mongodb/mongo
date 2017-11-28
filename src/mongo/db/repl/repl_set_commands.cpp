@@ -744,20 +744,6 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        /* we want to keep heartbeat connections open when relinquishing primary.
-           tag them here. */
-        auto session = opCtx->getClient()->session();
-        if (session) {
-            session->setTags(transport::Session::kKeepOpen);
-        }
-
-        // Unset the tag on block exit
-        ON_BLOCK_EXIT([session]() {
-            if (session) {
-                session->unsetTags(transport::Session::kKeepOpen);
-            }
-        });
-
         // Process heartbeat based on the version of request. The missing fields in mismatched
         // version will be empty.
         if (isHeartbeatRequestV1(cmdObj)) {
