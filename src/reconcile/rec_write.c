@@ -5675,10 +5675,10 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 			    session, r, WT_INSERT_KEY_SIZE(ins)));
 
 			/*
-			 * Turn off prefix compression until a full key is
-			 * written into the new page.
+			 * Turn off prefix and suffix compression until a full
+			 * key is written into the new page.
 			 */
-			r->key_pfx_compress = false;
+			r->key_pfx_compress = r->key_sfx_compress = false;
 			continue;
 		}
 
