@@ -592,7 +592,9 @@ bool LockManager::unlock(LockRequest* request) {
         lock->decGrantedModeCount(request->mode);
 
         if (request->compatibleFirst) {
+            invariant(lock->compatibleFirstCount > 0);
             lock->compatibleFirstCount--;
+            invariant(lock->compatibleFirstCount == 0 || !lock->grantedList.empty());
         }
 
         _onLockModeChanged(lock, lock->grantedCounts[request->mode] == 0);
