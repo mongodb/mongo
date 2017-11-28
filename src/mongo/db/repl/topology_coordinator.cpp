@@ -74,25 +74,13 @@ MONGO_FP_DECLARE(disableMaxSyncSourceLagSecs);
 
 constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPing;
 
-namespace {
-constexpr int kLeaderValue = 0;
-constexpr int kFollowerValue = 1;
-constexpr int kCandidateValue = 2;
-}  // namespace
-
-const TopologyCoordinator::Role TopologyCoordinator::Role::leader(kLeaderValue);
-const TopologyCoordinator::Role TopologyCoordinator::Role::follower(kFollowerValue);
-const TopologyCoordinator::Role TopologyCoordinator::Role::candidate(kCandidateValue);
-
-TopologyCoordinator::Role::Role(int value) : _value(value) {}
-
-std::string TopologyCoordinator::Role::toString() const {
-    switch (_value) {
-        case kLeaderValue:
+std::string TopologyCoordinator::roleToString(TopologyCoordinator::Role role) {
+    switch (role) {
+        case TopologyCoordinator::Role::kLeader:
             return "leader";
-        case kFollowerValue:
+        case TopologyCoordinator::Role::kFollower:
             return "follower";
-        case kCandidateValue:
+        case TopologyCoordinator::Role::kCandidate:
             return "candidate";
     }
     invariant(false);
@@ -101,7 +89,7 @@ std::string TopologyCoordinator::Role::toString() const {
 TopologyCoordinator::~TopologyCoordinator() {}
 
 std::ostream& operator<<(std::ostream& os, TopologyCoordinator::Role role) {
-    return os << role.toString();
+    return os << TopologyCoordinator::roleToString(role);
 }
 
 std::ostream& operator<<(std::ostream& os,
@@ -175,7 +163,7 @@ void TopologyCoordinator::PingStats::miss() {
 }
 
 TopologyCoordinator::TopologyCoordinator(Options options)
-    : _role(Role::follower),
+    : _role(Role::kFollower),
       _term(OpTime::kUninitializedTerm),
       _currentPrimaryIndex(-1),
       _forceSyncSourceIndex(-1),
@@ -1569,9 +1557,9 @@ Status TopologyCoordinator::checkShouldStandForElection(Date_t now) const {
     if (_currentPrimaryIndex != -1) {
         return {ErrorCodes::NodeNotElectable, "Not standing for election since there is a Primary"};
     }
-    invariant(_role != Role::leader);
+    invariant(_role != Role::kLeader);
 
-    if (_role == Role::candidate) {
+    if (_role == Role::kCandidate) {
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already candidate"};
     }
 
@@ -1708,7 +1696,7 @@ bool TopologyCoordinator::_amIFreshEnoughForCatchupTakeover() const {
 }
 
 bool TopologyCoordinator::_iAmPrimary() const {
-    if (_role == Role::leader) {
+    if (_role == Role::kLeader) {
         invariant(_currentPrimaryIndex == _selfIndex);
         invariant(_leaderMode != LeaderMode::kNotLeader);
         return true;
@@ -1803,15 +1791,15 @@ void TopologyCoordinator::changeMemberState_forTest(const MemberState& newMember
         return;
     switch (newMemberState.s) {
         case MemberState::RS_PRIMARY:
-            _role = Role::candidate;
+            _role = Role::kCandidate;
             processWinElection(OID(), electionTime);
-            invariant(_role == Role::leader);
+            invariant(_role == Role::kLeader);
             break;
         case MemberState::RS_SECONDARY:
         case MemberState::RS_ROLLBACK:
         case MemberState::RS_RECOVERING:
         case MemberState::RS_STARTUP2:
-            _role = Role::follower;
+            _role = Role::kFollower;
             _followerMode = newMemberState.s;
             if (_currentPrimaryIndex == _selfIndex) {
                 _currentPrimaryIndex = -1;
@@ -2184,10 +2172,10 @@ void TopologyCoordinator::fillIsMasterForReplSet(IsMasterResponse* response) {
 
 StatusWith<TopologyCoordinator::PrepareFreezeResponseResult>
 TopologyCoordinator::prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder* response) {
-    if (_role != TopologyCoordinator::Role::follower) {
+    if (_role != TopologyCoordinator::Role::kFollower) {
         std::string msg = str::stream()
             << "cannot freeze node when primary or running for election. state: "
-            << (_role == TopologyCoordinator::Role::leader ? "Primary" : "Running-Election");
+            << (_role == TopologyCoordinator::Role::kLeader ? "Primary" : "Running-Election");
         log() << msg;
         return Status(ErrorCodes::NotSecondary, msg);
     }
@@ -2202,7 +2190,7 @@ TopologyCoordinator::prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder*
             // we're electable, we're not in maintenance mode, and we are currently in followerMode
             // SECONDARY, we must transition to candidate now that our stepdown period
             // is no longer active, in leiu of heartbeats.
-            _role = Role::candidate;
+            _role = Role::kCandidate;
             return PrepareFreezeResponseResult::kElectSelf;
         }
     } else {
@@ -2225,7 +2213,7 @@ bool TopologyCoordinator::becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Da
         // If the new config describes a one-node replica set, we're the one member,
         // we're electable, we're not in maintenance mode, and we are currently in followerMode
         // SECONDARY, we must transition to candidate, in leiu of heartbeats.
-        _role = Role::candidate;
+        _role = Role::kCandidate;
         return true;
     }
     return false;
@@ -2302,7 +2290,7 @@ void TopologyCoordinator::_updateHeartbeatDataForReconfig(const ReplSetConfig& n
 // This function installs a new config object and recreates MemberData objects
 // that reflect the new config.
 void TopologyCoordinator::updateConfig(const ReplSetConfig& newConfig, int selfIndex, Date_t now) {
-    invariant(_role != Role::candidate);
+    invariant(_role != Role::kCandidate);
     invariant(selfIndex < newConfig.getNumMembers());
 
     // Reset term on startup and upgrade/downgrade of protocol version.
@@ -2322,7 +2310,7 @@ void TopologyCoordinator::updateConfig(const ReplSetConfig& newConfig, int selfI
     _selfIndex = selfIndex;
     _forceSyncSourceIndex = -1;
 
-    if (_role == Role::leader) {
+    if (_role == Role::kLeader) {
         if (_selfIndex == -1) {
             log() << "Could not remain primary because no longer a member of the replica set";
         } else if (!_selfConfig().isElectable()) {
@@ -2332,18 +2320,18 @@ void TopologyCoordinator::updateConfig(const ReplSetConfig& newConfig, int selfI
             _currentPrimaryIndex = _selfIndex;
             return;
         }
-        _role = Role::follower;
+        _role = Role::kFollower;
         _setLeaderMode(LeaderMode::kNotLeader);
     }
 
-    // By this point we know we are in Role::follower
+    // By this point we know we are in Role::kFollower
     _currentPrimaryIndex = -1;  // force secondaries to re-detect who the primary is
 
     if (_isElectableNodeInSingleNodeReplicaSet()) {
         // If the new config describes a one-node replica set, we're the one member,
         // we're electable, we're not in maintenance mode and we are currently in followerMode
         // SECONDARY, we must transition to candidate, in leiu of heartbeats.
-        _role = Role::candidate;
+        _role = Role::kCandidate;
     }
 }
 std::string TopologyCoordinator::_getHbmsg(Date_t now) const {
@@ -2591,7 +2579,7 @@ std::vector<HostAndPort> TopologyCoordinator::getMaybeUpHostAndPorts() const {
 }
 
 bool TopologyCoordinator::voteForMyself(Date_t now) {
-    if (_role != Role::candidate) {
+    if (_role != Role::kCandidate) {
         return false;
     }
     int selfId = _selfConfig().getId();
@@ -2663,7 +2651,7 @@ MemberState TopologyCoordinator::getMemberState() const {
         }
     }
 
-    if (_role == Role::leader) {
+    if (_role == Role::kLeader) {
         invariant(_currentPrimaryIndex == _selfIndex);
         invariant(_leaderMode != LeaderMode::kNotLeader);
         return MemberState::RS_PRIMARY;
@@ -2684,15 +2672,15 @@ bool TopologyCoordinator::canAcceptWrites() const {
 }
 
 void TopologyCoordinator::setElectionInfo(OID electionId, Timestamp electionOpTime) {
-    invariant(_role == Role::leader);
+    invariant(_role == Role::kLeader);
     _electionTime = electionOpTime;
     _electionId = electionId;
 }
 
 void TopologyCoordinator::processWinElection(OID electionId, Timestamp electionOpTime) {
-    invariant(_role == Role::candidate);
+    invariant(_role == Role::kCandidate);
     invariant(_leaderMode == LeaderMode::kNotLeader);
-    _role = Role::leader;
+    _role = Role::kLeader;
     _setLeaderMode(LeaderMode::kLeaderElect);
     setElectionInfo(electionId, electionOpTime);
     _currentPrimaryIndex = _selfIndex;
@@ -2704,12 +2692,12 @@ void TopologyCoordinator::processWinElection(OID electionId, Timestamp electionO
 }
 
 void TopologyCoordinator::processLoseElection() {
-    invariant(_role == Role::candidate);
+    invariant(_role == Role::kCandidate);
     invariant(_leaderMode == LeaderMode::kNotLeader);
     const HostAndPort syncSourceAddress = getSyncSourceAddress();
     _electionTime = Timestamp(0, 0);
     _electionId = OID();
-    _role = Role::follower;
+    _role = Role::kFollower;
 
     // Clear voteLease time, if we voted for ourselves in this election.
     // This will allow us to vote for others.
@@ -2721,7 +2709,8 @@ void TopologyCoordinator::processLoseElection() {
 bool TopologyCoordinator::attemptStepDown(
     long long termAtStart, Date_t now, Date_t waitUntil, Date_t stepDownUntil, bool force) {
 
-    if (_role != Role::leader || _leaderMode == LeaderMode::kSteppingDown || _term != termAtStart) {
+    if (_role != Role::kLeader || _leaderMode == LeaderMode::kSteppingDown ||
+        _term != termAtStart) {
         uasserted(ErrorCodes::PrimarySteppedDown,
                   "While waiting for secondaries to catch up before stepping down, "
                   "this node decided to step down for other reasons");
@@ -2799,7 +2788,7 @@ bool TopologyCoordinator::isSafeToStepDown() {
 }
 
 void TopologyCoordinator::setFollowerMode(MemberState::MS newMode) {
-    invariant(_role == Role::follower);
+    invariant(_role == Role::kFollower);
     switch (newMode) {
         case MemberState::RS_RECOVERING:
         case MemberState::RS_ROLLBACK:
@@ -2820,7 +2809,7 @@ void TopologyCoordinator::setFollowerMode(MemberState::MS newMode) {
     // heartbeats that would normally change the role to candidate.
 
     if (_isElectableNodeInSingleNodeReplicaSet()) {
-        _role = Role::candidate;
+        _role = Role::kCandidate;
     }
 }
 
@@ -2856,12 +2845,12 @@ void TopologyCoordinator::finishUnconditionalStepDown() {
 }
 
 void TopologyCoordinator::_stepDownSelfAndReplaceWith(int newPrimary) {
-    invariant(_role == Role::leader);
+    invariant(_role == Role::kLeader);
     invariant(_selfIndex != -1);
     invariant(_selfIndex != newPrimary);
     invariant(_selfIndex == _currentPrimaryIndex);
     _currentPrimaryIndex = newPrimary;
-    _role = Role::follower;
+    _role = Role::kFollower;
     _setLeaderMode(LeaderMode::kNotLeader);
 }
 
@@ -2954,7 +2943,7 @@ Status TopologyCoordinator::completeTransitionToPrimary(const OpTime& firstOpTim
 }
 
 void TopologyCoordinator::adjustMaintenanceCountBy(int inc) {
-    invariant(_role == Role::follower);
+    invariant(_role == Role::kFollower);
     _maintenanceModeCalls += inc;
     invariant(_maintenanceModeCalls >= 0);
 }
@@ -3208,11 +3197,11 @@ void TopologyCoordinator::setPrimaryIndex(long long primaryIndex) {
 
 Status TopologyCoordinator::becomeCandidateIfElectable(const Date_t now,
                                                        StartElectionReason reason) {
-    if (_role == Role::leader) {
+    if (_role == Role::kLeader) {
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already primary"};
     }
 
-    if (_role == Role::candidate) {
+    if (_role == Role::kCandidate) {
         return {ErrorCodes::NodeNotElectable, "Not standing for election again; already candidate"};
     }
 
@@ -3224,7 +3213,7 @@ Status TopologyCoordinator::becomeCandidateIfElectable(const Date_t now,
     }
 
     // All checks passed, become a candidate and start election proceedings.
-    _role = Role::candidate;
+    _role = Role::kCandidate;
 
     return Status::OK();
 }

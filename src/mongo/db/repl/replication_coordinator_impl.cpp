@@ -882,7 +882,7 @@ Status ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) 
     if (newState == _topCoord->getMemberState()) {
         return Status::OK();
     }
-    if (_topCoord->getRole() == TopologyCoordinator::Role::leader) {
+    if (_topCoord->getRole() == TopologyCoordinator::Role::kLeader) {
         return Status(ErrorCodes::NotSecondary,
                       "Cannot set follower mode when node is currently the leader");
     }
@@ -2164,7 +2164,7 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
     }
 
     stdx::unique_lock<stdx::mutex> lk(_mutex);
-    if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+    if (_topCoord->getRole() == TopologyCoordinator::Role::kCandidate) {
         return Status(ErrorCodes::NotSecondary, "currently running for election");
     }
 
@@ -2178,7 +2178,7 @@ Status ReplicationCoordinatorImpl::setMaintenanceMode(bool activate) {
               << " other maintenance mode tasks in progress" << rsLog;
         _topCoord->adjustMaintenanceCountBy(1);
     } else if (curMaintenanceCalls > 0) {
-        invariant(_topCoord->getRole() == TopologyCoordinator::Role::follower);
+        invariant(_topCoord->getRole() == TopologyCoordinator::Role::kFollower);
 
         _topCoord->adjustMaintenanceCountBy(-1);
 
@@ -2572,7 +2572,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
 
     const MemberState newState = _topCoord->getMemberState();
     if (newState == _memberState) {
-        if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+        if (_topCoord->getRole() == TopologyCoordinator::Role::kCandidate) {
             invariant(_rsConfig.getNumMembers() == 1 && _selfIndex == 0 &&
                       _rsConfig.getMemberAt(0).isElectable());
             if (isV1ElectionProtocol()) {
@@ -2619,7 +2619,7 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
         _canServeNonLocalReads.store(1U);
     }
 
-    if (newState.secondary() && _topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+    if (newState.secondary() && _topCoord->getRole() == TopologyCoordinator::Role::kCandidate) {
         // When transitioning to SECONDARY, the only way for _topCoord to report the candidate
         // role is if the configuration represents a single-node replica set.  In that case, the
         // overriding requirement is to elect this singleton node primary.
@@ -3750,7 +3750,7 @@ void ReplicationCoordinatorImpl::setIndexPrefetchConfig(
 }
 
 executor::TaskExecutor::EventHandle ReplicationCoordinatorImpl::_cancelElectionIfNeeded_inlock() {
-    if (_topCoord->getRole() != TopologyCoordinator::Role::candidate) {
+    if (_topCoord->getRole() != TopologyCoordinator::Role::kCandidate) {
         return {};
     }
     if (isV1ElectionProtocol()) {
