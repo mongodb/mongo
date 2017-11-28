@@ -1058,6 +1058,24 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
     invariant(!fixUpInfo.commonPointOurDiskloc.isNull());
 
+    // Rolls back createIndexes commands by dropping the indexes that were created. It is
+    // necessary to roll back createIndexes commands before dropIndexes commands because
+    // it is possible that we previously dropped an index with the same name but a different
+    // index spec. If we attempt to re-create an index that has the same name as an existing
+    // index, the operation will fail. Thus, we roll back createIndexes commands first in
+    // order to ensure that no collisions will occur when we re-create previously dropped
+    // indexes.
+    // We drop indexes before renaming collections so that if a collection name gets longer,
+    // any indexes with names that are now too long will already be dropped.
+    log() << "Rolling back createIndexes commands.";
+    for (auto it = fixUpInfo.indexesToDrop.begin(); it != fixUpInfo.indexesToDrop.end(); it++) {
+
+        UUID uuid = it->first;
+        std::set<std::string> indexNames = it->second;
+
+        rollbackCreateIndexes(opCtx, uuid, indexNames);
+    }
+
     log() << "Dropping collections to roll back create operations";
 
     // Drops collections before updating individual documents. We drop these collections before
@@ -1215,22 +1233,6 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         // minValid if necessary.
         log() << "Rechecking the Rollback ID and minValid";
         checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, replicationProcess);
-    }
-
-    // Rolls back createIndexes commands by dropping the indexes that were created. It is
-    // necessary to roll back createIndexes commands before dropIndexes commands because
-    // it is possible that we previously dropped an index with the same name but a different
-    // index spec. If we attempt to re-create an index that has the same name as an existing
-    // index, the operation will fail. Thus, we roll back createIndexes commands first in
-    // order to ensure that no collisions will occur when we re-create previously dropped
-    // indexes.
-    log() << "Rolling back createIndexes commands.";
-    for (auto it = fixUpInfo.indexesToDrop.begin(); it != fixUpInfo.indexesToDrop.end(); it++) {
-
-        UUID uuid = it->first;
-        std::set<std::string> indexNames = it->second;
-
-        rollbackCreateIndexes(opCtx, uuid, indexNames);
     }
 
     // Rolls back dropIndexes commands by re-creating the indexes that were dropped.
