@@ -30,6 +30,7 @@
 
 #include "mongo/util/net/ssl_manager.h"
 
+#include "mongo/config.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
