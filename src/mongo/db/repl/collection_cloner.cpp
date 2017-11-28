@@ -79,8 +79,12 @@ MONGO_FP_DECLARE(initialSyncHangBeforeCollectionClone);
 MONGO_FP_DECLARE(initialSyncHangDuringCollectionClone);
 
 // Failpoint which causes initial sync to hang after handling the next batch of results from the
-// 'AsyncResultsMerger' for a specific collection.
+// 'AsyncResultsMerger', optionally limited to a specific collection.
 MONGO_FP_DECLARE(initialSyncHangCollectionClonerAfterHandlingBatchResponse);
+
+// Failpoint which causes initial sync to hang before establishing the cursors (but after
+// listIndexes), optionally limited to a specific collection.
+MONGO_FP_DECLARE(initialSyncHangCollectionClonerBeforeEstablishingCursor);
 
 BSONObj makeCommandWithUUIDorCollectionName(StringData command,
                                             OptionalCollectionUUID uuid,
@@ -249,6 +253,10 @@ void CollectionCloner::_cancelRemainingWork_inlock() {
     _listIndexesFetcher.shutdown();
     if (_establishCollectionCursorsScheduler) {
         _establishCollectionCursorsScheduler->shutdown();
+    }
+    if (_verifyCollectionDroppedScheduler) {
+        _verifyCollectionDroppedScheduler->shutdown();
+        _verifyCollectionDroppedScheduler.reset();
     }
     _dbWorkTaskRunner.cancel();
 }
@@ -441,6 +449,20 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
         _finishCallback(cbd.status);
         return;
     }
+    MONGO_FAIL_POINT_BLOCK(initialSyncHangCollectionClonerBeforeEstablishingCursor, nssData) {
+        const BSONObj& data = nssData.getData();
+        auto nss = data["nss"].str();
+        // Only hang when cloning the specified collection, or if no collection was specified.
+        if (nss.empty() || _destNss.toString() == nss) {
+            while (MONGO_FAIL_POINT(initialSyncHangCollectionClonerBeforeEstablishingCursor) &&
+                   !_isShuttingDown()) {
+                log() << "initialSyncHangCollectionClonerBeforeEstablishingCursor fail point "
+                         "enabled for "
+                      << _destNss.toString() << ". Blocking until fail point is disabled.";
+                mongo::sleepsecs(1);
+            }
+        }
+    }
     if (!_idIndexSpec.isEmpty() && _options.autoIndexId == CollectionOptions::NO) {
         warning()
             << "Found the _id_ index spec but the collection specified autoIndexId of false on ns:"
@@ -627,6 +649,8 @@ void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCa
     _clusterClientCursorParams =
         stdx::make_unique<ClusterClientCursorParams>(_sourceNss, UserNameIterator());
     _clusterClientCursorParams->remotes = std::move(remoteCursors);
+    if (_collectionCloningBatchSize > 0)
+        _clusterClientCursorParams->batchSize = _collectionCloningBatchSize;
     Client::initThreadIfNotAlready();
     _arm = stdx::make_unique<AsyncResultsMerger>(
         cc().getOperationContext(), _executor, _clusterClientCursorParams.get());
@@ -734,7 +758,17 @@ void CollectionCloner::_handleARMResultsCallback(
         UniqueLock lk(_mutex);
         auto nextBatchStatus = _bufferNextBatchFromArm(lk);
         if (!nextBatchStatus.isOK()) {
-            onCompletionGuard->setResultAndCancelRemainingWork_inlock(lk, nextBatchStatus);
+            if (_options.uuid && (nextBatchStatus.code() == ErrorCodes::OperationFailed ||
+                                  nextBatchStatus.code() == ErrorCodes::CursorNotFound)) {
+                // With these errors, it's possible the collection was dropped while we were
+                // cloning.  If so, we'll execute the drop during oplog application, so it's OK to
+                // just stop cloning.  This is only safe if cloning by UUID; if we are cloning by
+                // name, we have no way to detect if the collection was dropped and another
+                // collection with the same name created in the interim.
+                _verifyCollectionWasDropped(lk, nextBatchStatus, onCompletionGuard, cbd.opCtx);
+            } else {
+                onCompletionGuard->setResultAndCancelRemainingWork_inlock(lk, nextBatchStatus);
+            }
             return;
         }
 
@@ -762,13 +796,13 @@ void CollectionCloner::_handleARMResultsCallback(
     MONGO_FAIL_POINT_BLOCK(initialSyncHangCollectionClonerAfterHandlingBatchResponse, nssData) {
         const BSONObj& data = nssData.getData();
         auto nss = data["nss"].str();
-        // Only hang when cloning the specified collection.
-        if (_destNss.toString() == nss) {
+        // Only hang when cloning the specified collection, or if no collection was specified.
+        if (nss.empty() || _destNss.toString() == nss) {
             while (MONGO_FAIL_POINT(initialSyncHangCollectionClonerAfterHandlingBatchResponse) &&
                    !_isShuttingDown()) {
                 log() << "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point "
                          "enabled for "
-                      << nss << ". Blocking until fail point is disabled.";
+                      << _destNss.toString() << ". Blocking until fail point is disabled.";
                 mongo::sleepsecs(1);
             }
         }
@@ -782,6 +816,74 @@ void CollectionCloner::_handleARMResultsCallback(
             setResultAndCancelRemainingWork(onCompletionGuard, scheduleStatus);
             return;
         }
+    }
+}
+
+void CollectionCloner::_verifyCollectionWasDropped(
+    const stdx::unique_lock<stdx::mutex>& lk,
+    Status batchStatus,
+    std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+    OperationContext* opCtx) {
+    // If we already have a _verifyCollectionDroppedScheduler, just return; the existing
+    // scheduler will take care of cleaning up.
+    if (_verifyCollectionDroppedScheduler) {
+        return;
+    }
+    BSONObjBuilder cmdObj;
+    _options.uuid->appendToBuilder(&cmdObj, "find");
+    cmdObj.append("batchSize", 0);
+    _verifyCollectionDroppedScheduler = stdx::make_unique<RemoteCommandRetryScheduler>(
+        _executor,
+        RemoteCommandRequest(_source,
+                             _sourceNss.db().toString(),
+                             cmdObj.obj(),
+                             ReadPreferenceSetting::secondaryPreferredMetadata(),
+                             opCtx,
+                             RemoteCommandRequest::kNoTimeout),
+        [this, opCtx, batchStatus, onCompletionGuard](const RemoteCommandCallbackArgs& args) {
+            // If the attempt to determine if the collection was dropped fails for any reason other
+            // than NamespaceNotFound, return the original error code.
+            //
+            // Otherwise, if the collection was dropped, either the error will be NamespaceNotFound,
+            // or it will be a drop-pending collection and the find will succeed and give us a
+            // collection with a drop-pending name.
+            UniqueLock lk(_mutex);
+            Status finalStatus(batchStatus);
+            if (args.response.isOK()) {
+                auto response = CursorResponse::parseFromBSON(args.response.data);
+                if (response.getStatus().code() == ErrorCodes::NamespaceNotFound ||
+                    (response.isOK() && response.getValue().getNSS().isDropPendingNamespace())) {
+                    log() << "CollectionCloner ns: '" << _sourceNss.ns() << "' uuid: UUID(\""
+                          << *_options.uuid << "\") stopped because collection was dropped.";
+                    finalStatus = Status::OK();
+                } else if (!response.isOK()) {
+                    log() << "CollectionCloner received an unexpected error when verifying drop of "
+                             "ns: '"
+                          << _sourceNss.ns() << "' uuid: UUID(\"" << *_options.uuid
+                          << "\"), status " << response.getStatus();
+                }
+            } else {
+                log() << "CollectionCloner is unable to verify drop of ns: '" << _sourceNss.ns()
+                      << "' uuid: UUID(\"" << *_options.uuid << "\"), status "
+                      << args.response.status;
+            }
+            // Because setResultAndCancelRemainingWork destroys the RemoteCommandRetryScheduler, it
+            // must be done outside this callback.
+            auto result = _executor->scheduleWork([this, finalStatus, onCompletionGuard](
+                const executor::TaskExecutor::CallbackArgs& args) {
+                UniqueLock lk(_mutex);
+                onCompletionGuard->setResultAndCancelRemainingWork_inlock(lk, finalStatus);
+            });
+            invariant(result.isOK() || result.getStatus().code() == ErrorCodes::ShutdownInProgress);
+        },
+        RemoteCommandRetryScheduler::makeNoRetryPolicy());
+
+    auto status = _verifyCollectionDroppedScheduler->startup();
+    if (!status.isOK()) {
+        log() << "CollectionCloner is unable to start verification of ns: '" << _sourceNss.ns()
+              << "' uuid: UUID(\"" << *_options.uuid << "\"), status " << status;
+        // If we can't run the command, assume this wasn't a drop and just use the original error.
+        onCompletionGuard->setResultAndCancelRemainingWork_inlock(lk, batchStatus);
     }
 }
 

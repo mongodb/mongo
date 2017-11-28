@@ -63,11 +63,10 @@ const char* kNameFieldName = "name";
 const char* kOptionsFieldName = "options";
 const char* kInfoFieldName = "info";
 const char* kUUIDFieldName = "uuid";
-// 16MB max batch size / 12 byte min doc size * 10 (for good measure) = defaultBatchSize to use.
-const auto defaultBatchSize = (16 * 1024 * 1024) / 12 * 10;
 
 // The batchSize to use for the find/getMore queries called by the CollectionCloner
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(collectionClonerBatchSize, int, defaultBatchSize);
+constexpr int kUseARMDefaultBatchSize = -1;
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(collectionClonerBatchSize, int, kUseARMDefaultBatchSize);
 
 // The number of attempts for the listCollections commands.
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListCollectionsAttempts, int, 3);

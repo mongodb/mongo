@@ -251,6 +251,15 @@ private:
                                   std::shared_ptr<OnCompletionGuard> onCompletionGuard);
 
     /**
+     * Verifies that an error from the ARM was the result of a collection drop.  If
+     * so, cloning is stopped with no error.  Otherwise it is stopped with the given error.
+     */
+    void _verifyCollectionWasDropped(const stdx::unique_lock<stdx::mutex>& lk,
+                                     Status batchStatus,
+                                     std::shared_ptr<OnCompletionGuard> onCompletionGuard,
+                                     OperationContext* opCtx);
+
+    /**
      * Reports completion status.
      * Commits/aborts collection building.
      * Sets cloner to inactive.
@@ -303,6 +312,9 @@ private:
 
     // (M) Scheduler used to establish the initial cursor or set of cursors.
     std::unique_ptr<RemoteCommandRetryScheduler> _establishCollectionCursorsScheduler;
+
+    // (M) Scheduler used to determine if a cursor was closed because the collection was dropped.
+    std::unique_ptr<RemoteCommandRetryScheduler> _verifyCollectionDroppedScheduler;
 
     // State transitions:
     // PreStart --> Running --> ShuttingDown --> Complete
