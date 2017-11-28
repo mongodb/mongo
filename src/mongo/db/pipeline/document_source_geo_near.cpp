@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -47,6 +48,8 @@ REGISTER_DOCUMENT_SOURCE(geoNear,
                          DocumentSourceGeoNear::createFromBson);
 
 const long long DocumentSourceGeoNear::kDefaultLimit = 100;
+
+constexpr StringData DocumentSourceGeoNear::kKeyFieldName;
 
 const char* DocumentSourceGeoNear::getSourceName() const {
     return "$geoNear";
@@ -105,6 +108,10 @@ std::list<intrusive_ptr<DocumentSource>> DocumentSourceGeoNear::getMergeSources(
 
 Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument result;
+
+    if (!keyFieldPath.empty()) {
+        result.setField(kKeyFieldName, Value(keyFieldPath));
+    }
 
     if (coordsIsArray) {
         result.setField("near", Value(BSONArray(coords)));
@@ -168,6 +175,10 @@ BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {
     if (includeLocs)
         geoNear.append("includeLocs", true);  // String in toBson
 
+    if (!keyFieldPath.empty()) {
+        geoNear.append(kKeyFieldName, keyFieldPath);
+    }
+
     return geoNear.obj();
 }
 
@@ -176,7 +187,9 @@ void DocumentSourceGeoNear::runCommand() {
 
     bool ok = _mongoProcessInterface->directClient()->runCommand(
         pExpCtx->ns.db().toString(), buildGeoNearCmd(), cmdOutput);
-    uassert(16604, "geoNear command failed: " + cmdOutput.toString(), ok);
+    if (!ok) {
+        uassertStatusOK(getStatusFromCommandResult(cmdOutput));
+    }
 
     resultsIterator.reset(new BSONObjIterator(cmdOutput["results"].embeddedObject()));
 }
@@ -239,6 +252,19 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options) {
 
     if (options.hasField("uniqueDocs"))
         warning() << "ignoring deprecated uniqueDocs option in $geoNear aggregation stage";
+
+    if (auto keyElt = options[kKeyFieldName]) {
+        uassert(ErrorCodes::TypeMismatch,
+                str::stream() << "$geoNear parameter '" << DocumentSourceGeoNear::kKeyFieldName
+                              << "' must be of type string but found type: "
+                              << typeName(keyElt.type()),
+                keyElt.type() == BSONType::String);
+        keyFieldPath = keyElt.str();
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "$geoNear parameter '" << DocumentSourceGeoNear::kKeyFieldName
+                              << "' cannot be the empty string",
+                !keyFieldPath.empty());
+    }
 
     // The collation field is disallowed, even though it is accepted by the geoNear command, since
     // the $geoNear operation should respect the collation associated with the entire pipeline.

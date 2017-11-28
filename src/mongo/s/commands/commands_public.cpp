@@ -1526,6 +1526,7 @@ public:
         while (!ars.done()) {
             // Block until a response is available.
             auto shardResult = uassertStatusOK(ars.next().swResponse).data;
+            uassertStatusOK(getStatusFromCommandResult(shardResult));
             if (shardResult.hasField("near")) {
                 nearStr = shardResult["near"].String();
             }

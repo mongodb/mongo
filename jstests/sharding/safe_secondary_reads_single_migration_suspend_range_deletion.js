@@ -463,7 +463,7 @@
                     "command.shardVersion": {"$exists": false},
                     "command.$readPreference": {"mode": "secondary"},
                     "command.readConcern": {"level": 'available'},
-                    "exceptionCode": {"$exists": false}
+                    "exceptionCode": {"$ne": ErrorCodes.StaleConfig},
                 },
                                       commandProfile)
             });
@@ -473,7 +473,7 @@
                     "command.shardVersion": {"$exists": false},
                     "command.$readPreference": {"mode": "secondary"},
                     "command.readConcern": {"level": "local"},
-                    "exceptionCode": {"$exists": false}
+                    "exceptionCode": {"$ne": ErrorCodes.StaleConfig},
                 },
                                       commandProfile)
             });
@@ -491,7 +491,7 @@
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
                     "command.readConcern": {"level": "available"},
-                    "exceptionCode": {"$exists": false}
+                    "exceptionCode": {"$ne": ErrorCodes.StaleConfig},
                 },
                                       commandProfile)
             });
@@ -501,7 +501,7 @@
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
                     "command.readConcern": {"$exists": false},
-                    "exceptionCode": {"$exists": false}
+                    "exceptionCode": {"$ne": ErrorCodes.StaleConfig},
                 },
                                       commandProfile)
             });
@@ -541,7 +541,7 @@
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
                     "command.readConcern": {"level": "local"},
-                    "exceptionCode": {"$exists": false}
+                    "exceptionCode": {"$ne": ErrorCodes.StaleConfig},
                 },
                                       commandProfile)
             });
