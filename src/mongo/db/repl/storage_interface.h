@@ -84,11 +84,26 @@ public:
     virtual ~StorageInterface() = default;
 
     /**
-     * Rollback ID is an increasing counter of how many rollbacks have occurred on this server.
+     * Rollback ID is an increasing counter of how many rollbacks have occurred on this server. It
+     * is initialized with a value of 1, and should increase by exactly 1 every time a rollback
+     * occurs.
+     */
+
+    /**
+     * Return the current value of the rollback ID.
      */
     virtual StatusWith<int> getRollbackID(OperationContext* opCtx) = 0;
-    virtual Status initializeRollbackID(OperationContext* opCtx) = 0;
-    virtual Status incrementRollbackID(OperationContext* opCtx) = 0;
+
+    /**
+     * Initialize the rollback ID to 1. Returns the value of the initialized rollback ID if
+     * successful.
+     */
+    virtual StatusWith<int> initializeRollbackID(OperationContext* opCtx) = 0;
+
+    /**
+     * Increments the current rollback ID. Returns the new value of the rollback ID if successful.
+     */
+    virtual StatusWith<int> incrementRollbackID(OperationContext* opCtx) = 0;
 
 
     // Collection creation and population for initial sync.

@@ -130,8 +130,8 @@ public:
     StorageInterfaceMock() = default;
 
     StatusWith<int> getRollbackID(OperationContext* opCtx) override;
-    Status initializeRollbackID(OperationContext* opCtx) override;
-    Status incrementRollbackID(OperationContext* opCtx) override;
+    StatusWith<int> initializeRollbackID(OperationContext* opCtx) override;
+    StatusWith<int> incrementRollbackID(OperationContext* opCtx) override;
 
     StatusWith<std::unique_ptr<CollectionBulkLoader>> createCollectionForBulkLoading(
         const NamespaceString& nss,
