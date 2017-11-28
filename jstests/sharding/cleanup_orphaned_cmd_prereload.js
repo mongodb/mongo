@@ -8,26 +8,25 @@ var mongos = st.s0;
 var admin = mongos.getDB("admin");
 var coll = mongos.getCollection("foo.bar");
 
-assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
+assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
 printjson(admin.runCommand({movePrimary: coll.getDB() + "", to: st.shard0.shardName}));
-assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
-
-// Turn off best-effort recipient metadata refresh post-migration commit on both shards because it
-// would clean up the pending chunks on migration recipients.
-assert.commandWorked(st.shard0.getDB('admin').runCommand(
-    {configureFailPoint: 'doNotRefreshRecipientAfterCommit', mode: 'alwaysOn'}));
-assert.commandWorked(st.shard1.getDB('admin').runCommand(
-    {configureFailPoint: 'doNotRefreshRecipientAfterCommit', mode: 'alwaysOn'}));
+assert(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}).ok);
 
 jsTest.log("Moving some chunks to shard1...");
 
-assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
-assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 1}}));
+assert(admin.runCommand({split: coll + "", middle: {_id: 0}}).ok);
+assert(admin.runCommand({split: coll + "", middle: {_id: 1}}).ok);
 
-assert.commandWorked(admin.runCommand(
-    {moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName, _waitForDelete: true}));
-assert.commandWorked(admin.runCommand(
-    {moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName, _waitForDelete: true}));
+assert(
+    admin
+        .runCommand(
+            {moveChunk: coll + "", find: {_id: 0}, to: st.shard1.shardName, _waitForDelete: true})
+        .ok);
+assert(
+    admin
+        .runCommand(
+            {moveChunk: coll + "", find: {_id: 1}, to: st.shard1.shardName, _waitForDelete: true})
+        .ok);
 
 var metadata =
     st.shard1.getDB("admin").runCommand({getShardVersion: coll + "", fullMetadata: true}).metadata;
@@ -45,8 +44,8 @@ assert(!st.shard1.getDB("admin")
 
 jsTest.log("Moving some chunks back to shard0 after empty...");
 
-assert.commandWorked(admin.runCommand(
-    {moveChunk: coll + "", find: {_id: -1}, to: st.shard1.shardName, _waitForDelete: true}));
+admin.runCommand(
+    {moveChunk: coll + "", find: {_id: -1}, to: st.shard1.shardName, _waitForDelete: true});
 
 var metadata =
     st.shard0.getDB("admin").runCommand({getShardVersion: coll + "", fullMetadata: true}).metadata;
@@ -57,8 +56,11 @@ assert.eq(metadata.shardVersion.t, 0);
 assert.neq(metadata.collVersion.t, 0);
 assert.eq(metadata.pending.length, 0);
 
-assert.commandWorked(admin.runCommand(
-    {moveChunk: coll + "", find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true}));
+assert(
+    admin
+        .runCommand(
+            {moveChunk: coll + "", find: {_id: 1}, to: st.shard0.shardName, _waitForDelete: true})
+        .ok);
 
 var metadata =
     st.shard0.getDB("admin").runCommand({getShardVersion: coll + "", fullMetadata: true}).metadata;

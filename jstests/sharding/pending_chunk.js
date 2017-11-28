@@ -17,13 +17,6 @@
     printjson(admin.runCommand({movePrimary: dbName, to: st.shard0.shardName}));
     assert.commandWorked(admin.runCommand({shardCollection: ns, key: {_id: 1}}));
 
-    // Turn off best-effort recipient metadata refresh post-migration commit on both shards because
-    // it would clean up the pending chunks on migration recipients.
-    assert.commandWorked(st.shard0.getDB('admin').runCommand(
-        {configureFailPoint: 'doNotRefreshRecipientAfterCommit', mode: 'alwaysOn'}));
-    assert.commandWorked(st.shard1.getDB('admin').runCommand(
-        {configureFailPoint: 'doNotRefreshRecipientAfterCommit', mode: 'alwaysOn'}));
-
     jsTest.log('Moving some chunks to shard1...');
 
     assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 0}}));

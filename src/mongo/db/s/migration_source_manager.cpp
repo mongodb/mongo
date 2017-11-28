@@ -43,8 +43,6 @@
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard_collection.h"
@@ -52,7 +50,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
-#include "mongo/s/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
@@ -78,43 +75,11 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 Seconds(15));
 
-/**
- * Best-effort attempt to ensure the recipient shard has refreshed its routing table to
- * 'newCollVersion'. Fires and forgets an asychronous remote setShardVersion command.
- */
-void refreshRecipientRoutingTable(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  ShardId toShard,
-                                  const HostAndPort& toShardHost,
-                                  const ChunkVersion& newCollVersion) {
-    SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
-        Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString(),
-        toShard,
-        ConnectionString(toShardHost),
-        nss,
-        newCollVersion,
-        false);
-
-    const executor::RemoteCommandRequest request(
-        toShardHost,
-        NamespaceString::kAdminDb.toString(),
-        ssv.toBSON(),
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly}.toContainingBSON(),
-        opCtx,
-        executor::RemoteCommandRequest::kNoTimeout);
-
-    executor::TaskExecutor* const executor =
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    executor->scheduleRemoteCommand(
-        request, [](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {});
-}
-
 }  // namespace
 
-MONGO_FP_DECLARE(doNotRefreshRecipientAfterCommit);
+MONGO_FP_DECLARE(migrationCommitNetworkError);
 MONGO_FP_DECLARE(failMigrationCommit);
 MONGO_FP_DECLARE(hangBeforeLeavingCriticalSection);
-MONGO_FP_DECLARE(migrationCommitNetworkError);
 
 MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                                                MoveChunkRequest request,
@@ -557,15 +522,6 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
         return CollectionShardingState::get(opCtx, getNss())->cleanUpRange(range, whenToClean);
     }();
-
-    if (!MONGO_FAIL_POINT(doNotRefreshRecipientAfterCommit)) {
-        // Best-effort make the recipient refresh its routing table to the new collection version.
-        refreshRecipientRoutingTable(opCtx,
-                                     getNss(),
-                                     _args.getToShardId(),
-                                     _recipientHost,
-                                     refreshedMetadata->getCollVersion());
-    }
 
     if (_args.getWaitForDelete()) {
         log() << "Waiting for cleanup of " << getNss().ns() << " range "

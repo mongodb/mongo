@@ -102,9 +102,6 @@ selector:
   - jstests/sharding/read_pref_cmd.js
   # SERVER-30444: Add a maxChunkSize field to the serverStatus command response
   - jstests/sharding/server_status.js
-  # New failpoint in v3.6 shard mongod.
-  - jstests/sharding/cleanup_orphaned_cmd_prereload.js
-  - jstests/sharding/pending_chunk.js
 
 executor:
   config:
