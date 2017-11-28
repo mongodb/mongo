@@ -328,15 +328,16 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
     // Retrieve all collections in config.collections that do not have a UUID. Some collections
     // may already have a UUID if an earlier upgrade attempt failed after making some progress.
     auto shardedColls =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                            opCtx,
-                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            repl::ReadConcernLevel::kLocalReadConcern,
-                            NamespaceString(CollectionType::ConfigNS),
-                            BSON(CollectionType::uuid.name() << BSON("$exists" << false)),  // query
-                            BSONObj(),                                                      // sort
-                            boost::none                                                     // limit
-                            ))
+        uassertStatusOK(
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kLocalReadConcern,
+                NamespaceString(CollectionType::ConfigNS),
+                BSON(CollectionType::uuid.name() << BSON("$exists" << false) << "dropped" << false),
+                BSONObj(),   // sort
+                boost::none  // limit
+                ))
             .docs;
 
     if (shardedColls.empty()) {

@@ -106,10 +106,6 @@ var blacklist = [
     'kill_aggregation.js',
     'kill_rooted_or.js',
     'view_catalog_cycle_with_drop.js',
-
-    // SERVER-31884 The setFeatureCompatibilityVersion command in this test takes too long to
-    // successfully complete with the primary stepping down as frequently as it does.
-    'toggle_feature_compatibility.js',
 ].map(function(file) {
     return dir + '/' + file;
 });
