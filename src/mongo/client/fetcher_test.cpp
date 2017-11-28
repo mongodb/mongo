@@ -101,11 +101,7 @@ FetcherTest::FetcherTest()
     : status(getDetectableErrorStatus()), cursorId(-1), nextAction(Fetcher::NextAction::kInvalid) {}
 
 Fetcher::CallbackFn FetcherTest::makeCallback() {
-    return stdx::bind(&FetcherTest::_callback,
-                      this,
-                      stdx::placeholders::_1,
-                      stdx::placeholders::_2,
-                      stdx::placeholders::_3);
+    return [this](const auto& x, const auto& y, const auto& z) { return _callback(x, y, z); };
 }
 
 void FetcherTest::setUp() {
@@ -1012,13 +1008,9 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
     const BSONObj doc2 = BSON("_id" << 2);
 
     bool isShutdownCalled = false;
-    callbackHook = stdx::bind(shutdownDuringSecondBatch,
-                              stdx::placeholders::_1,
-                              stdx::placeholders::_2,
-                              stdx::placeholders::_3,
-                              doc2,
-                              &getExecutor(),
-                              &isShutdownCalled);
+    callbackHook = [this, doc2, &isShutdownCalled](const auto& x, const auto& y, const auto& z) {
+        return shutdownDuringSecondBatch(x, y, z, doc2, &getExecutor(), &isShutdownCalled);
+    };
 
     processNetworkResponse(BSON("cursor" << BSON("id" << 1LL << "ns"
                                                       << "db.coll"

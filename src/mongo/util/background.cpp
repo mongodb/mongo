@@ -177,8 +177,7 @@ void BackgroundJob::go() {
     // If the job is already 'done', for instance because it was cancelled or already
     // finished, ignore additional requests to run the job.
     if (_status->state == NotStarted) {
-        stdx::thread t(stdx::bind(&BackgroundJob::jobBody, this));
-        t.detach();
+        stdx::thread{[this] { jobBody(); }}.detach();
         _status->state = Running;
     }
 }

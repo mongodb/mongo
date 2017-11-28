@@ -242,8 +242,8 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     //
     // Parse electionTimeoutMillis
     //
-    auto greaterThanZero = stdx::bind(std::greater<long long>(), stdx::placeholders::_1, 0);
     long long electionTimeoutMillis;
+    auto greaterThanZero = [](const auto& x) { return x > 0; };
     auto electionTimeoutStatus = bsonExtractIntegerFieldWithDefaultIf(
         settings,
         kElectionTimeoutFieldName,
@@ -706,13 +706,10 @@ StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patt
 }
 
 void ReplSetConfig::_calculateMajorities() {
-    const int voters = std::count_if(_members.begin(),
-                                     _members.end(),
-                                     stdx::bind(&MemberConfig::isVoter, stdx::placeholders::_1));
-    const int arbiters =
-        std::count_if(_members.begin(),
-                      _members.end(),
-                      stdx::bind(&MemberConfig::isArbiter, stdx::placeholders::_1));
+    const int voters =
+        std::count_if(begin(_members), end(_members), [](const auto& x) { return x.isVoter(); });
+    const int arbiters = std::count_if(
+        begin(_members), end(_members), [](const auto& x) { return x.isArbiter(); });
     _totalVotingMembers = voters;
     _majorityVoteCount = voters / 2 + 1;
     _writeMajority = std::min(_majorityVoteCount, voters - arbiters);

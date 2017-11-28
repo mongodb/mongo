@@ -382,7 +382,7 @@ void ThreadPool::_startWorkerThread_inlock() {
     invariant(_threads.size() < _options.maxThreads);
     const std::string threadName = str::stream() << _options.threadNamePrefix << _nextThreadId++;
     try {
-        _threads.emplace_back(stdx::bind(&ThreadPool::_workerThreadBody, this, threadName));
+        _threads.emplace_back([this, threadName] { _workerThreadBody(this, threadName); });
         ++_numIdleThreads;
     } catch (const std::exception& ex) {
         error() << "Failed to start " << threadName << "; " << _threads.size()

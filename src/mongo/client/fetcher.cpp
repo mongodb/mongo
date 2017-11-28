@@ -186,7 +186,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
       _firstRemoteCommandScheduler(
           _executor,
           RemoteCommandRequest(_source, _dbname, _cmdObj, _metadata, nullptr, _findNetworkTimeout),
-          stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, kFirstBatchFieldName),
+          [this](const auto& x) { return _callback(x, kFirstBatchFieldName); },
           std::move(firstCommandRetryPolicy)) {
     uassert(ErrorCodes::BadValue, "callback function cannot be null", work);
 }
@@ -318,7 +318,7 @@ Status Fetcher::_scheduleGetMore(const BSONObj& cmdObj) {
         _executor->scheduleRemoteCommand(
             RemoteCommandRequest(
                 _source, _dbname, cmdObj, _metadata, nullptr, _getMoreNetworkTimeout),
-            stdx::bind(&Fetcher::_callback, this, stdx::placeholders::_1, kNextBatchFieldName));
+            [this](const auto& x) { return _callback(x, kNextBatchFieldName); });
 
     if (!scheduleResult.isOK()) {
         return scheduleResult.getStatus();
