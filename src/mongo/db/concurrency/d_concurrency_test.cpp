@@ -1002,6 +1002,211 @@ TEST_F(DConcurrencyTestFixture, Throttling) {
     ASSERT(!overlongWait);
 }
 
+TEST_F(DConcurrencyTestFixture, CompatibleFirstWithSXIS) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(3);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+    auto opctx2 = clientOpctxPairs[1].second.get();
+    auto opctx3 = clientOpctxPairs[2].second.get();
+
+    // Build a queue of MODE_S <- MODE_X <- MODE_IS, with MODE_S granted.
+    Lock::GlobalRead lockS(opctx1);
+    ASSERT(lockS.isLocked());
+    Lock::GlobalLock lockX(opctx2, MODE_X, UINT_MAX, Lock::GlobalLock::EnqueueOnly());
+    ASSERT(!lockX.isLocked());
+
+    // A MODE_IS should be granted due to compatibleFirst policy.
+    Lock::GlobalLock lockIS(opctx3, MODE_IS, 0);
+    ASSERT(lockIS.isLocked());
+
+    lockX.waitForLock(0);
+    ASSERT(!lockX.isLocked());
+}
+
+
+TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSIXIS) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(4);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+    auto opctx2 = clientOpctxPairs[1].second.get();
+    auto opctx3 = clientOpctxPairs[2].second.get();
+    auto opctx4 = clientOpctxPairs[3].second.get();
+
+    // Build a queue of MODE_X <- MODE_S <- MODE_IX <- MODE_IS, with MODE_X granted.
+    boost::optional<Lock::GlobalWrite> lockX;
+    lockX.emplace(opctx1);
+    ASSERT(lockX->isLocked());
+    boost::optional<Lock::GlobalLock> lockS;
+    lockS.emplace(opctx2, MODE_S, UINT_MAX, Lock::GlobalLock::EnqueueOnly());
+    ASSERT(!lockS->isLocked());
+    Lock::GlobalLock lockIX(opctx3, MODE_IX, UINT_MAX, Lock::GlobalLock::EnqueueOnly());
+    ASSERT(!lockIX.isLocked());
+    Lock::GlobalLock lockIS(opctx4, MODE_IS, UINT_MAX, Lock::GlobalLock::EnqueueOnly());
+    ASSERT(!lockIS.isLocked());
+
+
+    // Now release the MODE_X and ensure that MODE_S will switch policy to compatibleFirst
+    lockX.reset();
+    lockS->waitForLock(0);
+    ASSERT(lockS->isLocked());
+    ASSERT(!lockIX.isLocked());
+    lockIS.waitForLock(0);
+    ASSERT(lockIS.isLocked());
+
+    // Now release the MODE_S and ensure that MODE_IX gets locked.
+    lockS.reset();
+    lockIX.waitForLock(0);
+    ASSERT(lockIX.isLocked());
+}
+
+TEST_F(DConcurrencyTestFixture, CompatibleFirstWithXSXIXIS) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(5);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+    auto opctx2 = clientOpctxPairs[1].second.get();
+    auto opctx3 = clientOpctxPairs[2].second.get();
+    auto opctx4 = clientOpctxPairs[3].second.get();
+    auto opctx5 = clientOpctxPairs[4].second.get();
+
+    // Build a queue of MODE_X <- MODE_S <- MODE_X <- MODE_IX <- MODE_IS, with the first MODE_X
+    // granted and check that releasing it will result in the MODE_IS being granted.
+    boost::optional<Lock::GlobalWrite> lockXgranted;
+    lockXgranted.emplace(opctx1);
+    ASSERT(lockXgranted->isLocked());
+
+    boost::optional<Lock::GlobalLock> lockX;
+    lockX.emplace(opctx3, MODE_X, UINT_MAX, Lock::GlobalLock::EnqueueOnly());
+    ASSERT(!lockX->isLocked());
+
+    // Now request MODE_S: it will be first in the pending list due to EnqueueAtFront policy.
+    boost::optional<Lock::GlobalLock> lockS;
+    lockS.emplace(opctx2, MODE_S, UINT_MAX, Lock::GlobalLock::EnqueueOnly());
+    ASSERT(!lockS->isLocked());
+
+    Lock::GlobalLock lockIX(opctx4, MODE_IX, UINT_MAX, Lock::GlobalLock::EnqueueOnly());
+    ASSERT(!lockIX.isLocked());
+    Lock::GlobalLock lockIS(opctx5, MODE_IS, UINT_MAX, Lock::GlobalLock::EnqueueOnly());
+    ASSERT(!lockIS.isLocked());
+
+
+    // Now release the granted MODE_X and ensure that MODE_S will switch policy to compatibleFirst,
+    // not locking the MODE_X or MODE_IX, but instead granting the final MODE_IS.
+    lockXgranted.reset();
+    lockS->waitForLock(0);
+    ASSERT(lockS->isLocked());
+
+    lockX->waitForLock(0);
+    ASSERT(!lockX->isLocked());
+    lockIX.waitForLock(0);
+    ASSERT(!lockIX.isLocked());
+
+    lockIS.waitForLock(0);
+    ASSERT(lockIS.isLocked());
+}
+
+TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
+    int numThreads = 8;
+    int testMicros = 500'000;
+    AtomicUInt64 readOnlyInterval{0};
+    AtomicBool done{false};
+    std::vector<uint64_t> acquisitionCount(numThreads);
+    std::vector<uint64_t> timeoutCount(numThreads);
+    std::vector<uint64_t> busyWaitCount(numThreads);
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(numThreads);
+
+    // Do some busy waiting to trigger different timings. The atomic load prevents compilers
+    // from optimizing the loop away.
+    auto busyWait = [&done, &busyWaitCount](int threadId, long long iters) {
+        while (iters-- > 0) {
+            for (int i = 0; i < 100 && !done.load(); i++) {
+                busyWaitCount[threadId]++;
+            }
+        }
+    };
+
+    std::vector<stdx::thread> threads;
+
+    // Thread putting state in/out of read-only CompatibleFirst mode.
+    threads.emplace_back([&]() {
+        Timer t;
+        auto endTime = t.micros() + testMicros;
+        uint64_t readOnlyIntervalCount = 0;
+        OperationContext* opCtx = clientOpctxPairs[0].second.get();
+        for (int iters = 0; (t.micros() < endTime); iters++) {
+            busyWait(0, iters % 20);
+            Lock::GlobalRead readLock(opCtx, iters % 2);
+            if (!readLock.isLocked()) {
+                timeoutCount[0]++;
+                continue;
+            }
+            acquisitionCount[0]++;
+            readOnlyInterval.store(++readOnlyIntervalCount);
+            busyWait(0, iters % 200);
+            readOnlyInterval.store(0);
+        };
+        done.store(true);
+    });
+
+    for (int threadId = 1; threadId < numThreads; threadId++) {
+        threads.emplace_back([&, threadId]() {
+            Timer t;
+            for (int iters = 0; !done.load(); iters++) {
+                OperationContext* opCtx = clientOpctxPairs[threadId].second.get();
+                boost::optional<Lock::GlobalLock> lock;
+                switch (threadId) {
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 4: {
+                        // Here, actually try to acquire a lock without waiting, and check whether
+                        // we should have gotten the lock or not. Use MODE_IS in 95% of the cases,
+                        // and MODE_S in only 5, as that stressing the partitioning scheme and
+                        // policy changes more as thread 0 acquires/releases its MODE_S lock.
+                        busyWait(threadId, iters % 100);
+                        auto interval = readOnlyInterval.load();
+                        lock.emplace(opCtx,
+                                     iters % 20 ? MODE_IS : MODE_S,
+                                     0,
+                                     Lock::GlobalLock::EnqueueOnly());
+                        // If thread 0 is holding the MODE_S lock while we tried to acquire a
+                        // MODE_IS or MODE_S lock, the CompatibleFirst policy guarantees success.
+                        auto newInterval = readOnlyInterval.load();
+                        invariant(!interval || interval != newInterval || lock->isLocked());
+                        interval = newInterval;
+                        lock->waitForLock(0);
+                        newInterval = readOnlyInterval.load();
+                        invariant(!interval || interval != newInterval || lock->isLocked());
+                        break;
+                    }
+                    case 5:
+                        busyWait(threadId, iters % 150);
+                        lock.emplace(opCtx, MODE_X, iters % 2);
+                        busyWait(threadId, iters % 10);
+                        break;
+                    case 6:
+                        lock.emplace(opCtx, iters % 25 ? MODE_IX : MODE_S, iters % 2);
+                        busyWait(threadId, iters % 100);
+                        break;
+                    case 7:
+                        busyWait(threadId, iters % 100);
+                        lock.emplace(opCtx, iters % 20 ? MODE_IS : MODE_X, 0);
+                        break;
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+                if (lock->isLocked())
+                    acquisitionCount[threadId]++;
+                else
+                    timeoutCount[threadId]++;
+            };
+        });
+    }
+
+    for (auto& thread : threads)
+        thread.join();
+    for (int threadId = 0; threadId < numThreads; threadId++) {
+        log() << "thread " << threadId << " stats: " << acquisitionCount[threadId]
+              << " acquisitions, " << timeoutCount[threadId] << " timeouts, "
+              << busyWaitCount[threadId] / 1'000'000 << "M busy waits";
+    }
+}
 
 // These tests exercise single- and multi-threaded performance of uncontended lock acquisition. It
 // is neither practical nor useful to run them on debug builds.
