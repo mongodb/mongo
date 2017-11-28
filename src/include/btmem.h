@@ -215,6 +215,7 @@ struct __wt_page_modify {
 	uint64_t first_dirty_txn;
 
 	/* The transaction state last time eviction was attempted. */
+	uint64_t last_evict_pass_gen;
 	uint64_t last_eviction_id;
 	WT_DECL_TIMESTAMP(last_eviction_timestamp)
 

@@ -567,13 +567,13 @@ __evict_review(
 		if (F_ISSET(conn, WT_CONN_IN_MEMORY))
 			LF_SET(WT_REC_IN_MEMORY |
 			    WT_REC_SCRUB | WT_REC_UPDATE_RESTORE);
+		else if (WT_SESSION_IS_CHECKPOINT(session))
+			LF_SET(WT_REC_LOOKASIDE);
 		else if (!WT_IS_METADATA(session->dhandle)) {
-			if (!WT_SESSION_IS_CHECKPOINT(session)) {
-				LF_SET(WT_REC_UPDATE_RESTORE);
+			LF_SET(WT_REC_UPDATE_RESTORE);
 
-				if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB))
-					LF_SET(WT_REC_SCRUB);
-			}
+			if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB))
+				LF_SET(WT_REC_SCRUB);
 
 			/*
 			 * If the cache is under pressure with many updates

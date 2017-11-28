@@ -297,8 +297,7 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * skipping the page indefinitely or large records can lead to
 	 * extremely large memory footprints.
 	 */
-	if (page->modify->update_restored &&
-	    !__wt_page_evict_retry(session, page))
+	if (!__wt_page_evict_retry(session, page))
 		return (false);
 
 	/* Trigger eviction on the next page release. */
