@@ -114,15 +114,7 @@ selector:
   # causally consistent.
   - jstests/core/snapshot_queries.js
   - jstests/core/find1.js
-  # Tests that fail for Causal Consistency with default injected readPreference 'secondary'
-  # "TODO SERVER-30384: These tests assume that documents are returned in the same order they are
-  # written when no sort is specified; however, the order of documents within a collection can
-  # be different across a primary and secondary."
-  - jstests/core/coveredIndex1.js
-  - jstests/core/fts_spanish.js
-  - jstests/core/null2.js
-  - jstests/core/sorta.js
-  - jstests/core/sortc.js
+  # An index drop does not necessarily cause cursors to be killed on the secondary.
   - jstests/core/ord.js
   # plan_cache tests does not work because they check the plan_cache on the primary while the 
   # cache is created on the secondary.
