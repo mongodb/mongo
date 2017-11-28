@@ -72,39 +72,7 @@ public:
      * map to the follower role, and MemberState::RS_SECONDARY maps to either
      * follower or candidate roles, e.g.
      */
-    class Role {
-    public:
-        /**
-         * Constant indicating leader role.
-         */
-        static const Role leader;
-
-        /**
-         * Constant indicating follower role.
-         */
-        static const Role follower;
-
-        /**
-         * Constant indicating candidate role
-         */
-        static const Role candidate;
-
-        Role() {}
-
-        bool operator==(Role other) const {
-            return _value == other._value;
-        }
-        bool operator!=(Role other) const {
-            return _value != other._value;
-        }
-
-        std::string toString() const;
-
-    private:
-        explicit Role(int value);
-
-        int _value;
-    };
+    enum class Role { kLeader = 0, kFollower = 1, kCandidate = 2 };
 
     struct Options {
         // A sync source is re-evaluated after it lags behind further than this amount.
@@ -781,6 +749,9 @@ public:
 
     // Returns _electionId.  Only used in unittests.
     OID getElectionId() const;
+
+    // Returns the name for a role.  Only used in unittests.
+    static std::string roleToString(TopologyCoordinator::Role role);
 
 private:
     typedef int UnelectableReasonMask;
