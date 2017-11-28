@@ -1,29 +1,37 @@
+(function() {
+    "use strict";
 
-load("jstests/libs/fts.js");
+    load("jstests/libs/fts.js");
 
-t = db.text_spanish;
-t.drop();
+    const coll = db.text_spanish;
+    coll.drop();
 
-t.save({_id: 1, title: "mi blog", text: "Este es un blog de prueba"});
-t.save({_id: 2, title: "mi segundo post", text: "Este es un blog de prueba"});
-t.save({_id: 3, title: "cuchillos son divertidos", text: "este es mi tercer blog stemmed"});
-t.save({_id: 4, language: "en", title: "My fourth blog", text: "This stemmed blog is in english"});
+    assert.writeOK(coll.insert({_id: 1, title: "mi blog", text: "Este es un blog de prueba"}));
+    assert.writeOK(
+        coll.insert({_id: 2, title: "mi segundo post", text: "Este es un blog de prueba"}));
+    assert.writeOK(coll.insert(
+        {_id: 3, title: "cuchillos son divertidos", text: "este es mi tercer blog stemmed"}));
+    assert.writeOK(coll.insert({
+        _id: 4,
+        language: "en",
+        title: "My fourth blog",
+        text: "This stemmed blog is in english"
+    }));
 
-// default weight is 1
-// specify weights if you want a field to be more meaningull
-t.ensureIndex({"title": "text", text: "text"}, {weights: {title: 10}, default_language: "es"});
+    // Create a text index, giving more weight to the "title" field.
+    assert.commandWorked(coll.createIndex({title: "text", text: "text"},
+                                          {weights: {title: 10}, default_language: "es"}));
 
-res = t.find({"$text": {"$search": "blog"}});
-assert.eq(4, res.length());
+    assert.eq(4, coll.count({$text: {$search: "blog"}}));
+    assert.eq([4], queryIDS(coll, "stem"));
+    assert.eq([3], queryIDS(coll, "stemmed"));
+    assert.eq([4], queryIDS(coll, "stemmed", null, {"$language": "en"}));
+    assert.eq([1, 2], queryIDS(coll, "prueba").sort());
 
-assert.eq([4], queryIDS(t, "stem"));
-assert.eq([3], queryIDS(t, "stemmed"));
-assert.eq([4], queryIDS(t, "stemmed", null, {"$language": "en"}));
+    assert.writeError(coll.insert({_id: 5, language: "spanglish", title: "", text: ""}));
 
-assert.eq([1, 2], queryIDS(t, "prueba"));
-
-assert.writeError(t.save({_id: 5, language: "spanglish", title: "", text: ""}));
-
-t.dropIndexes();
-res = t.ensureIndex({"title": "text", text: "text"}, {default_language: "spanglish"});
-assert.neq(null, res);
+    assert.commandWorked(coll.dropIndexes());
+    assert.commandFailedWithCode(
+        coll.createIndex({title: "text", text: "text"}, {default_language: "spanglish"}),
+        ErrorCodes.CannotCreateIndex);
+}());
