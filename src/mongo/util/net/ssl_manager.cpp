@@ -142,8 +142,10 @@ public:
         return Status::OK();
     }
 } openSSLCipherConfig;
+}  // namespace mongo
 
 #ifdef MONGO_CONFIG_SSL
+namespace mongo {
 namespace {
 
 // If the underlying SSL supports auto-configuration of ECDH parameters, this function will select
@@ -474,11 +476,6 @@ private:
      * Send and receive network data
      */
     void _flushNetworkBIO(SSLConnection* conn);
-
-    /*
-     * match a remote host name to an x.509 host name
-     */
-    bool _hostNameMatch(const char* nameToMatch, const char* certHostName);
 
     /**
      * Callbacks for SSL functions.
@@ -1314,22 +1311,6 @@ SSLConnection* SSLManager::accept(Socket* socket, const char* initialBytes, int 
     return sslConn.release();
 }
 
-// TODO SERVER-11601 Use NFC Unicode canonicalization
-bool SSLManager::_hostNameMatch(const char* nameToMatch, const char* certHostName) {
-    if (strlen(certHostName) < 2) {
-        return false;
-    }
-
-    // match wildcard DNS names
-    if (certHostName[0] == '*' && certHostName[1] == '.') {
-        // allow name.example.com if the cert is *.example.com, '*' does not match '.'
-        const char* subName = strchr(nameToMatch, '.');
-        return subName && !strcasecmp(certHostName + 1, subName);
-    } else {
-        return !strcasecmp(nameToMatch, certHostName);
-    }
-}
-
 StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertificate(
     SSL* conn, const std::string& remoteHost) {
     if (!_sslConfiguration.hasCA && isSSLServer)
@@ -1399,7 +1380,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
             const GENERAL_NAME* currentName = sk_GENERAL_NAME_value(sanNames, i);
             if (currentName && currentName->type == GEN_DNS) {
                 char* dnsName = reinterpret_cast<char*>(ASN1_STRING_data(currentName->d.dNSName));
-                if (_hostNameMatch(remoteHost.c_str(), dnsName)) {
+                if (hostNameMatchForX509Certificates(remoteHost, dnsName)) {
                     sanMatch = true;
                     break;
                 }
@@ -1414,7 +1395,7 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
         int cnEnd = peerSubjectName.find(",", cnBegin);
         std::string commonName = peerSubjectName.substr(cnBegin, cnEnd - cnBegin);
 
-        if (_hostNameMatch(remoteHost.c_str(), commonName.c_str())) {
+        if (hostNameMatchForX509Certificates(remoteHost, commonName)) {
             cnMatch = true;
         }
         certificateNames << "CN: " << commonName;
@@ -1619,13 +1600,44 @@ void SSLManager::_handleSSLError(int code, int ret) {
     }
     throw SocketException(SocketException::CONNECT_ERROR, "");
 }
+}  // namespace mongo
+
+// TODO SERVER-11601 Use NFC Unicode canonicalization
+bool mongo::hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
+    auto removeFQDNRoot = [](std::string name) -> std::string {
+        if (name.back() == '.') {
+            name.pop_back();
+        }
+        return name;
+    };
+
+    nameToMatch = removeFQDNRoot(std::move(nameToMatch));
+    certHostName = removeFQDNRoot(std::move(certHostName));
+
+    if (certHostName.size() < 2) {
+        return false;
+    }
+
+    // match wildcard DNS names
+    if (certHostName[0] == '*' && certHostName[1] == '.') {
+        // allow name.example.com if the cert is *.example.com, '*' does not match '.'
+        const char* subName = strchr(nameToMatch.c_str(), '.');
+        return subName && !strcasecmp(certHostName.c_str() + 1, subName);
+    } else {
+        return !strcasecmp(nameToMatch.c_str(), certHostName.c_str());
+    }
+}
+
 #else
 
+namespace mongo {
+namespace {
 MONGO_INITIALIZER(SSLManager)(InitializerContext*) {
     // we need a no-op initializer so that we can depend on SSLManager as a prerequisite in
     // non-SSL builds.
     return Status::OK();
 }
+}  // namespace
+}  // namespace mongo
 
 #endif  // #ifdef MONGO_CONFIG_SSL
-}  // namespace mongo
