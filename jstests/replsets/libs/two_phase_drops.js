@@ -142,6 +142,14 @@ class TwoPhaseDropCollectionTest {
     }
 
     /**
+     * Waits until 'collName' in database 'db' is not in drop pending state.
+     */
+    static waitForDropToComplete(db, collName) {
+        assert.soon(
+            () => !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(db, collName));
+    }
+
+    /**
      * Puts a collection with name 'collName' into the drop pending state. Returns the name of the
      * collection after it has been renamed to the 'system.drop' namespace.
      */
