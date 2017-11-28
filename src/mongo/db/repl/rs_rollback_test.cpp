@@ -641,6 +641,63 @@ TEST_F(RSRollbackTest, RollingBackCreateAndDropOfSameIndexIgnoresBothCommands) {
     }
 }
 
+TEST_F(RSRollbackTest, RollingBackCreateIndexAndRenameWithLongName) {
+    createOplog(_opCtx.get());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    NamespaceString nss("test", "coll");
+    auto collection = _createCollection(_opCtx.get(), nss.toString(), options);
+
+    auto longName = std::string(115, 'a');
+    auto indexSpec = BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
+                               << BSON("b" << 1)
+                               << "name"
+                               << longName);
+
+    int numIndexes = createIndexForColl(_opCtx.get(), collection, nss, indexSpec);
+    ASSERT_EQUALS(2, numIndexes);
+
+    auto commonOperation =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+
+    auto createIndexOperation = makeCreateIndexOplogEntry(collection, BSON("b" << 1), longName, 2);
+
+    // A collection rename will fail if it would cause an index name to become more than 128 bytes.
+    // The old collection name plus the index name is not too long, but the new collection name
+    // plus the index name is too long.
+    auto newName = NamespaceString("test", "collcollcollcollcoll");
+    auto renameCollectionOperation =
+        makeRenameCollectionOplogEntry(newName,
+                                       nss,
+                                       collection->uuid().get(),
+                                       boost::none,
+                                       false,
+                                       OpTime(Timestamp(Seconds(2), 0), 1));
+
+    RollbackSourceMock rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
+        commonOperation,
+    })));
+
+    ASSERT_OK(syncRollback(
+        _opCtx.get(),
+        OplogInterfaceMock({createIndexOperation, renameCollectionOperation, commonOperation}),
+        rollbackSource,
+        {},
+        _coordinator,
+        _replicationProcess.get()));
+
+    {
+        AutoGetCollectionForReadCommand coll(_opCtx.get(), newName);
+        auto indexCatalog = coll.getCollection()->getIndexCatalog();
+        ASSERT(indexCatalog);
+        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
+
+        std::vector<IndexDescriptor*> indexes;
+        indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("b" << 1), false, &indexes);
+        ASSERT(indexes.size() == 0);
+    }
+}
+
 TEST_F(RSRollbackTest, RollingBackDropAndCreateOfSameIndexNameWithDifferentSpecs) {
     createOplog(_opCtx.get());
     CollectionOptions options;
