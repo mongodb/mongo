@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test that the plan summary string appears in db.currentOp() for
 // count operations. SERVER-14064.
 

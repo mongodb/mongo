@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns, requires_non_retryable_commands]
+
 // Check the return value of a db.eval function running a database query, and ensure the function's
 // contents are logged in the profile log.
 

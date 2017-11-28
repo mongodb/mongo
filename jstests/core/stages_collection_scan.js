@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test basic query stage collection scan functionality.
 t = db.stages_collection_scan;
 t.drop();

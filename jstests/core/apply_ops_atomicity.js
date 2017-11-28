@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // SERVER-23326: Make applyOps atomic for CRUD operations
 (function() {
     'use strict';

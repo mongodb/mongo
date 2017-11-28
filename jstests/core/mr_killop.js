@@ -1,7 +1,7 @@
 // Cannot implicitly shard accessed collections because the "command" field in the currentOp()
 // output is reported as {"mapreduce.shardedfinish": { mapreduce: "jstests_mr_killop", ... }, ... }
 // when the "finalize" option to the "mapReduce" command is used on a sharded collection.
-// @tags: [assumes_unsharded_collection]
+// @tags: [assumes_unsharded_collection, does_not_support_stepdowns]
 
 // Test killop applied to m/r operations and child ops of m/r operations.
 

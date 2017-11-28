@@ -1,3 +1,6 @@
+// @tags: [does_not_support_stepdowns, requires_non_retryable_commands,
+// requires_non_retryable_writes]
+
 // Test various user operations against "system.profile" collection.  SERVER-18111.
 
 var testDB = db.getSiblingDB("system_profile");

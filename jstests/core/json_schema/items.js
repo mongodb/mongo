@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 /**
  * Tests the JSON Schema "items" keyword.
  */

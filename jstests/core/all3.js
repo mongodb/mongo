@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Check that $all matching null is consistent with $in - SERVER-3820
 
 t = db.jstests_all3;

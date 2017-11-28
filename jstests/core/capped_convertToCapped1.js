@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // test cloneCollectionAsCapped
 
 source = db.capped_convertToCapped1;

@@ -1,6 +1,7 @@
 // Cannot implicitly shard accessed collections because unsupported use of sharded collection
 // from db.eval.
-// @tags: [assumes_unsharded_collection]
+// @tags: [assumes_unsharded_collection, requires_non_retryable_commands,
+// requires_non_retryable_writes]
 
 t = db.eval4;
 t.drop();

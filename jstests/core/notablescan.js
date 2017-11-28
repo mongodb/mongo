@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // check notablescan mode
 
 t = db.test_notablescan;

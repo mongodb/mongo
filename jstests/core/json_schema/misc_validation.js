@@ -12,7 +12,8 @@
  * - applyOps
  * - $elemMatch projection
  *
- * @tags: [assumes_no_implicit_collection_creation_after_drop]
+ * @tags: [assumes_no_implicit_collection_creation_after_drop, requires_non_retryable_commands,
+ * requires_non_retryable_writes]
  */
 (function() {
     "use strict";

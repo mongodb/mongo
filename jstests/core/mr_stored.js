@@ -1,3 +1,4 @@
+// @tags: [does_not_support_stepdowns, requires_non_retryable_writes]
 
 t = db.mr_stored;
 t.drop();

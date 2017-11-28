@@ -1,3 +1,6 @@
+// @tags: [does_not_support_stepdowns, requires_getmore, requires_non_retryable_commands,
+// requires_non_retryable_writes]
+
 /*
  * Declaratively-defined tests for views for all database commands. This file contains a map of test
  * definitions as well as code to run them.

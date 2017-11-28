@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Test that update validation failure terminates the update without modifying subsequent
 // documents.  SERVER-4779
 

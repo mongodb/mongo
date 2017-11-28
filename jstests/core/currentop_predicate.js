@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Tests the use of a match predicate with the currentOp command.
 (function() {
     // Test a predicate that matches the currentOp operation we are running.

@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // reported as server-1238.
 
 db.server1238.drop();

@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Top level match fields within an $elemMatch clause may constrain multiple subfields from a
 // compound multikey index.  SERVER-3104
 //

@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // test dropping a db with simultaneous commits
 
 m = db.getMongo();

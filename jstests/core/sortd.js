@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Test sorting with dups and multiple candidate query plans.
 
 t = db.jstests_sortd;

@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Tests for the $isolated update/delete operator.
 (function() {
     "use strict";

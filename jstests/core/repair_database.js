@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 /**
  * This tests checks that repair database works and doesn't leave the database in a bad state
  * 1.) Drop "repairDB" database

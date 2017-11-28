@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test the planCacheListPlans command.
 
 (function() {

@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // End-to-end testing for index scan explosion + merge sort.
 // SERVER-5063 and SERVER-1205.
 t = db.jstests_sortk;

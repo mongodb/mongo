@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Test that tailable cursors work correctly with skip and limit.
 (function() {
     "use strict";

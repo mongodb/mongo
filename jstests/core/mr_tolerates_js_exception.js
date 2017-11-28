@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 /**
  *  Test that the mapReduce command fails gracefully when user-provided JavaScript code throws.
  */

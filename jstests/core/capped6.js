@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // Test NamespaceDetails::cappedTruncateAfter via "captrunc" command
 (function() {
     var coll = db.capped6;

@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 (function() {
     'use strict';
 

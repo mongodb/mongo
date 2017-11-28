@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Test $exists with array element field names SERVER-2897
 
 t = db.jstests_exists8;

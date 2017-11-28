@@ -1,6 +1,6 @@
 // Cannot implicitly shard accessed collections because of following errmsg: Cannot output to a
 // non-sharded collection because sharded collection exists already.
-// @tags: [assumes_unsharded_collection]
+// @tags: [assumes_unsharded_collection, does_not_support_stepdowns]
 
 /**
  * Test that the server returns an error response for map-reduce operations that attempt to insert a

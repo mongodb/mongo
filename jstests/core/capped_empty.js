@@ -1,3 +1,4 @@
+// @tags: [requires_non_retryable_commands]
 
 t = db.capped_empty;
 t.drop();

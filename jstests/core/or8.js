@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // missing collection
 
 t = db.jstests_or8;

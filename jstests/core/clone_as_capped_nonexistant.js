@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 (function() {
     "use strict";
     // This test ensures that CloneCollectionAsCapped()ing a nonexistent collection will not

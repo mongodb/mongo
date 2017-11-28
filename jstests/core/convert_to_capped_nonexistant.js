@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // This test ensures that ConvertToCapped()ing a nonexistent collection will not cause the server to
 // abort (SERVER-13750)
 

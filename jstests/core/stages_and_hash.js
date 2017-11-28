@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 t = db.stages_and_hashed;
 t.drop();
 

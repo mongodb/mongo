@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Test $or query with several clauses on separate indexes.
 
 t = db.jstests_oro;

@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 //
 // Tests that the correct CRSes are used for geo queries (based on input geometry)
 //

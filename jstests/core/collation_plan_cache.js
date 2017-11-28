@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Integration testing for the plan cache and index filter commands with collation.
 (function() {
     'use strict';

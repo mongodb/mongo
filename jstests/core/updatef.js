@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands, requires_non_retryable_writes]
+
 // Test unsafe management of nsdt on update command yield SERVER-3208
 
 prefixNS = db.jstests_updatef;

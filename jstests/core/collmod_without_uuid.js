@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 /**
  * SERVER-32125 Check that applyOps commands with collMod without UUID don't strip it
  */
