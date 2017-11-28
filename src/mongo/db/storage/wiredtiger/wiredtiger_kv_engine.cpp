@@ -1055,7 +1055,6 @@ void WiredTigerKVEngine::setOldestTimestamp(SnapshotName oldestTimestamp) {
     }
 
     // Lag the oldest_timestamp by one timestamp set, to give a bit more history.
-    invariant(_previousSetOldestTimestamp <= oldestTimestamp);
     auto timestampToSet = _previousSetOldestTimestamp;
     _previousSetOldestTimestamp = oldestTimestamp;
     if (timestampToSet == SnapshotName()) {
