@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 /**
  * Tests for the JSON Schema logical keywords, including:
  *

@@ -1,6 +1,6 @@
 // Confirms that profiled update execution contains all expected metrics with proper values.
 // Uses features that require featureCompatibilityVersion 3.6.
-// @tags: [requires_fcv36]
+// @tags: [requires_fcv36, does_not_support_stepdowns, requires_non_retryable_writes]
 
 (function() {
     "use strict";

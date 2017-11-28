@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // SERVER-23129 Write commands should reject unknown fields. This is run in passthrough tests to
 // ensure that both mongos and mongod reject these commands.
 (function() {

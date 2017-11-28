@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test basic OR functionality
 t = db.stages_or;
 t.drop();

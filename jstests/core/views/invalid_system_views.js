@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands, requires_non_retryable_writes]
+
 /**
  * Tests that invalid view definitions in system.views do not impact valid commands on existing
  * collections.

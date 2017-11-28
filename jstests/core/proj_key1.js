@@ -1,3 +1,4 @@
+// @tags: [requires_getmore]
 
 t = db.proj_key1;
 t.drop();

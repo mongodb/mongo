@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 /**
  * Tests for handling of the JSON Schema 'required' keyword.
  */

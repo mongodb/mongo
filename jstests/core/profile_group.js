@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Confirms that profiled group execution contains all expected metrics with proper values.
 
 (function() {

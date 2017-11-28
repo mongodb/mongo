@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Test the creation of view with a duplicate name to a collection.
 
 (function() {

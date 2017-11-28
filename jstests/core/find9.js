@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Test that the MaxBytesToReturnToClientAtOnce limit is enforced.
 
 t = db.jstests_find9;

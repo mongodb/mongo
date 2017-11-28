@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns, requires_non_retryable_commands]
+
 // Basic tests for a form of stack recursion that's been shown to cause C++
 // side stack overflows in the past. See SERVER-19614.
 

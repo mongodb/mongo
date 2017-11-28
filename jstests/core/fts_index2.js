@@ -1,6 +1,6 @@
 // Cannot implicitly shard accessed collections because renameCollection command not supported
 // on sharded collections.
-// @tags: [assumes_unsharded_collection]
+// @tags: [assumes_unsharded_collection, requires_non_retryable_commands]
 
 // Test that collections with text indexes can be renamed.  SERVER-14027.
 

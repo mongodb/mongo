@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 /**
  * This test creates a collection with autoIndexId: false. It then copies the database and expects
  * the new collection to not have an _id index either.

@@ -1,3 +1,4 @@
+// @tags: [does_not_support_stepdowns, requires_getmore]
 
 t = db.mr1;
 t.drop();

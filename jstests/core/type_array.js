@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 /**
  * Tests for the array-related behavior of the $type query operator.
  */

@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 t = db.jstests_or7;
 t.drop();
 

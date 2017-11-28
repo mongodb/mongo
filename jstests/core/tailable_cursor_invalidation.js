@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Tests for the behavior of tailable cursors when a collection is dropped or the cursor is
 // otherwise invalidated.
 (function() {

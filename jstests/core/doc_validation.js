@@ -1,7 +1,8 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
 // Uses features that require featureCompatibilityVersion 3.6.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_fcv36]
+// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_fcv36,
+// requires_non_retryable_commands, requires_non_retryable_writes]
 
 // Test basic inserts and updates with document validation.
 (function() {

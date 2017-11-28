@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Check multikey index cases with parallel nested fields SERVER-958.
 
 t = db.jstests_indexr;

@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Sanity check for the showRecordId option.
 
 var t = db.show_record_id;

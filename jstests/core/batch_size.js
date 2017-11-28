@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Test subtleties of batchSize and limit.
 
 var t = db.jstests_batch_size;

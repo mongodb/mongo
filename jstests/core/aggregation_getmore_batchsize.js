@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // this is a simple test to make sure that batchSize gets propagated to the cursors returned
 // from the aggregate sell helper
 

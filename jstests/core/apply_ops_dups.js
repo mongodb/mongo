@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 (function() {
     "use strict";
     var t = db.apply_ops_dups;

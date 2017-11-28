@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // SERVER-2831 Demonstration of sparse index matching semantics in a multi index $or query.
 
 t = db.jstests_orh;

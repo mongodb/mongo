@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 /**
  * Tests for the non-standard 'bsonType' keyword in JSON Schema, as well as some tests for 'type'.
  */

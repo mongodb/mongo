@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Test the killCursors command.
 (function() {
     'use strict';

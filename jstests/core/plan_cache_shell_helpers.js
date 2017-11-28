@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test the shell helpers which wrap the plan cache commands.
 
 var t = db.jstests_plan_cache_shell_helpers;

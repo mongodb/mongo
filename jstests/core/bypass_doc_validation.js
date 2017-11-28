@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns, requires_non_retryable_commands]
+
 /**
  * Tests that various database commands respect the 'bypassDocumentValidation' flag:
  *

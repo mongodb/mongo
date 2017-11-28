@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns, requires_non_retryable_commands]
+
 /**
  * Tests the behavior of operations when interacting with a view's default collation.
  */

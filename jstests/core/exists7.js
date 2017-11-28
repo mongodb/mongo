@@ -1,3 +1,4 @@
+// @tags: [requires_non_retryable_writes]
 
 // Test that non boolean value types are allowed with $explain spec. SERVER-2322
 

@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Test removal of a substantial proportion of inserted documents.  SERVER-3803
 // A complete test will only be performed against a DEBUG build.
 

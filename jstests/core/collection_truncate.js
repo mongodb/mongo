@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // SERVER-15033 truncate on a regular collection
 
 var t = db.getCollection('collection_truncate');

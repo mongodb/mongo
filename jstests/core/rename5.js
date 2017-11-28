@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Check some $rename cases with a missing source.  SERVER-4845
 
 t = db.jstests_rename5;

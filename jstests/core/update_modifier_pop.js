@@ -1,5 +1,5 @@
 // Uses features that require featureCompatibilityVersion 3.6.
-// @tags: [requires_fcv36]
+// @tags: [requires_fcv36, requires_non_retryable_writes]
 (function() {
     "use strict";
 

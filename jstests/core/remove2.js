@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // remove2.js
 // a unit test for db remove
 

@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns, requires_non_retryable_writes]
+
 /**
  * Tests for sorting documents by fields that contain arrays.
  */

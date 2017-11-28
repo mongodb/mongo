@@ -1,3 +1,4 @@
+// @tags: [requires_getmore]
 
 t = db.cursor1;
 t.drop();

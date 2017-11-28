@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Ensure that the find and getMore commands can handle documents nearing the 16 MB size limit for
 // user-stored BSON documents.
 (function() {

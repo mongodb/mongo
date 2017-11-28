@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Sanity test for removing documents with adjacent index keys.  SERVER-2008
 
 t = db.jstests_removec;

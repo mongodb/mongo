@@ -1,3 +1,5 @@
+// @tags: [requires_getmore, requires_non_retryable_writes]
+
 t = db.cursora;
 
 function run(n, atomic) {

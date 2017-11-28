@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns, requires_getmore]
+
 // Confirms that a parallelCollectionScan command and subsequent getMores of its cursor are profiled
 // correctly.
 

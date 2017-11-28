@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // SERVER-12591: prevent renaming to arbitrary system collections.
 
 var testdb =

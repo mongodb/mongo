@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test that interrupting a count returns an error code.
 
 t = db.count10;

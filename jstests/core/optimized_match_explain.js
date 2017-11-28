@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 /**
  * Tests that the explain output for $match reflects any optimizations.
  */

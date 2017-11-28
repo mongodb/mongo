@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // SERVER-7343: allow $within without a geo index.
 t = db.geo_box1_noindex;
 t.drop();
