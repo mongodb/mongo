@@ -238,16 +238,16 @@ void Test::stopCapturingLogMessages() {
 }
 void Test::printCapturedLogLines() const {
     log() << "****************************** Captured Lines (start) *****************************";
-    std::for_each(getCapturedLogMessages().begin(),
-                  getCapturedLogMessages().end(),
-                  [](std::string line) { log() << line; });
+    for (const auto& line : getCapturedLogMessages()) {
+        log() << line;
+    }
     log() << "****************************** Captured Lines (end) ******************************";
 }
 
 int64_t Test::countLogLinesContaining(const std::string& needle) {
-    return std::count_if(getCapturedLogMessages().begin(),
-                         getCapturedLogMessages().end(),
-                         stdx::bind(stringContains, stdx::placeholders::_1, needle));
+    const auto& msgs = getCapturedLogMessages();
+    return std::count_if(
+        msgs.begin(), msgs.end(), [&](const std::string& s) { return stringContains(s, needle); });
 }
 
 Suite::Suite(const std::string& name) : _name(name) {

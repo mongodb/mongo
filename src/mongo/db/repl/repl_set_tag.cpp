@@ -50,12 +50,10 @@ bool ReplSetTag::operator!=(const ReplSetTag& other) const {
 }
 
 void ReplSetTagPattern::addTagCountConstraint(int32_t keyIndex, int32_t minCount) {
-    const std::vector<TagCountConstraint>::iterator iter = std::find_if(
-        _constraints.begin(),
-        _constraints.end(),
-        stdx::bind(std::equal_to<int32_t>(),
-                   keyIndex,
-                   stdx::bind(&TagCountConstraint::getKeyIndex, stdx::placeholders::_1)));
+    const auto iter =
+        std::find_if(_constraints.begin(), _constraints.end(), [=](const TagCountConstraint& x) {
+            return keyIndex == x.getKeyIndex();
+        });
     if (iter == _constraints.end()) {
         _constraints.push_back(TagCountConstraint(keyIndex, minCount));
     } else if (iter->getMinCount() < minCount) {
@@ -75,12 +73,10 @@ ReplSetTagMatch::ReplSetTagMatch(const ReplSetTagPattern& pattern) {
 }
 
 bool ReplSetTagMatch::update(const ReplSetTag& tag) {
-    const std::vector<BoundTagValue>::iterator iter =
+    const auto iter =
         std::find_if(_boundTagValues.begin(),
                      _boundTagValues.end(),
-                     stdx::bind(std::equal_to<int32_t>(),
-                                tag.getKeyIndex(),
-                                stdx::bind(&BoundTagValue::getKeyIndex, stdx::placeholders::_1)));
+                     [ki = tag.getKeyIndex()](const auto& x) { return ki == x.getKeyIndex(); });
     if (iter != _boundTagValues.end()) {
         if (!sequenceContains(iter->boundValues, tag.getValueIndex())) {
             iter->boundValues.push_back(tag.getValueIndex());
@@ -90,12 +86,9 @@ bool ReplSetTagMatch::update(const ReplSetTag& tag) {
 }
 
 bool ReplSetTagMatch::isSatisfied() const {
-    const std::vector<BoundTagValue>::const_iterator iter =
-        std::find_if(_boundTagValues.begin(),
-                     _boundTagValues.end(),
-                     stdx::bind(std::logical_not<bool>(),
-                                stdx::bind(&BoundTagValue::isSatisfied, stdx::placeholders::_1)));
-    return iter == _boundTagValues.end();
+    return std::find_if(_boundTagValues.begin(), _boundTagValues.end(), [](const auto& x) {
+               return !x.isSatisfied();
+           }) == _boundTagValues.end();
 }
 
 bool ReplSetTagMatch::BoundTagValue::isSatisfied() const {

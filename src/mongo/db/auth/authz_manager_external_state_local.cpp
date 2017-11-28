@@ -488,12 +488,12 @@ Status AuthzManagerExternalStateLocal::_initializeRoleGraph(OperationContext* op
     _roleGraph = RoleGraph();
 
     RoleGraph newRoleGraph;
-    Status status =
-        query(opCtx,
-              AuthorizationManager::rolesCollectionNamespace,
-              BSONObj(),
-              BSONObj(),
-              [p = &newRoleGraph](const auto& x) { return addRoleFromDocumentOrWarn(p, x); });
+    Status status = query(
+        opCtx,
+        AuthorizationManager::rolesCollectionNamespace,
+        BSONObj(),
+        BSONObj(),
+        [p = &newRoleGraph](const BSONObj& doc) { return addRoleFromDocumentOrWarn(p, doc); });
     if (!status.isOK())
         return status;
 

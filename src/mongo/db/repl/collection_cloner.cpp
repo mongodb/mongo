@@ -840,7 +840,7 @@ void CollectionCloner::_verifyCollectionWasDropped(
                              ReadPreferenceSetting::secondaryPreferredMetadata(),
                              opCtx,
                              RemoteCommandRequest::kNoTimeout),
-        [this, opCtx, batchStatus, onCompletionGuard](const RemoteCommandCallbackArgs& args) {
+        [this, batchStatus, onCompletionGuard](const RemoteCommandCallbackArgs& args) {
             // If the attempt to determine if the collection was dropped fails for any reason other
             // than NamespaceNotFound, return the original error code.
             //

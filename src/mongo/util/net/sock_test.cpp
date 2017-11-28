@@ -146,13 +146,11 @@ SocketPair socketPair(const int type, const int protocol) {
 
     Notification<void> accepted;
     SOCKET acceptSock = INVALID_SOCKET;
-    stdx::thread acceptor(
-        stdx::bind(&detail::awaitAccept, &acceptSock, listenSock, stdx::ref(accepted)));
+    stdx::thread acceptor([&] { detail::awaitAccept(&acceptSock, listenSock, accepted); });
 
     Notification<void> connected;
     SOCKET connectSock = INVALID_SOCKET;
-    stdx::thread connector(
-        stdx::bind(&detail::awaitConnect, &connectSock, *connectRes, stdx::ref(connected)));
+    stdx::thread connector([&] { detail::awaitConnect(&connectSock, *connectRes, connected); });
 
     connected.get();
     connector.join();

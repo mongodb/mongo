@@ -229,10 +229,6 @@ Status checkOkayToGrantPrivilegesToRole(const RoleName& role, const PrivilegeVec
     return Status::OK();
 }
 
-void appendBSONObjToBSONArrayBuilder(BSONArrayBuilder* array, const BSONObj& obj) {
-    array->append(obj);
-}
-
 /**
  * Finds all documents matching "query" in "collectionName".  For each document returned,
  * calls the function resultProcessor on it.
@@ -1268,14 +1264,12 @@ public:
             if (!args.showCredentials) {
                 projection.append("credentials", 0);
             }
-            const stdx::function<void(const BSONObj&)> function = stdx::bind(
-                appendBSONObjToBSONArrayBuilder, &usersArrayBuilder, stdx::placeholders::_1);
-
-            Status status = queryAuthzDocument(opCtx,
-                                               AuthorizationManager::usersCollectionNamespace,
-                                               queryBuilder.done(),
-                                               projection.done(),
-                                               function);
+            Status status =
+                queryAuthzDocument(opCtx,
+                                   AuthorizationManager::usersCollectionNamespace,
+                                   queryBuilder.done(),
+                                   projection.done(),
+                                   [&](const BSONObj& obj) { usersArrayBuilder.append(obj); });
             if (!status.isOK()) {
                 return appendCommandStatus(result, status);
             }
@@ -2423,18 +2417,6 @@ public:
         return UserName(name, db);
     }
 
-    /**
-     * Extracts the UserName from the user document and adds it to set of existing users.
-     * This function is written so it can used with stdx::bind over the result set of a query
-     * on admin.system.users to add the user names of all existing users to the "usersToDrop"
-     * set used in the command body.
-     */
-    static void extractAndInsertUserName(unordered_set<UserName>* existingUsers,
-                                         const BSONObj& userObj) {
-        UserName userName = extractUserNameFromBSON(userObj);
-        existingUsers->insert(userName);
-    }
-
     static RoleName extractRoleNameFromBSON(const BSONObj& roleObj) {
         std::string name;
         std::string db;
@@ -2444,18 +2426,6 @@ public:
         status = bsonExtractStringField(roleObj, AuthorizationManager::ROLE_DB_FIELD_NAME, &db);
         uassertStatusOK(status);
         return RoleName(name, db);
-    }
-
-    /**
-     * Extracts the RoleName from the role document and adds it to set of existing roles.
-     * This function is written so it can used with stdx::bind over the result set of a query
-     * on admin.system.roles to add the role names of all existing roles to the "rolesToDrop"
-     * set used in the command body.
-     */
-    static void extractAndInsertRoleName(unordered_set<RoleName>* existingRoles,
-                                         const BSONObj& roleObj) {
-        RoleName roleName = extractRoleNameFromBSON(roleObj);
-        existingRoles->insert(roleName);
     }
 
     /**
@@ -2526,7 +2496,7 @@ public:
     }
 
     /**
-     * Designed to be used with stdx::bind to be called on every user object in the result
+     * Designed to be used as a callback to be called on every user object in the result
      * set of a query over the tempUsersCollection provided to the command.  For each user
      * in the temp collection that is defined on the given db, adds that user to the actual
      * admin.system.users collection.
@@ -2564,7 +2534,7 @@ public:
     }
 
     /**
-     * Designed to be used with stdx::bind to be called on every role object in the result
+     * Designed to be used as a callback to be called on every role object in the result
      * set of a query over the tempRolesCollection provided to the command.  For each role
      * in the temp collection that is defined on the given db, adds that role to the actual
      * admin.system.roles collection.
@@ -2635,9 +2605,9 @@ public:
                                    AuthorizationManager::usersCollectionNamespace,
                                    query,
                                    fields,
-                                   stdx::bind(&CmdMergeAuthzCollections::extractAndInsertUserName,
-                                              &usersToDrop,
-                                              stdx::placeholders::_1));
+                                   [&](const BSONObj& userObj) {
+                                       usersToDrop.insert(extractUserNameFromBSON(userObj));
+                                   });
             if (!status.isOK()) {
                 return status;
             }
@@ -2648,23 +2618,16 @@ public:
             NamespaceString(usersCollName),
             db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db),
             BSONObj(),
-            stdx::bind(&CmdMergeAuthzCollections::addUser,
-                       opCtx,
-                       authzManager,
-                       db,
-                       drop,
-                       &usersToDrop,
-                       stdx::placeholders::_1));
+            [&](const BSONObj& userObj) {
+                return addUser(opCtx, authzManager, db, drop, &usersToDrop, userObj);
+            });
         if (!status.isOK()) {
             return status;
         }
 
         if (drop) {
             long long numRemoved;
-            for (unordered_set<UserName>::iterator it = usersToDrop.begin();
-                 it != usersToDrop.end();
-                 ++it) {
-                const UserName& userName = *it;
+            for (const UserName& userName : usersToDrop) {
                 audit::logDropUser(Client::getCurrent(), userName);
                 status = removePrivilegeDocuments(opCtx,
                                                   BSON(AuthorizationManager::USER_NAME_FIELD_NAME
@@ -2715,9 +2678,9 @@ public:
                                    AuthorizationManager::rolesCollectionNamespace,
                                    query,
                                    fields,
-                                   stdx::bind(&CmdMergeAuthzCollections::extractAndInsertRoleName,
-                                              &rolesToDrop,
-                                              stdx::placeholders::_1));
+                                   [&](const BSONObj& roleObj) {
+                                       return rolesToDrop.insert(extractRoleNameFromBSON(roleObj));
+                                   });
             if (!status.isOK()) {
                 return status;
             }
@@ -2728,13 +2691,9 @@ public:
             NamespaceString(rolesCollName),
             db.empty() ? BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db),
             BSONObj(),
-            stdx::bind(&CmdMergeAuthzCollections::addRole,
-                       opCtx,
-                       authzManager,
-                       db,
-                       drop,
-                       &rolesToDrop,
-                       stdx::placeholders::_1));
+            [&](const BSONObj& roleObj) {
+                return addRole(opCtx, authzManager, db, drop, &rolesToDrop, roleObj);
+            });
         if (!status.isOK()) {
             return status;
         }
@@ -2886,7 +2845,7 @@ Status updateCredentials(OperationContext* opCtx) {
         NamespaceString("admin", "system.users"),
         BSONObj(),
         BSONObj(),
-        stdx::bind(updateUserCredentials, opCtx, "admin", stdx::placeholders::_1));
+        [opCtx](const BSONObj& userDoc) { return updateUserCredentials(opCtx, "admin", userDoc); });
     if (!status.isOK())
         return logUpgradeFailed(status);
 
