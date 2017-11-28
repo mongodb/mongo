@@ -41,6 +41,20 @@ __wt_strdup(WT_SESSION_IMPL *session, const char *str, void *retp)
 }
 
 /*
+ * __wt_strnlen --
+ *      Determine the length of a fixed-size string
+ */
+static inline size_t
+__wt_strnlen(const char *s, size_t maxlen)
+{
+	size_t i;
+
+	for (i = 0; i < maxlen && *s != '\0'; i++, s++)
+		;
+	return (i);
+}
+
+/*
  * __wt_snprintf --
  *	snprintf convenience function, ignoring the returned size.
  */

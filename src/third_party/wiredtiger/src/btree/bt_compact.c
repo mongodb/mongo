@@ -58,7 +58,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
 		for (multi = mod->mod_multi,
 		    i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
-			if (multi->disk_image != NULL)
+			if (multi->addr.addr == NULL)
 				continue;
 			if ((ret = bm->compact_page_skip(bm, session,
 			    multi->addr.addr, multi->addr.size, skipp)) != 0)

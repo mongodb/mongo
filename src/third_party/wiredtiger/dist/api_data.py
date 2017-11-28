@@ -1303,6 +1303,10 @@ methods = {
         where the application is rolling back locally committed transactions.
         The supplied value should not be older than the current oldest and
         stable timestamps.  See @ref transaction_timestamps'''),
+    Config('force', 'false', r'''
+        set timestamps even if they violate normal ordering requirements.
+        For example allow the \c oldest_timestamp to move backwards''',
+        type='boolean'),
     Config('oldest_timestamp', '', r'''
         future commits and queries will be no earlier than the specified
         timestamp.  Supplied values must be monotonically increasing, any

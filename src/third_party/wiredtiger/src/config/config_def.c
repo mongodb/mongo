@@ -191,6 +191,7 @@ static const WT_CONFIG_CHECK confchk_WT_CONNECTION_reconfigure[] = {
 
 static const WT_CONFIG_CHECK confchk_WT_CONNECTION_set_timestamp[] = {
 	{ "commit_timestamp", "string", NULL, NULL, NULL, 0 },
+	{ "force", "boolean", NULL, NULL, NULL, 0 },
 	{ "oldest_timestamp", "string", NULL, NULL, NULL, 0 },
 	{ "stable_timestamp", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
@@ -1194,8 +1195,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL, 0
 	},
 	{ "WT_CONNECTION.set_timestamp",
-	  "commit_timestamp=,oldest_timestamp=,stable_timestamp=",
-	  confchk_WT_CONNECTION_set_timestamp, 3
+	  "commit_timestamp=,force=false,oldest_timestamp=,"
+	  "stable_timestamp=",
+	  confchk_WT_CONNECTION_set_timestamp, 4
 	},
 	{ "WT_CURSOR.close",
 	  "",
