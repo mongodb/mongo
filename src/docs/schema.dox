@@ -94,7 +94,10 @@ a size, that indicates the number of bytes to store; the default is a
 length of 1 byte.
 
 The \c 'S' type is encoded as a C language string terminated by a
-NUL character.
+NUL character. When preceded by a size, that indicates the maximum number of
+bytes the string can store. In a string with characters less than the
+specified size, the remaining bytes are NUL padded. If the supplied string
+is longer than the specified size, it will be stored without a trailing NUL.
 @m_if{java}
 Because of this, the associated Java String may not contain the NUL character.
 @m_endif
