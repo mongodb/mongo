@@ -7,6 +7,8 @@ Documentation=https://docs.mongodb.org/manual
 User=mongodb
 Group=mongodb
 ExecStart=/usr/bin/mongod --config /etc/mongod.conf
+PIDFile=/var/run/mongodb/mongod.pid
+Type=forking
 # file size
 LimitFSIZE=infinity
 # cpu time

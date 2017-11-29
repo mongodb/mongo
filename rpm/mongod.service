@@ -13,6 +13,7 @@ ExecStartPre=/usr/bin/chown mongod:mongod /var/run/mongodb
 ExecStartPre=/usr/bin/chmod 0755 /var/run/mongodb
 PermissionsStartOnly=true
 PIDFile=/var/run/mongodb/mongod.pid
+Type=forking
 # file size
 LimitFSIZE=infinity
 # cpu time
