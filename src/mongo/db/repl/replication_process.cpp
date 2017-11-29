@@ -54,14 +54,7 @@ const auto getReplicationProcess =
     ServiceContext::declareDecoration<std::unique_ptr<ReplicationProcess>>();
 
 const auto kRollbackNamespacePrefix = "local.system.rollback."_sd;
-
-const auto kRollbackProgressIdDoc = BSON("_id"
-                                         << "rollbackProgress");
-const auto kRollbackProgressIdKey = kRollbackProgressIdDoc["_id"];
 }  // namespace
-
-const NamespaceString ReplicationProcess::kRollbackProgressNamespace(kRollbackNamespacePrefix +
-                                                                     "progress");
 
 ReplicationProcess* ReplicationProcess::get(ServiceContext* service) {
     return getReplicationProcess(service).get();
@@ -146,48 +139,6 @@ Status ReplicationProcess::incrementRollbackID(OperationContext* opCtx) {
     }
 
     return status.getStatus();
-}
-
-StatusWith<OpTime> ReplicationProcess::getRollbackProgress(OperationContext* opCtx) {
-    auto documentResult =
-        _storageInterface->findById(opCtx, kRollbackProgressNamespace, kRollbackProgressIdKey);
-    if (!documentResult.isOK()) {
-        return documentResult.getStatus();
-    }
-    const auto& doc = documentResult.getValue();
-    RollbackProgress rollbackProgress;
-    try {
-        rollbackProgress = RollbackProgress::parse(IDLParserErrorContext("RollbackProgress"), doc);
-    } catch (...) {
-        return exceptionToStatus();
-    }
-    return rollbackProgress.getApplyUntil();
-}
-
-Status ReplicationProcess::setRollbackProgress(OperationContext* opCtx, const OpTime& applyUntil) {
-    auto status = _storageInterface->createCollection(opCtx, kRollbackProgressNamespace, {});
-    if (ErrorCodes::NamespaceExists == status.code()) {
-        // Collection exists. Proceed to upsert progress document.
-    } else if (!status.isOK()) {
-        return status;
-    }
-    RollbackProgress rollbackProgress;
-    rollbackProgress.set_id(kRollbackProgressIdKey.String());
-    rollbackProgress.setApplyUntil(applyUntil);
-    BSONObjBuilder bob;
-    rollbackProgress.serialize(&bob);
-    return _storageInterface->upsertById(
-        opCtx, kRollbackProgressNamespace, kRollbackProgressIdKey, bob.obj());
-}
-
-Status ReplicationProcess::clearRollbackProgress(OperationContext* opCtx) {
-    auto status = _storageInterface->deleteByFilter(opCtx, kRollbackProgressNamespace, {});
-    if (ErrorCodes::NamespaceNotFound == status) {
-        return Status::OK();
-    } else if (!status.isOK()) {
-        return status;
-    }
-    return Status::OK();
 }
 
 ReplicationConsistencyMarkers* ReplicationProcess::getConsistencyMarkers() {
