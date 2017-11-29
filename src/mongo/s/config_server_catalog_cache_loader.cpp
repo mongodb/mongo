@@ -107,14 +107,12 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
     const auto diffQuery = createConfigDiffQuery(nss, startingCollectionVersion);
 
     // Query the chunks which have changed
-    std::vector<ChunkType> changedChunks;
     repl::OpTime opTime;
-    uassertStatusOK(
+    const std::vector<ChunkType> changedChunks = uassertStatusOK(
         Grid::get(opCtx)->catalogClient()->getChunks(opCtx,
                                                      diffQuery.query,
                                                      diffQuery.sort,
                                                      boost::none,
-                                                     &changedChunks,
                                                      &opTime,
                                                      repl::ReadConcernLevel::kMajorityReadConcern));
 

@@ -416,9 +416,8 @@ std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opC
                                                            StringData dbName) {
     const auto dbNameStr = dbName.toString();
 
-    std::vector<CollectionType> collectionsOnConfig;
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
-        opCtx, &dbNameStr, &collectionsOnConfig, nullptr));
+    const std::vector<CollectionType> collectionsOnConfig = uassertStatusOK(
+        Grid::get(opCtx)->catalogClient()->getCollections(opCtx, &dbNameStr, nullptr));
 
     std::vector<NamespaceString> collectionsToReturn;
     for (const auto& coll : collectionsOnConfig) {

@@ -215,9 +215,8 @@ public:
      *
      * Returns a !OK status if an error occurs.
      */
-    Status getDatabasesForShard(OperationContext* opCtx,
-                                const ShardId& shardId,
-                                std::vector<std::string>* dbs);
+    StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
+                                                              const ShardId& shardId);
 
     //
     // Collection Operations

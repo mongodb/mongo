@@ -377,16 +377,15 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
     auto future = launchAsync([this, &chunksQuery, newOpTime] {
-        vector<ChunkType> chunks;
         OpTime opTime;
 
-        ASSERT_OK(catalogClient()->getChunks(operationContext(),
-                                             chunksQuery,
-                                             BSON(ChunkType::lastmod() << -1),
-                                             1,
-                                             &chunks,
-                                             &opTime,
-                                             repl::ReadConcernLevel::kMajorityReadConcern));
+        const auto chunks =
+            assertGet(catalogClient()->getChunks(operationContext(),
+                                                 chunksQuery,
+                                                 BSON(ChunkType::lastmod() << -1),
+                                                 1,
+                                                 &opTime,
+                                                 repl::ReadConcernLevel::kMajorityReadConcern));
         ASSERT_EQ(2U, chunks.size());
         ASSERT_EQ(newOpTime, opTime);
 
@@ -434,15 +433,13 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
     auto future = launchAsync([this, &chunksQuery] {
-        vector<ChunkType> chunks;
-
-        ASSERT_OK(catalogClient()->getChunks(operationContext(),
-                                             chunksQuery,
-                                             BSONObj(),
-                                             boost::none,
-                                             &chunks,
-                                             nullptr,
-                                             repl::ReadConcernLevel::kMajorityReadConcern));
+        const auto chunks =
+            assertGet(catalogClient()->getChunks(operationContext(),
+                                                 chunksQuery,
+                                                 BSONObj(),
+                                                 boost::none,
+                                                 nullptr,
+                                                 repl::ReadConcernLevel::kMajorityReadConcern));
         ASSERT_EQ(0U, chunks.size());
 
         return chunks;
@@ -481,17 +478,15 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSInvalidChunk) {
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
     auto future = launchAsync([this, &chunksQuery] {
-        vector<ChunkType> chunks;
-        Status status = catalogClient()->getChunks(operationContext(),
-                                                   chunksQuery,
-                                                   BSONObj(),
-                                                   boost::none,
-                                                   &chunks,
-                                                   nullptr,
-                                                   repl::ReadConcernLevel::kMajorityReadConcern);
+        const auto swChunks =
+            catalogClient()->getChunks(operationContext(),
+                                       chunksQuery,
+                                       BSONObj(),
+                                       boost::none,
+                                       nullptr,
+                                       repl::ReadConcernLevel::kMajorityReadConcern);
 
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
-        ASSERT_EQ(0U, chunks.size());
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, swChunks.getStatus());
     });
 
     onFindCommand([&chunksQuery](const RemoteCommandRequest& request) {
@@ -797,16 +792,14 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
     auto future = launchAsync([this, newOpTime] {
-        vector<CollectionType> collections;
 
         OpTime opTime;
-        const auto status =
-            catalogClient()->getCollections(operationContext(), nullptr, &collections, &opTime);
+        const auto& collections =
+            assertGet(catalogClient()->getCollections(operationContext(), nullptr, &opTime));
 
-        ASSERT_OK(status);
         ASSERT_EQ(newOpTime, opTime);
 
-        return collections;
+        return std::move(collections);
     });
 
     onFindWithMetadataCommand(
@@ -859,13 +852,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
 
     auto future = launchAsync([this] {
         string dbName = "test";
-        vector<CollectionType> collections;
 
-        const auto status =
-            catalogClient()->getCollections(operationContext(), &dbName, &collections, nullptr);
-
-        ASSERT_OK(status);
-        return collections;
+        return assertGet(catalogClient()->getCollections(operationContext(), &dbName, nullptr));
     });
 
     onFindCommand([this, coll1, coll2](const RemoteCommandRequest& request) {
@@ -900,13 +888,11 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
 
     auto future = launchAsync([this] {
         string dbName = "test";
-        vector<CollectionType> collections;
 
-        const auto status =
-            catalogClient()->getCollections(operationContext(), &dbName, &collections, nullptr);
+        const auto swCollections =
+            catalogClient()->getCollections(operationContext(), &dbName, nullptr);
 
-        ASSERT_EQ(ErrorCodes::FailedToParse, status);
-        ASSERT_EQ(0U, collections.size());
+        ASSERT_EQ(ErrorCodes::FailedToParse, swCollections.getStatus());
     });
 
     CollectionType validColl;
@@ -956,12 +942,8 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
     dbt2.setPrimary(ShardId("shard0000"));
 
     auto future = launchAsync([this] {
-        vector<string> dbs;
-        const auto status =
-            catalogClient()->getDatabasesForShard(operationContext(), ShardId("shard0000"), &dbs);
-
-        ASSERT_OK(status);
-        return dbs;
+        return assertGet(
+            catalogClient()->getDatabasesForShard(operationContext(), ShardId("shard0000")));
     });
 
     onFindCommand([this, dbt1, dbt2](const RemoteCommandRequest& request) {
@@ -993,12 +975,10 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        vector<string> dbs;
-        const auto status =
-            catalogClient()->getDatabasesForShard(operationContext(), ShardId("shard0000"), &dbs);
+        const auto swDatabaseNames =
+            catalogClient()->getDatabasesForShard(operationContext(), ShardId("shard0000"));
 
-        ASSERT_EQ(ErrorCodes::TypeMismatch, status);
-        ASSERT_EQ(0U, dbs.size());
+        ASSERT_EQ(ErrorCodes::TypeMismatch, swDatabaseNames.getStatus());
     });
 
     onFindCommand([](const RemoteCommandRequest& request) {
@@ -1031,10 +1011,9 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
     tagB.setMaxKey(BSON("a" << 300));
 
     auto future = launchAsync([this] {
-        vector<TagsType> tags;
+        const auto& tags =
+            assertGet(catalogClient()->getTagsForCollection(operationContext(), "TestDB.TestColl"));
 
-        ASSERT_OK(
-            catalogClient()->getTagsForCollection(operationContext(), "TestDB.TestColl", &tags));
         ASSERT_EQ(2U, tags.size());
 
         return tags;
@@ -1067,10 +1046,9 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollectionNoTags) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        vector<TagsType> tags;
+        const auto& tags =
+            assertGet(catalogClient()->getTagsForCollection(operationContext(), "TestDB.TestColl"));
 
-        ASSERT_OK(
-            catalogClient()->getTagsForCollection(operationContext(), "TestDB.TestColl", &tags));
         ASSERT_EQ(0U, tags.size());
 
         return tags;
@@ -1085,12 +1063,10 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollectionInvalidTag) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     auto future = launchAsync([this] {
-        vector<TagsType> tags;
-        Status status =
-            catalogClient()->getTagsForCollection(operationContext(), "TestDB.TestColl", &tags);
+        const auto swTags =
+            catalogClient()->getTagsForCollection(operationContext(), "TestDB.TestColl");
 
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
-        ASSERT_EQ(0U, tags.size());
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, swTags.getStatus());
     });
 
     onFindCommand([](const RemoteCommandRequest& request) {

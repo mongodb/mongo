@@ -32,10 +32,12 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -82,10 +84,8 @@ StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientMock::getColle
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::getCollections(OperationContext* opCtx,
-                                                 const string* dbName,
-                                                 vector<CollectionType>* collections,
-                                                 repl::OpTime* optime) {
+StatusWith<std::vector<CollectionType>> ShardingCatalogClientMock::getCollections(
+    OperationContext* opCtx, const string* dbName, repl::OpTime* optime) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -94,25 +94,23 @@ Status ShardingCatalogClientMock::dropCollection(OperationContext* opCtx,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::getDatabasesForShard(OperationContext* opCtx,
-                                                       const ShardId& shardName,
-                                                       vector<string>* dbs) {
+StatusWith<std::vector<std::string>> ShardingCatalogClientMock::getDatabasesForShard(
+    OperationContext* opCtx, const ShardId& shardName) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::getChunks(OperationContext* opCtx,
-                                            const BSONObj& filter,
-                                            const BSONObj& sort,
-                                            boost::optional<int> limit,
-                                            std::vector<ChunkType>* chunks,
-                                            repl::OpTime* opTime,
-                                            repl::ReadConcernLevel readConcern) {
+StatusWith<std::vector<ChunkType>> ShardingCatalogClientMock::getChunks(
+    OperationContext* opCtx,
+    const BSONObj& filter,
+    const BSONObj& sort,
+    boost::optional<int> limit,
+    repl::OpTime* opTime,
+    repl::ReadConcernLevel readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::getTagsForCollection(OperationContext* opCtx,
-                                                       const string& collectionNs,
-                                                       vector<TagsType>* tags) {
+StatusWith<std::vector<TagsType>> ShardingCatalogClientMock::getTagsForCollection(
+    OperationContext* opCtx, const string& collectionNs) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

@@ -118,9 +118,8 @@ public:
         const auto shardDrainingStatus =
             uassertStatusOK(shardingCatalogManager->removeShard(opCtx, shard->getId()));
 
-        std::vector<std::string> databases;
-        uassertStatusOK(
-            shardingCatalogManager->getDatabasesForShard(opCtx, shard->getId(), &databases));
+        std::vector<std::string> databases =
+            uassertStatusOK(shardingCatalogManager->getDatabasesForShard(opCtx, shard->getId()));
 
         // Get BSONObj containing:
         // 1) note about moving or dropping databases in a shard
@@ -149,19 +148,18 @@ public:
                 result.appendElements(dbInfo);
                 break;
             case ShardDrainingStatus::ONGOING: {
-                std::vector<ChunkType> chunks;
-                Status status = Grid::get(opCtx)->catalogClient()->getChunks(
+                const auto swChunks = Grid::get(opCtx)->catalogClient()->getChunks(
                     opCtx,
                     BSON(ChunkType::shard(shard->getId().toString())),
                     BSONObj(),
                     boost::none,  // return all
-                    &chunks,
                     nullptr,
                     repl::ReadConcernLevel::kMajorityReadConcern);
-                if (!status.isOK()) {
-                    return appendCommandStatus(result, status);
+                if (!swChunks.isOK()) {
+                    return appendCommandStatus(result, swChunks.getStatus());
                 }
 
+                const auto& chunks = swChunks.getValue();
                 result.append("msg", "draining ongoing");
                 result.append("state", "ongoing");
                 result.append("remaining",
