@@ -1025,6 +1025,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
     // operation type -- see logOp() comments for types
     const char* opType = fieldOp.valuestrsafe();
 
+    if (*opType == 'n') {
+        // no op
+        if (incrementOpsAppliedStats) {
+            incrementOpsAppliedStats();
+        }
+
+        return Status::OK();
+    }
+
     NamespaceString requestNss;
     Collection* collection = nullptr;
     if (fieldUI) {
@@ -1408,11 +1417,6 @@ Status applyOperation_inlock(OperationContext* opCtx,
             wuow.commit();
         });
 
-        if (incrementOpsAppliedStats) {
-            incrementOpsAppliedStats();
-        }
-    } else if (*opType == 'n') {
-        // no op
         if (incrementOpsAppliedStats) {
             incrementOpsAppliedStats();
         }
