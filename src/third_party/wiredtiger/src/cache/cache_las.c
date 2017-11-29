@@ -64,7 +64,7 @@ __wt_las_stats_update(WT_SESSION_IMPL *session)
 	dstats = ((WT_CURSOR_BTREE *)
 	    cache->las_session[0]->las_cursor)->btree->dhandle->stats;
 
-	v = WT_STAT_READ(dstats, cursor_insert);
+	v = WT_STAT_READ(dstats, cursor_update);
 	WT_STAT_SET(session, cstats, cache_lookaside_insert, v);
 	v = WT_STAT_READ(dstats, cursor_remove);
 	WT_STAT_SET(session, cstats, cache_lookaside_remove, v);
@@ -385,7 +385,7 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 		    btree_id, multi->page_las.las_pageid,
 		    multi->page_las.las_max_txn,
 		    hex_timestamp,
-		    multi->page_las.las_skew_oldest? "oldest" : "youngest",
+		    multi->page_las.las_skew_newest? "newest" : "oldest",
 		    WT_STAT_READ(conn->stats, cache_lookaside_entries),
 		    pct_dirty, pct_full);
 	}
@@ -433,6 +433,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 	/* Wrap all the updates in a transaction. */
 	las_session = (WT_SESSION_IMPL *)cursor->session;
 	WT_RET(__wt_txn_begin(las_session, NULL));
+	las_session->txn.isolation = WT_TXN_ISO_READ_UNCOMMITTED;
 
 	/*
 	 * Make sure there are no leftover entries (e.g., from a handle
@@ -638,6 +639,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	 */
 	if (local_cursor) {
 		WT_ERR(__wt_txn_begin(las_session, NULL));
+		las_session->txn.isolation = WT_TXN_ISO_READ_UNCOMMITTED;
 		local_txn = true;
 	}
 

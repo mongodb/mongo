@@ -1864,6 +1864,10 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 		if (F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU))
 			continue;
 
+		/* Don't queue dirty pages in trees during checkpoints. */
+		if (modified && btree->checkpointing != WT_CKPT_OFF)
+			continue;
+
 		/*
 		 * It's possible (but unlikely) to visit a page without a read
 		 * generation, if we race with the read instantiating the page.
@@ -1944,14 +1948,13 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 			goto fast;
 
 		/*
-		 * If there are active transaction and oldest transaction
-		 * hasn't changed since the last time this page was written,
-		 * it's unlikely we can make progress.  Similarly, if the most
-		 * recent update on the page is not yet globally visible,
-		 * eviction will fail.  This heuristic avoids repeated attempts
-		 * to evict the same page.
+		 * If the global transaction state hasn't changed since the
+		 * last time we tried eviction, it's unlikely we can make
+		 * progress.  Similarly, if the most recent update on the page
+		 * is not yet globally visible, eviction will fail.  This
+		 * heuristic avoids repeated attempts to evict the same page.
 		 */
-		if (modified && (!__wt_page_evict_retry(session, page) ||
+		if (!__wt_page_evict_retry(session, page) || (modified &&
 		    !__txn_visible_all_id(session, page->modify->update_txn)))
 			continue;
 
@@ -2050,9 +2053,10 @@ __evict_get_ref(
 	cache = S2C(session)->cache;
 	is_app = !F_ISSET(session, WT_SESSION_INTERNAL);
 	server_only = is_server && !WT_EVICT_HAS_WORKERS(session);
+	/* Application threads do eviction when cache is full of dirty data */
 	urgent_ok = (!is_app && !is_server) ||
 	    !WT_EVICT_HAS_WORKERS(session) ||
-	    (is_app && __wt_cache_aggressive(session));
+	    (is_app && F_ISSET(cache, WT_CACHE_EVICT_DIRTY_HARD));
 	urgent_queue = cache->evict_urgent_queue;
 
 	WT_STAT_CONN_INCR(session, cache_eviction_get_ref);
