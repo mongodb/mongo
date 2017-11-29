@@ -403,6 +403,14 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     _topCoord->finishUnconditionalStepDown();
     const auto action = _updateMemberStateFromTopologyCoordinator_inlock(opCtx.get());
+    if (_pendingTermUpdateDuringStepDown) {
+        TopologyCoordinator::UpdateTermResult result;
+        _updateTerm_inlock(*_pendingTermUpdateDuringStepDown, &result);
+        // We've just stepped down due to the "term", so it's impossible to step down again
+        // for the same term.
+        invariant(result != TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
+        _pendingTermUpdateDuringStepDown = boost::none;
+    }
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
     _replExecutor->signalEvent(finishedEvent);

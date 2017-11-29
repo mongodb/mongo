@@ -3379,12 +3379,6 @@ EventHandle ReplicationCoordinatorImpl::updateTerm_forTest(
 
     EventHandle finishEvh;
     finishEvh = _updateTerm_inlock(term, updateResult);
-    if (!finishEvh) {
-        auto finishEvhStatus = _replExecutor->makeEvent();
-        invariantOK(finishEvhStatus.getStatus());
-        finishEvh = finishEvhStatus.getValue();
-        _replExecutor->signalEvent(finishEvh);
-    }
     return finishEvh;
 }
 
@@ -3443,6 +3437,9 @@ EventHandle ReplicationCoordinatorImpl::_updateTerm_inlock(
     }
 
     if (localUpdateTermResult == TopologyCoordinator::UpdateTermResult::kTriggerStepDown) {
+        if (!_pendingTermUpdateDuringStepDown || *_pendingTermUpdateDuringStepDown < term) {
+            _pendingTermUpdateDuringStepDown = term;
+        }
         if (_topCoord->prepareForUnconditionalStepDown()) {
             log() << "stepping down from primary, because a new term has begun: " << term;
             return _stepDownStart();
