@@ -123,9 +123,7 @@ public:
 
         // We seek to populate this.
         string nearFieldName;
-        bool using2DIndex = false;
-        if (!getFieldName(
-                opCtx, collection, indexCatalog, &nearFieldName, &errmsg, &using2DIndex)) {
+        if (!getFieldName(opCtx, collection, indexCatalog, &nearFieldName, &errmsg)) {
             return false;
         }
 
@@ -135,9 +133,6 @@ public:
                 GeoParser::parseQueryPoint(cmdObj["near"], &point).isOK());
 
         bool isSpherical = cmdObj["spherical"].trueValue();
-        if (!using2DIndex) {
-            uassert(17301, "2dsphere index must have spherical: true", isSpherical);
-        }
 
         // Build the $near expression for the query.
         BSONObjBuilder nearBob;
@@ -343,8 +338,7 @@ private:
                       Collection* collection,
                       IndexCatalog* indexCatalog,
                       string* fieldOut,
-                      string* errOut,
-                      bool* isFrom2D) {
+                      string* errOut) {
         vector<IndexDescriptor*> idxs;
 
         // First, try 2d.
@@ -361,7 +355,6 @@ private:
                 BSONElement elt = kpIt.next();
                 if (String == elt.type() && IndexNames::GEO_2D == elt.valuestr()) {
                     *fieldOut = elt.fieldName();
-                    *isFrom2D = true;
                     return true;
                 }
             }
@@ -387,7 +380,6 @@ private:
             BSONElement elt = kpIt.next();
             if (String == elt.type() && IndexNames::GEO_2DSPHERE == elt.valuestr()) {
                 *fieldOut = elt.fieldName();
-                *isFrom2D = false;
                 return true;
             }
         }
