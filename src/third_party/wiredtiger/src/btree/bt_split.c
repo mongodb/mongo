@@ -1493,9 +1493,10 @@ __split_multi_inmem(
 	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
 	/*
-	 * If the new page is modified, save the oldest ID from reconciliation
-	 * to avoid repeatedly attempting eviction on the same page.
+	 * If the new page is modified, save the eviction generation to avoid
+	 * repeatedly attempting eviction on the same page.
 	 */
+	page->modify->last_evict_pass_gen = orig->modify->last_evict_pass_gen;
 	page->modify->last_eviction_id = orig->modify->last_eviction_id;
 	__wt_timestamp_set(&page->modify->last_eviction_timestamp,
 	    &orig->modify->last_eviction_timestamp);

@@ -28,6 +28,17 @@ __wt_page_is_empty(WT_PAGE *page)
 }
 
 /*
+ * __wt_page_evict_clean --
+ *	Return if the page can be evicted without dirtying the tree.
+ */
+static inline bool
+__wt_page_evict_clean(WT_PAGE *page)
+{
+	return (page->modify == NULL || (page->modify->write_gen == 0 &&
+	    page->modify->rec_result == 0));
+}
+
+/*
  * __wt_page_is_modified --
  *	Return if the page is dirty.
  */
@@ -1268,8 +1279,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __wt_page_evict_retry --
- *	Check if there has been transaction progress since the last eviction
- *	attempt.
+ *	Avoid busy-spinning attempting to evict the same page all the time.
  */
 static inline bool
 __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -1279,29 +1289,43 @@ __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	txn_global = &S2C(session)->txn_global;
 
-	if ((mod = page->modify) == NULL)
+	/*
+	 * If the page hasn't been through one round of update/restore, give it
+	 * a try.
+	 */
+	if ((mod = page->modify) == NULL || !mod->update_restored)
 		return (true);
 
-	if (txn_global->current != txn_global->oldest_id &&
-	    mod->last_eviction_id == __wt_txn_oldest_id(session))
-		return (false);
+	/*
+	 * Retry if a reasonable amount of eviction time has passed, the
+	 * choice of 5 eviction passes as a reasonable amount of time is
+	 * currently pretty arbitrary.
+	 */
+	if (__wt_cache_aggressive(session) ||
+	    mod->last_evict_pass_gen + 5 < S2C(session)->cache->evict_pass_gen)
+		return (true);
+
+	/* Retry if the global transaction state has moved forward. */
+	if (txn_global->current == txn_global->oldest_id ||
+	    mod->last_eviction_id != __wt_txn_oldest_id(session))
+		return (true);
 
 #ifdef HAVE_TIMESTAMPS
 	{
 	bool same_timestamp;
 
-	if (__wt_timestamp_iszero(&mod->last_eviction_timestamp))
+	same_timestamp = false;
+	if (!__wt_timestamp_iszero(&mod->last_eviction_timestamp))
+		WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
+		    same_timestamp = __wt_timestamp_cmp(
+		    &mod->last_eviction_timestamp,
+		    &txn_global->pinned_timestamp) == 0);
+	if (!same_timestamp)
 		return (true);
-
-	WT_WITH_TIMESTAMP_READLOCK(session, &txn_global->rwlock,
-	    same_timestamp = __wt_timestamp_cmp(
-	    &mod->last_eviction_timestamp, &txn_global->pinned_timestamp) == 0);
-	if (same_timestamp)
-		return (false);
 	}
 #endif
 
-	return (true);
+	return (false);
 }
 
 /*
@@ -1333,6 +1357,14 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	 */
 	if (!__wt_btree_can_evict_dirty(session) &&
 	    F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS))
+		return (false);
+
+	/*
+	 * If the page was restored after a truncate, it can't be evicted until
+	 * the truncate completes.
+	 */
+	if (ref->page_del != NULL && !__wt_txn_visible_all(session,
+	    ref->page_del->txnid, WT_TIMESTAMP_NULL(&ref->page_del->timestamp)))
 		return (false);
 
 	/*
@@ -1423,15 +1455,22 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 *
 	 * Fast checks if eviction is disabled for this handle, operation or
 	 * tree, then perform a general check if eviction will be possible.
+	 *
+	 * Checkpoint should not queue pages for urgent eviction if it cannot
+	 * evict them immediately: there is a special exemption that allows
+	 * checkpoint to evict dirty pages in a tree that is being
+	 * checkpointed, and no other thread can help with that.
 	 */
 	page = ref->page;
 	if (WT_READGEN_EVICT_SOON(page->read_gen) &&
 	    btree->evict_disabled == 0 &&
 	    __wt_page_can_evict(session, ref, &inmem_split)) {
-		if ((LF_ISSET(WT_READ_NO_SPLIT) || (!inmem_split &&
-		    F_ISSET(session, WT_SESSION_NO_RECONCILE))))
-			__wt_page_evict_urgent(session, ref);
-		else {
+		if (!__wt_page_evict_clean(page) &&
+		    (LF_ISSET(WT_READ_NO_SPLIT) || (!inmem_split &&
+		    F_ISSET(session, WT_SESSION_NO_RECONCILE)))) {
+			if (!WT_SESSION_IS_CHECKPOINT(session))
+				__wt_page_evict_urgent(session, ref);
+		} else {
 			WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
 			return (0);
 		}
