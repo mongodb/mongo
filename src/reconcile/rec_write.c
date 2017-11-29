@@ -621,11 +621,10 @@ __rec_write_check_complete(
 
 	/*
 	 * If we have used the lookaside table, check for a lookaside table and
-	 * checkpoint collision.  If there is no collision, go ahead with the
-	 * eviction.
+	 * checkpoint collision.
 	 */
-	if (r->cache_write_lookaside)
-		return (__rec_las_checkpoint_test(session, r) ? EBUSY : 0);
+	if (r->cache_write_lookaside && __rec_las_checkpoint_test(session, r))
+		return (EBUSY);
 
 	/*
 	 * Fall back to lookaside eviction during checkpoints if a page can't
@@ -646,11 +645,8 @@ __rec_write_check_complete(
 	 * likely get to write at least one of the blocks.  If we've created a
 	 * page image for a page that previously didn't have one, or we had a
 	 * page image and it is now empty, that's also progress.
-	 *
-	 * Also check that the current reconciliation applied some updates, in
-	 * which case evict/restore should gain us some space.
 	 */
-	if (r->multi_next > 1 && r->update_used)
+	if (r->multi_next > 1)
 		return (0);
 
 	/*
@@ -666,10 +662,13 @@ __rec_write_check_complete(
 		return (0);
 
 	/*
+	 * Check if the current reconciliation applied some updates, in which
+	 * case evict/restore should gain us some space.
+	 *
 	 * Check if lookaside eviction is possible.  If any of the updates we
 	 * saw were uncommitted, the lookaside table cannot be used.
 	 */
-	if (r->update_uncommitted)
+	if (r->update_uncommitted || r->update_used)
 		return (0);
 
 	*lookaside_retryp = true;
