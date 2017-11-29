@@ -2025,6 +2025,10 @@ def doConfigure(myenv):
         # it isn't required
         AddToCXXFLAGSIfSupported(myenv, "-Wno-instantiation-after-specialization")
 
+        # This warning was added in clang-5 and flags many of our lambdas. Since it isn't actively
+        # harmful to capture unused variables we are suppressing for now with a plan to fix later.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-unused-lambda-capture")
+
         # This warning was added in clang-5 and incorrectly flags our implementation of
         # exceptionToStatus(). See https://bugs.llvm.org/show_bug.cgi?id=34804
         AddToCCFLAGSIfSupported(myenv, "-Wno-exceptions")
