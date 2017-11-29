@@ -1011,6 +1011,10 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) 
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1056,6 +1060,10 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1100,6 +1108,10 @@ TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1155,6 +1167,10 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1175,18 +1191,16 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
-    // Mock another heartbeat where the primary is now up to date
+    // Create a new OpTime so that the primary's last applied OpTime will be in the current term.
+    OpTime caughtupOptime(Timestamp(300, 1), 1);
+    // Mock another heartbeat where the primary is now up to date.
     now = respondToHeartbeatsUntil(
-        config, now + catchupTakeoverDelay / 2, HostAndPort("node2", 12345), currentOptime);
+        config, now + catchupTakeoverDelay / 2, HostAndPort("node2", 12345), caughtupOptime);
 
-    // Since we are no longer ahead of the primary, we can't schedule a catchup
-    // takeover anymore. But we are still higher priority than the primary, so
-    // after the heartbeat we will try to schedule a priority takeover.
-    // Because we can't schedule two takeovers at the same time and the
-    // catchup takeover hasn't fired yet, make sure that we don't schedule a
-    // priority takeover.
-    ASSERT(replCoord->getCatchupTakeover_forTest());
-    ASSERT_FALSE(replCoord->getPriorityTakeover_forTest());
+    // Since the primary has caught up, we cancel the scheduled catchup takeover.
+    // But we are still higher priority than the primary, so after the heartbeat
+    // we will schedule a priority takeover.
+    ASSERT(replCoord->getPriorityTakeover_forTest());
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
@@ -1211,6 +1225,10 @@ TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1281,6 +1299,10 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);

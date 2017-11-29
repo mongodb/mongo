@@ -232,6 +232,16 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         _catchupState->signalHeartbeatUpdate_inlock();
     }
 
+    // Cancel catchup takeover if the last applied write by any node in the replica set was made
+    // in the current term, which implies that the primary has caught up.
+    bool catchupTakeoverScheduled = _catchupTakeoverCbh.isValid();
+    if (responseStatus.isOK() && catchupTakeoverScheduled && hbResponse.hasAppliedOpTime()) {
+        const auto& hbLastAppliedOpTime = hbResponse.getAppliedOpTime();
+        if (hbLastAppliedOpTime.getTerm() == _topCoord->getTerm()) {
+            _cancelCatchupTakeover_inlock();
+        }
+    }
+
     _scheduleHeartbeatToTarget_inlock(
         target, targetIndex, std::max(now, action.getNextHeartbeatStartDate()));
 
