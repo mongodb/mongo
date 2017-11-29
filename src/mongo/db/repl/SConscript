@@ -1146,29 +1146,6 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='rollback_common_point_resolver',
-    source=[
-        'rollback_common_point_resolver.cpp',
-    ],
-    LIBDEPS=[
-        'abstract_oplog_fetcher',
-        'replica_set_messages',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/namespace_string',
-    ],
-)
-
-env.CppUnitTest(
-    target='rollback_common_point_resolver_test',
-    source='rollback_common_point_resolver_test.cpp',
-    LIBDEPS=[
-        'rollback_common_point_resolver',
-        'oplog_interface_mock',
-        'abstract_oplog_fetcher_test_fixture',
-    ],
-)
-
-env.Library(
     target='reporter',
     source=[
         'reporter.cpp',
