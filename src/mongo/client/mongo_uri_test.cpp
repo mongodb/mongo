@@ -601,6 +601,7 @@ TEST(MongoURI, specTests) {
 
 TEST(MongoURI, srvRecordTest) {
     using namespace mongo;
+    enum Expectation : bool { success = true, failure = false };
     const struct {
         std::string uri;
         std::string user;
@@ -608,6 +609,7 @@ TEST(MongoURI, srvRecordTest) {
         std::string database;
         std::vector<HostAndPort> hosts;
         std::map<std::string, std::string> options;
+        Expectation expectation;
     } tests[] = {
         // Test some non-SRV URIs to make sure that they do not perform expansions
         {"mongodb://test1.test.build.10gen.cc:12345/",
@@ -615,13 +617,16 @@ TEST(MongoURI, srvRecordTest) {
          "",
          "",
          {{"test1.test.build.10gen.cc", 12345}},
-         {}},
+         {},
+         success},
+
         {"mongodb://test6.test.build.10gen.cc:12345/",
          "",
          "",
          "",
          {{"test6.test.build.10gen.cc", 12345}},
-         {}},
+         {},
+         success},
 
         // Test a sample URI against each provided testing DNS entry
         {"mongodb+srv://test1.test.build.10gen.cc/",
@@ -629,7 +634,17 @@ TEST(MongoURI, srvRecordTest) {
          "",
          "",
          {{"localhost.test.build.10gen.cc.", 27017}, {"localhost.test.build.10gen.cc.", 27018}},
-         {}},
+         {{"ssl", "true"}},
+         success},
+
+        // Test a sample URI against each provided testing DNS entry
+        {"mongodb+srv://test1.test.build.10gen.cc/?ssl=false",
+         "",
+         "",
+         "",
+         {{"localhost.test.build.10gen.cc.", 27017}, {"localhost.test.build.10gen.cc.", 27018}},
+         {{"ssl", "false"}},
+         success},
 
         {"mongodb+srv://user:password@test2.test.build.10gen.cc/"
          "database?someOption=someValue&someOtherOption=someOtherValue",
@@ -637,7 +652,8 @@ TEST(MongoURI, srvRecordTest) {
          "password",
          "database",
          {{"localhost.test.build.10gen.cc.", 27018}, {"localhost.test.build.10gen.cc.", 27019}},
-         {{"someOption", "someValue"}, {"someOtherOption", "someOtherValue"}}},
+         {{"someOption", "someValue"}, {"someOtherOption", "someOtherValue"}, {"ssl", "true"}},
+         success},
 
 
         {"mongodb+srv://user:password@test3.test.build.10gen.cc/"
@@ -646,7 +662,8 @@ TEST(MongoURI, srvRecordTest) {
          "password",
          "database",
          {{"localhost.test.build.10gen.cc.", 27017}},
-         {{"someOption", "someValue"}, {"someOtherOption", "someOtherValue"}}},
+         {{"someOption", "someValue"}, {"someOtherOption", "someOtherValue"}, {"ssl", "true"}},
+         success},
 
 
         {"mongodb+srv://user:password@test5.test.build.10gen.cc/"
@@ -658,7 +675,9 @@ TEST(MongoURI, srvRecordTest) {
          {{"someOption", "someValue"},
           {"someOtherOption", "someOtherValue"},
           {"replicaSet", "repl0"},
-          {"authSource", "thisDB"}}},
+          {"authSource", "thisDB"},
+          {"ssl", "true"}},
+         success},
 
         {"mongodb+srv://user:password@test5.test.build.10gen.cc/"
          "database?someOption=someValue&authSource=anotherDB&someOtherOption=someOtherValue",
@@ -670,37 +689,29 @@ TEST(MongoURI, srvRecordTest) {
           {"someOtherOption", "someOtherValue"},
           {"replicaSet", "repl0"},
           {"replicaSet", "repl0"},
-          {"authSource", "anotherDB"}}},
+          {"authSource", "anotherDB"},
+          {"ssl", "true"}},
+         success},
 
-        {"mongodb+srv://test6.test.build.10gen.cc/",
-         "",
-         "",
-         "",
-         {{"localhost.test.build.10gen.cc.", 27017}},
-         {{"replicaSet", "repl0"}, {"authSource", "otherDB"}}},
+        {"mongodb+srv://test6.test.build.10gen.cc/", "", "", "", {}, {}, failure},
 
-        {"mongodb+srv://test6.test.build.10gen.cc/database",
-         "",
-         "",
-         "database",
-         {{"localhost.test.build.10gen.cc.", 27017}},
-         {{"replicaSet", "repl0"}, {"authSource", "otherDB"}}},
+        {"mongodb+srv://test6.test.build.10gen.cc/database", "", "", "database", {}, {}, failure},
 
         {"mongodb+srv://test6.test.build.10gen.cc/?authSource=anotherDB",
          "",
          "",
          "",
-         {{"localhost.test.build.10gen.cc.", 27017}},
-         {{"replicaSet", "repl0"}, {"authSource", "anotherDB"}}},
+         {},
+         {},
+         failure},
 
         {"mongodb+srv://test6.test.build.10gen.cc/?irrelevantOption=irrelevantValue",
          "",
          "",
          "",
-         {{"localhost.test.build.10gen.cc.", 27017}},
-         {{"replicaSet", "repl0"},
-          {"authSource", "otherDB"},
-          {"irrelevantOption", "irrelevantValue"}}},
+         {},
+         {},
+         failure},
 
 
         {"mongodb+srv://test6.test.build.10gen.cc/"
@@ -708,14 +719,63 @@ TEST(MongoURI, srvRecordTest) {
          "",
          "",
          "",
-         {{"localhost.test.build.10gen.cc.", 27017}},
-         {{"replicaSet", "repl0"},
-          {"authSource", "anotherDB"},
-          {"irrelevantOption", "irrelevantValue"}}},
+         {},
+         {},
+         failure},
+
+        {"mongodb+srv://test7.test.build.10gen.cc./?irrelevantOption=irrelevantValue",
+         "",
+         "",
+         "",
+         {},
+         {},
+         failure},
+
+        {"mongodb+srv://test7.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+
+        {"mongodb+srv://test8.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+
+        {"mongodb+srv://test10.test.build.10gen.cc./?irrelevantOption=irrelevantValue",
+         "",
+         "",
+         "",
+         {},
+         {},
+         failure},
+
+        {"mongodb+srv://test11.test.build.10gen.cc./?irrelevantOption=irrelevantValue",
+         "",
+         "",
+         "",
+         {},
+         {},
+         failure},
+
+        {"mongodb+srv://test12.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test13.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test14.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test15.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test16.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test17.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test18.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test19.test.build.10gen.cc./", "", "", "", {}, {}, failure},
+
+        {"mongodb+srv://test12.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test13.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test14.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test15.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test16.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test17.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test18.test.build.10gen.cc/", "", "", "", {}, {}, failure},
+        {"mongodb+srv://test19.test.build.10gen.cc/", "", "", "", {}, {}, failure},
     };
 
     for (const auto& test : tests) {
         auto rs = MongoURI::parse(test.uri);
+        if (test.expectation == failure) {
+            ASSERT_FALSE(rs.getStatus().isOK()) << "Failing URI: " << test.uri;
+            continue;
+        }
         ASSERT_OK(rs.getStatus());
         auto rv = rs.getValue();
         ASSERT_EQ(rv.getUser(), test.user);
@@ -738,7 +798,7 @@ TEST(MongoURI, srvRecordTest) {
                 ASSERT(false);
             }
         }
-        ASSERT_EQ(options.size(), expectedOptions.size());
+        ASSERT_EQ(options.size(), expectedOptions.size()) << "Failing URI: " << test.uri;
 
         std::vector<HostAndPort> hosts(begin(rv.getServers()), end(rv.getServers()));
         std::sort(begin(hosts), end(hosts));
