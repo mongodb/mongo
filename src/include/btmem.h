@@ -203,7 +203,7 @@ struct __wt_page_lookaside {
 						   lookaside */
 	WT_DECL_TIMESTAMP(min_timestamp)	/* Min timestamp in lookaside */
 	WT_DECL_TIMESTAMP(onpage_timestamp)	/* Max timestamp on page */
-	bool las_skew_oldest;			/* On-page skewed to oldest */
+	bool las_skew_newest;			/* On-page skewed to newest */
 };
 
 /*
@@ -215,6 +215,7 @@ struct __wt_page_modify {
 	uint64_t first_dirty_txn;
 
 	/* The transaction state last time eviction was attempted. */
+	uint64_t last_evict_pass_gen;
 	uint64_t last_eviction_id;
 	WT_DECL_TIMESTAMP(last_eviction_timestamp)
 

@@ -121,7 +121,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_PAGE_MODIFY *mod;
 	bool clean_page, inmem_split, tree_dead;
 
 	conn = S2C(session);
@@ -166,8 +165,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
 	/* Figure out whether reconciliation was done on the page */
-	mod = page->modify;
-	clean_page = mod == NULL || mod->rec_result == 0;
+	clean_page = __wt_page_evict_clean(page);
 
 	/* Update the reference and discard the page. */
 	if (__wt_ref_is_root(ref))
@@ -569,13 +567,13 @@ __evict_review(
 		if (F_ISSET(conn, WT_CONN_IN_MEMORY))
 			LF_SET(WT_REC_IN_MEMORY |
 			    WT_REC_SCRUB | WT_REC_UPDATE_RESTORE);
+		else if (WT_SESSION_IS_CHECKPOINT(session))
+			LF_SET(WT_REC_LOOKASIDE);
 		else if (!WT_IS_METADATA(session->dhandle)) {
-			if (!WT_SESSION_IS_CHECKPOINT(session)) {
-				LF_SET(WT_REC_UPDATE_RESTORE);
+			LF_SET(WT_REC_UPDATE_RESTORE);
 
-				if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB))
-					LF_SET(WT_REC_SCRUB);
-			}
+			if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB))
+				LF_SET(WT_REC_SCRUB);
 
 			/*
 			 * If the cache is under pressure with many updates
