@@ -37,7 +37,7 @@
     // cause the shard to refresh.
     assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
     assert.commandWorked(
-        st.shard0.getDB('admin').runCommand({forceRoutingTableRefresh: coll + ""}));
+        st.shard0.getDB('admin').runCommand({_flushRoutingTableCacheUpdates: coll + ""}));
 
     assert.commandWorked(shardAdmin.runCommand({getShardVersion: coll + ""}));
     printjson(shardAdmin.runCommand({getShardVersion: coll + "", fullMetadata: true}));

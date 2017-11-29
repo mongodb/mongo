@@ -45,20 +45,25 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
-class ForceRoutingTableRefresh : public BasicCommand {
+class FlushRoutingTableCacheUpdates : public BasicCommand {
 public:
-    ForceRoutingTableRefresh() : BasicCommand("forceRoutingTableRefresh") {}
+    // Support deprecated name 'forceRoutingTableRefresh' for backwards compatibility with 3.6.0.
+    FlushRoutingTableCacheUpdates()
+        : BasicCommand("_flushRoutingTableCacheUpdates", "forceRoutingTableRefresh") {}
 
     void help(std::stringstream& help) const override {
-        help << "Internal command which forces a sharded node to refresh its metadata from the "
-                "config server and persist it locally only. Behaves like any other write command "
-                "in that it returns the cluster time of the last metadata write so it can be "
-                "waited on.";
+        help << "Internal command which waits for any pending routing table cache updates for a "
+                "particular namespace to be written locally. The operationTime returned in the "
+                "response metadata is guaranteed to be at least as late as the last routing table "
+                "cache update to the local disk. Takes a 'forceRemoteRefresh' option to make this "
+                "node refresh its cache from the config server before waiting for the last refresh "
+                "to be persisted.";
     }
 
     bool adminOnly() const override {
@@ -103,12 +108,18 @@ public:
         uassertStatusOK(shardingState->canAcceptShardedCommands());
 
         uassert(ErrorCodes::IllegalOperation,
-                "Can't issue forceRoutingTableRefresh from 'eval'",
+                "Can't issue _flushRoutingTableCacheUpdates from 'eval'",
                 !opCtx->getClient()->isInDirectClient());
+
+        uassert(ErrorCodes::IllegalOperation,
+                "Can't call _flushRoutingTableCacheUpdates if in read-only mode",
+                !storageGlobalParams.readOnly);
 
         auto& oss = OperationShardingState::get(opCtx);
 
         const NamespaceString nss(parseNs(dbname, cmdObj));
+        const auto request = _flushRoutingTableCacheUpdatesRequest::parse(
+            IDLParserErrorContext("_FlushRoutingTableCacheUpdatesRequest"), cmdObj);
 
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
@@ -129,10 +140,11 @@ public:
 
         oss.waitForMigrationCriticalSectionSignal(opCtx);
 
-        LOG(1) << "Forcing routing table refresh for " << nss;
-
-        ChunkVersion unusedShardVersion;
-        uassertStatusOK(shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion));
+        if (request.getSyncFromConfig()) {
+            LOG(1) << "Forcing remote routing table refresh for " << nss;
+            ChunkVersion unusedShardVersion;
+            uassertStatusOK(shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion));
+        }
 
         CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
 
@@ -141,7 +153,7 @@ public:
         return true;
     }
 
-} forceRoutingTableRefreshCmd;
+} _flushRoutingTableCacheUpdatesCmd;
 
 }  // namespace
 }  // namespace mongo
