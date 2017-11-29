@@ -28,6 +28,8 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kNetwork
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/util/net/ssl_manager.h"
 
 #include "mongo/config.h"
@@ -70,7 +72,7 @@ TEST(SSLManager, matchHostname) {
     };
     bool failure = false;
     for (const auto& test : tests) {
-        if (test.expected != hostNameMatchForX509Certificates(test.hostname, test.certName)) {
+        if (bool(test.expected) != hostNameMatchForX509Certificates(test.hostname, test.certName)) {
             failure = true;
             LOG(1) << "Failure for Hostname: " << test.hostname
                    << " Certificate: " << test.certName;
