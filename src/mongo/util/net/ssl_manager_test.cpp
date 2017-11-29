@@ -34,11 +34,11 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
-#ifdef MONGO_CONFIG_SSL
 
 namespace mongo {
 namespace {
 TEST(SSLManager, matchHostname) {
+#ifdef MONGO_CONFIG_SSL
     enum Expected : bool { match = true, mismatch = false };
     const struct {
         Expected expected;
@@ -79,7 +79,7 @@ TEST(SSLManager, matchHostname) {
         }
     }
     ASSERT_FALSE(failure);
+#endif
 }
 }  // namespace
 }  // namespace mongo
-#endif
