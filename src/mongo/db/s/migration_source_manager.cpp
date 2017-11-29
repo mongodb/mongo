@@ -36,8 +36,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/shard_metadata_util.h"
@@ -126,8 +124,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                                                HostAndPort recipientHost)
     : _args(std::move(request)),
       _donorConnStr(std::move(donorConnStr)),
-      _recipientHost(std::move(recipientHost)),
-      _startTime() {
+      _recipientHost(std::move(recipientHost)) {
     invariant(!opCtx->lockState()->isLocked());
 
     // Disallow moving a chunk to ourselves
@@ -226,10 +223,10 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
                                << "to"
                                << _args.getToShardId()),
                     ShardingCatalogClient::kMajorityWriteConcern)
-        .transitional_ignore();
+        .ignore();
 
     _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
-        _args, _collectionMetadata->getKeyPattern(), _donorConnStr, _recipientHost);
+        _args, _keyPattern, _donorConnStr, _recipientHost);
 
     {
         // Register for notifications from the replication subsystem
@@ -271,38 +268,13 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
     invariant(_state == kCloneCaughtUp);
     auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
 
-    const ShardId& recipientId = _args.getToShardId();
-    if (!_collectionMetadata->getChunkManager()->getVersion(recipientId).isSet() &&
-        (serverGlobalParams.featureCompatibility.getVersion() ==
-         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
-        // The recipient didn't have any chunks of this collection. Write the no-op message so that
-        // change stream will notice that and close cursor to notify mongos to target to the new
-        // shard.
-        std::stringstream ss;
-        // The message for debugging.
-        ss << "Migrating chunk from shard " << _args.getFromShardId() << " to shard "
-           << _args.getToShardId() << " with no chunks for this collection";
-        // The message expected by change streams.
-        auto message = BSON("type"
-                            << "migrateChunkToNewShard"
-                            << "from"
-                            << _args.getFromShardId()
-                            << "to"
-                            << _args.getToShardId());
-        AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
-        writeConflictRetry(
-            opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
-                WriteUnitOfWork uow(opCtx);
-                opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
-                    opCtx, getNss(), _collectionUuid, BSON("msg" << ss.str()), message);
-                uow.commit();
-            });
-    }
+    _notifyChangeStreamsOnRecipientFirstChunk(opCtx);
 
     // Mark the shard as running critical operation, which requires recovery on crash.
     //
-    // Note: the 'migrateChunkToNewShard' oplog message written above depends on this
-    // majority write to carry its local write to majority committed.
+    // NOTE: The 'migrateChunkToNewShard' oplog message written by the above call to
+    // '_notifyChangeStreamsOnRecipientFirstChunk' depends on this majority write to carry its local
+    // write to majority committed.
     Status status = ShardingStateRecovery::startMetadataOp(opCtx);
     if (!status.isOK()) {
         return status;
@@ -547,7 +519,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                                << "to"
                                << _args.getToShardId()),
                     ShardingCatalogClient::kMajorityWriteConcern)
-        .transitional_ignore();
+        .ignore();
 
     // Wait for the metadata update to be persisted before attempting to delete orphaned documents
     // so that metadata changes propagate to secondaries first
@@ -605,9 +577,43 @@ void MigrationSourceManager::cleanupOnError(OperationContext* opCtx) {
                                << "to"
                                << _args.getToShardId()),
                     ShardingCatalogClient::kMajorityWriteConcern)
-        .transitional_ignore();
+        .ignore();
 
     _cleanup(opCtx);
+}
+
+void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx) {
+    // Change streams are only supported in 3.6 and above
+    if (serverGlobalParams.featureCompatibility.getVersion() !=
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)
+        return;
+
+    // If this is not the first donation, there is nothing to be done
+    if (_collectionMetadata->getChunkManager()->getVersion(_args.getToShardId()).isSet())
+        return;
+
+    const std::string dbgMessage = str::stream()
+        << "Migrating chunk from shard " << _args.getFromShardId() << " to shard "
+        << _args.getToShardId() << " with no chunks for this collection";
+
+    // The message expected by change streams
+    const auto o2Message = BSON("type"
+                                << "migrateChunkToNewShard"
+                                << "from"
+                                << _args.getFromShardId()
+                                << "to"
+                                << _args.getToShardId());
+
+    auto const serviceContext = opCtx->getClient()->getServiceContext();
+
+    AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
+    writeConflictRetry(
+        opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
+            WriteUnitOfWork uow(opCtx);
+            serviceContext->getOpObserver()->onInternalOpMessage(
+                opCtx, getNss(), _collectionUuid, BSON("msg" << dbgMessage), o2Message);
+            uow.commit();
+        });
 }
 
 void MigrationSourceManager::_cleanup(OperationContext* opCtx) {

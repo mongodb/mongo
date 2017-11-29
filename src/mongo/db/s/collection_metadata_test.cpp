@@ -83,8 +83,7 @@ protected:
 };
 
 struct stRangeMap : public RangeMap {
-    stRangeMap()
-        : RangeMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()) {}
+    stRangeMap() : RangeMap(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {}
 };
 
 TEST_F(NoChunkFixture, BasicBelongsToMe) {

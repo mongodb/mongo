@@ -30,7 +30,6 @@
 
 #include <map>
 #include <string>
-#include <vector>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/jsobj.h"
@@ -94,46 +93,18 @@ bool rangeOverlaps(const BSONObj& inclusiveLower1,
                    const BSONObj& exclusiveUpper2);
 
 /**
- * Represents a cached chunk information on the shard.
- */
-class CachedChunkInfo {
-public:
-    CachedChunkInfo(BSONObj maxKey, ChunkVersion version);
-
-    const BSONObj& getMaxKey() const {
-        return _maxKey;
-    }
-
-private:
-    BSONObj _maxKey;
-};
-
-/**
- * A RangeMap is a mapping of an inclusive lower BSON key to an upper key and chunk version, using
- * standard BSON woCompare. The upper bound is exclusive.
+ * A RangeMap is a mapping of an inclusive lower BSON key to an exclusive upper key, using standard
+ * BSON woCompare.
  *
  * NOTE: For overlap testing to work correctly, there may be no overlaps present in the map itself.
  */
-typedef BSONObjIndexedMap<CachedChunkInfo> RangeMap;
-
-/**
- * A RangeVector is a list of [lower,upper) ranges.
- */
-typedef std::vector<std::pair<BSONObj, BSONObj>> RangeVector;
+typedef BSONObjIndexedMap<BSONObj> RangeMap;
 
 /**
  * Returns true if the provided range map has ranges which overlap the provided range
  * [inclusiveLower, exclusiveUpper).
  */
 bool rangeMapOverlaps(const RangeMap& ranges,
-                      const BSONObj& inclusiveLower,
-                      const BSONObj& exclusiveUpper);
-
-/**
- * Returns true if the provided range map exactly contains the provided range
- * [inclusiveLower, exclusiveUpper).
- */
-bool rangeMapContains(const RangeMap& ranges,
                       const BSONObj& inclusiveLower,
                       const BSONObj& exclusiveUpper);
 

@@ -213,10 +213,7 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
     ChunkVersion wanted;
     if (!_checkShardVersionOk(opCtx, &errmsg, &received, &wanted)) {
         throw StaleConfigException(
-            _nss.ns(),
-            str::stream() << "[" << _nss.ns() << "] shard version not ok: " << errmsg,
-            received,
-            wanted);
+            _nss.ns(), str::stream() << "shard version not ok: " << errmsg, received, wanted);
     }
 }
 

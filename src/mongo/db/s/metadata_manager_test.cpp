@@ -304,7 +304,7 @@ TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
 
     const auto chunkEntry = _manager->getActiveMetadata(_manager)->getChunks().begin();
     ASSERT_BSONOBJ_EQ(BSON("key" << 20), chunkEntry->first);
-    ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second.getMaxKey());
+    ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second);
 }
 
 // Tests membership functions for _rangesToClean

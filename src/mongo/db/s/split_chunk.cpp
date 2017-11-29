@@ -95,13 +95,14 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const ChunkRange& chunkRange,
                                           const std::vector<BSONObj>& splitKeys) {
-    ScopedCollectionMetadata metadataAfterSplit;
-    {
+    const auto metadataAfterSplit = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+        return CollectionShardingState::get(opCtx, nss.ns())->getMetadata();
+    }();
 
-        // Get collection metadata
-        metadataAfterSplit = CollectionShardingState::get(opCtx, nss.ns())->getMetadata();
-    }
+    uassert(ErrorCodes::StaleConfig,
+            str::stream() << "Collection " << nss.ns() << " became unsharded",
+            metadataAfterSplit);
 
     auto newChunkBounds(splitKeys);
     auto startKey = chunkRange.getMin();

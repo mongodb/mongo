@@ -160,8 +160,7 @@ MetadataManager::MetadataManager(ServiceContext* serviceContext,
     : _serviceContext(serviceContext),
       _nss(std::move(nss)),
       _executor(executor),
-      _receivingChunks(
-          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()) {}
+      _receivingChunks(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()) {}
 
 MetadataManager::~MetadataManager() {
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
@@ -265,7 +264,7 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
     // Should be no more than one.
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end();) {
         BSONObj const& min = it->first;
-        BSONObj const& max = it->second.getMaxKey();
+        BSONObj const& max = it->second;
 
         if (!remoteMetadata->rangeOverlapsChunk(ChunkRange(min, max))) {
             ++it;
@@ -308,7 +307,7 @@ void MetadataManager::toBSONPending(BSONArrayBuilder& bb) const {
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end(); ++it) {
         BSONArrayBuilder pendingBB(bb.subarrayStart());
         pendingBB.append(it->first);
-        pendingBB.append(it->second.getMaxKey());
+        pendingBB.append(it->second);
         pendingBB.done();
     }
 }
@@ -321,7 +320,7 @@ void MetadataManager::append(BSONObjBuilder* builder) const {
     BSONArrayBuilder pcArr(builder->subarrayStart("pendingChunks"));
     for (const auto& entry : _receivingChunks) {
         BSONObjBuilder obj;
-        ChunkRange r = ChunkRange(entry.first, entry.second.getMaxKey());
+        ChunkRange r = ChunkRange(entry.first, entry.second);
         r.append(&obj);
         pcArr.append(obj.done());
     }
@@ -334,7 +333,7 @@ void MetadataManager::append(BSONObjBuilder* builder) const {
     BSONArrayBuilder amrArr(builder->subarrayStart("activeMetadataRanges"));
     for (const auto& entry : _metadata.back()->metadata.getChunks()) {
         BSONObjBuilder obj;
-        ChunkRange r = ChunkRange(entry.first, entry.second.getMaxKey());
+        ChunkRange r = ChunkRange(entry.first, entry.second);
         r.append(&obj);
         amrArr.append(obj.done());
     }
@@ -360,9 +359,7 @@ void MetadataManager::_pushListToClean(WithLock, std::list<Deletion> ranges) {
 }
 
 void MetadataManager::_addToReceiving(WithLock, ChunkRange const& range) {
-    _receivingChunks.insert(
-        std::make_pair(range.getMin().getOwned(),
-                       CachedChunkInfo(range.getMax().getOwned(), ChunkVersion::IGNORED())));
+    _receivingChunks.insert(std::make_pair(range.getMin().getOwned(), range.getMax().getOwned()));
 }
 
 auto MetadataManager::beginReceive(ChunkRange const& range) -> CleanupNotification {

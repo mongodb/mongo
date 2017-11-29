@@ -31,31 +31,10 @@
 #include "mongo/db/range_arithmetic.h"
 
 namespace mongo {
-
-using std::make_pair;
-using std::pair;
-using std::string;
-using std::stringstream;
-
-CachedChunkInfo::CachedChunkInfo(BSONObj maxKey, ChunkVersion version)
-    : _maxKey(std::move(maxKey)) {}
-
-bool rangeContains(const BSONObj& inclusiveLower,
-                   const BSONObj& exclusiveUpper,
-                   const BSONObj& point) {
-    return point.woCompare(inclusiveLower) >= 0 && point.woCompare(exclusiveUpper) < 0;
-}
-
-bool rangeOverlaps(const BSONObj& inclusiveLower1,
-                   const BSONObj& exclusiveUpper1,
-                   const BSONObj& inclusiveLower2,
-                   const BSONObj& exclusiveUpper2) {
-    return (exclusiveUpper1.woCompare(inclusiveLower2) > 0) &&
-        (exclusiveUpper2.woCompare(inclusiveLower1) > 0);
-}
+namespace {
 
 // Represents the start and end of an overlap of a tested range
-typedef pair<RangeMap::const_iterator, RangeMap::const_iterator> OverlapBounds;
+typedef std::pair<RangeMap::const_iterator, RangeMap::const_iterator> OverlapBounds;
 
 // Internal-only, shared functionality
 OverlapBounds rangeMapOverlapBounds(const RangeMap& ranges,
@@ -71,7 +50,7 @@ OverlapBounds rangeMapOverlapBounds(const RangeMap& ranges,
         --low;
 
         // If the previous range's max value is lte our min value
-        if (low->second.getMaxKey().woCompare(inclusiveLower) < 1) {
+        if (low->second.woCompare(inclusiveLower) < 1) {
             low = next;
         }
     }
@@ -83,22 +62,27 @@ OverlapBounds rangeMapOverlapBounds(const RangeMap& ranges,
     return OverlapBounds(low, high);
 }
 
+}  // namespace
+
+bool rangeContains(const BSONObj& inclusiveLower,
+                   const BSONObj& exclusiveUpper,
+                   const BSONObj& point) {
+    return point.woCompare(inclusiveLower) >= 0 && point.woCompare(exclusiveUpper) < 0;
+}
+
+bool rangeOverlaps(const BSONObj& inclusiveLower1,
+                   const BSONObj& exclusiveUpper1,
+                   const BSONObj& inclusiveLower2,
+                   const BSONObj& exclusiveUpper2) {
+    return (exclusiveUpper1.woCompare(inclusiveLower2) > 0) &&
+        (exclusiveUpper2.woCompare(inclusiveLower1) > 0);
+}
+
 bool rangeMapOverlaps(const RangeMap& ranges,
                       const BSONObj& inclusiveLower,
                       const BSONObj& exclusiveUpper) {
     OverlapBounds bounds = rangeMapOverlapBounds(ranges, inclusiveLower, exclusiveUpper);
     return bounds.first != bounds.second;
-}
-
-bool rangeMapContains(const RangeMap& ranges,
-                      const BSONObj& inclusiveLower,
-                      const BSONObj& exclusiveUpper) {
-    OverlapBounds bounds = rangeMapOverlapBounds(ranges, inclusiveLower, exclusiveUpper);
-    if (bounds.first == ranges.end())
-        return false;
-
-    return bounds.first->first.woCompare(inclusiveLower) == 0 &&
-        bounds.first->second.getMaxKey().woCompare(exclusiveUpper) == 0;
 }
 
 }  // namespace mongo

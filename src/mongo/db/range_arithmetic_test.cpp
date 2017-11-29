@@ -26,13 +26,13 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
-
-using std::make_pair;
 
 TEST(BSONRange, SmallerLowerRangeNonSubset) {
     ASSERT_TRUE(
@@ -71,11 +71,8 @@ TEST(BSONRange, EqualRange) {
 }
 
 TEST(RangeMap, RangeMapOverlaps) {
-    const OID epoch = OID::gen();
-
-    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
-    rangeMap.insert(
-        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
+    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>();
+    rangeMap.insert(std::make_pair(BSON("x" << 100), BSON("x" << 200)));
 
     ASSERT(rangeMapOverlaps(rangeMap, BSON("x" << 100), BSON("x" << 200)));
     ASSERT(rangeMapOverlaps(rangeMap, BSON("x" << 99), BSON("x" << 200)));
@@ -83,30 +80,6 @@ TEST(RangeMap, RangeMapOverlaps) {
     ASSERT(rangeMapOverlaps(rangeMap, BSON("x" << 100), BSON("x" << 200)));
     ASSERT(!rangeMapOverlaps(rangeMap, BSON("x" << 99), BSON("x" << 100)));
     ASSERT(!rangeMapOverlaps(rangeMap, BSON("x" << 200), BSON("x" << 201)));
-}
-
-TEST(RangeMap, RangeMapContains) {
-    const OID epoch = OID::gen();
-
-    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
-    rangeMap.insert(
-        make_pair(BSON("x" << 100), CachedChunkInfo(BSON("x" << 200), ChunkVersion(1, 0, epoch))));
-
-    ASSERT(rangeMapContains(rangeMap, BSON("x" << 100), BSON("x" << 200)));
-    ASSERT(!rangeMapContains(rangeMap, BSON("x" << 99), BSON("x" << 200)));
-    ASSERT(!rangeMapContains(rangeMap, BSON("x" << 100), BSON("x" << 201)));
-}
-
-TEST(RangeMap, RangeMapContainsMinMax) {
-    const OID epoch = OID::gen();
-
-    RangeMap rangeMap = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
-    rangeMap.insert(make_pair(BSON("x" << MINKEY),
-                              CachedChunkInfo(BSON("x" << MAXKEY), ChunkVersion(1, 0, epoch))));
-
-    ASSERT(rangeMapContains(rangeMap, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
-    ASSERT(!rangeMapContains(rangeMap, BSON("x" << 1), BSON("x" << MAXKEY)));
-    ASSERT(!rangeMapContains(rangeMap, BSON("x" << MINKEY), BSON("x" << 1)));
 }
 
 }  // namespace
