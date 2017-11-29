@@ -1,52 +1,62 @@
 /**
- * Ensures that a server started with --shardsvr or --configsvr must also be started with --replSet,
- * unless it is started with enableTestCommands=1.
+ * Ensures that a server started with --shardsvr or --configsvr must also be started as a replica
+ * set, unless it is started with enableTestCommands=1.
  */
 (function() {
-    jsTest.setOption('enableTestCommands', false);
+    var testAllPermutations = function(enableTestCommands) {
+        jsTest.setOption('enableTestCommands', enableTestCommands);
+        var mongod;
 
-    // Standalone tests. If the server fails to start, MongoRunner.runMongod returns null.
+        // Standalone tests.
 
-    jsTest.log("Ensure starting a standalone with --shardsvr fails");
-    let standaloneWithShardsvr = MongoRunner.runMongod({shardsvr: ''});
-    assert.eq(null, standaloneWithShardsvr);
+        jsTest.log("Starting shardsvr with enableTestCommands=" + enableTestCommands);
+        mongod = MongoRunner.runMongod({shardsvr: ''});
+        if (enableTestCommands) {
+            assert.neq(null, mongod);
+            MongoRunner.stopMongod(mongod);
+        } else {
+            assert.eq(null, mongod);
+        }
 
-    jsTest.log("Ensure starting a standalone with --shardsvr and enableTestCommands=1 succeeds");
-    let standaloneWithShardsvrForTest =
-        MongoRunner.runMongod({shardsvr: '', setParameter: "enableTestCommands=1"});
-    assert.neq(null, standaloneWithShardsvrForTest);
-    MongoRunner.stopMongod(standaloneWithShardsvrForTest);
+        jsTest.log("Starting configsvr with enableTestCommands=" + enableTestCommands);
+        mongod = MongoRunner.runMongod({configsvr: ''});
+        if (enableTestCommands) {
+            assert.neq(null, mongod);
+            MongoRunner.stopMongod(mongod);
+        } else {
+            assert.eq(null, mongod);
+        }
 
-    jsTest.log("Ensure starting a standalone with --configsvr fails");
-    let standaloneWithConfigsvr = MongoRunner.runMongod({configsvr: ''});
-    assert.eq(null, standaloneWithConfigsvr);
+        // Replica set tests using the command line 'replSet' option.
 
-    jsTest.log("Ensure starting a standalone with --configsvr and enableTestCommands=1 succeeds");
-    let standaloneWithConfigsvrForTest =
-        MongoRunner.runMongod({configsvr: '', setParameter: "enableTestCommands=1"});
-    assert.neq(null, standaloneWithConfigsvrForTest);
-    MongoRunner.stopMongod(standaloneWithConfigsvrForTest);
+        jsTest.log("Starting shardsvr with --replSet and enableTestCommands=" + enableTestCommands);
+        mongod = MongoRunner.runMongod({shardsvr: '', replSet: 'dummy'});
+        assert.neq(null, mongod);
+        MongoRunner.stopMongod(mongod);
 
-    // Replset tests. If any server fails to start, ReplSetTest.startSet throws an error.
+        jsTest.log("Starting configsvr with --replSet and enableTestCommands=" +
+                   enableTestCommands);
+        mongod = MongoRunner.runMongod({configsvr: '', replSet: 'dummy'});
+        assert.neq(null, mongod);
+        MongoRunner.stopMongod(mongod);
 
-    jsTest.log("Ensure starting a replset with --shardsvr succeeds");
-    let replsetWithShardsvr = new ReplSetTest({nodes: 1});
-    replsetWithShardsvr.startSet({shardsvr: ''});
-    replsetWithShardsvr.stopSet();
+        // Replica set tests using the config file 'replSetName' option.
 
-    jsTest.log("Ensure starting a replset with --shardsvr and enableTestCommands=1 succeeds");
-    let replsetWithShardsvrForTest = new ReplSetTest({nodes: 1});
-    replsetWithShardsvrForTest.startSet({shardsvr: '', setParameter: "enableTestCommands=1"});
-    replsetWithShardsvrForTest.stopSet();
+        jsTest.log("Starting shardsvr with 'replication.replSetName' and enableTestCommands=" +
+                   enableTestCommands);
+        mongod = MongoRunner.runMongod(
+            {config: "jstests/libs/config_files/set_shardingrole_shardsvr.json"});
+        assert.neq(null, mongod);
+        MongoRunner.stopMongod(mongod);
 
-    jsTest.log("Ensure starting a replset with --configsvr succeeds");
-    let replsetWithConfigsvr = new ReplSetTest({nodes: 1});
-    replsetWithConfigsvr.startSet({configsvr: ''});
-    replsetWithConfigsvr.stopSet();
+        jsTest.log("Starting configsvr with 'replication.replSetName' and enableTestCommands=" +
+                   enableTestCommands);
+        mongod = MongoRunner.runMongod(
+            {config: "jstests/libs/config_files/set_shardingrole_configsvr.json"});
+        assert.neq(null, mongod);
+        MongoRunner.stopMongod(mongod);
+    };
 
-    jsTest.log("Ensure starting a replset with --configsvr and enableTestCommands=1 succeeds");
-    let replsetWithConfigsvrForTest = new ReplSetTest({nodes: 1});
-    replsetWithConfigsvrForTest.startSet({configsvr: '', setParameter: "enableTestCommands=1"});
-    replsetWithConfigsvrForTest.stopSet();
-
+    testAllPermutations(true /* enableTestCommands */);
+    testAllPermutations(false /* enableTestCommands */);
 })();
