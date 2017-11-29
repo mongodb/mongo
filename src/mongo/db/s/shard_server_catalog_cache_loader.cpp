@@ -240,7 +240,7 @@ StatusWith<CollectionAndChangedChunks> getIncompletePersistedMetadataSinceVersio
 }
 
 /**
- * Sends forceRoutingTableRefresh to the primary to force it to refresh its routing table for
+ * Sends _flushRoutingTableCacheUpdates to the primary to force it to refresh its routing table for
  * collection 'nss' and then waits for the refresh to replicate to this node.
  */
 void forcePrimaryRefreshAndWaitForReplication(OperationContext* opCtx, const NamespaceString& nss) {
@@ -254,7 +254,7 @@ void forcePrimaryRefreshAndWaitForReplication(OperationContext* opCtx, const Nam
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
-        BSON("forceRoutingTableRefresh" << nss.ns()),
+        BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
         Seconds{30},
         Shard::RetryPolicy::kIdempotent));
 

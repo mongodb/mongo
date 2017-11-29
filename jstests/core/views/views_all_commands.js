@@ -78,6 +78,7 @@
         _configsvrShardCollection: {skip: isAnInternalCommand},
         _configsvrSetFeatureCompatibilityVersion: {skip: isAnInternalCommand},
         _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
+        _flushRoutingTableCacheUpdates: {skip: isUnrelated},
         _getNextSessionMods: {skip: isAnInternalCommand},
         _getUserCacheGeneration: {skip: isAnInternalCommand},
         _hashBSONElement: {skip: isAnInternalCommand},
@@ -218,7 +219,6 @@
         },
         flushRouterConfig: {skip: isUnrelated},
         forceerror: {skip: isUnrelated},
-        forceRoutingTableRefresh: {skip: isUnrelated},
         fsync: {skip: isUnrelated},
         fsyncUnlock: {skip: isUnrelated},
         geoNear: {

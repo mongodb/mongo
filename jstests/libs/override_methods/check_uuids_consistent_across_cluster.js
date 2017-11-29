@@ -76,7 +76,8 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
         });
 
         for (let authoritativeCollMetadata of authoritativeCollMetadataArr) {
-            const[dbName, collName] = parseNs(authoritativeCollMetadata._id);
+            const ns = authoritativeCollMetadata._id;
+            const[dbName, collName] = parseNs(ns);
 
             for (let shardConnString of authoritativeCollMetadata.shardConnStrings) {
                 // A connection the shard may not be cached in ShardingTest if the shard was added
@@ -87,8 +88,8 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
                 }
                 let shardConn = shardConnStringToConn[shardConnString];
 
-                print("running listCollections against " + shardConn +
-                      " to check UUID consistency for " + authoritativeCollMetadata._id);
+                print("checking that the UUID in the storage catalog for " + ns + " on " +
+                      shardConn + " is consistent with the config server");
                 const actualCollMetadata =
                     shardConn.getDB(dbName).getCollectionInfos({name: collName})[0];
                 assert.eq(authoritativeCollMetadata.collInfo.uuid,
@@ -98,11 +99,13 @@ ShardingTest.prototype.checkUUIDsConsistentAcrossCluster = function() {
                               ", actual collection info on shard " + shardConnString + ": " +
                               tojson(actualCollMetadata));
 
-                print("checking " + shardConn + " config.collections" +
-                      " for UUID consistency with " + authoritativeCollMetadata._id);
-                const configDB = shardConn.getDB('config');
+                print("checking that the UUID in config.cache.collections for " + ns + " on " +
+                      shardConn + " is consistent with the config server");
+                assert.commandWorked(shardConn.adminCommand(
+                    {_flushRoutingTableCacheUpdates: ns, syncFromConfig: false}));
                 const actualConfigMetadata =
-                    configDB.cache.collections.find({"_id": dbName + "." + collName})[0];
+                    shardConn.getDB("config").getCollection("cache.collections").find({"_id":
+                                                                                           ns})[0];
                 assert.eq(authoritativeCollMetadata.collInfo.uuid,
                           actualConfigMetadata.uuid,
                           "authoritative collection info on config server: " +
