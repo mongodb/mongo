@@ -265,12 +265,6 @@ class ScopedCollectionMetadata {
     MONGO_DISALLOW_COPYING(ScopedCollectionMetadata);
 
 public:
-    /**
-     * Creates an empty ScopedCollectionMetadata. Using the default constructor means that no
-     * metadata is available.
-     */
-    ScopedCollectionMetadata() = default;
-
     ~ScopedCollectionMetadata() {
         _clear();
     }
@@ -320,6 +314,12 @@ private:
 
     friend std::vector<ScopedCollectionMetadata> MetadataManager::overlappingMetadata(
         std::shared_ptr<MetadataManager> const&, ChunkRange const&);
+
+    /**
+     * Creates an empty ScopedCollectionMetadata, which is interpreted as if the collection is
+     * unsharded.
+     */
+    ScopedCollectionMetadata();
 
     /**
      * Increments the usageCounter in the specified CollectionMetadata.

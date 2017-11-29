@@ -538,6 +538,8 @@ boost::optional<KeyRange> MetadataManager::getNextOrphanRange(BSONObj const& fro
     return _metadata.back()->metadata.getNextOrphanRange(_receivingChunks, from);
 }
 
+ScopedCollectionMetadata::ScopedCollectionMetadata() = default;
+
 ScopedCollectionMetadata::ScopedCollectionMetadata(
     WithLock,
     std::shared_ptr<MetadataManager> metadataManager,
