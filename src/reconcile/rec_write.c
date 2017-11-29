@@ -40,9 +40,9 @@ typedef struct {
 
 	/*
 	 * Track the oldest running transaction and whether to skew lookaside
-	 * to the newest or oldest update.
+	 * to the newest update.
 	 */
-	bool las_skew_oldest;
+	bool las_skew_newest;
 	uint64_t last_running;
 
 	/* Track the page's min/maximum transactions. */
@@ -907,6 +907,7 @@ __rec_init(WT_SESSION_IMPL *session,
 	WT_PAGE *page;
 	WT_RECONCILE *r;
 	WT_TXN_GLOBAL *txn_global;
+	bool las_skew_oldest;
 
 	btree = S2BT(session);
 	page = ref->page;
@@ -952,10 +953,13 @@ __rec_init(WT_SESSION_IMPL *session,
 	 */
 	txn_global = &S2C(session)->txn_global;
 	if (__wt_btree_immediately_durable(session))
-		r->las_skew_oldest = false;
+		las_skew_oldest = false;
 	else
-		WT_ORDERED_READ(r->las_skew_oldest,
+		WT_ORDERED_READ(las_skew_oldest,
 		    txn_global->has_stable_timestamp);
+	r->las_skew_newest = LF_ISSET(WT_REC_LOOKASIDE) &&
+	    LF_ISSET(WT_REC_VISIBLE_ALL) && !las_skew_oldest;
+
 	WT_ORDERED_READ(r->last_running, txn_global->last_running);
 
 	/*
@@ -1344,8 +1348,7 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * version (but we save enough information that checkpoint can
 		 * fix things up if we choose an update that is too new).
 		 */
-		if (*updp == NULL && F_ISSET(r, WT_REC_LOOKASIDE) &&
-		    F_ISSET(r, WT_REC_VISIBLE_ALL) && !r->las_skew_oldest)
+		if (*updp == NULL && r->las_skew_newest)
 			*updp = upd;
 
 		if (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
@@ -1480,7 +1483,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 	 * unresolved updates, move the entire update list.
 	 */
 	WT_RET(__rec_update_save(session, r, ins, ripcip, *updp, upd_memsize));
-
 	if (upd_savedp != NULL)
 		*upd_savedp = true;
 
@@ -1523,7 +1525,7 @@ check_original_value:
 	 * - or any reconciliation of a backing overflow record that will be
 	 *   physically removed once it's no longer needed.
 	 */
-	if (*updp != NULL && ((*updp)->type == WT_UPDATE_MODIFIED ||
+	if (*updp != NULL && (!WT_UPDATE_DATA_VALUE(*updp) ||
 	    F_ISSET(r, WT_REC_LOOKASIDE) || (vpack != NULL &&
 	    vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)))
 		WT_RET(
@@ -3386,7 +3388,7 @@ __rec_split_write_supd(WT_SESSION_IMPL *session,
 	}
 
 done:	/* Track the oldest timestamp seen so far. */
-	multi->page_las.las_skew_oldest = r->las_skew_oldest;
+	multi->page_las.las_skew_newest = r->las_skew_newest;
 	multi->page_las.las_max_txn = r->max_txn;
 	WT_ASSERT(session, r->max_txn != WT_TXN_NONE);
 #ifdef HAVE_TIMESTAMPS
@@ -4629,8 +4631,9 @@ record_loop:	/*
 					break;
 				case WT_UPDATE_MODIFIED:
 					cbt->slot = WT_COL_SLOT(page, cip);
-					WT_ERR(__wt_value_return(
-					    session, cbt, upd));
+					WT_ERR(__wt_value_return_upd(
+					    session, cbt, upd,
+					    F_ISSET(r, WT_REC_VISIBLE_ALL)));
 					data = cbt->iface.value.data;
 					size = (uint32_t)cbt->iface.value.size;
 					update_no_copy = false;
@@ -4873,8 +4876,9 @@ compare:		/*
 					 * on-page item.
 					 */
 					cbt->slot = UINT32_MAX;
-					WT_ERR(__wt_value_return(
-					    session, cbt, upd));
+					WT_ERR(__wt_value_return_upd(
+					    session, cbt, upd,
+					    F_ISSET(r, WT_REC_VISIBLE_ALL)));
 					data = cbt->iface.value.data;
 					size = (uint32_t)cbt->iface.value.size;
 					update_no_copy = false;
@@ -5471,7 +5475,9 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				goto leaf_insert;
 			case WT_UPDATE_MODIFIED:
 				cbt->slot = WT_ROW_SLOT(page, rip);
-				WT_ERR(__wt_value_return(session, cbt, upd));
+				WT_ERR(__wt_value_return_upd(
+				    session, cbt, upd,
+				    F_ISSET(r, WT_REC_VISIBLE_ALL)));
 				WT_ERR(__rec_cell_build_val(session, r,
 				    cbt->iface.value.data,
 				    cbt->iface.value.size, (uint64_t)0));
@@ -5690,7 +5696,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 			 * item.
 			 */
 			cbt->slot = UINT32_MAX;
-			WT_RET(__wt_value_return(session, cbt, upd));
+			WT_RET(__wt_value_return_upd(
+			    session, cbt, upd,
+			    F_ISSET(r, WT_REC_VISIBLE_ALL)));
 			WT_RET(__rec_cell_build_val(session, r,
 			    cbt->iface.value.data,
 			    cbt->iface.value.size, (uint64_t)0));

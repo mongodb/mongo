@@ -203,7 +203,7 @@ struct __wt_page_lookaside {
 						   lookaside */
 	WT_DECL_TIMESTAMP(min_timestamp)	/* Min timestamp in lookaside */
 	WT_DECL_TIMESTAMP(onpage_timestamp)	/* Max timestamp on page */
-	bool las_skew_oldest;			/* On-page skewed to oldest */
+	bool las_skew_newest;			/* On-page skewed to newest */
 };
 
 /*

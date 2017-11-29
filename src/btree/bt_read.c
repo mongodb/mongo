@@ -221,7 +221,7 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t btree_id)
 		 */
 		page->modify->first_dirty_txn = WT_TXN_FIRST;
 
-		if (!ref->page_las->las_skew_oldest &&
+		if (ref->page_las->las_skew_newest &&
 		    !S2C(session)->txn_global.has_stable_timestamp &&
 		    __wt_txn_visible_all(session, ref->page_las->las_max_txn,
 		    WT_TIMESTAMP_NULL(&ref->page_las->onpage_timestamp))) {
@@ -495,7 +495,7 @@ __las_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 		goto done;
 
 	if (!F_ISSET(txn, WT_TXN_HAS_TS_READ) &&
-	    !ref->page_las->las_skew_oldest) {
+	    ref->page_las->las_skew_newest) {
 		skip = true;
 		goto done;
 	}
@@ -511,7 +511,7 @@ __las_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 	    &session->txn.read_timestamp) <= 0);
 
 	if (F_ISSET(&session->txn, WT_TXN_HAS_TS_READ) &&
-	    ref->page_las->las_skew_oldest &&
+	    !ref->page_las->las_skew_newest &&
 	    __wt_timestamp_cmp(
 	    &ref->page_las->min_timestamp, &session->txn.read_timestamp) > 0) {
 		skip = true;
