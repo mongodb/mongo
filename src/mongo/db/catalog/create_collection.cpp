@@ -71,6 +71,10 @@ Status createCollection(OperationContext* opCtx,
         const auto elem = it.next();
         if (!Command::isGenericArgument(elem.fieldNameStringData()))
             optionsBuilder.append(elem);
+        if (elem.fieldNameStringData() == "viewOn") {
+            // Views don't have UUIDs so it should always be parsed for command.
+            kind = CollectionOptions::parseForCommand;
+        }
     }
 
     BSONObj options = optionsBuilder.obj();
