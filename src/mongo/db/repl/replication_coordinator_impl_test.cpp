@@ -1467,13 +1467,8 @@ TEST_F(ReplCoordTest, NodeChangesTermAndStepsDownWhenAndOnlyWhenUpdateTermSuppli
     // higher term, step down and change term
     executor::TaskExecutor::CallbackHandle cbHandle;
     ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(opCtx.get(), 2).code());
-    // Term hasn't been incremented yet, as we need another try to update it after stepdown.
-    ASSERT_EQUALS(1, getReplCoord()->getTerm());
-    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-
-    // Now update term should actually update the term, as stepdown is complete.
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(opCtx.get(), 2).code());
     ASSERT_EQUALS(2, getReplCoord()->getTerm());
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 
 TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreThanOnce) {
@@ -1512,41 +1507,24 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
 
     TopologyCoordinator::UpdateTermResult termUpdated2;
     auto updateTermEvh2 = getReplCoord()->updateTerm_forTest(2, &termUpdated2);
+    ASSERT(termUpdated2 == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
     ASSERT(updateTermEvh2.isValid());
 
     TopologyCoordinator::UpdateTermResult termUpdated3;
     auto updateTermEvh3 = getReplCoord()->updateTerm_forTest(3, &termUpdated3);
-    ASSERT(updateTermEvh3.isValid());
+    ASSERT(termUpdated3 == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
+    // Although term 3 can trigger stepdown, a stepdown has already been scheduled,
+    // so no other stepdown can be scheduled again. Term 3 will be remembered and
+    // installed once stepdown finishes.
+    ASSERT(!updateTermEvh3.isValid());
 
     // Unblock the tasks for updateTerm and _stepDownFinish.
     globalExclusiveLock.reset();
 
-    // Both _updateTerm_incallback tasks should be scheduled.
+    // Wait stepdown to finish and term 3 to be installed.
     replExec->waitForEvent(updateTermEvh2);
-    ASSERT(termUpdated2 == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
-
-    replExec->waitForEvent(updateTermEvh3);
-    if (termUpdated3 == TopologyCoordinator::UpdateTermResult::kTriggerStepDown) {
-        // Term hasn't updated yet.
-        ASSERT_EQUALS(1, getReplCoord()->getTerm());
-
-        // Update term event handles will wait for potential stepdown.
-        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-
-        TopologyCoordinator::UpdateTermResult termUpdated4;
-        auto updateTermEvh4 = getReplCoord()->updateTerm_forTest(3, &termUpdated4);
-        ASSERT(updateTermEvh4.isValid());
-        replExec->waitForEvent(updateTermEvh4);
-        ASSERT(termUpdated4 == TopologyCoordinator::UpdateTermResult::kUpdatedTerm);
-        ASSERT_EQUALS(3, getReplCoord()->getTerm());
-    } else {
-        // Term already updated.
-        ASSERT(termUpdated3 == TopologyCoordinator::UpdateTermResult::kUpdatedTerm);
-        ASSERT_EQUALS(3, getReplCoord()->getTerm());
-
-        // Update term event handles will wait for potential stepdown.
-        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    }
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+    ASSERT_EQUALS(3, getReplCoord()->getTerm());
 }
 
 TEST_F(ReplCoordTest, DrainCompletionMidStepDown) {
