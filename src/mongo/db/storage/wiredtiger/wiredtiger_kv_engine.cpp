@@ -169,9 +169,10 @@ public:
 
             try {
                 if (keepOldBehavior) {
-                    const bool forceCheckpoint = true;
-                    const bool stableCheckpoint = false;
-                    _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
+                    UniqueWiredTigerSession session = _sessionCache->getSession();
+                    WT_SESSION* s = session->getSession();
+                    invariantWTOK(s->checkpoint(s, nullptr));
+                    LOG(4) << "created checkpoint (forced)";
                 } else {
                     // Three cases:
                     //
