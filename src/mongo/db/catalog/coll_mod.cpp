@@ -48,6 +48,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/view_catalog.h"
@@ -433,7 +434,9 @@ Status _collModInternal(OperationContext* opCtx,
             log() << "Assigning UUID " << uuid.get().toString() << " to collection " << coll->ns();
             CollectionCatalogEntry* cce = coll->getCatalogEntry();
             cce->addUUID(opCtx, uuid.get(), coll);
-        } else if (!uuid && coll->uuid()) {
+        } else if (!uuid && coll->uuid() &&
+                   serverGlobalParams.featureCompatibility.getVersion() !=
+                       ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
             log() << "Removing UUID " << coll->uuid().get().toString() << " from collection "
                   << coll->ns();
             CollectionCatalogEntry* cce = coll->getCatalogEntry();
