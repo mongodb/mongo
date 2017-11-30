@@ -1645,7 +1645,26 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
         // Immediately rewind visibility to our truncation point, to prevent new
         // transactions from appearing.
         Timestamp truncTs(lastKeptId.repr());
-        _kvEngine->setOldestTimestamp(SnapshotName(truncTs));
+
+
+        char commitTSConfigString["commit_timestamp="_sd.size() +
+                                  (8 * 2) /* 8 hexadecimal characters */ + 1 /* trailing null */];
+        auto size = std::snprintf(commitTSConfigString,
+                                  sizeof(commitTSConfigString),
+                                  "commit_timestamp=%llx",
+                                  truncTs.asULL());
+        if (size < 0) {
+            int e = errno;
+            error() << "error snprintf " << errnoWithDescription(e);
+            fassertFailedNoTrace(40662);
+        }
+
+        invariant(static_cast<std::size_t>(size) < sizeof(commitTSConfigString));
+        auto conn = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn();
+        invariantWTOK(conn->set_timestamp(conn, commitTSConfigString));
+
+        _kvEngine->getOplogManager()->setOplogReadTimestamp(truncTs);
+        LOG(1) << "truncation new read timestamp: " << truncTs;
     }
 
     if (_oplogStones) {

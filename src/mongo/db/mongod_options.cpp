@@ -1201,15 +1201,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         if (clusterRoleParam == "configsvr") {
             serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
 
-            if (params.count("replication.enableMajorityReadConcern") &&
-                !params["replication.enableMajorityReadConcern"].as<bool>()) {
-                warning()
-                    << "Config servers require majority read concern, but it was explicitly "
-                       "disabled. The override is being ignored and the process is continuing "
-                       "with majority read concern enabled.";
-            }
-            serverGlobalParams.enableMajorityReadConcern = true;
-
             // If we haven't explicitly specified a journal option, default journaling to true for
             // the config server role
             if (!params.count("storage.journal.enabled")) {

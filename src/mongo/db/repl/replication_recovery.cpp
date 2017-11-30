@@ -140,18 +140,6 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx) try {
     }
 
     if (auto startPoint = _getOplogApplicationStartPoint(checkpointTimestamp, appliedThrough)) {
-        // When `recoverFromOplog` truncates the oplog, that also happens to set the "oldest
-        // timestamp" to the truncation point[1]. `_applyToEndOfOplog` will then perform writes
-        // before the truncation point. Doing so violates the constraint that all updates must be
-        // timestamped newer than the "oldest timestamp". This call will move the "oldest
-        // timestamp" back to the `startPoint`.
-        //
-        // [1] This is arguably incorrect. On rollback for nodes that are not keeping history to
-        // the "majority point", the "oldest timestamp" likely needs to go back in time. The
-        // oplog's `cappedTruncateAfter` method was a convenient location for this logic, which,
-        // unfortunately, conflicts with the usage above.
-        opCtx->getServiceContext()->getGlobalStorageEngine()->setOldestTimestamp(
-            SnapshotName(startPoint.get()));
         _applyToEndOfOplog(opCtx, startPoint.get(), topOfOplog->getTimestamp());
     }
 

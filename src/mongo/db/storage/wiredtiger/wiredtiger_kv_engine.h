@@ -217,17 +217,11 @@ public:
     }
 
     /**
-     * Callers to this method and `setOldestTimestamp` must be serialized. A "timestamping"
-     * MongoDB can be one of two modes: supporting majority reads or not. A node that supports
-     * majority reads will have its `oldest_timestamp` updates via replication calling
-     * `setStableTimestamp`. Nodes that do not support majority reads (master-slave or explicitly
-     * disabled) will call this method directly from the WiredTigerOplogManager background thread.
-     */
-    void advanceOldestTimestamp(SnapshotName oldestTimestamp);
-
-    /**
-     * Callers to this method and `advanceOldestTimestamp` must be serialized. This method will
-     * force the oldest timestamp to the input value.
+     * Callers to this method must be serialized. A "timestamping" MongoDB can be one of two
+     * modes: supporting majority reads or not. A node that supports majority reads will have its
+     * `oldest_timestamp` updates via replication calling `setStableTimestamp`. Nodes that do not
+     * support majority reads (master-slave or explicitly disabled) will call this method directly
+     * from the WiredTigerOplogManager background thread.
      */
     void setOldestTimestamp(SnapshotName oldestTimestamp);
 
