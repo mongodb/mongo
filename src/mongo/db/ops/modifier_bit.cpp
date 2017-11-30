@@ -159,6 +159,8 @@ Status ModifierBit::prepare(mutablebson::Element root,
     // Locate the field name in 'root'.
     Status status = pathsupport::findLongestPrefix(
         _fieldRef, root, &_preparedState->idxFound, &_preparedState->elemFound);
+    const auto elemFoundIsArray =
+        _preparedState->elemFound.ok() && _preparedState->elemFound.getType() == BSONType::Array;
 
 
     // FindLongestPrefix may say the path does not exist at all, which is fine here, or
@@ -184,6 +186,12 @@ Status ModifierBit::prepare(mutablebson::Element root,
         // If no target element exists, the value we will write is the result of applying
         // the operation to a zero-initialized integer element.
         _preparedState->newValue = apply(SafeNum(static_cast<int>(0)));
+
+        if (elemFoundIsArray) {
+            // Report that an existing array will gain a new element as a result of this mod.
+            execInfo->indexOfArrayWithNewElement[0] = _preparedState->idxFound;
+        }
+
         return Status::OK();
     }
 

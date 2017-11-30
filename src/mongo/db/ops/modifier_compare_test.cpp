@@ -292,4 +292,40 @@ TEST(ExistingEmbeddedDoc, MaxNumber) {
     ASSERT_EQUALS("a", execInfo.fieldRef[0]->dottedField());
 }
 
+TEST(IndexedMod, PrepareReportCreatedArrayElement) {
+    Document doc(fromjson("{a: [{b: 0}]}"));
+    Mod mod(fromjson("{$min: {'a.1.c': 2}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.c");
+    ASSERT_TRUE(execInfo.indexOfArrayWithNewElement[0]);
+    ASSERT_EQUALS(*execInfo.indexOfArrayWithNewElement[0], 0u);
+    ASSERT_FALSE(execInfo.noOp);
+}
+
+TEST(IndexedMod, PrepareDoNotReportModifiedArrayElement) {
+    Document doc(fromjson("{a: [{b: 0}]}"));
+    Mod mod(fromjson("{$min: {'a.0.c': 2}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.0.c");
+    ASSERT_FALSE(execInfo.indexOfArrayWithNewElement[0]);
+    ASSERT_FALSE(execInfo.noOp);
+}
+
+TEST(IndexedMod, PrepareDoNotReportCreatedNumericObjectField) {
+    Document doc(fromjson("{a: {'0': {b: 0}}}"));
+    Mod mod(fromjson("{$min: {'a.1.c': 2}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.c");
+    ASSERT_FALSE(execInfo.indexOfArrayWithNewElement[0]);
+    ASSERT_FALSE(execInfo.noOp);
+}
 }  // namespace
