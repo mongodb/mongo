@@ -755,4 +755,41 @@ TEST(DbUpdateTests, Bit1_4_Combined) {
     ASSERT_EQUALS(BSON("$set" << BSON("x" << ((3 | 2) & 8))), logDoc);
 }
 
+TEST(IndexedMod, PrepareReportCreatedArrayElement) {
+    Document doc(fromjson("{a: [{b: 0}]}"));
+    Mod mod(fromjson("{$bit: {'a.1.c': {and: NumberInt(1)}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.c");
+    ASSERT_TRUE(execInfo.indexOfArrayWithNewElement[0]);
+    ASSERT_EQUALS(*execInfo.indexOfArrayWithNewElement[0], 0u);
+    ASSERT_FALSE(execInfo.noOp);
+}
+
+TEST(IndexedMod, PrepareDoNotReportModifiedArrayElement) {
+    Document doc(fromjson("{a: [{b: NumberInt(0)}]}"));
+    Mod mod(fromjson("{$bit: {'a.0.c': {or: NumberInt(1)}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.0.c");
+    ASSERT_FALSE(execInfo.indexOfArrayWithNewElement[0]);
+    ASSERT_FALSE(execInfo.noOp);
+}
+
+TEST(IndexedMod, PrepareDoNotReportCreatedNumericObjectField) {
+    Document doc(fromjson("{a: {'0': {b: 0}}}"));
+    Mod mod(fromjson("{$bit: {'a.1.c': {and: NumberInt(1)}}}"));
+
+    ModifierInterface::ExecInfo execInfo;
+    ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+    ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.1.c");
+    ASSERT_FALSE(execInfo.indexOfArrayWithNewElement[0]);
+    ASSERT_FALSE(execInfo.noOp);
+}
+
 }  // namespace
