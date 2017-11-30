@@ -71,7 +71,7 @@
     assert.commandWorked(rollbackNode.getDB(dbName)['tToDropIndexes'].dropIndexes());
 
     // ----------------- Begins running operations only on the sync source node ---------------
-    rollbackTest.transitionToSyncSourceOperations();
+    rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
     // Fake removing the UUID on the sync source, to test when neither node has a UUID for
     // completeness.
@@ -82,7 +82,8 @@
     }));
 
     // ----------------- Allows rollback to occur and checks for consistency ------------------
-    rollbackTest.transitionToSteadyStateOperations({waitForRollback: true});
+    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+    rollbackTest.transitionToSteadyStateOperations();
 
     waitForDowngradeToFinish();
 

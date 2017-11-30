@@ -39,11 +39,12 @@
     let rollbackNode = rollbackTest.transitionToRollbackOperations();
     RollbackOps(rollbackNode);
 
-    let syncSourceNode = rollbackTest.transitionToSyncSourceOperations();
+    let syncSourceNode = rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     SyncSourceOps(syncSourceNode);
 
     // Wait for rollback to finish.
-    rollbackTest.transitionToSteadyStateOperations({waitForRollback: true});
+    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+    rollbackTest.transitionToSteadyStateOperations();
 
     // Check the replica set.
     rollbackTest.stop();

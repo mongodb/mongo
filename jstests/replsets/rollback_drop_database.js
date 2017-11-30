@@ -56,13 +56,14 @@
     jsTestLog("Database " + oldDbName + " successfully dropped on primary node " +
               rollbackNode.host);
 
-    rollbackTest.transitionToSyncSourceOperations();
+    rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
     // Perform an insert on another database while interfacing with the new primary.
     // This is the sync source's divergent oplog entry.
     assert.writeOK(syncSourceNode.getDB(newDbName)["afterRollback"].insert({"num": 2}));
 
-    rollbackTest.transitionToSteadyStateOperations({waitForRollback: true});
+    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+    rollbackTest.transitionToSteadyStateOperations();
 
     rollbackTest.stop();
 })();
