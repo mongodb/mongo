@@ -1,5 +1,6 @@
 /**
  * SERVER-32125 Check that applyOps commands with collMod without UUID don't strip it
+ * @tags: [requires_fcv36]
  */
 (function() {
     "use strict";
