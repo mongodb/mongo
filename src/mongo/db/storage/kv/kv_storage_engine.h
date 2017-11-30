@@ -116,6 +116,8 @@ public:
 
     virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) override;
 
+    virtual void setOldestTimestamp(SnapshotName oldestTimestamp) override;
+
     virtual bool supportsRecoverToStableTimestamp() const override;
 
     virtual void replicationBatchIsComplete() const override;
