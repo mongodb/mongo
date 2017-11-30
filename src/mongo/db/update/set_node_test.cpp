@@ -1275,6 +1275,64 @@ TEST_F(SetNodeTest, ApplyCanCreatePrefixOfImmutablePath) {
     ASSERT_EQUALS(fromjson("{$set: {a: 2}}"), getLogDoc());
 }
 
+TEST_F(SetNodeTest, ApplySetFieldInNonExistentArrayElementAffectsIndexOnSiblingField) {
+    auto update = fromjson("{$set: {'a.1.c': 2}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.1.c"], expCtx));
+
+    mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
+    setPathToCreate("1.c");
+    setPathTaken("a");
+    addIndexedPath("a.b");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: [{b: 0}, {c: 2}]}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(getLogDoc().root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a.1.c': 2}}"), getLogDoc());
+}
+
+TEST_F(SetNodeTest, ApplySetFieldInExistingArrayElementDoesNotAffectIndexOnSiblingField) {
+    auto update = fromjson("{$set: {'a.0.c': 2}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.0.c"], expCtx));
+
+    mutablebson::Document doc(fromjson("{a: [{b: 0}]}"));
+    setPathToCreate("c");
+    setPathTaken("a.0");
+    addIndexedPath("a.b");
+    auto result = node.apply(getApplyParams(doc.root()["a"][0]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: [{b: 0, c: 2}]}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(getLogDoc().root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a.0.c': 2}}"), getLogDoc());
+}
+
+TEST_F(SetNodeTest, ApplySetFieldInNonExistentNumericFieldDoesNotAffectIndexOnSiblingField) {
+    auto update = fromjson("{$set: {'a.1.c': 2}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    SetNode node;
+    ASSERT_OK(node.init(update["$set"]["a.1.c"], expCtx));
+
+    mutablebson::Document doc(fromjson("{a: {'0': {b: 0}}}"));
+    setPathToCreate("1.c");
+    setPathTaken("a");
+    addIndexedPath("a.b");
+    addIndexedPath("a.1.b");
+    auto result = node.apply(getApplyParams(doc.root()["a"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: {'0': {b: 0}, '1': {c: 2}}}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+    ASSERT_EQUALS(countChildren(getLogDoc().root()), 1u);
+    ASSERT_EQUALS(fromjson("{$set: {'a.1.c': 2}}"), getLogDoc());
+}
+
 TEST_F(SetNodeTest, ApplySetOnInsertIsNoopWhenInsertIsFalse) {
     auto update = fromjson("{$setOnInsert: {a: 2}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
