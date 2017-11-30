@@ -354,8 +354,9 @@
     RollbackOps(rollbackNode);
 
     // Wait for rollback to finish.
-    rollbackTest.transitionToSyncSourceOperations();
-    rollbackTest.transitionToSteadyStateOperations({waitForRollback: true});
+    rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
+    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+    rollbackTest.transitionToSteadyStateOperations();
 
     // Check the replica set.
     rollbackTest.stop();

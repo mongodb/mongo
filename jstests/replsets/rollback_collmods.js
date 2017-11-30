@@ -92,12 +92,13 @@
     printCollectionOptions(rollbackTest, "before branch");
     RollbackOps(rollbackNode);
 
-    rollbackTest.transitionToSyncSourceOperations();
+    rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     printCollectionOptions(rollbackTest, "before rollback");
     // No ops on the sync source.
 
     // Wait for rollback to finish.
-    rollbackTest.transitionToSteadyStateOperations({waitForRollback: true});
+    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+    rollbackTest.transitionToSteadyStateOperations();
     printCollectionOptions(rollbackTest, "after rollback");
 
     SteadyStateOps(rollbackTest.getPrimary());
