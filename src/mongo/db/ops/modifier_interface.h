@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/element.h"
@@ -190,11 +192,17 @@ struct ModifierInterface::ExecInfo {
     ExecInfo() : noOp(false), context(ANY_CONTEXT) {
         for (int i = 0; i < MAX_NUM_FIELDS; i++) {
             fieldRef[i] = NULL;
+            indexOfArrayWithNewElement[i] = boost::none;
         }
     }
 
     // The fields of concern to the driver: no other op may modify the fields listed here.
     FieldRef* fieldRef[MAX_NUM_FIELDS];  // not owned here
+
+    // For each modified field ref, the index of the path component representing an existing array
+    // that gained a new element.
+    boost::optional<size_t> indexOfArrayWithNewElement[MAX_NUM_FIELDS];
+
     bool noOp;
     UpdateContext context;
 };

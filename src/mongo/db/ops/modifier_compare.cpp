@@ -107,6 +107,8 @@ Status ModifierCompare::prepare(mutablebson::Element root,
     // be created during the apply.
     Status status = pathsupport::findLongestPrefix(
         _updatePath, root, &_preparedState->idxFound, &_preparedState->elemFound);
+    const auto elemFoundIsArray =
+        _preparedState->elemFound.ok() && _preparedState->elemFound.getType() == BSONType::Array;
 
     // FindLongestPrefix may say the path does not exist at all, which is fine here, or
     // that the path was not viable or otherwise wrong, in which case, the mod cannot
@@ -125,6 +127,11 @@ Status ModifierCompare::prepare(mutablebson::Element root,
                              _preparedState->idxFound == (_updatePath.numParts() - 1));
     if (!destExists) {
         execInfo->noOp = false;
+
+        if (elemFoundIsArray) {
+            // Report that an existing array will gain a new element as a result of this mod.
+            execInfo->indexOfArrayWithNewElement[0] = _preparedState->idxFound;
+        }
     } else {
         const int compareVal = _preparedState->elemFound.compareWithBSONElement(_val, false);
         execInfo->noOp = (compareVal == 0) ||
