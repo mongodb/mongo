@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/create_collection.h"
@@ -42,6 +44,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logger/redaction.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -170,7 +173,8 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                 // node.
                 const bool stayTemp = true;
                 if (auto futureColl = db ? db->getCollection(opCtx, newCollName) : nullptr) {
-                    auto tmpNameResult = db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%");
+                    auto tmpNameResult =
+                        db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.create");
                     if (!tmpNameResult.isOK()) {
                         return Result(Status(tmpNameResult.getStatus().code(),
                                              str::stream() << "Cannot generate temporary "
@@ -181,6 +185,10 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                            << tmpNameResult.getStatus().reason()));
                     }
                     const auto& tmpName = tmpNameResult.getValue();
+                    // It is ok to log this because this doesn't happen very frequently.
+                    log() << "CMD: create " << newCollName
+                          << " - renaming existing collection with conflicting UUID " << uuid
+                          << " to temporary collection " << tmpName;
                     Status status =
                         db->renameCollection(opCtx, newCollName.ns(), tmpName.ns(), stayTemp);
                     if (!status.isOK())
