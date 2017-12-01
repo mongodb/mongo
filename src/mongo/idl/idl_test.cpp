@@ -2027,9 +2027,20 @@ TEST(IDLDocSequence, TestWellKnownFieldsAreIgnored) {
                                 << "objects"
                                 << BSON_ARRAY(BSON("foo" << 1)));
 
+
         OpMsgRequest request = OpMsgRequest::fromDBAndBody("db", testTempDoc);
-        auto testStruct = DocSequenceCommand::parse(ctxt, request);
-        ASSERT_EQUALS(2UL, testStruct.getStructs().size());
+
+        // Validate it can be parsed as a OpMsgRequest.
+        {
+            auto testStruct = DocSequenceCommand::parse(ctxt, request);
+            ASSERT_EQUALS(2UL, testStruct.getStructs().size());
+        }
+
+        // Validate it can be parsed as just a BSON document.
+        {
+            auto testStruct = DocSequenceCommand::parse(ctxt, request.body);
+            ASSERT_EQUALS(2UL, testStruct.getStructs().size());
+        }
     }
 }
 
