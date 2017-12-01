@@ -1056,7 +1056,7 @@ def remote_handler(options, operations):
         port=options.port,
         options=options.mongod_options)
 
-    mongo_client_opts = get_mongo_client_args(options, host="localhost", port=options.port)
+    mongo_client_opts = get_mongo_client_args(host="localhost", port=options.port, options=options)
 
     # Perform the sequence of operations specified. If any operation fails
     # then return immediately.
@@ -1285,21 +1285,23 @@ def wait_for_mongod_shutdown(data_dir, timeout=120):
     return 0
 
 
-def get_mongo_client_args(options, host=None, port=None):
+def get_mongo_client_args(host=None, port=None, options=None):
     """ Returns keyword arg dict used in PyMongo client. """
-    # Set the serverSelectionTimeoutMS to 600 seconds
-    mongo_args = {"serverSelectionTimeoutMS": 600000}
-    # Set the serverSelectionTimeoutMS to 120 seconds
-    mongo_args["socketTimeoutMS"] = 120000
-    # Set the writeConcern
-    mongo_args = yaml.safe_load(options.write_concern)
-    # Set the readConcernLevel
-    if options.read_concern_level:
-        mongo_args["readConcernLevel"] = options.read_concern_level
+    # Set the serverSelectionTimeoutMS & socketTimeoutMS to 10 minutes
+    mongo_args = {
+        "serverSelectionTimeoutMS": 600000,
+        "socketTimeoutMS": 600000
+    }
     if host:
         mongo_args["host"] = host
     if port:
         mongo_args["port"] = port
+    # Set the writeConcern
+    if hasattr(options, "write_concern"):
+        mongo_args.update(yaml.safe_load(options.write_concern))
+    # Set the readConcernLevel
+    if hasattr(options, "read_concern_level") and options.read_concern_level:
+        mongo_args["readConcernLevel"] = options.read_concern_level
     return mongo_args
 
 
@@ -2231,7 +2233,7 @@ Examples:
         # Optionally validate canary document locally.
         if validate_canary_local:
             mongo = pymongo.MongoClient(
-                **get_mongo_client_args(options, host=mongod_host, port=secret_port))
+                **get_mongo_client_args(host=mongod_host, port=secret_port))
             ret = mongo_validate_canary(
                 mongo, options.db_name, options.collection_name, canary_doc)
             LOGGER.info("Local canary validation: %d", ret)
@@ -2345,7 +2347,7 @@ Examples:
             canary_doc = {"x": time.time()}
             orig_canary_doc = copy.deepcopy(canary_doc)
             mongo = pymongo.MongoClient(
-                **get_mongo_client_args(options, host=mongod_host, port=standard_port))
+                **get_mongo_client_args(host=mongod_host, port=standard_port))
             crash_canary["function"] = mongo_insert_canary
             crash_canary["args"] = [
                 mongo,
