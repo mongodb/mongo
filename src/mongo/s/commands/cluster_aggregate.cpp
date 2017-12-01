@@ -661,7 +661,16 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     auto executionNsRoutingInfoStatus =
         getExecutionNsRoutingInfo(opCtx, namespaces.executionNss, catalogCache);
 
+    LiteParsedPipeline liteParsedPipeline(request);
+
     if (!executionNsRoutingInfoStatus.isOK()) {
+        // Standard aggregations swallow 'NamespaceNotFound' and return an empty cursor with id 0 in
+        // the event that the database does not exist. For $changeStream aggregations, however, we
+        // throw the exception in all error cases, including that of a non-existent database.
+        uassert(executionNsRoutingInfoStatus.getStatus().code(),
+                str::stream() << "failed to open $changeStream: "
+                              << executionNsRoutingInfoStatus.getStatus().reason(),
+                !liteParsedPipeline.hasChangeStream());
         appendEmptyResultSet(
             *result, executionNsRoutingInfoStatus.getStatus(), namespaces.requestedNss.ns());
         return Status::OK();
@@ -678,7 +687,6 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // need to check if any involved collections are sharded before forwarding an aggregation
     // command on an unsharded collection.
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    LiteParsedPipeline liteParsedPipeline(request);
 
     for (auto&& nss : liteParsedPipeline.getInvolvedNamespaces()) {
         const auto resolvedNsRoutingInfo =

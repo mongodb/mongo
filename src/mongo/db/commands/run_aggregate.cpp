@@ -362,9 +362,16 @@ Status runAggregate(OperationContext* opCtx,
             // of the collection on which $changeStream was invoked, so that we do not end up
             // resolving the collation on the oplog.
             invariant(!collatorToUse);
-            // Change streams can only be created on collections. An error will be raised in
-            // AutoGetCollection if the given namespace is a view.
+            // Change streams can only be run against collections; AutoGetCollection will raise an
+            // error if the given namespace is a view. A change stream may be opened on a namespace
+            // before the associated collection is created, but only if the database already exists.
+            // If the $changeStream was sent from mongoS then the database exists at the cluster
+            // level even if not yet present on this shard, so we allow the $changeStream to run.
             AutoGetCollection origNssCtx(opCtx, origNss, MODE_IS);
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "cannot open $changeStream for non-existent database: "
+                                  << origNss.db(),
+                    origNssCtx.getDb() || request.isFromMongos());
             Collection* origColl = origNssCtx.getCollection();
             collatorToUse.emplace(resolveCollator(opCtx, request, origColl));
         }

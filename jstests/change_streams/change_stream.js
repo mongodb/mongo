@@ -6,10 +6,18 @@
     load("jstests/libs/change_stream_util.js");
     load('jstests/libs/uuid_util.js');
 
+    jsTestLog("Testing $changeStream on non-existent database");
+    const dbDoesNotExist = db.getSiblingDB("database-does-not-exist");
+    assert.commandWorked(dbDoesNotExist.dropDatabase());
+    assert.commandFailedWithCode(
+        dbDoesNotExist.runCommand(
+            {aggregate: dbDoesNotExist.getName(), pipeline: [{$changeStream: {}}], cursor: {}}),
+        ErrorCodes.NamespaceNotFound);
+
     let cst = new ChangeStreamTest(db);
 
     jsTestLog("Testing single insert");
-    assertDropCollection(db, "t1");
+    assertDropAndRecreateCollection(db, "t1");
     let cursor = cst.startWatchingChanges({pipeline: [{$changeStream: {}}], collection: db.t1});
     // Test that if there are no changes, we return an empty batch.
     assert.eq(0, cursor.firstBatch.length, "Cursor had changes: " + tojson(cursor));
