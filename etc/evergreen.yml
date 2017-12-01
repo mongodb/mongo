@@ -163,6 +163,10 @@ variables:
   standard_port: "20000"
   virtualenv_dir: venv_powercycle
   virtualenv_requirements: psutil
+  windows_crash_cmd: \"notmyfault/notmyfaultc64.exe -accepteula crash 1\"
+  windows_crash_dl: https://download.sysinternals.com/files/NotMyFault.zip
+  windows_crash_dir: notmyfault
+  windows_crash_zip: notmyfault.zip
 
 - &powercycle_expansions
   params:
@@ -181,7 +185,7 @@ variables:
   program_options: --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
   connection_options: --sshUserHost=${ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
   test_options: --testLoops=15 --seedDocNum=10000 --rsync --validate=local --canary=local
-  crash_options: "--crashMethod=aws_ec2 --crashOptions=${instance_id}:private_ip_address --crashWaitTime=45 --jitterForCrashWaitTime=5"
+  crash_options: --crashMethod=internal --crashOption=${windows_crash_cmd} --crashWaitTime=45 --jitterForCrashWaitTime=5
   client_options: --numCrudClients=20 --numFsmClients=20
   mongodb_options: --rootDir=${remote_dir}-${task_id} --mongodbBinDir=${remote_dir}
   mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path}
@@ -883,9 +887,11 @@ functions:
           echo "{\"failures\": $failures, \"results\": [{\"status\": $status, \"exit_code\": $exit_code, \"test_file\": \"${task_name}\", \"start\": $start_time, \"end\": $end_time, \"elapsed\": $elapsed_secs}]}" > $report_json
           generate_report_json="--reportJsonFile=$report_json"
 
-          # # On Windows execute 10 test loops, cap the maximum number of clients to 10 each.
+          # Windows task overrides:
+          #   - Execute 10 test loops
+          #   - Cap the maximum number of clients to 10 each
           if [ "Windows_NT" = "$OS" ]; then
-            test_override="--testLoops=10"
+            test_override=--testLoops=10
             max_clients=10
             for client in --numCrudClients --numFsmClients
             do
@@ -1387,6 +1393,26 @@ functions:
               --retries ${ssh_retries|0}                       \
               --commands "$cmds"
           fi
+
+    - command: shell.exec
+      params:
+        shell: bash
+        working_dir: src
+        script: |
+          set -o errexit
+          if [[ "Windows_NT" != "$OS" || -z "${windows_crash_zip}" ]]; then
+            exit 0
+          fi
+          # Install NotMyFault, used to crash Windows.
+          cmds="curl -s -o ${windows_crash_zip} ${windows_crash_dl} | unzip ${windows_crash_zip} -d ${windows_crash_dir}"
+          cmds="$cmds; chmod +x ${windows_crash_dir}/*.exe"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --commands "$cmds"
 
   "copy EC2 artifacts":
     - command: shell.exec

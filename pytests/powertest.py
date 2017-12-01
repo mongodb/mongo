@@ -311,7 +311,7 @@ def execute_cmd(cmd, use_file=False):
     return error_code, output
 
 
-def get_aws_crash_options(option):
+def get_aws_crash_option(option):
     """ Returns a tuple (instance_id, address_type) of the AWS crash option. """
     if ":" in option:
         return tuple(option.split(":"))
@@ -1063,7 +1063,7 @@ def remote_handler(options, operations):
     for operation in operations:
         # This is the internal "crash" mechanism, which is executed on the remote host.
         if operation == "crash_server":
-            ret, output = internal_crash(options.remote_sudo)
+            ret, output = internal_crash(options.remote_sudo, options.crash_option)
             # An internal crash on Windows is not immediate
             try:
                 LOGGER.info("Waiting after issuing internal crash!")
@@ -1178,13 +1178,14 @@ def rsync(src_dir, dest_dir):
     return ret, output
 
 
-def internal_crash(use_sudo=False):
+def internal_crash(use_sudo=False, crash_option=None):
     """ Internally crash the host this excutes on. """
 
-    # Windows does not have a way to immediately crash itself. It's
-    # better to use an external mechanism instead.
+    # Windows can use NotMyFault to immediately crash itself, if it's been installed.
+    # See https://docs.microsoft.com/en-us/sysinternals/downloads/notmyfault
+    # Otherwise it's better to use an external mechanism instead.
     if _IS_WINDOWS:
-        cmds = "shutdown /r /f /t 0"
+        cmds = crash_option if crash_option else "shutdown /r /f /t 0"
         ret, output = execute_cmd(cmds, use_file=True)
         return ret, output
     else:
@@ -1222,12 +1223,12 @@ def crash_server(options, crash_canary, canary_port, local_ops, script_name, cli
         # Provide time for power to dissipate by sleeping 10 seconds before turning it back on.
         crash_func = local_ops.shell
         crash_args = ["""
-            echo 0 > /dev/{crash_options} ;
+            echo 0 > /dev/{crash_option} ;
             sleep 10 ;
-            echo 1 > /dev/{crash_options}""".format(crash_options=options.crash_options)]
+            echo 1 > /dev/{crash_option}""".format(crash_option=options.crash_option)]
         local_ops = LocalToRemoteOperations(
             user_host=options.ssh_crash_user_host,
-            ssh_connection_options=options.ssh_crash_options,
+            ssh_connection_options=options.ssh_crash_option,
             shell_binary="/bin/sh")
 
     elif options.crash_method == "internal":
@@ -1251,7 +1252,7 @@ def crash_server(options, crash_canary, canary_port, local_ops, script_name, cli
     elif options.crash_method == "aws_ec2":
         ec2 = aws_ec2.AwsEc2()
         crash_func = ec2.control_instance
-        instance_id, _ = get_aws_crash_options(options.crash_options)
+        instance_id, _ = get_aws_crash_option(options.crash_option)
         crash_args = ["force-stop", instance_id, 600, True]
 
     else:
@@ -1519,9 +1520,9 @@ Examples:
             --rootDir pt-mmap
             --replSet power
             --crashMethod mpower
-            --crashOptions output1
+            --crashOption output1
             --sshCrashUserHost admin@10.4.100.2
-            --sshCrashOptions "-oKexAlgorithms=+diffie-hellman-group1-sha1 -i /Users/jonathan/.ssh/mFi.pem"
+            --sshCrashOption "-oKexAlgorithms=+diffie-hellman-group1-sha1 -i /Users/jonathan/.ssh/mFi.pem"
             --mongodOptions "--storageEngine mmapv1"
 
     Linux server running in AWS, testing nojournal:
@@ -1650,14 +1651,15 @@ Examples:
 
     aws_address_types = [
         "private_ip_address", "public_ip_address", "private_dns_name", "public_dns_name"]
-    crash_options.add_option("--crashOptions",
-                             dest="crash_options",
+    crash_options.add_option("--crashOption",
+                             dest="crash_option",
                              help="Secondary argument (REQUIRED) for the following --crashMethod:"
                                   " 'aws_ec2': specify EC2 'instance_id[:address_type]'."
                                   " The address_type is one of {} and defaults to"
-                                  " 'public_ip_address'."
-                                  " 'mpower': specify output<num> to turn off/on, i.e.,"
-                                  " 'output1'.".format(aws_address_types),
+                                  " 'public_ip_address'. 'mpower': specify output<num> to turn"
+                                  " off/on, i.e., 'output1'. 'internal': for Windows, optionally"
+                                  " specify a crash method, i.e., 'notmyfault/notmyfaultc64.exe"
+                                  " -accepteula crash 1'".format(aws_address_types),
                              default=None)
 
     crash_options.add_option("--crashWaitTime",
@@ -1670,8 +1672,7 @@ Examples:
     crash_options.add_option("--jitterForCrashWaitTime",
                              dest="crash_wait_time_jitter",
                              help="The maximum time, in seconds, to be added to --crashWaitTime,"
-                                  " as a uniform distributed random value,"
-                                  " [default: %default]",
+                                  " as a uniform distributed random value, [default: %default]",
                              type="int",
                              default=10)
 
@@ -1680,8 +1681,8 @@ Examples:
                              help="The crash host's user@host for performing the crash.",
                              default=None)
 
-    crash_options.add_option("--sshCrashOptions",
-                             dest="ssh_crash_options",
+    crash_options.add_option("--sshCrashOption",
+                             dest="ssh_crash_option",
                              help="The crash host's ssh connection options, i.e., '-i ident.pem'",
                              default=None)
 
@@ -1966,18 +1967,18 @@ Examples:
 
     # Setup the crash options
     if ((options.crash_method == "aws_ec2" or options.crash_method == "mpower") and
-            options.crash_options is None):
-        parser.error("Missing required argument --crashOptions for crashMethod '{}'".format(
+            options.crash_option is None):
+        parser.error("Missing required argument --crashOption for crashMethod '{}'".format(
             options.crash_method))
 
     if options.crash_method == "aws_ec2":
-        instance_id, address_type = get_aws_crash_options(options.crash_options)
+        instance_id, address_type = get_aws_crash_option(options.crash_option)
         address_type = address_type if address_type is not None else "public_ip_address"
         if address_type not in aws_address_types:
-            LOGGER.error("Invalid crashOptions address_type '%s' specified for crashMethod"
+            LOGGER.error("Invalid crashOption address_type '%s' specified for crashMethod"
                          " 'aws_ec2', specify one of %s", address_type, aws_address_types)
             sys.exit(1)
-        options.crash_options = "{}:{}".format(instance_id, address_type)
+        options.crash_option = "{}:{}".format(instance_id, address_type)
 
     # Initialize the mongod options
     # Note - We use posixpath for Windows client to Linux server scenarios.
@@ -2283,7 +2284,7 @@ Examples:
                      " {}"
                      " {}"
                      " start_mongod").format(
-                        rsync_opt, standard_port, use_replica_set, rsync_cmd)
+                         rsync_opt, standard_port, use_replica_set, rsync_cmd)
         ret, output = call_remote_operation(
             local_ops,
             options.remote_python,
