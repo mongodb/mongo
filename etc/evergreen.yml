@@ -4257,6 +4257,7 @@ tasks:
     vars:
       <<: *powercycle_test
       client_options: --numCrudClients=20 --numFsmClients=0
+      test_options: --testLoops=15 --seedDocNum=10000 --rsync --validate=local --canary=local --removeLockFile
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine mmapv1\"
 
 - name: powercycle_WT

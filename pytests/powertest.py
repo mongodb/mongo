@@ -1157,6 +1157,18 @@ def remote_handler(options, operations):
                 LOGGER.error(err.message)
                 ret = err.code
 
+        elif operation == "remove_lock_file":
+            lock_file = os.path.join(options.db_path, "mongod.lock")
+            ret = 0
+            if os.path.exists(lock_file):
+                LOGGER.debug("Deleting mongod lockfile %s", lock_file)
+                try:
+                    os.remove(lock_file)
+                except (IOError, OSError) as err:
+                    LOGGER.warn(
+                        "Unable to delete mongod lockfile %s with error %s", lock_file, err)
+                    ret = err.code
+
         else:
             LOGGER.error("Unsupported remote option specified '%s'", operation)
             ret = 1
@@ -1759,6 +1771,15 @@ Examples:
                               help="Set the FeatureCompatibilityVersion of mongod.",
                               default=None)
 
+    mongod_options.add_option("--removeLockFile",
+                              dest="remove_lock_file",
+                              help="If specified, the mongod.lock file will be deleted after a"
+                                   " powercycle event, before mongod is started. This is a"
+                                   " workaround for mongod failing start with MMAPV1 (See"
+                                   " SERVER-15109).",
+                              action="store_true",
+                              default=False)
+
     # Client options
     mongo_path = distutils.spawn.find_executable(
         "mongo", os.getcwd() + os.pathsep + os.environ["PATH"])
@@ -1992,6 +2013,7 @@ Examples:
         options.log_path = posixpath.join(options.root_dir, "log", "mongod.log")
     mongod_options_map = parse_options(options.mongod_options)
     set_fcv_cmd = "set_fcv" if options.fcv_version is not None else ""
+    remove_lock_file_cmd = "remove_lock_file" if options.remove_lock_file else ""
 
     # Error out earlier if these options are not properly specified
     write_concern = yaml.safe_load(options.write_concern)
@@ -2206,6 +2228,7 @@ Examples:
                             " {canary_opt}"
                             " --mongodPort {port}"
                             " {rsync_cmd}"
+                            " {remove_lock_file_cmd}"
                             " start_mongod"
                             " {set_fcv_cmd}"
                             " {validate_collections_cmd}"
@@ -2215,6 +2238,7 @@ Examples:
                                 canary_opt=canary_opt,
                                 port=secret_port,
                                 rsync_cmd=rsync_cmd,
+                                remove_lock_file_cmd=remove_lock_file_cmd,
                                 set_fcv_cmd=set_fcv_cmd if loop_num == 1 else "",
                                 validate_collections_cmd=validate_collections_cmd,
                                 validate_canary_cmd=validate_canary_cmd,
