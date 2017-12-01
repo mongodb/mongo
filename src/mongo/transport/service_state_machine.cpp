@@ -333,7 +333,7 @@ void ServiceStateMachine::_sinkCallback(Status status) {
         return _scheduleNextWithGuard(std::move(guard),
                                       ServiceExecutor::kDeferredTask |
                                           ServiceExecutor::kMayYieldBeforeSchedule,
-                                      transport::ServiceExecutorTaskName::kSSMProcessMessage);
+                                      transport::ServiceExecutorTaskName::kSSMExhaustMessage);
     } else {
         _state.store(State::Source);
         return _scheduleNextWithGuard(std::move(guard),

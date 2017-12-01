@@ -79,8 +79,6 @@ MONGO_EXPORT_SERVER_PARAMETER(adaptiveServiceExecutorRecursionLimit, int, 8);
 
 constexpr auto kTotalQueued = "totalQueued"_sd;
 constexpr auto kTotalExecuted = "totalExecuted"_sd;
-constexpr auto kTasksQueued = "tasksQueued"_sd;
-constexpr auto kDeferredTasksQueued = "deferredTasksQueued"_sd;
 constexpr auto kTotalTimeExecutingUs = "totalTimeExecutingMicros"_sd;
 constexpr auto kTotalTimeRunningUs = "totalTimeRunningMicros"_sd;
 constexpr auto kTotalTimeQueuedUs = "totalTimeQueuedMicros"_sd;
