@@ -28,10 +28,7 @@
                 "expected the shell's clusterTime value to increase after running command: " +
                     tojson(cmdObj));
         } else {
-            assert(bsonWoCompare(session.getOperationTime(), operationTime) == 0,
-                   "expected the shell's operationTime to not change after running command: " +
-                       tojson(cmdObj));
-            // Don't check clusterTime, because during a slow operation clusterTime may be
+            // Don't expect either clusterTime or operationTime to not change, because they may be
             // incremented by unrelated activity in the cluster.
         }
     }
