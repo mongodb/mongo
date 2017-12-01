@@ -10,7 +10,7 @@
     // Set up replica set.
     const testName = "initial_sync_drop_collection";
     const dbName = testName;
-    var replTest = new ReplSetTest({name: testName, nodes: 2});
+    var replTest = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}]});
     replTest.startSet();
     replTest.initiate();
 
@@ -41,6 +41,10 @@
 
         jsTestLog("Waiting for secondary to reach failPoint " + failPoint);
         checkLog.contains(secondary, failPoint + " fail point enabled for " + nss);
+
+        // Restarting the secondary may have resulted in an election.  Wait until the system
+        // stabilizes.
+        replTest.getPrimary();
     }
 
     function finishTest({failPoint, secondaryStartupParams, expectedLog, waitForDrop, createNew}) {
@@ -118,7 +122,7 @@
 
     // Add another node to the set, so when we drop the collection it can commit.  This other
     // secondary will be finished with initial sync when the drop happens.
-    var secondary2 = replTest.add({});
+    var secondary2 = replTest.add({rsConfig: {priority: 0}});
     replTest.reInitiate();
     replTest.waitForState(secondary2, ReplSetTest.State.SECONDARY);
 
