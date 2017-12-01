@@ -219,18 +219,6 @@ class _StructTypeInfo(StructTypeInfoBase):
         class_name = common.title_case(self._struct.name)
         return MethodInfo(class_name, class_name, [])
 
-    def get_serializer_method(self):
-        # type: () -> MethodInfo
-        return MethodInfo(
-            common.title_case(self._struct.name),
-            'serialize', ['BSONObjBuilder* builder'],
-            'void',
-            const=True)
-
-    def get_to_bson_method(self):
-        # type: () -> MethodInfo
-        return MethodInfo(common.title_case(self._struct.name), 'toBSON', [], 'BSONObj', const=True)
-
     def get_deserializer_static_method(self):
         # type: () -> MethodInfo
         class_name = common.title_case(self._struct.name)
@@ -245,6 +233,18 @@ class _StructTypeInfo(StructTypeInfoBase):
         return MethodInfo(
             common.title_case(self._struct.name), 'parseProtected',
             ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'], 'void')
+
+    def get_serializer_method(self):
+        # type: () -> MethodInfo
+        return MethodInfo(
+            common.title_case(self._struct.name),
+            'serialize', ['BSONObjBuilder* builder'],
+            'void',
+            const=True)
+
+    def get_to_bson_method(self):
+        # type: () -> MethodInfo
+        return MethodInfo(common.title_case(self._struct.name), 'toBSON', [], 'BSONObj', const=True)
 
     def get_op_msg_request_serializer_method(self):
         # type: () -> Optional[MethodInfo]
@@ -284,20 +284,6 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
         self._command = command
 
         super(_CommandBaseTypeInfo, self).__init__(command)
-
-    def get_deserializer_static_method(self):
-        # type: () -> MethodInfo
-        # For commands, do not generate a parse(BSONObj) method because if the "$db" is missing,
-        # users may not know that it defaults to admin. Force them to explictly use OpMsgRequest
-        # and OpMsgRequest::fromDbAndBody.
-        return None
-
-    def get_deserializer_method(self):
-        # type: () -> MethodInfo
-        # For commands, do not generate a parse(BSONObj) method because if the "$db" is missing,
-        # users may not know that it defaults to admin. Force them to explictly use OpMsgRequest
-        # and OpMsgRequest::fromDbAndBody.
-        return None
 
     def get_op_msg_request_serializer_method(self):
         # type: () -> Optional[MethodInfo]

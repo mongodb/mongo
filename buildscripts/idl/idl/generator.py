@@ -972,20 +972,31 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         return field_usage_check
 
+    def get_bson_deserializer_static_common(self, struct, static_method_info, method_info):
+        # type: (ast.Struct, struct_types.MethodInfo, struct_types.MethodInfo) -> None
+        """Generate the C++ deserializer static method."""
+        # pylint: disable=invalid-name
+        func_def = static_method_info.get_definition()
+
+        with self._block('%s {' % (func_def), '}'):
+            if isinstance(struct,
+                          ast.Command) and struct.namespace != common.COMMAND_NAMESPACE_IGNORED:
+                self._writer.write_line('NamespaceString localNS;')
+                self._writer.write_line('%s object(localNS);' % (common.title_case(struct.name)))
+            else:
+                self._writer.write_line('%s object;' % common.title_case(struct.name))
+
+            self._writer.write_line(method_info.get_call('object'))
+            self._writer.write_line('return object;')
+
     def gen_bson_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None
         """Generate the C++ deserializer method definitions."""
         struct_type_info = struct_types.get_struct_info(struct)
 
-        if not struct_type_info.get_deserializer_static_method():
-            return
-        assert not isinstance(struct, ast.Command)
-
-        with self._block('%s {' %
-                         (struct_type_info.get_deserializer_static_method().get_definition()), '}'):
-            self._writer.write_line('%s object;' % common.title_case(struct.name))
-            self._writer.write_line(struct_type_info.get_deserializer_method().get_call('object'))
-            self._writer.write_line('return object;')
+        self.get_bson_deserializer_static_common(struct,
+                                                 struct_type_info.get_deserializer_static_method(),
+                                                 struct_type_info.get_deserializer_method())
 
         func_def = struct_type_info.get_deserializer_method().get_definition()
         with self._block('%s {' % (func_def), '}'):
@@ -1010,18 +1021,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         struct_type_info = struct_types.get_struct_info(struct)
 
-        func_def = struct_type_info.get_op_msg_request_deserializer_static_method().get_definition()
-        with self._block('%s {' % (func_def), '}'):
-            if isinstance(struct,
-                          ast.Command) and struct.namespace != common.COMMAND_NAMESPACE_IGNORED:
-                self._writer.write_line('NamespaceString localNS;')
-                self._writer.write_line('%s object(localNS);' % (common.title_case(struct.name)))
-            else:
-                self._writer.write_line('%s object;' % common.title_case(struct.name))
-
-            self._writer.write_line(
-                struct_type_info.get_op_msg_request_deserializer_method().get_call('object'))
-            self._writer.write_line('return object;')
+        self.get_bson_deserializer_static_common(
+            struct,
+            struct_type_info.get_op_msg_request_deserializer_static_method(),
+            struct_type_info.get_op_msg_request_deserializer_method())
 
         func_def = struct_type_info.get_op_msg_request_deserializer_method().get_definition()
         with self._block('%s {' % (func_def), '}'):
