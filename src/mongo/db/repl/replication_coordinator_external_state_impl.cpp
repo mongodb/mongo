@@ -242,10 +242,9 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     _applierThread->startup();
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
-    _syncSourceFeedbackThread = stdx::make_unique<stdx::thread>(
-        [this, replCoord] {
-            _syncSourceFeedback.run(_taskExecutor.get(), _bgSync.get(), replCoord);
-        });
+    _syncSourceFeedbackThread = stdx::make_unique<stdx::thread>([this, replCoord] {
+        _syncSourceFeedback.run(_taskExecutor.get(), _bgSync.get(), replCoord);
+    });
 }
 
 void ReplicationCoordinatorExternalStateImpl::stopDataReplication(OperationContext* opCtx) {
