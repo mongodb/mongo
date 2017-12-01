@@ -4,8 +4,8 @@
  * invalidated_cursors.js
  *
  * This workload was designed to stress creating, pinning, and invalidating cursors through the
- * cursor manager. Threads perform finds and getMores while the database, collection, or an index
- * is dropped.
+ * cursor manager. Threads perform find, getMore and explain commands while the database,
+ * collection, or an index is dropped.
  */
 var $config = (function() {
 
@@ -20,7 +20,7 @@ var $config = (function() {
         involvedCollections: ['coll0', 'coll1', 'coll2'],
         indexSpecs: [{a: 1, b: 1}, {c: 1}],
 
-        numDocs: 10,
+        numDocs: 100,
         batchSize: 2,
 
         /**
@@ -64,6 +64,18 @@ var $config = (function() {
             if (res.ok) {
                 this.cursor = new DBCommandCursor(db, res, this.batchSize);
             }
+        },
+
+        /**
+         * Explains a find on a collection.
+         */
+        explain: function explain(db, collName) {
+            let myDB = db.getSiblingDB(this.uniqueDBName);
+            let res = myDB.runCommand({
+                explain: {find: this.chooseRandomlyFrom(this.involvedCollections), filter: {}},
+                verbosity: "executionStats"
+            });
+            assertAlways.commandWorked(res);
         },
 
         killCursor: function killCursor(db, collName) {
@@ -150,13 +162,15 @@ var $config = (function() {
 
     let transitions = {
         init: {
-            query: 0.7,
+            query: 0.6,
+            explain: 0.1,
             dropDatabase: 0.1,
             dropCollection: 0.1,
             dropIndex: 0.1,
         },
 
         query: {killCursor: 0.1, getMore: 0.9},
+        explain: {explain: 0.1, init: 0.9},
         killCursor: {init: 1},
         getMore: {killCursor: 0.2, getMore: 0.6, init: 0.2},
         dropDatabase: {init: 1},
