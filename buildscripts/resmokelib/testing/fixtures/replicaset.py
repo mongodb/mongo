@@ -258,11 +258,19 @@ class ReplicaSetFixture(interface.ReplFixture):
         while True:
             for node in self.nodes:
                 self._check_get_primary_timeout(start, timeout_secs)
-                client = clients.get(node.port)
-                if not client:
-                    client = node.mongo_client()
-                    clients[node.port] = client
-                is_master = client.admin.command("isMaster")["ismaster"]
+
+                try:
+                    client = clients.get(node.port)
+                    if not client:
+                        client = node.mongo_client()
+                        clients[node.port] = client
+                    is_master = client.admin.command("isMaster")["ismaster"]
+                except pymongo.errors.AutoReconnect:
+                    # AutoReconnect exceptions may occur if the primary stepped down since PyMongo
+                    # last contacted it. We'll just try contacting the node again in the next round
+                    # of isMaster requests.
+                    continue
+
                 if is_master:
                     self.logger.info("The node on port %d is primary of replica set '%s'",
                                      node.port, self.replset_name)

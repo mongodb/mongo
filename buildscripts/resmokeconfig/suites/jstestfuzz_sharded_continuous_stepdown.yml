@@ -1,0 +1,44 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstestfuzz/out/*.js
+
+executor:
+  config:
+    shell_options:
+      readMode: commands
+      global_vars:
+        TestData:
+          runningWithConfigStepdowns: true
+          # TODO SERVER-31452: Run this test suite with shard stepdowns as well.
+          runningWithShardStepdowns: false
+          usingReplicaSetShards: true
+  hooks:
+  - class: ContinuousStepdown
+    config_stepdown: true
+    # TODO SERVER-31452: Run this test suite with shard stepdowns as well.
+    shard_stepdown: false
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          skipValidationOnInvalidViewDefinitions: true
+  fixture:
+    class: ShardedClusterFixture
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        numInitialSyncAttempts: 1
+        writePeriodicNoops: 1
+    num_rs_nodes_per_shard: 2
+    num_shards: 2
+    configsvr_options:
+      all_nodes_electable: true
+    shard_options:
+      # TODO SERVER-31452: Make all nodes in the replica set shards electable when we go to run this
+      # test suite with shard stepdowns as well.
+      all_nodes_electable: false
