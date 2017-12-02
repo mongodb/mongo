@@ -493,7 +493,7 @@ Status AuthzManagerExternalStateLocal::_initializeRoleGraph(OperationContext* op
               AuthorizationManager::rolesCollectionNamespace,
               BSONObj(),
               BSONObj(),
-              [p = &newRoleGraph](const auto& x) { return addRoleFromDocumentOrWarn(p, x); });
+              stdx::bind(addRoleFromDocumentOrWarn, &newRoleGraph, stdx::placeholders::_1));
     if (!status.isOK())
         return status;
 

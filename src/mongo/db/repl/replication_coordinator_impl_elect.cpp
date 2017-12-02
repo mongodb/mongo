@@ -144,9 +144,7 @@ void ReplicationCoordinatorImpl::_startElectSelf_inlock() {
     fassert(18681, nextPhaseEvh.getStatus());
     _replExecutor
         ->onEvent(nextPhaseEvh.getValue(),
-                  [this](const mongo::executor::TaskExecutor::CallbackArgs&) {
-                      _onFreshnessCheckComplete();
-                  })
+                  stdx::bind(&ReplicationCoordinatorImpl::_onFreshnessCheckComplete, this))
         .status_with_transitional_ignore();
     lossGuard.dismiss();
 }
@@ -182,9 +180,9 @@ void ReplicationCoordinatorImpl::_onFreshnessCheckComplete() {
                       << dateToISOStringLocal(nextCandidateTime);
                 _topCoord->setElectionSleepUntil(nextCandidateTime);
                 _scheduleWorkAt(nextCandidateTime,
-                                [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                                    _recoverFromElectionTie(cbData);
-                                });
+                                stdx::bind(&ReplicationCoordinatorImpl::_recoverFromElectionTie,
+                                           this,
+                                           stdx::placeholders::_1));
                 _sleptLastElection = true;
                 return;
             }
@@ -222,7 +220,7 @@ void ReplicationCoordinatorImpl::_onFreshnessCheckComplete() {
 
     _replExecutor
         ->onEvent(nextPhaseEvh.getValue(),
-                  [=](const executor::TaskExecutor::CallbackArgs&) { _onElectCmdRunnerComplete(); })
+                  stdx::bind(&ReplicationCoordinatorImpl::_onElectCmdRunnerComplete, this))
         .status_with_transitional_ignore();
     lossGuard.dismiss();
 }
@@ -254,9 +252,10 @@ void ReplicationCoordinatorImpl::_onElectCmdRunnerComplete() {
         const Date_t nextCandidateTime = now + ms;
         log() << "waiting until " << nextCandidateTime << " before standing for election again";
         _topCoord->setElectionSleepUntil(nextCandidateTime);
-        _scheduleWorkAt(nextCandidateTime, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-            _recoverFromElectionTie(cbData);
-        });
+        _scheduleWorkAt(nextCandidateTime,
+                        stdx::bind(&ReplicationCoordinatorImpl::_recoverFromElectionTie,
+                                   this,
+                                   stdx::placeholders::_1));
         return;
     }
 

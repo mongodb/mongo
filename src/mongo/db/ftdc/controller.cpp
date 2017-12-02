@@ -139,7 +139,7 @@ void FTDCController::start() {
           << _path.generic_string() << "'";
 
     // Start the thread
-    _thread = stdx::thread([this] { doLoop(); });
+    _thread = stdx::thread(stdx::bind(&FTDCController::doLoop, this));
 
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);

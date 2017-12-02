@@ -223,7 +223,9 @@ std::string RemoteCommandRetryScheduler::toString() const {
 Status RemoteCommandRetryScheduler::_schedule_inlock() {
     ++_currentAttempt;
     auto scheduleResult = _executor->scheduleRemoteCommand(
-        _request, [this](const auto& x) { return _remoteCommandCallback(x); });
+        _request,
+        stdx::bind(
+            &RemoteCommandRetryScheduler::_remoteCommandCallback, this, stdx::placeholders::_1));
 
     if (!scheduleResult.isOK()) {
         return scheduleResult.getStatus();

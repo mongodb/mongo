@@ -155,7 +155,7 @@ void BackgroundSync::startup(OperationContext* opCtx) {
     _oplogBuffer->startup(opCtx);
 
     invariant(!_producerThread);
-    _producerThread.reset(new stdx::thread([this] { _run(); }));
+    _producerThread.reset(new stdx::thread(stdx::bind(&BackgroundSync::_run, this)));
 }
 
 void BackgroundSync::shutdown(OperationContext* opCtx) {
@@ -444,9 +444,11 @@ void BackgroundSync::_produce() {
             syncSourceResp.rbid,
             true /* requireFresherSyncSource */,
             &dataReplicatorExternalState,
-            [this](const auto& a1, const auto& a2, const auto& a3) {
-                return _enqueueDocuments(a1, a2, a3);
-            },
+            stdx::bind(&BackgroundSync::_enqueueDocuments,
+                       this,
+                       stdx::placeholders::_1,
+                       stdx::placeholders::_2,
+                       stdx::placeholders::_3),
             onOplogFetcherShutdownCallbackFn,
             bgSyncOplogFetcherBatchSize);
         stdx::lock_guard<stdx::mutex> lock(_mutex);

@@ -50,7 +50,7 @@ public:
     }
 
     void start(int increments) {
-        _t = new stdx::thread([this, increments] { test(increments); });
+        _t = new stdx::thread(mongo::stdx::bind(&LockTester::test, this, increments));
     }
 
     void join() {

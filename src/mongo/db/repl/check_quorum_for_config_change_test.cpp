@@ -97,7 +97,7 @@ void CheckQuorumTest::startQuorumCheck(const ReplSetConfig& config, int myIndex)
     ASSERT_FALSE(_quorumCheckThread);
     _isQuorumCheckDone = false;
     _quorumCheckThread.reset(
-        new stdx::thread([this, config, myIndex] { _runQuorumCheck(config, myIndex); }));
+        new stdx::thread(stdx::bind(&CheckQuorumTest::_runQuorumCheck, this, config, myIndex)));
 }
 
 Status CheckQuorumTest::waitForQuorumCheck() {

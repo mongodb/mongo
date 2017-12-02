@@ -210,7 +210,7 @@ Status DatabasesCloner::startup() noexcept {
     _listDBsScheduler = stdx::make_unique<RemoteCommandRetryScheduler>(
         _exec,
         listDBsReq,
-        [this](const auto& x) { _onListDatabaseFinish(x); },
+        stdx::bind(&DatabasesCloner::_onListDatabaseFinish, this, stdx::placeholders::_1),
         RemoteCommandRetryScheduler::makeRetryPolicy(
             numInitialSyncListDatabasesAttempts.load(),
             executor::RemoteCommandRequest::kNoTimeout,

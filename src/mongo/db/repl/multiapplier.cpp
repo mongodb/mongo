@@ -91,8 +91,8 @@ Status MultiApplier::startup() noexcept {
             return Status(ErrorCodes::ShutdownInProgress, "multi applier completed");
     }
 
-    auto scheduleResult = _executor->scheduleWork(
-        [=](const executor::TaskExecutor::CallbackArgs& cbd) { return _callback(cbd); });
+    auto scheduleResult =
+        _executor->scheduleWork(stdx::bind(&MultiApplier::_callback, this, stdx::placeholders::_1));
     if (!scheduleResult.isOK()) {
         _state = State::kComplete;
         return scheduleResult.getStatus();
