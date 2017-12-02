@@ -708,8 +708,8 @@ StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patt
 void ReplSetConfig::_calculateMajorities() {
     const int voters =
         std::count_if(begin(_members), end(_members), [](const auto& x) { return x.isVoter(); });
-    const int arbiters =
-        std::count_if(begin(_members), end(_members), [](const auto& x) { return x.isArbiter(); });
+    const int arbiters = std::count_if(
+        begin(_members), end(_members), [](const auto& x) { return x.isArbiter(); });
     _totalVotingMembers = voters;
     _majorityVoteCount = voters / 2 + 1;
     _writeMajority = std::min(_majorityVoteCount, voters - arbiters);
