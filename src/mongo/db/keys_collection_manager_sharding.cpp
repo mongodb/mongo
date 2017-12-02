@@ -323,12 +323,9 @@ void KeysCollectionManagerSharding::PeriodicRunner::start(ServiceContext* servic
     invariant(!_backgroundThread.joinable());
     invariant(!_inShutdown);
 
-    _backgroundThread =
-        stdx::thread(stdx::bind(&KeysCollectionManagerSharding::PeriodicRunner::_doPeriodicRefresh,
-                                this,
-                                service,
-                                threadName,
-                                refreshInterval));
+    _backgroundThread = stdx::thread([this, service, threadName, refreshInterval] {
+        _doPeriodicRefresh(service, threadName, refreshInterval);
+    });
 }
 
 void KeysCollectionManagerSharding::PeriodicRunner::stop() {

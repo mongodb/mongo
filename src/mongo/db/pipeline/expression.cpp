@@ -705,48 +705,26 @@ Value ExpressionCoerceToBool::serialize(bool explain) const {
 
 /* ----------------------- ExpressionCompare --------------------------- */
 
-REGISTER_EXPRESSION(cmp,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::CMP));
-REGISTER_EXPRESSION(eq,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::EQ));
-REGISTER_EXPRESSION(gt,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::GT));
-REGISTER_EXPRESSION(gte,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::GTE));
-REGISTER_EXPRESSION(lt,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::LT));
-REGISTER_EXPRESSION(lte,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::LTE));
-REGISTER_EXPRESSION(ne,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::NE));
+namespace {
+struct BoundOp {
+    ExpressionCompare::CmpOp op;
+
+    auto operator()(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                    BSONElement bsonExpr,
+                    const VariablesParseState& vps) const {
+        return ExpressionCompare::parse(expCtx, std::move(bsonExpr), vps, op);
+    }
+};
+}  // namespace
+
+REGISTER_EXPRESSION(cmp, BoundOp{ExpressionCompare::CMP});
+REGISTER_EXPRESSION(eq, BoundOp{ExpressionCompare::EQ});
+REGISTER_EXPRESSION(gt, BoundOp{ExpressionCompare::GT});
+REGISTER_EXPRESSION(gte, BoundOp{ExpressionCompare::GTE});
+REGISTER_EXPRESSION(lt, BoundOp{ExpressionCompare::LT});
+REGISTER_EXPRESSION(lte, BoundOp{ExpressionCompare::LTE});
+REGISTER_EXPRESSION(ne, BoundOp{ExpressionCompare::NE});
+
 intrusive_ptr<Expression> ExpressionCompare::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement bsonExpr,

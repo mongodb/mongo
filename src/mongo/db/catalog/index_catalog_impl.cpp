@@ -734,10 +734,9 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
                       "Please remove the field or include valid options.");
     }
     Status storageEngineStatus =
-        validateStorageOptions(storageEngineOptions,
-                               stdx::bind(&StorageEngine::Factory::validateIndexStorageOptions,
-                                          stdx::placeholders::_1,
-                                          stdx::placeholders::_2));
+        validateStorageOptions(storageEngineOptions, [](const auto& x, const auto& y) {
+            return x->validateIndexStorageOptions(y);
+        });
     if (!storageEngineStatus.isOK()) {
         return storageEngineStatus;
     }
