@@ -42,6 +42,17 @@ var FixtureHelpers = (function() {
     }
 
     /**
+     * Uses ReplSetTest.awaitLastOpCommitted() on each replica set in the fixture (besides the
+     * config servers) to wait for the last oplog entry on the respective primary to be visible in
+     * the committed snapshot view of the oplog on all secondaries.
+     *
+     * Asserts if the fixture is a standalone or if the shards are standalones.
+     */
+    function awaitLastOpCommitted() {
+        _getAllReplicas().forEach((replSet) => replSet.awaitLastOpCommitted());
+    }
+
+    /**
      * Runs the command given by 'cmdObj' on the database given by 'dbName' on each replica set in
      * the fixture (besides the config servers). Asserts that each command works, and returns an
      * array with the responses from each shard, or with a single element if the fixture was a
@@ -74,6 +85,7 @@ var FixtureHelpers = (function() {
 
     return {
         awaitReplication: awaitReplication,
+        awaitLastOpCommitted: awaitLastOpCommitted,
         runCommandOnEachPrimary: runCommandOnEachPrimary,
         getPrimaryForNodeHostingDatabase: getPrimaryForNodeHostingDatabase,
     };
