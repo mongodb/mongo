@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include <boost/preprocessor/facilities/overload.hpp>
+
 #include "mongo/platform/compiler.h"
 #include "mongo/util/debug_util.h"
 
@@ -46,20 +48,49 @@ MONGO_COMPILER_NORETURN void invariantFailed(const char* expr,
                                              const char* file,
                                              unsigned line) noexcept;
 
-#define MONGO_invariant(_Expression)                                    \
+// This overload is our legacy invariant, which just takes a condition to test.
+//
+// ex)   invariant(!condition);
+//
+//       Invariant failure !condition some/file.cpp 528
+//
+#define MONGO_invariant_1(_Expression)                                  \
     do {                                                                \
         if (MONGO_unlikely(!(_Expression))) {                           \
             ::mongo::invariantFailed(#_Expression, __FILE__, __LINE__); \
         }                                                               \
     } while (false)
 
-#define invariant MONGO_invariant
+MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
+                                                    const char* msg,
+                                                    const char* file,
+                                                    unsigned line) noexcept;
+
+// This invariant overload accepts a condition and a message, to be logged if the condition is
+// false.
+//
+// ex)   invariant(!condition, "hello!");
+//
+//       Invariant failure !condition "hello!" some/file.cpp 528
+//
+#define MONGO_invariant_2(_Expression, _Message)                                          \
+    do {                                                                                  \
+        if (MONGO_unlikely(!(_Expression))) {                                             \
+            ::mongo::invariantFailedWithMsg(#_Expression, #_Message, __FILE__, __LINE__); \
+        }                                                                                 \
+    } while (false)
+
+// This helper macro is necessary to make the __VAR_ARGS__ expansion work properly on MSVC.
+#define MONGO_expand(x) x
+
+#define invariant(...) \
+    MONGO_expand(MONGO_expand(BOOST_PP_OVERLOAD(MONGO_invariant_, __VA_ARGS__))(__VA_ARGS__))
 
 // Behaves like invariant in debug builds and is compiled out in release. Use for checks, which can
 // potentially be slow or on a critical path.
-#define MONGO_dassert(x) \
-    if (kDebugBuild)     \
-    invariant(x)
+#define MONGO_dassert(...) \
+    if (kDebugBuild)       \
+    invariant(__VA_ARGS__)
 
 #define dassert MONGO_dassert
 

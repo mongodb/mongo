@@ -312,7 +312,9 @@ void ConnectionPool::returnConnection(ConnectionInterface* conn) {
 
     auto iter = _pools.find(conn->getHostAndPort());
 
-    invariant(iter != _pools.end());
+    invariant(iter != _pools.end(),
+              str::stream() << "Tried to return connection but no pool found for "
+                            << conn->getHostAndPort());
 
     iter->second->runWithActiveClient(std::move(lk), [&](decltype(lk) lk) {
         iter->second->returnConnection(conn, std::move(lk));
