@@ -28,6 +28,7 @@
 *    it in the license file.
 */
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -56,28 +57,32 @@ intmax_t dbSize(const string& database);
 
 class CmdListDatabases : public BasicCommand {
 public:
-    virtual bool slaveOk() const {
+    bool slaveOk() const final {
         return false;
     }
-    virtual bool slaveOverrideOk() const {
+    bool slaveOverrideOk() const final {
         return true;
     }
-    virtual bool adminOnly() const {
+    bool adminOnly() const final {
         return true;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;
     }
-    virtual void help(stringstream& help) const {
+    void help(stringstream& help) const final {
         help << "{ listDatabases:1, [filter: <filterObject>] [, nameOnly: true ] }\n"
                 "list databases on this server";
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::listDatabases);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+
+    /* listDatabases is always authorized,
+     * however the results returned will be redacted
+     * based on read privileges if auth is enabled
+     * and the current user does not have listDatabases permisison.
+     */
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        return Status::OK();
     }
 
     CmdListDatabases() : BasicCommand("listDatabases") {}
@@ -85,7 +90,7 @@ public:
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& jsobj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) final {
         // Parse the filter.
         std::unique_ptr<MatchExpression> filter;
         if (auto filterElt = jsobj[kFilterField]) {
@@ -118,12 +123,25 @@ public:
 
         vector<BSONObj> dbInfos;
 
-        bool filterNameOnly = filter &&
+        // If we have ActionType::listDatabases,
+        // then we don't need to test each record in the output.
+        // Otherwise, we'll test the database names as we enumerate them.
+        const auto as = AuthorizationSession::get(opCtx->getClient());
+        const bool checkAuth = as &&
+            !as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::listDatabases);
+
+        const bool filterNameOnly = filter &&
             filter->getCategory() == MatchExpression::MatchCategory::kLeaf &&
             filter->path() == kNameField;
         intmax_t totalSize = 0;
-        for (vector<string>::iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
-            const string& dbname = *i;
+        for (const auto& dbname : dbNames) {
+            if (checkAuth && as &&
+                !as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
+                                                      ActionType::find)) {
+                // We don't have listDatabases on the cluser or find on this database.
+                continue;
+            }
 
             BSONObjBuilder b;
             b.append("name", dbname);

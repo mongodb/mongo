@@ -35,6 +35,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard.h"
@@ -55,39 +56,43 @@ class ListDatabasesCmd : public BasicCommand {
 public:
     ListDatabasesCmd() : BasicCommand("listDatabases", "listdatabases") {}
 
-    virtual bool slaveOk() const {
+    bool slaveOk() const final {
         return true;
     }
 
-    virtual bool slaveOverrideOk() const {
+    bool slaveOverrideOk() const final {
         return true;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const final {
         return true;
     }
 
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
+    void help(std::stringstream& help) const final {
         help << "list databases in a cluster";
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::listDatabases);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+    /* listDatabases is always authorized,
+     * however the results returned will be redacted
+     * based on read privileges if auth is enabled
+     * and the current user does not have listDatabases permisison.
+     */
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) final {
+        return Status::OK();
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname_unused,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+
+    bool run(OperationContext* opCtx,
+             const std::string& dbname_unused,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) final {
         const bool nameOnly = cmdObj["nameOnly"].trueValue();
 
         map<string, long long> sizes;
@@ -151,6 +156,14 @@ public:
             }
         }
 
+        // If we have ActionType::listDatabases,
+        // then we don't need to test each record in the output.
+        // Otherwise, we'll test the database names as we enumerate them.
+        const auto as = AuthorizationSession::get(opCtx->getClient());
+        const bool checkAuth = as &&
+            !as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                  ActionType::listDatabases);
+
         // Now that we have aggregated results for all the shards, convert to a response,
         // and compute total sizes.
         long long totalSize = 0;
@@ -161,6 +174,13 @@ public:
 
                 if (name == "local") {
                     // We don't return local, since all shards have their own independent local
+                    continue;
+                }
+
+                if (checkAuth && as &&
+                    !as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(name),
+                                                          ActionType::find)) {
+                    // We don't have listDatabases on the cluser or find on this database.
                     continue;
                 }
 

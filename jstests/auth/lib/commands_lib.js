@@ -3978,17 +3978,7 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: {
-                    readAnyDatabase: 1,
-                    readWriteAnyDatabase: 1,
-                    dbAdminAnyDatabase: 1,
-                    userAdminAnyDatabase: 1,
-                    clusterMonitor: 1,
-                    clusterAdmin: 1,
-                    backup: 1,
-                    root: 1,
-                    __system: 1
-                },
+                roles: roles_all,
                 privileges: [{resource: {cluster: true}, actions: ["listDatabases"]}]
               },
               {runOnDb: firstDbName, roles: {}},
