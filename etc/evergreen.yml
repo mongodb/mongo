@@ -464,6 +464,7 @@ functions:
         done
 
   "do setup" :
+  - *fail_if_unexpected_processes
   - *fetch_artifacts
   - *fetch_binaries
   - *extract_binaries
@@ -967,12 +968,11 @@ functions:
 
         rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws ~/.boto
 
-  "kill processes" :
+  "check processes" :
     command: shell.exec
     params:
-      silent: true
       script: |
-        process_kill_list="(^cl\.exe$|bsondump|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
+        process_list="(^cl\.exe$|bsondump|java|lein|lldb|mongo|python|_test$|_test\.exe$)"
         # Exclude Evergreen agent processes and other system daemons
         process_exclude_list="(main|tuned|evergreen)"
 
@@ -983,10 +983,8 @@ functions:
           # - The second column (and beyond) has task name
           # - Grep for the task names of interest while ignoring any names that are in the exclude list
 
-          processes=$(tasklist /fo:csv | awk -F'","' '{x=$1; gsub("\"","",x); print $2, x}' | grep -iE "$process_kill_list" | grep -ivE "$process_exclude_list")
+          processes=$(tasklist /fo:csv | awk -F'","' '{x=$1; gsub("\"","",x); print $2, x}' | grep -iE "$process_list" | grep -ivE "$process_exclude_list")
 
-          # Kill the Windows process by process ID with force (/f)
-          kill_process () { pid=$(echo $1 | cut -f1 -d ' '); echo "Killing process $1"; taskkill /pid "$pid" /f; }
         else
           # Get the list of Unix tasks (pgrep full & long):
           # - Grep for the task names of interest while ignoring any names that are in the exclude list
@@ -998,25 +996,30 @@ functions:
           # we cannot rely on the return status ($?) to detect if the option is supported.
           pgrep -f --list-full ".*" 2>&1 | grep -qE "(illegal|invalid|unrecognized) option"
           if [ $? -ne 0 ]; then
-            pgrep_list=$(pgrep -f --list-full "$process_kill_list")
+            pgrep_list=$(pgrep -f --list-full "$process_list")
           else
-            pgrep_list=$(pgrep -f -l "$process_kill_list")
+            pgrep_list=$(pgrep -f -l "$process_list")
           fi
 
           # Since a process name might have a CR or LF in it, we need to delete any lines from
           # pgrep which do not start with space(s) and 1 digit and trim any leading spaces.
           processes=$(echo "$pgrep_list" | grep -ivE "$process_exclude_list" | sed -e '/^ *[0-9]/!d; s/^ *//; s/[[:cntrl:]]//g;')
 
-          # Kill the Unix process ID with signal KILL (9)
-          kill_process () { pid=$(echo $1 | cut -f1 -d ' '); echo "Killing process $1"; kill -9 $pid; }
         fi
-        # Since a full process name can have spaces, the IFS (internal field separator)
-        # should not include a space, just a LF & CR
-        IFS=$(printf "\n\r")
-        for process in $processes
-        do
-          kill_process "$process"
-        done
+        if [ ! -z "$processes" ]; then
+          error_message="Unexpected processes still active: $processes"
+          echo $error_message | tee ${running_processes_log}
+        fi
+
+  "fail if unexpected processes" : &fail_if_unexpected_processes
+    command: shell.exec
+    params:
+      script: |
+        # Exit out if any unexpected processes are running
+        if [ -f ${running_processes_log} ]; then
+          cat ${running_processes_log}
+          exit 1
+        fi
 
   "set up remote credentials":
     command: shell.exec
@@ -1473,8 +1476,6 @@ functions:
         echo "Terminated AMI EC2 instance: $aws_ec2"
 
 pre:
-  - func: "kill processes"
-  - func: "cleanup environment"
   - command: expansions.update
     params:
        updates:
@@ -1494,6 +1495,8 @@ pre:
           fi
        - key: posix_workdir
          value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
+       - key: running_processes_log
+         value: /tmp/${task_id}_running_processes.log
        # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
        # & UserKnownHostsFile, since these are local connections from one AWS instance to another.
        - key: ssh_connection_options
@@ -1518,6 +1521,8 @@ pre:
           if [ $errexit_on -eq 0 ]; then
             set -o errexit
           fi
+  - func: "check processes"
+  - func: "cleanup environment"
   - command: shell.exec
     params:
       system_log: true
@@ -1542,7 +1547,6 @@ post:
   - func: "copy EC2 artifacts"
   - func: "cleanup EC2 instance"
 
-  - func: "kill processes"
   # Print out any Out of Memory killed process messages.
   - command: shell.exec
     params:
@@ -2134,6 +2138,7 @@ tasks:
 ## compile_all - build all scons targets including unittests ##
 - name: compile_all
   commands:
+    - *fail_if_unexpected_processes
     - command: manifest.load
     - *git_get_project
     - func: "get buildnumber"
