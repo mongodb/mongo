@@ -23,12 +23,15 @@ import random
 import re
 import shlex
 import shutil
+import signal
 import stat
 import string
 import sys
 import tarfile
 import tempfile
+import threading
 import time
+import traceback
 import urlparse
 import zipfile
 
@@ -78,6 +81,10 @@ _try_import("buildscripts.aws_ec2", "aws_ec2")
 _try_import("buildscripts.remote_operations", "remote_operations")
 
 if _IS_WINDOWS:
+
+    # These modules are used on both sides for dumping python stacks.
+    import win32api
+    import win32event
 
     # These modules are used on the 'server' side.
     _try_import("ntsecuritycon")
@@ -151,6 +158,80 @@ def exit_handler():
         NamedTempFile.delete_all()
     except:
         pass
+
+
+def register_signal_handler(handler):
+
+    def _handle_set_event(event_handle, handler):
+        """
+        Windows event object handler that will dump the stacks of all threads.
+        """
+        while True:
+            try:
+                # Wait for task time out to dump stacks.
+                ret = win32event.WaitForSingleObject(event_handle, win32event.INFINITE)
+                if ret != win32event.WAIT_OBJECT_0:
+                    LOGGER.error("_handle_set_event WaitForSingleObject failed: %d", ret)
+                    return
+            except win32event.error as err:
+                LOGGER.error("Exception from win32event.WaitForSingleObject with error: %s", err)
+            else:
+                handler(None, None)
+
+    if _IS_WINDOWS:
+        # Create unique event_name.
+        event_name = "Global\\Mongo_Python_%d".format(os.getpid())
+        LOGGER.debug("Registering event %s", event_name)
+
+        try:
+            security_attributes = None
+            manual_reset = False
+            initial_state = False
+            task_timeout_handle = win32event.CreateEvent(
+                security_attributes, manual_reset, initial_state, event_name)
+        except win32event.error as err:
+            LOGGER.error("Exception from win32event.CreateEvent with error: %s", err)
+            return
+
+        # Register to close event object handle on exit.
+        atexit.register(win32api.CloseHandle, task_timeout_handle)
+
+        # Create thread.
+        event_handler_thread = threading.Thread(
+            target=_handle_set_event,
+            kwargs={"event_handle": task_timeout_handle, "handler": handler},
+            name="windows_event_handler_thread")
+        event_handler_thread.daemon = True
+        event_handler_thread.start()
+    else:
+        # Otherwise register a signal handler for SIGUSR1.
+        signal_num = signal.SIGUSR1
+        signal.signal(signal_num, handler)
+
+
+def dump_stacks_and_exit(signum, frame):
+    """
+    Handler that will dump the stacks of all threads.
+    """
+    LOGGER.info("Dumping stacks!")
+
+    sb = []
+    frames = sys._current_frames()
+    sb.append("Total threads: {}\n".format(len(frames)))
+    sb.append("")
+
+    for thread_id in frames:
+        stack = frames[thread_id]
+        sb.append("Thread {}:".format(thread_id))
+        sb.append("".join(traceback.format_stack(stack)))
+
+    LOGGER.info("".join(sb))
+
+    if _IS_WINDOWS:
+        exit_handler()
+        os._exit(1)
+    else:
+        sys.exit(1)
 
 
 def child_processes(parent_pid):
@@ -1520,6 +1601,7 @@ def main():
     global _report_json_file
 
     atexit.register(exit_handler)
+    register_signal_handler(dump_stacks_and_exit)
 
     parser = optparse.OptionParser(usage="""
 %prog [options]
