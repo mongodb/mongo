@@ -302,7 +302,7 @@ functions:
           get_pids() {
             proc_pids=$(tasklist /fo:csv |
                         awk -F'","' '{x=$1; gsub("\"","",x); print $2, x}' |
-                        grep -i -E $1 |
+                        grep -iE $1 |
                         cut -f1 -d ' ');
           }
           get_process_info() {
@@ -983,7 +983,7 @@ functions:
           # - The second column (and beyond) has task name
           # - Grep for the task names of interest while ignoring any names that are in the exclude list
 
-          processes=$(tasklist /fo:csv | awk -F'","' '{x=$1; gsub("\"","",x); print $2, x}' | grep -i -E "$process_kill_list" | grep -i -v -E "$process_exclude_list")
+          processes=$(tasklist /fo:csv | awk -F'","' '{x=$1; gsub("\"","",x); print $2, x}' | grep -iE "$process_kill_list" | grep -ivE "$process_exclude_list")
 
           # Kill the Windows process by process ID with force (/f)
           kill_process () { pid=$(echo $1 | cut -f1 -d ' '); echo "Killing process $1"; taskkill /pid "$pid" /f; }
@@ -993,22 +993,10 @@ functions:
           # - The first column has the process ID
           # - The second column (and beyond) has task name
 
-          # There are 2 "styles" of grep, figure out which one works
-          grep=grep
-          echo "a" | $grep -qE "(a)" > /dev/null 2>&1
-          if [ $? -ne 0 ]; then
-            # Extended grep on Solaris is in the following location
-            grep=/usr/xpg4/bin/grep
-            if [ ! -f $grep ]; then
-              echo "Extended $grep does not exist"
-              return 1
-            fi
-          fi
-
           # There are 2 "styles" of pgrep, figure out which one works.
           # Due to https://bugs.launchpad.net/ubuntu/+source/procps/+bug/1501916
           # we cannot rely on the return status ($?) to detect if the option is supported.
-          pgrep -f --list-full ".*" 2>&1 | $grep -qE "(illegal|invalid|unrecognized) option"
+          pgrep -f --list-full ".*" 2>&1 | grep -qE "(illegal|invalid|unrecognized) option"
           if [ $? -ne 0 ]; then
             pgrep_list=$(pgrep -f --list-full "$process_kill_list")
           else
@@ -1017,7 +1005,7 @@ functions:
 
           # Since a process name might have a CR or LF in it, we need to delete any lines from
           # pgrep which do not start with space(s) and 1 digit and trim any leading spaces.
-          processes=$(echo "$pgrep_list" | $grep -ivE "$process_exclude_list" | sed -e '/^ *[0-9]/!d; s/^ *//; s/[[:cntrl:]]//g;')
+          processes=$(echo "$pgrep_list" | grep -ivE "$process_exclude_list" | sed -e '/^ *[0-9]/!d; s/^ *//; s/[[:cntrl:]]//g;')
 
           # Kill the Unix process ID with signal KILL (9)
           kill_process () { pid=$(echo $1 | cut -f1 -d ' '); echo "Killing process $1"; kill -9 $pid; }
@@ -1573,7 +1561,7 @@ post:
           echo "Cannot check for OOM (Out of memory) killed processes on this platform"
           exit 0
         fi
-        egrep -i '(Out of memory|OOM[- ]killer|Killed process)' dmesg.txt > oom.txt
+        grep -iE '(Out of memory|OOM[- ]killer|Killed process)' dmesg.txt > oom.txt
         if [ -s oom.txt ]; then
           echo "OOM (Out of memory) killed processes detected"
           cat oom.txt
