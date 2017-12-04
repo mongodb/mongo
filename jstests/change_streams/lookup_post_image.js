@@ -7,6 +7,7 @@
 
     load("jstests/libs/change_stream_util.js");
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+    load("jstests/libs/fixture_helpers.js");           // For awaitLastOpCommitted().
     load("jstests/replsets/libs/two_phase_drops.js");  // For 'TwoPhaseDropCollectionTest'.
 
     let cst = new ChangeStreamTest(db);
@@ -106,6 +107,11 @@
     });
     assert.writeOK(coll.update({_id: "fullDocument is lookup"}, {$set: {updatedAgain: true}}));
     assert.writeOK(coll.remove({_id: "fullDocument is lookup"}));
+    // If this test is running with secondary read preference, it's necessary for the remove
+    // to propagate to all secondary nodes and be available for majority reads before we can
+    // assume looking up the document will fail.
+    FixtureHelpers.awaitLastOpCommitted();
+
     latestChange = cst.getOneChange(cursor);
     assert.eq(latestChange.operationType, "update");
     assert(latestChange.hasOwnProperty("fullDocument"));
@@ -153,6 +159,10 @@
     assert.soon(function() {
         return !TwoPhaseDropCollectionTest.collectionIsPendingDropInDatabase(db, coll.getName());
     });
+    // If this test is running with secondary read preference, it's necessary for the drop
+    // to propagate to all secondary nodes and be available for majority reads before we can
+    // assume looking up the document will fail.
+    FixtureHelpers.awaitLastOpCommitted();
 
     // Check the next $changeStream entry; this is the test document inserted above.
     latestChange = cst.getOneChange(cursor);
