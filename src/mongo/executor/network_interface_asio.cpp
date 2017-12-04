@@ -290,10 +290,7 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
             Status status = wasPreviouslyCanceled
                 ? Status(ErrorCodes::CallbackCanceled, "Callback canceled")
                 : swConn.getStatus();
-            if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
-                status = Status(ErrorCodes::ExceededTimeLimit, status.reason());
-            }
-            if (status.code() == ErrorCodes::ExceededTimeLimit) {
+            if (ErrorCodes::isExceededTimeLimitError(status.code())) {
                 _numTimedOutOps.fetchAndAdd(1);
             }
             if (status.code() != ErrorCodes::CallbackCanceled) {

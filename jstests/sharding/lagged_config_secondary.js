@@ -36,7 +36,8 @@
         testDB.user.find({}).maxTimeMS(15000).itcount();
     });
 
-    assert.eq(ErrorCodes.ExceededTimeLimit, exception.code);
+    assert(exception.code == ErrorCodes.ExceededTimeLimit ||
+           exception.code == ErrorCodes.NetworkInterfaceExceededTimeLimit);
 
     var msg = 'Command on database config timed out waiting for read concern to be satisfied.';
     assert.soon(function() {

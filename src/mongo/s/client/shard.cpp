@@ -97,7 +97,7 @@ bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
     return std::find(RemoteCommandRetryScheduler::kAllRetriableErrors.begin(),
                      RemoteCommandRetryScheduler::kAllRetriableErrors.end(),
                      code) == RemoteCommandRetryScheduler::kAllRetriableErrors.end() &&
-        code != ErrorCodes::ExceededTimeLimit;
+        code != ErrorCodes::NetworkInterfaceExceededTimeLimit;
 }
 
 Shard::Shard(const ShardId& id) : _id(id) {}

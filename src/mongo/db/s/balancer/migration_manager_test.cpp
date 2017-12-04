@@ -1014,7 +1014,7 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
         chunk2,
         kShardId3,
         false,
-        Status(ErrorCodes::ExceededTimeLimit,
+        Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
                "RemoteCallErrorConversionToOperationFailedCheck generated error."));
 
     // Run the MigrationManager code.

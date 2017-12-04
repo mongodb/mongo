@@ -287,8 +287,7 @@ void NetworkInterfaceASIO::_completeOperation(AsyncOp* op, ResponseStatus resp) 
         op->_timeoutAlarm->cancel();
     }
 
-    if (resp.status.code() == ErrorCodes::ExceededTimeLimit ||
-        resp.status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
+    if (ErrorCodes::isExceededTimeLimitError(resp.status.code())) {
         _numTimedOutOps.fetchAndAdd(1);
     }
 

@@ -244,3 +244,5 @@ error_class("WriteConcernError", ["WriteConcernFailed",
                                   "UnknownReplWriteConcern",
                                   "CannotSatisfyWriteConcern"])
 error_class("ShutdownError", ["ShutdownInProgress", "InterruptedAtShutdown"])
+
+error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "NetworkInterfaceExceededTimeLimit"])
