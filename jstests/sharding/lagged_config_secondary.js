@@ -41,7 +41,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         testDB.user.find({}).maxTimeMS(15000).itcount();
     });
 
-    assert.eq(ErrorCodes.ExceededTimeLimit, exception.code);
+    assert(ErrorCodes.isExceededTimeLimitError(exception.code));
 
     var msg = 'Command on database config timed out waiting for read concern to be satisfied.';
     assert.soon(function() {

@@ -124,9 +124,7 @@ void ShardRemote::updateReplSetMonitor(const HostAndPort& remoteHost,
         _targeter->markHostNotMaster(remoteHost, remoteCommandStatus);
     } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
         _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
-    } else if (remoteCommandStatus == ErrorCodes::NotMasterOrSecondary) {
-        _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
-    } else if (remoteCommandStatus == ErrorCodes::ExceededTimeLimit) {
+    } else if (remoteCommandStatus == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
         _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
     }
 }
@@ -206,7 +204,7 @@ StatusWith<Shard::CommandResponse> ShardRemote::_runCommand(OperationContext* op
     updateReplSetMonitor(host, response.status);
 
     if (!response.status.isOK()) {
-        if (response.status == ErrorCodes::ExceededTimeLimit) {
+        if (ErrorCodes::isExceededTimeLimitError(response.status.code())) {
             LOG(0) << "Operation timed out with status " << redact(response.status);
         }
         return response.status;
@@ -334,7 +332,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     updateReplSetMonitor(host.getValue(), status);
 
     if (!status.isOK()) {
-        if (status == ErrorCodes::ExceededTimeLimit) {
+        if (ErrorCodes::isExceededTimeLimitError(status.code())) {
             LOG(0) << "Operation timed out " << causedBy(status);
         }
         return status;
