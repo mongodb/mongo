@@ -130,6 +130,17 @@ NOINLINE_DECL void invariantFailed(const char* expr, const char* file, unsigned 
     std::abort();
 }
 
+NOINLINE_DECL void invariantFailedWithMsg(const char* expr,
+                                          const char* msg,
+                                          const char* file,
+                                          unsigned line) noexcept {
+    severe() << "Invariant failure " << expr << " " << msg << " " << file << ' ' << dec << line
+             << endl;
+    breakpoint();
+    severe() << "\n\n***aborting after invariant() failure\n\n" << endl;
+    std::abort();
+}
+
 NOINLINE_DECL void invariantOKFailed(const char* expr,
                                      const Status& status,
                                      const char* file,
