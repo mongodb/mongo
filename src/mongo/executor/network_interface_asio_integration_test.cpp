@@ -65,7 +65,7 @@ TEST_F(NetworkInterfaceASIOIntegrationFixture, Timeouts) {
                                             << "none"
                                             << "secs"
                                             << 10),
-                               ErrorCodes::ExceededTimeLimit,
+                               ErrorCodes::NetworkInterfaceExceededTimeLimit,
                                Milliseconds(100));
 
     // Run a sleep command that should return before we hit the ASIO timeout.
@@ -179,7 +179,7 @@ TEST_F(NetworkInterfaceASIOIntegrationFixture, StressTest) {
             expectedResults[i] = ErrorCodes::OK;
             StressTestOp::runCompleteOp(this, cb);
         } else if (r < .99) {
-            expectedResults[i] = ErrorCodes::ExceededTimeLimit;
+            expectedResults[i] = ErrorCodes::NetworkInterfaceExceededTimeLimit;
             StressTestOp::runTimeoutOp(this, cb);
         } else {
             // Just a sprinkling of long ops, to mitigate connection pool contention
@@ -228,7 +228,7 @@ TEST_F(NetworkInterfaceASIOIntegrationFixture, HookHangs) {
     startNet(std::move(options));
 
     assertCommandFailsOnClient(
-        "admin", BSON("ping" << 1), ErrorCodes::ExceededTimeLimit, Seconds(1));
+        "admin", BSON("ping" << 1), ErrorCodes::NetworkInterfaceExceededTimeLimit, Seconds(1));
 }
 
 }  // namespace
