@@ -15,6 +15,7 @@
  * of each stage.
  */
 load("jstests/replsets/rslib.js");
+load("jstests/hooks/validate_collections.js");
 
 function RollbackTest(name = "RollbackTest") {
     const State = {
@@ -38,6 +39,7 @@ function RollbackTest(name = "RollbackTest") {
     };
 
     const rst = new ReplSetTest({name, nodes: 3, useBridge: true});
+    const collectionValidator = new CollectionValidator();
 
     let curPrimary;
     let curSecondary;
@@ -81,7 +83,7 @@ function RollbackTest(name = "RollbackTest") {
         const name = rst.name;
         rst.checkOplogs(name);
         rst.checkReplicatedDataHashes(name);
-        // TODO: SERVER-31920 run validate.
+        collectionValidator.validateNodes(rst.nodeList());
     }
 
     function log(msg, important = false) {
