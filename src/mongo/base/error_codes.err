@@ -283,3 +283,5 @@ error_class("ShutdownError", ["ShutdownInProgress", "InterruptedAtShutdown"])
 #TODO SERVER-28679 add checksum failure.
 error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
                                                  "TooManyDocumentSequences"])
+
+error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "NetworkInterfaceExceededTimeLimit"])

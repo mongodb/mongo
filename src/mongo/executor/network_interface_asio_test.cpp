@@ -340,7 +340,7 @@ TEST_F(NetworkInterfaceASIOTest, TimeoutWithNetworkError) {
 
     // Wait for op to complete, assert that timeout had precedence.
     auto& result = deferred.get();
-    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, result.status);
+    ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
     ASSERT(result.elapsedMillis);
     assertNumOps(0u, 1u, 1u, 0u);
 }
@@ -409,7 +409,7 @@ TEST_F(NetworkInterfaceASIOTest, AsyncOpTimeout) {
     }
 
     auto& result = deferred.get();
-    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, result.status);
+    ASSERT_EQ(ErrorCodes::NetworkInterfaceExceededTimeLimit, result.status);
     ASSERT(result.elapsedMillis);
     assertNumOps(0u, 1u, 1u, 0u);
 }
