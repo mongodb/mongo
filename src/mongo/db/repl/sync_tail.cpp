@@ -631,7 +631,7 @@ private:
  *      session id present in the given operations. Each record represents the final state of the
  *      transaction table entry for that session id after the operations are applied.
  */
-void fillWriterVectorsAndLastestSessionRecords(
+void fillWriterVectorsAndLatestSessionRecords(
     OperationContext* opCtx,
     MultiApplier::Operations* ops,
     std::vector<MultiApplier::OperationPtrs>* writerVectors,
@@ -1521,7 +1521,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
 
         std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
         SessionRecordMap latestSessionRecords;
-        fillWriterVectorsAndLastestSessionRecords(
+        fillWriterVectorsAndLatestSessionRecords(
             opCtx, &ops, &writerVectors, &latestSessionRecords);
 
         // Wait for writes to finish before applying ops.
