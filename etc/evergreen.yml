@@ -1404,7 +1404,8 @@ functions:
             exit 0
           fi
           # Install NotMyFault, used to crash Windows.
-          cmds="curl -s -o ${windows_crash_zip} ${windows_crash_dl} | unzip ${windows_crash_zip} -d ${windows_crash_dir}"
+          cmds="curl -s -o ${windows_crash_zip} ${windows_crash_dl}"
+          cmds="$cmds; unzip -q ${windows_crash_zip} -d ${windows_crash_dir}"
           cmds="$cmds; chmod +x ${windows_crash_dir}/*.exe"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
