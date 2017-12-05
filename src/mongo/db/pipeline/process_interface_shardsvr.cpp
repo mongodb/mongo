@@ -105,22 +105,22 @@ std::pair<std::vector<FieldPath>, bool> MongoInterfaceShardServer::collectDocume
         return {{"_id"}, false};
     }
 
-    auto scm = [opCtx, &nss]() -> ScopedCollectionMetadata {
+    const auto metadata = [opCtx, &nss]() {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
+        return CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
     }();
 
     // If the UUID is set in 'nssOrUuid', check that the UUID in the ScopedCollectionMetadata
     // matches. Otherwise, this implies that the collection has been dropped and recreated as
     // sharded.
-    if (!scm->isSharded() || (uuid && !scm->uuidMatches(*uuid))) {
+    if (!metadata->isSharded() || (uuid && !metadata->uuidMatches(*uuid))) {
         return {{"_id"}, false};
     }
 
     // Unpack the shard key.
     std::vector<FieldPath> result;
     bool gotId = false;
-    for (auto& field : scm->getKeyPatternFields()) {
+    for (auto& field : metadata->getKeyPatternFields()) {
         result.emplace_back(field->dottedField());
         gotId |= (result.back().fullPath() == "_id");
     }

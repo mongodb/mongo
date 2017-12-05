@@ -235,8 +235,6 @@ std::vector<BSONObj> resolveDefaultsAndRemoveExistingIndexes(OperationContext* o
     return specs;
 }
 
-}  // namespace
-
 /**
  * { createIndexes : "bar", indexes : [ { ns : "test.bar", key : { x : 1 }, name: "x_1" } ] }
  */
@@ -244,16 +242,17 @@ class CmdCreateIndex : public ErrmsgCommandDeprecated {
 public:
     CmdCreateIndex() : ErrmsgCommandDeprecated(kCommandName) {}
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
+
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
         ActionSet actions;
         actions.addAction(ActionType::createIndex);
         Privilege p(parseResourcePattern(dbname, cmdObj), actions);
@@ -262,26 +261,22 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const string& dbname,
-                           const BSONObj& cmdObj,
-                           string& errmsg,
-                           BSONObjBuilder& result) {
+    bool errmsgRun(OperationContext* opCtx,
+                   const string& dbname,
+                   const BSONObj& cmdObj,
+                   string& errmsg,
+                   BSONObjBuilder& result) override {
         const NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
+        uassertStatusOK(userAllowedWriteNS(ns));
 
-        Status status = userAllowedWriteNS(ns);
-        uassertStatusOK(status);
-
-        // Disallow users from creating new indexes on config.transactions since the sessions
-        // code was optimized to not update indexes.
+        // Disallow users from creating new indexes on config.transactions since the sessions code
+        // was optimized to not update indexes
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "not allowed to create index on " << ns.ns(),
                 ns != NamespaceString::kSessionTransactionsTableNamespace);
 
-        auto specsWithStatus =
-            parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility);
-        uassertStatusOK(specsWithStatus.getStatus());
-        auto specs = std::move(specsWithStatus.getValue());
+        auto specs = uassertStatusOK(
+            parseAndValidateIndexSpecs(opCtx, ns, cmdObj, serverGlobalParams.featureCompatibility));
 
         // Do not use AutoGetOrCreateDb because we may relock the database in mode X.
         Lock::DBLock dbLock(opCtx, ns.db(), MODE_IX);
@@ -336,8 +331,7 @@ public:
                 uasserted(ErrorCodes::CommandNotSupportedOnView, errmsg);
             }
 
-            status = userAllowedCreateNS(ns.db(), ns.coll());
-            uassertStatusOK(status);
+            uassertStatusOK(userAllowedCreateNS(ns.db(), ns.coll()));
 
             writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
@@ -352,7 +346,6 @@ public:
         boost::optional<AutoStatsTracker> statsTracker;
         const boost::optional<int> dbProfilingLevel = boost::none;
         statsTracker.emplace(opCtx, ns, Top::LockType::WriteLocked, dbProfilingLevel);
-
 
         MultiIndexBlockImpl indexer(opCtx, collection);
         indexer.allowBackgroundBuilding();
@@ -375,8 +368,7 @@ public:
         for (size_t i = 0; i < specs.size(); i++) {
             const BSONObj& spec = specs[i];
             if (spec["unique"].trueValue()) {
-                status = checkUniqueIndexConstraints(opCtx, ns, spec["key"].Obj());
-                uassertStatusOK(status);
+                _checkUniqueIndexConstraints(opCtx, ns, spec["key"].Obj());
             }
         }
 
@@ -442,24 +434,24 @@ public:
     }
 
 private:
-    static Status checkUniqueIndexConstraints(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              const BSONObj& newIdxKey) {
+    static void _checkUniqueIndexConstraints(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const BSONObj& newIdxKey) {
         invariant(opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X));
 
-        auto metadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
-        if (metadata->isSharded()) {
-            ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
-            if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {
-                return Status(ErrorCodes::CannotCreateIndex,
-                              str::stream() << "cannot create unique index over " << newIdxKey
-                                            << " with shard key pattern "
-                                            << shardKeyPattern.toBSON());
-            }
-        }
+        const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
+        if (!metadata->isSharded())
+            return;
 
-
-        return Status::OK();
+        const ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
+        uassert(ErrorCodes::CannotCreateIndex,
+                str::stream() << "cannot create unique index over " << newIdxKey
+                              << " with shard key pattern "
+                              << shardKeyPattern.toBSON(),
+                shardKeyPattern.isUniqueIndexCompatible(newIdxKey));
     }
+
 } cmdCreateIndex;
-}
+
+}  // namespace
+}  // namespace mongo

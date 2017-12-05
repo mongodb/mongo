@@ -42,7 +42,7 @@ const auto getIsMigrating = OperationContext::declareDecoration<bool>();
 void assertIntersectingChunkHasNotMoved(OperationContext* opCtx,
                                         CollectionShardingRuntime* csr,
                                         const BSONObj& doc) {
-    auto metadata = csr->getMetadata(opCtx);
+    auto metadata = csr->getMetadataForOperation(opCtx);
     if (!metadata->isSharded()) {
         return;
     }

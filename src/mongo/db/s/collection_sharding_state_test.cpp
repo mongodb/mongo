@@ -33,6 +33,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/s/shard_server_test_fixture.h"
 
@@ -58,12 +59,25 @@ CollectionMetadata makeAMetadata(BSONObj const& keyPattern) {
     return CollectionMetadata(std::move(cm), ShardId("this"));
 }
 
-using DeleteStateTest = ShardServerTestFixture;
+class DeleteStateTest : public ShardServerTestFixture {
+protected:
+    void setCollectionFilteringMetadata(CollectionMetadata metadata) {
+        AutoGetCollection autoColl(operationContext(), kTestNss, MODE_X);
+        auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
+        css->setFilteringMetadata(operationContext(), std::move(metadata));
+
+        auto& oss = OperationShardingState::get(operationContext());
+        const auto version = metadata.getShardVersion();
+        BSONObjBuilder builder;
+        version.appendToCommand(&builder);
+        oss.initializeClientRoutingVersions(kTestNss, builder.obj());
+    }
+};
 
 TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
+    setCollectionFilteringMetadata(CollectionMetadata());
+
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
-    css->setFilteringMetadata(operationContext(), CollectionMetadata());
 
     auto doc = BSON("key3"
                     << "abc"
@@ -82,11 +96,10 @@ TEST_F(DeleteStateTest, MakeDeleteStateUnsharded) {
 }
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
-    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
-
     // Push a CollectionMetadata with a shard key not including "_id"...
-    css->setFilteringMetadata(operationContext(), makeAMetadata(BSON("key" << 1 << "key3" << 1)));
+    setCollectionFilteringMetadata(makeAMetadata(BSON("key" << 1 << "key3" << 1)));
+
+    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key3"
@@ -108,12 +121,10 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithoutIdInShardKey) {
 }
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
-    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
-
     // Push a CollectionMetadata with a shard key that does have "_id" in the middle...
-    css->setFilteringMetadata(operationContext(),
-                              makeAMetadata(BSON("key" << 1 << "_id" << 1 << "key2" << 1)));
+    setCollectionFilteringMetadata(makeAMetadata(BSON("key" << 1 << "_id" << 1 << "key2" << 1)));
+
+    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key2" << true << "key3"
@@ -133,13 +144,11 @@ TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdInShardKey) {
 }
 
 TEST_F(DeleteStateTest, MakeDeleteStateShardedWithIdHashInShardKey) {
-    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    auto* const css = CollectionShardingRuntime::get(operationContext(), kTestNss);
-
     // Push a CollectionMetadata with a shard key "_id", hashed.
-    auto aMetadata = makeAMetadata(BSON("_id"
-                                        << "hashed"));
-    css->setFilteringMetadata(operationContext(), std::move(aMetadata));
+    setCollectionFilteringMetadata(makeAMetadata(BSON("_id"
+                                                      << "hashed")));
+
+    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     auto doc = BSON("key2" << true << "_id"
                            << "hello"

@@ -73,14 +73,28 @@ public:
     static void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
-     * Returns the chunk filtering metadata for the collection. The returned object is safe to
-     * access outside of collection lock.
+     * Returns the chunk filtering metadata that the current operation should be using for that
+     * collection or otherwise throws if it has not been loaded yet. If the operation does not
+     * require a specific shard version, returns an UNSHARDED metadata. The returned object is safe
+     * to access outside of collection lock.
      *
      * If the operation context contains an 'atClusterTime' property, the returned filtering
      * metadata will be tied to a specific point in time. Otherwise it will reference the latest
      * time available.
      */
-    ScopedCollectionMetadata getMetadata(OperationContext* opCtx);
+    ScopedCollectionMetadata getMetadataForOperation(OperationContext* opCtx);
+    ScopedCollectionMetadata getCurrentMetadata();
+
+    /**
+     * Returns boost::none if the filtering metadata for the collection is not known yet. Otherwise
+     * returns the most recently refreshed from the config server metadata or shard version.
+     *
+     * These methods do not check for the shard version that the operation requires and should only
+     * be used for cases such as checking whether a particular config server update has taken
+     * effect.
+     */
+    boost::optional<ScopedCollectionMetadata> getCurrentMetadataIfKnown();
+    boost::optional<ChunkVersion> getCurrentShardVersionIfKnown();
 
     /**
      * Checks whether the shard version in the operation context is compatible with the shard

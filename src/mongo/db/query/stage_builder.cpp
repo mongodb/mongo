@@ -298,11 +298,11 @@ PlanStage* buildStages(OperationContext* opCtx,
             if (nullptr == childStage) {
                 return nullptr;
             }
-            return new ShardFilterStage(
-                opCtx,
-                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(opCtx),
-                ws,
-                childStage);
+            return new ShardFilterStage(opCtx,
+                                        CollectionShardingState::get(opCtx, collection->ns())
+                                            ->getMetadataForOperation(opCtx),
+                                        ws,
+                                        childStage);
         }
         case STAGE_DISTINCT_SCAN: {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);

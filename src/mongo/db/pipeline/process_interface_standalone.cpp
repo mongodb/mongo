@@ -105,8 +105,8 @@ DBClientBase* MongoInterfaceStandalone::directClient() {
 
 bool MongoInterfaceStandalone::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead autoColl(opCtx, nss);
-    auto const css = CollectionShardingState::get(opCtx, nss);
-    return css->getMetadata(opCtx)->isSharded();
+    const auto metadata = CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
+    return metadata->isSharded();
 }
 
 Insert MongoInterfaceStandalone::buildInsertOp(const NamespaceString& nss,
@@ -322,7 +322,7 @@ Status MongoInterfaceStandalone::attachCursorSourceToPipeline(
     auto css = CollectionShardingState::get(expCtx->opCtx, expCtx->ns);
     uassert(4567,
             str::stream() << "from collection (" << expCtx->ns.ns() << ") cannot be sharded",
-            !css->getMetadata(expCtx->opCtx)->isSharded());
+            !css->getMetadataForOperation(expCtx->opCtx)->isSharded());
 
     PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline);
 

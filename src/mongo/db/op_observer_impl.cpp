@@ -332,7 +332,7 @@ OpTimeBundle replLogApplyOps(OperationContext* opCtx,
 BSONObj OpObserverImpl::getDocumentKey(OperationContext* opCtx,
                                        NamespaceString const& nss,
                                        BSONObj const& doc) {
-    auto metadata = CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
+    auto metadata = CollectionShardingState::get(opCtx, nss)->getMetadataForOperation(opCtx);
     return metadata->extractDocumentKey(doc).getOwned();
 }
 

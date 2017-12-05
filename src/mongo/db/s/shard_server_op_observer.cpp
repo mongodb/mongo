@@ -206,8 +206,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       std::vector<InsertStatement>::const_iterator begin,
                                       std::vector<InsertStatement>::const_iterator end,
                                       bool fromMigrate) {
-    auto const css = CollectionShardingState::get(opCtx, nss);
-    const auto metadata = css->getMetadata(opCtx);
+    auto* const css = CollectionShardingState::get(opCtx, nss);
+    const auto metadata = css->getMetadataForOperation(opCtx);
 
     for (auto it = begin; it != end; ++it) {
         const auto& insertedDoc = it->doc;
@@ -236,8 +236,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    auto const css = CollectionShardingState::get(opCtx, args.nss);
-    const auto metadata = css->getMetadata(opCtx);
+    auto* const css = CollectionShardingState::get(opCtx, args.nss);
+    const auto metadata = css->getMetadataForOperation(opCtx);
 
     if (args.nss == NamespaceString::kShardConfigCollectionsNamespace) {
         // Notification of routing table changes are only needed on secondaries

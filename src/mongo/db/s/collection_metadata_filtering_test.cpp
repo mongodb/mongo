@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_server_test_fixture.h"
 
@@ -107,6 +108,12 @@ protected:
         }
 
         _manager->setFilteringMetadata(CollectionMetadata(cm, ShardId("0")));
+
+        auto& oss = OperationShardingState::get(operationContext());
+        const auto version = cm->getVersion(ShardId("0"));
+        BSONObjBuilder builder;
+        version.appendToCommand(&builder);
+        oss.initializeClientRoutingVersions(kNss, builder.obj());
     }
 
     std::shared_ptr<MetadataManager> _manager;
@@ -134,7 +141,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFn(css->getMetadata(operationContext()));
+        testFn(css->getMetadataForOperation(operationContext()));
     }
 
     {
@@ -165,7 +172,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFn(css->getMetadata(operationContext()));
+        testFn(css->getMetadataForOperation(operationContext()));
     }
 
     {
@@ -204,7 +211,7 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
 
         AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
         auto* const css = CollectionShardingState::get(operationContext(), kNss);
-        testFn(css->getMetadata(operationContext()));
+        testFn(css->getMetadataForOperation(operationContext()));
     }
 
     {

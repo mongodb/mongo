@@ -83,8 +83,8 @@ if wiredtiger:
             ],
         LIBDEPS_PRIVATE= [
             '$BUILD_DIR/mongo/db/snapshot_window_options',
-            '$BUILD_DIR/mongo/util/options_parser/options_parser',
             '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
+            '$BUILD_DIR/mongo/util/options_parser/options_parser',
             ],
         )
 

@@ -110,27 +110,37 @@ public:
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         auto* const css = CollectionShardingRuntime::get(opCtx, nss);
 
-        const auto metadata = css->getMetadata(opCtx);
-        if (metadata->isSharded()) {
-            result.appendTimestamp("global", metadata->getShardVersion().toLong());
-        } else {
-            result.appendTimestamp("global", ChunkVersion::UNSHARDED().toLong());
-        }
+        const auto optMetadata = css->getCurrentMetadataIfKnown();
+        if (!optMetadata) {
+            result.append("global", "UNKNOWN");
 
-        if (cmdObj["fullMetadata"].trueValue()) {
-            BSONObjBuilder metadataBuilder(result.subobjStart("metadata"));
-            if (metadata->isSharded()) {
-                metadata->toBSONBasic(metadataBuilder);
-
-                BSONArrayBuilder chunksArr(metadataBuilder.subarrayStart("chunks"));
-                metadata->toBSONChunks(chunksArr);
-                chunksArr.doneFast();
-
-                BSONArrayBuilder pendingArr(metadataBuilder.subarrayStart("pending"));
-                css->toBSONPending(pendingArr);
-                pendingArr.doneFast();
+            if (cmdObj["fullMetadata"].trueValue()) {
+                result.append("metadata", BSONObj());
             }
-            metadataBuilder.doneFast();
+        } else {
+            const auto& metadata = *optMetadata;
+
+            if (metadata->isSharded()) {
+                result.appendTimestamp("global", metadata->getShardVersion().toLong());
+            } else {
+                result.appendTimestamp("global", ChunkVersion::UNSHARDED().toLong());
+            }
+
+            if (cmdObj["fullMetadata"].trueValue()) {
+                BSONObjBuilder metadataBuilder(result.subobjStart("metadata"));
+                if (metadata->isSharded()) {
+                    metadata->toBSONBasic(metadataBuilder);
+
+                    BSONArrayBuilder chunksArr(metadataBuilder.subarrayStart("chunks"));
+                    metadata->toBSONChunks(chunksArr);
+                    chunksArr.doneFast();
+
+                    BSONArrayBuilder pendingArr(metadataBuilder.subarrayStart("pending"));
+                    css->toBSONPending(pendingArr);
+                    pendingArr.doneFast();
+                }
+                metadataBuilder.doneFast();
+            }
         }
 
         return true;

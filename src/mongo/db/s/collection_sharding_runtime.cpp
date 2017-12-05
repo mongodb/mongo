@@ -45,6 +45,30 @@ namespace {
 // How long to wait before starting cleanup of an emigrated chunk range
 MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
 
+/**
+ * Returns whether the specified namespace is used for sharding-internal purposes only and can never
+ * be marked as anything other than UNSHARDED, because the call sites which reference these
+ * collections are not prepared to handle StaleConfig errors.
+ */
+bool isNamespaceAlwaysUnsharded(const NamespaceString& nss) {
+    // There should never be a case to mark as sharded collections which are on the config server
+    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer)
+        return true;
+
+    // Local and admin never have sharded collections
+    if (nss.db() == NamespaceString::kLocalDb || nss.db() == NamespaceString::kAdminDb)
+        return true;
+
+    // Certain config collections can never be sharded
+    if (nss == NamespaceString::kSessionTransactionsTableNamespace)
+        return true;
+
+    if (nss.isSystemDotProfile())
+        return true;
+
+    return false;
+}
+
 }  // namespace
 
 CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* sc,
@@ -52,7 +76,11 @@ CollectionShardingRuntime::CollectionShardingRuntime(ServiceContext* sc,
                                                      executor::TaskExecutor* rangeDeleterExecutor)
     : CollectionShardingState(nss),
       _nss(std::move(nss)),
-      _metadataManager(std::make_shared<MetadataManager>(sc, _nss, rangeDeleterExecutor)) {}
+      _metadataManager(std::make_shared<MetadataManager>(sc, _nss, rangeDeleterExecutor)) {
+    if (isNamespaceAlwaysUnsharded(_nss)) {
+        _metadataManager->setFilteringMetadata(CollectionMetadata());
+    }
+}
 
 CollectionShardingRuntime* CollectionShardingRuntime::get(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
@@ -62,13 +90,17 @@ CollectionShardingRuntime* CollectionShardingRuntime::get(OperationContext* opCt
 
 void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
                                                      CollectionMetadata newMetadata) {
+    invariant(!newMetadata.isSharded() || !isNamespaceAlwaysUnsharded(_nss),
+              str::stream() << "Namespace " << _nss.ns() << " must never be sharded.");
     invariant(opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_X));
 
     _metadataManager->setFilteringMetadata(std::move(newMetadata));
 }
 
 void CollectionShardingRuntime::clearFilteringMetadata() {
-    _metadataManager->clearFilteringMetadata();
+    if (!isNamespaceAlwaysUnsharded(_nss)) {
+        _metadataManager->clearFilteringMetadata();
+    }
 }
 
 auto CollectionShardingRuntime::beginReceive(ChunkRange const& range) -> CleanupNotification {
