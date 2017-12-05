@@ -295,7 +295,8 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
         }
 
         if (res["state"].String() == "fail") {
-            return {ErrorCodes::OperationFailed, "Data transfer error"};
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "Data transfer error: " << res["errmsg"].str()};
         }
 
         auto migrationSessionIdStatus = MigrationSessionId::extractFromBSON(res);
