@@ -46,7 +46,8 @@ private:
         invariant(as);
 
         auto* opCtx = client->getOperationContext();
-        auto ccPin = grid.getCursorManager()->checkOutCursor(nss, cursorId, opCtx);
+        auto ccPin = grid.getCursorManager()->checkOutCursor(
+            nss, cursorId, opCtx, ClusterCursorManager::kNoCheckSession);
         if (!ccPin.isOK()) {
             return ccPin.getStatus();
         }
