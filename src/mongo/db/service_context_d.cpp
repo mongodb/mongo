@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
 #include "mongo/platform/basic.h"
 
@@ -119,6 +119,18 @@ void ServiceContextMongoD::initializeGlobalStorageEngine() {
 
     const std::string dbpath = storageGlobalParams.dbpath;
     if (auto existingStorageEngine = StorageEngineMetadata::getStorageEngineForPath(dbpath)) {
+        if (*existingStorageEngine == "mmapv1" ||
+            (storageGlobalParams.engineSetByUser && storageGlobalParams.engine == "mmapv1")) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: Support for MMAPV1 storage engine has been deprecated and will be"
+                  << startupWarningsLog;
+            log() << "**          removed in version 4.0. Please plan to migrate to the wiredTiger"
+                  << startupWarningsLog;
+            log() << "**          storage engine." << startupWarningsLog;
+            log() << "**          See http://dochub.mongodb.org/core/deprecated-mmapv1";
+            log() << startupWarningsLog;
+        }
+
         if (storageGlobalParams.engineSetByUser) {
             // Verify that the name of the user-supplied storage engine matches the contents of
             // the metadata file.
@@ -155,6 +167,16 @@ void ServiceContextMongoD::initializeGlobalStorageEngine() {
                     << "' is not available with this build of mongod. Please specify a different"
                     << " storage engine explicitly, e.g. --storageEngine=mmapv1.",
                 isRegisteredStorageEngine(storageGlobalParams.engine));
+    } else if (storageGlobalParams.engineSetByUser && storageGlobalParams.engine == "mmapv1") {
+        log() << startupWarningsLog;
+        log() << "** WARNING: You have explicitly specified 'MMAPV1' storage engine in your"
+              << startupWarningsLog;
+        log() << "**          config file or as a command line option.  Support for the MMAPV1"
+              << startupWarningsLog;
+        log() << "**          storage engine has been deprecated and will be removed in"
+              << startupWarningsLog;
+        log() << "**          version 4.0. See http://dochub.mongodb.org/core/deprecated-mmapv1";
+        log() << startupWarningsLog;
     }
 
     const std::string repairpath = storageGlobalParams.repairpath;
