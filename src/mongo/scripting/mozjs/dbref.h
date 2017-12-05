@@ -47,6 +47,26 @@ struct DBRefInfo : public BaseInfo {
     static void construct(JSContext* cx, JS::CallArgs args);
 
     static const char* const className;
+    static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
+
+    static void delProperty(JSContext* cx,
+                            JS::HandleObject obj,
+                            JS::HandleId id,
+                            JS::ObjectOpResult& result);
+    static void enumerate(JSContext* cx,
+                          JS::HandleObject obj,
+                          JS::AutoIdVector& properties,
+                          bool enumerableOnly);
+    static void finalize(JSFreeOp* fop, JSObject* obj);
+    static void resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp);
+    static void setProperty(JSContext* cx,
+                            JS::HandleObject obj,
+                            JS::HandleId id,
+                            JS::MutableHandleValue vp,
+                            JS::ObjectOpResult& result);
+
+    static void make(
+        JSContext* cx, JS::MutableHandleObject obj, BSONObj bson, const BSONObj* parent, bool ro);
 };
 
 }  // namespace mozjs

@@ -455,7 +455,8 @@ void ObjectWrapper::callMethod(JS::HandleValue fun, JS::MutableHandleValue out) 
 }
 
 BSONObj ObjectWrapper::toBSON() {
-    if (getScope(_context)->getProto<BSONInfo>().instanceOf(_object)) {
+    if (getScope(_context)->getProto<BSONInfo>().instanceOf(_object) ||
+        getScope(_context)->getProto<DBRefInfo>().instanceOf(_object)) {
         BSONObj* originalBSON = nullptr;
         bool altered;
 
@@ -591,7 +592,8 @@ ObjectWrapper::WriteFieldRecursionFrame::WriteFieldRecursionFrame(JSContext* cx,
         }
     }
 
-    if (getScope(cx)->getProto<BSONInfo>().instanceOf(thisv)) {
+    if (getScope(cx)->getProto<BSONInfo>().instanceOf(thisv) ||
+        getScope(cx)->getProto<DBRefInfo>().instanceOf(thisv)) {
         std::tie(originalBSON, altered) = BSONInfo::originalBSON(cx, thisv);
     }
 }

@@ -204,38 +204,23 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
 }
 
 void ValueReader::fromBSON(const BSONObj& obj, const BSONObj* parent, bool readOnly) {
+    JS::RootedObject child(_context);
+
+    bool filledDBRef = false;
     if (obj.firstElementType() == String && str::equals(obj.firstElementFieldName(), "$ref")) {
         BSONObjIterator it(obj);
-        const BSONElement ref = it.next();
+        it.next();
         const BSONElement id = it.next();
 
         if (id.ok() && str::equals(id.fieldName(), "$id")) {
-            JS::AutoValueArray<2> args(_context);
-
-            ValueReader(_context, args[0]).fromBSONElement(ref, parent ? *parent : obj, readOnly);
-
-            // id can be a subobject
-            ValueReader(_context, args[1]).fromBSONElement(id, parent ? *parent : obj, readOnly);
-
-            JS::RootedObject robj(_context);
-
-            auto scope = getScope(_context);
-
-            scope->getProto<DBRefInfo>().newInstance(args, &robj);
-            ObjectWrapper o(_context, robj);
-
-            while (it.more()) {
-                BSONElement elem = it.next();
-                o.setBSONElement(elem.fieldName(), elem, parent ? *parent : obj, readOnly);
-            }
-
-            _value.setObjectOrNull(robj);
-            return;
+            DBRefInfo::make(_context, &child, obj, parent, readOnly);
+            filledDBRef = true;
         }
     }
 
-    JS::RootedObject child(_context);
-    BSONInfo::make(_context, &child, obj, parent, readOnly);
+    if (!filledDBRef) {
+        BSONInfo::make(_context, &child, obj, parent, readOnly);
+    }
 
     _value.setObjectOrNull(child);
 }

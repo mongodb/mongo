@@ -30,9 +30,11 @@
 
 #include "mongo/scripting/mozjs/dbref.h"
 
+#include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/scripting/mozjs/valuewriter.h"
 
 namespace mongo {
 namespace mozjs {
@@ -40,16 +42,13 @@ namespace mozjs {
 const char* const DBRefInfo::className = "DBRef";
 
 void DBRefInfo::construct(JSContext* cx, JS::CallArgs args) {
-    auto scope = getScope(cx);
-
     if (!(args.length() == 2 || args.length() == 3))
         uasserted(ErrorCodes::BadValue, "DBRef needs 2 or 3 arguments");
 
     if (!args.get(0).isString())
         uasserted(ErrorCodes::BadValue, "DBRef 1st parameter must be a string");
 
-    JS::RootedObject thisv(cx);
-    scope->getProto<DBRefInfo>().newObject(&thisv);
+    JS::RootedObject thisv(cx, JS_NewPlainObject(cx));
     ObjectWrapper o(cx, thisv);
 
     o.setValue(InternedString::dollar_ref, args.get(0));
@@ -62,7 +61,53 @@ void DBRefInfo::construct(JSContext* cx, JS::CallArgs args) {
         o.setValue(InternedString::dollar_db, args.get(2));
     }
 
-    args.rval().setObjectOrNull(thisv);
+    JS::RootedObject out(cx);
+    DBRefInfo::make(cx, &out, o.toBSON(), nullptr, false);
+
+    args.rval().setObjectOrNull(out);
+}
+
+void DBRefInfo::finalize(JSFreeOp* fop, JSObject* obj) {
+    BSONInfo::finalize(fop, obj);
+}
+
+void DBRefInfo::enumerate(JSContext* cx,
+                          JS::HandleObject obj,
+                          JS::AutoIdVector& properties,
+                          bool enumerableOnly) {
+    BSONInfo::enumerate(cx, obj, properties, enumerableOnly);
+}
+
+void DBRefInfo::setProperty(JSContext* cx,
+                            JS::HandleObject obj,
+                            JS::HandleId id,
+                            JS::MutableHandleValue vp,
+                            JS::ObjectOpResult& result) {
+    BSONInfo::setProperty(cx, obj, id, vp, result);
+}
+
+void DBRefInfo::delProperty(JSContext* cx,
+                            JS::HandleObject obj,
+                            JS::HandleId id,
+                            JS::ObjectOpResult& result) {
+    BSONInfo::delProperty(cx, obj, id, result);
+}
+
+void DBRefInfo::resolve(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* resolvedp) {
+    BSONInfo::resolve(cx, obj, id, resolvedp);
+}
+
+void DBRefInfo::make(
+    JSContext* cx, JS::MutableHandleObject obj, BSONObj bson, const BSONObj* parent, bool ro) {
+
+    JS::RootedObject local(cx);
+    BSONInfo::make(cx, &local, std::move(bson), parent, ro);
+
+    auto scope = getScope(cx);
+
+    scope->getProto<DBRefInfo>().newObject(obj);
+    JS_SetPrivate(obj, JS_GetPrivate(local));
+    JS_SetPrivate(local, nullptr);
 }
 
 }  // namespace mozjs
