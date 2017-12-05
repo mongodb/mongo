@@ -104,19 +104,20 @@ public:
      *
      * This allows us to do the following to iterate over all orphan ranges:
      *
-     * KeyRange range;
+     * ChunkRange range;
      * BSONObj lookupKey = metadata->getMinKey();
-     * boost::optional<KeyRange> range;
+     * boost::optional<ChunkRange> range;
      * while((range = metadata->getNextOrphanRange(receiveMap, lookupKey))) {
      *     lookupKey = range->maxKey;
      * }
      *
      * @param lookupKey passing a key that does not belong to this metadata is undefined.
      * @param receiveMap is an extra set of chunks not considered orphaned.
-     * @param orphanRange the output range. Note that the NS is not set.
+     *
+     * @return orphanRange the output range. Note that the NS is not set.
      */
-    boost::optional<KeyRange> getNextOrphanRange(RangeMap const& receiveMap,
-                                                 BSONObj const& lookupKey) const;
+    boost::optional<ChunkRange> getNextOrphanRange(RangeMap const& receiveMap,
+                                                   BSONObj const& lookupKey) const;
 
     ChunkVersion getCollVersion() const {
         return _cm->getVersion();

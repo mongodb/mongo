@@ -32,11 +32,51 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/range_arithmetic.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+
+/**
+ * A KeyRange represents a range over keys of documents in a namespace, qualified by a
+ * key pattern which defines the documents that are in the key range.
+ *
+ * There may be many different expressions to generate the same key fields from a document - the
+ * keyPattern tells us these expressions.
+ *
+ * Ex:
+ * DocA : { field : "aaaa" }
+ * DocB : { field : "bbb" }
+ * DocC : { field : "ccccc" }
+ *
+ * keyPattern : { field : 1 }
+ * minKey : { field : "aaaa" } : Id(DocA)
+ * maxKey : { field : "ccccc" } : Id(DocB)
+ *
+ * contains Id(DocB)
+ *
+ * keyPattern : { field : "numberofletters" }
+ * minKey : { field : 4 } : numberofletters(DocA)
+ * maxKey : { field : 5 } : numberofletters(DocC)
+ *
+ * does not contain numberofletters(DocB)
+ */
+struct KeyRange {
+    KeyRange(const std::string& ns,
+             const BSONObj& minKey,
+             const BSONObj& maxKey,
+             const BSONObj& keyPattern)
+        : ns(ns), minKey(minKey), maxKey(maxKey), keyPattern(keyPattern) {}
+
+    KeyRange() {}
+
+    std::string ns;
+    BSONObj minKey;
+    BSONObj maxKey;
+    BSONObj keyPattern;
+};
 
 /**
  * A MockRange represents a range with endpoint that a MockNSTargeter uses to direct writes to
@@ -155,14 +195,12 @@ public:
     }
 
 private:
-    KeyRange parseRange(const BSONObj& query) const {
-        std::string fieldName = query.firstElement().fieldName();
+    ChunkRange parseRange(const BSONObj& query) const {
+        const std::string fieldName = query.firstElement().fieldName();
 
         if (query.firstElement().isNumber()) {
-            return KeyRange("",
-                            BSON(fieldName << query.firstElement().numberInt()),
-                            BSON(fieldName << query.firstElement().numberInt() + 1),
-                            BSON(fieldName << 1));
+            return ChunkRange(BSON(fieldName << query.firstElement().numberInt()),
+                              BSON(fieldName << query.firstElement().numberInt() + 1));
         } else if (query.firstElement().type() == Object) {
             BSONObj queryRange = query.firstElement().Obj();
 
@@ -174,11 +212,11 @@ private:
             BSONObjBuilder maxKeyB;
             maxKeyB.appendAs(queryRange[LT.l_], fieldName);
 
-            return KeyRange("", minKeyB.obj(), maxKeyB.obj(), BSON(fieldName << 1));
+            return ChunkRange(minKeyB.obj(), maxKeyB.obj());
         }
 
         ASSERT(false);
-        return KeyRange("", BSONObj(), BSONObj(), BSONObj());
+        return ChunkRange({}, {});
     }
 
     /**
@@ -187,15 +225,15 @@ private:
      */
     Status targetQuery(const BSONObj& query,
                        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
-        KeyRange queryRange = parseRange(query);
+        ChunkRange queryRange(parseRange(query));
 
         const std::vector<MockRange*>& ranges = getRanges();
         for (std::vector<MockRange*>::const_iterator it = ranges.begin(); it != ranges.end();
              ++it) {
             const MockRange* range = *it;
 
-            if (rangeOverlaps(queryRange.minKey,
-                              queryRange.maxKey,
+            if (rangeOverlaps(queryRange.getMin(),
+                              queryRange.getMax(),
                               range->range.minKey,
                               range->range.maxKey)) {
                 endpoints->push_back(stdx::make_unique<ShardEndpoint>(range->endpoint));

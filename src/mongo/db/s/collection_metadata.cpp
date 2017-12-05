@@ -208,16 +208,15 @@ std::string CollectionMetadata::toStringBasic() const {
                          << ", shard version: " << _shardVersion.toString();
 }
 
-boost::optional<KeyRange> CollectionMetadata::getNextOrphanRange(
+boost::optional<ChunkRange> CollectionMetadata::getNextOrphanRange(
     RangeMap const& receivingChunks, BSONObj const& origLookupKey) const {
-
+    const BSONObj maxKey = getMaxKey();
     BSONObj lookupKey = origLookupKey;
-    BSONObj maxKey = getMaxKey();  // so we don't keep rebuilding
-    while (lookupKey.woCompare(maxKey) < 0) {
 
+    while (lookupKey.woCompare(maxKey) < 0) {
         using Its = std::pair<RangeMap::const_iterator, RangeMap::const_iterator>;
 
-        auto patchLookupKey = [&](RangeMap const& map) -> boost::optional<Its> {
+        const auto patchLookupKey = [&](RangeMap const& map) -> boost::optional<Its> {
             auto lowerIt = map.end(), upperIt = map.end();
 
             if (!map.empty()) {
@@ -230,6 +229,7 @@ boost::optional<KeyRange> CollectionMetadata::getNextOrphanRange(
             }
 
             // If we overlap, continue after the overlap
+            //
             // TODO: Could optimize slightly by finding next non-contiguous chunk
             if (lowerIt != map.end() && lowerIt->second.woCompare(lookupKey) > 0) {
                 lookupKey = lowerIt->second;  // note side effect
@@ -245,26 +245,29 @@ boost::optional<KeyRange> CollectionMetadata::getNextOrphanRange(
             continue;
         }
 
-        boost::optional<KeyRange> range =
-            KeyRange("", getMinKey(), maxKey, _cm->getShardKeyPattern().toBSON());
+        BSONObj rangeMin = getMinKey();
+        BSONObj rangeMax = maxKey;
 
-        auto patchArgRange = [&range](RangeMap const& map, Its its) {
+        const auto patchArgRange = [&rangeMin, &rangeMax](RangeMap const& map, Its const& its) {
             // We know that the lookup key is not covered by a chunk or pending range, and where the
             // previous chunk and pending chunks are.  Now we fill in the bounds as the closest
             // bounds of the surrounding ranges in both maps.
-            auto lowerIt = its.first, upperIt = its.second;
+            const auto& lowerIt = its.first;
+            const auto& upperIt = its.second;
 
-            if (lowerIt != map.end() && lowerIt->second.woCompare(range->minKey) > 0) {
-                range->minKey = lowerIt->second;
+            if (lowerIt != map.end() && lowerIt->second.woCompare(rangeMin) > 0) {
+                rangeMin = lowerIt->second;
             }
-            if (upperIt != map.end() && upperIt->first.woCompare(range->maxKey) < 0) {
-                range->maxKey = upperIt->first;
+
+            if (upperIt != map.end() && upperIt->first.woCompare(rangeMax) < 0) {
+                rangeMax = upperIt->first;
             }
         };
 
         patchArgRange(_chunksMap, *chunksIts);
         patchArgRange(receivingChunks, *pendingIts);
-        return range;
+
+        return ChunkRange(rangeMin.getOwned(), rangeMax.getOwned());
     }
 
     return boost::none;

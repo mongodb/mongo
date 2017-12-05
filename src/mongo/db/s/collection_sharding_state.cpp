@@ -272,6 +272,7 @@ Status CollectionShardingState::waitForClean(OperationContext* opCtx,
                                   << result.reason()};
         }
     }
+
     MONGO_UNREACHABLE;
 }
 
@@ -280,7 +281,7 @@ auto CollectionShardingState::trackOrphanedDataCleanup(ChunkRange const& range)
     return _metadataManager->trackOrphanedDataCleanup(range);
 }
 
-boost::optional<KeyRange> CollectionShardingState::getNextOrphanRange(BSONObj const& from) {
+boost::optional<ChunkRange> CollectionShardingState::getNextOrphanRange(BSONObj const& from) {
     return _metadataManager->getNextOrphanRange(from);
 }
 

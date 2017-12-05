@@ -38,45 +38,6 @@
 namespace mongo {
 
 /**
- * A KeyRange represents a range over keys of documents in a namespace, qualified by a
- * key pattern which defines the documents that are in the key range.
- *
- * There may be many different expressions to generate the same key fields from a document - the
- * keyPattern tells us these expressions.
- *
- * Ex:
- * DocA : { field : "aaaa" }
- * DocB : { field : "bbb" }
- * DocC : { field : "ccccc" }
- *
- * keyPattern : { field : 1 }
- * minKey : { field : "aaaa" } : Id(DocA)
- * maxKey : { field : "ccccc" } : Id(DocB)
- *
- * contains Id(DocB)
- *
- * keyPattern : { field : "numberofletters" }
- * minKey : { field : 4 } : numberofletters(DocA)
- * maxKey : { field : 5 } : numberofletters(DocC)
- *
- * does not contain numberofletters(DocB)
- */
-struct KeyRange {
-    KeyRange(const std::string& ns,
-             const BSONObj& minKey,
-             const BSONObj& maxKey,
-             const BSONObj& keyPattern)
-        : ns(ns), minKey(minKey), maxKey(maxKey), keyPattern(keyPattern) {}
-
-    KeyRange() {}
-
-    std::string ns;
-    BSONObj minKey;
-    BSONObj maxKey;
-    BSONObj keyPattern;
-};
-
-/**
  * Returns true if the point is within the range [inclusiveLower, exclusiveUpper).
  */
 bool rangeContains(const BSONObj& inclusiveLower,

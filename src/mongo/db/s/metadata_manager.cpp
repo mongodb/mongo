@@ -215,7 +215,7 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
     // Collection is becoming unsharded
     if (!remoteMetadata) {
         log() << "Marking collection " << _nss.ns() << " with "
-              << redact(_metadata.back()->metadata.toStringBasic()) << " as no longer sharded";
+              << redact(_metadata.back()->metadata.toStringBasic()) << " as unsharded";
 
         _receivingChunks.clear();
         _clearAllCleanups(lg);
@@ -260,20 +260,19 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
     log() << "Updating collection metadata for " << _nss.ns() << " from "
           << activeMetadata->toStringBasic() << " to " << remoteMetadata->toStringBasic();
 
-    // Resolve any receiving chunks, which might have completed by now.
-    // Should be no more than one.
+    // Resolve any receiving chunks, which might have completed by now
     for (auto it = _receivingChunks.begin(); it != _receivingChunks.end();) {
-        BSONObj const& min = it->first;
-        BSONObj const& max = it->second;
+        const ChunkRange receivingRange(it->first, it->second);
 
-        if (!remoteMetadata->rangeOverlapsChunk(ChunkRange(min, max))) {
+        if (!remoteMetadata->rangeOverlapsChunk(receivingRange)) {
             ++it;
             continue;
         }
-        // The remote metadata contains a chunk we were earlier in the process of receiving, so
-        // we deem it successfully received.
-        LOG(2) << "Verified chunk " << ChunkRange(min, max) << " for collection " << _nss.ns()
-               << " has been migrated to this shard earlier";
+
+        // The remote metadata contains a chunk we were earlier in the process of receiving, so we
+        // deem it successfully received
+        LOG(2) << "Verified chunk " << redact(receivingRange.toString()) << " for collection "
+               << _nss.ns() << " has been migrated to this shard earlier";
 
         _receivingChunks.erase(it);
         it = _receivingChunks.begin();
@@ -532,7 +531,7 @@ auto MetadataManager::_overlapsInUseCleanups(WithLock, ChunkRange const& range) 
     return boost::none;
 }
 
-boost::optional<KeyRange> MetadataManager::getNextOrphanRange(BSONObj const& from) const {
+boost::optional<ChunkRange> MetadataManager::getNextOrphanRange(BSONObj const& from) const {
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
     invariant(!_metadata.empty());
     return _metadata.back()->metadata.getNextOrphanRange(_receivingChunks, from);
@@ -557,8 +556,11 @@ ScopedCollectionMetadata::ScopedCollectionMetadata(ScopedCollectionMetadata&& ot
 ScopedCollectionMetadata& ScopedCollectionMetadata::operator=(ScopedCollectionMetadata&& other) {
     if (this != &other) {
         _clear();
+
         _metadataManager = std::move(other._metadataManager);
-        _metadataTracker = other._metadataTracker;
+        _metadataTracker = std::move(other._metadataTracker);
+
+        other._metadataManager = nullptr;
         other._metadataTracker = nullptr;
     }
     return *this;

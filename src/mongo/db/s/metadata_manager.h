@@ -140,7 +140,7 @@ public:
      */
     boost::optional<CleanupNotification> trackOrphanedDataCleanup(ChunkRange const& orphans) const;
 
-    boost::optional<KeyRange> getNextOrphanRange(BSONObj const& from) const;
+    boost::optional<ChunkRange> getNextOrphanRange(BSONObj const& from) const;
 
 private:
     // Management of the _metadata list is implemented in ScopedCollectionMetadata
@@ -297,16 +297,6 @@ public:
      * Does not alter any field values (e.g. by hashing); values are copied verbatim.
      */
     BSONObj extractDocumentKey(BSONObj const& doc) const;
-
-    /**
-     * Checks whether both objects refer to the identically the same metadata.
-     */
-    bool operator==(ScopedCollectionMetadata const& other) const {
-        return _metadataTracker == other._metadataTracker;
-    }
-    bool operator!=(ScopedCollectionMetadata const& other) const {
-        return _metadataTracker != other._metadataTracker;
-    }
 
 private:
     friend ScopedCollectionMetadata MetadataManager::getActiveMetadata(

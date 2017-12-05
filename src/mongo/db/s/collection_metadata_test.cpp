@@ -127,11 +127,11 @@ TEST_F(NoChunkFixture, OrphanedDataRangeBegin) {
     auto keyRange = metadata->getNextOrphanRange(pending, lookupKey);
     ASSERT(keyRange);
 
-    ASSERT(keyRange->minKey.woCompare(metadata->getMinKey()) == 0);
-    ASSERT(keyRange->maxKey.woCompare(metadata->getMaxKey()) == 0);
+    ASSERT(keyRange->getMin().woCompare(metadata->getMinKey()) == 0);
+    ASSERT(keyRange->getMax().woCompare(metadata->getMaxKey()) == 0);
 
     // Make sure we don't have any more ranges
-    ASSERT(!metadata->getNextOrphanRange(pending, keyRange->maxKey));
+    ASSERT(!metadata->getNextOrphanRange(pending, keyRange->getMax()));
 }
 
 TEST_F(NoChunkFixture, OrphanedDataRangeMiddle) {
@@ -142,12 +142,11 @@ TEST_F(NoChunkFixture, OrphanedDataRangeMiddle) {
     auto keyRange = metadata->getNextOrphanRange(pending, lookupKey);
     ASSERT(keyRange);
 
-    ASSERT(keyRange->minKey.woCompare(metadata->getMinKey()) == 0);
-    ASSERT(keyRange->maxKey.woCompare(metadata->getMaxKey()) == 0);
-    ASSERT(keyRange->keyPattern.woCompare(metadata->getKeyPattern()) == 0);
+    ASSERT(keyRange->getMin().woCompare(metadata->getMinKey()) == 0);
+    ASSERT(keyRange->getMax().woCompare(metadata->getMaxKey()) == 0);
 
     // Make sure we don't have any more ranges
-    ASSERT(!metadata->getNextOrphanRange(pending, keyRange->maxKey));
+    ASSERT(!metadata->getNextOrphanRange(pending, keyRange->getMax()));
 }
 
 TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
@@ -213,17 +212,15 @@ TEST_F(SingleChunkFixture, ChunkOrphanedDataRanges) {
         pending, makeCollectionMetadata()->getMinKey());
     ASSERT(keyRange);
 
-    ASSERT(keyRange->minKey.woCompare(makeCollectionMetadata()->getMinKey()) == 0);
-    ASSERT(keyRange->maxKey.woCompare(BSON("a" << 10)) == 0);
-    ASSERT(keyRange->keyPattern.woCompare(makeCollectionMetadata()->getKeyPattern()) == 0);
+    ASSERT(keyRange->getMin().woCompare(makeCollectionMetadata()->getMinKey()) == 0);
+    ASSERT(keyRange->getMax().woCompare(BSON("a" << 10)) == 0);
 
-    keyRange = makeCollectionMetadata()->getNextOrphanRange(pending, keyRange->maxKey);
+    keyRange = makeCollectionMetadata()->getNextOrphanRange(pending, keyRange->getMax());
     ASSERT(keyRange);
-    ASSERT(keyRange->minKey.woCompare(BSON("a" << 20)) == 0);
-    ASSERT(keyRange->maxKey.woCompare(makeCollectionMetadata()->getMaxKey()) == 0);
-    ASSERT(keyRange->keyPattern.woCompare(makeCollectionMetadata()->getKeyPattern()) == 0);
+    ASSERT(keyRange->getMin().woCompare(BSON("a" << 20)) == 0);
+    ASSERT(keyRange->getMax().woCompare(makeCollectionMetadata()->getMaxKey()) == 0);
 
-    ASSERT(!makeCollectionMetadata()->getNextOrphanRange(pending, keyRange->maxKey));
+    ASSERT(!makeCollectionMetadata()->getNextOrphanRange(pending, keyRange->getMax()));
 }
 
 /**
@@ -266,26 +263,24 @@ protected:
 
 TEST_F(TwoChunksWithGapCompoundKeyFixture, ChunkGapOrphanedDataRanges) {
     stRangeMap pending;
+
     auto keyRange = makeCollectionMetadata()->getNextOrphanRange(
         pending, makeCollectionMetadata()->getMinKey());
     ASSERT(keyRange);
-    ASSERT(keyRange->minKey.woCompare(makeCollectionMetadata()->getMinKey()) == 0);
-    ASSERT(keyRange->maxKey.woCompare(BSON("a" << 10 << "b" << 0)) == 0);
-    ASSERT(keyRange->keyPattern.woCompare(makeCollectionMetadata()->getKeyPattern()) == 0);
+    ASSERT(keyRange->getMin().woCompare(makeCollectionMetadata()->getMinKey()) == 0);
+    ASSERT(keyRange->getMax().woCompare(BSON("a" << 10 << "b" << 0)) == 0);
 
-    keyRange = makeCollectionMetadata()->getNextOrphanRange(pending, keyRange->maxKey);
+    keyRange = makeCollectionMetadata()->getNextOrphanRange(pending, keyRange->getMax());
     ASSERT(keyRange);
-    ASSERT(keyRange->minKey.woCompare(BSON("a" << 20 << "b" << 0)) == 0);
-    ASSERT(keyRange->maxKey.woCompare(BSON("a" << 30 << "b" << 0)) == 0);
-    ASSERT(keyRange->keyPattern.woCompare(makeCollectionMetadata()->getKeyPattern()) == 0);
+    ASSERT(keyRange->getMin().woCompare(BSON("a" << 20 << "b" << 0)) == 0);
+    ASSERT(keyRange->getMax().woCompare(BSON("a" << 30 << "b" << 0)) == 0);
 
-    keyRange = makeCollectionMetadata()->getNextOrphanRange(pending, keyRange->maxKey);
+    keyRange = makeCollectionMetadata()->getNextOrphanRange(pending, keyRange->getMax());
     ASSERT(keyRange);
-    ASSERT(keyRange->minKey.woCompare(BSON("a" << 40 << "b" << 0)) == 0);
-    ASSERT(keyRange->maxKey.woCompare(makeCollectionMetadata()->getMaxKey()) == 0);
-    ASSERT(keyRange->keyPattern.woCompare(makeCollectionMetadata()->getKeyPattern()) == 0);
+    ASSERT(keyRange->getMin().woCompare(BSON("a" << 40 << "b" << 0)) == 0);
+    ASSERT(keyRange->getMax().woCompare(makeCollectionMetadata()->getMaxKey()) == 0);
 
-    ASSERT(!makeCollectionMetadata()->getNextOrphanRange(pending, keyRange->maxKey));
+    ASSERT(!makeCollectionMetadata()->getNextOrphanRange(pending, keyRange->getMax()));
 }
 
 /**
