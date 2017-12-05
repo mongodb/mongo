@@ -19,6 +19,7 @@ executor:
       eval: "testingReplication = true;"
       readMode: commands
   hooks:
+  - class: CheckPrimary
   - class: IntermediateInitialSync
     n: *run_hook_interval
   - class: CleanEveryN
