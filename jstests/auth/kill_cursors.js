@@ -29,20 +29,29 @@
                 });
             }
 
-            // Create a cursor to be killed later.
-            loginAll(authUsers);
-            const id = assert.commandWorked(db.runCommand({find: db.coll.getName(), batchSize: 2}))
-                           .cursor.id;
-            assert.neq(id, 0, "Invalid cursor ID");
-            logoutAll();
+            function doKill(extra) {
+                // Create a cursor to be killed later.
+                loginAll(authUsers);
+                let cmd = {find: db.coll.getName(), batchSize: 2};
+                Object.assign(cmd, extra);
+                const id = assert.commandWorked(db.runCommand(cmd)).cursor.id;
+                assert.neq(id, 0, "Invalid cursor ID");
+                logoutAll();
 
-            loginAll(killUsers);
-            const killCmd = db.runCommand({killCursors: db.coll.getName(), cursors: [id]});
-            logoutAll();
-            if (shouldWork) {
-                assert.commandWorked(killCmd, "Unable to kill cursor");
-            } else {
-                assert.commandFailed(killCmd, "Should not have been able to kill cursor");
+                loginAll(killUsers);
+                const killCmd = db.runCommand({killCursors: db.coll.getName(), cursors: [id]});
+                logoutAll();
+                if (shouldWork) {
+                    assert.commandWorked(killCmd, "Unable to kill cursor");
+                } else {
+                    assert.commandFailed(killCmd, "Should not have been able to kill cursor");
+                }
+            }
+
+            doKill({});
+            if ((authUsers.length === 1) && (killUsers.length === 1)) {
+                // Session variant only makes sense with single auth'd users.
+                doKill({lsid: {id: BinData(4, "QlLfPHTySm6tqfuV+EOsVA==")}});
             }
         }
 

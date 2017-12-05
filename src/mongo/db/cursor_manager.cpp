@@ -173,7 +173,7 @@ bool GlobalCursorIdCache::eraseCursor(OperationContext* opCtx, CursorId id, bool
     // Figure out what the namespace of this cursor is.
     NamespaceString nss;
     if (CursorManager::isGloballyManagedCursor(id)) {
-        auto pin = globalCursorManager->pinCursor(opCtx, id);
+        auto pin = globalCursorManager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
         if (!pin.isOK()) {
             invariant(pin == ErrorCodes::CursorNotFound || pin == ErrorCodes::Unauthorized);
             // No such cursor.  TODO: Consider writing to audit log here (even though we don't
@@ -198,7 +198,7 @@ bool GlobalCursorIdCache::eraseCursor(OperationContext* opCtx, CursorId id, bool
     if (checkAuth) {
         auto status = CursorManager::withCursorManager(
             opCtx, id, nss, [nss, id, opCtx](CursorManager* manager) {
-                auto ccPin = manager->pinCursor(opCtx, id);
+                auto ccPin = manager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
                 if (!ccPin.isOK()) {
                     return ccPin.getStatus();
                 }
@@ -526,7 +526,9 @@ void CursorManager::deregisterExecutor(PlanExecutor* exec) {
     }
 }
 
-StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx, CursorId id) {
+StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
+                                                     CursorId id,
+                                                     AuthCheck checkSessionAuth) {
     auto lockedPartition = _cursorMap->lockOnePartition(id);
     auto it = lockedPartition->find(id);
     if (it == lockedPartition->end()) {
@@ -548,10 +550,11 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx, Cu
         return error;
     }
 
-    auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, cursor->getSessionId());
-
-    if (!cursorPrivilegeStatus.isOK()) {
-        return cursorPrivilegeStatus;
+    if (checkSessionAuth == kCheckSession) {
+        auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, cursor->getSessionId());
+        if (!cursorPrivilegeStatus.isOK()) {
+            return cursorPrivilegeStatus;
+        }
     }
 
     cursor->_isPinned = true;

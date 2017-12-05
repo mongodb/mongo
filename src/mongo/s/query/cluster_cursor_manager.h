@@ -314,9 +314,11 @@ public:
      *
      * Does not block.
      */
+    enum AuthCheck { kCheckSession = true, kNoCheckSession = false };
     StatusWith<PinnedCursor> checkOutCursor(const NamespaceString& nss,
                                             CursorId cursorId,
-                                            OperationContext* opCtx);
+                                            OperationContext* opCtx,
+                                            AuthCheck checkSessionAuth = kCheckSession);
 
     /**
      * Informs the manager that the given cursor should be killed.  The cursor need not necessarily
