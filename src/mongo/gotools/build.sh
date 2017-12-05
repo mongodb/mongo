@@ -27,6 +27,9 @@ for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mong
         ./bin/$i --version | head -1
 done
 
-stty sane
+if [ -t /dev/stdin ]; then
+    stty sane
+fi
+
 mv -f common/options/options.go.bak common/options/options.go
 exit $ec

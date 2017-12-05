@@ -236,15 +236,16 @@ func IsConnectionError(err error) bool {
 	if err == nil {
 		return false
 	}
-	if err.Error() == ErrNoReachableServers ||
-		err.Error() == io.EOF.Error() ||
-		strings.HasPrefix(err.Error(), ErrReplTimeoutPrefix) ||
-		strings.HasPrefix(err.Error(), ErrCouldNotContactPrimaryPrefix) ||
-		strings.HasPrefix(err.Error(), ErrWriteResultsUnavailable) ||
-		strings.HasPrefix(err.Error(), ErrCouldNotFindPrimaryPrefix) ||
-		strings.HasPrefix(err.Error(), ErrUnableToTargetPrefix) ||
-		err.Error() == ErrNotMaster ||
-		strings.HasSuffix(err.Error(), ErrConnectionRefusedSuffix) {
+	lowerCaseError := strings.ToLower(err.Error())
+	if lowerCaseError == ErrNoReachableServers ||
+		err == io.EOF ||
+		strings.HasPrefix(lowerCaseError, ErrReplTimeoutPrefix) ||
+		strings.HasPrefix(lowerCaseError, ErrCouldNotContactPrimaryPrefix) ||
+		strings.HasPrefix(lowerCaseError, ErrWriteResultsUnavailable) ||
+		strings.HasPrefix(lowerCaseError, ErrCouldNotFindPrimaryPrefix) ||
+		strings.HasPrefix(lowerCaseError, ErrUnableToTargetPrefix) ||
+		lowerCaseError == ErrNotMaster ||
+		strings.HasSuffix(lowerCaseError, ErrConnectionRefusedSuffix) {
 		return true
 	}
 	return false
