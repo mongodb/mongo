@@ -859,11 +859,11 @@ std::vector<std::string> ReplSetConfig::getWriteConcernNames() const {
 
 Milliseconds ReplSetConfig::getPriorityTakeoverDelay(int memberIdx) const {
     auto member = getMemberAt(memberIdx);
-    int priorityRank = _calculatePriorityRank(member.getPriority());
+    int priorityRank = calculatePriorityRank(member.getPriority());
     return (priorityRank + 1) * getElectionTimeoutPeriod();
 }
 
-int ReplSetConfig::_calculatePriorityRank(double priority) const {
+int ReplSetConfig::calculatePriorityRank(double priority) const {
     int count = 0;
     for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
         if (mem->getPriority() > priority) {

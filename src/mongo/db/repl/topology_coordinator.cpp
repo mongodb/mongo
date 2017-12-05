@@ -1348,6 +1348,10 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBDataV1(
         bool catchupTakeoverDisabled =
             ReplSetConfig::kCatchUpDisabled == _rsConfig.getCatchUpTimeoutPeriod() ||
             ReplSetConfig::kCatchUpTakeoverDisabled == _rsConfig.getCatchUpTakeoverDelay();
+
+        bool scheduleCatchupTakeover = false;
+        bool schedulePriorityTakeover = false;
+
         if (!catchupTakeoverDisabled && (_memberData.at(primaryIndex).getLastAppliedOpTime() <
                                          _memberData.at(_selfIndex).getLastAppliedOpTime())) {
             LOG(2) << "I can take over the primary due to fresher data."
@@ -1357,15 +1361,37 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBDataV1(
                    << _memberData.at(primaryIndex).getLastAppliedOpTime()
                    << " My optime: " << _memberData.at(_selfIndex).getLastAppliedOpTime();
 
-            return HeartbeatResponseAction::makeCatchupTakeoverAction();
+            scheduleCatchupTakeover = true;
         }
 
         if (_rsConfig.getMemberAt(primaryIndex).getPriority() <
             _rsConfig.getMemberAt(_selfIndex).getPriority()) {
-            LOG(4) << "I can take over the primary due to higher priority."
+            LOG(2) << "I can take over the primary due to higher priority."
                    << " Current primary index: " << primaryIndex << " in term "
                    << _memberData.at(primaryIndex).getTerm();
 
+            schedulePriorityTakeover = true;
+        }
+
+        // Calculate rank of current node. A rank of 0 indicates that it has the highest priority.
+        auto currentNodePriority = _rsConfig.getMemberAt(_selfIndex).getPriority();
+
+        // Schedule a priority takeover early only if we know that the current node has the highest
+        // priority in the replica set, has a higher priority than the primary, and is the most
+        // up to date node.
+        // Otherwise, prefer to schedule a catchup takeover over a priority takeover
+        if (scheduleCatchupTakeover && schedulePriorityTakeover &&
+            _rsConfig.calculatePriorityRank(currentNodePriority) == 0) {
+            LOG(2) << "I can take over the primary because I have a higher priority, the highest "
+                   << "priority in the replica set, and fresher data."
+                   << " Current primary index: " << primaryIndex << " in term "
+                   << _memberData.at(primaryIndex).getTerm();
+            return HeartbeatResponseAction::makePriorityTakeoverAction();
+        }
+        if (scheduleCatchupTakeover) {
+            return HeartbeatResponseAction::makeCatchupTakeoverAction();
+        }
+        if (schedulePriorityTakeover) {
             return HeartbeatResponseAction::makePriorityTakeoverAction();
         }
     }

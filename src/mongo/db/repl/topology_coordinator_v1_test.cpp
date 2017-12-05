@@ -4720,7 +4720,9 @@ TEST_F(HeartbeatResponseTestV1,
                                     << BSON("_id" << 1 << "host"
                                                   << "host2:27017")
                                     << BSON("_id" << 6 << "host"
-                                                  << "host7:27017"))
+                                                  << "host7:27017"
+                                                  << "priority"
+                                                  << 3))
                       << "protocolVersion"
                       << 1
                       << "settings"
