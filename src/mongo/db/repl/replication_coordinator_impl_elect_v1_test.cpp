@@ -1049,7 +1049,9 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
+                                                         << "node3:12345"
+                                                         << "priority"
+                                                         << 3))
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
@@ -1084,6 +1086,62 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
     auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
+}
+
+TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345"
+                                                      << "priority"
+                                                      << 2)
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(2));
+    startCapturingLogMessages();
+
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Make sure we're secondary and that no catchup takeover has been scheduled.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    // Mock a first round of heartbeat responses, which should give us enough information to know
+    // that we are fresher than the current primary, prompting the scheduling of a takeover.
+    now = respondToHeartbeatsUntil(config, now, HostAndPort("node2", 12345), behindOptime);
+
+    // Assert that a priority takeover has been scheduled and that a catchup takeover has not
+    // been scheduled.
+    ASSERT(replCoord->getPriorityTakeover_forTest());
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(
+        1,
+        countLogLinesContaining("I can take over the primary because I have a higher priority, "
+                                "the highest priority in the replica set, and fresher data."));
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
@@ -1156,9 +1214,15 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
+                                                         << "node3:12345"
+                                                         << "priority"
+                                                         << 3))
                              << "protocolVersion"
                              << 1);
+    // In order for node 1 to first schedule a catchup takeover, then a priority takeover
+    // once the first gets canceled, it must have a higher priority than the current primary
+    // (node 2). But, it must not have the highest priority in the replica set. Otherwise,
+    // it will schedule a priority takeover from the start.
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1587,7 +1651,9 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
+                                                         << "node3:12345"
+                                                         << "priority"
+                                                         << 3))
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
@@ -1642,12 +1708,13 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
     auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
     assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
-    // The priority takeover might be scheduled at a time later than one election
-    // timeout after our initial heartbeat responses, so mock another round of
-    // heartbeat responses to prevent a normal election timeout.
-    Milliseconds halfElectionTimeout = config.getElectionTimeoutPeriod() / 2;
+    // Node 1 schedules the priority takeover, and since it has the second highest
+    // priority in the replica set, it will schedule in 20 seconds. We must increase
+    // the election timeout so that the priority takeover will actually be executed.
+    // Mock another round of heartbeat responses to prevent a normal election timeout.
+    Milliseconds longElectionTimeout = config.getElectionTimeoutPeriod() * 2;
     now = respondToHeartbeatsUntil(
-        config, now + halfElectionTimeout, HostAndPort("node2", 12345), currentOptime);
+        config, now + longElectionTimeout, HostAndPort("node2", 12345), currentOptime);
 
     LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
     performSuccessfulTakeover(priorityTakeoverTime,

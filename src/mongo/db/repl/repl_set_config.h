@@ -351,16 +351,16 @@ public:
         return _catchUpTakeoverDelay;
     }
 
+    /**
+     * Return the number of members with a priority greater than "priority".
+     */
+    int calculatePriorityRank(double priority) const;
+
 private:
     /**
      * Parses the "settings" subdocument of a replica set configuration.
      */
     Status _parseSettingsSubdocument(const BSONObj& settings);
-
-    /**
-     * Return the number of members with a priority greater than "priority".
-     */
-    int _calculatePriorityRank(double priority) const;
 
     /**
      * Calculates and stores the majority for electing a primary (_majorityVoteCount).
