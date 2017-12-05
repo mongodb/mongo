@@ -307,10 +307,9 @@ TEST(CanonicalQueryTest, CanonicalizeFromBaseQuery) {
     MatchExpression* firstClauseExpr = baseCq->root()->getChild(0);
     auto childCq = assertGet(CanonicalQuery::canonicalize(opCtx.get(), *baseCq, firstClauseExpr));
 
-    // Descriptive test. The childCq's filter should be the relevant $or clause, rather than the
-    // entire query predicate.
-    ASSERT_BSONOBJ_EQ(childCq->getQueryRequest().getFilter(),
-                      baseCq->getQueryRequest().getFilter());
+    BSONObjBuilder expectedFilter;
+    firstClauseExpr->serialize(&expectedFilter);
+    ASSERT_BSONOBJ_EQ(childCq->getQueryRequest().getFilter(), expectedFilter.obj());
 
     ASSERT_BSONOBJ_EQ(childCq->getQueryRequest().getProj(), baseCq->getQueryRequest().getProj());
     ASSERT_BSONOBJ_EQ(childCq->getQueryRequest().getSort(), baseCq->getQueryRequest().getSort());

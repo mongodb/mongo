@@ -180,10 +180,10 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
 // static
 StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     OperationContext* opCtx, const CanonicalQuery& baseQuery, MatchExpression* root) {
-    // TODO: we should be passing the filter corresponding to 'root' to the QR rather than the base
-    // query's filter, baseQuery.getQueryRequest().getFilter().
     auto qr = stdx::make_unique<QueryRequest>(baseQuery.nss());
-    qr->setFilter(baseQuery.getQueryRequest().getFilter());
+    BSONObjBuilder builder;
+    root->serialize(&builder);
+    qr->setFilter(builder.obj());
     qr->setProj(baseQuery.getQueryRequest().getProj());
     qr->setSort(baseQuery.getQueryRequest().getSort());
     qr->setCollation(baseQuery.getQueryRequest().getCollation());
