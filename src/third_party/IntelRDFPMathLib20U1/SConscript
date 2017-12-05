@@ -367,7 +367,7 @@ readtest_input = env.Install(
 )
 
 readtest_dict = {
-    '@readtest_python_interpreter@' : sys.executable,
+    '@readtest_python_interpreter@' : sys.executable.replace('\\', r'\\'),
     '@readtest_program@' : readtest[0].name,
     '@readtest_input@' : readtest_input[0].name,
 }

@@ -566,7 +566,7 @@ functions:
             python_loc=$(cygpath -w $python_loc)
           fi
           # Set up virtualenv in ${workdir}
-          virtualenv --python $python_loc --system-site-packages "${workdir}/venv"
+          virtualenv --python "$python_loc" --system-site-packages "${workdir}/venv"
 
   "run tests" :
     - command: expansions.update
@@ -1097,7 +1097,7 @@ functions:
       script: |
         set -o verbose
 
-        rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws ~/.boto
+        rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws ~/.boto venv
 
   "kill processes" :
     command: shell.exec
@@ -2170,7 +2170,7 @@ timeout:
             file_param="$file_param --file $debug_file"
           done
           if [ ! -z "$file_param" ]; then
-            python buildscripts/remote_operations.py           \
+            $python buildscripts/remote_operations.py          \
               --verbose                                        \
               --userHost $USER@${ip_address}                   \
               --operation "copy_to"                            \
@@ -2461,7 +2461,8 @@ tasks:
           set -o errexit
           set -o verbose
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
+          ${activate_virtualenv}
+          ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
 
 - <<: *task_template
   name: burn_in_tests
