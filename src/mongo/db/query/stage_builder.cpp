@@ -302,11 +302,11 @@ PlanStage* buildStages(OperationContext* opCtx,
             if (nullptr == childStage) {
                 return nullptr;
             }
-            return new ShardFilterStage(
-                opCtx,
-                CollectionShardingState::get(opCtx, collection->ns())->getMetadata(opCtx),
-                ws,
-                childStage);
+            return new ShardFilterStage(opCtx,
+                                        CollectionShardingState::get(opCtx, collection->ns())
+                                            ->getMetadataForOperation(opCtx),
+                                        ws,
+                                        childStage);
         }
         case STAGE_KEEP_MUTATIONS: {
             const KeepMutationsNode* km = static_cast<const KeepMutationsNode*>(root);

@@ -96,16 +96,17 @@ bool checkIfSingleDoc(OperationContext* opCtx,
  */
 bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                                           const NamespaceString& nss,
+                                          const OID& epoch,
                                           const ChunkRange& chunkRange,
                                           const std::vector<BSONObj>& splitKeys) {
     const auto metadataAfterSplit = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        return CollectionShardingState::get(opCtx, nss)->getMetadata(opCtx);
+        return CollectionShardingState::get(opCtx, nss)->getCurrentMetadata();
     }();
 
     uassert(ErrorCodes::StaleEpoch,
-            str::stream() << "Collection " << nss.ns() << " became unsharded",
-            metadataAfterSplit->isSharded());
+            str::stream() << "Collection " << nss.ns() << " changed since split start",
+            metadataAfterSplit->getCollVersion().epoch() == epoch);
 
     auto newChunkBounds(splitKeys);
     auto startKey = chunkRange.getMin();
@@ -208,7 +209,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     if (!commandStatus.isOK() || !writeConcernStatus.isOK()) {
         forceShardFilteringMetadataRefresh(opCtx, nss);
 
-        if (checkMetadataForSuccessfulSplitChunk(opCtx, nss, chunkRange, splitKeys)) {
+        if (checkMetadataForSuccessfulSplitChunk(
+                opCtx, nss, expectedCollectionEpoch, chunkRange, splitKeys)) {
             // Split was committed.
         } else if (!commandStatus.isOK()) {
             return commandStatus;

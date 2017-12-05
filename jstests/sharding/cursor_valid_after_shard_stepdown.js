@@ -38,10 +38,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.eq(0, getMoreCursor.id);
     assert.eq(2, getMoreCursor.nextBatch[0].x);
 
+    // After stepdown, the shard version will be reset
     var shardVersionAfterStepdown =
         assert.commandWorked(st.rs0.getPrimary().adminCommand({getShardVersion: 'TestDB.TestColl'}))
             .global;
-    assert.eq(Timestamp(0, 0), shardVersionAfterStepdown);
+    assert.eq("UNKNOWN", shardVersionAfterStepdown);
 
     st.stop();
 })();
