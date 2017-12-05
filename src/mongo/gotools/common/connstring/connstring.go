@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -144,41 +145,44 @@ func (p *parser) parse(original string) error {
 				return fmt.Errorf("invalid password: %s", err)
 			}
 		}
-
 	}
 
 	// fetch the hosts field
 	hosts := uri
 	if idx := strings.IndexAny(uri, "/?@"); idx != -1 {
 		if uri[idx] == '@' {
-
 			return fmt.Errorf("unescaped @ sign in user info")
 		}
 		if uri[idx] == '?' {
 			return fmt.Errorf("must have a / before the query ?")
 		}
 		hosts = uri[:idx]
-
 	}
 
 	var connectionArgsFromTXT []string
 	parsedHosts := strings.Split(hosts, ",")
 
 	if isSRV {
-
 		parsedHosts = strings.Split(hosts, ",")
 		if len(parsedHosts) != 1 {
 			return fmt.Errorf("URI with SRV must include one and only one hostname")
 		}
 		parsedHosts, err = fetchSeedlistFromSRV(parsedHosts[0])
 		if err != nil {
-
 			return err
 		}
 
 		// error ignored because finding a TXT record should not be
 		// considered an error.
 		recordsFromTXT, _ := net.LookupTXT(hosts)
+
+		// This is a temporary fix to get around bug https://github.com/golang/go/issues/21472.
+		// It will currently incorrectly concatenate multiple TXT records to one
+		// on windows.
+		if runtime.GOOS == "windows" {
+			recordsFromTXT = []string{strings.Join(recordsFromTXT, "")}
+		}
+
 		if len(recordsFromTXT) > 1 {
 			return errors.New("multiple records from TXT not supported")
 		}
@@ -189,11 +193,11 @@ func (p *parser) parse(original string) error {
 			if err != nil {
 				return err
 			}
+
 		}
 	}
 
 	for _, host := range parsedHosts {
-
 		err = p.addHost(host)
 		if err != nil {
 			return fmt.Errorf("invalid host \"%s\": %s", host, err)
@@ -205,45 +209,15 @@ func (p *parser) parse(original string) error {
 
 	uri = uri[len(hosts):]
 
-	if len(uri) == 0 {
-		return nil
-	}
-
-	if uri[0] != '/' {
-		return fmt.Errorf("must have a / separator between hosts and path")
-	}
-
-	uri = uri[1:]
-	if len(uri) == 0 {
-		return nil
-	}
-
-	database := uri
-	if idx := strings.IndexAny(uri, "?"); idx != -1 {
-		database = uri[:idx]
-	}
-
-	p.Database, err = url.QueryUnescape(database)
+	extractedDatabase, err := extractDatabaseFromURI(uri)
 	if err != nil {
-		return fmt.Errorf("invalid database \"%s\": %s", database, err)
+		return err
 	}
 
-	uri = uri[len(database):]
+	uri = extractedDatabase.uri
+	p.Database = extractedDatabase.db
 
-	if len(uri) == 0 {
-		return nil
-	}
-
-	if uri[0] != '?' {
-		return fmt.Errorf("must have a ? separator between path and query")
-	}
-
-	uri = uri[1:]
-	if len(uri) == 0 {
-		return nil
-	}
-
-	connectionArgsFromQueryString := strings.FieldsFunc(uri, func(r rune) bool { return r == ';' || r == '&' })
+	connectionArgsFromQueryString, err := extractQueryArgsFromURI(uri)
 	connectionArgPairs := append(connectionArgsFromTXT, connectionArgsFromQueryString...)
 
 	for _, pair := range connectionArgPairs {
@@ -510,21 +484,79 @@ func validateSRVResult(recordFromSRV, inputHostName string) error {
 	return nil
 }
 
-var allowedTXTOptions map[string]struct{} = map[string]struct{}{
-	"authsource": struct{}{},
-	"replicaset": struct{}{},
+var allowedTXTOptions = map[string]struct{}{
+	"authsource": {},
+	"replicaset": {},
 }
 
 func validateTXTResult(paramsFromTXT []string) error {
 	for _, param := range paramsFromTXT {
 		kv := strings.SplitN(param, "=", 2)
 		if len(kv) != 2 {
-			return errors.New("invalid TXT record")
+			return errors.New("Invalid TXT record")
 		}
 		key := strings.ToLower(kv[0])
 		if _, ok := allowedTXTOptions[key]; !ok {
-			return fmt.Errorf("cannot specify option '%s' in TXT record", kv[0])
+			return fmt.Errorf("Cannot specify option '%s' in TXT record", kv[0])
 		}
 	}
 	return nil
+}
+
+func extractQueryArgsFromURI(uri string) ([]string, error) {
+	if len(uri) == 0 {
+		return nil, nil
+	}
+
+	if uri[0] != '?' {
+		return nil, errors.New("must have a ? separator between path and query")
+	}
+
+	uri = uri[1:]
+	if len(uri) == 0 {
+		return nil, nil
+	}
+	return strings.FieldsFunc(uri, func(r rune) bool { return r == ';' || r == '&' }), nil
+
+}
+
+type extractedDatabase struct {
+	uri string
+	db  string
+}
+
+// extractDatabaseFromURI is a helper function to retreive information about
+// the database from the passed in URI. It accepts as an argument the currently
+// parsed URI and returns the remainder of the uri, the database it found,
+// and any error it encounters while parsing.
+func extractDatabaseFromURI(uri string) (extractedDatabase, error) {
+	if len(uri) == 0 {
+		return extractedDatabase{}, nil
+	}
+
+	if uri[0] != '/' {
+		return extractedDatabase{}, errors.New("must have a / separator between hosts and path")
+	}
+
+	uri = uri[1:]
+	if len(uri) == 0 {
+		return extractedDatabase{}, nil
+	}
+
+	database := uri
+	if idx := strings.IndexRune(uri, '?'); idx != -1 {
+		database = uri[:idx]
+	}
+
+	escapedDatabase, err := url.QueryUnescape(database)
+	if err != nil {
+		return extractedDatabase{}, fmt.Errorf("invalid database \"%s\": %s", database, err)
+	}
+
+	uri = uri[len(database):]
+
+	return extractedDatabase{
+		uri: uri,
+		db:  escapedDatabase,
+	}, nil
 }
