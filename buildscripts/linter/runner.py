@@ -67,6 +67,7 @@ def _find_linter(linter, config_dict):
     # Search for tool
     # 1. In the same directory as the interpreter
     # 2. The current path
+    # 3. In '/opt/mongodbtoolchain/v2/bin' if virtualenv is set up.
     python_dir = os.path.dirname(sys.executable)
     if sys.platform == "win32":
         # On Windows, these scripts are installed in %PYTHONDIR%\scripts like
@@ -87,11 +88,12 @@ def _find_linter(linter, config_dict):
 
         if linter.ignore_interpreter():
             # Some linters use a different interpreter then the current interpreter.
+            cmd_str = os.path.join('/opt/mongodbtoolchain/v2/bin', linter.cmd_name)
             cmd = [cmd_str]
         else:
             cmd = [sys.executable, cmd_str]
 
-    # Check 1: interpreter location
+    # Check 1: interpreter location or for linters that ignore current interpreter.
     if _check_version(linter, cmd, linter.get_lint_version_cmd_args()):
         return base.LinterInstance(linter, cmd)
 
@@ -100,6 +102,12 @@ def _find_linter(linter, config_dict):
 
     # Check 2: current path
     cmd = [linter.cmd_name]
+    if _check_version(linter, cmd, linter.get_lint_version_cmd_args()):
+        return base.LinterInstance(linter, cmd)
+
+    # Check 3: When a virtualenv is setup the linter modules are not installed, so we need
+    # to use the linters installed in '/opt/mongodbtoolchain/v2/bin'.
+    cmd = [sys.executable, os.path.join('/opt/mongodbtoolchain/v2/bin', linter.cmd_name)]
     if _check_version(linter, cmd, linter.get_lint_version_cmd_args()):
         return base.LinterInstance(linter, cmd)
 

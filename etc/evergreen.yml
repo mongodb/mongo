@@ -84,9 +84,10 @@ variables:
         MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
       fi
 
+      ${activate_virtualenv}
       # This script converts the generated version string into a sanitized version string for
       # use by scons and uploading artifacts as well as information about for the scons cache.
-      MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+      MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
 
 - &apply_compile_expansions
   command: expansions.update
@@ -238,7 +239,8 @@ functions:
           echo "There is more than 1 extracted mongo binary: $mongo_binary"
           exit 1
         fi
-        bin_ver=$(${python|/opt/mongodbtoolchain/v2/bin/python2} -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
+        ${activate_virtualenv}
+        bin_ver=$($python -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
         # Due to SERVER-23810, we cannot use $mongo_binary --quiet --nodb --eval "version();"
         mongo_ver=$($mongo_binary --version | perl -pe '/version v(.*)$/; $_ = $1;' | tr -d '[ \r\n]')
         # The versions must match
@@ -289,7 +291,8 @@ functions:
       background: true
       system_log: true
       script: |
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/collect_resource_info.py -o system_resource_info.json -i 5
+        ${activate_virtualenv}
+        $python buildscripts/collect_resource_info.py -o system_resource_info.json -i 5
 
   # Run a monitor process as a background, system task to periodically
   # display how many threads interesting processes are using.
@@ -480,7 +483,6 @@ functions:
     command: shell.exec
     type: test
     params:
-        working_dir: src
         script: |
           # exit immediately if virtualenv is not found
           set -o errexit
@@ -490,7 +492,8 @@ functions:
           if [ "Windows_NT" = "$OS" ]; then
             python_loc=$(cygpath -w $python_loc)
           fi
-          virtualenv --python $python_loc --system-site-packages ./venv
+          # Set up virtualenv in ${workdir}
+          virtualenv --python "$python_loc" --system-site-packages "${workdir}/venv"
 
   "run tests" :
     - command: shell.exec
@@ -845,7 +848,8 @@ functions:
           set -o verbose
           set -o errexit
 
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/idl/run_tests.py
+          ${activate_virtualenv}
+          $python buildscripts/idl/run_tests.py
 
   "run ios sim embedded tests" :
     command: shell.exec
@@ -855,9 +859,11 @@ functions:
       script: |
         set -o verbose
         set -o errexit
+
+        ${activate_virtualenv}
         if [ ${enable_ios_sim_tests|false} = "true" ]; then
-            ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_capi_test"
-            ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_transport_test"
+            ${compile_env|} $python buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_capi_test"
+            ${compile_env|} $python buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_transport_test"
         fi
 
   "run powercycle test" :
@@ -868,8 +874,8 @@ functions:
           set -o verbose
           set -o errexit
 
-          ${activate_virtualenv}
           if [ ! -z "${virtualenv_requirements}" ]; then
+            ${activate_virtualenv}
             pip install ${virtualenv_requirements}
           fi
 
@@ -882,16 +888,15 @@ functions:
           set -o verbose
           set -o errexit
 
-          ${activate_virtualenv}
-
           ${set_sudo}
           if [ ! -z $sudo ]; then
             remote_sudo="--remoteSudo"
           fi
 
-          # The virtaulenv bin_dir is different for Linux and Windows
+          ${activate_virtualenv}
+          # The virtualenv bin_dir is different for Linux and Windows
           bin_dir=$(find $VIRTUAL_ENV -name activate | sed -e "s,$VIRTUAL_ENV,,;s,activate,,;s,/,,g")
-          cmds="source ${virtualenv_dir|venv}/$bin_dir/activate"
+          cmds=". ${virtualenv_dir|venv}/$bin_dir/activate"
           cmds="$cmds; python -u"
           # The remote python operates in a virtualenv
           remote_python="--remotePython=\"$cmds\""
@@ -939,7 +944,7 @@ functions:
           set +o errexit
           $python -u pytests/powertest.py --configFile=$config_file
           test_status=$?
-          aws_ec2=$(python buildscripts/aws_ec2.py --imageId ${instance_id} --mode status)
+          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode status)
           echo "Test completed, AMI EC2 instance ${instance_id} status: $aws_ec2"
           exit $test_status
 
@@ -990,7 +995,7 @@ functions:
       script: |
         set -o verbose
 
-        rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws ~/.boto
+        rm -rf src /data/db/* mongo-diskstats* mongo-*.tgz ~/.aws ~/.boto venv
 
   "kill processes" :
     command: shell.exec
@@ -1089,8 +1094,9 @@ functions:
         export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
         export KITCHEN_SUBNET="${kitchen_subnet}"
 
+        ${activate_virtualenv}
         # set expiration tag 2 hours in the future, since no test should take this long
-        export KITCHEN_EXPIRE="$(${python|/opt/mongodbtoolchain/v2/bin/python2} -c 'import datetime; print((datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"))')"
+        export KITCHEN_EXPIRE="$($python -c 'import datetime; print((datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"))')"
 
         for i in {1..3}
         do
@@ -1115,12 +1121,13 @@ functions:
       script: |
         set -o verbose
 
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/fetch_test_lifecycle.py \
+        ${activate_virtualenv}
+        $python buildscripts/fetch_test_lifecycle.py                      \
             --metadataRepo git@github.com:mongodb/mongo-test-metadata.git \
-            --lifecycleFile etc/test_lifecycle.yml \
-            --referencesFile references.yml \
-            --destinationFile etc/test_lifecycle.yml \
-            --revision ${revision} \
+            --lifecycleFile etc/test_lifecycle.yml                        \
+            --referencesFile references.yml                               \
+            --destinationFile etc/test_lifecycle.yml                      \
+            --revision ${revision}                                        \
             ${project}
         exit_code=$?
         if [ ${fail_task_on_error|false} = true ]; then
@@ -1208,7 +1215,8 @@ functions:
           set -o errexit
           # Copy mount_data_drive.sh script to remote host.
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${ip_address}                   \
             --operation "copy_to"                            \
@@ -1244,11 +1252,12 @@ functions:
           fi
           cmds="$sudo bash mount_data_drive.sh $script_opts; $set_permission; ls -ld $data_db; df; mount"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}     \
+            --retries ${ssh_retries|0}                       \
             --commands "$cmds"
 
     - command: shell.exec
@@ -1270,7 +1279,8 @@ functions:
             set_permission="setfacl -s user::rwx,group::rwx,other::rwx ${remote_dir}"
           fi
           cmds="$sudo mkdir -p ${remote_dir}; $sudo chown $user_group ${remote_dir}; $set_permission; ls -ld ${remote_dir}"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
@@ -1291,7 +1301,8 @@ functions:
             file_param="$file_param --file $executable${exe}"
           done
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${ip_address}                   \
             --operation "copy_to"                            \
@@ -1306,22 +1317,24 @@ functions:
         working_dir: src
         script: |
           set -o errexit
-          # Setup virtualenv and install python modules on remote, if required
+          # Setup virtualenv on remote.
+          cmds="python_loc=\$(which \${python|/opt/mongodbtoolchain/v2/bin/python2})"
+          cmds="$cmds; if [ \"Windows_NT\" = \"$OS\" ]; then python_loc=\$(cygpath -w \$python_loc); fi"
+          cmds="$cmds; virtualenv --python \$python_loc --system-site-packages ${virtualenv_dir|venv}"
+          cmds="$cmds; activate=\$(find ${virtualenv_dir|venv} -name 'activate')"
+          cmds="$cmds; . \$activate"
+          # Install python modules on remote, if required.
           if [ ! -z "${virtualenv_requirements}" ]; then
-            cmds="python_loc=\$(which ${python|/opt/mongodbtoolchain/v2/bin/python2})"
-            cmds="$cmds; if [ \"Windows_NT\" = \"$OS\" ]; then python_loc=\$(cygpath -w \$python_loc); fi"
-            cmds="$cmds; virtualenv --python \$python_loc --system-site-packages ${virtualenv_dir|venv}"
-            cmds="$cmds; activate=\$(find ${virtualenv_dir|venv} -name 'activate')"
-            cmds="$cmds; source \$activate"
             cmds="$cmds; pip install ${virtualenv_requirements}"
-            ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-            ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
-              --verbose                                        \
-              --userHost $USER@${ip_address}                   \
-              --sshConnectionOptions "$ssh_connection_options" \
-              --retries ${ssh_retries|0}                       \
-              --commands "$cmds"
           fi
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
+            --verbose                                        \
+            --userHost $USER@${ip_address}                   \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --commands "$cmds"
 
     - command: shell.exec
       params:
@@ -1357,7 +1370,8 @@ functions:
             cmds="$cmds; { $sudo \$HOME/curator stat system --file ${monitor_system_file} > /dev/null 2>&1 & $sudo \$HOME/curator stat process-all --file ${monitor_proc_file} > /dev/null 2>&1 & } & disown"
           fi
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
@@ -1427,7 +1441,8 @@ functions:
           set -o errexit
           if [ ! -z "$cmds" ]; then
             ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-            ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            ${activate_virtualenv}
+            $python buildscripts/remote_operations.py          \
               --verbose                                        \
               --userHost $USER@${ip_address}                   \
               --sshConnectionOptions "$ssh_connection_options" \
@@ -1449,7 +1464,8 @@ functions:
           cmds="$cmds; unzip -q ${windows_crash_zip} -d ${windows_crash_dir}"
           cmds="$cmds; chmod +x ${windows_crash_dir}/*.exe"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
@@ -1494,7 +1510,8 @@ functions:
           fi
           cmd="${tar|tar} czf ec2_artifacts.tgz ${ec2_artifacts}"
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
@@ -1511,7 +1528,8 @@ functions:
             exit 0
           fi
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          ${activate_virtualenv}
+          $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${ip_address}                   \
             --operation "copy_from"                          \
@@ -1535,23 +1553,29 @@ functions:
 pre:
   - func: "kill processes"
   - func: "cleanup environment"
+  # The python virtual environment is installed in ${workdir}, which is created in "set up virtualenv".
+  - func: "set up virtualenv"
   - command: expansions.update
     params:
        updates:
        - key: activate_virtualenv
          value: |
           # check if virtualenv is set up
-          if [ -d "venv" ]; then
+          if [ -d "${workdir}/venv" ]; then
             if [ "Windows_NT" = "$OS" ]; then
-              . ./venv/Scripts/activate
+              # Need to quote the path on Windows to preserve the separator.
+              . "${workdir}/venv/Scripts/activate" 2> /tmp/activate_error.log
             else
-              . ./venv/bin/activate
+              . ${workdir}/venv/bin/activate 2> /tmp/activate_error.log
             fi
-
+            if [ $? -ne 0 ]; then
+              echo "Failed to activate virtualenv: $(cat /tmp/activate_error.log)"
+            fi
             python=python
           else
             python=${python|/opt/mongodbtoolchain/v2/bin/python2}
           fi
+          echo "python set to $(which python)"
        - key: posix_workdir
          value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
        # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
@@ -1619,7 +1643,7 @@ post:
         cmds="$cmds; do base_name=\$(echo \$core_file | sed 's/.*\///')"
         cmds="$cmds;   if [ ! -f \$base_name ]; then mv \$core_file .; fi"
         cmds="$cmds; done"
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+        $python buildscripts/remote_operations.py \
           --verbose                                        \
           --userHost $USER@${ip_address}                   \
           --sshConnectionOptions "$ssh_connection_options" \
@@ -1635,7 +1659,7 @@ post:
         fi
         ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
         remote_dir=${remote_dir|.}
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+        $python buildscripts/remote_operations.py \
           --verbose                                        \
           --userHost $USER@${ip_address}                   \
           --operation "copy_from"                          \
@@ -2023,8 +2047,9 @@ post:
         # threshold, to the $prune_ratio percentage. Ideally override
         # these default values in the distro config in evergreen.
 
+        ${activate_virtualenv}
         if [ -d "${scons_cache_path}" ]; then
-            ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+            $python buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
         fi
   - func: "cleanup environment"
 
@@ -2051,8 +2076,9 @@ timeout:
           hang_analyzer_option="-c $hang_analyzer_option"
         fi
 
-        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option"
-        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option
+        ${activate_virtualenv}
+        echo "Calling the hang analyzer: PATH=\"/opt/mongodbtoolchain/gdb/bin:$PATH\" $sudo $python buildscripts/hang_analyzer.py $hang_analyzer_option"
+        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" $sudo $python buildscripts/hang_analyzer.py $hang_analyzer_option
 
         # Call hang_analyzer.py script for tasks that are running remote mongo processes
         # The file ${aws_ec2_yml} will define the remote's ${ip_address}.
@@ -2074,7 +2100,7 @@ timeout:
             file_param="$file_param --file $debug_file"
           done
           if [ ! -z "$file_param" ]; then
-            ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            $python buildscripts/remote_operations.py          \
               --verbose                                        \
               --userHost $USER@${ip_address}                   \
               --operation "copy_to"                            \
@@ -2084,15 +2110,23 @@ timeout:
               --remoteDir $remote_dir
           fi
 
-          cmds="PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          # Activate virtualenv on remote host. The virtualenv bin_dir is different for Linux and
+          # Windows.
+          bin_dir=$(find $VIRTUAL_ENV -name activate | sed -e "s,$VIRTUAL_ENV,,;s,activate,,;s,/,,g")
+          cmds=". ${virtualenv_dir|venv}/$bin_dir/activate"
+          # In the 'cmds' variable we pass to remote host, use 'python' instead of '$python' since
+          # we don't want to evaluate the local python variable, but instead pass the python string
+          # so the remote host will use the right python when the virtualenv is sourced.
+          cmds="$cmds; cd ${remote_dir}"
+          cmds="$cmds; PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" $sudo python buildscripts/hang_analyzer.py $hang_analyzer_option"
+          $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${ip_address}                   \
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries}                         \
-            --commands "$cmds"                               \
-            --commandDir $remote_dir
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --commands "$cmds"
+
+          $python buildscripts/remote_operations.py          \
             --verbose                                        \
             --userHost $USER@${ip_address}                   \
             --operation "copy_from"                          \
@@ -2153,7 +2187,8 @@ tasks:
 
           rm -rf ${install_directory|/data/mongo-install-directory}
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
+          ${activate_virtualenv}
+          ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
@@ -2174,9 +2209,10 @@ tasks:
           set -o errexit
           set -o verbose
 
+          ${activate_virtualenv}
           if [ "${has_packages|}" = "true" ] ; then
             cd buildscripts
-            ${python|/opt/mongodbtoolchain/v2/bin/python2} ${packager_script} --prefix `pwd`/.. --distros ${packager_distro} --tarball `pwd`/../mongodb-binaries.tgz -s ${version} -m HEAD -a ${packager_arch}
+            $python ${packager_script} --prefix `pwd`/.. --distros ${packager_distro} --tarball `pwd`/../mongodb-binaries.tgz -s ${version} -m HEAD -a ${packager_arch}
             cd ..
           fi
 
@@ -2185,7 +2221,7 @@ tasks:
           cd shell-archive
           ${platform_decompress|tar xzvf} ../mongodb-binaries.tgz
           find . -mindepth 3 ! -name "mongo${exe}" -type f -exec rm {} \; # delete bin/* except bin/mongo
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} ../buildscripts/make_archive.py -o mongodb-shell.${ext|tgz} $(find mongodb-* -type f)
+          $python ../buildscripts/make_archive.py -o mongodb-shell.${ext|tgz} $(find mongodb-* -type f)
           cd ..
 
     - func: "fetch test_lifecycle.yml"
@@ -2301,7 +2337,8 @@ tasks:
             extra_args="$extra_args --jobs=${num_scons_compile_all_jobs_available|}"
           fi
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations $extra_args all ${additional_targets|} MONGO_VERSION=${version}
+          ${activate_virtualenv}
+          ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations $extra_args all ${additional_targets|} MONGO_VERSION=${version}
 
     - command: s3.put
       params:
@@ -2341,7 +2378,8 @@ tasks:
           set -o errexit
           set -o verbose
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
+          ${activate_virtualenv}
+          ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} --stack-size=1024 lint
 
 - <<: *task_template
   name: burn_in_tests
@@ -2356,16 +2394,11 @@ tasks:
       <<: *git_get_project_params
       directory: burn_in_tests_clonedir
   - func: "do setup"
-  - func: "set up virtualenv"
   - command: shell.exec
     params:
       working_dir: burn_in_tests_clonedir
       script: |
         set -o errexit
-        # Create a symbolic link to the venv in the src directory so activate_virtualenv can use it
-        # if it exists.
-        ln -s ../src/venv venv
-        ${activate_virtualenv}
         set -o verbose
         # If this is a scheduled build, we check for changes against the last scheduled commit.
         if [ "${is_patch}" != "true" ]; then
@@ -2374,6 +2407,9 @@ tasks:
         # Copy the dbtest executable from the src dir because burn_in_tests.py calls it to get the
         # list of dbtest suites.
         cp ../src/dbtest${exe} .
+        pushd ../src
+        ${activate_virtualenv}
+        popd
         # Capture a list of new and modified tests.
         $python buildscripts/burn_in_tests.py --branch=${branch_name} --buildVariant=${build_variant} --testListOutfile=jstests/new_tests.json --noExec $burn_in_args
         # Copy the results to the src dir.
@@ -2522,7 +2558,6 @@ tasks:
   name: update_fuzzer
   commands:
   - func: "do setup"
-  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run jstestfuzz"
     vars:
@@ -2538,7 +2573,6 @@ tasks:
   name: update_fuzzer_replication
   commands:
   - func: "do setup"
-  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run jstestfuzz"
     vars:
@@ -2954,7 +2988,6 @@ tasks:
   name: ese
   commands:
   - func: "do setup"
-  - func: "set up virtualenv"
   - command: shell.exec
     type: test
     params:
@@ -3235,7 +3268,6 @@ tasks:
   name: multiversion_auth
   commands:
   - func: "do setup"
-  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
@@ -3247,7 +3279,6 @@ tasks:
   name: multiversion
   commands:
   - func: "do setup"
-  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
@@ -3259,7 +3290,6 @@ tasks:
   name: multiversion_multistorage_engine
   commands:
   - func: "do setup"
-  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
@@ -3605,7 +3635,6 @@ tasks:
   name: sharding_last_stable_mongos_and_mixed_shards
   commands:
   - func: "do setup"
-  - func: "set up virtualenv"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
@@ -3782,7 +3811,6 @@ tasks:
   - func: "set up remote credentials"
     vars:
       <<: *powercycle_remote_credentials
-  - func: "set up virtualenv"
   - func: "set up EC2 instance"
     vars:
       <<: *powercycle_ec2_instance
@@ -3802,7 +3830,6 @@ tasks:
   - func: "set up remote credentials"
     vars:
       <<: *powercycle_remote_credentials
-  - func: "set up virtualenv"
   - func: "set up EC2 instance"
     vars:
       <<: *powercycle_ec2_instance
@@ -3824,7 +3851,6 @@ tasks:
   - func: "set up remote credentials"
     vars:
       <<: *powercycle_remote_credentials
-  - func: "set up virtualenv"
   - func: "set up EC2 instance"
     vars:
       <<: *powercycle_ec2_instance
@@ -3844,7 +3870,6 @@ tasks:
   - func: "set up remote credentials"
     vars:
       <<: *powercycle_remote_credentials
-  - func: "set up virtualenv"
   - func: "set up EC2 instance"
     vars:
       <<: *powercycle_ec2_instance
@@ -3864,7 +3889,6 @@ tasks:
   - func: "set up remote credentials"
     vars:
       <<: *powercycle_remote_credentials
-  - func: "set up virtualenv"
   - func: "set up EC2 instance"
     vars:
       <<: *powercycle_ec2_instance
@@ -3884,7 +3908,6 @@ tasks:
   - func: "set up remote credentials"
     vars:
       <<: *powercycle_remote_credentials
-  - func: "set up virtualenv"
   - func: "set up EC2 instance"
     vars:
       <<: *powercycle_ec2_instance
@@ -4390,7 +4413,6 @@ tasks:
   depends_on: []
   commands:
   - *git_get_project
-  - func: "set up virtualenv"
   - command: shell.exec
     timeout_secs: 14400 # Timeout if there is no output for 4 hours
     type: test
@@ -4415,13 +4437,12 @@ tasks:
         set -o verbose
 
         ${activate_virtualenv}
-
         # Install Python jira client with pip until it is available in the toolchain
         pip install jira==1.0.10
 
         # We use a small batch size to avoid hitting the load balancer timeout if the Evergreen
         # API query is not fast enough.
-        python buildscripts/update_test_lifecycle.py                    \
+        $python buildscripts/update_test_lifecycle.py                   \
             --project ${project}                                        \
             --requestBatchSize 20                                       \
             --commit                                                    \
