@@ -337,7 +337,7 @@ TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating
     hbArgs.setTerm(0);
 
     Status status(ErrorCodes::InternalError, "Not set");
-    stdx::thread prsiThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
+    stdx::thread prsiThread([&] { doReplSetInitiate(getReplCoord(), &status); });
     const Date_t startDate = getNet()->now();
     getNet()->enterNetwork();
     const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
@@ -372,7 +372,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     getReplCoord()->setMyLastAppliedOpTime(OpTime(appliedTS, 1));
 
     Status status(ErrorCodes::InternalError, "Not set");
-    stdx::thread prsiThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status));
+    stdx::thread prsiThread([&] { doReplSetInitiate(getReplCoord(), &status); });
     const Date_t startDate = getNet()->now();
     getNet()->enterNetwork();
     const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
@@ -1046,7 +1046,7 @@ public:
 
     void start() {
         ASSERT(!_finished);
-        _thread = stdx::thread(stdx::bind(&ReplicationAwaiter::_awaitReplication, this));
+        _thread = stdx::thread([this] { _awaitReplication(); });
     }
 
     void reset() {
@@ -3146,7 +3146,7 @@ TEST_F(ReplCoordTest, AwaitReplicationShouldResolveAsNormalDuringAReconfig) {
 
     // reconfig
     Status status(ErrorCodes::InternalError, "Not Set");
-    stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status); });
 
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
@@ -3236,7 +3236,7 @@ TEST_F(
 
     // reconfig to fewer nodes
     Status status(ErrorCodes::InternalError, "Not Set");
-    stdx::thread reconfigThread(stdx::bind(doReplSetReconfigToFewer, getReplCoord(), &status));
+    stdx::thread reconfigThread([&] { doReplSetReconfigToFewer(getReplCoord(), &status); });
 
     replyToReceivedHeartbeatV1();
 
@@ -3321,7 +3321,7 @@ TEST_F(ReplCoordTest,
 
     // reconfig to three nodes
     Status status(ErrorCodes::InternalError, "Not Set");
-    stdx::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status); });
 
     replyToReceivedHeartbeatV1();
     reconfigThread.join();

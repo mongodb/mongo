@@ -170,8 +170,10 @@ Status Reporter::trigger() {
         return Status::OK();
     }
 
-    auto scheduleResult = _executor->scheduleWork(
-        stdx::bind(&Reporter::_prepareAndSendCommandCallback, this, stdx::placeholders::_1, true));
+    auto scheduleResult =
+        _executor->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& args) {
+            _prepareAndSendCommandCallback(args, true);
+        });
 
     _status = scheduleResult.getStatus();
     if (!_status.isOK()) {
@@ -212,7 +214,9 @@ void Reporter::_sendCommand_inlock(BSONObj commandRequest) {
 
     auto scheduleResult = _executor->scheduleRemoteCommand(
         executor::RemoteCommandRequest(_target, "admin", commandRequest, nullptr),
-        stdx::bind(&Reporter::_processResponseCallback, this, stdx::placeholders::_1));
+        [this](const executor::TaskExecutor::RemoteCommandCallbackArgs& rcbd) {
+            _processResponseCallback(rcbd);
+        });
 
     _status = scheduleResult.getStatus();
     if (!_status.isOK()) {
@@ -268,13 +272,10 @@ void Reporter::_processResponseCallback(
             // triggered.
             auto when = _executor->now() + _keepAliveInterval;
             bool fromTrigger = false;
-            auto scheduleResult =
-                _executor->scheduleWorkAt(when,
-                                          stdx::bind(&Reporter::_prepareAndSendCommandCallback,
-                                                     this,
-                                                     stdx::placeholders::_1,
-                                                     fromTrigger));
-
+            auto scheduleResult = _executor->scheduleWorkAt(
+                when, [=](const executor::TaskExecutor::CallbackArgs& args) {
+                    _prepareAndSendCommandCallback(args, fromTrigger);
+                });
             _status = scheduleResult.getStatus();
             if (!_status.isOK()) {
                 _onShutdown_inlock();

@@ -130,7 +130,7 @@ FileAllocator::FileAllocator() : _failed() {}
 
 
 void FileAllocator::start() {
-    stdx::thread t(stdx::bind(&FileAllocator::run, this));
+    stdx::thread t([this] { run(this); });
     t.detach();
 }
 

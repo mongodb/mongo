@@ -77,7 +77,7 @@ private:
         if (!remaining)
             return;
 
-        stdx::thread athread(stdx::bind(&ThreadedTest::subthread, this, remaining));
+        stdx::thread athread([=] { subthread(remaining); });
         launch_subthreads(remaining - 1);
         athread.join();
     }

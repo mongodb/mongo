@@ -104,9 +104,9 @@ protected:
     }
 
     int64_t countLogLinesContaining(const std::string& needle) {
-        return std::count_if(getCapturedLogMessages().begin(),
-                             getCapturedLogMessages().end(),
-                             stdx::bind(stringContains, stdx::placeholders::_1, needle));
+        const auto& msgs = getCapturedLogMessages();
+        return std::count_if(
+            msgs.begin(), msgs.end(), [&](const auto& s) { return stringContains(s, needle); });
     }
 
     void makeSelfPrimary(const Timestamp& electionTimestamp = Timestamp(0, 0)) {

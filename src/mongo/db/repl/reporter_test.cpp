@@ -146,8 +146,9 @@ void ReporterTest::setUp() {
     posUpdater = stdx::make_unique<MockProgressManager>();
     posUpdater->updateMap(0, OpTime({3, 0}, 1), OpTime({3, 0}, 1));
 
-    prepareReplSetUpdatePositionCommandFn =
-        stdx::bind(&MockProgressManager::prepareReplSetUpdatePositionCommand, posUpdater.get());
+    prepareReplSetUpdatePositionCommandFn = [updater = posUpdater.get()] {
+        return updater->prepareReplSetUpdatePositionCommand();
+    };
 
     reporter =
         stdx::make_unique<Reporter>(_executorProxy.get(),

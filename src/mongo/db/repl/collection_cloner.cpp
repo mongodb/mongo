@@ -123,7 +123,9 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
                           ReadPreferenceSetting::secondaryPreferredMetadata(),
                           nullptr,
                           RemoteCommandRequest::kNoTimeout),
-                      stdx::bind(&CollectionCloner::_countCallback, this, stdx::placeholders::_1),
+                      [this](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+                          return _countCallback(args);
+                      },
                       RemoteCommandRetryScheduler::makeRetryPolicy(
                           numInitialSyncCollectionCountAttempts.load(),
                           executor::RemoteCommandRequest::kNoTimeout,
@@ -133,11 +135,11 @@ CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
           _source,
           _sourceNss.db().toString(),
           makeCommandWithUUIDorCollectionName("listIndexes", _options.uuid, sourceNss),
-          stdx::bind(&CollectionCloner::_listIndexesCallback,
-                     this,
-                     stdx::placeholders::_1,
-                     stdx::placeholders::_2,
-                     stdx::placeholders::_3),
+          [this](const Fetcher::QueryResponseStatus& fetchResult,
+                 Fetcher::NextAction * nextAction,
+                 BSONObjBuilder * getMoreBob) {
+              _listIndexesCallback(fetchResult, nextAction, getMoreBob);
+          },
           ReadPreferenceSetting::secondaryPreferredMetadata(),
           RemoteCommandRequest::kNoTimeout /* find network timeout */,
           RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
@@ -438,7 +440,7 @@ void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& 
 
     // We have all of the indexes now, so we can start cloning the collection data.
     auto&& scheduleResult = _scheduleDbWorkFn(
-        stdx::bind(&CollectionCloner::_beginCollectionCallback, this, stdx::placeholders::_1));
+        [=](const executor::TaskExecutor::CallbackArgs& cbd) { _beginCollectionCallback(cbd); });
     if (!scheduleResult.isOK()) {
         _finishCallback(scheduleResult.getStatus());
         return;
@@ -527,10 +529,9 @@ void CollectionCloner::_beginCollectionCallback(const executor::TaskExecutor::Ca
                              ReadPreferenceSetting::secondaryPreferredMetadata(),
                              opCtx,
                              RemoteCommandRequest::kNoTimeout),
-        stdx::bind(&CollectionCloner::_establishCollectionCursorsCallback,
-                   this,
-                   stdx::placeholders::_1,
-                   cursorCommand),
+        [=](const RemoteCommandCallbackArgs& rcbd) {
+            _establishCollectionCursorsCallback(rcbd, cursorCommand);
+        },
         RemoteCommandRetryScheduler::makeRetryPolicy(
             numInitialSyncCollectionFindAttempts.load(),
             executor::RemoteCommandRequest::kNoTimeout,
@@ -723,11 +724,9 @@ Status CollectionCloner::_scheduleNextARMResultsCallback(
     }
     auto event = nextEvent.getValue();
     auto handleARMResultsOnNextEvent =
-        _executor->onEvent(event,
-                           stdx::bind(&CollectionCloner::_handleARMResultsCallback,
-                                      this,
-                                      stdx::placeholders::_1,
-                                      onCompletionGuard));
+        _executor->onEvent(event, [=](const executor::TaskExecutor::CallbackArgs& cbd) {
+            _handleARMResultsCallback(cbd, onCompletionGuard);
+        });
     return handleARMResultsOnNextEvent.getStatus();
 }
 
@@ -778,12 +777,9 @@ void CollectionCloner::_handleARMResultsCallback(
     }
 
     // Schedule the next document batch insertion.
-    auto&& scheduleResult =
-        _scheduleDbWorkFn(stdx::bind(&CollectionCloner::_insertDocumentsCallback,
-                                     this,
-                                     stdx::placeholders::_1,
-                                     lastBatch,
-                                     onCompletionGuard));
+    auto&& scheduleResult = _scheduleDbWorkFn([=](const executor::TaskExecutor::CallbackArgs& cbd) {
+        _insertDocumentsCallback(cbd, lastBatch, onCompletionGuard);
+    });
     if (!scheduleResult.isOK()) {
         Status newStatus{scheduleResult.getStatus().code(),
                          str::stream() << "While cloning collection '" << _sourceNss.ns()

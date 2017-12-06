@@ -121,15 +121,10 @@ void ElectCmdRunnerTest::startTest(ElectCmdRunner* electCmdRunner,
                                    int selfIndex,
                                    const std::vector<HostAndPort>& hosts) {
     StatusWith<executor::TaskExecutor::EventHandle> evh(ErrorCodes::InternalError, "Not set");
-    StatusWith<executor::TaskExecutor::CallbackHandle> cbh =
-        getExecutor().scheduleWork(stdx::bind(&ElectCmdRunnerTest::electCmdRunnerRunner,
-                                              this,
-                                              stdx::placeholders::_1,
-                                              electCmdRunner,
-                                              &evh,
-                                              currentConfig,
-                                              selfIndex,
-                                              hosts));
+    StatusWith<executor::TaskExecutor::CallbackHandle> cbh = getExecutor().scheduleWork([&](
+        const executor::TaskExecutor::CallbackArgs& data) {
+        return electCmdRunnerRunner(data, electCmdRunner, &evh, currentConfig, selfIndex, hosts);
+    });
     ASSERT_OK(cbh.getStatus());
     getExecutor().wait(cbh.getValue());
     ASSERT_OK(evh.getStatus());
@@ -213,14 +208,9 @@ TEST_F(ElectCmdRunnerTest, ShuttingDown) {
     ElectCmdRunner electCmdRunner;
     StatusWith<executor::TaskExecutor::EventHandle> evh(ErrorCodes::InternalError, "Not set");
     StatusWith<executor::TaskExecutor::CallbackHandle> cbh =
-        getExecutor().scheduleWork(stdx::bind(&ElectCmdRunnerTest::electCmdRunnerRunner,
-                                              this,
-                                              stdx::placeholders::_1,
-                                              &electCmdRunner,
-                                              &evh,
-                                              config,
-                                              0,
-                                              hosts));
+        getExecutor().scheduleWork([&](const executor::TaskExecutor::CallbackArgs& data) {
+            return electCmdRunnerRunner(data, &electCmdRunner, &evh, config, 0, hosts);
+        });
     ASSERT_OK(cbh.getStatus());
     getExecutor().wait(cbh.getValue());
     ASSERT_OK(evh.getStatus());

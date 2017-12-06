@@ -140,7 +140,7 @@ void JournalWriter::start() {
     }
 
     // Start the thread
-    stdx::thread t(stdx::bind(&JournalWriter::_journalWriterThread, this));
+    stdx::thread t([this] { _journalWriterThread(); });
     _journalWriterThreadHandle.swap(t);
 }
 

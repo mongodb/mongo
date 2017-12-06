@@ -414,12 +414,10 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 Status SyncTail::syncApply(OperationContext* opCtx,
                            const BSONObj& op,
                            OplogApplication::Mode oplogApplicationMode) {
-    return SyncTail::syncApply(opCtx,
-                               op,
-                               oplogApplicationMode,
-                               applyOperation_inlock,
-                               applyCommand_inlock,
-                               stdx::bind(&Counter64::increment, &opsAppliedStats, 1ULL));
+    return SyncTail::syncApply(
+        opCtx, op, oplogApplicationMode, applyOperation_inlock, applyCommand_inlock, [] {
+            opsAppliedStats.increment(1);
+        });
 }
 
 

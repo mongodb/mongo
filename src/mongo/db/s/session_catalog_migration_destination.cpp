@@ -338,8 +338,7 @@ void SessionCatalogMigrationDestination::start(ServiceContext* service) {
         _isStateChanged.notify_all();
     }
 
-    _thread = stdx::thread(stdx::bind(
-        &SessionCatalogMigrationDestination::_retrieveSessionStateFromSource, this, service));
+    _thread = stdx::thread([=] { _retrieveSessionStateFromSource(service); });
 }
 
 void SessionCatalogMigrationDestination::finish() {

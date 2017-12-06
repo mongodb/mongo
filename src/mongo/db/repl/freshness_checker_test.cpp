@@ -66,17 +66,13 @@ protected:
     FreshnessChecker::ElectionAbortReason shouldAbortElection() const;
 
     int64_t countLogLinesContaining(const std::string& needle) {
-        return std::count_if(getCapturedLogMessages().begin(),
-                             getCapturedLogMessages().end(),
-                             stdx::bind(stringContains, stdx::placeholders::_1, needle));
+        const auto& messages = getCapturedLogMessages();
+        return std::count_if(messages.begin(), messages.end(), [&](const std::string& x) {
+            return stringContains(x, needle);
+        });
     }
 
 private:
-    void freshnessCheckerRunner(const executor::TaskExecutor::CallbackArgs& data,
-                                const Timestamp& lastOpTimeApplied,
-                                const ReplSetConfig& currentConfig,
-                                int selfIndex,
-                                const std::vector<HostAndPort>& hosts);
     void setUp();
 
     FreshnessChecker _checker;
@@ -119,29 +115,18 @@ const BSONObj makeFreshRequest(const ReplSetConfig& rsConfig,
 
 // This is necessary because the run method must be scheduled in the executor
 // for correct concurrency operation.
-void FreshnessCheckerTest::freshnessCheckerRunner(const executor::TaskExecutor::CallbackArgs& data,
-                                                  const Timestamp& lastOpTimeApplied,
-                                                  const ReplSetConfig& currentConfig,
-                                                  int selfIndex,
-                                                  const std::vector<HostAndPort>& hosts) {
-    invariant(data.status.isOK());
-    StatusWith<executor::TaskExecutor::EventHandle> evh =
-        _checker.start(data.executor, lastOpTimeApplied, currentConfig, selfIndex, hosts);
-    _checkerDoneEvent = assertGet(evh);
-}
 
 void FreshnessCheckerTest::startTest(const Timestamp& lastOpTimeApplied,
                                      const ReplSetConfig& currentConfig,
                                      int selfIndex,
                                      const std::vector<HostAndPort>& hosts) {
-    getExecutor().wait(assertGet(
-        getExecutor().scheduleWork(stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                                              this,
-                                              stdx::placeholders::_1,
-                                              lastOpTimeApplied,
-                                              currentConfig,
-                                              selfIndex,
-                                              hosts))));
+    auto runner = [&](const executor::TaskExecutor::CallbackArgs& data) {
+        invariant(data.status.isOK());
+        StatusWith<executor::TaskExecutor::EventHandle> evh =
+            _checker.start(data.executor, lastOpTimeApplied, currentConfig, selfIndex, hosts);
+        _checkerDoneEvent = assertGet(evh);
+    };
+    getExecutor().wait(assertGet(getExecutor().scheduleWork(std::move(runner))));
 }
 
 TEST_F(FreshnessCheckerTest, TwoNodes) {

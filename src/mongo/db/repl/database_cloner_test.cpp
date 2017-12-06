@@ -59,36 +59,38 @@ struct CollectionCloneInfo {
 
 class DatabaseClonerTest : public BaseClonerTest {
 public:
-    void collectionWork(const Status& status, const NamespaceString& sourceNss);
     void clear() override;
     BaseCloner* getCloner() const override;
 
 protected:
+    auto makeCollectionWorkClosure() {
+        return [this](const Status& status, const NamespaceString& srcNss) {
+            _collections[srcNss].status = status;
+        };
+    }
+    auto makeSetStatusClosure() {
+        return [this](const Status& status) { setStatus(status); };
+    }
+
     void setUp() override;
     void tearDown() override;
 
     std::map<NamespaceString, CollectionCloneInfo> _collections;
     std::unique_ptr<DatabaseCloner> _databaseCloner;
 };
-void DatabaseClonerTest::collectionWork(const Status& status, const NamespaceString& srcNss) {
-    _collections[srcNss].status = status;
-}
 
 void DatabaseClonerTest::setUp() {
     BaseClonerTest::setUp();
-    _databaseCloner.reset(new DatabaseCloner(
-        &getExecutor(),
-        dbWorkThreadPool.get(),
-        target,
-        dbname,
-        BSONObj(),
-        DatabaseCloner::ListCollectionsPredicateFn(),
-        storageInterface.get(),
-        stdx::bind(&DatabaseClonerTest::collectionWork,
-                   this,
-                   stdx::placeholders::_1,
-                   stdx::placeholders::_2),
-        stdx::bind(&DatabaseClonerTest::setStatus, this, stdx::placeholders::_1)));
+    _databaseCloner =
+        stdx::make_unique<DatabaseCloner>(&getExecutor(),
+                                          dbWorkThreadPool.get(),
+                                          target,
+                                          dbname,
+                                          BSONObj(),
+                                          DatabaseCloner::ListCollectionsPredicateFn(),
+                                          storageInterface.get(),
+                                          makeCollectionWorkClosure(),
+                                          makeSetStatusClosure());
     _databaseCloner->setScheduleDbWorkFn_forTest(
         [this](const executor::TaskExecutor::CallbackFn& work) {
             return getExecutor().scheduleWork(work);
@@ -127,11 +129,8 @@ TEST_F(DatabaseClonerTest, InvalidConstruction) {
     const BSONObj filter;
     DatabaseCloner::ListCollectionsPredicateFn pred;
     StorageInterface* si = storageInterface.get();
-    namespace stdxph = stdx::placeholders;
-    const DatabaseCloner::CollectionCallbackFn ccb =
-        stdx::bind(&DatabaseClonerTest::collectionWork, this, stdxph::_1, stdxph::_2);
-
-    const auto& cb = [](const Status&) { FAIL("should not reach here"); };
+    auto ccb = makeCollectionWorkClosure();
+    auto cb = [](const Status&) { FAIL("should not reach here"); };
 
     // Null executor -- error from Fetcher, not _databaseCloner.
     ASSERT_THROWS_CODE_AND_WHAT(
@@ -266,19 +265,16 @@ TEST_F(DatabaseClonerTest, FirstRemoteCommandWithoutFilter) {
 TEST_F(DatabaseClonerTest, FirstRemoteCommandWithFilter) {
     const BSONObj listCollectionsFilter = BSON("name"
                                                << "coll");
-    _databaseCloner.reset(new DatabaseCloner(
-        &getExecutor(),
-        dbWorkThreadPool.get(),
-        target,
-        dbname,
-        listCollectionsFilter,
-        DatabaseCloner::ListCollectionsPredicateFn(),
-        storageInterface.get(),
-        stdx::bind(&DatabaseClonerTest::collectionWork,
-                   this,
-                   stdx::placeholders::_1,
-                   stdx::placeholders::_2),
-        stdx::bind(&DatabaseClonerTest::setStatus, this, stdx::placeholders::_1)));
+    _databaseCloner =
+        stdx::make_unique<DatabaseCloner>(&getExecutor(),
+                                          dbWorkThreadPool.get(),
+                                          target,
+                                          dbname,
+                                          listCollectionsFilter,
+                                          DatabaseCloner::ListCollectionsPredicateFn(),
+                                          storageInterface.get(),
+                                          makeCollectionWorkClosure(),
+                                          makeSetStatusClosure());
     ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
 
     ASSERT_OK(_databaseCloner->startup());
@@ -351,19 +347,15 @@ TEST_F(DatabaseClonerTest, ListCollectionsPredicate) {
     DatabaseCloner::ListCollectionsPredicateFn pred = [](const BSONObj& info) {
         return info["name"].String() != "b";
     };
-    _databaseCloner.reset(new DatabaseCloner(
-        &getExecutor(),
-        dbWorkThreadPool.get(),
-        target,
-        dbname,
-        BSONObj(),
-        pred,
-        storageInterface.get(),
-        stdx::bind(&DatabaseClonerTest::collectionWork,
-                   this,
-                   stdx::placeholders::_1,
-                   stdx::placeholders::_2),
-        stdx::bind(&DatabaseClonerTest::setStatus, this, stdx::placeholders::_1)));
+    _databaseCloner = stdx::make_unique<DatabaseCloner>(&getExecutor(),
+                                                        dbWorkThreadPool.get(),
+                                                        target,
+                                                        dbname,
+                                                        BSONObj(),
+                                                        pred,
+                                                        storageInterface.get(),
+                                                        makeCollectionWorkClosure(),
+                                                        makeSetStatusClosure());
     ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
 
     ASSERT_OK(_databaseCloner->startup());
@@ -612,19 +604,16 @@ TEST_F(DatabaseClonerTest, DatabaseClonerResendsListCollectionsRequestOnRetriabl
 }
 
 TEST_F(DatabaseClonerTest, ListCollectionsReturnsEmptyCollectionName) {
-    _databaseCloner.reset(new DatabaseCloner(
-        &getExecutor(),
-        dbWorkThreadPool.get(),
-        target,
-        dbname,
-        BSONObj(),
-        DatabaseCloner::ListCollectionsPredicateFn(),
-        storageInterface.get(),
-        stdx::bind(&DatabaseClonerTest::collectionWork,
-                   this,
-                   stdx::placeholders::_1,
-                   stdx::placeholders::_2),
-        stdx::bind(&DatabaseClonerTest::setStatus, this, stdx::placeholders::_1)));
+    _databaseCloner =
+        stdx::make_unique<DatabaseCloner>(&getExecutor(),
+                                          dbWorkThreadPool.get(),
+                                          target,
+                                          dbname,
+                                          BSONObj(),
+                                          DatabaseCloner::ListCollectionsPredicateFn(),
+                                          storageInterface.get(),
+                                          makeCollectionWorkClosure(),
+                                          makeSetStatusClosure());
     ASSERT_EQUALS(DatabaseCloner::State::kPreStart, _databaseCloner->getState_forTest());
 
     ASSERT_OK(_databaseCloner->startup());

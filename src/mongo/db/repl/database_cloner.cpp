@@ -125,11 +125,11 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
                               _source,
                               _dbname,
                               createListCollectionsCommandObject(_listCollectionsFilter),
-                              stdx::bind(&DatabaseCloner::_listCollectionsCallback,
-                                         this,
-                                         stdx::placeholders::_1,
-                                         stdx::placeholders::_2,
-                                         stdx::placeholders::_3),
+                              [=](const StatusWith<Fetcher::QueryResponse>& result,
+                                  Fetcher::NextAction * nextAction,
+                                  BSONObjBuilder * getMoreBob) {
+                                  _listCollectionsCallback(result, nextAction, getMoreBob);
+                              },
                               ReadPreferenceSetting::secondaryPreferredMetadata(),
                               RemoteCommandRequest::kNoTimeout /* find network timeout */,
                               RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
@@ -403,8 +403,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
                 _source,
                 nss,
                 options,
-                stdx::bind(
-                    &DatabaseCloner::_collectionClonerCallback, this, stdx::placeholders::_1, nss),
+                [=](const Status& status) { return _collectionClonerCallback(status, nss); },
                 _storageInterface,
                 collectionClonerBatchSize,
                 maxNumInitialSyncCollectionClonerCursors.load());

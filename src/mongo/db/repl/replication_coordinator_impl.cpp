@@ -503,12 +503,9 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     // that the server's networking layer be up and running and accepting connections, which
     // doesn't happen until startReplication finishes.
     auto handle =
-        _replExecutor->scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
-                                               this,
-                                               stdx::placeholders::_1,
-                                               localConfig,
-                                               lastOpTimeStatus,
-                                               lastVote));
+        _replExecutor->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& args) {
+            _finishLoadLocalConfig(args, localConfig, lastOpTimeStatus, lastVote);
+        });
     if (handle == ErrorCodes::ShutdownInProgress) {
         handle = CallbackHandle{};
     }
@@ -1782,9 +1779,9 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     onExitGuard.Dismiss();
     updateMemberState();
     // Schedule work to (potentially) step back up once the stepdown period has ended.
-    _scheduleWorkAt(
-        stepDownUntil,
-        stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing, this, stdx::placeholders::_1));
+    _scheduleWorkAt(stepDownUntil, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+        _handleTimePassing(cbData);
+    });
     return Status::OK();
 }
 
@@ -2246,10 +2243,8 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     }
 
     _setConfigState_inlock(kConfigReconfiguring);
-    ScopeGuard configStateGuard = MakeGuard(
-        lockAndCall,
-        &lk,
-        stdx::bind(&ReplicationCoordinatorImpl::_setConfigState_inlock, this, kConfigSteady));
+    ScopeGuard configStateGuard =
+        MakeGuard(lockAndCall, &lk, [=] { _setConfigState_inlock(kConfigSteady); });
 
     ReplSetConfig oldConfig = _rsConfig;
     lk.unlock();
@@ -2303,14 +2298,10 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     }
 
     auto reconfigFinished = uassertStatusOK(_replExecutor->makeEvent());
-    uassertStatusOK(
-        _replExecutor->scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
-                                               this,
-                                               stdx::placeholders::_1,
-                                               newConfig,
-                                               args.force,
-                                               myIndex.getValue(),
-                                               reconfigFinished)));
+    uassertStatusOK(_replExecutor->scheduleWork([ =, f = args.force, v = myIndex.getValue() ](
+        const executor::TaskExecutor::CallbackArgs& cbData) {
+        _finishReplSetReconfig(cbData, newConfig, f, v, reconfigFinished);
+    }));
     configStateGuard.Dismiss();
     _replExecutor->waitForEvent(reconfigFinished);
     return Status::OK();
@@ -2344,13 +2335,10 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
         // Wait for the election to complete and the node's Role to be set to follower.
         _replExecutor
             ->onEvent(electionFinishedEvent,
-                      stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
-                                 this,
-                                 stdx::placeholders::_1,
-                                 newConfig,
-                                 isForceReconfig,
-                                 myIndex,
-                                 finishedEvent))
+                      [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+                          _finishReplSetReconfig(
+                              cbData, newConfig, isForceReconfig, myIndex, finishedEvent);
+                      })
             .status_with_transitional_ignore();
         return;
     }
@@ -2390,11 +2378,8 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     invariant(!_rsConfig.isInitialized());
     _setConfigState_inlock(kConfigInitiating);
 
-    ScopeGuard configStateGuard = MakeGuard(
-        lockAndCall,
-        &lk,
-        stdx::bind(
-            &ReplicationCoordinatorImpl::_setConfigState_inlock, this, kConfigUninitialized));
+    ScopeGuard configStateGuard =
+        MakeGuard(lockAndCall, &lk, [=] { _setConfigState_inlock(kConfigUninitialized); });
     lk.unlock();
 
     ReplSetConfig newConfig;
@@ -3079,11 +3064,9 @@ void ReplicationCoordinatorImpl::_unblacklistSyncSource(
 void ReplicationCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Date_t until) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _topCoord->blacklistSyncSource(host, until);
-    _scheduleWorkAt(until,
-                    stdx::bind(&ReplicationCoordinatorImpl::_unblacklistSyncSource,
-                               this,
-                               stdx::placeholders::_1,
-                               host));
+    _scheduleWorkAt(until, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+        _unblacklistSyncSource(cbData, host);
+    });
 }
 
 void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opCtx,
