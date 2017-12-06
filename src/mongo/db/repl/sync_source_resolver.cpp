@@ -168,7 +168,11 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
         _taskExecutor,
         candidate,
         kLocalOplogNss.db().toString(),
-        BSON("find" << kLocalOplogNss.coll() << "limit" << 1 << "sort" << BSON("$natural" << 1)),
+        BSON("find" << kLocalOplogNss.coll() << "limit" << 1 << "sort" << BSON("$natural" << 1)
+                    << "projection"
+                    << BSON(OplogEntryBase::kTimestampFieldName << 1
+                                                                << OplogEntryBase::kTermFieldName
+                                                                << 1)),
         stdx::bind(&SyncSourceResolver::_firstOplogEntryFetcherCallback,
                    this,
                    stdx::placeholders::_1,
@@ -242,9 +246,18 @@ OpTime SyncSourceResolver::_parseRemoteEarliestOpTime(const HostAndPort& candida
         return OpTime();
     }
 
-    const OplogEntry oplogEntry(firstObjFound);
-    const auto remoteEarliestOpTime = oplogEntry.getOpTime();
-    if (remoteEarliestOpTime.isNull()) {
+    const auto remoteEarliestOpTime = OpTime::parseFromOplogEntry(firstObjFound);
+    if (!remoteEarliestOpTime.isOK()) {
+        const auto until = _taskExecutor->now() + kFirstOplogEntryNullTimestampBlacklistDuration;
+        log() << "Blacklisting " << candidate << " due to error parsing OpTime from the oldest"
+              << " oplog entry for " << kFirstOplogEntryNullTimestampBlacklistDuration
+              << " until: " << until << ". Error: " << remoteEarliestOpTime.getStatus()
+              << ", Entry: " << redact(firstObjFound);
+        _syncSourceSelector->blacklistSyncSource(candidate, until);
+        return OpTime();
+    }
+
+    if (remoteEarliestOpTime.getValue().isNull()) {
         // First document in remote oplog is empty.
         const auto until = _taskExecutor->now() + kFirstOplogEntryNullTimestampBlacklistDuration;
         log() << "Blacklisting " << candidate << " due to null timestamp in first document for "
@@ -253,7 +266,7 @@ OpTime SyncSourceResolver::_parseRemoteEarliestOpTime(const HostAndPort& candida
         return OpTime();
     }
 
-    return remoteEarliestOpTime;
+    return remoteEarliestOpTime.getValue();
 }
 
 void SyncSourceResolver::_firstOplogEntryFetcherCallback(
