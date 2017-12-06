@@ -711,16 +711,6 @@ private:
     Milliseconds _getRandomizedElectionOffset_inlock();
 
     /**
-     * Helper for _handleHeartbeatResponse.
-     *
-     * Updates the lastDurableOpTime and lastAppliedOpTime associated with the member at
-     * "memberIndex" in our config.
-     */
-    void _updateOpTimesFromHeartbeat_inlock(int targetIndex,
-                                            const OpTime& durableOpTime,
-                                            const OpTime& appliedOpTime);
-
-    /**
      * Starts a heartbeat for each member in the current config.  Called while holding _mutex.
      */
     void _startHeartbeats_inlock();
