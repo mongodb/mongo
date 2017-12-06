@@ -100,7 +100,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
         return CollectionShardingState::get(opCtx, nss.ns())->getMetadata();
     }();
 
-    uassert(ErrorCodes::StaleConfig,
+    uassert(ErrorCodes::StaleEpoch,
             str::stream() << "Collection " << nss.ns() << " became unsharded",
             metadataAfterSplit);
 

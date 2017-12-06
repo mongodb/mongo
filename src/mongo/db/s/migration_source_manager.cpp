@@ -174,7 +174,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         }
 
         auto metadata = CollectionShardingState::get(opCtx, getNss())->getMetadata();
-        uassert(ErrorCodes::StaleConfig,
+        uassert(ErrorCodes::IncompatibleShardingMetadata,
                 str::stream() << "cannot move chunks for an unsharded collection",
                 metadata);
 
@@ -187,7 +187,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     const auto shardVersion = collectionMetadata->getShardVersion();
 
     // If the shard major version is zero, this means we do not have any chunks locally to migrate
-    uassert(ErrorCodes::StaleConfig,
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
             str::stream() << "cannot move chunk " << _args.toString()
                           << " because the shard doesn't contain any chunks",
             shardVersion.majorVersion() > 0);
