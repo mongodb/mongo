@@ -56,6 +56,7 @@ namespace {
 
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
+using executor::RemoteCommandRequest;
 
 constexpr auto kCountResponseDocumentCountFieldName = "n"_sd;
 

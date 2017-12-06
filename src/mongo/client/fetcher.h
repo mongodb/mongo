@@ -47,9 +47,6 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-namespace {
-using executor::RemoteCommandRequest;
-}
 
 class Fetcher {
     MONGO_DISALLOW_COPYING(Fetcher);
@@ -199,6 +196,8 @@ public:
     State getState_forTest() const;
 
 private:
+    using RemoteCommandRequest = executor::RemoteCommandRequest;
+
     bool _isActive_inlock() const;
 
     /**

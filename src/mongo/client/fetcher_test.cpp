@@ -42,6 +42,7 @@ namespace {
 
 using namespace mongo;
 using executor::NetworkInterfaceMock;
+using executor::RemoteCommandRequest;
 using executor::TaskExecutor;
 
 using ResponseStatus = TaskExecutor::ResponseStatus;

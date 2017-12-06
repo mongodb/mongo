@@ -58,6 +58,7 @@ namespace {
 
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
+using executor::RemoteCommandRequest;
 
 const char* kNameFieldName = "name";
 const char* kOptionsFieldName = "options";
