@@ -229,9 +229,8 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
               << remoteMetadata->toStringBasic();
 
         invariant(_receivingChunks.empty());
-        invariant(_rangesToClean.isEmpty());
-
         _setActiveMetadata(lg, std::move(*remoteMetadata));
+        invariant(_rangesToClean.isEmpty());
         return;
     }
 
@@ -357,10 +356,6 @@ void MetadataManager::_pushListToClean(WithLock, std::list<Deletion> ranges) {
     invariant(ranges.empty());
 }
 
-void MetadataManager::_addToReceiving(WithLock, ChunkRange const& range) {
-    _receivingChunks.insert(std::make_pair(range.getMin().getOwned(), range.getMax().getOwned()));
-}
-
 auto MetadataManager::beginReceive(ChunkRange const& range) -> CleanupNotification {
     stdx::lock_guard<stdx::mutex> lg(_managerLock);
     invariant(!_metadata.empty());
@@ -370,18 +365,12 @@ auto MetadataManager::beginReceive(ChunkRange const& range) -> CleanupNotificati
                       "Documents in target range may still be in use on the destination shard."};
     }
 
-    _addToReceiving(lg, range);
+    _receivingChunks.emplace(range.getMin().getOwned(), range.getMax().getOwned());
 
     log() << "Scheduling deletion of any documents in " << _nss.ns() << " range "
           << redact(range.toString()) << " before migrating in a chunk covering the range";
 
     return _pushRangeToClean(lg, range, Date_t{});
-}
-
-void MetadataManager::_removeFromReceiving(WithLock, ChunkRange const& range) {
-    auto it = _receivingChunks.find(range.getMin());
-    invariant(it != _receivingChunks.end());
-    _receivingChunks.erase(it);
 }
 
 void MetadataManager::forgetReceive(ChunkRange const& range) {
@@ -394,7 +383,11 @@ void MetadataManager::forgetReceive(ChunkRange const& range) {
           << "; scheduling deletion of any documents already copied";
 
     invariant(!_overlapsInUseChunk(lg, range));
-    _removeFromReceiving(lg, range);
+
+    auto it = _receivingChunks.find(range.getMin());
+    invariant(it != _receivingChunks.end());
+    _receivingChunks.erase(it);
+
     _pushRangeToClean(lg, range, Date_t{}).abandon();
 }
 

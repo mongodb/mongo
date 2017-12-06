@@ -535,7 +535,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
     scopedGuard.Dismiss();
 
-    // Exit critical section, clear old scoped collection metadata.
+    // Exit the critical section and ensure that all the necessary state is fully persisted before
+    // scheduling orphan cleanup.
     _cleanup(opCtx);
 
     Grid::get(opCtx)
@@ -549,10 +550,6 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                                << _args.getToShardId()),
                     ShardingCatalogClient::kMajorityWriteConcern)
         .ignore();
-
-    // Wait for the metadata update to be persisted before attempting to delete orphaned documents
-    // so that metadata changes propagate to secondaries first
-    CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, getNss());
 
     const ChunkRange range(_args.getMinKey(), _args.getMaxKey());
 
@@ -667,9 +664,26 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
         return std::move(_cloneDriver);
     }();
 
-    // Decrement the metadata op counter outside of the collection lock in order to hold it for as
-    // short as possible.
+    // The cleanup operations below are potentially blocking or acquire other locks, so perform them
+    // outside of the collection X lock
+
     if (_state == kCriticalSection || _state == kCloneCompleted) {
+        // NOTE: The order of the operations below is important and the comments explain the
+        // reasoning behind it
+
+        // Wait for the updates to the cache of the routing table to be fully written to disk before
+        // clearing the 'minOpTime recovery' document. This way, we ensure that all nodes from a
+        // shard, which donated a chunk will always be at the shard version of the last migration it
+        // performed.
+        //
+        // If the metadata is not persisted before clearing the 'inMigration' flag below, it is
+        // possible that the persisted metadata is rolled back after step down, but the write which
+        // cleared the 'inMigration' flag is not, a secondary node will report itself at an older
+        // shard version.
+        CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, getNss());
+
+        // Clear the 'minOpTime recovery' document so that the next time a node from this shard
+        // becomes a primary, it won't have to recover the config server optime.
         ShardingStateRecovery::endMetadataOp(opCtx);
     }
 

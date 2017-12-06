@@ -217,14 +217,6 @@ void ShardingState::interruptChunkSplitter() {
     _chunkSplitter->interruptChunkSplitter();
 }
 
-void ShardingState::markCollectionsNotShardedAtStepdown() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    for (auto& coll : _collections) {
-        auto& css = coll.second;
-        css->markNotShardedAtStepdown();
-    }
-}
-
 void ShardingState::setGlobalInitMethodForTest(GlobalInitFunc func) {
     _globalInit = func;
 }

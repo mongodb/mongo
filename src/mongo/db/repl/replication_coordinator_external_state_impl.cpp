@@ -663,8 +663,6 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
         CatalogCacheLoader::get(_service).onStepDown();
     }
 
-    ShardingState::get(_service)->markCollectionsNotShardedAtStepdown();
-
     if (auto validator = LogicalTimeValidator::get(_service)) {
         auto opCtx = cc().getOperationContext();
 
@@ -755,10 +753,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
     }
 
     SessionCatalog::get(_service)->onStepUp(opCtx);
-
-    // There is a slight chance that some stale metadata might have been loaded before the latest
-    // optime has been recovered, so throw out everything that we have up to now
-    ShardingState::get(opCtx)->markCollectionsNotShardedAtStepdown();
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
