@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/connection_string.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
@@ -60,8 +59,6 @@ namespace {
 const char kRecoveryDocumentId[] = "minOpTimeRecovery";
 const char kMinOpTime[] = "minOpTime";
 const char kMinOpTimeUpdaters[] = "minOpTimeUpdaters";
-const char kConfigsvrConnString[] = "configsvrConnectionString";  // TODO(SERVER-25276): Remove
-const char kShardName[] = "shardName";                            // TODO(SERVER-25276): Remove
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -73,11 +70,6 @@ const WriteConcernOptions kLocalWriteConcern(1,
 
 /**
  * Encapsulates the parsing and construction of the config server min opTime recovery document.
- * TODO(SERVER-25276): Currently this still parses the 'shardName' and
- * 'configsvrConnectionString' fields for backwards compatibility during 3.2->3.4 upgrade
- * when the 3.4 shard may have a minOpTimeRecovery document but no shardIdenity document.  After
- * 3.4 ships this should be removed so that the only fields in a minOpTimeRecovery document
- * are the _id, 'minOpTime', and 'minOpTimeUpdaters'
  */
 class RecoveryDocument {
 public:
@@ -86,25 +78,7 @@ public:
     static StatusWith<RecoveryDocument> fromBSON(const BSONObj& obj) {
         RecoveryDocument recDoc;
 
-        {
-            std::string configsvrString;
-
-            Status status = bsonExtractStringField(obj, kConfigsvrConnString, &configsvrString);
-            if (!status.isOK())
-                return status;
-
-            auto configsvrStatus = ConnectionString::parse(configsvrString);
-            if (!configsvrStatus.isOK())
-                return configsvrStatus.getStatus();
-
-            recDoc._configsvr = std::move(configsvrStatus.getValue());
-        }
-
-        Status status = bsonExtractStringField(obj, kShardName, &recDoc._shardName);
-        if (!status.isOK())
-            return status;
-
-        status = bsonExtractOpTimeField(obj, kMinOpTime, &recDoc._minOpTime);
+        Status status = bsonExtractOpTimeField(obj, kMinOpTime, &recDoc._minOpTime);
         if (!status.isOK())
             return status;
 
@@ -115,16 +89,11 @@ public:
         return recDoc;
     }
 
-    static BSONObj createChangeObj(ConnectionString configsvr,
-                                   std::string shardName,
-                                   repl::OpTime minOpTime,
-                                   ChangeType change) {
+    static BSONObj createChangeObj(repl::OpTime minOpTime, ChangeType change) {
         BSONObjBuilder cmdBuilder;
 
         {
             BSONObjBuilder setBuilder(cmdBuilder.subobjStart("$set"));
-            setBuilder.append(kConfigsvrConnString, configsvr.toString());
-            setBuilder.append(kShardName, shardName);
             minOpTime.append(&setBuilder, kMinOpTime);
         }
 
@@ -144,20 +113,10 @@ public:
     BSONObj toBSON() const {
         BSONObjBuilder builder;
         builder.append("_id", kRecoveryDocumentId);
-        builder.append(kConfigsvrConnString, _configsvr.toString());
-        builder.append(kShardName, _shardName);
         builder.append(kMinOpTime, _minOpTime.toBSON());
         builder.append(kMinOpTimeUpdaters, _minOpTimeUpdaters);
 
         return builder.obj();
-    }
-
-    ConnectionString getConfigsvr() const {
-        return _configsvr;
-    }
-
-    std::string getShardName() const {
-        return _shardName;
     }
 
     repl::OpTime getMinOpTime() const {
@@ -170,9 +129,6 @@ public:
 
 private:
     RecoveryDocument() = default;
-
-    ConnectionString _configsvr;
-    std::string _shardName;
     repl::OpTime _minOpTime;
     long long _minOpTimeUpdaters;
 };
@@ -191,11 +147,7 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
         autoGetOrCreateDb.emplace(
             opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_X);
 
-        BSONObj updateObj = RecoveryDocument::createChangeObj(
-            grid.shardRegistry()->getConfigServerConnectionString(),
-            ShardingState::get(opCtx)->getShardName(),
-            grid.configOpTime(),
-            change);
+        BSONObj updateObj = RecoveryDocument::createChangeObj(grid.configOpTime(), change);
 
         LOG(1) << "Changing sharding recovery document " << redact(updateObj);
 
