@@ -180,7 +180,7 @@ def register_signal_handler(handler):
 
     if _IS_WINDOWS:
         # Create unique event_name.
-        event_name = "Global\\Mongo_Python_%d".format(os.getpid())
+        event_name = "Global\\Mongo_Python_{:d}".format(os.getpid())
         LOGGER.debug("Registering event %s", event_name)
 
         try:
