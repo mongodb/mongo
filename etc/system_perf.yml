@@ -533,6 +533,20 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: retryable_writes_workloads_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "retryable_writes"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: bestbuy_agg_WT
   priority: 5
   depends_on:
@@ -834,6 +848,7 @@ buildvariants:
     - name: misc_workloads_WT
     - name: map_reduce_workloads_WT
     - name: smoke_test
+    - name: retryable_writes_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: crud_workloads_MMAPv1
     - name: mixed_workloads_MMAPv1
@@ -903,6 +918,7 @@ buildvariants:
     - name: misc_workloads_WT
     - name: map_reduce_workloads_WT
     - name: smoke_test
+    - name: retryable_writes_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: industry_benchmarks_wmajority_WT
     - name: industry_benchmarks_wmajority_MMAPv1
@@ -941,6 +957,7 @@ buildvariants:
     - name: misc_workloads_WT
     - name: map_reduce_workloads_WT
     - name: smoke_test
+    - name: retryable_writes_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: industry_benchmarks_wmajority_WT
     - name: industry_benchmarks_wmajority_MMAPv1
