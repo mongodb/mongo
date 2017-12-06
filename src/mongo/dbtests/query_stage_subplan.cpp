@@ -402,8 +402,6 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
     }
 
     // Can't use subplanning for a single contained $or.
-    //
-    // TODO: Consider allowing this to use subplanning (see SERVER-13732).
     {
         std::string findCmd =
             "{find: 'testns',"
@@ -413,8 +411,6 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
     }
 
     // Can't use subplanning if the contained $or query has a geo predicate.
-    //
-    // TODO: Consider allowing this to use subplanning (see SERVER-13732).
     {
         std::string findCmd =
             "{find: 'testns',"
@@ -443,120 +439,6 @@ TEST_F(QueryStageSubplanTest, QueryStageSubplanCanUseSubplanning) {
         std::unique_ptr<CanonicalQuery> cq = cqFromFindCommand(findCmd);
         ASSERT_FALSE(SubplanStage::canUseSubplanning(*cq));
     }
-}
-
-/**
- * Unit test the subplan stage's rewriteToRootedOr() method.
- */
-TEST_F(QueryStageSubplanTest, QueryStageSubplanRewriteToRootedOr) {
-    // Rewrite (AND (OR a b) e) => (OR (AND a e) (AND b e))
-    {
-        BSONObj queryObj = fromjson("{$or:[{a:1}, {b:1}], e:1}");
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, expCtx);
-        ASSERT_OK(expr.getStatus());
-        std::unique_ptr<MatchExpression> rewrittenExpr =
-            SubplanStage::rewriteToRootedOr(std::move(expr.getValue()));
-
-        std::string findCmdRewritten =
-            "{find: 'testns',"
-            "filter: {$or:[{a:1,e:1}, {b:1,e:1}]}}";
-        std::unique_ptr<CanonicalQuery> cqRewritten = cqFromFindCommand(findCmdRewritten);
-
-        ASSERT(rewrittenExpr->equivalent(cqRewritten->root()));
-    }
-
-    // Rewrite (AND (OR a b) e f) => (OR (AND a e f) (AND b e f))
-    {
-        BSONObj queryObj = fromjson("{$or:[{a:1}, {b:1}], e:1, f:1}");
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, expCtx);
-        ASSERT_OK(expr.getStatus());
-        std::unique_ptr<MatchExpression> rewrittenExpr =
-            SubplanStage::rewriteToRootedOr(std::move(expr.getValue()));
-
-        std::string findCmdRewritten =
-            "{find: 'testns',"
-            "filter: {$or:[{a:1,e:1,f:1}, {b:1,e:1,f:1}]}}";
-        std::unique_ptr<CanonicalQuery> cqRewritten = cqFromFindCommand(findCmdRewritten);
-
-        ASSERT(rewrittenExpr->equivalent(cqRewritten->root()));
-    }
-
-    // Rewrite (AND (OR (AND a b) (AND c d) e f) => (OR (AND a b e f) (AND c d e f))
-    {
-        BSONObj queryObj = fromjson("{$or:[{a:1,b:1}, {c:1,d:1}], e:1,f:1}");
-        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-        StatusWithMatchExpression expr = MatchExpressionParser::parse(queryObj, expCtx);
-        ASSERT_OK(expr.getStatus());
-        std::unique_ptr<MatchExpression> rewrittenExpr =
-            SubplanStage::rewriteToRootedOr(std::move(expr.getValue()));
-
-        std::string findCmdRewritten =
-            "{find: 'testns',"
-            "filter: {$or:[{a:1,b:1,e:1,f:1},"
-            "{c:1,d:1,e:1,f:1}]}}";
-        std::unique_ptr<CanonicalQuery> cqRewritten = cqFromFindCommand(findCmdRewritten);
-
-        ASSERT(rewrittenExpr->equivalent(cqRewritten->root()));
-    }
-}
-
-/**
- * Test the subplan stage's ability to answer a contained $or query.
- */
-TEST_F(QueryStageSubplanTest, QueryStageSubplanPlanContainedOr) {
-    OldClientWriteContext ctx(opCtx(), nss.ns());
-    addIndex(BSON("b" << 1 << "a" << 1));
-    addIndex(BSON("c" << 1 << "a" << 1));
-
-    BSONObj query = fromjson("{a: 1, $or: [{b: 2}, {c: 3}]}");
-
-    // Two of these documents match.
-    insert(BSON("_id" << 1 << "a" << 1 << "b" << 2));
-    insert(BSON("_id" << 2 << "a" << 2 << "b" << 2));
-    insert(BSON("_id" << 3 << "a" << 1 << "c" << 3));
-    insert(BSON("_id" << 4 << "a" << 1 << "c" << 4));
-
-    auto qr = stdx::make_unique<QueryRequest>(nss);
-    qr->setFilter(query);
-    auto cq = unittest::assertGet(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
-
-    Collection* collection = ctx.getCollection();
-
-    // Get planner params.
-    QueryPlannerParams plannerParams;
-    fillOutPlannerParams(opCtx(), collection, cq.get(), &plannerParams);
-
-    WorkingSet ws;
-    std::unique_ptr<SubplanStage> subplan(
-        new SubplanStage(opCtx(), collection, &ws, plannerParams, cq.get()));
-
-    // Plan selection should succeed due to falling back on regular planning.
-    PlanYieldPolicy yieldPolicy(PlanExecutor::NO_YIELD, _clock);
-    ASSERT_OK(subplan->pickBestPlan(&yieldPolicy));
-
-    // Work the stage until it produces all results.
-    size_t numResults = 0;
-    PlanStage::StageState stageState = PlanStage::NEED_TIME;
-    while (stageState != PlanStage::IS_EOF) {
-        WorkingSetID id = WorkingSet::INVALID_ID;
-        stageState = subplan->work(&id);
-        ASSERT_NE(stageState, PlanStage::DEAD);
-        ASSERT_NE(stageState, PlanStage::FAILURE);
-
-        if (stageState == PlanStage::ADVANCED) {
-            ++numResults;
-            WorkingSetMember* member = ws.get(id);
-            ASSERT(member->hasObj());
-            ASSERT(SimpleBSONObjComparator::kInstance.evaluate(
-                       member->obj.value() == BSON("_id" << 1 << "a" << 1 << "b" << 2)) ||
-                   SimpleBSONObjComparator::kInstance.evaluate(
-                       member->obj.value() == BSON("_id" << 3 << "a" << 1 << "c" << 3)));
-        }
-    }
-
-    ASSERT_EQ(numResults, 2U);
 }
 
 /**
