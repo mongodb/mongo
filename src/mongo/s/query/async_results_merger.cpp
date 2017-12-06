@@ -640,8 +640,7 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx)
                 remote.getTargetHost(), _params->nsString.db().toString(), cmdObj, opCtx);
 
             // Send kill request; discard callback handle, if any, or failure report, if not.
-            Status s = _executor->scheduleRemoteCommand(request, [](auto const&) {}).getStatus();
-            std::move(s).ignore();
+            _executor->scheduleRemoteCommand(request, [](auto const&) {}).getStatus().ignore();
         }
     }
 }

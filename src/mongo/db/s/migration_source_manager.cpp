@@ -103,12 +103,8 @@ void refreshRecipientRoutingTable(OperationContext* opCtx,
 
     executor::TaskExecutor* const executor =
         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    Status s =
-        executor
-            ->scheduleRemoteCommand(
-                request, [](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {})
-            .getStatus();
-    std::move(s).ignore();
+    auto noOp = [](const executor::TaskExecutor::RemoteCommandCallbackArgs&) {};
+    executor->scheduleRemoteCommand(request, noOp).getStatus().ignore();
 }
 
 Status checkCollectionEpochMatches(const ScopedCollectionMetadata& metadata, OID expectedEpoch) {

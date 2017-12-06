@@ -91,4 +91,11 @@ TEST(StatusWith, nonDefaultConstructible) {
     ASSERT_FALSE(swNDerror.isOK());
 }
 
+TEST(StatusWith, ignoreTest) {
+    auto function = []() -> StatusWith<bool> { return false; };
+
+    // Compile only test:
+    function().getStatus().ignore();
+}
+
 }  // namespace
