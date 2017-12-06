@@ -29,9 +29,7 @@
 #include <algorithm>
 #include <iomanip>
 
-namespace {
-const int kDefaultColumnSpacing = 3;
-}
+namespace mongo {
 
 /**
  * A tool to shape data into a table. Input may be any iterable type T of another
@@ -50,6 +48,7 @@ const int kDefaultColumnSpacing = 3;
  */
 template <typename T>
 std::string toTable(const T& rows) {
+    const int kDefaultColumnSpacing = 3;
     std::vector<std::size_t> widths;
 
     for (auto&& row : rows) {
@@ -75,3 +74,5 @@ std::string toTable(const T& rows) {
 
     return ss.str();
 }
+
+}  // namespace mongo
