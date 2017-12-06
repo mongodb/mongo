@@ -7,8 +7,7 @@
     load("jstests/libs/feature_compatibility_version.js");
 
     /**
-     * Checks that the featureCompatibilityVersion document is missing, and the
-     * featureCompatibilityVersion server parameter is "3.4".
+     * Checks that the featureCompatibilityVersion document is missing.
      */
     let checkFCVDocumentMissing = function(adminDB) {
         assert.eq(null, adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}));
@@ -58,8 +57,7 @@
                               ErrorCodes.BadValue);
     checkFCV(adminDB, "3.6");
 
-    // Deleting the featureCompatibilityVersion document changes the featureCompatibilityVersion
-    // server parameter to 3.4.
+    // Do hack to remove FCV document.
     removeFCVDocument(adminDB);
     checkFCVDocumentMissing(adminDB);
 
