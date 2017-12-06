@@ -535,7 +535,7 @@ TEST_F(SyncSourceResolverTest,
 TEST_F(SyncSourceResolverTest,
        SyncSourceResolverWillTryOtherSourcesWhenTheFirstNodeHasAnEmptyOplog) {
     HostAndPort candidate1("node1", 12345);
-    HostAndPort candidate2("node1", 12345);
+    HostAndPort candidate2("node2", 12345);
     _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
@@ -560,7 +560,7 @@ TEST_F(SyncSourceResolverTest,
 TEST_F(SyncSourceResolverTest,
        SyncSourceResolverWillTryOtherSourcesWhenTheFirstNodeHasAnEmptyFirstOplogEntry) {
     HostAndPort candidate1("node1", 12345);
-    HostAndPort candidate2("node1", 12345);
+    HostAndPort candidate2("node2", 12345);
     _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
@@ -583,9 +583,35 @@ TEST_F(SyncSourceResolverTest,
 }
 
 TEST_F(SyncSourceResolverTest,
+       SyncSourceResolverWillTryOtherSourcesWhenFirstNodeContainsBadOplogEntry) {
+    HostAndPort candidate1("node1", 12345);
+    HostAndPort candidate2("node2", 12345);
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
+    ASSERT_OK(_resolver->startup());
+    ASSERT_TRUE(_resolver->isActive());
+
+    _scheduleFirstOplogEntryFetcherResponse(
+        getNet(), _selector.get(), candidate1, candidate2, {BSON("t" << 1)});
+
+    ASSERT_TRUE(_resolver->isActive());
+    ASSERT_EQUALS(candidate1, _selector->getLastBlacklistedSyncSource_forTest());
+    ASSERT_EQUALS(getExecutor().now() +
+                      SyncSourceResolver::kFirstOplogEntryNullTimestampBlacklistDuration,
+                  _selector->getLastBlacklistExpiration_forTest());
+
+    _scheduleFirstOplogEntryFetcherResponse(
+        getNet(), _selector.get(), candidate2, HostAndPort(), Timestamp(10, 2));
+    _scheduleRBIDResponse(getNet(), candidate2);
+
+    _resolver->join();
+    ASSERT_FALSE(_resolver->isActive());
+    ASSERT_EQUALS(candidate2, unittest::assertGet(_response.syncSourceStatus));
+}
+
+TEST_F(SyncSourceResolverTest,
        SyncSourceResolverWillTryOtherSourcesWhenFirstNodeContainsOplogEntryWithNullTimestamp) {
     HostAndPort candidate1("node1", 12345);
-    HostAndPort candidate2("node1", 12345);
+    HostAndPort candidate2("node2", 12345);
     _selector->setChooseNewSyncSourceResult_forTest(candidate1);
     ASSERT_OK(_resolver->startup());
     ASSERT_TRUE(_resolver->isActive());
@@ -608,6 +634,26 @@ TEST_F(SyncSourceResolverTest,
     ASSERT_EQUALS(candidate2, unittest::assertGet(_response.syncSourceStatus));
 }
 
+
+TEST_F(SyncSourceResolverTest, SyncSourceResolverWillSucceedWithExtraFields) {
+    HostAndPort candidate1("node1", 12345);
+    _selector->setChooseNewSyncSourceResult_forTest(candidate1);
+    ASSERT_OK(_resolver->startup());
+    ASSERT_TRUE(_resolver->isActive());
+
+    _scheduleFirstOplogEntryFetcherResponse(getNet(),
+                                            _selector.get(),
+                                            candidate1,
+                                            HostAndPort(),
+                                            {BSON("ts" << Timestamp(1, 1) << "t" << 1 << "note"
+                                                       << "a")});
+
+    _scheduleRBIDResponse(getNet(), candidate1);
+
+    _resolver->join();
+    ASSERT_FALSE(_resolver->isActive());
+    ASSERT_EQUALS(candidate1, unittest::assertGet(_response.syncSourceStatus));
+}
 /**
  * Constructs and schedules a network interface response using the given documents to the required
  * optime on the sync source candidate.
