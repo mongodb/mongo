@@ -27,6 +27,7 @@ from yaml import nodes
 from typing import Any, Callable, Dict, List, Set, Tuple, Union
 
 from . import common
+from . import cpp_types
 from . import errors
 from . import syntax
 
@@ -427,6 +428,36 @@ def _parse_command(ctxt, spec, name, node):
     spec.symbols.add_command(ctxt, command)
 
 
+def _prefix_with_namespace(cpp_namespace, cpp_name):
+    # type: (unicode, unicode) -> unicode
+    """Preface a C++ type name with a namespace if not already qualified or a primitive type."""
+    if "::" in cpp_name or cpp_types.is_primitive_scalar_type(cpp_name):
+        return cpp_name
+
+    return cpp_namespace + "::" + cpp_name
+
+
+def _propagate_globals(spec):
+    # type: (syntax.IDLSpec) -> None
+    """Propagate the globals information to each type and struct as needed."""
+    if not spec.globals or not spec.globals.cpp_namespace:
+        return
+
+    cpp_namespace = spec.globals.cpp_namespace
+
+    for struct in spec.symbols.structs:
+        struct.cpp_namespace = cpp_namespace
+
+    for command in spec.symbols.commands:
+        command.cpp_namespace = cpp_namespace
+
+    for idlenum in spec.symbols.enums:
+        idlenum.cpp_namespace = cpp_namespace
+
+    for idltype in spec.symbols.types:
+        idltype.cpp_type = _prefix_with_namespace(cpp_namespace, idltype.cpp_type)
+
+
 def _parse(stream, error_file_name):
     # type: (Any, unicode) -> syntax.IDLParsedSpec
     """
@@ -483,6 +514,8 @@ def _parse(stream, error_file_name):
     if ctxt.errors.has_errors():
         return syntax.IDLParsedSpec(None, ctxt.errors)
     else:
+        _propagate_globals(spec)
+
         return syntax.IDLParsedSpec(spec, None)
 
 

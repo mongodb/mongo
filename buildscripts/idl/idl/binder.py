@@ -392,6 +392,31 @@ def _validate_doc_sequence_field(ctxt, ast_field):
         ctxt.add_bad_non_object_as_doc_sequence_error(ast_field, ast_field.name)
 
 
+def _normalize_method_name(cpp_type_name, cpp_method_name):
+    # type: (unicode, unicode) -> unicode
+    """Normalize the method name to be fully-qualified with the type name."""
+    # Default deserializer
+    if not cpp_method_name:
+        return cpp_method_name
+
+    # Global function
+    if cpp_method_name.startswith('::'):
+        return cpp_method_name
+
+    # Method is full qualified already
+    if cpp_method_name.startswith(cpp_type_name):
+        return cpp_method_name
+
+    # Get the unqualified type name
+    type_name = cpp_type_name.split("::")[-1]
+
+    # Method is prefixed with just the type name
+    if cpp_method_name.startswith(type_name):
+        return '::'.join(cpp_type_name.split('::')[0:-1]) + "::" + cpp_method_name
+
+    return cpp_method_name
+
+
 def _bind_field(ctxt, parsed_spec, field):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Field) -> ast.Field
     """
@@ -444,7 +469,7 @@ def _bind_field(ctxt, parsed_spec, field):
     # Copy over only the needed information if this a struct or a type
     if isinstance(syntax_symbol, syntax.Struct):
         struct = cast(syntax.Struct, syntax_symbol)
-        ast_field.struct_type = struct.name
+        ast_field.struct_type = common.qualify_cpp_name(struct.cpp_namespace, struct.name)
         ast_field.bson_serialization_type = ["object"]
 
         _validate_field_of_type_struct(ctxt, field)
@@ -452,7 +477,7 @@ def _bind_field(ctxt, parsed_spec, field):
         enum_type_info = enum_types.get_type_info(cast(syntax.Enum, syntax_symbol))
 
         ast_field.enum_type = True
-        ast_field.cpp_type = enum_type_info.get_cpp_type_name()
+        ast_field.cpp_type = enum_type_info.get_qualified_cpp_type_name()
         ast_field.bson_serialization_type = enum_type_info.get_bson_types()
         ast_field.serializer = enum_type_info.get_enum_serializer_name()
         ast_field.deserializer = enum_type_info.get_enum_deserializer_name()
@@ -466,8 +491,8 @@ def _bind_field(ctxt, parsed_spec, field):
         ast_field.cpp_type = idltype.cpp_type
         ast_field.bson_serialization_type = idltype.bson_serialization_type
         ast_field.bindata_subtype = idltype.bindata_subtype
-        ast_field.serializer = idltype.serializer
-        ast_field.deserializer = idltype.deserializer
+        ast_field.serializer = _normalize_method_name(idltype.cpp_type, idltype.serializer)
+        ast_field.deserializer = _normalize_method_name(idltype.cpp_type, idltype.deserializer)
         ast_field.default = idltype.default
 
         if field.default:
@@ -627,6 +652,7 @@ def _bind_enum(ctxt, idl_enum):
     ast_enum.name = idl_enum.name
     ast_enum.description = idl_enum.description
     ast_enum.type = idl_enum.type
+    ast_enum.cpp_namespace = idl_enum.cpp_namespace
 
     enum_type_info = enum_types.get_type_info(idl_enum)
     if not enum_type_info:

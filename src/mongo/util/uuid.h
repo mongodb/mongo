@@ -45,6 +45,12 @@ namespace repl {
 class OplogEntryBase;
 }  // namespace repl
 
+namespace idl {
+namespace import {
+class One_UUID;
+}  // namespace import
+}  // namespace idl
+
 /**
  * A UUID is a 128-bit unique identifier, per RFC 4122, v4, using
  * a secure random number generator.
@@ -55,7 +61,7 @@ class UUID {
     // Make the IDL generated parser a friend
     friend class ConfigsvrShardCollectionResponse;
     friend class DbCheckOplogCollection;
-    friend class One_UUID;
+    friend class idl::import::One_UUID;
     friend class LogicalSessionId;
     friend class LogicalSessionToClient;
     friend class LogicalSessionIdToClient;

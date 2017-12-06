@@ -179,6 +179,7 @@ class Enum(common.SourceLocation):
         """Construct an Enum."""
         self.name = None  # type: unicode
         self.description = None  # type: unicode
+        self.cpp_namespace = None  # type: unicode
         self.type = None  # type: unicode
         self.values = []  # type: List[EnumValue]
 

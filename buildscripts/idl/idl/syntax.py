@@ -350,6 +350,9 @@ class Struct(common.SourceLocation):
         # imported file, and no code is generated for it.
         self.imported = False  # type: bool
 
+        # Internal property: cpp_namespace from globals section
+        self.cpp_namespace = None  # type: unicode
+
         super(Struct, self).__init__(file_name, line, column)
 
 
@@ -402,5 +405,8 @@ class Enum(common.SourceLocation):
         # Internal property that is not represented as syntax. An imported enum is read from an
         # imported file, and no code is generated for it.
         self.imported = False  # type: bool
+
+        # Internal property: cpp_namespace from globals section
+        self.cpp_namespace = None  # type: unicode
 
         super(Enum, self).__init__(file_name, line, column)

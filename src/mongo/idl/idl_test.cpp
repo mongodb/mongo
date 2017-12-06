@@ -35,6 +35,7 @@
 #include "mongo/util/net/op_msg.h"
 
 using namespace mongo::idl::test;
+using namespace mongo::idl::import;
 
 namespace mongo {
 
@@ -896,7 +897,8 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     assert_same_types<decltype(testStruct.getField4()),
                       const std::vector<mongo::ObjectBasicType>&>();
     assert_same_types<decltype(testStruct.getField5()), const std::vector<mongo::BSONObj>&>();
-    assert_same_types<decltype(testStruct.getField6()), const std::vector<mongo::One_string>&>();
+    assert_same_types<decltype(testStruct.getField6()),
+                      const std::vector<mongo::idl::import::One_string>&>();
 
     assert_same_types<decltype(testStruct.getField1o()),
                       const boost::optional<std::vector<std::int64_t>>&>();
@@ -909,7 +911,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     assert_same_types<decltype(testStruct.getField5o()),
                       const boost::optional<std::vector<mongo::BSONObj>>&>();
     assert_same_types<decltype(testStruct.getField6o()),
-                      const boost::optional<std::vector<mongo::One_string>>&>();
+                      const boost::optional<std::vector<mongo::idl::import::One_string>>&>();
 
     std::vector<std::int64_t> field1{1, 2, 3};
     ASSERT_TRUE(field1 == testStruct.getField1());
