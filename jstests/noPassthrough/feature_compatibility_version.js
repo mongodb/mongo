@@ -6,6 +6,10 @@
 
     load("jstests/libs/feature_compatibility_version.js");
 
+    // Skip collection validation since this test leaves collections in an invalid state, where
+    // FCV=3.4 but UUIDs exist.
+    TestData.skipCollectionAndIndexValidation = true;
+
     /**
      * Checks that the featureCompatibilityVersion document is missing, and the
      * featureCompatibilityVersion server parameter is "3.4".
