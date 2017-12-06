@@ -174,12 +174,6 @@ public:
     bool allowDiskUse = false;
     bool bypassDocumentValidation = false;
 
-    // We track whether the aggregation request came from a 3.4 mongos. If so, the merge may occur
-    // on a 3.4 shard (which does not understand sort key metadata), and we should not serialize the
-    // sort key.
-    // TODO SERVER-30924: remove this.
-    bool from34Mongos = false;
-
     NamespaceString ns;
     boost::optional<UUID> uuid;
     std::string tempDir;  // Defaults to empty to prevent external sorting in mongos.

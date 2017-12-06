@@ -208,7 +208,7 @@ public:
      * Like toBson, but includes metadata at the top-level.
      * Output is parseable by fromBsonWithMetaData
      */
-    BSONObj toBsonWithMetaData(bool includeSortKey = true) const;
+    BSONObj toBsonWithMetaData() const;
 
     /**
      * Like Document(BSONObj) but treats top-level fields with special names as metadata.

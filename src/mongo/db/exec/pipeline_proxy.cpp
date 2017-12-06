@@ -52,7 +52,6 @@ PipelineProxyStage::PipelineProxyStage(OperationContext* opCtx,
     : PlanStage(kStageType, opCtx),
       _pipeline(std::move(pipeline)),
       _includeMetaData(_pipeline->getContext()->needsMerge),  // send metadata to merger
-      _includeSortKey(_includeMetaData && !_pipeline->getContext()->from34Mongos),
       _ws(ws) {
     // We take over responsibility for disposing of the Pipeline, since it is required that
     // doDispose() will be called before destruction of this PipelineProxyStage.
@@ -118,7 +117,7 @@ unique_ptr<PlanStageStats> PipelineProxyStage::getStats() {
 boost::optional<BSONObj> PipelineProxyStage::getNextBson() {
     if (auto next = _pipeline->getNext()) {
         if (_includeMetaData) {
-            return next->toBsonWithMetaData(_includeSortKey);
+            return next->toBsonWithMetaData();
         } else {
             return next->toBson();
         }

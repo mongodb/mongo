@@ -51,7 +51,6 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     needsMerge = request.needsMerge();
     allowDiskUse = request.shouldAllowDiskUse();
     bypassDocumentValidation = request.shouldBypassDocumentValidation();
-    from34Mongos = request.isFrom34Mongos();
     ns = request.getNamespaceString();
     collation = request.getCollation();
     _ownedCollator = std::move(collator);
@@ -135,7 +134,6 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     expCtx->comment = comment;
     expCtx->needsMerge = needsMerge;
     expCtx->fromMongos = fromMongos;
-    expCtx->from34Mongos = from34Mongos;
     expCtx->inMongos = inMongos;
     expCtx->allowDiskUse = allowDiskUse;
     expCtx->bypassDocumentValidation = bypassDocumentValidation;
