@@ -637,9 +637,14 @@ if env.TargetOSIs('windows'):
     # On windows the .in needs to be explicitly added to the file.
     compass_script = "Install-Compass.ps1.in"
 
+compass_python_interpreter = '/usr/bin/env python2'
+if env.TargetOSIs('darwin'):
+    compass_python_interpreter = '/usr/bin/env python'
+
 compass_installer = env.Substfile('#/src/mongo/installer/compass/' + compass_script,
                                   SUBST_DICT=[
-                                      ('@compass_type@', compass_type)
+                                      ('@compass_type@', compass_type),
+                                      ('@python_interpreter@', compass_python_interpreter),
                                   ])
 distBinaries.append(compass_installer)
 
