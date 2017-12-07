@@ -596,6 +596,15 @@ const std::vector<BSONObj>& getInterestingElements(KeyString::Version version) {
 
     // Something that needs multiple bytes of typeBits
     elements.push_back(BSON("" << BSON_ARRAY("" << BSONSymbol("") << 0 << 0ll << 0.0 << -0.0)));
+    if (version != KeyString::Version::V0) {
+        // Something with exceptional typeBits for Decimal
+        elements.push_back(
+            BSON("" << BSON_ARRAY("" << BSONSymbol("") << Decimal128::kNegativeInfinity
+                                     << Decimal128::kPositiveInfinity
+                                     << Decimal128::kPositiveNaN
+                                     << Decimal128("0.0000000")
+                                     << Decimal128("-0E1000"))));
+    }
 
     //
     // Interesting numeric cases
@@ -605,6 +614,11 @@ const std::vector<BSONObj>& getInterestingElements(KeyString::Version version) {
     elements.push_back(BSON("" << 0ll));
     elements.push_back(BSON("" << 0.0));
     elements.push_back(BSON("" << -0.0));
+    if (version != KeyString::Version::V0) {
+        Decimal128("0.0.0000000");
+        Decimal128("-0E1000");
+    }
+
     elements.push_back(BSON("" << std::numeric_limits<double>::quiet_NaN()));
     elements.push_back(BSON("" << std::numeric_limits<double>::infinity()));
     elements.push_back(BSON("" << -std::numeric_limits<double>::infinity()));
@@ -740,6 +754,11 @@ const std::vector<BSONObj>& getInterestingElements(KeyString::Version version) {
         elements.push_back(BSON("" << Decimal128("4.940656458412465441765687928682214E-324")));
         elements.push_back(BSON("" << Decimal128("-4.940656458412465441765687928682214E-324")));
         elements.push_back(BSON("" << Decimal128("-4.940656458412465441765687928682213E-324")));
+
+        // Non-finite values. Note: can't roundtrip negative NaNs, so not testing here.
+        elements.push_back(BSON("" << Decimal128::kPositiveNaN));
+        elements.push_back(BSON("" << Decimal128::kNegativeInfinity));
+        elements.push_back(BSON("" << Decimal128::kPositiveInfinity));
     }
 
     // Tricky double precision number for binary/decimal conversion: very close to a decimal
@@ -823,8 +842,36 @@ void testPermutation(KeyString::Version version,
     }
 }
 
+namespace {
+std::random_device rd;
+std::mt19937_64 seedGen(rd());
+
+// To be used by perf test for seeding, so that the entire test is repeatable in case of error.
+unsigned newSeed() {
+    unsigned int seed = seedGen();  // Replace by the reported number to repeat test execution.
+    log() << "Initializing random number generator using seed " << seed;
+    return seed;
+};
+
+std::vector<BSONObj> thinElements(std::vector<BSONObj> elements,
+                                  unsigned seed,
+                                  size_t maxElements) {
+    std::mt19937_64 gen(seed);
+
+    if (elements.size() <= maxElements)
+        return elements;
+
+    log() << "only keeping " << maxElements << " of " << elements.size()
+          << " elements using random selection";
+    std::shuffle(elements.begin(), elements.end(), gen);
+    elements.resize(maxElements);
+    return elements;
+}
+}  // namespace
+
+
 TEST_F(KeyStringTest, AllPermCompare) {
-    const std::vector<BSONObj>& elements = getInterestingElements(version);
+    std::vector<BSONObj> elements = getInterestingElements(version);
 
     for (size_t i = 0; i < elements.size(); i++) {
         const BSONObj& o = elements[i];
@@ -839,19 +886,23 @@ TEST_F(KeyStringTest, AllPermCompare) {
 }
 
 TEST_F(KeyStringTest, AllPerm2Compare) {
-#if !defined(MONGO_CONFIG_OPTIMIZED_BUILD)
-    log() << "\t\t\tskipping permutation testing on non-optimized build";
-    return;
-#endif
+    std::vector<BSONObj> baseElements = getInterestingElements(version);
+    auto seed = newSeed();
 
-    const std::vector<BSONObj>& baseElements = getInterestingElements(version);
+    // Select only a small subset of elements, as the combination is quadratic.
+    // We want to select two subsets independently, so all combinations will get tested eventually.
+    // kMaxPermElements is the desired number of elements to pass to testPermutation.
+    const size_t kMaxPermElements = kDebugBuild ? 100000 : 500000;
+    size_t maxElements = sqrt(kMaxPermElements);
+    auto firstElements = thinElements(baseElements, seed, maxElements);
+    auto secondElements = thinElements(baseElements, seed + 1, maxElements);
 
     std::vector<BSONObj> elements;
-    for (size_t i = 0; i < baseElements.size(); i++) {
-        for (size_t j = 0; j < baseElements.size(); j++) {
+    for (size_t i = 0; i < firstElements.size(); i++) {
+        for (size_t j = 0; j < secondElements.size(); j++) {
             BSONObjBuilder b;
-            b.appendElements(baseElements[i]);
-            b.appendElements(baseElements[j]);
+            b.appendElements(firstElements[i]);
+            b.appendElements(secondElements[j]);
             BSONObj o = b.obj();
             elements.push_back(o);
         }
@@ -927,6 +978,27 @@ TEST_F(KeyStringTest, NaNs) {
     ASSERT(std::isnan(toBson(ks2a, ONE_ASCENDING)[""].Double()));
     ASSERT(std::isnan(toBson(ks1d, ONE_DESCENDING)[""].Double()));
     ASSERT(std::isnan(toBson(ks2d, ONE_DESCENDING)[""].Double()));
+
+    if (version == KeyString::Version::V0)
+        return;
+
+    const auto nan3 = Decimal128::kPositiveNaN;
+    const auto nan4 = Decimal128::kNegativeNaN;
+    // Since we only output a single NaN, we can only do ROUNDTRIP testing for nan1.
+    ROUNDTRIP(version, BSON("" << nan3));
+    const KeyString ks3a(version, BSON("" << nan3), ONE_ASCENDING);
+    const KeyString ks3d(version, BSON("" << nan3), ONE_DESCENDING);
+
+    const KeyString ks4a(version, BSON("" << nan4), ONE_ASCENDING);
+    const KeyString ks4d(version, BSON("" << nan4), ONE_DESCENDING);
+
+    ASSERT_EQ(ks1a, ks4a);
+    ASSERT_EQ(ks1d, ks4d);
+
+    ASSERT(toBson(ks3a, ONE_ASCENDING)[""].Decimal().isNaN());
+    ASSERT(toBson(ks4a, ONE_ASCENDING)[""].Decimal().isNaN());
+    ASSERT(toBson(ks3d, ONE_DESCENDING)[""].Decimal().isNaN());
+    ASSERT(toBson(ks4d, ONE_DESCENDING)[""].Decimal().isNaN());
 }
 TEST_F(KeyStringTest, NumberOrderLots) {
     std::vector<BSONObj> numbers;
@@ -1073,16 +1145,6 @@ namespace {
 const uint64_t kMinPerfMicros = 20 * 1000;
 const uint64_t kMinPerfSamples = 50 * 1000;
 typedef std::vector<BSONObj> Numbers;
-
-std::random_device rd;
-std::mt19937 seedGen(rd());
-
-// To be used by perf test for seeding, so that the entire test is repeatable in case of error.
-unsigned newSeed() {
-    unsigned int seed = seedGen();  // Replace by the reported number to repeat test execution.
-    log() << "Initializing random number generator using seed " << seed;
-    return seed;
-};
 
 /**
  * Evaluates ROUNDTRIP on all items in Numbers a sufficient number of times to take at least
