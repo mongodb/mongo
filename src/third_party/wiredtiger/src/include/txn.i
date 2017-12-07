@@ -456,6 +456,10 @@ __wt_txn_visible(
 	if (!__txn_visible_id(session, id))
 		return (false);
 
+	/* Transactions read their writes, regardless of timestamps. */
+	if (F_ISSET(&session->txn, WT_TXN_HAS_ID) && id == session->txn.id)
+		return (true);
+
 #ifdef HAVE_TIMESTAMPS
 	{
 	WT_TXN *txn = &session->txn;
