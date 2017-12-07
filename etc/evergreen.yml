@@ -491,118 +491,136 @@ functions:
           virtualenv --python $python_loc --system-site-packages ./venv
 
   "run tests" :
-    command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
 
-        if [ ${disable_unit_tests|false} = "false" ]; then
+          if [ ${disable_unit_tests|false} = "false" ]; then
 
-        # activate the virtualenv if it has been set up
-        ${activate_virtualenv}
+          # activate the virtualenv if it has been set up
+          ${activate_virtualenv}
 
-        if [ -f /proc/self/coredump_filter ]; then
-          # Set the shell process (and its children processes) to dump ELF headers (bit 4),
-          # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
-          echo 0x13 > /proc/self/coredump_filter
+          if [ -f /proc/self/coredump_filter ]; then
+            # Set the shell process (and its children processes) to dump ELF headers (bit 4),
+            # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
+            echo 0x13 > /proc/self/coredump_filter
 
-          if [ -f /sbin/sysctl ]; then
-            # Check that the core pattern is set explicitly on our distro image instead
-            # of being the OS's default value. This ensures that coredump names are consistent
-            # across distros and can be picked up by Evergreen.
-            core_pattern=$(/sbin/sysctl -n "kernel.core_pattern")
-            if [ "$core_pattern" = "dump_%e.%p.core" ]; then
-              echo "Enabling coredumps"
-              ulimit -c unlimited
+            if [ -f /sbin/sysctl ]; then
+              # Check that the core pattern is set explicitly on our distro image instead
+              # of being the OS's default value. This ensures that coredump names are consistent
+              # across distros and can be picked up by Evergreen.
+              core_pattern=$(/sbin/sysctl -n "kernel.core_pattern")
+              if [ "$core_pattern" = "dump_%e.%p.core" ]; then
+                echo "Enabling coredumps"
+                ulimit -c unlimited
+              fi
             fi
           fi
-        fi
 
-        extra_args=""
-        if [ ${run_multiple_jobs|false} = true ]; then
-          processor_architecture=$(uname -m)
-          num_jobs_available=${num_jobs_available|1}
-          # Reduce the number of available jobs by half when running any sharding*, replica_sets*
-          # and select jsCore passthrough tasks on Windows and ARM to avoid overwhelming test hosts.
-          if [ "Windows_NT" = "$OS" ] || [ "aarch64" = $processor_architecture ]; then
-            case "${task_name}" in
-            replica_sets_initsync_jscore_passthrough          \
-            |replica_sets_initsync_static_jscore_passthrough  \
-            |replica_sets_resync_static_jscore_passthrough    \
-            |replica_sets*                           \
-            |sharding*                              \
-            )
-              num_jobs_available=$((${num_jobs_available|2} / 2))
-              echo "Reducing jobs from ${num_jobs_available|1} to $num_jobs_available"
-              ;;
-            esac
+          extra_args=""
+          if [ ${run_multiple_jobs|false} = true ]; then
+            processor_architecture=$(uname -m)
+            num_jobs_available=${num_jobs_available|1}
+            # Reduce the number of available jobs by half when running any sharding*, replica_sets*
+            # and select jsCore passthrough tasks on Windows and ARM to avoid overwhelming test hosts.
+            if [ "Windows_NT" = "$OS" ] || [ "aarch64" = $processor_architecture ]; then
+              case "${task_name}" in
+              replica_sets_initsync_jscore_passthrough          \
+              |replica_sets_initsync_static_jscore_passthrough  \
+              |replica_sets_resync_static_jscore_passthrough    \
+              |replica_sets*                           \
+              |sharding*                              \
+              )
+                num_jobs_available=$((${num_jobs_available|2} / 2))
+                echo "Reducing jobs from ${num_jobs_available|1} to $num_jobs_available"
+                ;;
+              esac
+            fi
+
+            if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt $num_jobs_available ]; then
+              extra_args="$extra_args --jobs=${max_jobs}"
+            else
+              extra_args="$extra_args --jobs=$num_jobs_available"
+            fi
           fi
 
-          if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt $num_jobs_available ]; then
-            extra_args="$extra_args --jobs=${max_jobs}"
+          if [ ${should_shuffle|true} = true ]; then
+            extra_args="$extra_args --shuffle"
+          fi
+
+          if [ ${continue_on_failure|true} = true ]; then
+            extra_args="$extra_args --continueOnFailure"
+          fi
+
+          # Default storageEngineCacheSizeGB to 1. Override on individual test config if needed.
+          # resmoke will assign to the appropriate parameter on storage engines that support it.
+          set +o errexit
+          echo "${resmoke_args}" | grep -q storageEngineCacheSizeGB
+          if [ $? -eq 1 ]; then
+            extra_args="$extra_args --storageEngineCacheSizeGB=1"
+          fi
+          set -o errexit
+
+          path_value="$PATH"
+          if [ ${variant_path_suffix} ]; then
+            path_value="$path_value:${variant_path_suffix}"
+          fi
+          if [ ${task_path_suffix} ]; then
+            path_value="$path_value:${task_path_suffix}"
+          fi
+
+          if [ "${is_patch|}" = "true" ]; then
+            extra_args="$extra_args --tagFile=etc/test_lifecycle.yml --patchBuild"
           else
-            extra_args="$extra_args --jobs=$num_jobs_available"
+            extra_args="$extra_args --tagFile=etc/test_retrial.yml"
           fi
-        fi
 
-        if [ ${should_shuffle|true} = true ]; then
-          extra_args="$extra_args --shuffle"
-        fi
+          # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
+          # invocation. It doesn't set any environment variables and should therefore come last in
+          # this list of expansions.
+          set +o errexit
+          PATH="$path_value"                              \
+              ${gcov_environment}                         \
+              ${rlp_environment}                          \
+              ${lang_environment}                         \
+              ${san_options}                              \
+              ${san_symbolizer}                           \
+              ${snmp_config_path}                         \
+              ${resmoke_wrapper}                          \
+              $python buildscripts/evergreen_run_tests.py \
+                  ${resmoke_args}                         \
+                  $extra_args                             \
+                  ${test_flags}                           \
+                  --log=buildlogger                       \
+                  --staggerJobs=on                        \
+                  --taskId=${task_id}                     \
+                  --taskName=${task_name}                 \
+                  --variantName=${build_variant}          \
+                  --distroId=${distro_id}                 \
+                  --reportFile=report.json
+          resmoke_exit_code=$?
+          set -o errexit
 
-        if [ ${continue_on_failure|true} = true ]; then
-          extra_args="$extra_args --continueOnFailure"
-        fi
+          # 74 is exit code for IOError on POSIX systems.
+          if [[ $resmoke_exit_code = 74 ]]; then
+            echo $resmoke_exit_code > run_tests_system_failure
+            exit 0
+          fi
+          exit $resmoke_exit_code
+          fi # end if ${disable_unit_tests}
 
-        # Default storageEngineCacheSizeGB to 1. Override on individual test config if needed.
-        # resmoke will assign to the appropriate parameter on storage engines that support it.
-        set +o errexit
-        echo "${resmoke_args}" | grep -q storageEngineCacheSizeGB
-        if [ $? -eq 1 ]; then
-          extra_args="$extra_args --storageEngineCacheSizeGB=1"
-        fi
-        set -o errexit
-
-        path_value="$PATH"
-        if [ ${variant_path_suffix} ]; then
-          path_value="$path_value:${variant_path_suffix}"
-        fi
-        if [ ${task_path_suffix} ]; then
-          path_value="$path_value:${task_path_suffix}"
-        fi
-
-        if [ "${is_patch|}" = "true" ]; then
-          extra_args="$extra_args --tagFile=etc/test_lifecycle.yml --patchBuild"
-        else
-          extra_args="$extra_args --tagFile=etc/test_retrial.yml"
-        fi
-
-        # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
-        # invocation. It doesn't set any environment variables and should therefore come last in
-        # this list of expansions.
-        PATH="$path_value"                              \
-            ${gcov_environment}                         \
-            ${rlp_environment}                          \
-            ${lang_environment}                         \
-            ${san_options}                              \
-            ${san_symbolizer}                           \
-            ${snmp_config_path}                         \
-            ${resmoke_wrapper}                          \
-            $python buildscripts/evergreen_run_tests.py \
-                ${resmoke_args}                         \
-                $extra_args                             \
-                ${test_flags}                           \
-                --log=buildlogger                       \
-                --staggerJobs=on                        \
-                --taskId=${task_id}                     \
-                --taskName=${task_name}                 \
-                --variantName=${build_variant}          \
-                --distroId=${distro_id}                 \
-                --reportFile=report.json
-
-        fi # end if ${disable_unit_tests}
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          if [ -f run_tests_system_failure ]; then
+            exit $(cat run_tests_system_failure)
+          fi
 
   "do jepsen setup" :
     - command: shell.exec

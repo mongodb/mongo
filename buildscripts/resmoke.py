@@ -75,6 +75,9 @@ def _execute_suite(suite):
     except resmokelib.errors.UserInterrupt:
         suite.return_code = 130  # Simulate SIGINT as exit code.
         return True
+    except IOError:
+        suite.return_code = 74  # Exit code for IOError on POSIX systems.
+        return True
     except:
         logger.exception("Encountered an error when running %ss of suite %s.",
                          suite.test_kind, suite.get_display_name())
