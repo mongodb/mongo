@@ -3933,15 +3933,6 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: replica_sets_rollback_refetch_no_uuid
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=replica_sets_rollback_refetch_no_uuid
-      run_multiple_jobs: true
-
-- <<: *task_template
   name: master_slave
   commands:
   - func: "do setup"
@@ -5154,7 +5145,6 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_pv0
-  - name: replica_sets_rollback_refetch_no_uuid
   - name: retryable_writes_jscore_passthrough_WT
   - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: master_slave_WT
@@ -6932,9 +6922,6 @@ buildvariants:
     distros:
     - rhel62-large
   - name: replica_sets_pv0
-    distros:
-    - rhel62-large
-  - name: replica_sets_rollback_refetch_no_uuid
     distros:
     - rhel62-large
   - name: replica_sets_jscore_passthrough_WT
