@@ -30,7 +30,6 @@
 
 #include "mongo/db/service_liason.h"
 
-#include "mongo/db/keys_collection_manager_zero.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/service_context.h"
 

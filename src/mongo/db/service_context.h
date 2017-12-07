@@ -31,7 +31,6 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"

@@ -289,7 +289,6 @@ env.Library(
         'db/ftdc/ftdc_mongod',
         'db/index_d',
         'db/initialize_snmp',
-        'db/keys_collection_manager_direct',
         'db/kill_sessions_local',
         'db/logical_session_cache_factory_mongod',
         'db/mongod_options',

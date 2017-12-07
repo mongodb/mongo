@@ -78,7 +78,6 @@
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
-#include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/log_process_details.h"
@@ -946,7 +945,7 @@ ExitCode _initAndListen(int listenPort) {
                 makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
         } else if (replSettings.usingReplSets()) {  // standalone replica set
             auto keysCollectionClient = stdx::make_unique<KeysCollectionClientDirect>();
-            auto keyManager = std::make_shared<KeysCollectionManagerSharding>(
+            auto keyManager = std::make_shared<KeysCollectionManager>(
                 KeysCollectionManager::kKeyManagerPurposeString,
                 std::move(keysCollectionClient),
                 Seconds(KeysRotationIntervalSec));

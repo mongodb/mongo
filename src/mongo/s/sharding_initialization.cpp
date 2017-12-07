@@ -39,7 +39,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
-#include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -247,10 +246,10 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
 
     auto keysCollectionClient =
         stdx::make_unique<KeysCollectionClientSharded>(grid->catalogClient());
-    auto keyManager = std::make_shared<KeysCollectionManagerSharding>(
-        KeysCollectionManager::kKeyManagerPurposeString,
-        std::move(keysCollectionClient),
-        Seconds(KeysRotationIntervalSec));
+    auto keyManager =
+        std::make_shared<KeysCollectionManager>(KeysCollectionManager::kKeyManagerPurposeString,
+                                                std::move(keysCollectionClient),
+                                                Seconds(KeysRotationIntervalSec));
     keyManager->startMonitoring(opCtx->getServiceContext());
 
     LogicalTimeValidator::set(opCtx->getServiceContext(),
