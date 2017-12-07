@@ -156,7 +156,7 @@ js_engine_ver = get_option("js-engine") if get_option("server-js") == "on" else 
 
 # On windows, we need to escape the backslashes in the command-line
 # so that windows paths look okay.
-cmd_line = " ".join(sys.argv).encode('string-escape')
+cmd_line = " ".join(sys.argv).encode('unicode_escape')
 if env.TargetOSIs('windows'):
     cmd_line = cmd_line.replace('\\', r'\\')
 
@@ -601,7 +601,7 @@ env.Append(MODULE_BANNERS = [distsrc.File('README'),
                              distsrc.File('MPL-2')])
 
 # If no module has introduced a file named LICENSE.txt, then inject the AGPL.
-if sum(itertools.imap(lambda x: x.name == "LICENSE.txt", env['MODULE_BANNERS'])) == 0:
+if sum(map(lambda x: x.name == "LICENSE.txt", env['MODULE_BANNERS'])) == 0:
     env.Append(MODULE_BANNERS = [distsrc.File('GNU-AGPL-3.0')])
 
 # All module banners get staged to the top level of the tarfile, so we

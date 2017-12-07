@@ -11,7 +11,7 @@ import distutils.sysconfig
 EnsureSConsVersion( 2, 0, 0 )
 
 if not os.sys.platform == "win32":
-    print ("SConstruct is only supported for Windows, use build_posix for other platforms")
+    print("SConstruct is only supported for Windows, use build_posix for other platforms")
     Exit(1)
 
 # Command line options
@@ -118,7 +118,7 @@ wtlibs = []
 
 conf = Configure(env)
 if not conf.CheckCHeader('stdlib.h'):
-    print 'stdlib.h must be installed!'
+    print('stdlib.h must be installed!')
     Exit(1)
 
 if useZlib:
@@ -128,7 +128,7 @@ if useZlib:
         conf.env.Append(CPPDEFINES=["HAVE_BUILTIN_EXTENSION_ZLIB"])
         wtlibs.append("zlib")
     else:
-        print 'zlib.h must be installed!'
+        print('zlib.h must be installed!')
         Exit(1)
 
 if useSnappy:
@@ -138,7 +138,7 @@ if useSnappy:
         conf.env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_SNAPPY'])
         wtlibs.append("snappy")
     else:
-        print 'snappy-c.h must be installed!'
+        print('snappy-c.h must be installed!')
         Exit(1)
 
 if useLz4:
@@ -148,14 +148,14 @@ if useLz4:
         conf.env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_LZ4'])
         wtlibs.append("lz4")
     else:
-        print 'lz4.h must be installed!'
+        print('lz4.h must be installed!')
         Exit(1)
 
 if useBdb:
     conf.env.Append(CPPPATH=[useBdb+ "/include"])
     conf.env.Append(LIBPATH=[useBdb+ "/lib"])
     if not conf.CheckCHeader('db.h'):
-        print 'db.h must be installed!'
+        print('db.h must be installed!')
         Exit(1)
 
 if useTcmalloc:
@@ -166,7 +166,7 @@ if useTcmalloc:
         conf.env.Append(CPPDEFINES=['HAVE_LIBTCMALLOC'])
         conf.env.Append(CPPDEFINES=['HAVE_POSIX_MEMALIGN'])
     else:
-        print 'tcmalloc.h must be installed!'
+        print('tcmalloc.h must be installed!')
         Exit(1)
 
 env = conf.Finish()
@@ -205,7 +205,7 @@ if (VERSION_MAJOR == None or
     VERSION_MINOR == None or
     VERSION_PATCH == None or
     VERSION_STRING == None):
-    print "Failed to find version variables in " + version_file
+    print("Failed to find version variables in " + version_file)
     Exit(1)
 
 wiredtiger_includes = """
@@ -325,7 +325,7 @@ if GetOption("lang-python"):
     # Check that this version of python is 64-bit
     #
     if sys.maxsize < 2**32:
-        print "The Python Interpreter must be 64-bit in order to build the python bindings"
+        print("The Python Interpreter must be 64-bit in order to build the python bindings")
         Exit(1)
 
     pythonEnv = env.Clone()
@@ -384,7 +384,7 @@ examples = [
 # WiredTiger Smoke Test support
 # Runs each test in a custom temporary directory
 def run_smoke_test(x):
-    print "Running Smoke Test: " + x
+    print("Running Smoke Test: " + x)
 
     # Make temp dir
     temp_dir = tempfile.mkdtemp(prefix="wt_home")

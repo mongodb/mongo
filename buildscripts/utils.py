@@ -122,7 +122,7 @@ def getprocesslist():
     raw = ""
     try:
         raw = execsys( "/bin/ps axww" )[0]
-    except Exception,e:
+    except Exception as e:
         print( "can't get processlist: " + str( e ) )
 
     r = re.compile( "[\r\n]+" )
@@ -176,7 +176,7 @@ def didMongodStart( port=27017 , timeout=20 ):
         try:
             checkMongoPort( port )
             return True
-        except Exception,e:
+        except Exception as e:
             print( e )
             timeout = timeout - 1
     return False

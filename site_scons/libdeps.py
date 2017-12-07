@@ -122,7 +122,7 @@ def __get_libdeps(node):
                 marked.add(n.target_node)
                 tsorted.append(n.target_node)
 
-            except DependencyCycleError, e:
+            except DependencyCycleError as e:
                 if len(e.cycle_nodes) == 1 or e.cycle_nodes[0] != e.cycle_nodes[-1]:
                     e.cycle_nodes.insert(0, n.target_node)
                 raise

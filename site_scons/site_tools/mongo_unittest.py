@@ -14,7 +14,7 @@ def unit_test_list_builder_action(env, target, source):
     ofile = open(str(target[0]), 'wb')
     try:
         for s in _unittests:
-            print '\t' + str(s)
+            print('\t' + str(s))
             ofile.write('%s\n' % s)
     finally:
         ofile.close()

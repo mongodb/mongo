@@ -241,7 +241,7 @@ class ProjFileGenerator(object):
 
 def main():
     if len(sys.argv) != 2:
-        print r"Usage: python buildscripts\make_vcxproj.py FILE_NAME"
+        print(r"Usage: python buildscripts\make_vcxproj.py FILE_NAME")
         return
 
     with ProjFileGenerator(sys.argv[1]) as projfile:

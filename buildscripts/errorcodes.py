@@ -9,7 +9,7 @@ Optionally replaces zero codes in source code with new distinct values.
 import bisect
 import os
 import sys
-import utils
+from . import utils
 from collections import defaultdict, namedtuple
 from optparse import OptionParser
 
@@ -66,9 +66,9 @@ def parseSourceFiles( callback ):
 
     for sourceFile in utils.getAllSourceFiles(prefix='src/mongo/'):
         if list_files:
-            print 'scanning file: ' + sourceFile
+            print('scanning file: ' + sourceFile)
 
-        with open(sourceFile) as f:
+        with open(sourceFile,encoding="utf-8") as f:
             text = f.read()
 
             if not any([zz in text for zz in quick]):
@@ -159,7 +159,7 @@ def readErrorCodes():
 
     parseSourceFiles( checkDups )
 
-    if seen.has_key("0"):
+    if "0" in seen:
         code = "0"
         bad = seen[code]
         errors.append( bad )
@@ -189,19 +189,19 @@ def replaceBadCodes( errors, nextCode ):
 
     for loc in skip_errors:
         line, col = getLineAndColumnForPosition(loc)
-        print ("SKIPPING NONZERO code=%s: %s:%d:%d"
+        print( "SKIPPING NONZERO code=%s: %s:%d:%d"
                 % (loc.code, loc.sourceFile, line, col))
 
     # Dedupe, sort, and reverse so we don't have to update offsets as we go.
     for assertLoc in reversed(sorted(set(zero_errors))):
         (sourceFile, byteOffset, lines, code) = assertLoc
         lineNum, _ = getLineAndColumnForPosition(assertLoc)
-        print "UPDATING_FILE: %s:%s" % (sourceFile, lineNum)
+        print("UPDATING_FILE: %s:%s" % (sourceFile, lineNum))
 
         ln = lineNum - 1
 
         with open(sourceFile, 'r+') as f:
-            print "LINE_%d_BEFORE:%s" % (lineNum, f.readlines()[ln].rstrip())
+            print("LINE_%d_BEFORE:%s" % (lineNum, f.readlines()[ln].rstrip()))
 
             f.seek(0)
             text = f.read()
@@ -212,7 +212,7 @@ def replaceBadCodes( errors, nextCode ):
             f.write(text[byteOffset+1:])
             f.seek(0)
 
-            print "LINE_%d_AFTER :%s" % (lineNum, f.readlines()[ln].rstrip())
+            print("LINE_%d_AFTER :%s" % (lineNum, f.readlines()[ln].rstrip()))
         nextCode += 1
 
 
@@ -281,7 +281,7 @@ def main():
     elif options.replace:
         replaceBadCodes(errors, next)
     else:
-        print ERROR_HELP
+        print(ERROR_HELP)
         sys.exit(1)
 
 
