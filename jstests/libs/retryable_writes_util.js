@@ -2,14 +2,22 @@
  * Utilities for testing retryable writes.
  */
 var RetryableWritesUtil = (function() {
-    const retryableWriteCommands =
+    /**
+     * Returns true if the error code is retryable, assuming the command is idempotent.
+     */
+    function isRetryableCode(code) {
+        return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotMasterError(code) ||
+            ErrorCodes.isWriteConcernError(code) || ErrorCodes.isInterruption(code);
+    }
+
+    const kRetryableWriteCommands =
         new Set(["delete", "findandmodify", "findAndModify", "insert", "update"]);
 
     /**
      * Returns true if the command name is that of a retryable write command.
      */
     function isRetryableWriteCmdName(cmdName) {
-        return retryableWriteCommands.has(cmdName);
+        return kRetryableWriteCommands.has(cmdName);
     }
 
     const kStorageEnginesWithoutDocumentLocking = new Set(["ephemeralForTest", "mmapv1"]);
@@ -22,5 +30,5 @@ var RetryableWritesUtil = (function() {
         return !kStorageEnginesWithoutDocumentLocking.has(storageEngineName);
     }
 
-    return {isRetryableWriteCmdName, storageEngineSupportsRetryableWrites};
+    return {isRetryableCode, isRetryableWriteCmdName, storageEngineSupportsRetryableWrites};
 })();

@@ -13,6 +13,8 @@
 
     load("jstests/libs/retryable_writes_util.js");
 
+    const kMaxNumRetries = 3;
+
     // Store a session to access ServerSession#canRetryWrites.
     let _serverSession;
 
@@ -37,6 +39,118 @@
             this, cmdObj, mongoRunCommandWithMetadataOriginal, arguments);
     };
 
+    // Commands assumed to not be blindly retryable.
+    const kNonRetryableCommands = new Set([
+        // Commands that take write concern and do not support txnNumbers.
+        "_configsvrAddShard",
+        "_configsvrAddShardToZone",
+        "_configsvrCommitChunkMerge",
+        "_configsvrCommitChunkMigration",
+        "_configsvrCommitChunkSplit",
+        "_configsvrCreateDatabase",
+        "_configsvrEnableSharding",
+        "_configsvrMoveChunk",
+        "_configsvrMovePrimary",
+        "_configsvrRemoveShard",
+        "_configsvrRemoveShardFromZone",
+        "_configsvrShardCollection",
+        "_configsvrUpdateZoneKeyRange",
+        "_mergeAuthzCollections",
+        "_recvChunkStart",
+        "appendOplogNote",
+        "applyOps",
+        "authSchemaUpgrade",
+        "captrunc",
+        "cleanupOrphaned",
+        "clone",
+        "cloneCollection",
+        "cloneCollectionAsCapped",
+        "collMod",
+        "convertToCapped",
+        "copydb",
+        "create",
+        "createIndexes",
+        "createRole",
+        "createUser",
+        "deleteIndexes",
+        "drop",
+        "dropAllRolesFromDatabase",
+        "dropAllUsersFromDatabase",
+        "dropDatabase",
+        "dropIndexes",
+        "dropRole",
+        "dropUser",
+        "emptycapped",
+        "godinsert",
+        "grantPrivilegesToRole",
+        "grantRolesToRole",
+        "grantRolesToUser",
+        "mapreduce.shardedfinish",
+        "moveChunk",
+        "renameCollection",
+        "revokePrivilegesFromRole",
+        "revokeRolesFromRole",
+        "revokeRolesFromUser",
+        "updateRole",
+        "updateUser",
+
+        // Other commands.
+        "eval",  // May contain non-retryable commands.
+        "$eval",
+    ]);
+
+    // These commands are not idempotent because they return errors if retried after
+    // successfully completing (like IndexNotFound, NamespaceExists, etc.), but because they
+    // only take effect once, and many tests use them to set up state, their errors on retries
+    // are handled specially.
+    const kAcceptableNonRetryableCommands = new Set([
+        "create",
+        "createIndexes",
+        "deleteIndexes",
+        "drop",
+        "dropDatabase",  // Already ignores NamespaceNotFound errors, so not handled below.
+        "dropIndexes",
+    ]);
+
+    function isAcceptableNonRetryableCommand(cmdName) {
+        return kAcceptableNonRetryableCommands.has(cmdName);
+    }
+
+    function isAcceptableRetryFailedResponse(cmdName, res) {
+        return ((cmdName === "create" && res.code === ErrorCodes.NamespaceExists) ||
+                (cmdName === "createIndexes" && res.code === ErrorCodes.IndexAlreadyExists) ||
+                (cmdName === "drop" && res.code === ErrorCodes.NamespaceNotFound) ||
+                ((cmdName === "dropIndexes" || cmdName === "deleteIndexes") &&
+                 res.code === ErrorCodes.IndexNotFound));
+    }
+
+    // Commands that may return different values or fail if retried on a new primary after a
+    // failover.
+    const kNonFailoverTolerantCommands = new Set([
+        "currentOp",  // Failovers can change currentOp output.
+        "getLog",     // The log is different on different servers.
+        "killOp",     // Failovers may interrupt operations intended to be killed later in the test.
+        "logRotate",
+        "planCacheClear",  // The plan cache isn't replicated.
+        "planCacheClearFilters",
+        "planCacheListFilters",
+        "planCacheListPlans",
+        "planCacheListQueryShapes",
+        "planCacheSetFilter",
+        "profile",       // Not replicated, so can't tolerate failovers.
+        "setParameter",  // Not replicated, so can't tolerate failovers.
+        "stageDebug",
+    ]);
+
+    // Several commands that use the plan executor swallow the actual error code from a failed plan
+    // into their error message and instead return OperationFailed.
+    //
+    // TODO SERVER-32208: Remove this function once it is no longer needed.
+    function isRetryableExecutorCodeAndMessage(code, msg) {
+        return code === ErrorCodes.OperationFailed && typeof msg !== "undefined" &&
+            msg.indexOf("InterruptedDueToReplStateChange") >= 0;
+    }
+
     function runWithRetriesOnNetworkErrors(mongo, cmdObj, clientFunction, clientFunctionArguments) {
         let cmdName = Object.keys(cmdObj)[0];
 
@@ -50,11 +164,137 @@
         const isRetryableWriteCmd = RetryableWritesUtil.isRetryableWriteCmdName(cmdName);
         const canRetryWrites = _serverSession.canRetryWrites(cmdObj);
 
-        let numRetries = !jsTest.options().skipRetryOnNetworkError ? 1 : 0;
+        let numRetries = !jsTest.options().skipRetryOnNetworkError ? kMaxNumRetries : 0;
+
+        // Validate the command before running it, to prevent tests with non-retryable commands
+        // from being run.
+        if (isRetryableWriteCmd && !canRetryWrites) {
+            throw new Error("Refusing to run a test that issues non-retryable write operations" +
+                            " since the test likely makes assertions on the write results and" +
+                            " can lead to spurious failures if a network error occurs.");
+        } else if (cmdName === "getMore") {
+            throw new Error(
+                "Refusing to run a test that issues a getMore command since if a network error" +
+                " occurs during it then we won't know whether the cursor was advanced or not.");
+        } else if (kNonRetryableCommands.has(cmdName) &&
+                   !isAcceptableNonRetryableCommand(cmdName)) {
+            throw new Error(
+                "Refusing to run a test that issues commands that are not blindly retryable, " +
+                " cmdName: " + cmdName);
+        } else if (kNonFailoverTolerantCommands.has(cmdName)) {
+            throw new Error(
+                "Refusing to run a test that issues commands that may return different values" +
+                " after a failover, cmdName: " + cmdName);
+        } else if (cmdName === "aggregate") {
+            // Aggregate can be either a read or a write depending on whether it has a $out stage.
+            // $out is required to be the last stage of the pipeline.
+            var stages = cmdObj.pipeline;
+            const lastStage = stages && Array.isArray(stages) && (stages.length !== 0)
+                ? stages[stages.length - 1]
+                : undefined;
+            const hasOut =
+                lastStage && (typeof lastStage === 'object') && lastStage.hasOwnProperty('$out');
+            const hasExplain = cmdObj.hasOwnProperty("explain");
+            if (hasExplain) {
+                throw new Error(
+                    "Refusing to run a test that issues an aggregation command with explain" +
+                    " because it may return incomplete results if interrupted by a stepdown.");
+            }
+            if (hasOut) {
+                throw new Error("Refusing to run a test that issues an aggregation command" +
+                                " with $out because it is not retryable.");
+            }
+        } else if (cmdName === "mapReduce" || cmdName === "mapreduce") {
+            throw new Error(
+                "Refusing to run a test that issues a mapReduce command, because it calls " +
+                " std::terminate() if interrupted by a stepdown.");
+        }
 
         do {
             try {
-                return clientFunction.apply(mongo, clientFunctionArguments);
+                let res = clientFunction.apply(mongo, clientFunctionArguments);
+
+                if (isRetryableWriteCmd && canRetryWrites) {
+                    // findAndModify can fail during the find stage and return an executor error.
+                    if ((cmdName === "findandmodify" || cmdName === "findAndModify") &&
+                        isRetryableExecutorCodeAndMessage(res.code, res.errmsg)) {
+                        print("=-=-=-= Retrying because of executor interruption: " + cmdName +
+                              ", retries remaining: " + numRetries);
+                        continue;
+                    }
+
+                    // Don't interfere with retryable writes.
+                    return res;
+                }
+
+                if (cmdName === "explain") {
+                    // If an explain is interrupted by a stepdown, and it returns before its
+                    // connection is closed, it will return incomplete results. To prevent failing
+                    // the test, force retries of interrupted explains.
+                    if (res.hasOwnProperty("executionStats") &&
+                        !res.executionStats.executionSuccess &&
+                        (RetryableWritesUtil.isRetryableCode(res.executionStats.errorCode) ||
+                         isRetryableExecutorCodeAndMessage(res.executionStats.errorCode,
+                                                           res.executionStats.errorMessage))) {
+                        print("=-=-=-= Forcing retry of interrupted explain, res: " + tojson(res));
+                        continue;
+                    }
+
+                    // An explain command can fail if its child command cannot be run on the current
+                    // server. This can be hit if a primary only or not explicitly slaveOk command
+                    // is accepted by a primary node that then steps down and returns before having
+                    // its connection closed.
+                    if (!res.ok &&
+                        res.errmsg.indexOf("child command cannot run on this node") >= 0) {
+                        print(
+                            "=-=-=-= Forcing retry of explain likely interrupted by transition to" +
+                            " secondary, res: " + tojson(res));
+                        continue;
+                    }
+                }
+
+                if (!res.ok) {
+                    if (numRetries > 0) {
+                        if (RetryableWritesUtil.isRetryableCode(res.code)) {
+                            // Don't decrement retries, because the command returned before the
+                            // connection was closed, so a subsequent attempt will receive a
+                            // network error (or NotMaster error) and need to retry.
+                            print("=-=-=-= Retrying failed response with retryable code: " +
+                                  res.code + ", for command: " + cmdName + ", retries remaining: " +
+                                  numRetries);
+                            continue;
+                        }
+
+                        if (isRetryableExecutorCodeAndMessage(res.code, res.errmsg)) {
+                            // Don't decrement retries for the same reason as above.
+                            print("=-=-=-= Retrying because of executor interruption: " + cmdName +
+                                  ", retries remaining: " + numRetries);
+                            continue;
+                        }
+                    }
+
+                    // Swallow safe errors that may come from a retry since the command may have
+                    // completed before the connection was closed.
+                    if (isAcceptableRetryFailedResponse(cmdName, res)) {
+                        print("=-=-=-= Overriding safe failed response for: " + cmdName +
+                              ", retries remaining: " + numRetries);
+                        res.ok = 1;
+                    }
+                }
+
+                if (res.writeConcernError && numRetries > 0) {
+                    if (RetryableWritesUtil.isRetryableCode(res.writeConcernError.code)) {
+                        // Don't decrement retries, because the command returned before the
+                        // connection was closed, so a subsequent attempt will receive a
+                        // network error (or NotMaster error) and need to retry.
+                        print("=-=-=-= Retrying write concern error with retryable code: " +
+                              res.writeConcernError.code + ", for command: " + cmdName +
+                              ", retries remaining: " + numRetries);
+                        continue;
+                    }
+                }
+
+                return res;
             } catch (e) {
                 if (!isNetworkError(e) || numRetries === 0) {
                     throw e;
@@ -64,21 +304,12 @@
                         // or will go through the retry logic in SessionAwareClient, so propagate
                         // the error.
                         throw e;
-                    } else {
-                        throw new Error(
-                            "Cowardly refusing to run a test that issues non-retryable write" +
-                            " operations since the test likely makes assertions on the write" +
-                            " results and can lead to spurious failures if a network error" +
-                            " occurs.");
                     }
-                } else if (cmdName === "getMore") {
-                    throw new Error(
-                        "Cowardly refusing to run a test that issues a getMore command since if" +
-                        " a network error occurs during it then we won't know whether the cursor" +
-                        " was advanced or not.");
                 }
 
                 --numRetries;
+                print("=-=-=-= Retrying on network error for command: " + cmdName +
+                      ", retries remaining: " + numRetries);
             }
         } while (numRetries >= 0);
     }
@@ -96,5 +327,29 @@
         }
 
         return startParallelShellOriginal(newCode, port, noConnect);
+    };
+
+    const connectOriginal = connect;
+
+    connect = function(url, user, pass) {
+        let retVal;
+
+        let connectionAttempts = 0;
+        assert.soon(
+            () => {
+                try {
+                    connectionAttempts += 1;
+                    retVal = connectOriginal.apply(this, arguments);
+                    return true;
+                } catch (e) {
+                    print("=-=-=-= Retrying connection to: " + url + ", attempts: " +
+                          connectionAttempts + ", failed with: " + tojson(e));
+                }
+            },
+            "Failed connecting to url: " + tojson(url),
+            undefined,  // Default timeout.
+            2000);      // 2 second interval.
+
+        return retVal;
     };
 })();
