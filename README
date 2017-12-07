@@ -19,6 +19,7 @@ UTILITIES
   bsondump          - Convert BSON files into human-readable formats.
   mongoreplay       - Traffic capture and replay tool.
   mongotop          - Track time spent reading and writing data.
+  install_compass   - Installs MongoDB Compass for your platform
 
 BUILDING
 
@@ -38,6 +39,15 @@ RUNNING
     $ # The mongo javascript shell connects to localhost and test database by default:
     $ ./mongo
     > help
+
+INSTALLING COMPASS
+
+  You can install compass using the install_compass script packaged with MongoDB:
+
+    $ ./install_compass
+
+  This will download the appropriate MongoDB Compass package for your platform
+  and install it.
 
 DRIVERS
 
