@@ -261,6 +261,9 @@ jsTestOptions = function() {
             alwaysInjectTransactionNumber: TestData.alwaysInjectTransactionNumber,
             skipGossipingClusterTime: TestData.skipGossipingClusterTime || false,
             disableEnableSessions: TestData.disableEnableSessions,
+            overrideRetryAttempts: TestData.overrideRetryAttempts || 0,
+            logRetryAttempts: TestData.logRetryAttempts || false,
+            connectionString: TestData.connectionString || "",
         });
     }
     return _jsTestOptions;

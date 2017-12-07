@@ -4224,6 +4224,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: retryable_writes_jscore_stepdown_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=retryable_writes_jscore_stepdown_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: watchdog
   commands:
   - func: "do setup"
@@ -5145,6 +5156,7 @@ buildvariants:
   - name: replica_sets_pv0
   - name: replica_sets_rollback_refetch_no_uuid
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: master_slave_WT
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough_WT
@@ -6145,6 +6157,9 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough_WT
     distros:
     - windows-64-vs2015-large
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
+    distros:
+    - windows-64-vs2015-large
   - name: session_jscore_passthrough_WT
   - name: sharding_WT
     distros:
@@ -6640,6 +6655,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: rollback_fuzzer_WT
   - name: serial_run_WT
   - name: session_jscore_passthrough_WT
@@ -6939,6 +6955,9 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough_WT
     distros:
     - rhel62-large
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
+    distros:
+    - rhel62-large
   - name: rlp_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
@@ -7074,6 +7093,7 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough_WT
@@ -8795,6 +8815,7 @@ buildvariants:
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: rlp
   - name: rollback_fuzzer_WT
   - name: sasl
@@ -9189,6 +9210,7 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough_WT
@@ -9341,6 +9363,7 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough_WT

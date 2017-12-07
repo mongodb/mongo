@@ -280,6 +280,47 @@ var {
             }
         }
 
+        /**
+         * Returns true if the error code is retryable, assuming the command is idempotent.
+         */
+        function isRetryableCode(code) {
+            return ErrorCodes.isNetworkError(code) || ErrorCodes.isNotMasterError(code) ||
+                // The driver's spec does not allow retrying on writeConcern errors, so only do so
+                // when testing retryable writes.
+                (jsTest.options().alwaysInjectTransactionNumber &&
+                 ErrorCodes.isWriteConcernError(code));
+        }
+
+        /**
+         * Returns the error code from a write response that should be used in the check for
+         * retryability.
+         */
+        function getEffectiveWriteErrorCode(res) {
+            let code;
+            if (res instanceof WriteResult) {
+                if (res.hasWriteError()) {
+                    code = res.getWriteError().code;
+                } else if (res.hasWriteConcernError()) {
+                    code = res.getWriteConcernError().code;
+                }
+            } else if (res instanceof BulkWriteResult) {
+                if (res.hasWriteErrors()) {
+                    code = res.getWriteErrorAt(0).code;
+                } else if (res.hasWriteConcernError()) {
+                    code = res.getWriteConcernError().code;
+                }
+            } else {
+                if (res.writeError) {
+                    code = res.writeError.code;
+                } else if (res.writeErrors) {
+                    code = res.writeErrors[0].code;
+                } else if (res.writeConcernError) {
+                    code = res.writeConcernError.code;
+                }
+            }
+            return code;
+        }
+
         function runClientFunctionWithRetries(
             driverSession, cmdObj, clientFunction, clientFunctionArguments) {
             let cmdName = Object.keys(cmdObj)[0];
@@ -296,13 +337,42 @@ var {
                 ? 1
                 : 0;
 
+            if (numRetries > 0 && jsTest.options().overrideRetryAttempts) {
+                numRetries = jsTest.options().overrideRetryAttempts;
+            }
+
             do {
                 try {
-                    const res = clientFunction.apply(client, clientFunctionArguments);
-                    if (res.ok === 1 || numRetries === 0 ||
-                        !ErrorCodes.isNotMasterError(res.code)) {
-                        return res;
+                    let res = clientFunction.apply(client, clientFunctionArguments);
+
+                    if (numRetries > 0) {
+                        if (!res.ok && isRetryableCode(res.code)) {
+                            // Don't decrement retries, because the command returned before the
+                            // connection was closed, so a subsequent attempt will receive a
+                            // network error (or NotMaster error) and need to retry.
+                            if (jsTest.options().logRetryAttempts) {
+                                print("=-=-=-= Retrying failed response with retryable code: " +
+                                      res.code + ", for command: " + cmdName +
+                                      ", retries remaining: " + numRetries);
+                            }
+                            continue;
+                        }
+
+                        let code = getEffectiveWriteErrorCode(res);
+                        if (isRetryableCode(code)) {
+                            // Don't decrement retries, because the command returned before the
+                            // connection was closed, so a subsequent attempt will receive a network
+                            // error (or NotMaster error) and need to retry.
+                            if (jsTest.options().logRetryAttempts) {
+                                print("=-=-=-= Retrying write with retryable write error code: " +
+                                      code + ", for command: " + cmdName + ", retries remaining: " +
+                                      numRetries);
+                            }
+                            continue;
+                        }
                     }
+
+                    return res;
                 } catch (e) {
                     if (!isNetworkError(e) || numRetries === 0) {
                         throw e;
@@ -329,6 +399,10 @@ var {
                 }
 
                 --numRetries;
+                if (jsTest.options().logRetryAttempts) {
+                    print("=-=-=-= Retrying on network error for command: " + cmdName +
+                          ", retries remaining: " + numRetries);
+                }
             } while (numRetries >= 0);
         }
 
