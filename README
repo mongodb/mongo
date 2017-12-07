@@ -19,7 +19,7 @@ UTILITIES
   bsondump          - Convert BSON files into human-readable formats.
   mongoreplay       - Traffic capture and replay tool.
   mongotop          - Track time spent reading and writing data.
-  install_compass   - Installs MongoDB Compass for your platform
+  install_compass   - Installs MongoDB Compass for your platform.
 
 BUILDING
 
