@@ -86,6 +86,12 @@ public:
         return STAGE_PIPELINE_PROXY;
     }
 
+    /**
+     * Writes the pipelineProxyStage's operators to a std::vector<Value>, providing the level of
+     * detail specified by 'verbosity'.
+     */
+    std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const;
+
     static const char* kStageType;
 
 protected:

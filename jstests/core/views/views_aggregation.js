@@ -152,7 +152,7 @@
         viewsDB.coll.explain("allPlansExecution").aggregate([{$limit: 1}, {$match: {pop: 3}}]));
     assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_aggregation.coll");
     assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
-    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 5);
+    assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 1);
     assert(explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
 
     // The explain:true option should not work when paired with the explain shell helper.

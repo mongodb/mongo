@@ -64,9 +64,8 @@ DocumentSource::GetNextResult DocumentSourceCursor::getNext() {
 }
 
 void DocumentSourceCursor::loadBatch() {
-    if (!_exec) {
+    if (!_exec || _exec->isDisposed()) {
         // No more documents.
-        dispose();
         return;
     }
 
@@ -135,20 +134,22 @@ void DocumentSourceCursor::loadBatch() {
         case PlanExecutor::IS_EOF:
             return;  // We've reached our limit or exhausted the cursor.
         case PlanExecutor::DEAD: {
-            cleanupExecutor();
-            uasserted(ErrorCodes::QueryPlanKilled,
-                      str::stream() << "collection or index disappeared when cursor yielded: "
-                                    << WorkingSetCommon::toStatusString(resultObj));
+            _execStatus =
+                Status(ErrorCodes::QueryPlanKilled,
+                       str::stream() << "collection or index disappeared when cursor yielded: "
+                                     << WorkingSetCommon::toStatusString(resultObj));
+            break;
         }
         case PlanExecutor::FAILURE: {
-            cleanupExecutor();
-            uasserted(17285,
-                      str::stream() << "cursor encountered an error: "
-                                    << WorkingSetCommon::toStatusString(resultObj));
+            _execStatus = Status(ErrorCodes::Error(17285),
+                                 str::stream() << "cursor encountered an error: "
+                                               << WorkingSetCommon::toStatusString(resultObj));
+            break;
         }
         default:
             MONGO_UNREACHABLE;
     }
+    uassertStatusOK(_execStatus);
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceCursor::doOptimizeAt(
@@ -182,20 +183,16 @@ void DocumentSourceCursor::recordPlanSummaryStats() {
     _planSummaryStats.hasSortStage = hasSortStage;
 }
 
-Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity> verbosity) const {
     // We never parse a DocumentSourceCursor, so we only serialize for explain.
-    if (!explain)
+    if (!verbosity)
         return Value();
 
-    // Get planner-level explain info from the underlying PlanExecutor.
     invariant(_exec);
-    BSONObjBuilder explainBuilder;
-    {
-        AutoGetCollectionForRead autoColl(pExpCtx->opCtx, _exec->nss());
-        uassertStatusOK(_exec->restoreState());
-        Explain::explainStages(_exec.get(), autoColl.getCollection(), *explain, &explainBuilder);
-        _exec->saveState();
-    }
+
+    uassert(50660,
+            "Mismatch between verbosity passed to serialize() and expression context verbosity",
+            verbosity == pExpCtx->explain);
 
     MutableDocument out;
     out["query"] = Value(_query);
@@ -209,13 +206,30 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
     if (!_projection.isEmpty())
         out["fields"] = Value(_projection);
 
-    // Add explain results from the query system into the agg explain output.
-    BSONObj explainObj = explainBuilder.obj();
-    invariant(explainObj.hasField("queryPlanner"));
-    out["queryPlanner"] = Value(explainObj["queryPlanner"]);
-    if (*explain >= ExplainOptions::Verbosity::kExecStats) {
-        invariant(explainObj.hasField("executionStats"));
-        out["executionStats"] = Value(explainObj["executionStats"]);
+    BSONObjBuilder explainStatsBuilder;
+
+    {
+        auto opCtx = pExpCtx->opCtx;
+        AutoGetDb dbLock(opCtx, _exec->nss().db(), MODE_IS);
+        Lock::CollectionLock collLock(opCtx->lockState(), _exec->nss().ns(), MODE_IS);
+        auto collection =
+            dbLock.getDb() ? dbLock.getDb()->getCollection(opCtx, _exec->nss()) : nullptr;
+
+        Explain::explainStages(_exec.get(),
+                               collection,
+                               verbosity.get(),
+                               _execStatus,
+                               _winningPlanTrialStats.get(),
+                               &explainStatsBuilder);
+    }
+
+    BSONObj explainStats = explainStatsBuilder.obj();
+    invariant(explainStats["queryPlanner"]);
+    out["queryPlanner"] = Value(explainStats["queryPlanner"]);
+
+    if (verbosity.get() >= ExplainOptions::Verbosity::kExecStats) {
+        invariant(explainStats["executionStats"]);
+        out["executionStats"] = Value(explainStats["executionStats"]);
     }
 
     return Value(DOC(getSourceName() << out.freezeToValue()));
@@ -235,7 +249,7 @@ void DocumentSourceCursor::reattachToOperationContext(OperationContext* opCtx) {
 
 void DocumentSourceCursor::doDispose() {
     _currentBatch.clear();
-    if (!_exec) {
+    if (!_exec || _exec->isDisposed()) {
         // We've already properly disposed of our PlanExecutor.
         return;
     }
@@ -256,7 +270,12 @@ void DocumentSourceCursor::cleanupExecutor() {
     auto collection = dbLock.getDb() ? dbLock.getDb()->getCollection(opCtx, _exec->nss()) : nullptr;
     auto cursorManager = collection ? collection->getCursorManager() : nullptr;
     _exec->dispose(opCtx, cursorManager);
-    _exec.reset();
+
+    // Not freeing _exec if we're in explain mode since it will be used in serialize() to gather
+    // execution stats.
+    if (!pExpCtx->explain) {
+        _exec.reset();
+    }
 }
 
 void DocumentSourceCursor::cleanupExecutor(const AutoGetCollectionForRead& readLock) {
@@ -264,11 +283,20 @@ void DocumentSourceCursor::cleanupExecutor(const AutoGetCollectionForRead& readL
     auto cursorManager =
         readLock.getCollection() ? readLock.getCollection()->getCursorManager() : nullptr;
     _exec->dispose(pExpCtx->opCtx, cursorManager);
-    _exec.reset();
+
+    // Not freeing _exec if we're in explain mode since it will be used in serialize() to gather
+    // execution stats.
+    if (!pExpCtx->explain) {
+        _exec.reset();
+    }
 }
 
 DocumentSourceCursor::~DocumentSourceCursor() {
-    invariant(!_exec);  // '_exec' should have been cleaned up via dispose() before destruction.
+    if (pExpCtx->explain) {
+        invariant(_exec->isDisposed());  // _exec should have at least been disposed.
+    } else {
+        invariant(!_exec);  // '_exec' should have been cleaned up via dispose() before destruction.
+    }
 }
 
 DocumentSourceCursor::DocumentSourceCursor(
@@ -282,6 +310,12 @@ DocumentSourceCursor::DocumentSourceCursor(
 
     _planSummary = Explain::getPlanSummary(_exec.get());
     recordPlanSummaryStats();
+
+    if (pExpCtx->explain) {
+        // It's safe to access the executor even if we don't have the collection lock since we're
+        // just going to call getStats() on it.
+        _winningPlanTrialStats = Explain::getWinningPlanTrialStats(_exec.get());
+    }
 
     if (collection) {
         collection->infoCache()->notifyOfQuery(pExpCtx->opCtx, _planSummaryStats.indexesUsed);

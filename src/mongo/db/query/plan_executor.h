@@ -269,7 +269,8 @@ public:
      * Generates a tree of stats objects with a separate lifetime from the execution
      * stage tree wrapped by this PlanExecutor.
      *
-     * This is OK even if we were killed.
+     * This may be called without holding any locks. It also may be called on a PlanExecutor that
+     * has been killed or has produced an error.
      */
     std::unique_ptr<PlanStageStats> getStats() const;
 
@@ -448,6 +449,10 @@ public:
     const std::string& getKillReason() {
         invariant(isMarkedAsKilled());
         return *_killReason;
+    }
+
+    bool isDisposed() const {
+        return _currentState == kDisposed;
     }
 
     /**

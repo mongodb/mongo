@@ -139,4 +139,9 @@ void PipelineProxyStage::getPlanSummaryStats(PlanSummaryStats* statsOut) const {
     PipelineD::getPlanSummaryStats(_pipeline.get(), statsOut);
     statsOut->nReturned = getCommonStats()->advanced;
 }
+
+vector<Value> PipelineProxyStage::writeExplainOps(ExplainOptions::Verbosity verbosity) const {
+    return _pipeline->writeExplainOps(verbosity);
+}
+
 }  // namespace mongo

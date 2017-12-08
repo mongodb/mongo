@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 
@@ -199,9 +200,19 @@ private:
     // collection lock.
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
 
+    // Status of the underlying executor, _exec. Used for explain queries if _exec produces an
+    // error. Since _exec may not finish running (if there is a limit, for example), we store OK as
+    // the default.
+    Status _execStatus = Status::OK();
+
     BSONObjSet _outputSorts;
     std::string _planSummary;
     PlanSummaryStats _planSummaryStats;
+
+    // Used only for explain() queries. Stores the stats of the winning plan when _exec's root
+    // stage is a MultiPlanStage. When the query is executed (with exec->executePlan()), it will
+    // wipe out its own copy of the winning plan's statistics, so they need to be saved here.
+    std::unique_ptr<PlanStageStats> _winningPlanTrialStats;
 };
 
 }  // namespace mongo
