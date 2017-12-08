@@ -150,6 +150,9 @@ Status ShardingCatalogManager::getDatabasesForShard(OperationContext* opCtx,
         BSONObj(),
         boost::none);  // no limit
 
+    if (!findStatus.isOK())
+        return findStatus.getStatus();
+
     for (const BSONObj& obj : findStatus.getValue().value) {
         std::string dbName;
         Status status = bsonExtractStringField(obj, DatabaseType::name(), &dbName);
