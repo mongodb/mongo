@@ -100,7 +100,6 @@
             expectFailure: true,
             skipSharded: true,
         },
-        authSchemaUpgrade: {skip: isUnrelated},
         authenticate: {skip: isUnrelated},
         availableQueryOptions: {skip: isAnInternalCommand},
         balancerStart: {skip: isUnrelated},

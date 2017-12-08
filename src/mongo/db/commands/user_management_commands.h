@@ -141,7 +141,5 @@ Status checkAuthForGetUserCacheGenerationCommand(Client* client);
 
 Status checkAuthForMergeAuthzCollectionsCommand(Client* client, const BSONObj& cmdObj);
 
-Status checkAuthForAuthSchemaUpgradeCommand(Client* client);
-
 }  // namespace auth
 }  // namespace mongo

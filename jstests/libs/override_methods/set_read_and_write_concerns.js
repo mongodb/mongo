@@ -79,7 +79,6 @@
             "_recvChunkStart",
             "appendOplogNote",
             "applyOps",
-            "authSchemaUpgrade",
             "captrunc",
             "cleanupOrphaned",
             "clone",
