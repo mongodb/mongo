@@ -7,10 +7,14 @@
     load('jstests/replsets/libs/two_phase_drops.js');
     load("jstests/libs/uuid_util.js");
 
-    // Set up replica set.
+    // Set up replica set. Disallow chaining so nodes always sync from primary.
     const testName = "initial_sync_drop_collection";
     const dbName = testName;
-    var replTest = new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}]});
+    var replTest = new ReplSetTest({
+        name: testName,
+        nodes: [{}, {rsConfig: {priority: 0}}],
+        settings: {chainingAllowed: false}
+    });
     replTest.startSet();
     replTest.initiate();
 
