@@ -51,14 +51,13 @@ public:
                    std::vector<InsertStatement>::const_iterator end,
                    bool fromMigrate) override;
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
-    CollectionShardingState::DeleteState aboutToDelete(OperationContext* opCtx,
-                                                       const NamespaceString& nss,
-                                                       const BSONObj& doc) override;
+    void aboutToDelete(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       const BSONObj& doc) override;
     void onDelete(OperationContext* opCtx,
                   const NamespaceString& nss,
                   OptionalCollectionUUID uuid,
                   StmtId stmtId,
-                  CollectionShardingState::DeleteState deleteState,
                   bool fromMigrate,
                   const boost::optional<BSONObj>& deletedDoc) override;
     void onInternalOpMessage(OperationContext* opCtx,

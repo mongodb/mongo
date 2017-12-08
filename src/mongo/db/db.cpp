@@ -58,6 +58,7 @@
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -89,6 +90,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repair_database.h"
@@ -689,7 +691,10 @@ ExitCode _initAndListen(int listenPort) {
     auto serviceContext = checked_cast<ServiceContextMongoD*>(getGlobalServiceContext());
 
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
-    serviceContext->setOpObserver(stdx::make_unique<OpObserverImpl>());
+    auto opObserverRegistry = stdx::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(stdx::make_unique<OpObserverImpl>());
+    opObserverRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
+    serviceContext->setOpObserver(std::move(opObserverRegistry));
 
     DBDirectClientFactory::get(serviceContext).registerImplementation([](OperationContext* opCtx) {
         return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));

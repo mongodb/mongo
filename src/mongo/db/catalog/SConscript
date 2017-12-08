@@ -189,6 +189,7 @@ env.Library(
     LIBDEPS=[
         'collection',
         'database',
+        'database_holder',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/storage_options',

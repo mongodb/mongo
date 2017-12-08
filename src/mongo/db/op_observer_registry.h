@@ -28,60 +28,124 @@
 
 #pragma once
 
+#include <algorithm>
+#include <memory>
+#include <vector>
+
 #include "mongo/db/op_observer.h"
 
 namespace mongo {
 
-class OpObserverNoop : public OpObserver {
+/**
+ * Implementation of the OpObserver interface that allows multiple observers to be registered.
+ * All observers will be called in order of registration. Once an observer throws an exception,
+ * no further observers will receive notifications: typically the enclosing transaction will be
+ * aborted. If an observer needs to undo changes in such a case, it should register an onRollback
+ * handler with the recovery unit.
+ */
+class OpObserverRegistry final : public OpObserver {
+    MONGO_DISALLOW_COPYING(OpObserverRegistry);
+
 public:
+    OpObserverRegistry() = default;
+    virtual ~OpObserverRegistry() = default;
+
+    // Add 'observer' to the list of observers to call. Observers are called in registration order.
+    // Registration must be done while no calls to observers are made.
+    void addObserver(std::unique_ptr<OpObserver> observer) {
+        _observers.emplace_back(std::move(observer));
+    }
+
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        OptionalCollectionUUID uuid,
                        BSONObj indexDoc,
-                       bool fromMigrate) override {}
+                       bool fromMigrate) override {
+        for (auto& o : _observers)
+            o->onCreateIndex(opCtx, nss, uuid, indexDoc, fromMigrate);
+    }
+
     void onInserts(OperationContext* opCtx,
                    const NamespaceString& nss,
                    OptionalCollectionUUID uuid,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
-                   bool fromMigrate) override {}
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override{};
+                   bool fromMigrate) override {
+        for (auto& o : _observers)
+            o->onInserts(opCtx, nss, uuid, begin, end, fromMigrate);
+    }
+
+    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override {
+        for (auto& o : _observers)
+            o->onUpdate(opCtx, args);
+    }
+
     void aboutToDelete(OperationContext* opCtx,
                        const NamespaceString& nss,
-                       const BSONObj& doc) override {}
+                       const BSONObj& doc) override {
+        for (auto& o : _observers)
+            o->aboutToDelete(opCtx, nss, doc);
+    }
+
     void onDelete(OperationContext* opCtx,
                   const NamespaceString& nss,
                   OptionalCollectionUUID uuid,
                   StmtId stmtId,
                   bool fromMigrate,
-                  const boost::optional<BSONObj>& deletedDoc) override {}
+                  const boost::optional<BSONObj>& deletedDoc) override {
+        for (auto& o : _observers)
+            o->onDelete(opCtx, nss, uuid, stmtId, fromMigrate, deletedDoc);
+    }
+
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<UUID> uuid,
                              const BSONObj& msgObj,
-                             const boost::optional<BSONObj> o2MsgObj) override {}
+                             const boost::optional<BSONObj> o2MsgObj) override {
+        for (auto& o : _observers)
+            o->onInternalOpMessage(opCtx, nss, uuid, msgObj, o2MsgObj);
+    }
+
     void onCreateCollection(OperationContext* opCtx,
                             Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
-                            const BSONObj& idIndex) override {}
+                            const BSONObj& idIndex) override {
+        for (auto& o : _observers)
+            o->onCreateCollection(opCtx, coll, collectionName, options, idIndex);
+    }
+
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
                    OptionalCollectionUUID uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
-                   boost::optional<TTLCollModInfo> ttlInfo) override {}
-    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override {}
+                   boost::optional<TTLCollModInfo> ttlInfo) override {
+        for (auto& o : _observers)
+            o->onCollMod(opCtx, nss, uuid, collModCmd, oldCollOptions, ttlInfo);
+    }
+
+    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override {
+        for (auto& o : _observers)
+            o->onDropDatabase(opCtx, dbName);
+    }
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   OptionalCollectionUUID uuid) override {
-        return {};
+        return _forEachObserver([&](auto& observer) -> repl::OpTime {
+            return observer.onDropCollection(opCtx, collectionName, uuid);
+        });
     }
+
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
                      OptionalCollectionUUID uuid,
                      const std::string& indexName,
-                     const BSONObj& idxDescriptor) override {}
+                     const BSONObj& idxDescriptor) override {
+        for (auto& o : _observers)
+            o->onDropIndex(opCtx, nss, uuid, indexName, idxDescriptor);
+    }
+
     repl::OpTime onRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
@@ -89,14 +153,38 @@ public:
                                     bool dropTarget,
                                     OptionalCollectionUUID dropTargetUUID,
                                     bool stayTemp) override {
-        return {};
+        return _forEachObserver([&](auto& observer) -> repl::OpTime {
+            return observer.onRenameCollection(
+                opCtx, fromCollection, toCollection, uuid, dropTarget, dropTargetUUID, stayTemp);
+        });
     }
+
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
-                    const BSONObj& applyOpCmd) override {}
+                    const BSONObj& applyOpCmd) override {
+        for (auto& o : _observers)
+            o->onApplyOps(opCtx, dbName, applyOpCmd);
+    }
+
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,
-                       OptionalCollectionUUID uuid) override {}
-};
+                       OptionalCollectionUUID uuid) {
+        for (auto& o : _observers)
+            o->onEmptyCapped(opCtx, collectionName, uuid);
+    }
 
+private:
+    repl::OpTime _forEachObserver(stdx::function<repl::OpTime(OpObserver&)> f) {
+        repl::OpTime opTime;
+        for (auto& observer : _observers) {
+            repl::OpTime newTime = f(*observer);
+            if (!newTime.isNull() && newTime != opTime) {
+                invariant(opTime.isNull());
+                opTime = newTime;
+            }
+        }
+        return opTime;
+    }
+    std::vector<std::unique_ptr<OpObserver>> _observers;
+};
 }  // namespace mongo

@@ -380,7 +380,8 @@ public:
     void setOpObserver(std::unique_ptr<OpObserver> opObserver);
 
     /**
-     * Return the OpObserver instance we're using.
+     * Return the OpObserver instance we're using. This may be an OpObserverRegistry that in fact
+     * contains multiple observers.
      */
     OpObserver* getOpObserver() const {
         return _opObserver.get();

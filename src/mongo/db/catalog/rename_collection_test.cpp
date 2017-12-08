@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -43,6 +44,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
@@ -231,8 +233,11 @@ void RenameCollectionTest::setUp() {
     ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
     // Use OpObserverMock to track notifications for collection and database drops.
-    auto opObserver = stdx::make_unique<OpObserverMock>();
-    _opObserver = opObserver.get();
+    auto opObserver = stdx::make_unique<OpObserverRegistry>();
+    auto mockObserver = stdx::make_unique<OpObserverMock>();
+    _opObserver = mockObserver.get();
+    opObserver->addObserver(std::move(mockObserver));
+    opObserver->addObserver(stdx::make_unique<UUIDCatalogObserver>());
     service->setOpObserver(std::move(opObserver));
 
     _sourceNss = NamespaceString("test.foo");

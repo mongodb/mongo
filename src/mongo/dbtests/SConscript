@@ -25,7 +25,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/op_observer_noop',
         '$BUILD_DIR/mongo/db/service_context_d',
         '$BUILD_DIR/mongo/db/s/sharding',
         '$BUILD_DIR/mongo/s/coreshard',

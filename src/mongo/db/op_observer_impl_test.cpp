@@ -29,6 +29,7 @@
 
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/repl/oplog.h"
@@ -36,7 +37,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-
+#include "mongo/unittest/death_test.h"
 
 namespace mongo {
 namespace {
@@ -236,6 +237,38 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
 
     // Ensure that the rename optime returned is the same as the last optime in the ReplClientInfo.
     ASSERT_EQUALS(repl::ReplClientInfo::forClient(&cc()).getLastOp(), renameOpTime);
+}
+
+TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    opCtx->releaseLockState();
+    opCtx->setLockState(stdx::make_unique<LockerNoop>());
+    NamespaceString nss = {"test", "coll"};
+    opObserver.aboutToDelete(opCtx.get(), nss, {});
+    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
+    opObserver.aboutToDelete(opCtx.get(), nss, {});
+    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
+}
+
+DEATH_TEST_F(OpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    opCtx->releaseLockState();
+    opCtx->setLockState(stdx::make_unique<LockerNoop>());
+    NamespaceString nss = {"test", "coll"};
+    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
+}
+
+DEATH_TEST_F(OpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    opCtx->releaseLockState();
+    opCtx->setLockState(stdx::make_unique<LockerNoop>());
+    NamespaceString nss = {"test", "coll"};
+    opObserver.aboutToDelete(opCtx.get(), nss, {});
+    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
+    opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
 }
 
 }  // namespace

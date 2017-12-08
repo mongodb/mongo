@@ -417,6 +417,8 @@ OpTime logOp(OperationContext* opCtx,
              StmtId statementId,
              const OplogLink& oplogLink) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
+    // For commands, the test below is on the command ns and therefore does not check for
+    // specific namespaces such as system.profile. This is the caller's responsibility.
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
         invariant(statementId == kUninitializedStmtId);
         return {};

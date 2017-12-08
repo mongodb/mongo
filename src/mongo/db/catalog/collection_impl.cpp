@@ -546,9 +546,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     }
 
     Snapshotted<BSONObj> doc = docFor(opCtx, loc);
-
-    auto deleteState =
-        getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
+    getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
 
     boost::optional<BSONObj> deletedDoc;
     if (storeDeletedDoc == Collection::StoreDeletedDoc::On) {
@@ -567,7 +565,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     _recordStore->deleteRecord(opCtx, loc);
 
     getGlobalServiceContext()->getOpObserver()->onDelete(
-        opCtx, ns(), uuid(), stmtId, std::move(deleteState), fromMigrate, deletedDoc);
+        opCtx, ns(), uuid(), stmtId, fromMigrate, deletedDoc);
 }
 
 Counter64 moveCounter;

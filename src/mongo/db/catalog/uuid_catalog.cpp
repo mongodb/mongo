@@ -32,7 +32,9 @@
 #include "uuid_catalog.h"
 
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/uuid.h"
 
@@ -41,6 +43,62 @@ namespace {
 const ServiceContext::Decoration<UUIDCatalog> getCatalog =
     ServiceContext::declareDecoration<UUIDCatalog>();
 }  // namespace
+
+void UUIDCatalogObserver::onCreateCollection(OperationContext* opCtx,
+                                             Collection* coll,
+                                             const NamespaceString& collectionName,
+                                             const CollectionOptions& options,
+                                             const BSONObj& idIndex) {
+    if (!options.uuid)
+        return;
+    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+    catalog.onCreateCollection(opCtx, coll, options.uuid.get());
+}
+
+void UUIDCatalogObserver::onCollMod(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    OptionalCollectionUUID uuid,
+                                    const BSONObj& collModCmd,
+                                    const CollectionOptions& oldCollOptions,
+                                    boost::optional<TTLCollModInfo> ttlInfo) {
+    if (!uuid)
+        return;
+    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+    Collection* catalogColl = catalog.lookupCollectionByUUID(uuid.get());
+    invariant(catalogColl->uuid() == uuid, uuid + "," + catalogColl->uuid);
+}
+
+repl::OpTime UUIDCatalogObserver::onDropCollection(OperationContext* opCtx,
+                                                   const NamespaceString& collectionName,
+                                                   OptionalCollectionUUID uuid) {
+
+    if (!uuid)
+        return {};
+    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+    catalog.onDropCollection(opCtx, uuid.get());
+    return {};
+}
+
+repl::OpTime UUIDCatalogObserver::onRenameCollection(OperationContext* opCtx,
+                                                     const NamespaceString& fromCollection,
+                                                     const NamespaceString& toCollection,
+                                                     OptionalCollectionUUID uuid,
+                                                     bool dropTarget,
+                                                     OptionalCollectionUUID dropTargetUUID,
+                                                     bool stayTemp) {
+
+    if (!uuid)
+        return {};
+    auto getNewCollection = [opCtx, toCollection] {
+        auto db = dbHolder().get(opCtx, toCollection.db());
+        auto newColl = db->getCollection(opCtx, toCollection);
+        invariant(newColl);
+        return newColl;
+    };
+    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+    catalog.onRenameCollection(opCtx, getNewCollection, uuid.get());
+    return {};
+}
 
 UUIDCatalog& UUIDCatalog::get(ServiceContext* svcCtx) {
     return getCatalog(svcCtx);

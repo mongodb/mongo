@@ -116,6 +116,14 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target= 'op_observer_registry_test',
+    source= 'op_observer_registry_test.cpp',
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+env.CppUnitTest(
     target= 'op_observer_impl_test',
     source= 'op_observer_impl_test.cpp',
     LIBDEPS=[
@@ -609,9 +617,9 @@ env.Library(
         "op_observer_impl.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         'repl/serveronly',
         'views/views_mongod',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
@@ -1432,24 +1440,11 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target= 'op_observer_noop',
-    source= [
-        'op_observer_noop.cpp',
-    ],
-    LIBDEPS= [
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
-    ],
-)
-
-env.Library(
     target= 'service_context_d_test_fixture',
     source= [
         'service_context_d_test_fixture.cpp',
     ],
     LIBDEPS= [
-        'op_observer_noop',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
