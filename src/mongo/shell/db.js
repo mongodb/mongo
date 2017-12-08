@@ -1568,11 +1568,6 @@ var DB;
         if (this._defaultAuthenticationMechanism != null)
             return this._defaultAuthenticationMechanism;
 
-        // Use MONGODB-CR for v2.6 and earlier.
-        maxWireVersion = this.isMaster().maxWireVersion;
-        if (maxWireVersion == undefined || maxWireVersion < 3) {
-            return "MONGODB-CR";
-        }
         return "SCRAM-SHA-1";
     };
 

@@ -82,7 +82,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/authcommon',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/db/auth/serverauth',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/common',

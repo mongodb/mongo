@@ -46,7 +46,6 @@ const int minimumScramIterationCount = 5000;
 
 SASLGlobalParams::SASLGlobalParams() {
     // Authentication mechanisms supported by default.
-    authenticationMechanisms.push_back("MONGODB-CR");
     authenticationMechanisms.push_back("MONGODB-X509");
     authenticationMechanisms.push_back("SCRAM-SHA-1");
 
@@ -65,7 +64,7 @@ Status addSASLOptions(moe::OptionSection* options) {
                            "",
                            moe::StringVector,
                            "List of supported authentication mechanisms.  "
-                           "Default is MONGODB-CR, SCRAM-SHA-1 and MONGODB-X509.")
+                           "Default is SCRAM-SHA-1 and MONGODB-X509.")
         .setSources(moe::SourceYAMLConfig);
 
     saslOptions

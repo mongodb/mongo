@@ -41,26 +41,18 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/mongo_authentication_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/log.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/text.h"
 
@@ -70,64 +62,73 @@ using std::hex;
 using std::string;
 using std::stringstream;
 
-static bool _isCRAuthDisabled;
 static bool _isX509AuthDisabled;
 static const char _nonceAuthenticationDisabledMessage[] =
     "Challenge-response authentication using getnonce and authenticate commands is disabled.";
 static const char _x509AuthenticationDisabledMessage[] = "x.509 authentication is disabled.";
 
 void CmdAuthenticate::disableAuthMechanism(std::string authMechanism) {
-    if (authMechanism == "MONGODB-CR") {
-        _isCRAuthDisabled = true;
-    }
     if (authMechanism == "MONGODB-X509") {
         _isX509AuthDisabled = true;
     }
 }
 
-/* authentication
-
-   system.users contains
-     { user : <username>, pwd : <pwd_digest>, ... }
-
-   getnonce sends nonce to client
-
-   client then sends { authenticate:1, nonce64:<nonce_str>, user:<username>, key:<key> }
-
-   where <key> is md5(<nonce_str><username><pwd_digest_str>) as a string
-*/
-
+/**
+ * Returns a random 64-bit nonce.
+ *
+ * Previously, this command would have been called prior to {authenticate: ...}
+ * when using the MONGODB-CR authentication mechanism.
+ * Since that mechanism has been removed from MongoDB 3.8,
+ * it is nominally no longer required.
+ *
+ * Unfortunately, mongo-tools uses a connection library
+ * which optimistically invokes {getnonce: 1} upon connection
+ * under the assumption that it will eventually be used as part
+ * of "classic" authentication.
+ * If the command dissapeared, then all of mongo-tools would
+ * fail to connect, despite using SCRAM-SHA-1 or another valid
+ * auth mechanism. Thus, we have to keep this command around for now.
+ *
+ * Note that despite nonces being available, they are not bound
+ * to the AuthorizationSession anymore, and the authenticate
+ * command doesn't acknowledge their existence.
+ */
 class CmdGetNonce : public BasicCommand {
 public:
     CmdGetNonce() : BasicCommand("getnonce"), _random(SecureRandom::create()) {}
 
-    virtual bool slaveOk() const {
+    bool slaveOk() const final {
         return true;
     }
-    void help(stringstream& h) const {
+
+    void help(stringstream& h) const final {
         h << "internal";
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
+
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) final {
+        // No auth required since this command was explicitly part
+        // of an authentication workflow.
+    }
+
     bool run(OperationContext* opCtx,
              const string&,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        nonce64 n = getNextNonce();
+             BSONObjBuilder& result) final {
+        auto n = getNextNonce();
         stringstream ss;
         ss << hex << n;
         result.append("nonce", ss.str());
-        AuthenticationSession::set(Client::getCurrent(),
-                                   stdx::make_unique<MongoAuthenticationSession>(n));
         return true;
     }
 
 private:
-    nonce64 getNextNonce() {
+    int64_t getNextNonce() {
         stdx::lock_guard<SimpleMutex> lk(_randMutex);
         return _random->nextInt64();
     }
@@ -136,31 +137,18 @@ private:
     std::unique_ptr<SecureRandom> _random;
 } cmdGetNonce;
 
-void CmdAuthenticate::redactForLogging(mutablebson::Document* cmdObj) {
-    namespace mmb = mutablebson;
-    static const int numRedactedFields = 2;
-    static const char* redactedFields[numRedactedFields] = {"key", "nonce"};
-    for (int i = 0; i < numRedactedFields; ++i) {
-        for (mmb::Element element = mmb::findFirstChildNamed(cmdObj->root(), redactedFields[i]);
-             element.ok();
-             element = mmb::findElementNamed(element.rightSibling(), redactedFields[i])) {
-            element.setValueString("xxx").transitional_ignore();
-        }
-    }
-}
-
 bool CmdAuthenticate::run(OperationContext* opCtx,
                           const string& dbname,
                           const BSONObj& cmdObj,
                           BSONObjBuilder& result) {
     if (!serverGlobalParams.quiet.load()) {
         mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
-        redactForLogging(&cmdToLog);
         log() << " authenticate db: " << dbname << " " << cmdToLog;
     }
     std::string mechanism = cmdObj.getStringField("mechanism");
     if (mechanism.empty()) {
-        mechanism = "MONGODB-CR";
+        appendCommandStatus(result, {ErrorCodes::BadValue, "Auth mechanism not specified"});
+        return false;
     }
     UserName user;
     auto& sslPeerInfo = SSLPeerInfo::forSession(opCtx->getClient()->session());
@@ -206,102 +194,12 @@ Status CmdAuthenticate::_authenticate(OperationContext* opCtx,
                                       const std::string& mechanism,
                                       const UserName& user,
                                       const BSONObj& cmdObj) {
-    if (mechanism == "MONGODB-CR") {
-        return _authenticateCR(opCtx, user, cmdObj);
-    }
 #ifdef MONGO_CONFIG_SSL
     if (mechanism == "MONGODB-X509") {
         return _authenticateX509(opCtx, user, cmdObj);
     }
 #endif
     return Status(ErrorCodes::BadValue, "Unsupported mechanism: " + mechanism);
-}
-
-Status CmdAuthenticate::_authenticateCR(OperationContext* opCtx,
-                                        const UserName& user,
-                                        const BSONObj& cmdObj) {
-    if (user == internalSecurity.user->getName() &&
-        serverGlobalParams.clusterAuthMode.load() == ServerGlobalParams::ClusterAuthMode_x509) {
-        return Status(ErrorCodes::AuthenticationFailed,
-                      "Mechanism x509 is required for internal cluster authentication");
-    }
-
-    if (_isCRAuthDisabled) {
-        // SERVER-8461, MONGODB-CR must be enabled for authenticating the internal user, so that
-        // cluster members may communicate with each other.
-        if (user != internalSecurity.user->getName()) {
-            return Status(ErrorCodes::BadValue, _nonceAuthenticationDisabledMessage);
-        }
-    }
-
-    string key = cmdObj.getStringField("key");
-    string received_nonce = cmdObj.getStringField("nonce");
-
-    if (user.getUser().empty() || key.empty() || received_nonce.empty()) {
-        sleepmillis(10);
-        return Status(ErrorCodes::ProtocolError,
-                      "field missing/wrong type in received authenticate command");
-    }
-
-    stringstream digestBuilder;
-
-    {
-        Client* client = Client::getCurrent();
-        std::unique_ptr<AuthenticationSession> session;
-        AuthenticationSession::swap(client, session);
-        if (!session || session->getType() != AuthenticationSession::SESSION_TYPE_MONGO) {
-            sleepmillis(30);
-            return Status(ErrorCodes::ProtocolError, "No pending nonce");
-        } else {
-            nonce64 nonce = static_cast<MongoAuthenticationSession*>(session.get())->getNonce();
-            digestBuilder << hex << nonce;
-            if (digestBuilder.str() != received_nonce) {
-                sleepmillis(30);
-                return Status(ErrorCodes::AuthenticationFailed, "Received wrong nonce.");
-            }
-        }
-    }
-
-    User* userObj;
-    Status status = getGlobalAuthorizationManager()->acquireUser(opCtx, user, &userObj);
-    if (!status.isOK()) {
-        // Failure to find the privilege document indicates no-such-user, a fact that we do not
-        // wish to reveal to the client.  So, we return AuthenticationFailed rather than passing
-        // through the returned status.
-        return Status(ErrorCodes::AuthenticationFailed, status.toString());
-    }
-    string pwd = userObj->getCredentials().password;
-    getGlobalAuthorizationManager()->releaseUser(userObj);
-
-    if (pwd.empty()) {
-        return Status(ErrorCodes::AuthenticationFailed,
-                      "MONGODB-CR credentials missing in the user document");
-    }
-
-    md5digest d;
-    {
-        digestBuilder << user.getUser() << pwd;
-        string done = digestBuilder.str();
-
-        md5_state_t st;
-        md5_init(&st);
-        md5_append(&st, (const md5_byte_t*)done.c_str(), done.size());
-        md5_finish(&st, d);
-    }
-
-    string computed = digestToString(d);
-
-    if (key != computed) {
-        return Status(ErrorCodes::AuthenticationFailed, "key mismatch");
-    }
-
-    AuthorizationSession* authorizationSession = AuthorizationSession::get(Client::getCurrent());
-    status = authorizationSession->addAndAuthorizeUser(opCtx, user);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return Status::OK();
 }
 
 #ifdef MONGO_CONFIG_SSL

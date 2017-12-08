@@ -45,8 +45,7 @@ class AuthenticationSession {
 
 public:
     enum SessionType {
-        SESSION_TYPE_MONGO,  // The mongo-specific challenge-response authentication mechanism.
-        SESSION_TYPE_SASL    // SASL authentication mechanism.
+        SESSION_TYPE_SASL  // SASL authentication mechanism.
     };
 
     /**
