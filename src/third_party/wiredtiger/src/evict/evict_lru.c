@@ -17,7 +17,7 @@ static int  __evict_pass(WT_SESSION_IMPL *);
 static int  __evict_server(WT_SESSION_IMPL *, bool *);
 static void __evict_tune_workers(WT_SESSION_IMPL *session);
 static int  __evict_walk(WT_SESSION_IMPL *, WT_EVICT_QUEUE *);
-static int  __evict_walk_file(
+static int  __evict_walk_tree(
     WT_SESSION_IMPL *, WT_EVICT_QUEUE *, u_int, u_int *);
 
 #define	WT_EVICT_HAS_WORKERS(s)				\
@@ -805,8 +805,10 @@ __evict_clear_walk(WT_SESSION_IMPL *session)
 	cache = S2C(session)->cache;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_PASS));
-	if (session->dhandle == cache->evict_file_next)
-		cache->evict_file_next = NULL;
+	if (session->dhandle == cache->walk_tree) {
+		cache->walk_tree = NULL;
+		cache->walk_target = 0;
+	}
 
 	if ((ref = btree->evict_ref) == NULL)
 		return (0);
@@ -1391,19 +1393,22 @@ retry:	while (slot < max_entries) {
 			 * scan last time through.  If we don't have a saved
 			 * handle, start from the beginning of the list.
 			 */
-			if ((dhandle = cache->evict_file_next) != NULL)
-				cache->evict_file_next = NULL;
-			else
+			if ((dhandle = cache->walk_tree) != NULL)
+				cache->walk_tree = NULL;
+			else {
 				dhandle = TAILQ_FIRST(&conn->dhqh);
+				cache->walk_target = 0;
+			}
 		} else {
 			if (incr) {
 				WT_ASSERT(session, dhandle->session_inuse > 0);
 				(void)__wt_atomic_subi32(
 				    &dhandle->session_inuse, 1);
 				incr = false;
-				cache->evict_file_next = NULL;
+				cache->walk_tree = NULL;
 			}
 			dhandle = TAILQ_NEXT(dhandle, q);
+			cache->walk_target = 0;
 		}
 
 		/* If we reach the end of the list, we're done. */
@@ -1482,9 +1487,9 @@ retry:	while (slot < max_entries) {
 				/*
 				 * Remember the file to visit first, next loop.
 				 */
-				cache->evict_file_next = dhandle;
+				cache->walk_tree = dhandle;
 				WT_WITH_DHANDLE(session, dhandle,
-				    ret = __evict_walk_file(
+				    ret = __evict_walk_tree(
 				    session, queue, max_entries, &slot));
 
 				WT_ASSERT(session, __wt_session_gen(
@@ -1572,42 +1577,21 @@ __evict_push_candidate(WT_SESSION_IMPL *session,
 }
 
 /*
- * __evict_walk_file --
- *	Get a few page eviction candidates from a single underlying file.
+ * __evict_walk_target --
+ *	Calculate how many pages to queue for a given tree.
  */
-static int
-__evict_walk_file(WT_SESSION_IMPL *session,
-    WT_EVICT_QUEUE *queue, u_int max_entries, u_int *slotp)
+static uint32_t
+__evict_walk_target(
+    WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_entries)
 {
-	WT_BTREE *btree;
 	WT_CACHE *cache;
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	WT_EVICT_ENTRY *end, *evict, *start;
-	WT_PAGE *last_parent, *page;
-	WT_REF *ref;
-	uint64_t btree_inuse, bytes_per_slot, cache_inuse, min_pages;
-	uint64_t pages_seen, pages_queued, refs_walked;
-	uint32_t remaining_slots, total_slots, walk_flags;
+	uint64_t btree_inuse, bytes_per_slot, cache_inuse;
 	uint32_t target_pages_clean, target_pages_dirty, target_pages;
-	int restarts;
-	bool give_up, modified, urgent_queued;
+	uint32_t total_slots;
 
-	conn = S2C(session);
-	btree = S2BT(session);
-	cache = conn->cache;
-	last_parent = NULL;
-	restarts = 0;
-	give_up = urgent_queued = false;
-
-	/*
-	 * Figure out how many slots to fill from this tree.
-	 * Note that some care is taken in the calculation to avoid overflow.
-	 */
-	start = queue->evict_queue + *slotp;
-	remaining_slots = max_entries - *slotp;
-	total_slots = max_entries - queue->evict_entries;
+	cache = S2C(session)->cache;
 	target_pages_clean = target_pages_dirty = 0;
+	total_slots = max_entries - queue->evict_entries;
 
 	/*
 	 * The number of times we should fill the queue by the end of
@@ -1653,13 +1637,6 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	    QUEUE_FILLS_PER_PASS;
 
 	/*
-	 * If the tree is dead or we're near the end of the queue, fill the
-	 * remaining slots.
-	 */
-	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
-		target_pages = remaining_slots;
-
-	/*
 	 * Walk trees with a small fraction of the cache in case there are so
 	 * many trees that none of them use enough of the cache to be allocated
 	 * slots.  Only skip a tree if it has no bytes of interest.
@@ -1680,8 +1657,61 @@ __evict_walk_file(WT_SESSION_IMPL *session,
 	if (target_pages < MIN_PAGES_PER_TREE)
 		target_pages = MIN_PAGES_PER_TREE;
 
+	/* If the tree is dead, take a lot of pages.  */
+	if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD))
+		target_pages *= 10;
+
+	return (target_pages);
+}
+
+/*
+ * __evict_walk_tree --
+ *	Get a few page eviction candidates from a single underlying file.
+ */
+static int
+__evict_walk_tree(WT_SESSION_IMPL *session,
+    WT_EVICT_QUEUE *queue, u_int max_entries, u_int *slotp)
+{
+	WT_BTREE *btree;
+	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_EVICT_ENTRY *end, *evict, *start;
+	WT_PAGE *last_parent, *page;
+	WT_REF *ref;
+	uint64_t min_pages, pages_seen, pages_queued, refs_walked;
+	uint32_t remaining_slots, target_pages, walk_flags;
+	int restarts;
+	bool give_up, modified, urgent_queued;
+
+	conn = S2C(session);
+	btree = S2BT(session);
+	cache = conn->cache;
+	last_parent = NULL;
+	restarts = 0;
+	give_up = urgent_queued = false;
+
+	/*
+	 * Figure out how many slots to fill from this tree.
+	 * Note that some care is taken in the calculation to avoid overflow.
+	 */
+	start = queue->evict_queue + *slotp;
+	remaining_slots = max_entries - *slotp;
+	if (cache->walk_target != 0) {
+		WT_ASSERT(session, cache->walk_progress <= cache->walk_target);
+		target_pages = cache->walk_target - cache->walk_progress;
+	} else {
+		target_pages = cache->walk_target =
+		    __evict_walk_target(session, queue, max_entries);
+		cache->walk_progress = 0;
+	}
+
 	if (target_pages > remaining_slots)
 		target_pages = remaining_slots;
+
+	/* If we don't want any pages from this tree, move on. */
+	if (target_pages == 0)
+		return (0);
 
 	/*
 	 * These statistics generate a histogram of the number of pages targeted
@@ -1967,6 +1997,7 @@ fast:		/* If the page can't be evicted, give up. */
 			continue;
 		++evict;
 		++pages_queued;
+		++cache->walk_progress;
 
 		__wt_verbose(session, WT_VERB_EVICTSERVER,
 		    "select: %p, size %" WT_SIZET_FMT,
