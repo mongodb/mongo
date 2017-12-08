@@ -1169,10 +1169,7 @@ TEST_F(DConcurrencyTestFixture, CompatibleFirstStress) {
                         // MODE_IS or MODE_S lock, the CompatibleFirst policy guarantees success.
                         auto newInterval = readOnlyInterval.load();
                         invariant(!interval || interval != newInterval || lock->isLocked());
-                        interval = newInterval;
                         lock->waitForLock(0);
-                        newInterval = readOnlyInterval.load();
-                        invariant(!interval || interval != newInterval || lock->isLocked());
                         break;
                     }
                     case 5:
