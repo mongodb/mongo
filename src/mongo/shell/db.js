@@ -562,7 +562,7 @@ var DB;
         }
 
         // Fall back to MONGODB-CR
-        var n = this._adminCommand({copydbgetnonce: 1, fromhost: fromhost});
+        var n = assert.commandWorked(this._adminCommand({copydbgetnonce: 1, fromhost: fromhost}));
         return this._adminCommand({
             copydb: 1,
             fromhost: fromhost,

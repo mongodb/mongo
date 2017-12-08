@@ -110,7 +110,6 @@
         connectionStatus: {skip: "does not return user data"},
         convertToCapped: {skip: "primary only"},
         copydb: {skip: "primary only"},
-        copydbgetnonce: {skip: "primary only"},
         copydbsaslstart: {skip: "primary only"},
         count: {
             setUp: function(mongosConn) {
