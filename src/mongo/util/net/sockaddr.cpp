@@ -231,6 +231,10 @@ bool SockAddr::isDefaultRoute() const {
     }
 }
 
+bool SockAddr::isAnonymousUNIXSocket() const {
+    return ((getType() == AF_UNIX) && (as<sockaddr_un>().sun_path[0] == '\0'));
+}
+
 std::string SockAddr::toString(bool includePort) const {
     if (includePort && (getType() != AF_UNIX) && (getType() != AF_UNSPEC)) {
         StringBuilder ss;
@@ -281,8 +285,8 @@ std::string SockAddr::getAddr() const {
         }
 
         case AF_UNIX:
-            return (as<sockaddr_un>().sun_path[0] != '\0' ? as<sockaddr_un>().sun_path
-                                                          : "anonymous unix socket");
+            return (!isAnonymousUNIXSocket() ? as<sockaddr_un>().sun_path
+                                             : "anonymous unix socket");
         case AF_UNSPEC:
             return "(NONE)";
         default:

@@ -222,6 +222,13 @@ BSONObj interpreterVersion(const BSONObj& a, void* data) {
     return BSON("" << getGlobalScriptEngine()->getInterpreterVersionString());
 }
 
+BSONObj fileExistsJS(const BSONObj& a, void*) {
+    uassert(40678,
+            "fileExists expects one string argument",
+            a.nFields() == 1 && a.firstElement().type() == String);
+    return BSON("" << fileExists(a.firstElement().valuestrsafe()));
+}
+
 void installShellUtils(Scope& scope) {
     scope.injectNative("getMemInfo", JSGetMemInfo);
     scope.injectNative("_replMonitorStats", replMonitorStats);
@@ -231,6 +238,7 @@ void installShellUtils(Scope& scope) {
     scope.injectNative("interpreterVersion", interpreterVersion);
     scope.injectNative("getBuildInfo", getBuildInfo);
     scope.injectNative("computeSHA256Block", computeSHA256Block);
+    scope.injectNative("fileExists", fileExistsJS);
 
 #ifndef MONGO_SAFE_SHELL
     // can't launch programs
