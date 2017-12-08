@@ -71,6 +71,7 @@
 #include "mongo/db/session.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/stats/timer_stats.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -533,7 +534,6 @@ void scheduleWritesToOplog(OperationContext* opCtx,
         threadPool->schedule(makeOplogWriterForRange(0, ops.size()));
         return;
     }
-
 
     const size_t numOplogThreads = threadPool->getNumThreads();
     const size_t numOpsPerThread = ops.size() / numOplogThreads;
@@ -1511,9 +1511,36 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
 
     std::vector<Status> statusVector(workerPool->getNumThreads(), Status::OK());
     {
+        const bool pinOldestTimestamp = !serverGlobalParams.enableMajorityReadConcern;
+        std::unique_ptr<RecoveryUnit> pinningTransaction;
+        if (pinOldestTimestamp) {
+            // If `enableMajorityReadConcern` is false, storage aggressively trims
+            // history. Documents may not be inserted before the cutoff point. This piece will pin
+            // the "oldest timestamp" until after the batch is fully applied.
+            //
+            // When `enableMajorityReadConcern` is false, storage sets the "oldest timestamp" to
+            // the "get all committed" timestamp. Opening a transaction and setting its timestamp
+            // to first oplog entry's timestamp will prevent the "get all committed" timestamp
+            // from advancing.
+            //
+            // This transaction will be aborted after all writes from the batch of operations are
+            // complete. Aborting the transaction allows the "get all committed" point to be
+            // move forward.
+            pinningTransaction = std::unique_ptr<RecoveryUnit>(
+                opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit());
+            pinningTransaction->beginUnitOfWork(opCtx);
+            fassertStatusOK(
+                50659, pinningTransaction->setTimestamp(SnapshotName(ops.front().getTimestamp())));
+        }
+
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on the stack
-        ON_BLOCK_EXIT([&] { workerPool->join(); });
+        ON_BLOCK_EXIT([&] {
+            workerPool->join();
+            if (pinOldestTimestamp) {
+                pinningTransaction->abortUnitOfWork();
+            }
+        });
 
         // Write batch of ops into oplog.
         consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());

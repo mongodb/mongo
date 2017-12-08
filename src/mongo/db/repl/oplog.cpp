@@ -1112,7 +1112,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
     const bool assignOperationTimestamp = !opCtx->writesAreReplicated() &&
         !haveWrappingWriteUnitOfWork && fieldTs &&
         getGlobalReplicationCoordinator()->getReplicationMode() !=
-            ReplicationCoordinator::modeMasterSlave;
+            ReplicationCoordinator::modeMasterSlave &&
+        serverGlobalParams.enableMajorityReadConcern;
 
     if (*opType == 'i') {
         if (requestNss.isSystemDotIndexes()) {
@@ -1157,12 +1158,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
             while (true) {
                 auto oElem = fieldOIt.next();
                 auto tsElem = fieldTsIt.next();
+                SnapshotName timestamp;
+                if (assignOperationTimestamp) {
+                    timestamp = SnapshotName(tsElem.timestamp());
+                }
                 auto tElem = fieldTIt.next();
 
                 // Note: we don't care about statement ids here since the secondaries don't create
                 // their own oplog entries.
-                insertObjs.emplace_back(
-                    oElem.Obj(), SnapshotName(tsElem.timestamp()), tElem.Long());
+                insertObjs.emplace_back(oElem.Obj(), timestamp, tElem.Long());
                 if (!fieldOIt.more()) {
                     // Make sure arrays are the same length.
                     uassert(ErrorCodes::OperationFailed,

@@ -372,6 +372,10 @@ void KVStorageEngine::setInitialDataTimestamp(SnapshotName initialDataTimestamp)
     _engine->setInitialDataTimestamp(initialDataTimestamp);
 }
 
+void KVStorageEngine::setOldestTimestamp(SnapshotName oldestTimestamp) {
+    _engine->setOldestTimestamp(oldestTimestamp);
+}
+
 bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
     return _engine->supportsRecoverToStableTimestamp();
 }
