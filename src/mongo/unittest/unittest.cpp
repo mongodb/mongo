@@ -297,6 +297,8 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
             passes = true;
         } catch (const TestAssertionFailureException& ae) {
             err << ae.toString();
+        } catch (const DBException& e) {
+            err << " DBException: " << e.toString() << " in test " << tc->getName();
         } catch (const std::exception& e) {
             err << " std::exception: " << e.what() << " in test " << tc->getName();
         } catch (int x) {
