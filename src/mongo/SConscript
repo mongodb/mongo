@@ -484,7 +484,10 @@ if not has_option('noshell') and usemozjs:
 
     mongo_shell = shellEnv.Program(
         "mongo",
-        ["shell/dbshell.cpp"] + env.WindowsResourceFile("shell/shell.rc"),
+        [
+            "shell/dbshell.cpp",
+            "shell/mongodbcr.cpp",
+        ] + env.WindowsResourceFile("shell/shell.rc"),
         LIBDEPS=[
             "$BUILD_DIR/third_party/shim_pcrecpp",
             "shell_core",
