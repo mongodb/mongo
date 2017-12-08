@@ -32,6 +32,7 @@
 
 #include "mongo/db/logical_session_id.h"
 
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/auth/authorization_session_for_test.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/jsobj.h"
@@ -106,11 +108,11 @@ public:
     }
 
     User* addSimpleUser(UserName un) {
+        const auto creds = BSON("SCRAM-SHA-1" << scram::generateCredentials(
+                                    "a", saslGlobalParams.scramIterationCount.load()));
         ASSERT_OK(managerState->insertPrivilegeDocument(
             _opCtx.get(),
-            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << BSON("MONGODB-CR"
-                                                                                       << "a")
-                        << "roles"
+            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << creds << "roles"
                         << BSON_ARRAY(BSON("role"
                                            << "readWrite"
                                            << "db"
@@ -121,11 +123,11 @@ public:
     }
 
     User* addClusterUser(UserName un) {
+        const auto creds = BSON("SCRAM-SHA-1" << scram::generateCredentials(
+                                    "a", saslGlobalParams.scramIterationCount.load()));
         ASSERT_OK(managerState->insertPrivilegeDocument(
             _opCtx.get(),
-            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << BSON("MONGODB-CR"
-                                                                                       << "a")
-                        << "roles"
+            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << creds << "roles"
                         << BSON_ARRAY(BSON("role"
                                            << "__system"
                                            << "db"

@@ -32,12 +32,14 @@
  */
 #include "mongo/base/status.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session_for_test.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
@@ -91,6 +93,7 @@ public:
     AuthzSessionExternalStateMock* sessionState;
     AuthorizationManager* authzManager;
     std::unique_ptr<AuthorizationSessionForTest> authzSession;
+    BSONObj credentials;
 
     void setUp() {
         serverGlobalParams.featureCompatibility.setVersion(
@@ -111,6 +114,9 @@ public:
         sessionState = localSessionState.get();
         authzSession = stdx::make_unique<AuthorizationSessionForTest>(std::move(localSessionState));
         authzManager->setAuthEnabled(true);
+
+        credentials = BSON("SCRAM-SHA-1" << scram::generateCredentials(
+                               "a", saslGlobalParams.scramIterationCount.load()));
     }
 };
 
@@ -173,8 +179,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "readWrite"
@@ -202,8 +207,7 @@ TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
                                                    << "db"
                                                    << "admin"
                                                    << "credentials"
-                                                   << BSON("MONGODB-CR"
-                                                           << "a")
+                                                   << credentials
                                                    << "roles"
                                                    << BSON_ARRAY(BSON("role"
                                                                       << "readWriteAnyDatabase"
@@ -249,8 +253,7 @@ TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "readWrite"
@@ -282,8 +285,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "readWrite"
@@ -300,8 +302,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "userAdmin"
@@ -315,8 +316,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                                                    << "db"
                                                    << "test"
                                                    << "credentials"
-                                                   << BSON("MONGODB-CR"
-                                                           << "a")
+                                                   << credentials
                                                    << "roles"
                                                    << BSON_ARRAY(BSON("role"
                                                                       << "readWriteAnyDatabase"
@@ -334,8 +334,7 @@ TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
                                                    << "db"
                                                    << "test"
                                                    << "credentials"
-                                                   << BSON("MONGODB-CR"
-                                                           << "a")
+                                                   << credentials
                                                    << "roles"
                                                    << BSON_ARRAY(BSON("role"
                                                                       << "userAdminAnyDatabase"
@@ -430,8 +429,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "readWrite"
@@ -463,8 +461,7 @@ TEST_F(AuthorizationSessionTest, InvalidateUser) {
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "read"
@@ -509,8 +506,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "readWrite"
@@ -543,8 +539,7 @@ TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSON_ARRAY(BSON("role"
                                                                             << "read"
@@ -580,8 +575,7 @@ TEST_F(AuthorizationSessionTest, AcquireUserObtainsAndValidatesAuthenticationRes
              << "db"
              << "test"
              << "credentials"
-             << BSON("MONGODB-CR"
-                     << "a")
+             << credentials
              << "roles"
              << BSON_ARRAY(BSON("role"
                                 << "readWrite"
@@ -1124,8 +1118,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithEmptyUser
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
@@ -1144,8 +1137,7 @@ TEST_F(AuthorizationSessionTest,
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
@@ -1162,8 +1154,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedWithIntersecting
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
@@ -1173,8 +1164,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsCoauthorizedWithIntersecting
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
@@ -1194,8 +1184,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithNoninters
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
@@ -1205,8 +1194,7 @@ TEST_F(AuthorizationSessionTest, AuthorizedSessionIsNotCoauthorizedWithNoninters
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
@@ -1227,8 +1215,7 @@ TEST_F(AuthorizationSessionTest,
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));
@@ -1238,8 +1225,7 @@ TEST_F(AuthorizationSessionTest,
                                                          << "db"
                                                          << "test"
                                                          << "credentials"
-                                                         << BSON("MONGODB-CR"
-                                                                 << "a")
+                                                         << credentials
                                                          << "roles"
                                                          << BSONArray()),
                                                     BSONObj()));

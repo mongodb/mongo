@@ -32,9 +32,11 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/status.h"
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/server_options.h"
@@ -229,12 +231,16 @@ public:
     unique_ptr<User> user;
     unique_ptr<User> adminUser;
     V2UserDocumentParser v2parser;
+    BSONObj credentials;
 
     void setUp() {
         serverGlobalParams.featureCompatibility.setVersion(
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
         user.reset(new User(UserName("spencer", "test")));
         adminUser.reset(new User(UserName("admin", "admin")));
+
+        credentials = BSON("SCRAM-SHA-1" << scram::generateCredentials(
+                               "a", saslGlobalParams.scramIterationCount.load()));
     }
 };
 
@@ -254,8 +260,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
     ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("db"
                                                        << "test"
                                                        << "credentials"
-                                                       << BSON("MONGODB-CR"
-                                                               << "a")
+                                                       << credentials
                                                        << "roles"
                                                        << emptyArray)));
 
@@ -263,8 +268,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
     ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
                                                        << "spencer"
                                                        << "credentials"
-                                                       << BSON("MONGODB-CR"
-                                                               << "a")
+                                                       << credentials
                                                        << "roles"
                                                        << emptyArray)));
 
@@ -282,8 +286,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                        << "db"
                                                        << "test"
                                                        << "credentials"
-                                                       << BSON("MONGODB-CR"
-                                                               << "a"))));
+                                                       << credentials)));
 
     // authenticationRestricitons must be an array if it exists
     ASSERT_NOT_OK(v2parser.checkValidUserDocument(BSON("user"
@@ -299,8 +302,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "db"
                                                    << "test"
                                                    << "credentials"
-                                                   << BSON("MONGODB-CR"
-                                                           << "a")
+                                                   << credentials
                                                    << "roles"
                                                    << emptyArray
                                                    << "authenticationRestrictions"
@@ -312,8 +314,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "db"
                                                    << "test"
                                                    << "credentials"
-                                                   << BSON("MONGODB-CR"
-                                                           << "a")
+                                                   << credentials
                                                    << "roles"
                                                    << emptyArray)));
 
@@ -333,8 +334,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                        << "db"
                                                        << "test"
                                                        << "credentials"
-                                                       << BSON("MONGODB-CR"
-                                                               << "a")
+                                                       << credentials
                                                        << "roles"
                                                        << BSON_ARRAY("read"))));
 
@@ -344,8 +344,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                        << "db"
                                                        << "test"
                                                        << "credentials"
-                                                       << BSON("MONGODB-CR"
-                                                               << "a")
+                                                       << credentials
                                                        << "roles"
                                                        << BSON_ARRAY(BSON("db"
                                                                           << "dbA")))));
@@ -356,8 +355,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                        << "db"
                                                        << "test"
                                                        << "credentials"
-                                                       << BSON("MONGODB-CR"
-                                                               << "a")
+                                                       << credentials
                                                        << "roles"
                                                        << BSON_ARRAY(BSON("role"
                                                                           << "roleA")))));
@@ -369,8 +367,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "db"
                                                    << "test"
                                                    << "credentials"
-                                                   << BSON("MONGODB-CR"
-                                                           << "a")
+                                                   << credentials
                                                    << "roles"
                                                    << BSON_ARRAY(BSON("role"
                                                                       << "roleA"
@@ -383,8 +380,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "db"
                                                    << "test"
                                                    << "credentials"
-                                                   << BSON("MONGODB-CR"
-                                                           << "a")
+                                                   << credentials
                                                    << "roles"
                                                    << BSON_ARRAY(BSON("role"
                                                                       << "roleA"
@@ -396,23 +392,21 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                                          << "dbB")))));
 
     // Optional authenticationRestrictions field OK
-    ASSERT_OK(v2parser.checkValidUserDocument(BSON("user"
-                                                   << "spencer"
-                                                   << "db"
-                                                   << "test"
-                                                   << "credentials"
-                                                   << BSON("MONGODB-CR"
-                                                           << "a")
-                                                   << "authenticationRestrictions"
-                                                   << BSON_ARRAY(BSON("clientSource"
-                                                                      << BSON_ARRAY("127.0.0.1/8")
-                                                                      << "serverAddress"
-                                                                      << BSON_ARRAY("127.0.0.1/8")))
-                                                   << "roles"
-                                                   << BSON_ARRAY(BSON("role"
-                                                                      << "roleA"
-                                                                      << "db"
-                                                                      << "dbA")))));
+    ASSERT_OK(v2parser.checkValidUserDocument(
+        BSON("user"
+             << "spencer"
+             << "db"
+             << "test"
+             << "credentials"
+             << credentials
+             << "authenticationRestrictions"
+             << BSON_ARRAY(BSON("clientSource" << BSON_ARRAY("127.0.0.1/8") << "serverAddress"
+                                               << BSON_ARRAY("127.0.0.1/8")))
+             << "roles"
+             << BSON_ARRAY(BSON("role"
+                                << "roleA"
+                                << "db"
+                                << "dbA")))));
 
     // Optional extraData field OK
     ASSERT_OK(v2parser.checkValidUserDocument(BSON("user"
@@ -420,8 +414,7 @@ TEST_F(V2UserDocumentParsing, V2DocumentValidation) {
                                                    << "db"
                                                    << "test"
                                                    << "credentials"
-                                                   << BSON("MONGODB-CR"
-                                                           << "a")
+                                                   << credentials
                                                    << "extraData"
                                                    << BSON("foo"
                                                            << "bar")
@@ -458,7 +451,7 @@ TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
                                                                           << "credentials"
                                                                           << "a")));
 
-    // Must specify credentials for MONGODB-CR
+    // Must specify credentials for a valid mechanism
     ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromUserDocument(user.get(),
                                                                      BSON("user"
                                                                           << "spencer"
@@ -475,9 +468,9 @@ TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
                                                                       << "db"
                                                                       << "test"
                                                                       << "credentials"
-                                                                      << BSON("MONGODB-CR"
-                                                                              << "a"))));
-    ASSERT(user->getCredentials().password == "a");
+                                                                      << credentials)));
+    ASSERT(user->getCredentials().password.empty());
+    ASSERT(!user->getCredentials().scram.storedKey.empty());
     ASSERT(!user->getCredentials().isExternal);
 
     // Credentials are {external:true if users's db is $external
