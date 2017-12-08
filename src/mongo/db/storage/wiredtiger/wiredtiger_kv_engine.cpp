@@ -1009,7 +1009,7 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp oldestTimestamp) {
     if (size < 0) {
         int e = errno;
         error() << "error snprintf " << errnoWithDescription(e);
-        fassertFailedNoTrace(50659);
+        fassertFailedNoTrace(40677);
     }
 
     invariant(static_cast<std::size_t>(size) < sizeof(commitTSConfigString));

@@ -266,7 +266,7 @@ TEST_F(ChangeStreamStageTest, ShouldRejectBothResumeAfterClusterTimeAndResumeAft
                 .firstElement(),
             expCtx),
         AssertionException,
-        50656);
+        40674);
 }
 
 TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
