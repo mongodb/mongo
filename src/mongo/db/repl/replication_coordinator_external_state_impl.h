@@ -100,7 +100,7 @@ public:
     virtual void stopProducer();
     virtual void startProducerIfStopped();
     void dropAllSnapshots() final;
-    void updateCommittedSnapshot(SnapshotInfo newCommitPoint) final;
+    void updateCommittedSnapshot(const OpTime& newCommitPoint) final;
     virtual bool snapshotsEnabled() const;
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
     virtual double getElectionTimeoutOffsetLimitFraction() const;

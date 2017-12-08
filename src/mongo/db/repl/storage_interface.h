@@ -36,13 +36,13 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/snapshot_name.h"
 
 namespace mongo {
 
@@ -54,7 +54,7 @@ namespace repl {
 
 struct TimestampedBSONObj {
     BSONObj obj;
-    SnapshotName timestamp;
+    Timestamp timestamp;
 };
 
 /**
@@ -318,13 +318,13 @@ public:
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
      * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
      */
-    virtual void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) = 0;
+    virtual void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) = 0;
 
     /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because
      * timestamps are not persisted in the storage layer.
      */
-    virtual void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) = 0;
+    virtual void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) = 0;
 
     /**
      * Reverts the state of all database data to the last stable timestamp.

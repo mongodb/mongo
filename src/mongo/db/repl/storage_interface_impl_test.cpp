@@ -121,7 +121,7 @@ TimestampedBSONObj makeOplogEntry(OpTime opTime) {
     bob.append("h", 1LL);
     bob.append("op", "c");
     bob.append("ns", "test.t");
-    return {bob.obj(), SnapshotName(opTime.getTimestamp())};
+    return {bob.obj(), opTime.getTimestamp()};
 }
 
 /**
@@ -307,7 +307,7 @@ TEST_F(StorageInterfaceImplTest, IncrementRollbackIDRollsToZeroWhenExceedingMaxI
     TimestampedBSONObj maxDoc = {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
                                             << StorageInterfaceImpl::kRollbackIdFieldName
                                             << std::numeric_limits<int>::max()),
-                                 SnapshotName(0)};
+                                 Timestamp::min()};
     ASSERT_OK(storage.insertDocument(opCtx, nss, maxDoc, OpTime::kUninitializedTerm));
     _assertRollbackIDDocument(opCtx, std::numeric_limits<int>::max());
 
@@ -336,7 +336,7 @@ TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfDocumentHasBadFi
 
     std::vector<TimestampedBSONObj> badDocs = {
         {BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId << "bad field" << 3),
-         SnapshotName(0)}};
+         Timestamp::min()}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(badDocs)));
     ASSERT_EQUALS(ErrorCodes::duplicateCodeForTest(40415),
                   storage.getRollbackID(opCtx).getStatus());
@@ -353,7 +353,7 @@ TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotI
         TimestampedBSONObj{BSON("_id" << StorageInterfaceImpl::kRollbackIdDocumentId
                                       << StorageInterfaceImpl::kRollbackIdFieldName
                                       << "bad id"),
-                           SnapshotName(0)}};
+                           Timestamp::min()}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(badDoc)));
     ASSERT_EQUALS(ErrorCodes::TypeMismatch, storage.getRollbackID(opCtx).getStatus());
 }
@@ -461,7 +461,7 @@ TEST_F(StorageInterfaceImplTest, InsertMissingDocWorksOnExistingCappedCollection
     opts.cappedSize = 1024 * 1024;
     createCollection(opCtx, nss, opts);
     ASSERT_OK(storage.insertDocument(
-        opCtx, nss, {BSON("_id" << 1), SnapshotName(1)}, OpTime::kUninitializedTerm));
+        opCtx, nss, {BSON("_id" << 1), Timestamp(1)}, OpTime::kUninitializedTerm));
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     ASSERT_TRUE(autoColl.getCollection());
 }
@@ -472,7 +472,7 @@ TEST_F(StorageInterfaceImplTest, InsertMissingDocWorksOnExistingCollection) {
     auto nss = makeNamespace(_agent);
     createCollection(opCtx, nss);
     ASSERT_OK(storage.insertDocument(
-        opCtx, nss, {BSON("_id" << 1), SnapshotName(1)}, OpTime::kUninitializedTerm));
+        opCtx, nss, {BSON("_id" << 1), Timestamp(1)}, OpTime::kUninitializedTerm));
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     ASSERT_TRUE(autoColl.getCollection());
 }
@@ -482,7 +482,7 @@ TEST_F(StorageInterfaceImplTest, InsertMissingDocFailesIfCollectionIsMissing) {
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
     const auto status = storage.insertDocument(
-        opCtx, nss, {BSON("_id" << 1), SnapshotName(1)}, OpTime::kUninitializedTerm);
+        opCtx, nss, {BSON("_id" << 1), Timestamp(1)}, OpTime::kUninitializedTerm);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status.code(), ErrorCodes::NamespaceNotFound);
 }
@@ -653,7 +653,7 @@ TEST_F(StorageInterfaceImplTest, DropCollectionWorksWithExistingWithDataCollecti
     auto nss = makeNamespace(_agent);
     createCollection(opCtx, nss);
     ASSERT_OK(storage.insertDocument(
-        opCtx, nss, {BSON("_id" << 1), SnapshotName(1)}, OpTime::kUninitializedTerm));
+        opCtx, nss, {BSON("_id" << 1), Timestamp(1)}, OpTime::kUninitializedTerm));
     ASSERT_OK(storage.dropCollection(opCtx, nss));
 }
 
@@ -926,11 +926,11 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(storage.insertDocuments(
         opCtx,
         nss,
-        transformInserts(std::vector<TimestampedBSONObj>{{BSON("_id" << 0), SnapshotName(0)},
-                                                         {BSON("_id" << 1), SnapshotName(1)},
-                                                         {BSON("_id" << 2), SnapshotName(2)},
-                                                         {BSON("_id" << 3), SnapshotName(3)},
-                                                         {BSON("_id" << 4), SnapshotName(4)}})));
+        transformInserts(std::vector<TimestampedBSONObj>{{BSON("_id" << 0), Timestamp(0)},
+                                                         {BSON("_id" << 1), Timestamp(1)},
+                                                         {BSON("_id" << 2), Timestamp(2)},
+                                                         {BSON("_id" << 3), Timestamp(3)},
+                                                         {BSON("_id" << 4), Timestamp(4)}})));
 
     // startKey not provided
     ASSERT_BSONOBJ_EQ(
@@ -1063,11 +1063,11 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 1), SnapshotName(1), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(2), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 3), SnapshotName(3), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 4), SnapshotName(4), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 1), Timestamp(1), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(2), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 3), Timestamp(3), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 4), Timestamp(4), OpTime::kUninitializedTerm}}));
 
     // startKey not provided
     ASSERT_BSONOBJ_EQ(
@@ -1179,9 +1179,9 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 1), SnapshotName(1), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(2), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 1), Timestamp(1), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(2), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 1),
         _assetGetFront(storage.findDocuments(opCtx,
@@ -1210,9 +1210,9 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 1), SnapshotName(1), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(2), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 1), Timestamp(1), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(2), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 0),
         _assetGetFront(storage.findDocuments(opCtx,
@@ -1235,9 +1235,9 @@ TEST_F(StorageInterfaceImplTest, FindDocumentsCollScanReturnsNoSuchKeyIfStartKey
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 1), SnapshotName(1), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(2), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 1), Timestamp(1), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(2), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
                   storage
                       .findDocuments(opCtx,
@@ -1259,9 +1259,9 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 1), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 1), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_EQUALS(ErrorCodes::InvalidOptions,
                   storage
                       .findDocuments(opCtx,
@@ -1336,14 +1336,14 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 1), SnapshotName(1), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(2), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 3), SnapshotName(3), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 4), SnapshotName(4), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 5), SnapshotName(5), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 6), SnapshotName(6), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 7), SnapshotName(7), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 1), Timestamp(1), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(2), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 3), Timestamp(3), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 4), Timestamp(4), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 5), Timestamp(5), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 6), Timestamp(6), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 7), Timestamp(7), OpTime::kUninitializedTerm}}));
 
     // startKey not provided
     ASSERT_BSONOBJ_EQ(
@@ -1447,14 +1447,14 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 1), SnapshotName(1), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(2), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 3), SnapshotName(3), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 4), SnapshotName(4), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 5), SnapshotName(5), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 6), SnapshotName(6), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 7), SnapshotName(7), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 1), Timestamp(1), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(2), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 3), Timestamp(3), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 4), Timestamp(4), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 5), Timestamp(5), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 6), Timestamp(6), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 7), Timestamp(7), OpTime::kUninitializedTerm}}));
 
     // startKey not provided
     ASSERT_BSONOBJ_EQ(
@@ -1557,9 +1557,9 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 1), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 1), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 1),
         _assetGetFront(storage.deleteDocuments(opCtx,
@@ -1582,9 +1582,9 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 1), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 1), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_BSONOBJ_EQ(
         BSON("_id" << 0),
         _assetGetFront(storage.deleteDocuments(opCtx,
@@ -1606,9 +1606,9 @@ TEST_F(StorageInterfaceImplTest, DeleteDocumentsCollScanReturnsNoSuchKeyIfStartK
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 1), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 1), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey,
                   storage
                       .deleteDocuments(opCtx,
@@ -1630,9 +1630,9 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 1), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 1), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_EQUALS(ErrorCodes::InvalidOptions,
                   storage
                       .deleteDocuments(opCtx,
@@ -1678,8 +1678,8 @@ TEST_F(StorageInterfaceImplTest,
     auto doc2 = BSON("_id" << 1 << "x" << 1);
     ASSERT_OK(storage.insertDocuments(opCtx,
                                       nss,
-                                      {{doc1, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc2, SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                      {{doc1, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc2, Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_EQUALS(ErrorCodes::TooManyMatchingDocuments,
                   storage.findSingleton(opCtx, nss).getStatus());
 }
@@ -1690,8 +1690,7 @@ TEST_F(StorageInterfaceImplTest, FindSingletonReturnsDocumentWhenSingletonDocume
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
     auto doc1 = BSON("_id" << 0 << "x" << 0);
-    ASSERT_OK(
-        storage.insertDocument(opCtx, nss, {doc1, SnapshotName(0)}, OpTime::kUninitializedTerm));
+    ASSERT_OK(storage.insertDocument(opCtx, nss, {doc1, Timestamp(0)}, OpTime::kUninitializedTerm));
     ASSERT_BSONOBJ_EQ(doc1, unittest::assertGet(storage.findSingleton(opCtx, nss)));
 }
 
@@ -1731,8 +1730,7 @@ TEST_F(StorageInterfaceImplTest, PutSingletonUpdatesDocumentWhenCollectionIsNotE
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
     auto doc1 = BSON("_id" << 0 << "x" << 0);
-    ASSERT_OK(
-        storage.insertDocument(opCtx, nss, {doc1, SnapshotName(0)}, OpTime::kUninitializedTerm));
+    ASSERT_OK(storage.insertDocument(opCtx, nss, {doc1, Timestamp(0)}, OpTime::kUninitializedTerm));
     auto update = BSON("$set" << BSON("x" << 1));
     ASSERT_OK(storage.putSingleton(opCtx, nss, update));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 0 << "x" << 1),
@@ -1749,8 +1747,8 @@ TEST_F(StorageInterfaceImplTest, PutSingletonUpdatesFirstDocumentWhenCollectionI
     auto doc2 = BSON("_id" << 1 << "x" << 1);
     ASSERT_OK(storage.insertDocuments(opCtx,
                                       nss,
-                                      {{doc1, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc2, SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                      {{doc1, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc2, Timestamp(0), OpTime::kUninitializedTerm}}));
     auto update = BSON("$set" << BSON("x" << 2));
     ASSERT_OK(storage.putSingleton(opCtx, nss, update));
     _assertDocumentsInCollectionEquals(opCtx, nss, {BSON("_id" << 0 << "x" << 2), doc2});
@@ -1774,7 +1772,7 @@ TEST_F(StorageInterfaceImplTest, UpdateSingletonUpdatesDocumentWhenCollectionIsN
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
     auto doc1 = BSON("_id" << 0 << "x" << 0);
     ASSERT_OK(
-        storage.insertDocument(opCtx, nss, {doc1, SnapshotName(0)}, OpTime::kUninitializedTerm));
+        storage.insertDocument(opCtx, nss, {doc1, Timestamp::min()}, OpTime::kUninitializedTerm));
     auto update = BSON("$set" << BSON("x" << 1));
     ASSERT_OK(storage.updateSingleton(opCtx, nss, BSON("_id" << 0), update));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 0 << "x" << 1),
@@ -1810,8 +1808,8 @@ TEST_F(StorageInterfaceImplTest, FindByIdReturnsNoSuchKeyWhenDocumentIsNotFound)
     auto doc3 = BSON("_id" << 2 << "x" << 2);
     ASSERT_OK(storage.insertDocuments(opCtx,
                                       nss,
-                                      {{doc1, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc3, SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                      {{doc1, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc3, Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, storage.findById(opCtx, nss, doc2["_id"]).getStatus());
 }
 
@@ -1825,9 +1823,9 @@ TEST_F(StorageInterfaceImplTest, FindByIdReturnsDocumentWhenDocumentExists) {
     auto doc3 = BSON("_id" << 2 << "x" << 2);
     ASSERT_OK(storage.insertDocuments(opCtx,
                                       nss,
-                                      {{doc1, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc2, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc3, SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                      {{doc1, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc2, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc3, Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_BSONOBJ_EQ(doc2, unittest::assertGet(storage.findById(opCtx, nss, doc2["_id"])));
 }
 
@@ -1860,8 +1858,8 @@ TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsNoSuchKeyWhenDocumentIsNotFoun
     auto doc3 = BSON("_id" << 2 << "x" << 2);
     ASSERT_OK(storage.insertDocuments(opCtx,
                                       nss,
-                                      {{doc1, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc3, SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                      {{doc1, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc3, Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, storage.deleteById(opCtx, nss, doc2["_id"]).getStatus());
     _assertDocumentsInCollectionEquals(opCtx, nss, {doc1, doc3});
 }
@@ -1876,9 +1874,9 @@ TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsDocumentWhenDocumentExists) {
     auto doc3 = BSON("_id" << 2 << "x" << 2);
     ASSERT_OK(storage.insertDocuments(opCtx,
                                       nss,
-                                      {{doc1, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc2, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc3, SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                      {{doc1, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc2, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc3, Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_BSONOBJ_EQ(doc2, unittest::assertGet(storage.deleteById(opCtx, nss, doc2["_id"])));
     _assertDocumentsInCollectionEquals(opCtx, nss, {doc1, doc3});
 }
@@ -1918,9 +1916,9 @@ TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentReplacesExistingDocumentInC
     ASSERT_OK(storage.insertDocuments(
         opCtx,
         nss,
-        {{BSON("_id" << 0 << "x" << 0), SnapshotName(0), OpTime::kUninitializedTerm},
-         {originalDoc, SnapshotName(0), OpTime::kUninitializedTerm},
-         {BSON("_id" << 2 << "x" << 2), SnapshotName(2), OpTime::kUninitializedTerm}}));
+        {{BSON("_id" << 0 << "x" << 0), Timestamp(0), OpTime::kUninitializedTerm},
+         {originalDoc, Timestamp(0), OpTime::kUninitializedTerm},
+         {BSON("_id" << 2 << "x" << 2), Timestamp(2), OpTime::kUninitializedTerm}}));
 
     ASSERT_OK(storage.upsertById(opCtx, nss, originalDoc["_id"], BSON("x" << 100)));
 
@@ -1940,8 +1938,8 @@ TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentInsertsNewDocumentInCollect
     ASSERT_OK(storage.insertDocuments(
         opCtx,
         nss,
-        {{BSON("_id" << 0 << "x" << 0), SnapshotName(0), OpTime::kUninitializedTerm},
-         {BSON("_id" << 2 << "x" << 2), SnapshotName(2), OpTime::kUninitializedTerm}}));
+        {{BSON("_id" << 0 << "x" << 0), Timestamp(0), OpTime::kUninitializedTerm},
+         {BSON("_id" << 2 << "x" << 2), Timestamp(2), OpTime::kUninitializedTerm}}));
 
     ASSERT_OK(storage.upsertById(opCtx, nss, BSON("" << 1).firstElement(), BSON("x" << 100)));
 
@@ -1969,9 +1967,9 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_OK(storage.insertDocuments(
         opCtx,
         nss,
-        {{BSON("_id" << 0 << "x" << 0), SnapshotName(0), OpTime::kUninitializedTerm},
-         {originalDoc, SnapshotName(0), OpTime::kUninitializedTerm},
-         {BSON("_id" << 2 << "x" << 2), SnapshotName(2), OpTime::kUninitializedTerm}}));
+        {{BSON("_id" << 0 << "x" << 0), Timestamp(0), OpTime::kUninitializedTerm},
+         {originalDoc, Timestamp(0), OpTime::kUninitializedTerm},
+         {BSON("_id" << 2 << "x" << 2), Timestamp(2), OpTime::kUninitializedTerm}}));
 
     ASSERT_OK(storage.upsertById(opCtx, nss, originalDoc["_id"], BSON("x" << 100)));
 
@@ -2082,7 +2080,7 @@ TEST_F(
 
     auto doc = BSON("_id" << 0 << "x" << 0);
     ASSERT_OK(
-        storage.insertDocuments(opCtx, nss, {{doc, SnapshotName(0), OpTime::kUninitializedTerm}}));
+        storage.insertDocuments(opCtx, nss, {{doc, Timestamp(0), OpTime::kUninitializedTerm}}));
     _assertDocumentsInCollectionEquals(opCtx, nss, {doc});
 
     // This test fixture disables replicated writes by default. We want to re-enable this setting
@@ -2108,7 +2106,7 @@ TEST_F(
 
     auto doc = BSON("_id" << 0 << "x" << 0);
     ASSERT_OK(
-        storage.insertDocuments(opCtx, nss, {{doc, SnapshotName(0), OpTime::kUninitializedTerm}}));
+        storage.insertDocuments(opCtx, nss, {{doc, Timestamp(0), OpTime::kUninitializedTerm}}));
     _assertDocumentsInCollectionEquals(opCtx, nss, {doc});
 
     // This test fixture disables replicated writes by default. We want to re-enable this setting
@@ -2158,8 +2156,8 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterLeavesCollectionUnchangedIfNoDocu
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
 
-    std::vector<TimestampedBSONObj> docs = {{BSON("_id" << 0 << "x" << 0), SnapshotName(0)},
-                                            {BSON("_id" << 2 << "x" << 2), SnapshotName(0)}};
+    std::vector<TimestampedBSONObj> docs = {{BSON("_id" << 0 << "x" << 0), Timestamp(0)},
+                                            {BSON("_id" << 2 << "x" << 2), Timestamp(0)}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(docs)));
 
     auto filter = BSON("x" << 1);
@@ -2174,10 +2172,10 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterRemoveDocumentsThatMatchFilter) {
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
 
-    std::vector<TimestampedBSONObj> docs = {{BSON("_id" << 0 << "x" << 0), SnapshotName(0)},
-                                            {BSON("_id" << 1 << "x" << 1), SnapshotName(0)},
-                                            {BSON("_id" << 2 << "x" << 2), SnapshotName(0)},
-                                            {BSON("_id" << 3 << "x" << 3), SnapshotName(0)}};
+    std::vector<TimestampedBSONObj> docs = {{BSON("_id" << 0 << "x" << 0), Timestamp(0)},
+                                            {BSON("_id" << 1 << "x" << 1), Timestamp(0)},
+                                            {BSON("_id" << 2 << "x" << 2), Timestamp(0)},
+                                            {BSON("_id" << 3 << "x" << 3), Timestamp(0)}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(docs)));
 
     auto filter = BSON("x" << BSON("$in" << BSON_ARRAY(1 << 2)));
@@ -2194,10 +2192,10 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterExpandsDottedFieldNamesAsPaths) {
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
 
     std::vector<TimestampedBSONObj> docs = {
-        {BSON("_id" << 0 << "x" << BSON("y" << 0)), SnapshotName(0)},
-        {BSON("_id" << 1 << "x" << BSON("y" << 1)), SnapshotName(0)},
-        {BSON("_id" << 2 << "x" << BSON("y" << 2)), SnapshotName(0)},
-        {BSON("_id" << 3 << "x" << BSON("y" << 3)), SnapshotName(0)}};
+        {BSON("_id" << 0 << "x" << BSON("y" << 0)), Timestamp::min()},
+        {BSON("_id" << 1 << "x" << BSON("y" << 1)), Timestamp::min()},
+        {BSON("_id" << 2 << "x" << BSON("y" << 2)), Timestamp::min()},
+        {BSON("_id" << 3 << "x" << BSON("y" << 3)), Timestamp::min()}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(docs)));
 
     auto filter = BSON("x.y" << BSON("$gte" << 1));
@@ -2213,8 +2211,8 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterUsesIdHackIfFilterContainsIdField
     auto nss = makeNamespace(_agent);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
 
-    std::vector<TimestampedBSONObj> docs = {{BSON("_id" << 0 << "x" << 0), SnapshotName(0)},
-                                            {BSON("_id" << 1 << "x" << 1), SnapshotName(0)}};
+    std::vector<TimestampedBSONObj> docs = {{BSON("_id" << 0 << "x" << 0), Timestamp(0)},
+                                            {BSON("_id" << 1 << "x" << 1), Timestamp(0)}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(docs)));
 
     auto filter = BSON("_id" << 1);
@@ -2234,10 +2232,10 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterRemovesDocumentsInIllegalClientSy
     StorageInterfaceImpl storage;
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
 
-    std::vector<TimestampedBSONObj> docs = {{BSON("_id" << 0 << "x" << 0), SnapshotName(0)},
-                                            {BSON("_id" << 1 << "x" << 1), SnapshotName(0)},
-                                            {BSON("_id" << 2 << "x" << 2), SnapshotName(0)},
-                                            {BSON("_id" << 3 << "x" << 3), SnapshotName(0)}};
+    std::vector<TimestampedBSONObj> docs = {{BSON("_id" << 0 << "x" << 0), Timestamp(0)},
+                                            {BSON("_id" << 1 << "x" << 1), Timestamp(0)},
+                                            {BSON("_id" << 2 << "x" << 2), Timestamp(0)},
+                                            {BSON("_id" << 3 << "x" << 3), Timestamp(0)}};
     ASSERT_OK(storage.insertDocuments(opCtx, nss, transformInserts(docs)));
 
     auto filter = BSON("$or" << BSON_ARRAY(BSON("x" << 0) << BSON("_id" << 2)));
@@ -2271,10 +2269,10 @@ TEST_F(StorageInterfaceImplTest,
                            << "def");
     ASSERT_OK(storage.insertDocuments(opCtx,
                                       nss,
-                                      {{doc1, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc2, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc3, SnapshotName(0), OpTime::kUninitializedTerm},
-                                       {doc4, SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                      {{doc1, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc2, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc3, Timestamp(0), OpTime::kUninitializedTerm},
+                                       {doc4, Timestamp(0), OpTime::kUninitializedTerm}}));
 
     // This filter should remove doc1 and doc2 because the values of the field "x"
     // are equivalent to "aBc" under the case-insensive collation.
@@ -2322,9 +2320,9 @@ TEST_F(StorageInterfaceImplTest, GetCollectionCountReturnsCollectionCount) {
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 1), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 1), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     auto count = unittest::assertGet(storage.getCollectionCount(opCtx, nss));
     ASSERT_EQUALS(3UL, count);
 }
@@ -2462,9 +2460,9 @@ TEST_F(StorageInterfaceImplTest, GetCollectionSizeReturnsCollectionSize) {
     ASSERT_OK(
         storage.insertDocuments(opCtx,
                                 nss,
-                                {{BSON("_id" << 1), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 2), SnapshotName(0), OpTime::kUninitializedTerm},
-                                 {BSON("_id" << 0), SnapshotName(0), OpTime::kUninitializedTerm}}));
+                                {{BSON("_id" << 1), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 2), Timestamp(0), OpTime::kUninitializedTerm},
+                                 {BSON("_id" << 0), Timestamp(0), OpTime::kUninitializedTerm}}));
     auto size = unittest::assertGet(storage.getCollectionSize(opCtx, nss));
     ASSERT_NOT_EQUALS(0UL, size);
 }

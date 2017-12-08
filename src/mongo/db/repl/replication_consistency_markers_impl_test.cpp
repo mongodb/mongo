@@ -360,7 +360,7 @@ TEST_F(ReplicationConsistencyMarkersTest, OplogTruncateAfterPointUpgrade) {
                                       << minValidTime.getTerm()
                                       << MinValidDocument::kOldOplogDeleteFromPointFieldName
                                       << time1),
-                           SnapshotName(0)},
+                           Timestamp(0)},
         OpTime::kUninitializedTerm));
     consistencyMarkers.initializeMinValidDocument(opCtx);
 

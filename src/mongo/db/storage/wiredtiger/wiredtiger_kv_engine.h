@@ -38,6 +38,7 @@
 #include <wiredtiger.h>
 
 #include "mongo/bson/ordering.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
@@ -167,9 +168,9 @@ public:
 
     void setJournalListener(JournalListener* jl) final;
 
-    virtual void setStableTimestamp(SnapshotName stableTimestamp) override;
+    virtual void setStableTimestamp(Timestamp stableTimestamp) override;
 
-    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) override;
+    virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
@@ -223,13 +224,13 @@ public:
      * `setStableTimestamp`. Nodes that do not support majority reads (master-slave or explicitly
      * disabled) will call this method directly from the WiredTigerOplogManager background thread.
      */
-    void advanceOldestTimestamp(SnapshotName oldestTimestamp);
+    void advanceOldestTimestamp(Timestamp oldestTimestamp);
 
     /**
      * Callers to this method and `advanceOldestTimestamp` must be serialized. This method will
      * force the oldest timestamp to the input value.
      */
-    void setOldestTimestamp(SnapshotName oldestTimestamp);
+    void setOldestTimestamp(Timestamp oldestTimestamp);
 
     /*
      * This function is called when replication has completed a batch.  In this function, we
@@ -265,7 +266,9 @@ private:
 
     std::string _uri(StringData ident) const;
 
-    SnapshotName _previousSetOldestTimestamp;
+    // Not threadsafe; callers must be serialized.
+    void _setOldestTimestamp(Timestamp oldestTimestamp);
+    Timestamp _previousSetOldestTimestamp;
     const bool _keepDataHistory;
 
     WT_CONNECTION* _conn;

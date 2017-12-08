@@ -1146,8 +1146,8 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
             ts = timestamps[i];
         }
         if (!ts.isNull()) {
-            LOG(4) << "inserting record with timestamp " << ts.asULL();
-            fassertStatusOK(39001, opCtx->recoveryUnit()->setTimestamp(SnapshotName(ts)));
+            LOG(4) << "inserting record with timestamp " << ts;
+            fassertStatusOK(39001, opCtx->recoveryUnit()->setTimestamp(ts));
         }
         setKey(c, record.id);
         WiredTigerItem value(record.data.data(), record.data.size());
@@ -1645,7 +1645,7 @@ void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
         // Immediately rewind visibility to our truncation point, to prevent new
         // transactions from appearing.
         Timestamp truncTs(lastKeptId.repr());
-        _kvEngine->setOldestTimestamp(SnapshotName(truncTs));
+        _kvEngine->setOldestTimestamp(truncTs);
     }
 
     if (_oplogStones) {
@@ -1659,7 +1659,7 @@ Status WiredTigerRecordStore::oplogDiskLocRegister(OperationContext* opCtx,
     // This labels the current transaction with a timestamp.
     // This is required for oplog visibility to work correctly, as WiredTiger uses the transaction
     // list to determine where there are holes in the oplog.
-    return opCtx->recoveryUnit()->setTimestamp(SnapshotName(opTime));
+    return opCtx->recoveryUnit()->setTimestamp(opTime);
 }
 
 // Cursor Base:

@@ -38,7 +38,6 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
@@ -64,8 +63,8 @@ public:
     InsertStatement(StmtId statementId, BSONObj toInsert) : stmtId(statementId), doc(toInsert) {}
     InsertStatement(StmtId statementId, BSONObj toInsert, OplogSlot os)
         : stmtId(statementId), oplogSlot(os), doc(toInsert) {}
-    InsertStatement(BSONObj toInsert, SnapshotName ts, long long term)
-        : oplogSlot(repl::OpTime(Timestamp(ts.asU64()), term), 0), doc(toInsert) {}
+    InsertStatement(BSONObj toInsert, Timestamp ts, long long term)
+        : oplogSlot(repl::OpTime(ts, term), 0), doc(toInsert) {}
 
     StmtId stmtId = kUninitializedStmtId;
     OplogSlot oplogSlot;

@@ -33,12 +33,12 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
-#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 
@@ -152,11 +152,11 @@ public:
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must treat this index as unfinished.
      */
-    boost::optional<SnapshotName> getMinimumVisibleSnapshot() final {
+    boost::optional<Timestamp> getMinimumVisibleSnapshot() final {
         return _minVisibleSnapshot;
     }
 
-    void setMinimumVisibleSnapshot(SnapshotName name) final {
+    void setMinimumVisibleSnapshot(Timestamp name) final {
         _minVisibleSnapshot = name;
     }
 
@@ -226,6 +226,6 @@ private:
     const KVPrefix _prefix;
 
     // The earliest snapshot that is allowed to read this index.
-    boost::optional<SnapshotName> _minVisibleSnapshot;
+    boost::optional<Timestamp> _minVisibleSnapshot;
 };
 }  // namespace mongo

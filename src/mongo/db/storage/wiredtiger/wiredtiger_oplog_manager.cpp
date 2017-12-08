@@ -202,7 +202,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         // data. This is also exercised when `majorityReadConcern` is disabled. SERVER-31802,
         // SERVER-32022.
         if (updateOldestTimestamp) {
-            sessionCache->getKVEngine()->advanceOldestTimestamp(SnapshotName(newTimestamp));
+            sessionCache->getKVEngine()->advanceOldestTimestamp(Timestamp(newTimestamp));
         }
     }
 }

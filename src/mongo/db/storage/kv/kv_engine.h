@@ -36,10 +36,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/storage/kv/kv_prefix.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/db/storage/snapshot_name.h"
 
 namespace mongo {
 
@@ -249,17 +249,17 @@ public:
     /**
      * See `StorageEngine::setStableTimestamp`
      */
-    virtual void setStableTimestamp(SnapshotName stableTimestamp) {}
+    virtual void setStableTimestamp(Timestamp stableTimestamp) {}
 
     /**
      * See `StorageEngine::setInitialDataTimestamp`
      */
-    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) {}
+    virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) {}
 
     /**
      * See `StorageEngine::setOldestTimestamp`
      */
-    virtual void setOldestTimestamp(SnapshotName oldestTimestamp) {}
+    virtual void setOldestTimestamp(Timestamp oldestTimestamp) {}
 
     /**
      * See `StorageEngine::supportsRecoverToStableTimestamp`

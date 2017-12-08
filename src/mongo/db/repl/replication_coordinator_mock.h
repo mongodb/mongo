@@ -250,18 +250,14 @@ public:
 
     virtual Status updateTerm(OperationContext* opCtx, long long term);
 
-    virtual SnapshotName reserveSnapshotName(OperationContext* opCtx);
-
-    virtual void createSnapshot(OperationContext* opCtx,
-                                OpTime timeOfSnapshot,
-                                SnapshotName name) override;
+    virtual Timestamp reserveSnapshotName(OperationContext* opCtx);
 
     virtual void dropAllSnapshots() override;
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 
     virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
-                                            const SnapshotName& untilSnapshot) override;
+                                            const Timestamp& untilSnapshot) override;
 
     virtual size_t getNumUncommittedSnapshots() override;
 

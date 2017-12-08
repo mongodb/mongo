@@ -33,6 +33,7 @@
 #include <wiredtiger.h>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/mutex.h"
@@ -55,7 +56,7 @@ public:
     }
 
     Status prepareForCreateSnapshot(OperationContext* opCtx) final;
-    void setCommittedSnapshot(const SnapshotName& name, Timestamp ts) final;
+    void setCommittedSnapshot(const Timestamp& timestamp) final;
     void cleanupUnneededSnapshots() final;
     void dropAllSnapshots() final;
 
@@ -68,14 +69,14 @@ public:
      */
     void shutdown();
 
-    Status beginTransactionAtTimestamp(SnapshotName pointInTime, WT_SESSION* session) const;
+    Status beginTransactionAtTimestamp(Timestamp pointInTime, WT_SESSION* session) const;
 
     /**
      * Starts a transaction and returns the SnapshotName used.
      *
      * Throws if there is currently no committed snapshot.
      */
-    SnapshotName beginTransactionOnCommittedSnapshot(WT_SESSION* session) const;
+    Timestamp beginTransactionOnCommittedSnapshot(WT_SESSION* session) const;
 
     /**
      * Starts a transaction on the oplog using an appropriate timestamp for oplog visiblity.
@@ -90,11 +91,11 @@ public:
      * This should not be used for starting a transaction on this SnapshotName since the named
      * snapshot may be deleted by the time you start the transaction.
      */
-    boost::optional<SnapshotName> getMinSnapshotForNextCommittedRead() const;
+    boost::optional<Timestamp> getMinSnapshotForNextCommittedRead() const;
 
 private:
     mutable stdx::mutex _mutex;  // Guards all members.
-    boost::optional<SnapshotName> _committedSnapshot;
+    boost::optional<Timestamp> _committedSnapshot;
     WT_SESSION* _session;
     WT_CONNECTION* _conn;
 };

@@ -35,7 +35,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/storage/snapshot_name.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -320,13 +320,13 @@ public:
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
      * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
      */
-    virtual void setStableTimestamp(SnapshotName snapshotName) {}
+    virtual void setStableTimestamp(Timestamp timestamp) {}
 
     /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because
      * timestamps are not persisted in the storage layer.
      */
-    virtual void setInitialDataTimestamp(SnapshotName snapshotName) {}
+    virtual void setInitialDataTimestamp(Timestamp timestamp) {}
 
     /**
      * Sets the oldest timestamp which the storage engine must maintain history
@@ -334,7 +334,7 @@ public:
      * method is expected to be used in cases where the oldest timestamp should be set back in
      * time.
      */
-    virtual void setOldestTimestamp(SnapshotName snapshotName) {}
+    virtual void setOldestTimestamp(Timestamp snapshotName) {}
 
     /**
      *  Notifies the storage engine that a replication batch has completed.

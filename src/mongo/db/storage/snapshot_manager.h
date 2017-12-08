@@ -34,7 +34,6 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -70,7 +69,7 @@ public:
      * can be done later. In particular, cleaning up of old snapshots should be deferred until
      * cleanupUnneededSnapshots is called.
      */
-    virtual void setCommittedSnapshot(const SnapshotName& name, Timestamp ts) = 0;
+    virtual void setCommittedSnapshot(const Timestamp& timestamp) = 0;
 
     /**
      * Cleans up all snapshots older than the current committed snapshot.
