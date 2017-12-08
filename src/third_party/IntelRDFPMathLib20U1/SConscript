@@ -274,9 +274,9 @@ def float53_object(target, source, extra_defines=None):
     obj_env.Append(CPPDEFINES=defines)
 
     if env.ToolchainIs('msvc'):
-        removeIfPresent(env['CCFLAGS'], '/W3')
+        removeIfPresent(obj_env['CCFLAGS'], '/W3')
     else:
-        env.Append(CCFLAGS='-w')
+        obj_env.Append(CCFLAGS='-w')
     return obj_env.LibraryObject(target, source)
 
 # Set OS Defines
