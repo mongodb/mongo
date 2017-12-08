@@ -1577,7 +1577,7 @@ TEST_F(SyncTailTest, FailOnAssigningUUIDToCollectionWithExistingUUID) {
                                       boost::none,
                                       boost::none);
 
-    ASSERT_EQUALS(runOpInitialSync(collModOp), ErrorCodes::duplicateCodeForTest(50658));
+    ASSERT_EQUALS(runOpInitialSync(collModOp), ErrorCodes::duplicateCodeForTest(40676));
 }
 
 TEST_F(SyncTailTest, SuccessOnAssigningUUIDToCollectionWithExistingUUID) {

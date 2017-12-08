@@ -1529,7 +1529,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
             pinningTransaction = std::unique_ptr<RecoveryUnit>(
                 opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit());
             pinningTransaction->beginUnitOfWork(opCtx);
-            fassertStatusOK(50659, pinningTransaction->setTimestamp(ops.front().getTimestamp()));
+            fassertStatusOK(40677, pinningTransaction->setTimestamp(ops.front().getTimestamp()));
         }
 
         // We must wait for the all work we've dispatched to complete before leaving this block

@@ -329,7 +329,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
         }
     }
     if (auto resumeAfterClusterTime = spec.getResumeAfterClusterTime()) {
-        uassert(50656,
+        uassert(40674,
                 str::stream() << "Do not specify both "
                               << DocumentSourceChangeStreamSpec::kResumeAfterFieldName
                               << " and "
