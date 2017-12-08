@@ -745,7 +745,8 @@ env_vars.Add('TOOLS',
 
 env_vars.Add('VARIANT_DIR',
     help='Sets the name (or generator function) for the variant directory',
-    default=mongo_generators.default_variant_dir_generator,
+#    default=mongo_generators.default_variant_dir_generator,
+    default="blah",
 )
 
 env_vars.Add('VERBOSE',

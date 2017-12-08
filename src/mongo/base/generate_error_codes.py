@@ -94,7 +94,7 @@ def main(argv):
                 )
 
         with open(output, 'wb') as outfile:
-            outfile.write(text)
+            outfile.write(bytes(text,encoding='utf-8'))
 
 def die(message=None):
     sys.stderr.write(message or "Fatal error\n")
