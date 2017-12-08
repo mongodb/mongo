@@ -26,6 +26,7 @@
     };
 
     var checkSocket = function(path) {
+        assert.eq(fileExists(path), true);
         var conn = new Mongo(path);
         assert.commandWorked(conn.getDB("admin").runCommand("ping"),
                              `Expected ping command to succeed for ${path}`);
@@ -55,6 +56,7 @@
         assert(doesLogMatchRegex(ll, re), "Log message did not contain 'anonymous unix socket'");
 
         MongoRunner.stopMongod(conn);
+        assert.eq(fileExists(checkPath), false);
     };
 
     // Check that the default unix sockets work
