@@ -50,6 +50,7 @@ namespace mongo {
 
 class Fetcher {
     MONGO_DISALLOW_COPYING(Fetcher);
+    using RemoteCommandRequest = executor::RemoteCommandRequest;
 
 public:
     /**
@@ -196,8 +197,6 @@ public:
     State getState_forTest() const;
 
 private:
-    using RemoteCommandRequest = executor::RemoteCommandRequest;
-
     bool _isActive_inlock() const;
 
     /**
