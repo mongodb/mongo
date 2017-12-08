@@ -195,6 +195,7 @@ functions:
           source ./venv/bin/activate
           pip install argparse
     - command: shell.exec
+      type : test
       params:
         working_dir: src
         script: |
