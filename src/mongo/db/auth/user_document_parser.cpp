@@ -57,7 +57,6 @@ const std::string READONLY_FIELD_NAME = "readOnly";
 const std::string CREDENTIALS_FIELD_NAME = "credentials";
 const std::string ROLE_NAME_FIELD_NAME = "role";
 const std::string ROLE_DB_FIELD_NAME = "db";
-const std::string MONGODB_CR_CREDENTIAL_FIELD_NAME = "MONGODB-CR";
 const std::string SCRAM_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-1";
 const std::string MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external";
 constexpr StringData AUTHENTICATION_RESTRICTIONS_FIELD_NAME = "authenticationRestrictions"_sd;
@@ -136,15 +135,8 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
         }
     } else {
         BSONElement scramElement = credentialsObj[SCRAM_CREDENTIAL_FIELD_NAME];
-        BSONElement mongoCRElement = credentialsObj[MONGODB_CR_CREDENTIAL_FIELD_NAME];
 
-        if (!mongoCRElement.eoo()) {
-            if (mongoCRElement.type() != String || mongoCRElement.valueStringData().empty()) {
-                return _badValue(
-                    "MONGODB-CR credential must to be a non-empty string"
-                    ", if present");
-            }
-        } else if (!scramElement.eoo()) {
+        if (!scramElement.eoo()) {
             if (scramElement.type() != Object) {
                 return _badValue("SCRAM credential must be an object, if present");
             }
@@ -200,13 +192,10 @@ Status V2UserDocumentParser::initializeUserCredentialsFromUserDocument(
             }
         } else {
             BSONElement scramElement = credentialsElement.Obj()[SCRAM_CREDENTIAL_FIELD_NAME];
-            BSONElement mongoCRCredentialElement =
-                credentialsElement.Obj()[MONGODB_CR_CREDENTIAL_FIELD_NAME];
 
-            if (scramElement.eoo() && mongoCRCredentialElement.eoo()) {
+            if (scramElement.eoo()) {
                 return Status(ErrorCodes::UnsupportedFormat,
-                              "User documents must provide credentials for SCRAM-SHA-1 "
-                              "or MONGODB-CR authentication");
+                              "User documents must provide credentials for SCRAM-SHA-1");
             }
 
             if (!scramElement.eoo()) {
@@ -227,19 +216,6 @@ Status V2UserDocumentParser::initializeUserCredentialsFromUserDocument(
                 uassert(17504, "Missing SCRAM storedKey", !credentials.scram.storedKey.empty());
             }
 
-            if (!mongoCRCredentialElement.eoo()) {
-                if (mongoCRCredentialElement.type() != String ||
-                    mongoCRCredentialElement.valueStringData().empty()) {
-                    return Status(ErrorCodes::UnsupportedFormat,
-                                  "MONGODB-CR credentials must be non-empty strings");
-                } else {
-                    credentials.password = mongoCRCredentialElement.String();
-                    if (credentials.password.empty()) {
-                        return Status(ErrorCodes::UnsupportedFormat,
-                                      "User documents must provide authentication credentials");
-                    }
-                }
-            }
             credentials.isExternal = false;
         }
     } else {

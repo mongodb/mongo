@@ -874,24 +874,13 @@ ExitCode _initAndListen(int listenPort) {
             exitCleanly(EXIT_NEED_UPGRADE);
         }
 
-        if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
-            log() << "Auth schema version is incompatible: "
-                  << "User and role management commands require auth data to have "
-                  << "at least schema version " << AuthorizationManager::schemaVersion26Final
-                  << " but found " << foundSchemaVersion << ". In order to upgrade "
-                  << "the auth schema, first downgrade MongoDB binaries to version "
-                  << "2.6 and then run the authSchemaUpgrade command.";
-            exitCleanly(EXIT_NEED_UPGRADE);
-        }
-
         if (foundSchemaVersion <= AuthorizationManager::schemaVersion26Final) {
-            log() << startupWarningsLog;
-            log() << "** WARNING: This server is using MONGODB-CR, a deprecated authentication "
-                  << "mechanism." << startupWarningsLog;
-            log() << "**          Support will be dropped in a future release."
-                  << startupWarningsLog;
-            log() << "**          See http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1"
-                  << startupWarningsLog;
+            log() << "This server is using MONGODB-CR, an authentication mechanism which "
+                  << "has been removed from MongoDB 3.8. In order to upgrade the auth schema, "
+                  << "first downgrade MongoDB binaries to version 3.6 and then run the "
+                  << "authSchemaUpgrade command. "
+                  << "See http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1";
+            exitCleanly(EXIT_NEED_UPGRADE);
         }
     } else if (globalAuthzManager->isAuthEnabled()) {
         error() << "Auth must be disabled when starting without auth schema validation";

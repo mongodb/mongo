@@ -296,7 +296,6 @@ TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
                                                                       << "test"
                                                                       << "credentials"
                                                                       << credentials)));
-    ASSERT(user->getCredentials().password.empty());
     ASSERT(!user->getCredentials().scram.storedKey.empty());
     ASSERT(!user->getCredentials().isExternal);
 
@@ -309,7 +308,6 @@ TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
                                                                 << "$external"
                                                                 << "credentials"
                                                                 << BSON("external" << true))));
-    ASSERT(user->getCredentials().password.empty());
     ASSERT(user->getCredentials().isExternal);
 }
 

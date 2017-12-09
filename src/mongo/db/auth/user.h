@@ -69,9 +69,8 @@ public:
         std::string storedKey;
     };
     struct CredentialData {
-        CredentialData() : password(""), scram(), isExternal(false) {}
+        CredentialData() : scram(), isExternal(false) {}
 
-        std::string password;
         SCRAMCredentials scram;
         bool isExternal;
     };

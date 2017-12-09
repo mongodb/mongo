@@ -690,14 +690,10 @@ public:
             // Must be an external user
             credentialsBuilder.append("external", true);
         } else {
-            // Add SCRAM credentials for appropriate authSchemaVersions.
-            if (authzVersion > AuthorizationManager::schemaVersion26Final) {
-                BSONObj scramCred = scram::generateCredentials(
-                    args.hashedPassword, saslGlobalParams.scramIterationCount.load());
-                credentialsBuilder.append("SCRAM-SHA-1", scramCred);
-            } else {  // Otherwise default to MONGODB-CR.
-                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
-            }
+            // Add SCRAM credentials.
+            BSONObj scramCred = scram::generateCredentials(
+                args.hashedPassword, saslGlobalParams.scramIterationCount.load());
+            credentialsBuilder.append("SCRAM-SHA-1", scramCred);
         }
         credentialsBuilder.done();
 
@@ -804,21 +800,11 @@ public:
         if (args.hasHashedPassword) {
             BSONObjBuilder credentialsBuilder(updateSetBuilder.subobjStart("credentials"));
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            int authzVersion;
-            Status status = authzManager->getAuthorizationVersion(opCtx, &authzVersion);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
+            // Add SCRAM credentials.
+            BSONObj scramCred = scram::generateCredentials(
+                args.hashedPassword, saslGlobalParams.scramIterationCount.load());
+            credentialsBuilder.append("SCRAM-SHA-1", scramCred);
 
-            // Add SCRAM credentials for appropriate authSchemaVersions
-            if (authzVersion > AuthorizationManager::schemaVersion26Final) {
-                BSONObj scramCred = scram::generateCredentials(
-                    args.hashedPassword, saslGlobalParams.scramIterationCount.load());
-                credentialsBuilder.append("SCRAM-SHA-1", scramCred);
-            } else {  // Otherwise default to MONGODB-CR
-                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
-            }
             credentialsBuilder.done();
         }
 
@@ -2459,14 +2445,14 @@ public:
         if (create) {
             audit::logCreateUser(Client::getCurrent(),
                                  userName,
-                                 userObj["credentials"].Obj().hasField("MONGODB-CR"),
+                                 userObj["credentials"].Obj().hasField("SCRAM-SHA-1"),
                                  userObj.hasField("customData") ? &customData : NULL,
                                  roles,
                                  authenticationRestrictions);
         } else {
             audit::logUpdateUser(Client::getCurrent(),
                                  userName,
-                                 userObj["credentials"].Obj().hasField("MONGODB-CR"),
+                                 userObj["credentials"].Obj().hasField("SCRAM-SHA-1"),
                                  userObj.hasField("customData") ? &customData : NULL,
                                  &roles,
                                  authenticationRestrictions);
