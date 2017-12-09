@@ -544,23 +544,23 @@ Status writeAuthSchemaVersionIfNeeded(OperationContext* opCtx,
 
 /**
  * Returns Status::OK() if the current Auth schema version is at least the auth schema version
- * for the MongoDB 2.6 and 3.0 MongoDB-CR/SCRAM mixed auth mode.
+ * for the MongoDB 3.0 SCRAM auth mode.
  * Returns an error otherwise.
  */
-Status requireAuthSchemaVersion26Final(OperationContext* opCtx,
-                                       AuthorizationManager* authzManager) {
+Status requireWritableAuthSchema28SCRAM(OperationContext* opCtx,
+                                        AuthorizationManager* authzManager) {
     int foundSchemaVersion;
     Status status = authzManager->getAuthorizationVersion(opCtx, &foundSchemaVersion);
     if (!status.isOK()) {
         return status;
     }
 
-    if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
+    if (foundSchemaVersion < AuthorizationManager::schemaVersion28SCRAM) {
         return Status(ErrorCodes::AuthSchemaIncompatible,
                       str::stream()
                           << "User and role management commands require auth data to have "
                           << "at least schema version "
-                          << AuthorizationManager::schemaVersion26Final
+                          << AuthorizationManager::schemaVersion28SCRAM
                           << " but found "
                           << foundSchemaVersion);
     }
@@ -571,9 +571,16 @@ Status requireAuthSchemaVersion26Final(OperationContext* opCtx,
  * Returns Status::OK() if the current Auth schema version is at least the auth schema version
  * for MongoDB 2.6 during the upgrade process.
  * Returns an error otherwise.
+ *
+ * This method should only be called by READ-ONLY commands (usersInfo & rolesInfo)
+ * because getAuthorizationVersion() will return the current max version without
+ * reifying the authSchema setting in the admin database.
+ *
+ * If records are added thinking we're at one schema level, then the default is changed,
+ * then the auth database would wind up in an inconsistent state.
  */
-Status requireAuthSchemaVersion26UpgradeOrFinal(OperationContext* opCtx,
-                                                AuthorizationManager* authzManager) {
+Status requireReadableAuthSchema26Upgrade(OperationContext* opCtx,
+                                          AuthorizationManager* authzManager) {
     int foundSchemaVersion;
     Status status = authzManager->getAuthorizationVersion(opCtx, &foundSchemaVersion);
     if (!status.isOK()) {
@@ -714,7 +721,7 @@ public:
 
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -852,7 +859,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -922,7 +929,7 @@ public:
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -988,7 +995,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1048,7 +1055,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1120,7 +1127,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1190,7 +1197,7 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        status = requireAuthSchemaVersion26UpgradeOrFinal(opCtx, getGlobalAuthorizationManager());
+        status = requireReadableAuthSchema26Upgrade(opCtx, getGlobalAuthorizationManager());
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1373,7 +1380,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1469,7 +1476,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1557,7 +1564,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1666,7 +1673,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1787,7 +1794,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1867,7 +1874,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1953,7 +1960,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2104,7 +2111,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2243,7 +2250,7 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        status = requireAuthSchemaVersion26UpgradeOrFinal(opCtx, getGlobalAuthorizationManager());
+        status = requireReadableAuthSchema26Upgrade(opCtx, getGlobalAuthorizationManager());
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2743,7 +2750,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
