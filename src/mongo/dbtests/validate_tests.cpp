@@ -68,8 +68,10 @@ public:
         _client.createCollection(_ns);
         {
             AutoGetCollection autoGetCollection(&_opCtx, _nss, MODE_X);
-            _isInRecordIdOrder =
-                autoGetCollection.getCollection()->getRecordStore()->isInRecordIdOrder();
+            auto && col = autoGetCollection.getCollection();
+            if (col != nullptr) {
+                _isInRecordIdOrder = col->getRecordStore()->isInRecordIdOrder();
+            }
         }
     }
 
