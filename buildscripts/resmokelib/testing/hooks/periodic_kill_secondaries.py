@@ -209,48 +209,85 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
 
             client = secondary.mongo_client()
             minvalid_doc = client.local["replset.minvalid"].find_one()
+            oplog_truncate_after_doc = client.local["replset.oplogTruncateAfterPoint"].find_one()
 
             latest_oplog_doc = client.local["oplog.rs"].find_one(
                 sort=[("$natural", pymongo.DESCENDING)])
 
+            null_ts = bson.Timestamp(0, 0)
+
+            # The "oplogTruncateAfterPoint" document may not exist at startup. If so, we default
+            # it to null.
+            oplog_truncate_after_ts = null_ts
+            if oplog_truncate_after_doc is not None:
+                oplog_truncate_after_ts = oplog_truncate_after_doc.get(
+                    "oplogTruncateAfterPoint", null_ts)
+
             if minvalid_doc is not None:
-                # Check the invariants 'begin <= minValid', 'minValid <= oplogDeletePoint', and
-                # 'minValid <= top of oplog' before the secondary has reconciled the end of its
-                # oplog.
-                null_ts = bson.Timestamp(0, 0)
-                begin_ts = minvalid_doc.get("begin", {}).get("ts", null_ts)
-                minvalid_ts = minvalid_doc.get("ts", begin_ts)
-                oplog_delete_point_ts = minvalid_doc.get("oplogDeleteFromPoint", minvalid_ts)
+                applied_through_ts = minvalid_doc.get("begin", {}).get("ts", null_ts)
+                minvalid_ts = minvalid_doc.get("ts", null_ts)
+
+                # This hook never runs upgrades, so it should never have an "oplogDeleteFromPoint".
+                if minvalid_doc.get("oplogDeleteFromPoint") is not None:
+                    raise errors.ServerFailure(
+                        "The condition oplogDeleteFromPoint != null doesn't hold:"
+                        " minValid document={}, oplogTruncateAfterPoint document={},"
+                        " last oplog entry={}".format(
+                            minvalid_doc, oplog_truncate_after_doc, latest_oplog_doc))
 
                 if minvalid_ts == null_ts:
                     # The server treats the "ts" field in the minValid document as missing when its
                     # value is the null timestamp.
-                    minvalid_ts = begin_ts
+                    minvalid_ts = applied_through_ts
 
-                if oplog_delete_point_ts == null_ts:
-                    # The server treats the "oplogDeleteFromPoint" field as missing when its value
-                    # is the null timestamp.
-                    oplog_delete_point_ts = minvalid_ts
+                # If the oplog is empty, we treat the "minValid" as the latest oplog entry.
+                latest_oplog_entry_ts = latest_oplog_doc.get("ts", minvalid_ts)
 
-                latest_oplog_entry_ts = latest_oplog_doc.get("ts", oplog_delete_point_ts)
+                if oplog_truncate_after_ts == null_ts:
+                    # The server treats the "oplogTruncateAfterPoint" field as missing when its
+                    # value is the null timestamp. When it is null, the oplog is complete and
+                    # should not be truncated, so it is effectively the top of the oplog.
+                    oplog_truncate_after_ts = latest_oplog_entry_ts
 
-                if not begin_ts <= minvalid_ts:
+                # Check the ordering invariants before the secondary has reconciled the end of
+                # its oplog.
+                # The "oplogTruncateAfterPoint" is set to the first timestamp of each batch of
+                # oplog entries before they are written to the oplog. Thus, it can be ahead
+                # of the top of the oplog before any oplog entries are written, and behind it
+                # after some are written. Thus, we cannot compare it to the top of the oplog.
+
+                # appliedThrough <= minValid
+                # appliedThrough represents the end of the previous batch, so it is always the
+                # earliest.
+                if not applied_through_ts <= minvalid_ts:
                     raise errors.ServerFailure(
-                        "The condition begin <= minValid ({} <= {}) doesn't hold: minValid"
+                        "The condition appliedThrough <= minValid ({} <= {}) doesn't hold: minValid"
                         " document={}, latest oplog entry={}".format(
-                            begin_ts, minvalid_ts, minvalid_doc, latest_oplog_doc))
+                            applied_through_ts, minvalid_ts, minvalid_doc, latest_oplog_doc))
 
-                if not minvalid_ts <= oplog_delete_point_ts:
+                # minValid <= oplogTruncateAfterPoint
+                # This is true because this hook is never run after a rollback. Thus, we only
+                # move "minValid" to the end of each batch after the batch is written to the oplog.
+                # We reset the "oplogTruncateAfterPoint" to null before we move "minValid" from
+                # the end of the previous batch to the end of the current batch. Thus "minValid"
+                # must be less than or equal to the "oplogTruncateAfterPoint".
+                if not minvalid_ts <= oplog_truncate_after_ts:
                     raise errors.ServerFailure(
-                        "The condition minValid <= oplogDeletePoint ({} <= {}) doesn't hold:"
-                        " minValid document={}, latest oplog entry={}".format(
-                            minvalid_ts, oplog_delete_point_ts, minvalid_doc, latest_oplog_doc))
+                        "The condition minValid <= oplogTruncateAfterPoint ({} <= {}) doesn't"
+                        " hold: minValid document={}, oplogTruncateAfterPoint document={},"
+                        " latest oplog entry={}".format(
+                            minvalid_ts, oplog_truncate_after_ts, minvalid_doc,
+                            oplog_truncate_after_doc, latest_oplog_doc))
 
+                # minvalid <= latest oplog entry
+                # "minValid" is set to the end of a batch after the batch is written to the oplog.
+                # Thus it is always less than or equal to the top of the oplog.
                 if not minvalid_ts <= latest_oplog_entry_ts:
                     raise errors.ServerFailure(
-                        "The condition minValid <= top of oplog ({} <= {}) doesn't hold: minValid"
-                        " document={}, latest oplog entry={}".format(
-                            minvalid_ts, latest_oplog_entry_ts, minvalid_doc, latest_oplog_doc))
+                        "The condition minValid <= top of oplog ({} <= {}) doesn't"
+                        " hold: minValid document={}, latest oplog entry={}".format(
+                            minvalid_ts, latest_oplog_entry_ts, minvalid_doc,
+                            latest_oplog_doc))
 
             teardown_success = secondary.teardown()
             if not teardown_success:
@@ -259,11 +296,12 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
                         secondary))
         except pymongo.errors.OperationFailure as err:
             self.hook_test_case.logger.exception(
-                "Failed to read the minValid document or the latest oplog entry from the mongod on"
-                " port %d",
-                secondary.port)
+                "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
+                " or the latest oplog entry from the mongod on"
+                " port %d", secondary.port)
             raise errors.ServerFailure(
-                "Failed to read the minValid document or the latest oplog entry from the mongod on"
+                "Failed to read the minValid document, the oplogTruncateAfterPoint document,"
+                " or the latest oplog entry from the mongod on"
                 " port {}: {}".format(secondary.port, err.args[0]))
         finally:
             # Set the secondary's options back to their original values.
