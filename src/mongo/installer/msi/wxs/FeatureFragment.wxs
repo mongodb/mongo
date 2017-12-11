@@ -20,14 +20,32 @@
                  Title ="Server"
                  Description="The MongoDB server (mongod)"
                  Level ="1">
-          <ComponentRef Id="c_mongod"/>
           <ComponentRef Id="c_mongodPdb"/>
+          <ComponentRef Id="c_mongodCfg"/>
+
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseServer" />
           <?endif ?>
           <?if $(var.Edition) = SSL ?>
             <ComponentGroupRef Id="cg_SSLBase" />
           <?endif ?>
+        </Feature>
+        <Feature Id="ServerNoService"
+                 Title ="ServerNoService"
+                 Description="The MongoDB server (mongod)"
+                 Display="hidden"
+                 Level ="32767">
+             <ComponentRef Id="c_mongod"/>
+        </Feature>
+        <Feature Id="ServerService"
+                 Title ="ServerService"
+                 Description="The MongoDB server (mongod)"
+                 Display="hidden"
+                 Level ="32767">
+             <ComponentRef Id="c_mongodWithService"/>
+             <ComponentRef Id="c_mongodWithServiceUser" />
+             <ComponentRef Id="c_MONGO_DATA_PATH"/>
+             <ComponentRef Id="c_MONGO_LOG_PATH"/>
         </Feature>
         <Feature Id="Client"
                  Title ="Client"

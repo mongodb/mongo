@@ -1,0 +1,6 @@
+LIBRARY "mongoca"
+
+EXPORTS
+
+UpdateMongoYAML
+ValidateServiceLogon
