@@ -44,27 +44,28 @@ public:
                          const std::string& raw,
                          ChunkVersion received,
                          ChunkVersion wanted)
-        : AssertionException(ErrorCodes::StaleConfig,
-                             str::stream() << raw << " ( ns : " << ns << ", received : "
-                                           << received.toString()
-                                           << ", wanted : "
-                                           << wanted.toString()
-                                           << " )"),
+        : AssertionException(Status(ErrorCodes::StaleConfig,
+                                    str::stream() << raw << " ( ns : " << ns << ", received : "
+                                                  << received.toString()
+                                                  << ", wanted : "
+                                                  << wanted.toString()
+                                                  << " )")),
           _ns(ns),
           _received(received),
           _wanted(wanted) {}
 
     /** Preferred if we're rebuilding this from a thrown exception */
     StaleConfigException(const std::string& raw, const BSONObj& error)
-        : AssertionException(ErrorCodes::StaleConfig,
-                             str::stream() << raw << " ( ns : " << (error["ns"].type() == String
-                                                                        ? error["ns"].String()
-                                                                        : std::string("<unknown>"))
-                                           << ", received : "
-                                           << ChunkVersion::fromBSON(error, "vReceived").toString()
-                                           << ", wanted : "
-                                           << ChunkVersion::fromBSON(error, "vWanted").toString()
-                                           << " )"),
+        : AssertionException(
+              Status(ErrorCodes::StaleConfig,
+                     str::stream() << raw << " ( ns : " << (error["ns"].type() == String
+                                                                ? error["ns"].String()
+                                                                : std::string("<unknown>"))
+                                   << ", received : "
+                                   << ChunkVersion::fromBSON(error, "vReceived").toString()
+                                   << ", wanted : "
+                                   << ChunkVersion::fromBSON(error, "vWanted").toString()
+                                   << " )")),
           // For legacy reasons, we may not always get a namespace here
           _ns(error["ns"].type() == String ? error["ns"].String() : ""),
           _received(ChunkVersion::fromBSON(error, "vReceived")),
@@ -75,8 +76,8 @@ public:
      * stale config exceptions in a map and this requires a default constructor.
      */
     StaleConfigException()
-        : AssertionException(ErrorCodes::InternalError,
-                             "initializing empty stale config exception object") {}
+        : AssertionException(Status(ErrorCodes::InternalError,
+                                    "initializing empty stale config exception object")) {}
 
     virtual ~StaleConfigException() throw() {}
 

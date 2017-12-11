@@ -113,9 +113,6 @@ protected:
         traceIfNeeded(*this);
     }
 
-    DBException(int code, StringData msg)
-        : DBException(Status(code ? ErrorCodes::Error(code) : ErrorCodes::UnknownError, msg)) {}
-
 private:
     static void traceIfNeeded(const DBException& e);
 
@@ -131,7 +128,6 @@ private:
 class AssertionException : public DBException {
 public:
     AssertionException(const Status& status) : DBException(status) {}
-    AssertionException(int code, StringData msg) : DBException(code, msg) {}
 };
 
 /**
