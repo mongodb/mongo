@@ -996,6 +996,30 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
     return initRsOplogBackgroundThreadCallback(ns);
 }
 
+void WiredTigerKVEngine::setOldestTimestamp(Timestamp oldestTimestamp) {
+    invariant(oldestTimestamp != Timestamp::min());
+
+    char commitTSConfigString["force=true,oldest_timestamp=,commit_timestamp="_sd.size() +
+                              (2 * 8 * 2) /* 8 hexadecimal characters */ + 1 /* trailing null */];
+    auto size = std::snprintf(commitTSConfigString,
+                              sizeof(commitTSConfigString),
+                              "force=true,oldest_timestamp=%llx,commit_timestamp=%llx",
+                              oldestTimestamp.asULL(),
+                              oldestTimestamp.asULL());
+    if (size < 0) {
+        int e = errno;
+        error() << "error snprintf " << errnoWithDescription(e);
+        fassertFailedNoTrace(50659);
+    }
+
+    invariant(static_cast<std::size_t>(size) < sizeof(commitTSConfigString));
+    invariantWTOK(_conn->set_timestamp(_conn, commitTSConfigString));
+
+    _oplogManager->setOplogReadTimestamp(oldestTimestamp);
+    _previousSetOldestTimestamp = oldestTimestamp;
+    LOG(1) << "Forced a new oldest_timestamp. Value: " << oldestTimestamp;
+}
+
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
     const bool keepOldBehavior = true;
     // Communicate to WiredTiger what the "stable timestamp" is. Timestamp-aware checkpoints will
@@ -1023,10 +1047,10 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
     // Communicate to WiredTiger that it can clean up timestamp data earlier than the timestamp
     // provided.  No future queries will need point-in-time reads at a timestamp prior to the one
     // provided here.
-    _setOldestTimestamp(stableTimestamp);
+    _advanceOldestTimestamp(stableTimestamp);
 }
 
-void WiredTigerKVEngine::_setOldestTimestamp(Timestamp oldestTimestamp) {
+void WiredTigerKVEngine::_advanceOldestTimestamp(Timestamp oldestTimestamp) {
     if (oldestTimestamp == Timestamp()) {
         // No oldestTimestamp to set, yet.
         return;

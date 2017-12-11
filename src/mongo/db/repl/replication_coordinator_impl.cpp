@@ -1149,6 +1149,11 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
         if (opTime <= _topCoord->getLastCommittedOpTime()) {
             _setStableTimestampForStorage_inlock();
         }
+    } else if (_getMemberState_inlock().startup2()) {
+        // The oplog application phase of initial sync starts timestamping writes, causing
+        // WiredTiger to pin this data in memory. Advancing the oldest timestamp in step with the
+        // last applied optime here will permit WiredTiger to evict this data as it sees fit.
+        _service->getGlobalStorageEngine()->setOldestTimestamp(opTime.getTimestamp());
     }
 }
 
