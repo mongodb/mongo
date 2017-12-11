@@ -228,25 +228,6 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
                                                                         const char* file,
                                                                         unsigned line) noexcept;
 
-/** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
-    could cause, such as duplicate key, disk full, etc.
-*/
-MONGO_COMPILER_NORETURN void uassertedWithLocation(int msgid,
-                                                   StringData msg,
-                                                   const char* file,
-                                                   unsigned line);
-
-/** msgassert and massert are for errors that are internal but have a well defined error text
-    std::string.
-*/
-
-#define msgasserted MONGO_msgasserted
-#define MONGO_msgasserted(...) ::mongo::msgassertedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-MONGO_COMPILER_NORETURN void msgassertedWithLocation(int msgid,
-                                                     StringData msg,
-                                                     const char* file,
-                                                     unsigned line);
-
 /* convert various types of exceptions to strings */
 std::string causedBy(StringData e);
 std::string causedBy(const char* e);
@@ -291,33 +272,44 @@ inline void fassertNoTraceWithLocation(int msgid,
 }
 
 /**
- * "user assert".  if asserts, user did something wrong, not our code.
+ * Common implementation for assert and assertFailed macros. Not for direct use.
  *
  * Using an immediately invoked lambda to give the compiler an easy way to inline the check (expr)
  * and out-of-line the error path. This is most helpful when the error path involves building a
  * complex error message in the expansion of msg. The call to the lambda is followed by
  * MONGO_COMPILER_UNREACHABLE as it is impossible to mark a lambda noreturn.
  */
-#define uassert MONGO_uassert
-#define MONGO_uassert(msgid, msg, expr)                                         \
-    do {                                                                        \
-        if (MONGO_unlikely(!(expr))) {                                          \
-            [&]() MONGO_COMPILER_COLD_FUNCTION {                                \
-                ::mongo::uassertedWithLocation(msgid, msg, __FILE__, __LINE__); \
-            }();                                                                \
-            MONGO_COMPILER_UNREACHABLE;                                         \
-        }                                                                       \
+#define MONGO_BASE_ASSERT_FAILED(fail_func, code, msg)                           \
+    do {                                                                         \
+        [&]() MONGO_COMPILER_COLD_FUNCTION {                                     \
+            fail_func(Status(ErrorCodes::Error(code), msg), __FILE__, __LINE__); \
+        }();                                                                     \
+        MONGO_COMPILER_UNREACHABLE;                                              \
     } while (false)
 
-#define uasserted MONGO_uasserted
-#define MONGO_uasserted(...) ::mongo::uassertedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+#define MONGO_BASE_ASSERT(fail_func, code, msg, cond)       \
+    do {                                                    \
+        if (MONGO_unlikely(!(cond))) {                      \
+            MONGO_BASE_ASSERT_FAILED(fail_func, code, msg); \
+        }                                                   \
+    } while (false)
 
-#define uassertStatusOK MONGO_uassertStatusOK
-#define MONGO_uassertStatusOK(...) \
-    ::mongo::uassertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+/**
+ * "user assert".  if asserts, user did something wrong, not our code.
+ * On failure, throws an exception.
+ */
+#define uasserted(msgid, msg) MONGO_BASE_ASSERT_FAILED(::mongo::uassertedWithLocation, msgid, msg)
+#define uassert(msgid, msg, expr) \
+    MONGO_BASE_ASSERT(::mongo::uassertedWithLocation, msgid, msg, expr)
+
+MONGO_COMPILER_NORETURN void uassertedWithLocation(const Status& status,
+                                                   const char* file,
+                                                   unsigned line);
+
+#define uassertStatusOK(...) ::mongo::uassertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
 inline void uassertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
-        uassertedWithLocation(status.code(), status.reason(), file, line);
+        uassertedWithLocation(status, file, line);
     }
 }
 
@@ -327,6 +319,31 @@ inline T uassertStatusOKWithLocation(StatusWith<T> sw, const char* file, unsigne
     return std::move(sw.getValue());
 }
 
+/**
+ * massert is like uassert but it logs the message before throwing.
+ */
+#define massert(msgid, msg, expr) \
+    MONGO_BASE_ASSERT(::mongo::msgassertedWithLocation, msgid, msg, expr)
+
+#define msgasserted(msgid, msg) \
+    MONGO_BASE_ASSERT_FAILED(::mongo::msgassertedWithLocation, msgid, msg)
+MONGO_COMPILER_NORETURN void msgassertedWithLocation(const Status& status,
+                                                     const char* file,
+                                                     unsigned line);
+
+#define massertStatusOK(...) ::mongo::massertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
+inline void massertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
+    if (MONGO_unlikely(!status.isOK())) {
+        msgassertedWithLocation(status, file, line);
+    }
+}
+
+/**
+ * fassert is our fatal assert: if it fails, the process dies.
+ *
+ * Use this rather than invariant for cases that are possible, but we have chosen not to implement
+ * recovery logic for.
+ */
 #define fassertStatusOK MONGO_fassertStatusOK
 #define MONGO_fassertStatusOK(...) \
     ::mongo::fassertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
@@ -356,33 +373,9 @@ inline void fassertStatusOKWithLocation(int msgid,
         }                                                         \
     } while (false)
 
-/* display a message, no context, and throw assertionexception
-
-   easy way to throw an exception and log something without our stack trace
-   display happening.
-*/
-#define massert MONGO_massert
-#define MONGO_massert(msgid, msg, expr)                                           \
-    do {                                                                          \
-        if (MONGO_unlikely(!(expr))) {                                            \
-            [&]() MONGO_COMPILER_COLD_FUNCTION {                                  \
-                ::mongo::msgassertedWithLocation(msgid, msg, __FILE__, __LINE__); \
-            }();                                                                  \
-            MONGO_COMPILER_UNREACHABLE;                                           \
-        }                                                                         \
-    } while (false)
-
-
-#define massertStatusOK MONGO_massertStatusOK
-#define MONGO_massertStatusOK(...) \
-    ::mongo::massertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-inline void massertStatusOKWithLocation(const Status& status, const char* file, unsigned line) {
-    if (MONGO_unlikely(!status.isOK())) {
-        msgassertedWithLocation(status.code(), status.reason(), file, line);
-    }
-}
-
-/* same as massert except no msgid */
+/**
+ * verify is deprecated. It is like invariant() in debug builds and massert() in release builds.
+ */
 #define verify(expression) MONGO_verify(expression)
 #define MONGO_verify(_Expression)                                    \
     do {                                                             \

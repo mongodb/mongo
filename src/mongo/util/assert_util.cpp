@@ -197,24 +197,16 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
     quickExit(EXIT_ABRUPT);
 }
 
-NOINLINE_DECL void uassertedWithLocation(int msgid,
-                                         StringData msg,
-                                         const char* file,
-                                         unsigned line) {
+NOINLINE_DECL void uassertedWithLocation(const Status& status, const char* file, unsigned line) {
     assertionCount.condrollover(++assertionCount.user);
-    LOG(1) << "User Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
-           << endl;
-    error_details::throwExceptionForStatus(Status(ErrorCodes::Error(msgid), msg));
+    LOG(1) << "User Assertion: " << redact(status) << ' ' << file << ' ' << dec << line;
+    error_details::throwExceptionForStatus(status);
 }
 
-NOINLINE_DECL void msgassertedWithLocation(int msgid,
-                                           StringData msg,
-                                           const char* file,
-                                           unsigned line) {
+NOINLINE_DECL void msgassertedWithLocation(const Status& status, const char* file, unsigned line) {
     assertionCount.condrollover(++assertionCount.msg);
-    error() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
-            << endl;
-    error_details::throwExceptionForStatus(Status(ErrorCodes::Error(msgid), msg));
+    error() << "Assertion: " << redact(status) << ' ' << file << ' ' << dec << line;
+    error_details::throwExceptionForStatus(status);
 }
 
 std::string causedBy(StringData e) {
