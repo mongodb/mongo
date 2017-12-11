@@ -329,12 +329,10 @@ public:
     virtual void setInitialDataTimestamp(Timestamp timestamp) {}
 
     /**
-     * Sets the oldest timestamp which the storage engine must maintain history
-     * through. Additionally, all future writes must be newer or equal than this value. This
-     * method is expected to be used in cases where the oldest timestamp should be set back in
-     * time.
+     * Sets the oldest timestamp for which the storage engine must maintain snapshot history
+     * through. Additionally, all future writes must be newer or equal to this value.
      */
-    virtual void setOldestTimestamp(Timestamp snapshotName) {}
+    virtual void setOldestTimestamp(Timestamp timestamp) {}
 
     /**
      *  Notifies the storage engine that a replication batch has completed.

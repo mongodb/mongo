@@ -266,8 +266,6 @@ private:
 
     std::string _uri(StringData ident) const;
 
-    // Not threadsafe; callers must be serialized.
-    void _setOldestTimestamp(Timestamp oldestTimestamp);
     Timestamp _previousSetOldestTimestamp;
     const bool _keepDataHistory;
 
