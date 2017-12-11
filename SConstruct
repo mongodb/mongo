@@ -1760,7 +1760,7 @@ def doConfigure(myenv):
         }
         """ % compiler_minimum_string)
     elif myenv.ToolchainIs('gcc'):
-        compiler_minimum_string = "GCC 5.3.0"
+        compiler_minimum_string = "GCC 5.4.0"
         compiler_test_body = textwrap.dedent(
         """
         #if !defined(__GNUC__) || defined(__clang__)
@@ -2009,7 +2009,7 @@ def doConfigure(myenv):
 
         # Disable warning about variables that may not be initialized
         # Failures are triggered in the case of boost::optional in GCC 4.8.x
-        # TODO: re-evaluate when we move to GCC 5.3
+        # TODO: re-evaluate when we move to GCC 5.4
         # see: http://stackoverflow.com/questions/21755206/how-to-get-around-gcc-void-b-4-may-be-used-uninitialized-in-this-funct
         AddToCXXFLAGSIfSupported(myenv, "-Wno-maybe-uninitialized")
 
@@ -2222,23 +2222,23 @@ def doConfigure(myenv):
     conf.Finish()
 
     # If we are using libstdc++, check to see if we are using a
-    # libstdc++ that is older than our GCC minimum of 5.3.0. This is
+    # libstdc++ that is older than our GCC minimum of 5.4.0. This is
     # primarly to help people using clang on OS X but forgetting to
     # use --libc++ (or set the target OS X version high enough to get
     # it as the default). We would, ideally, check the __GLIBCXX__
     # version, but for various reasons this is not workable. Instead,
     # we switch on the fact that the <experimental/filesystem> header
-    # wasn't introduced until libstdc++ 5.3.0. Yes, this is a terrible
+    # wasn't introduced until libstdc++ 5.4.0. Yes, this is a terrible
     # hack.
     if usingLibStdCxx:
         def CheckModernLibStdCxx(context):
             test_body = """
             #if !__has_include(<experimental/filesystem>)
-            #error "libstdc++ from GCC 5.3.0 or newer is required"
+            #error "libstdc++ from GCC 5.4.0 or newer is required"
             #endif
             """
 
-            context.Message('Checking for libstdc++ 5.3.0 or better... ')
+            context.Message('Checking for libstdc++ 5.4.0 or better... ')
             ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
             context.Result(ret)
             return ret
@@ -2249,7 +2249,7 @@ def doConfigure(myenv):
 
         suppress_invalid = has_option("disable-minimum-compiler-version-enforcement")
         if not conf.CheckModernLibStdCxx() and not suppress_invalid:
-            myenv.ConfError("When using libstdc++, MongoDB requires libstdc++ from GCC 5.3.0 or newer")
+            myenv.ConfError("When using libstdc++, MongoDB requires libstdc++ from GCC 5.4.0 or newer")
 
         conf.Finish()
 
