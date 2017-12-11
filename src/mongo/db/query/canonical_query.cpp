@@ -222,6 +222,12 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 
     _canHaveNoopMatchNodes = canHaveNoopMatchNodes;
     _isIsolated = QueryRequest::isQueryIsolated(_qr->getFilter());
+    if (_isIsolated) {
+        RARELY {
+            warning() << "The $isolated/$atomic option is deprecated. See "
+                         "http://dochub.mongodb.org/core/isolated-deprecation";
+        }
+    }
 
     // Normalize, sort and validate tree.
     _root = MatchExpression::optimize(std::move(root));
