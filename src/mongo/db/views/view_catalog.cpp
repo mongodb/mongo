@@ -68,62 +68,6 @@ StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* o
     }
     return CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationSpec);
 }
-
-// TODO SERVER-31588: Remove FCV 3.4 validation during the 3.7 development cycle.
-Status validInViewUnder34FeatureCompatibility(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              const Pipeline& pipeline) {
-    const auto& sourceList = pipeline.getSources();
-    // Confirm that the view pipeline does not contain elements that require 3.6 feature
-    // compatibility.
-    for (auto&& source : sourceList) {
-        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(source.get())) {
-            auto query = matchStage->getQuery();
-            MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-                Pipeline::kAllowedMatcherFeatures &
-                ~MatchExpressionParser::AllowedFeatures::kJSONSchema &
-                ~MatchExpressionParser::AllowedFeatures::kExpr;
-
-            auto statusWithMatcher = MatchExpressionParser::parse(
-                query, expCtx, ExtensionsCallbackNoop(), allowedFeatures);
-
-            if (!statusWithMatcher.isOK()) {
-                if (statusWithMatcher.getStatus().code() == ErrorCodes::QueryFeatureNotAllowed) {
-                    return {statusWithMatcher.getStatus().code(),
-                            str::stream()
-                                << "featureCompatibility version '3.6' is required to create "
-                                   "a view containing new features. See "
-                                << feature_compatibility_version::kDochubLink
-                                << "; "
-                                << statusWithMatcher.getStatus().reason()};
-                }
-
-                uasserted(ErrorCodes::InternalError,
-                          str::stream()
-                              << "Unexpected error on validation for 3.4 feature compatibility: "
-                              << statusWithMatcher.getStatus().toString());
-            }
-        } else if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(source.get())) {
-            if (lookupStage->wasConstructedWithPipelineSyntax()) {
-                return {ErrorCodes::QueryFeatureNotAllowed,
-                        str::stream() << "featureCompatibility version '3.6' is required to create "
-                                         "a view containing "
-                                         "a $lookup stage with 'pipeline' syntax. See "
-                                      << feature_compatibility_version::kDochubLink};
-            }
-        } else if (auto facetStage = dynamic_cast<DocumentSourceFacet*>(source.get())) {
-            for (auto&& facetSubPipe : facetStage->getFacetPipelines()) {
-                auto status =
-                    validInViewUnder34FeatureCompatibility(expCtx, *facetSubPipe.pipeline);
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
-        }
-    }
-
-    return Status::OK();
-}
-
 }  // namespace
 
 Status ViewCatalog::reloadIfNeeded(OperationContext* opCtx) {
@@ -311,15 +255,6 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
     if (!sources.empty() && sources.front()->constraints().isChangeStreamStage()) {
         return {ErrorCodes::OptionNotSupportedOnView,
                 "$changeStream cannot be used in a view definition"};
-    }
-
-    if (serverGlobalParams.validateFeaturesAsMaster.load() &&
-        serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-        auto status = validInViewUnder34FeatureCompatibility(expCtx, *pipelineStatus.getValue());
-        if (!status.isOK()) {
-            return status;
-        }
     }
 
     return std::move(involvedNamespaces);

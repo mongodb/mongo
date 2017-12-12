@@ -49,7 +49,6 @@
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/unittest/ensure_fcv.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -67,8 +66,6 @@ using D = Document;
 using V = Value;
 
 using DSChangeStream = DocumentSourceChangeStream;
-
-using unittest::EnsureFCV;
 
 static const Timestamp ts(100, 1);
 static const repl::OpTime optime(ts, 1);
@@ -104,11 +101,8 @@ repl::OplogEntry makeOplogEntry(repl::OpTypeEnum opType,
 class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
 public:
     ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
-    ChangeStreamStageTestNoSetup(NamespaceString nsString)
-        : AggregationContextFixture(nsString), _ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36) {}
-
-private:
-    EnsureFCV _ensureFCV;
+    explicit ChangeStreamStageTestNoSetup(NamespaceString nsString)
+        : AggregationContextFixture(nsString) {}
 };
 
 // This is needed only for the "insert" tests.

@@ -177,28 +177,10 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
 
         } else if (fieldName == "validator" && !isView) {
             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-                MatchExpressionParser::kBanAllSpecialFeatures;
-            if (!serverGlobalParams.validateFeaturesAsMaster.load() ||
-                (serverGlobalParams.featureCompatibility.getVersion() ==
-                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
-                // Note that we don't enforce this restriction on the secondary or on backup
-                // instances, as indicated by !validateFeaturesAsMaster.
-                allowedFeatures |= MatchExpressionParser::kJSONSchema;
-                allowedFeatures |= MatchExpressionParser::kExpr;
-            }
+                MatchExpressionParser::kDefaultSpecialFeatures;
             auto statusW = coll->parseValidator(opCtx, e.Obj(), allowedFeatures);
             if (!statusW.isOK()) {
-                if (statusW.getStatus().code() == ErrorCodes::QueryFeatureNotAllowed) {
-                    // The default error message for disallowed $jsonSchema and $expr is not
-                    // descriptive enough, so we rewrite it here.
-                    return {ErrorCodes::QueryFeatureNotAllowed,
-                            str::stream() << "The featureCompatibilityVersion must be 3.6 to add a "
-                                             "collection validator using 3.6 query features. See "
-                                          << feature_compatibility_version::kDochubLink
-                                          << "."};
-                } else {
-                    return statusW.getStatus();
-                }
+                return statusW.getStatus();
             }
 
             cmr.collValidator = e;

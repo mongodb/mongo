@@ -60,22 +60,6 @@ using DocumentSourceLookUpTest = AggregationContextFixture;
 const long long kDefaultMaxCacheSize = internalDocumentSourceLookupCacheSizeBytes.load();
 const auto kExplain = ExplainOptions::Verbosity::kQueryPlanner;
 
-// Allow tests to temporarily switch to a different FCV.
-class EnsureFCV {
-public:
-    using Version = ServerGlobalParams::FeatureCompatibility::Version;
-    EnsureFCV(Version version)
-        : _origVersion(serverGlobalParams.featureCompatibility.getVersion()) {
-        serverGlobalParams.featureCompatibility.setVersion(version);
-    }
-    ~EnsureFCV() {
-        serverGlobalParams.featureCompatibility.setVersion(_origVersion);
-    }
-
-private:
-    const Version _origVersion;
-};
-
 // For tests which need to run in a replica set context.
 class ReplDocumentSourceLookUpTest : public DocumentSourceLookUpTest {
 public:
@@ -258,9 +242,6 @@ TEST_F(DocumentSourceLookUpTest, RejectLookupWhenDepthLimitIsExceeded) {
 }
 
 TEST_F(ReplDocumentSourceLookUpTest, RejectsPipelineWithChangeStreamStage) {
-    // Temporarily set FCV to 3.6 for $changeStream.
-    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
-
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "coll");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
@@ -276,9 +257,6 @@ TEST_F(ReplDocumentSourceLookUpTest, RejectsPipelineWithChangeStreamStage) {
 }
 
 TEST_F(ReplDocumentSourceLookUpTest, RejectsSubPipelineWithChangeStreamStage) {
-    // Temporarily set FCV to 3.6 for $changeStream.
-    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
-
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "coll");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});

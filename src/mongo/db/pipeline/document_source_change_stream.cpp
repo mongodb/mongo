@@ -33,7 +33,6 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
@@ -282,15 +281,6 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(
-        ErrorCodes::InvalidOptions,
-        str::stream()
-            << "The featureCompatibilityVersion must be 3.6 to use the $changeStream stage. See "
-            << feature_compatibility_version::kDochubLink
-            << ".",
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-
     // A change stream is a tailable + awaitData cursor.
     expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
 

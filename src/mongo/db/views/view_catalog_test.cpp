@@ -178,12 +178,8 @@ TEST_F(ViewCatalogFixture, CreateViewOnDifferentDatabase) {
         viewCatalog.createView(opCtx.get(), viewName, viewOn, emptyPipeline, emptyCollation));
 }
 
-// TODO SERVER-31588: Remove FCV 3.4 validation during the 3.7 development cycle.
-TEST_F(ViewCatalogFixture, CreateViewWith36FeaturesSucceedsUnder36FCV) {
-    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
-
+TEST_F(ViewCatalogFixture, CanCreateViewWithExprPredicate) {
     const NamespaceString viewOn("db.coll");
-
     ASSERT_OK(viewCatalog.createView(opCtx.get(),
                                      NamespaceString("db.view1"),
                                      viewOn,
@@ -194,29 +190,35 @@ TEST_F(ViewCatalogFixture, CreateViewWith36FeaturesSucceedsUnder36FCV) {
         opCtx.get(),
         NamespaceString("db.view2"),
         viewOn,
+        BSON_ARRAY(
+            BSON("$facet" << BSON("output" << BSON_ARRAY(BSON("$match" << BSON("$expr" << 1)))))),
+        emptyCollation));
+}
+
+TEST_F(ViewCatalogFixture, CanCreateViewWithJSONSchemaPredicate) {
+    const NamespaceString viewOn("db.coll");
+    ASSERT_OK(viewCatalog.createView(
+        opCtx.get(),
+        NamespaceString("db.view1"),
+        viewOn,
         BSON_ARRAY(BSON("$match" << BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("x"))))),
         emptyCollation));
 
     ASSERT_OK(viewCatalog.createView(
         opCtx.get(),
-        NamespaceString("db.view3"),
-        viewOn,
-        BSON_ARRAY(
-            BSON("$facet" << BSON("output" << BSON_ARRAY(BSON("$match" << BSON("$expr" << 1)))))),
-        emptyCollation));
-
-    ASSERT_OK(viewCatalog.createView(
-        opCtx.get(),
-        NamespaceString("db.view4"),
+        NamespaceString("db.view2"),
         viewOn,
         BSON_ARRAY(BSON(
             "$facet" << BSON(
                 "output" << BSON_ARRAY(BSON(
                     "$match" << BSON("$jsonSchema" << BSON("required" << BSON_ARRAY("x")))))))),
         emptyCollation));
+}
 
+TEST_F(ViewCatalogFixture, CanCreateViewWithLookupUsingPipelineSyntax) {
+    const NamespaceString viewOn("db.coll");
     ASSERT_OK(viewCatalog.createView(opCtx.get(),
-                                     NamespaceString("db.view5"),
+                                     NamespaceString("db.view"),
                                      viewOn,
                                      BSON_ARRAY(BSON("$lookup" << BSON("from"
                                                                        << "fcoll"
@@ -226,79 +228,6 @@ TEST_F(ViewCatalogFixture, CreateViewWith36FeaturesSucceedsUnder36FCV) {
                                                                        << BSONArray()))),
                                      emptyCollation));
 }
-
-// TODO SERVER-31588: Remove FCV 3.4 validation during the 3.7 development cycle.
-TEST_F(ViewCatalogFixture, CreateViewWith36FeaturesFailsUnder34FCV) {
-    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyDowngradedTo34);
-
-    const NamespaceString viewName("db.view");
-    const NamespaceString viewOn("db.coll");
-
-    ASSERT_THROWS_CODE(viewCatalog
-                           .createView(opCtx.get(),
-                                       viewName,
-                                       viewOn,
-                                       BSON_ARRAY(BSON("$match" << BSON("$expr" << 1))),
-                                       emptyCollation)
-                           .ignore(),
-                       AssertionException,
-                       ErrorCodes::QueryFeatureNotAllowed);
-
-    ASSERT_THROWS_CODE(
-        viewCatalog
-            .createView(opCtx.get(),
-                        viewName,
-                        viewOn,
-                        BSON_ARRAY(BSON("$match" << BSON("$jsonSchema"
-                                                         << BSON("required" << BSON_ARRAY("x"))))),
-                        emptyCollation)
-            .ignore(),
-        AssertionException,
-        ErrorCodes::QueryFeatureNotAllowed);
-
-    ASSERT_THROWS_CODE(
-        viewCatalog
-            .createView(opCtx.get(),
-                        viewName,
-                        viewOn,
-                        BSON_ARRAY(BSON("$facet" << BSON("output" << BSON_ARRAY(BSON(
-                                                             "$match" << BSON("$expr" << 1)))))),
-                        emptyCollation)
-            .ignore(),
-        AssertionException,
-        ErrorCodes::QueryFeatureNotAllowed);
-
-    ASSERT_THROWS_CODE(
-        viewCatalog
-            .createView(
-                opCtx.get(),
-                viewName,
-                viewOn,
-                BSON_ARRAY(BSON(
-                    "$facet" << BSON("output" << BSON_ARRAY(BSON(
-                                         "$match" << BSON("$jsonSchema" << BSON(
-                                                              "required" << BSON_ARRAY("x")))))))),
-                emptyCollation)
-            .ignore(),
-        AssertionException,
-        ErrorCodes::QueryFeatureNotAllowed);
-
-    ASSERT_THROWS_CODE(viewCatalog
-                           .createView(opCtx.get(),
-                                       viewName,
-                                       viewOn,
-                                       BSON_ARRAY(BSON("$lookup" << BSON("from"
-                                                                         << "fcoll"
-                                                                         << "as"
-                                                                         << "as"
-                                                                         << "pipeline"
-                                                                         << BSONArray()))),
-                                       emptyCollation)
-                           .ignore(),
-                       AssertionException,
-                       ErrorCodes::QueryFeatureNotAllowed);
-}
-
 
 TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
     const NamespaceString viewName("db.view");
