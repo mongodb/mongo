@@ -49,6 +49,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
@@ -341,10 +342,10 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
 }
 
 StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientImpl::getCollection(
-    OperationContext* opCtx, const std::string& collNs) {
+    OperationContext* opCtx, const std::string& collNs, repl::ReadConcernLevel readConcernLevel) {
     auto statusFind = _exhaustiveFindOnConfig(opCtx,
                                               kConfigReadSelector,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              readConcernLevel,
                                               NamespaceString(CollectionType::ConfigNS),
                                               BSON(CollectionType::fullNs(collNs)),
                                               BSONObj(),
@@ -421,7 +422,8 @@ StatusWith<std::vector<CollectionType>> ShardingCatalogClientImpl::getCollection
 }
 
 Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
-                                                 const NamespaceString& ns) {
+                                                 const NamespaceString& ns,
+                                                 repl::ReadConcernLevel readConcernLevel) {
     logChange(opCtx,
               "dropCollection.start",
               ns.ns(),
@@ -429,7 +431,7 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
               ShardingCatalogClientImpl::kMajorityWriteConcern)
         .ignore();
 
-    auto shardsStatus = getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto shardsStatus = getAllShards(opCtx, readConcernLevel);
     if (!shardsStatus.isOK()) {
         return shardsStatus.getStatus();
     }

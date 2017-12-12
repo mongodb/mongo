@@ -121,18 +121,6 @@ load('jstests/libs/write_concern_util.js');
         admin: false
     });
 
-    // Unsharded drop collection should return a writeConcernError.
-    commands.push({
-        req: {drop: collName},
-        setupFunc: function() {
-            coll.insert({type: 'oak'});
-        },
-        confirmFunc: function() {
-            assert.eq(coll.count(), 0);
-        },
-        admin: false
-    });
-
     // Aggregate with passthrough.
     commands.push({
         req: {aggregate: collName, pipeline: [{$sort: {type: 1}}, {$out: "foo"}], cursor: {}},

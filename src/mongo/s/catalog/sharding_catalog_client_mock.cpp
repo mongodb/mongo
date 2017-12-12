@@ -80,7 +80,7 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientMock::getDatabas
 }
 
 StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientMock::getCollection(
-    OperationContext* opCtx, const string& collNs) {
+    OperationContext* opCtx, const string& collNs, repl::ReadConcernLevel readConcernLevel) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
@@ -90,7 +90,8 @@ StatusWith<std::vector<CollectionType>> ShardingCatalogClientMock::getCollection
 }
 
 Status ShardingCatalogClientMock::dropCollection(OperationContext* opCtx,
-                                                 const NamespaceString& ns) {
+                                                 const NamespaceString& ns,
+                                                 repl::ReadConcernLevel readConcernLevel) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 

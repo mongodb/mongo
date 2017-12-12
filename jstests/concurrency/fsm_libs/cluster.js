@@ -138,6 +138,12 @@ var Cluster = function(options) {
         assert(options.setupFunctions.mongos.every(f => (typeof f === 'function')),
                'Expected setupFunctions.mongos to be an array of functions');
 
+        options.setupFunctions.config = options.setupFunctions.config || [];
+        assert(Array.isArray(options.setupFunctions.config),
+               'Expected setupFunctions.config to be an array');
+        assert(options.setupFunctions.config.every(f => (typeof f === 'function')),
+               'Expected setupFunctions.config to be an array of functions');
+
         options.teardownFunctions = options.teardownFunctions || {};
         assert.eq('object', typeof options.teardownFunctions);
 
@@ -157,6 +163,12 @@ var Cluster = function(options) {
                'Expected teardownFunctions.mongos to be an array');
         assert(options.teardownFunctions.mongos.every(f => (typeof f === 'function')),
                'Expected teardownFunctions.mongos to be an array of functions');
+
+        options.teardownFunctions.config = options.teardownFunctions.config || [];
+        assert(Array.isArray(options.teardownFunctions.config),
+               'Expected teardownFunctions.config to be an array');
+        assert(options.teardownFunctions.config.every(f => (typeof f === 'function')),
+               'Expected teardownFunctions.config to be an array of functions');
 
         assert(!options.masterSlave || !options.replication.enabled,
                "Both 'masterSlave' and " + "'replication.enabled' cannot be true");
@@ -234,6 +246,7 @@ var Cluster = function(options) {
             this.teardown = function teardown() {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
                 options.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
+                options.teardownFunctions.config.forEach(this.executeOnConfigNodes);
 
                 // Skip checking uuids in teardown if performing continuous stepdowns. The override
                 // uses cached connections and expects to run commands against primaries, which is
@@ -241,7 +254,6 @@ var Cluster = function(options) {
                 if (this.shouldPerformContinuousStepdowns()) {
                     TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                 }
-
                 st.stop();
             };
 
@@ -335,6 +347,7 @@ var Cluster = function(options) {
         clusterStartTime = new Date();
 
         options.setupFunctions.mongod.forEach(this.executeOnMongodNodes);
+        options.setupFunctions.config.forEach(this.executeOnConfigNodes);
         if (options.sharded) {
             options.setupFunctions.mongos.forEach(this.executeOnMongosNodes);
         }
@@ -366,6 +379,27 @@ var Cluster = function(options) {
         }
         _conns.mongos.forEach(function(mongosConn) {
             fn(mongosConn.getDB('admin'), true /* isMongos */);
+        });
+    };
+
+    this.executeOnConfigNodes = function executeOnConfigNodes(fn) {
+        assert(initialized, 'cluster must be initialized first');
+
+        if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
+            throw new Error('config function must be a function that takes a db as an argument');
+        }
+
+        var configs = [];
+        var config = st.c0;
+        var i = 0;
+        while (config) {
+            configs.push(config);
+            ++i;
+            config = st['c' + i];
+        }
+
+        configs.forEach(function(conn) {
+            fn(conn.getDB('admin'));
         });
     };
 

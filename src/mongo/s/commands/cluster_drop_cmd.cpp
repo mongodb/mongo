@@ -33,21 +33,13 @@
 #include "mongo/base/status.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/util/fail_point_service.h"
-#include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace {
-
-MONGO_FP_DECLARE(setDropCollDistLockWait);
 
 class DropCmd : public BasicCommand {
 public:
@@ -77,92 +69,26 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
 
-        auto const catalogCache = Grid::get(opCtx)->catalogCache();
-        auto const catalogClient = Grid::get(opCtx)->catalogClient();
+        // Invalidate the routing table cache entry for this collection so that we reload it the
+        // next time it is accessed, even if sending the command to the config server fails due
+        // to e.g. a NetworkError.
+        ON_BLOCK_EXIT(
+            [opCtx, nss] { Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss); });
 
-        // Remove the backwards compatible lock after 3.6 ships.
-        Seconds waitFor(DistLockManager::kDefaultLockTimeout);
-        MONGO_FAIL_POINT_BLOCK(setDropCollDistLockWait, customWait) {
-            const BSONObj& data = customWait.getData();
-            waitFor = Seconds(data["waitForSecs"].numberInt());
-        }
-        auto backwardsCompatibleDbDistLock =
-            uassertStatusOK(catalogClient->getDistLockManager()->lock(
-                opCtx, nss.db() + "-movePrimary", "dropCollection", waitFor));
-        auto dbDistLock = uassertStatusOK(
-            catalogClient->getDistLockManager()->lock(opCtx, nss.db(), "dropCollection", waitFor));
-        auto collDistLock = uassertStatusOK(
-            catalogClient->getDistLockManager()->lock(opCtx, nss.ns(), "dropCollection", waitFor));
-
-        auto routingInfoStatus = catalogCache->getCollectionRoutingInfo(opCtx, nss);
-        if (routingInfoStatus == ErrorCodes::NamespaceNotFound) {
-            return true;
-        }
-
-        auto routingInfo = uassertStatusOK(std::move(routingInfoStatus));
-
-        if (!routingInfo.cm()) {
-            _dropUnshardedCollectionFromShard(opCtx, routingInfo.primaryId(), nss, &result);
-        } else {
-            uassertStatusOK(catalogClient->dropCollection(opCtx, nss));
-            catalogCache->invalidateShardedCollection(nss);
-        }
-
-        return true;
-    }
-
-private:
-    /**
-     * Sends the 'drop' command for the specified collection to the specified shard. Throws
-     * DBException on failure.
-     */
-    static void _dropUnshardedCollectionFromShard(OperationContext* opCtx,
-                                                  const ShardId& shardId,
-                                                  const NamespaceString& nss,
-                                                  BSONObjBuilder* result) {
-        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-
-        const auto dropCommandBSON = [shardRegistry, opCtx, &shardId, &nss] {
-            BSONObjBuilder builder;
-            builder.append("drop", nss.coll());
-
-            // Append the chunk version for the specified namespace indicating that we believe it is
-            // not sharded. Collections residing on the config server are never sharded so do not
-            // send the shard version.
-            if (shardId != shardRegistry->getConfigShard()->getId()) {
-                ChunkVersion::UNSHARDED().appendForCommands(&builder);
-            }
-
-            if (!opCtx->getWriteConcern().usedDefault) {
-                builder.append(WriteConcernOptions::kWriteConcernField,
-                               opCtx->getWriteConcern().toBSON());
-            }
-
-            return builder.obj();
-        }();
-
-        const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
-        auto cmdDropResult = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
+        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+        auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
             opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            nss.db().toString(),
-            dropCommandBSON,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+            "admin",
+            Command::appendMajorityWriteConcern(Command::appendPassthroughFields(
+                cmdObj, BSON("_configsvrDropCollection" << nss.toString()))),
             Shard::RetryPolicy::kIdempotent));
 
-        // Special-case SendStaleVersion errors
-        if (cmdDropResult.commandStatus == ErrorCodes::StaleConfig) {
-            throw StaleConfigException(str::stream() << "Stale config while dropping collection",
-                                       cmdDropResult.response);
-        }
-
-        uassertStatusOK(cmdDropResult.commandStatus);
-
-        if (!cmdDropResult.writeConcernStatus.isOK()) {
-            appendWriteConcernErrorToCmdResponse(
-                shardId, cmdDropResult.response["writeConcernError"], *result);
-        }
+        Command::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+        return true;
     }
 
 } clusterDropCmd;

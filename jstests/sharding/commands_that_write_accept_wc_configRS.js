@@ -57,7 +57,9 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         coll = db[collName];
     }
 
-    var commands = [];
+    // Commands in 'commands' will accept any valid writeConcern, while 'metadataCommands' will
+    // upconvert any valid writeConcern to "majority."
+    var commands = [], metadataCommands = [];
 
     // Drop an unsharded database.
     commands.push({
@@ -146,7 +148,7 @@ load('jstests/multiVersion/libs/auth_helpers.js');
     });
 
     // Sharded dropCollection should return a normal error.
-    commands.push({
+    metadataCommands.push({
         req: {drop: collName},
         setupFunc: function() {
             shardCollectionWithChunks(st, coll);
@@ -159,9 +161,6 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         failsOnShards: true,
         admin: false
     });
-
-    // Config server commands require w: majority writeConcerns.
-    var invalidWriteConcerns = [{w: 'invalid'}, {w: 2}];
 
     function testInvalidWriteConcern(wc, cmd) {
         if (wc.w === 2 && !cmd.requiresMajority) {
@@ -223,12 +222,12 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         }
     }
 
-    function testMajorityWriteConcern(cmd) {
+    function testValidWriteConcern(wc, cmd) {
         var req = cmd.req;
         var setupFunc = cmd.setupFunc;
         var confirmFunc = cmd.confirmFunc;
 
-        req.writeConcern = {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS};
+        req.writeConcern = wc;
         jsTest.log("Testing " + tojson(req));
 
         dropTestData();
@@ -267,11 +266,26 @@ load('jstests/multiVersion/libs/auth_helpers.js');
                    tojson(res));
     }
 
+    var majorityWC = {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS};
+
+    // Config server commands require w: majority writeConcerns.
+    // TODO: SERVER-32584 mongos accepts invalid writeConcern 'w' mode
+    var nonMajorityWCs = [{w: 'invalid'}, {w: 2}];
+
     commands.forEach(function(cmd) {
-        invalidWriteConcerns.forEach(function(wc) {
+        nonMajorityWCs.forEach(function(wc) {
             testInvalidWriteConcern(wc, cmd);
         });
-        testMajorityWriteConcern(cmd);
+        testValidWriteConcern(majorityWC, cmd);
+    });
+
+    // Mongos will upconvert the WC for config server metadata commands to majority, so
+    // we check that invalid WCs still work for these commands.
+    metadataCommands.forEach(function(cmd) {
+        nonMajorityWCs.forEach(function(wc) {
+            testValidWriteConcern(wc, cmd);
+        });
+        testValidWriteConcern(majorityWC, cmd);
     });
 
 })();

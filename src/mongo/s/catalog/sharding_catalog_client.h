@@ -141,7 +141,9 @@ public:
      *  - NamespaceNotFound - collection does not exist
      */
     virtual StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
-        OperationContext* opCtx, const std::string& collNs) = 0;
+        OperationContext* opCtx,
+        const std::string& collNs,
+        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Retrieves all collections undera specified database (or in the system).
@@ -165,7 +167,10 @@ public:
      * some of the known failures:
      *  - NamespaceNotFound - collection does not exist
      */
-    virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) = 0;
+    virtual Status dropCollection(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Retrieves all databases for a shard.

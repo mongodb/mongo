@@ -112,6 +112,7 @@ var blacklist = [
     'kill_aggregation.js',
     'kill_rooted_or.js',
     'view_catalog_cycle_with_drop.js',
+    'view_catalog.js',
 
     'toggle_feature_compatibility.js',  // Sets FCV to 3.4, which will cause session use to fail.
 

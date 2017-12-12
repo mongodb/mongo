@@ -96,12 +96,37 @@ BSONObj Command::appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFie
 }
 
 BSONObj Command::appendMajorityWriteConcern(const BSONObj& cmdObj) {
+
+    WriteConcernOptions newWC = kMajorityWriteConcern;
+
     if (cmdObj.hasField(kWriteConcernField)) {
-        return cmdObj;
+        auto wc = cmdObj.getField(kWriteConcernField);
+        // The command has a writeConcern field and it's majority, so we can
+        // return it as-is.
+        if (wc["w"].ok() && wc["w"].str() == "majority") {
+            return cmdObj;
+        }
+
+        if (wc["wtimeout"].ok()) {
+            // They set a timeout, but aren't using majority WC. We want to use their
+            // timeout along with majority WC.
+            newWC = WriteConcernOptions(WriteConcernOptions::kMajority,
+                                        WriteConcernOptions::SyncMode::UNSET,
+                                        wc["wtimeout"].Number());
+        }
     }
+
+    // Append all original fields except the writeConcern field to the new command.
     BSONObjBuilder cmdObjWithWriteConcern;
-    cmdObjWithWriteConcern.appendElementsUnique(cmdObj);
-    cmdObjWithWriteConcern.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
+    for (const auto& elem : cmdObj) {
+        const auto name = elem.fieldNameStringData();
+        if (name != "writeConcern" && !cmdObjWithWriteConcern.hasField(name)) {
+            cmdObjWithWriteConcern.append(elem);
+        }
+    }
+
+    // Finally, add the new write concern.
+    cmdObjWithWriteConcern.append(kWriteConcernField, newWC.toBSON());
     return cmdObjWithWriteConcern.obj();
 }
 
