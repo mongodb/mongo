@@ -780,6 +780,7 @@ func TestMongoDumpOplog(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			withUI := countOplogUI(iter)
+			So(iter.Err(), ShouldBeNil)
 
 			if cmp >= 0 {
 				// for FCV 3.6+, should have 'ui' field in oplog entries
