@@ -388,8 +388,8 @@ void _logOpsInner(OperationContext* opCtx,
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (nss.size() && replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
         !replCoord->canAcceptWritesFor(opCtx, nss)) {
-        severe() << "logOp() but can't accept write to collection " << nss.ns();
-        fassertFailed(17405);
+        uasserted(17405,
+                  str::stream() << "logOp() but can't accept write to collection " << nss.ns());
     }
 
     // we jump through a bunch of hoops here to avoid copying the obj buffer twice --
