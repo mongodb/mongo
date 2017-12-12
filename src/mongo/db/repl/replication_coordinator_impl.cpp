@@ -3462,8 +3462,9 @@ Timestamp ReplicationCoordinatorImpl::reserveSnapshotName(OperationContext* opCt
             // Use the current optime on the node, for primary nodes.
             reservedName = LogicalClock::get(getServiceContext())->getClusterTime().asTimestamp();
         } else {
-            // Use lastApplied time, for secondary nodes.
-            reservedName = getMyLastAppliedOpTime().getTimestamp();
+            // This function is only called when applying command operations on secondaries.
+            // We ask the RecoveryUnit what timestamp it will assign to this write.
+            reservedName = opCtx->recoveryUnit()->getCommitTimestamp();
         }
     } else {
         // All snapshots are the same for a standalone node.

@@ -202,6 +202,12 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
 
     int wtRet;
     if (commit) {
+        if (!_commitTimestamp.isNull()) {
+            const std::string conf = "commit_timestamp=" + integerToHex(_commitTimestamp.asULL());
+            invariantWTOK(s->timestamp_transaction(s, conf.c_str()));
+            _isTimestamped = true;
+        }
+
         wtRet = s->commit_transaction(s, NULL);
         LOG(3) << "WT commit_transaction for snapshot id " << _mySnapshotId;
     } else {
@@ -277,6 +283,10 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
     LOG(3) << "WT set timestamp of future write operations to " << timestamp;
     WT_SESSION* session = _session->getSession();
     invariant(_inUnitOfWork);
+    invariant(_commitTimestamp.isNull(),
+              str::stream() << "Commit timestamp set to " << _commitTimestamp.toString()
+                            << " and trying to set WUOW timestamp to "
+                            << timestamp.toString());
 
     // Starts the WT transaction associated with this session.
     getSession();
@@ -287,6 +297,25 @@ Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
         _isTimestamped = true;
     }
     return wtRCToStatus(rc, "timestamp_transaction");
+}
+
+void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {
+    invariant(!_inUnitOfWork);
+    invariant(_commitTimestamp.isNull(),
+              str::stream() << "Commit timestamp set to " << _commitTimestamp.toString()
+                            << " and trying to set it to "
+                            << timestamp.toString());
+    _commitTimestamp = timestamp;
+}
+
+Timestamp WiredTigerRecoveryUnit::getCommitTimestamp() {
+    return _commitTimestamp;
+}
+
+void WiredTigerRecoveryUnit::clearCommitTimestamp() {
+    invariant(!_inUnitOfWork);
+    invariant(!_commitTimestamp.isNull());
+    _commitTimestamp = Timestamp();
 }
 
 Status WiredTigerRecoveryUnit::selectSnapshot(Timestamp timestamp) {

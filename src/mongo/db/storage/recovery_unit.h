@@ -147,9 +147,23 @@ public:
      * new timestamp but past writes remain with their originally assigned timestamps.
      * Writes that occur before any setTimestamp() is called will be assigned the timestamp
      * specified in the last setTimestamp() call in the transaction, at commit time.
+     *
+     * setTimestamp() will fail if a commit timestamp is set using setCommitTimestamp() and not
+     * yet cleared with clearCommitTimestamp().
      */
     virtual Status setTimestamp(Timestamp timestamp) {
         return Status::OK();
+    }
+
+    /**
+     * Sets a timestamp that will be assigned to all future writes on this RecoveryUnit until
+     * clearCommitTimestamp() is called. This must be called outside of a WUOW and setTimestamp()
+     * must not be called while a commit timestamp is set.
+     */
+    virtual void setCommitTimestamp(Timestamp timestamp) {}
+    virtual void clearCommitTimestamp() {}
+    virtual Timestamp getCommitTimestamp() {
+        return {};
     }
 
     /**

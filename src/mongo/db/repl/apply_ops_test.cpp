@@ -135,6 +135,53 @@ Status getStatusFromApplyOpsResult(const BSONObj& result) {
     return getStatusFromCommandResult(newResult);
 }
 
+TEST_F(ApplyOpsTest, CommandInNestedApplyOpsReturnsSuccess) {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+    BSONObjBuilder resultBuilder;
+    NamespaceString nss("test", "foo");
+    auto innerCmdObj = BSON("op"
+                            << "c"
+                            << "ns"
+                            << nss.getCommandNS().ns()
+                            << "o"
+                            << BSON("create" << nss.coll()));
+    auto innerApplyOpsObj = BSON("op"
+                                 << "c"
+                                 << "ns"
+                                 << nss.getCommandNS().ns()
+                                 << "o"
+                                 << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
+    auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
+
+    ASSERT_OK(applyOps(opCtx.get(), nss.db().toString(), cmdObj, mode, &resultBuilder));
+    ASSERT_BSONOBJ_EQ({}, _opObserver->onApplyOpsCmdObj);
+}
+
+TEST_F(ApplyOpsTest, InsertInNestedApplyOpsReturnsSuccess) {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+    BSONObjBuilder resultBuilder;
+    NamespaceString nss("test", "foo");
+    auto innerCmdObj = BSON("op"
+                            << "i"
+                            << "ns"
+                            << nss.getCommandNS().ns()
+                            << "o"
+                            << BSON("_id"
+                                    << "a"));
+    auto innerApplyOpsObj = BSON("op"
+                                 << "c"
+                                 << "ns"
+                                 << nss.getCommandNS().ns()
+                                 << "o"
+                                 << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
+    auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
+
+    ASSERT_OK(applyOps(opCtx.get(), nss.db().toString(), cmdObj, mode, &resultBuilder));
+    ASSERT_BSONOBJ_EQ({}, _opObserver->onApplyOpsCmdObj);
+}
+
 TEST_F(ApplyOpsTest, AtomicApplyOpsWithNoOpsReturnsSuccess) {
     auto opCtx = cc().makeOperationContext();
     auto mode = OplogApplication::Mode::kApplyOpsCmd;

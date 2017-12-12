@@ -46,6 +46,7 @@
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
@@ -236,8 +237,59 @@ public:
             << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
     }
 
+    void assertDocumentAtTimestamp(Collection* coll,
+                                   const Timestamp& ts,
+                                   const BSONObj& expectedDoc) {
+
+        auto recoveryUnit = _opCtx->recoveryUnit();
+        recoveryUnit->abandonSnapshot();
+        ASSERT_OK(recoveryUnit->selectSnapshot(ts));
+        if (expectedDoc.isEmpty()) {
+            ASSERT_EQ(0, itCount(coll)) << "Should not find any documents in " << coll->ns()
+                                        << " at ts: " << ts;
+        } else {
+            ASSERT_EQ(1, itCount(coll)) << "Should find one document in " << coll->ns()
+                                        << " at ts: " << ts;
+            auto doc = findOne(coll);
+            ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, expectedDoc))
+                << "Doc: " << doc.toString() << " Expected: " << expectedDoc.toString();
+        }
+    }
+
     void setReplCoordAppliedOpTime(const repl::OpTime& opTime) {
         repl::getGlobalReplicationCoordinator()->setMyLastAppliedOpTime(opTime);
+    }
+
+    /**
+     * Asserts that the given collection is in (or not in) the KVCatalog's list of idents at the
+     * provided timestamp.
+     */
+    void assertNamespaceInIdents(OperationContext* opCtx,
+                                 NamespaceString nss,
+                                 Timestamp ts,
+                                 bool shouldExpect) {
+        KVCatalog* kvCatalog =
+            static_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine())
+                ->getCatalog();
+
+        auto recoveryUnit = _opCtx->recoveryUnit();
+        recoveryUnit->abandonSnapshot();
+        ASSERT_OK(recoveryUnit->selectSnapshot(ts));
+
+        // getCollectionIdent() returns the ident for the given namespace in the KVCatalog.
+        // getAllIdents() actually looks in the RecordStore for a list of all idents, and is thus
+        // versioned by timestamp. These tests do not do any renames, so we can expect the
+        // namespace to have a consistent ident across timestamps, if it exists.
+        auto expectedIdent = kvCatalog->getCollectionIdent(nss.ns());
+        auto idents = kvCatalog->getAllIdents(opCtx);
+        auto found = std::find(idents.begin(), idents.end(), expectedIdent);
+
+        if (shouldExpect) {
+            ASSERT(found != idents.end()) << nss.ns() << " was not found at " << ts.toString();
+        } else {
+            ASSERT(found == idents.end()) << nss.ns() << " was found at " << ts.toString()
+                                          << " when it should not have been.";
+        }
     }
 };
 
@@ -721,6 +773,258 @@ public:
     }
 };
 
+class SecondaryCreateCollection : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // In order for applyOps to assign timestamps, we must be in non-replicated mode.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        NamespaceString nss("unittests.secondaryCreateCollection");
+        ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
+
+        { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+
+        BSONObjBuilder resultBuilder;
+        auto swResult = doNonAtomicApplyOps(
+            nss.db().toString(),
+            {
+                BSON("ts" << presentTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+                          << "c"
+                          << "ui"
+                          << UUID::gen()
+                          << "ns"
+                          << nss.getCommandNS().ns()
+                          << "o"
+                          << BSON("create" << nss.coll())),
+            },
+            presentTs);
+        ASSERT_OK(swResult);
+
+        { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+
+        assertNamespaceInIdents(_opCtx, nss, pastTs, false);
+        assertNamespaceInIdents(_opCtx, nss, presentTs, true);
+        assertNamespaceInIdents(_opCtx, nss, futureTs, true);
+        assertNamespaceInIdents(_opCtx, nss, nullTs, true);
+    }
+};
+
+class SecondaryCreateTwoCollections : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // In order for applyOps to assign timestamps, we must be in non-replicated mode.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        std::string dbName = "unittest";
+        NamespaceString nss1(dbName, "secondaryCreateTwoCollections1");
+        NamespaceString nss2(dbName, "secondaryCreateTwoCollections2");
+        ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss1));
+        ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
+
+        { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection()); }
+        { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
+
+        const LogicalTime dummyLt = futureLt.addTicks(1);
+        const Timestamp dummyTs = dummyLt.asTimestamp();
+
+        BSONObjBuilder resultBuilder;
+        auto swResult = doNonAtomicApplyOps(
+            dbName,
+            {
+                BSON("ts" << presentTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+                          << "c"
+                          << "ui"
+                          << UUID::gen()
+                          << "ns"
+                          << nss1.getCommandNS().ns()
+                          << "o"
+                          << BSON("create" << nss1.coll())),
+                BSON("ts" << futureTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+                          << "c"
+                          << "ui"
+                          << UUID::gen()
+                          << "ns"
+                          << nss2.getCommandNS().ns()
+                          << "o"
+                          << BSON("create" << nss2.coll())),
+            },
+            dummyTs);
+        ASSERT_OK(swResult);
+
+        { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection()); }
+        { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
+
+        assertNamespaceInIdents(_opCtx, nss1, pastTs, false);
+        assertNamespaceInIdents(_opCtx, nss1, presentTs, true);
+        assertNamespaceInIdents(_opCtx, nss1, futureTs, true);
+        assertNamespaceInIdents(_opCtx, nss1, dummyTs, true);
+        assertNamespaceInIdents(_opCtx, nss1, nullTs, true);
+
+        assertNamespaceInIdents(_opCtx, nss2, pastTs, false);
+        assertNamespaceInIdents(_opCtx, nss2, presentTs, false);
+        assertNamespaceInIdents(_opCtx, nss2, futureTs, true);
+        assertNamespaceInIdents(_opCtx, nss2, dummyTs, true);
+        assertNamespaceInIdents(_opCtx, nss2, nullTs, true);
+    }
+};
+
+class SecondaryCreateCollectionBetweenInserts : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // In order for applyOps to assign timestamps, we must be in non-replicated mode.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        std::string dbName = "unittest";
+        NamespaceString nss1(dbName, "secondaryCreateCollectionBetweenInserts1");
+        NamespaceString nss2(dbName, "secondaryCreateCollectionBetweenInserts2");
+        BSONObj doc1 = BSON("_id" << 1 << "field" << 1);
+        BSONObj doc2 = BSON("_id" << 2 << "field" << 2);
+
+        const UUID uuid2 = UUID::gen();
+
+        const LogicalTime insert2Lt = futureLt.addTicks(1);
+        const Timestamp insert2Ts = insert2Lt.asTimestamp();
+
+        const LogicalTime dummyLt = insert2Lt.addTicks(1);
+        const Timestamp dummyTs = dummyLt.asTimestamp();
+
+        {
+            reset(nss1);
+            AutoGetCollection autoColl(_opCtx, nss1, LockMode::MODE_X, LockMode::MODE_IX);
+
+            ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss2));
+            { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
+
+            BSONObjBuilder resultBuilder;
+            auto swResult = doNonAtomicApplyOps(
+                dbName,
+                {
+                    BSON("ts" << presentTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+                              << "i"
+                              << "ns"
+                              << nss1.ns()
+                              << "ui"
+                              << autoColl.getCollection()->uuid().get()
+                              << "o"
+                              << doc1),
+                    BSON("ts" << futureTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+                              << "c"
+                              << "ui"
+                              << uuid2
+                              << "ns"
+                              << nss2.getCommandNS().ns()
+                              << "o"
+                              << BSON("create" << nss2.coll())),
+                    BSON("ts" << insert2Ts << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+                              << "i"
+                              << "ns"
+                              << nss2.ns()
+                              << "ui"
+                              << uuid2
+                              << "o"
+                              << doc2),
+                },
+                dummyTs);
+            ASSERT_OK(swResult);
+        }
+
+        {
+            AutoGetCollectionForReadCommand autoColl1(_opCtx, nss1);
+            auto coll1 = autoColl1.getCollection();
+            ASSERT(coll1);
+            AutoGetCollectionForReadCommand autoColl2(_opCtx, nss2);
+            auto coll2 = autoColl2.getCollection();
+            ASSERT(coll2);
+
+            assertDocumentAtTimestamp(coll1, pastTs, BSONObj());
+            assertDocumentAtTimestamp(coll1, presentTs, doc1);
+            assertDocumentAtTimestamp(coll1, futureTs, doc1);
+            assertDocumentAtTimestamp(coll1, insert2Ts, doc1);
+            assertDocumentAtTimestamp(coll1, dummyTs, doc1);
+            assertDocumentAtTimestamp(coll1, nullTs, doc1);
+
+            assertNamespaceInIdents(_opCtx, nss2, pastTs, false);
+            assertNamespaceInIdents(_opCtx, nss2, presentTs, false);
+            assertNamespaceInIdents(_opCtx, nss2, futureTs, true);
+            assertNamespaceInIdents(_opCtx, nss2, insert2Ts, true);
+            assertNamespaceInIdents(_opCtx, nss2, dummyTs, true);
+            assertNamespaceInIdents(_opCtx, nss2, nullTs, true);
+
+            assertDocumentAtTimestamp(coll2, pastTs, BSONObj());
+            assertDocumentAtTimestamp(coll2, presentTs, BSONObj());
+            assertDocumentAtTimestamp(coll2, futureTs, BSONObj());
+            assertDocumentAtTimestamp(coll2, insert2Ts, doc2);
+            assertDocumentAtTimestamp(coll2, dummyTs, doc2);
+            assertDocumentAtTimestamp(coll2, nullTs, doc2);
+        }
+    }
+};
+
+class PrimaryCreateCollectionInApplyOps : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        NamespaceString nss("unittests.primaryCreateCollectionInApplyOps");
+        ASSERT_OK(repl::StorageInterface::get(_opCtx)->dropCollection(_opCtx, nss));
+
+        { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+
+        BSONObjBuilder resultBuilder;
+        // This 'applyOps' command will not actually be atomic, however we use the atomic helper
+        // to avoid the extra 'applyOps' oplog entry that the non-atomic form creates on primaries.
+        auto swResult = doAtomicApplyOps(
+            nss.db().toString(),
+            {
+                BSON("ts" << presentTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
+                          << "c"
+                          << "ui"
+                          << UUID::gen()
+                          << "ns"
+                          << nss.getCommandNS().ns()
+                          << "o"
+                          << BSON("create" << nss.coll())),
+            });
+        ASSERT_OK(swResult);
+
+        { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
+
+        BSONObj result;
+        ASSERT(Helpers::getLast(
+            _opCtx, NamespaceString::kRsOplogNamespace.toString().c_str(), result));
+        repl::OplogEntry op(result);
+        ASSERT(op.getOpType() == repl::OpTypeEnum::kCommand) << op.toBSON();
+        // The next logOp() call will get 'futureTs', which will be the timestamp at which we do
+        // the write. Thus we expect the write to appear at 'futureTs' and not before.
+        ASSERT_EQ(op.getTimestamp(), futureTs) << op.toBSON();
+        ASSERT_EQ(op.getNamespace(), nss.getCommandNS().ns()) << op.toBSON();
+        ASSERT_BSONOBJ_EQ(op.getObject(), BSON("create" << nss.coll()));
+
+        assertNamespaceInIdents(_opCtx, nss, pastTs, false);
+        assertNamespaceInIdents(_opCtx, nss, presentTs, false);
+        assertNamespaceInIdents(_opCtx, nss, futureTs, true);
+        assertNamespaceInIdents(_opCtx, nss, nullTs, true);
+    }
+};
+
 class InitializeMinValid : public StorageTimestampTest {
 public:
     void run() {
@@ -899,6 +1203,10 @@ public:
         add<SecondaryInsertToUpsert>();
         add<SecondaryAtomicApplyOps>();
         add<SecondaryAtomicApplyOpsWCEToNonAtomic>();
+        add<SecondaryCreateCollection>();
+        add<SecondaryCreateTwoCollections>();
+        add<SecondaryCreateCollectionBetweenInserts>();
+        add<PrimaryCreateCollectionInApplyOps>();
         add<InitializeMinValid>();
         add<SetMinValidInitialSyncFlag>();
         add<SetMinValidToAtLeast>();
