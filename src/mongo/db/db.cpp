@@ -1364,6 +1364,8 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
         quickExit(EXIT_FAILURE);
     }
 
+    ErrorExtraInfo::invariantHaveAllParsers();
+
     startupConfigActions(std::vector<std::string>(argv, argv + argc));
     cmdline_utils::censorArgvArray(argc, argv);
 

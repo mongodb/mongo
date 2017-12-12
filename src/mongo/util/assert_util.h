@@ -105,6 +105,21 @@ public:
         return ErrorCodes::isA<category>(code());
     }
 
+    /**
+     * Returns the generic ErrorExtraInfo if present.
+     */
+    const ErrorExtraInfo* extraInfo() const {
+        return _status.extraInfo();
+    }
+
+    /**
+     * Returns a specific subclass of ErrorExtraInfo if the error code matches that type.
+     */
+    template <typename ErrorDetail>
+    const ErrorDetail* extraInfo() const {
+        return _status.extraInfo<ErrorDetail>();
+    }
+
     static AtomicBool traceExceptions;
 
 protected:
@@ -160,6 +175,14 @@ public:
 
     ExceptionForImpl(const Status& status) : AssertionException(status) {
         invariant(status.code() == kCode);
+    }
+
+    // This is only a template to enable SFINAE. It will only be instantiated with the default
+    // value.
+    template <ErrorCodes::Error code_copy = kCode>
+    const ErrorExtraInfoFor<code_copy>* operator->() const {
+        MONGO_STATIC_ASSERT(code_copy == kCode);
+        return this->template extraInfo<ErrorExtraInfoFor<kCode>>();
     }
 
 private:
@@ -271,6 +294,25 @@ inline void fassertNoTraceWithLocation(int msgid,
     }
 }
 
+namespace error_details {
+
+// This function exists so that uassert/massert can take plain int literals rather than requiring
+// ErrorCodes::Error wrapping.
+template <typename StringLike>
+Status makeStatus(int code, StringLike&& message) {
+    return Status(ErrorCodes::Error(code), std::forward<StringLike>(message));
+}
+
+template <typename ErrorDetail,
+          typename StringLike,
+          typename = stdx::enable_if_t<
+              std::is_base_of<ErrorExtraInfo, std::remove_reference_t<ErrorDetail>>::value>>
+Status makeStatus(ErrorDetail&& detail, StringLike&& message) {
+    return Status(std::forward<ErrorDetail>(detail), std::forward<StringLike>(message));
+}
+
+}  // namespace error_details
+
 /**
  * Common implementation for assert and assertFailed macros. Not for direct use.
  *
@@ -279,12 +321,12 @@ inline void fassertNoTraceWithLocation(int msgid,
  * complex error message in the expansion of msg. The call to the lambda is followed by
  * MONGO_COMPILER_UNREACHABLE as it is impossible to mark a lambda noreturn.
  */
-#define MONGO_BASE_ASSERT_FAILED(fail_func, code, msg)                           \
-    do {                                                                         \
-        [&]() MONGO_COMPILER_COLD_FUNCTION {                                     \
-            fail_func(Status(ErrorCodes::Error(code), msg), __FILE__, __LINE__); \
-        }();                                                                     \
-        MONGO_COMPILER_UNREACHABLE;                                              \
+#define MONGO_BASE_ASSERT_FAILED(fail_func, code, msg)                                    \
+    do {                                                                                  \
+        [&]() MONGO_COMPILER_COLD_FUNCTION {                                              \
+            fail_func(::mongo::error_details::makeStatus(code, msg), __FILE__, __LINE__); \
+        }();                                                                              \
+        MONGO_COMPILER_UNREACHABLE;                                                       \
     } while (false)
 
 #define MONGO_BASE_ASSERT(fail_func, code, msg, cond)       \

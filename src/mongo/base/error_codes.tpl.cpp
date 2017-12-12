@@ -34,7 +34,19 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
+//#set $codes_with_extra = [ec for ec in $codes if ec.extra]
+
 namespace mongo {
+
+namespace {
+// You can thing of this namespace as a compile-time map<ErrorCodes::Error, ErrorExtraInfoParser*>.
+namespace parsers {
+//#for $ec in $codes_with_extra
+ErrorExtraInfo::Parser* $ec.name = nullptr;
+//#end for
+}  // namespace parsers
+}  // namespace
+
 
 MONGO_STATIC_ASSERT(sizeof(ErrorCodes::Error) == sizeof(int));
 
@@ -73,6 +85,48 @@ bool ErrorCodes::is${cat.name}(Error err) {
     }
 }
 //#end for
+
+bool ErrorCodes::shouldHaveExtraInfo(Error code) {
+    switch (code) {
+        //#for $ec in $codes_with_extra
+        case ErrorCodes::$ec.name:
+            return true;
+        //#end for
+        default:
+            return false;
+    }
+}
+
+ErrorExtraInfo::Parser* ErrorExtraInfo::parserFor(ErrorCodes::Error code) {
+    switch (code) {
+        //#for $ec in $codes_with_extra
+        case ErrorCodes::$ec.name:
+            invariant(parsers::$ec.name);
+            return parsers::$ec.name;
+        //#end for
+        default:
+            return nullptr;
+    }
+}
+
+void ErrorExtraInfo::registerParser(ErrorCodes::Error code, Parser* parser) {
+    switch (code) {
+        //#for $ec in $codes_with_extra
+        case ErrorCodes::$ec.name:
+            invariant(!parsers::$ec.name);
+            parsers::$ec.name = parser;
+            break;
+        //#end for
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void ErrorExtraInfo::invariantHaveAllParsers() {
+    //#for $ec in $codes_with_extra
+    invariant(parsers::$ec.name);
+    //#end for
+}
 
 void error_details::throwExceptionForStatus(const Status& status) {
     /**

@@ -56,6 +56,7 @@ baseSource=[
     'base/data_type_string_data.cpp',
     'base/data_type_terminated.cpp',
     'base/error_codes.cpp',
+    'base/error_extra_info.cpp',
     'base/global_initializer.cpp',
     'base/global_initializer_registerer.cpp',
     'base/init.cpp',

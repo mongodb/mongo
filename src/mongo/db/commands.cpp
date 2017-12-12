@@ -240,6 +240,9 @@ bool Command::appendCommandStatus(BSONObjBuilder& result, const Status& status) 
         result.append("code", status.code());
         result.append("codeName", ErrorCodes::errorString(status.code()));
     }
+    if (auto extraInfo = status.extraInfo()) {
+        extraInfo->serialize(&result);
+    }
     return status.isOK();
 }
 

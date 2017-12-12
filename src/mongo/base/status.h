@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 
@@ -45,24 +46,15 @@ namespace mongo {
 /**
  * Status represents an error state or the absence thereof.
  *
- * A Status uses the standardized error codes -- from file 'error_codes.h' -- to
+ * A Status uses the standardized error codes -- from file 'error_codes.err' -- to
  * determine an error's cause. It further clarifies the error with a textual
- * description.
- *
- * Example usage:
- *
- *    Status sumAB(int a, int b, int* c) {
- *       if (overflowIfSum(a,b)) {
- *           return Status(ErrorCodes::ERROR_OVERFLOW, "overflow in sumAB", 16494);
- *       }
- *
- *       *c = a+b;
- *       return Status::OK();
- *   }
+ * description, and code-specific extra info (a subclass of ErrorExtraInfo).
  */
 class MONGO_WARN_UNUSED_RESULT_CLASS Status {
 public:
-    // Short-hand for returning an OK status.
+    /**
+     * This is the best way to construct an OK status.
+     */
     static inline Status OK();
 
     /**
@@ -74,12 +66,30 @@ public:
      *
      * For adding context to the reason string, use withContext/addContext rather than making a new
      * Status manually.
+     *
+     * If the status comes from a command reply, use getStatusFromCommandResult() instead of manual
+     * parsing. If the status is round-tripping through non-command BSON, use the constructor that
+     * takes a BSONObj so that it can extract the extra info if the code is supposed to have any.
      */
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, std::string reason);
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const std::string& reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const char* reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, StringData reason);
     MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
                                         const mongoutils::str::stream& reason);
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
+                                        StringData message,
+                                        const BSONObj& extraInfoHolder);
+
+    /**
+     * Constructs a Status with a subclass of ErrorExtraInfo.
+     */
+    template <typename T, typename = stdx::enable_if_t<std::is_base_of<ErrorExtraInfo, T>::value>>
+    MONGO_COMPILER_COLD_FUNCTION Status(T&& detail, StringData message)
+        : Status(T::code,
+                 message,
+                 std::make_shared<const std::remove_reference_t<T>>(std::forward<T>(detail))) {
+        MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
+    }
 
     inline Status(const Status& other);
     inline Status& operator=(const Status& other);
@@ -143,6 +153,32 @@ public:
         return empty;
     }
 
+    /**
+     * Returns the generic ErrorExtraInfo if present.
+     */
+    const ErrorExtraInfo* extraInfo() const {
+        return isOK() ? nullptr : _error->extra.get();
+    }
+
+    /**
+     * Returns a specific subclass of ErrorExtraInfo if the error code matches that type.
+     */
+    template <typename T>
+    const T* extraInfo() const {
+        MONGO_STATIC_ASSERT(std::is_base_of<ErrorExtraInfo, T>());
+        MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
+
+        if (isOK())
+            return nullptr;
+        if (code() != T::code)
+            return nullptr;
+
+        // Can't use checked_cast due to include cycle.
+        invariant(_error->extra);
+        dassert(dynamic_cast<const T*>(_error->extra.get()));
+        return static_cast<const T*>(_error->extra.get());
+    }
+
     std::string toString() const;
 
     /**
@@ -178,16 +214,23 @@ public:
     inline AtomicUInt32::WordType refCount() const;
 
 private:
+    // Private since it could result in a type mismatch between code and extraInfo.
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
+                                        StringData reason,
+                                        std::shared_ptr<const ErrorExtraInfo>);
     inline Status();
 
     struct ErrorInfo {
         AtomicUInt32 refs;             // reference counter
         const ErrorCodes::Error code;  // error code
         const std::string reason;      // description of error cause
+        const std::shared_ptr<const ErrorExtraInfo> extra;
 
-        static ErrorInfo* create(ErrorCodes::Error code, std::string reason);
+        static ErrorInfo* create(ErrorCodes::Error code,
+                                 StringData reason,
+                                 std::shared_ptr<const ErrorExtraInfo> extra);
 
-        ErrorInfo(ErrorCodes::Error code, std::string reason);
+        ErrorInfo(ErrorCodes::Error code, StringData reason, std::shared_ptr<const ErrorExtraInfo>);
     };
 
     ErrorInfo* _error;

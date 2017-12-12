@@ -39,6 +39,13 @@ namespace mongo {
 
 class Status;
 
+// ErrorExtraInfo subclasses:
+//#for $ec in $codes:
+//#if $ec.extra
+class $ec.extra;
+//#end if
+//#end for
+
 enum class ErrorCategory {
     //#for $cat in $categories
     ${cat.name},
@@ -95,6 +102,8 @@ public:
     //#for $cat in $categories
     static bool is${cat.name}(Error code);
     //#end for
+
+    static bool shouldHaveExtraInfo(Error code);
 };
 
 std::ostream& operator<<(std::ostream& stream, ErrorCodes::Error code);
@@ -121,6 +130,10 @@ constexpr bool isNamedCode<ErrorCodes::$ec.name> = true;
 
 MONGO_COMPILER_NORETURN void throwExceptionForStatus(const Status& status);
 
+//
+// ErrorCategoriesFor
+//
+
 template <ErrorCategory... categories>
 struct CategoryList;
 
@@ -145,6 +158,26 @@ struct ErrorCategoriesForImpl<ErrorCodes::$ec.name> {
 
 template <ErrorCodes::Error code>
 using ErrorCategoriesFor = typename ErrorCategoriesForImpl<code>::type;
+
+//
+// ErrorExtraInfoFor
+//
+
+template <ErrorCodes::Error code>
+struct ErrorExtraInfoForImpl {};
+
+//#for $code in $codes
+//#if $code.extra
+template <>
+struct ErrorExtraInfoForImpl<ErrorCodes::$code.name> {
+    using type = $code.extra;
+};
+
+//#end if
+//#end for
+
+template <ErrorCodes::Error code>
+using ErrorExtraInfoFor = typename ErrorExtraInfoForImpl<code>::type;
 
 }  // namespace error_details
 

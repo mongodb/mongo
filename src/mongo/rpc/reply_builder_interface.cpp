@@ -71,6 +71,10 @@ BSONObj augmentReplyWithStatus(const Status& status, BSONObj reply) {
         bob.append(kCodeNameField, ErrorCodes::errorString(status.code()));
     }
 
+    if (auto extraInfo = status.extraInfo()) {
+        extraInfo->serialize(&bob);
+    }
+
     return bob.obj();
 }
 }

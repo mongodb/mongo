@@ -147,6 +147,65 @@ TEST(AssertUtils, UassertNumericCode) {
     ASSERT_NOT_CATCHES(19999, ExceptionForCat<ErrorCategory::Interruption>);
 }
 
+TEST(AssertUtils, UassertStatusOKPreservesExtraInfo) {
+    const auto status = Status(ErrorExtraInfoExample(123), "");
+
+    try {
+        uassertStatusOK(status);
+    } catch (const DBException& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+    }
+
+    try {
+        uassertStatusOK(status);
+    } catch (const ExceptionFor<ErrorCodes::ForTestingErrorExtraInfo>& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+        ASSERT_EQ(ex->data, 123);
+    }
+}
+
+TEST(AssertUtils, UassertTypedExtraInfoWorks) {
+    try {
+        uasserted(ErrorExtraInfoExample(123), "");
+    } catch (const DBException& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+    }
+
+    try {
+        uassert(ErrorExtraInfoExample(123), "", false);
+    } catch (const ExceptionFor<ErrorCodes::ForTestingErrorExtraInfo>& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+        ASSERT_EQ(ex->data, 123);
+    }
+}
+
+TEST(AssertUtils, MassertTypedExtraInfoWorks) {
+    try {
+        msgasserted(ErrorExtraInfoExample(123), "");
+    } catch (const DBException& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+    }
+
+    try {
+        massert(ErrorExtraInfoExample(123), "", false);
+    } catch (const ExceptionFor<ErrorCodes::ForTestingErrorExtraInfo>& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+        ASSERT_EQ(ex->data, 123);
+    }
+}
+
 // uassert and its friends
 DEATH_TEST(UassertionTerminationTest, uassert, "Terminating with uassert") {
     uassert(40204, "Terminating with uassert", false);
