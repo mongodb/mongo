@@ -751,6 +751,22 @@ class TestBinder(testcase.IDLTestcase):
                             optional: true
             """), idl.errors.ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL)
 
+        # Test duplicate comparison order
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                strict: false
+                generate_comparison_operators: true
+                fields:
+                    foo:
+                        type: string
+                        comparison_order: 1
+                    bar:
+                        type: string
+                        comparison_order: 1
+            """), idl.errors.ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER)
+
     def test_ignored_field_negative(self):
         # type: () -> None
         """Test that if a field is marked as ignored, no other properties are set."""

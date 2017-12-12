@@ -30,21 +30,25 @@ imports:
 structs:
     one_string:
         description: UnitTest for a single string
+        generate_comparison_operators: true
         fields:
             value: string
 
     one_int:
         description: UnitTest for a single int
+        generate_comparison_operators: true
         fields:
             value: int
 
     one_long:
         description: UnitTest for a single long
+        generate_comparison_operators: true
         fields:
             value: long
 
     one_double:
         description: UnitTest for a single double
+        generate_comparison_operators: true
         fields:
             value: double
 
@@ -55,46 +59,55 @@ structs:
 
     one_bool:
         description: UnitTest for a single bool
+        generate_comparison_operators: true
         fields:
             value: bool
 
     one_bindata:
         description: UnitTest for a single bindata_generic
+        generate_comparison_operators: true
         fields:
             value: bindata_generic
 
     one_function:
         description: UnitTest for a single bindata_function
+        generate_comparison_operators: true
         fields:
             value: bindata_function
 
     one_uuid:
         description: UnitTest for a single bindata_uuid
+        generate_comparison_operators: true
         fields:
             value: bindata_uuid
 
     one_md5:
         description: UnitTest for a single bindata_md5
+        generate_comparison_operators: true
         fields:
             value: bindata_md5
 
     one_objectid:
         description: UnitTest for a single objectid
+        generate_comparison_operators: true
         fields:
             value: objectid
 
     one_date:
         description: UnitTest for a single date
+        generate_comparison_operators: true
         fields:
             value: date
 
     one_timestamp:
         description: UnitTest for a single timestamp
+        generate_comparison_operators: true
         fields:
             value: timestamp
 
     one_UUID:
         description: UnitTest for a single UUID
+        generate_comparison_operators: true
         fields:
             value: uuid
 

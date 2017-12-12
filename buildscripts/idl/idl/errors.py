@@ -82,6 +82,9 @@ ERROR_ID_STRUCT_NO_DOC_SEQUENCE = "ID0045"
 ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_ARRAY = "ID0046"
 ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_OBJECT = "ID0047"
 ERROR_ID_COMMAND_DUPLICATES_FIELD = "ID0048"
+ERROR_ID_IS_NODE_VALID_INT = "ID0049"
+ERROR_ID_IS_NODE_VALID_NON_NEGATIVE_INT = "ID0050"
+ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER = "ID0051"
 
 
 class IDLError(Exception):
@@ -615,6 +618,45 @@ class ParserContext(object):
         # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_COMMAND_DUPLICATES_FIELD,
                         ("Command '%s' cannot have the same name as a field.") % (command_name))
+
+    def is_scalar_non_negative_int_node(self, node, node_name):
+        # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], unicode) -> bool
+        """Return True if this YAML node is a Scalar and a valid non-negative int."""
+        if not self._is_node_type(node, node_name, "scalar"):
+            return False
+
+        try:
+            value = int(node.value)
+            if value < 0:
+                self._add_node_error(
+                    node, ERROR_ID_IS_NODE_VALID_NON_NEGATIVE_INT,
+                    "Illegal negative integer value for '%s', expected 0 or positive integer." %
+                    (node_name))
+                return False
+
+        except ValueError as value_error:
+            self._add_node_error(node, ERROR_ID_IS_NODE_VALID_INT,
+                                 "Illegal integer value for '%s', message '%s'." %
+                                 (node_name, value_error))
+            return False
+
+        return True
+
+    def get_non_negative_int(self, node):
+        # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> int
+        """Convert a scalar to an int."""
+        assert self.is_scalar_non_negative_int_node(node, "unknown")
+
+        return int(node.value)
+
+    def add_duplicate_comparison_order_field_error(self, location, struct_name, comparison_order):
+        # type: (common.SourceLocation, unicode, int) -> None
+        """Add an error about fields having duplicate comparison_orders."""
+        # pylint: disable=invalid-name
+        self._add_error(
+            location, ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER,
+            ("Struct '%s' cannot have two fields with the same comparison_order value '%d'.") %
+            (struct_name, comparison_order))
 
 
 def _assert_unique_error_messages():

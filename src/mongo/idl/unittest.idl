@@ -165,6 +165,31 @@ structs:
                 type: int
                 cpp_name: cppField3
 
+##################################################################################################
+#
+# Structs to test comparison options
+#
+##################################################################################################
+    CompareAllField3:
+        description: UnitTest for a struct with 3 int fields to test comparison
+        generate_comparison_operators: true
+        fields:
+            field1: int
+            field2: int
+            field3: int
+
+    CompareSomeField3:
+        description: |
+            UnitTest for a struct with 3 int fields to test comparison, but only 2 are compared.
+        generate_comparison_operators: true
+        fields:
+            field3:
+                type: int
+                comparison_order: 3
+            field2: int
+            field1:
+                type: int
+                comparison_order: 1
 
 ##################################################################################################
 #

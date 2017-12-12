@@ -84,6 +84,7 @@ class Struct(common.SourceLocation):
         self.strict = True  # type: bool
         self.immutable = False  # type: bool
         self.inline_chained_structs = False  # type: bool
+        self.generate_comparison_operators = False  # type: bool
         self.fields = []  # type: List[Field]
         super(Struct, self).__init__(file_name, line, column)
 
@@ -108,6 +109,7 @@ class Field(common.SourceLocation):
         self.optional = False  # type: bool
         self.ignore = False  # type: bool
         self.chained = False  # type: bool
+        self.comparison_order = -1  # type: int
 
         # Properties specific to fields which are types.
         self.cpp_type = None  # type: unicode

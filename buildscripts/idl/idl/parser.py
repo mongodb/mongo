@@ -36,9 +36,12 @@ class _RuleDesc(object):
     """
     Describe a simple parser rule for the generic YAML node parser.
 
-    node_type is either (scalar, scalar_bool, scalar_or_sequence, or mapping)
-    - scalar_bool - means a scalar node which is a valid bool, populates a bool
+    node_type is either (scalar, bool_scalar, int_scalar, scalar_or_sequence, sequence, or mapping)
+    - bool_scalar - means a scalar node which is a valid bool, populates a bool
+    - int_scalar - means a scalar node which is a valid non-negative int, populates a int
     - scalar_or_sequence - means a scalar or sequence node, populates a list
+    - sequence - a sequence node, populates a list
+    - mapping - a mapping node, calls another parser
     mapping_parser_func is only called when parsing a mapping yaml node
     """
 
@@ -83,6 +86,9 @@ def _generic_parser(
             elif rule_desc.node_type == "bool_scalar":
                 if ctxt.is_scalar_bool_node(second_node, first_name):
                     syntax_node.__dict__[first_name] = ctxt.get_bool(second_node)
+            elif rule_desc.node_type == "int_scalar":
+                if ctxt.is_scalar_non_negative_int_node(second_node, first_name):
+                    syntax_node.__dict__[first_name] = ctxt.get_non_negative_int(second_node)
             elif rule_desc.node_type == "scalar_or_sequence":
                 if ctxt.is_scalar_sequence_or_scalar_node(second_node, first_name):
                     syntax_node.__dict__[first_name] = ctxt.get_list(second_node)
@@ -198,6 +204,7 @@ def _parse_field(ctxt, name, node):
         "optional": _RuleDesc("bool_scalar"),
         "default": _RuleDesc('scalar'),
         "supports_doc_sequence": _RuleDesc("bool_scalar"),
+        "comparison_order": _RuleDesc("int_scalar"),
     })
 
     return field
@@ -337,6 +344,7 @@ def _parse_struct(ctxt, spec, name, node):
         "strict": _RuleDesc("bool_scalar"),
         "inline_chained_structs": _RuleDesc("bool_scalar"),
         "immutable": _RuleDesc('bool_scalar'),
+        "generate_comparison_operators": _RuleDesc("bool_scalar"),
     })
 
     # TODO: SHOULD WE ALLOW STRUCTS ONLY WITH CHAINED STUFF and no fields???
@@ -412,6 +420,9 @@ def _parse_command(ctxt, spec, name, node):
         "fields": _RuleDesc('mapping', mapping_parser_func=_parse_fields),
         "namespace": _RuleDesc('scalar', _RuleDesc.REQUIRED),
         "strict": _RuleDesc("bool_scalar"),
+        "inline_chained_structs": _RuleDesc("bool_scalar"),
+        "immutable": _RuleDesc('bool_scalar'),
+        "generate_comparison_operators": _RuleDesc("bool_scalar"),
     })
 
     # TODO: support the first argument as UUID depending on outcome of Catalog Versioning changes.

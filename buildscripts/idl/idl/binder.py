@@ -237,12 +237,14 @@ def _is_duplicate_field(ctxt, field_container, fields, ast_field):
 
 def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Struct, ast.Struct) -> None
+    # pylint: disable=too-many-branches
 
     ast_struct.name = struct.name
     ast_struct.description = struct.description
     ast_struct.strict = struct.strict
     ast_struct.immutable = struct.immutable
     ast_struct.inline_chained_structs = struct.inline_chained_structs
+    ast_struct.generate_comparison_operators = struct.generate_comparison_operators
 
     # Validate naming restrictions
     if ast_struct.name.startswith("array<"):
@@ -274,6 +276,28 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
 
             if not _is_duplicate_field(ctxt, ast_struct.name, ast_struct.fields, ast_field):
                 ast_struct.fields.append(ast_field)
+
+    # Fill out the field comparison_order property as needed
+    if ast_struct.generate_comparison_operators and ast_struct.fields:
+        # If the user did not specify an ordering of fields, then number all fields in
+        # declared field.
+        use_default_order = True
+        comparison_orders = set()  # type: Set[int]
+
+        for ast_field in ast_struct.fields:
+            if not ast_field.comparison_order == -1:
+                use_default_order = False
+                if ast_field.comparison_order in comparison_orders:
+                    ctxt.add_duplicate_comparison_order_field_error(ast_struct, ast_struct.name,
+                                                                    ast_field.comparison_order)
+
+                comparison_orders.add(ast_field.comparison_order)
+
+        if use_default_order:
+            pos = 0
+            for ast_field in ast_struct.fields:
+                ast_field.comparison_order = pos
+                pos += 1
 
 
 def _bind_struct(ctxt, parsed_spec, struct):
@@ -433,6 +457,7 @@ def _bind_field(ctxt, parsed_spec, field):
     ast_field.supports_doc_sequence = field.supports_doc_sequence
     ast_field.serialize_op_msg_request_only = field.serialize_op_msg_request_only
     ast_field.constructed = field.constructed
+    ast_field.comparison_order = field.comparison_order
 
     ast_field.cpp_name = field.name
     if field.cpp_name:
