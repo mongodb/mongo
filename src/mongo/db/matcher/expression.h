@@ -272,6 +272,22 @@ public:
      */
     virtual void serialize(BSONObjBuilder* out) const = 0;
 
+    /**
+     * Returns true if this expression will always evaluate to false, such as an $or with no
+     * children.
+     */
+    virtual bool isTriviallyFalse() const {
+        return false;
+    }
+
+    /**
+     * Returns true if this expression will always evaluate to true, such as an $and with no
+     * children.
+     */
+    virtual bool isTriviallyTrue() const {
+        return false;
+    }
+
     //
     // Debug information
     //

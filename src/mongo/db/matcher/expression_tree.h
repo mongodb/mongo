@@ -129,6 +129,8 @@ public:
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
     virtual void serialize(BSONObjBuilder* out) const;
+
+    bool isTriviallyTrue() const final;
 };
 
 class OrMatchExpression : public ListOfMatchExpression {
@@ -156,6 +158,8 @@ public:
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
     virtual void serialize(BSONObjBuilder* out) const;
+
+    bool isTriviallyFalse() const final;
 };
 
 class NorMatchExpression : public ListOfMatchExpression {
