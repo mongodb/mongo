@@ -5335,11 +5335,9 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: adminDbName,
-                roles: Object.extend({readWriteAnyDatabase: 1}, roles_clusterManager),
-                privileges: [{
-                    resource: {db: '$setFeatureCompatibilityVersion', collection: 'version'},
-                    actions: ['update']
-                }],
+                roles: roles_clusterManager,
+                privileges:
+                    [{resource: {cluster: true}, actions: ['setFeatureCompatibilityVersion']}],
                 expectFail: true
               },
               {runOnDb: firstDbName, roles: {}},
