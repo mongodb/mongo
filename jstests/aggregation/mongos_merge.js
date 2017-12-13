@@ -48,6 +48,9 @@
     // We will need to test $geoNear on this collection, so create a 2dsphere index.
     assert.commandWorked(mongosColl.createIndex({geo: "2dsphere"}));
 
+    // We will test that $textScore metadata is not propagated to the user, so create a text index.
+    assert.commandWorked(mongosColl.createIndex({text: "text"}));
+
     // Split the collection into 4 chunks: [MinKey, -100), [-100, 0), [0, 100), [100, MaxKey).
     assert.commandWorked(
         mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: -100}}));
@@ -68,7 +71,7 @@
     // Write 400 documents across the 4 chunks.
     for (let i = -200; i < 200; i++) {
         assert.writeOK(mongosColl.insert(
-            {_id: i, a: [i], b: {redactThisDoc: true}, c: true, geo: georng.mkPt()}));
+            {_id: i, a: [i], b: {redactThisDoc: true}, c: true, geo: georng.mkPt(), text: "txt"}));
         assert.writeOK(unshardedColl.insert({_id: i, x: i}));
     }
 
@@ -423,12 +426,37 @@
                   c: {$exists: false},
                   d: true,
                   geo: {$exists: false},
-                  distance: {$exists: false}
+                  distance: {$exists: false},
+                  text: "txt"
               }
             }
         ],
         expectedCount: 100
     });
+
+    // Test that metadata is not propagated to the user when a pipeline which produces metadata
+    // fields merges on mongoS.
+    const metaDataTests = [
+        {pipeline: [{$sort: {_id: -1}}], verifyNoMetaData: (doc) => assert.isnull(doc.$sortKey)},
+        {
+          pipeline: [{$match: {$text: {$search: "txt"}}}],
+          verifyNoMetaData: (doc) => assert.isnull(doc.$textScore)
+        },
+        {
+          pipeline: [{$sample: {size: 300}}],
+          verifyNoMetaData: (doc) => assert.isnull(doc.$randVal)
+        },
+        {
+          pipeline: [{$match: {$text: {$search: "txt"}}}, {$sort: {text: 1}}],
+          verifyNoMetaData:
+              (doc) => assert.docEq([doc.$textScore, doc.$sortKey], [undefined, undefined])
+        }
+    ];
+
+    for (let metaDataTest of metaDataTests) {
+        assert.gte(mongosColl.aggregate(metaDataTest.pipeline).itcount(), 300);
+        mongosColl.aggregate(metaDataTest.pipeline).forEach(metaDataTest.verifyNoMetaData);
+    }
 
     st.stop();
 })();

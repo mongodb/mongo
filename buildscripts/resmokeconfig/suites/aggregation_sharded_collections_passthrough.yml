@@ -38,8 +38,6 @@ selector:
   - jstests/aggregation/use_query_sort.js
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
-  # TODO: Remove when SERVER-32282 is fixed.
-  - jstests/aggregation/bugs/server11675.js
   # TODO: Remove when SERVER-32297 is fixed.
   - jstests/aggregation/sources/sort/collation_sort.js
   exclude_with_any_tags:
