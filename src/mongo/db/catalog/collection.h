@@ -324,11 +324,6 @@ public:
         virtual void notifyCappedWaitersIfNeeded() = 0;
 
         virtual const CollatorInterface* getDefaultCollator() const = 0;
-
-        virtual void informIndexObserver(OperationContext* opCtx,
-                                         const IndexDescriptor* descriptor,
-                                         const IndexKeyEntry& indexEntry,
-                                         const ValidationOperation operation) const = 0;
     };
 
 private:
@@ -733,15 +728,6 @@ public:
         return this->_impl().getDefaultCollator();
     }
 
-    /**
-     * Calls the Inforn function in the IndexObserver if it's hooked.
-     */
-    inline void informIndexObserver(OperationContext* opCtx,
-                                    const IndexDescriptor* descriptor,
-                                    const IndexKeyEntry& indexEntry,
-                                    const ValidationOperation operation) const {
-        return this->_impl().informIndexObserver(opCtx, descriptor, indexEntry, operation);
-    }
 
 private:
     inline DatabaseCatalogEntry* dbce() const {
