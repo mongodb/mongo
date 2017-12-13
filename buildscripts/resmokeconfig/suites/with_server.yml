@@ -1,5 +1,8 @@
 test_kind: js_test
 
+selector:
+  roots: []
+
 executor:
   config:
     shell_options:

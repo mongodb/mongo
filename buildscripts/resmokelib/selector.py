@@ -415,7 +415,7 @@ class _Selector(object):
         """
 
         # 1. Find the root files.
-        if selector_config.roots:
+        if selector_config.roots is not None:
             roots = selector_config.roots
         else:
             roots = self._test_file_explorer.read_root_file(selector_config.root)
