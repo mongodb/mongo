@@ -139,6 +139,8 @@ selector:
   - jstests/core/views/views_stats.js
   - jstests/core/orf.js #explain.executionStats is not CC
   - jstests/core/rename7.js
+  # getMore is not causally consistent if collection is dropped
+  - jstests/core/drop3.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
 

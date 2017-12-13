@@ -153,6 +153,8 @@ selector:
   - jstests/core/views/views_stats.js
   - jstests/core/orf.js #explain.executionStats is not CC
   - jstests/core/rename7.js
+  # getMore is not causally consistent if collection is dropped
+  - jstests/core/drop3.js
   # Logical sessions require that only one user be authenticated,
   # but this suite puts us in a multi-auth state.
   - jstests/core/list_local_sessions.js # Too many users authenticated
