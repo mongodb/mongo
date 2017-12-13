@@ -100,6 +100,12 @@ void ReplicationConsistencyMarkersMock::setAppliedThrough(OperationContext* opCt
     _appliedThrough = optime;
 }
 
+void ReplicationConsistencyMarkersMock::clearAppliedThrough(OperationContext* opCtx,
+                                                            const Timestamp& writeTimestamp) {
+    stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
+    _appliedThrough = {};
+}
+
 OpTime ReplicationConsistencyMarkersMock::getAppliedThrough(OperationContext* opCtx) const {
     stdx::lock_guard<stdx::mutex> lock(_minValidBoundariesMutex);
     return _appliedThrough;

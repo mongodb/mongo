@@ -417,7 +417,7 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
 
     OpTime minValid = fassertStatusOK(28774, OpTime::parseFromOplogEntry(newMinValidDoc));
     log() << "Setting minvalid to " << minValid;
-    replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});  // Use top of oplog.
+    replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, {});
     replicationProcess->getConsistencyMarkers()->setMinValid(opCtx, minValid);
 
     if (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {

@@ -752,7 +752,9 @@ StatusWith<BSONObj> makeUpsertQuery(const BSONElement& idKey) {
     return query;
 }
 
-Status _updateWithQuery(OperationContext* opCtx, const UpdateRequest& request) {
+Status _updateWithQuery(OperationContext* opCtx,
+                        const UpdateRequest& request,
+                        const Timestamp& ts) {
     invariant(!request.isMulti());  // We only want to update one document for performance.
     invariant(!request.shouldReturnAnyDocs());
     invariant(PlanExecutor::NO_YIELD == request.getYieldPolicy());
@@ -778,6 +780,10 @@ Status _updateWithQuery(OperationContext* opCtx, const UpdateRequest& request) {
             return collectionResult.getStatus();
         }
         auto collection = collectionResult.getValue();
+        WriteUnitOfWork wuow(opCtx);
+        if (!ts.isNull()) {
+            uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(ts));
+        }
 
         auto planExecutorResult =
             mongo::getExecutorUpdate(opCtx, nullptr, collection, &parsedUpdate);
@@ -786,7 +792,9 @@ Status _updateWithQuery(OperationContext* opCtx, const UpdateRequest& request) {
         }
         auto planExecutor = std::move(planExecutorResult.getValue());
 
-        return planExecutor->executePlan();
+        auto ret = planExecutor->executePlan();
+        wuow.commit();
+        return ret;
     });
 }
 
@@ -851,23 +859,23 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 
 Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          const BSONObj& update) {
+                                          const TimestampedBSONObj& update) {
     UpdateRequest request(nss);
     request.setQuery({});
-    request.setUpdates(update);
+    request.setUpdates(update.obj);
     request.setUpsert(true);
-    return _updateWithQuery(opCtx, request);
+    return _updateWithQuery(opCtx, request, update.timestamp);
 }
 
 Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const BSONObj& query,
-                                             const BSONObj& update) {
+                                             const TimestampedBSONObj& update) {
     UpdateRequest request(nss);
     request.setQuery(query);
-    request.setUpdates(update);
+    request.setUpdates(update.obj);
     invariant(!request.isUpsert());
-    return _updateWithQuery(opCtx, request);
+    return _updateWithQuery(opCtx, request, update.timestamp);
 }
 
 Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,

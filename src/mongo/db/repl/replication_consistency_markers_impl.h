@@ -43,6 +43,7 @@ namespace repl {
 
 class OpTime;
 class StorageInterface;
+struct TimestampedBSONObj;
 
 class ReplicationConsistencyMarkersImpl : public ReplicationConsistencyMarkers {
     MONGO_DISALLOW_COPYING(ReplicationConsistencyMarkersImpl);
@@ -76,6 +77,7 @@ public:
     void removeOldOplogDeleteFromPointField(OperationContext* opCtx) override;
 
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
+    void clearAppliedThrough(OperationContext* opCtx, const Timestamp& writeTimestamp) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
 
     void writeCheckpointTimestamp(OperationContext* opCtx, const Timestamp& timestamp);
@@ -94,7 +96,7 @@ private:
      *
      * This fasserts on failure.
      */
-    void _updateMinValidDocument(OperationContext* opCtx, const BSONObj& updateSpec);
+    void _updateMinValidDocument(OperationContext* opCtx, const TimestampedBSONObj& updateSpec);
 
     /**
      * Reads the OplogTruncateAfterPoint document from disk.
