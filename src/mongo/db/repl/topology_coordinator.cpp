@@ -2049,7 +2049,6 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
 }
 
 StatusWith<BSONObj> TopologyCoordinator::prepareReplSetUpdatePositionCommand(
-    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle,
     OpTime currentCommittedSnapshotOpTime) const {
     BSONObjBuilder cmdBuilder;
     invariant(_rsConfig.isInitialized());
@@ -2072,33 +2071,19 @@ StatusWith<BSONObj> TopologyCoordinator::prepareReplSetUpdatePositionCommand(
         }
 
         BSONObjBuilder entry(arrayBuilder.subobjStart());
-        switch (commandStyle) {
-            case ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle:
-                memberData.getLastDurableOpTime().append(
-                    &entry, UpdatePositionArgs::kDurableOpTimeFieldName);
-                memberData.getLastAppliedOpTime().append(
-                    &entry, UpdatePositionArgs::kAppliedOpTimeFieldName);
-                break;
-            case ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kOldStyle:
-                entry.append("_id", memberData.getRid());
-                if (_rsConfig.getProtocolVersion() == 1) {
-                    memberData.getLastDurableOpTime().append(&entry, "optime");
-                } else {
-                    entry.append("optime", memberData.getLastDurableOpTime().getTimestamp());
-                }
-                break;
-        }
+        memberData.getLastDurableOpTime().append(&entry,
+                                                 UpdatePositionArgs::kDurableOpTimeFieldName);
+        memberData.getLastAppliedOpTime().append(&entry,
+                                                 UpdatePositionArgs::kAppliedOpTimeFieldName);
         entry.append(UpdatePositionArgs::kMemberIdFieldName, memberData.getMemberId());
         entry.append(UpdatePositionArgs::kConfigVersionFieldName, _rsConfig.getConfigVersion());
     }
     arrayBuilder.done();
 
-    // Add metadata to command. Old style parsing logic will reject the metadata.
-    if (commandStyle == ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle) {
-        prepareReplSetMetadata(currentCommittedSnapshotOpTime)
-            .writeToMetadata(&cmdBuilder)
-            .transitional_ignore();
-    }
+    // Add metadata to command
+    prepareReplSetMetadata(currentCommittedSnapshotOpTime)
+        .writeToMetadata(&cmdBuilder)
+        .transitional_ignore();
     return cmdBuilder.obj();
 }
 

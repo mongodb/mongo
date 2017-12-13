@@ -33,7 +33,6 @@
 #include "mongo/db/repl/reporter.h"
 
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
@@ -68,10 +67,7 @@ long long _parseCommandRequestConfigVersion(const BSONObj& commandRequest) {
  * locally generated update command request object.
  * Returns false if config version is missing in either document.
  */
-bool _isTargetConfigNewerThanRequest(
-    const BSONObj& commandResult,
-    const BSONObj& commandRequest,
-    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle) {
+bool _isTargetConfigNewerThanRequest(const BSONObj& commandResult, const BSONObj& commandRequest) {
     long long targetConfigVersion;
     if (!bsonExtractIntegerField(commandResult, kConfigVersionFieldName, &targetConfigVersion)
              .isOK()) {
@@ -79,9 +75,7 @@ bool _isTargetConfigNewerThanRequest(
     }
 
     const long long localConfigVersion =
-        commandStyle == ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle
-        ? _parseCommandRequestConfigVersion<UpdatePositionArgs>(commandRequest)
-        : _parseCommandRequestConfigVersion<OldUpdatePositionArgs>(commandRequest);
+        _parseCommandRequestConfigVersion<UpdatePositionArgs>(commandRequest);
     if (localConfigVersion == -1) {
         return false;
     }
@@ -192,19 +186,7 @@ Status Reporter::trigger() {
 }
 
 StatusWith<BSONObj> Reporter::_prepareCommand() {
-    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle =
-        ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle;
-    {
-        stdx::lock_guard<stdx::mutex> lk(_mutex);
-        invariant(_isActive_inlock());
-        if (!_status.isOK()) {
-            return _status;
-        }
-
-        commandStyle = _commandStyle;
-    }
-
-    auto prepareResult = _prepareReplSetUpdatePositionCommandFn(commandStyle);
+    auto prepareResult = _prepareReplSetUpdatePositionCommandFn();
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -269,16 +251,8 @@ void Reporter::_processResponseCallback(
 
         // Some error types are OK and should not cause the reporter to stop sending updates to the
         // sync target.
-        if (_status == ErrorCodes::BadValue &&
-            _commandStyle == ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle) {
-            LOG(1) << "Reporter falling back to old style UpdatePosition command for sync source: "
-                   << _target;
-            _status = Status::OK();
-            _commandStyle = ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kOldStyle;
-            _isWaitingToSendReporter = true;
-        } else if (_status == ErrorCodes::InvalidReplicaSetConfig &&
-                   _isTargetConfigNewerThanRequest(
-                       commandResult, rcbd.request.cmdObj, _commandStyle)) {
+        if (_status == ErrorCodes::InvalidReplicaSetConfig &&
+            _isTargetConfigNewerThanRequest(commandResult, rcbd.request.cmdObj)) {
             LOG(1) << "Reporter found newer configuration on sync source: " << _target
                    << ". Retrying.";
             _status = Status::OK();

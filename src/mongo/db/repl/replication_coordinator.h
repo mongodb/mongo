@@ -67,7 +67,6 @@ namespace repl {
 class BackgroundSync;
 class HandshakeArgs;
 class IsMasterResponse;
-class OldUpdatePositionArgs;
 class OplogReader;
 class OpTime;
 class ReadConcernArgs;
@@ -521,17 +520,11 @@ public:
      */
     virtual void signalUpstreamUpdater() = 0;
 
-    enum class ReplSetUpdatePositionCommandStyle {
-        kNewStyle,
-        kOldStyle  // Pre-3.2.4 servers.
-    };
-
     /**
      * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
      * be sent to this node's sync source to update it about our progress in replication.
      */
-    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
-        ReplSetUpdatePositionCommandStyle commandStyle) const = 0;
+    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const = 0;
 
     enum class ReplSetGetStatusResponseStyle { kBasic, kInitialSync };
 
@@ -700,12 +693,7 @@ public:
      * were applied.
      * "configVersion" will be populated with our config version if and only if we return
      * InvalidReplicaSetConfig.
-     *
-     * The OldUpdatePositionArgs version provides support for the pre-3.2.4 format of
-     * UpdatePositionArgs.
      */
-    virtual Status processReplSetUpdatePosition(const OldUpdatePositionArgs& updates,
-                                                long long* configVersion) = 0;
     virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                 long long* configVersion) = 0;
 
