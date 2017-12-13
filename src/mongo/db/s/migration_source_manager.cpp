@@ -437,9 +437,13 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
             ErrorCodes::InternalError, "Failpoint 'migrationCommitNetworkError' generated error");
     }
 
-    const Status migrationCommitStatus =
-        (commitChunkMigrationResponse.isOK() ? commitChunkMigrationResponse.getValue().commandStatus
-                                             : commitChunkMigrationResponse.getStatus());
+    Status migrationCommitStatus = commitChunkMigrationResponse.getStatus();
+    if (migrationCommitStatus.isOK()) {
+        migrationCommitStatus = commitChunkMigrationResponse.getValue().commandStatus;
+        if (migrationCommitStatus.isOK()) {
+            migrationCommitStatus = commitChunkMigrationResponse.getValue().writeConcernStatus;
+        }
+    }
 
     if (!migrationCommitStatus.isOK()) {
         // Need to get the latest optime in case the refresh request goes to a secondary --
