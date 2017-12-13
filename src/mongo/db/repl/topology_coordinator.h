@@ -360,7 +360,6 @@ public:
 
     // Produce a replSetUpdatePosition command to be sent to the node's sync source.
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
-        ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle,
         OpTime currentCommittedSnapshotOpTime) const;
 
     // produce a reply to an ismaster request.  It is only valid to call this if we are a

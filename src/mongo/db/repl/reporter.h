@@ -71,8 +71,7 @@ public:
      *
      * The returned status indicates whether or not the command was created.
      */
-    using PrepareReplSetUpdatePositionCommandFn = stdx::function<StatusWith<BSONObj>(
-        ReplicationCoordinator::ReplSetUpdatePositionCommandStyle)>;
+    using PrepareReplSetUpdatePositionCommandFn = stdx::function<StatusWith<BSONObj>()>;
 
     Reporter(executor::TaskExecutor* executor,
              PrepareReplSetUpdatePositionCommandFn prepareReplSetUpdatePositionCommandFn,
@@ -187,10 +186,6 @@ private:
 
     // Stores the most recent Status returned from the executor.
     Status _status = Status::OK();
-
-    // Stores style of the most recent update command object.
-    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle _commandStyle =
-        ReplicationCoordinator::ReplSetUpdatePositionCommandStyle::kNewStyle;
 
     // _isWaitingToSendReporter is true when Reporter is scheduled to be run by the executor and
     // subsequent updates have come in.
