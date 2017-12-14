@@ -1,12 +1,17 @@
-// projecting a non-existent subfield should work as it does in a query with projection
-c = db.c;
-c.drop();
+/**
+ * Tests that projecting a non-existent subfield behaves identically in both query and aggregation.
+ */
+(function() {
+    "use strict";
+    const coll = db.c;
+    coll.drop();
 
-c.save({a: [1]});
-c.save({a: {c: 1}});
-c.save({a: [{c: 1}, {b: 1, c: 1}, {c: 1}]});
-c.save({a: 1});
-c.save({b: 1});
+    assert.writeOK(coll.insert({a: [1]}));
+    assert.writeOK(coll.insert({a: {c: 1}}));
+    assert.writeOK(coll.insert({a: [{c: 1}, {b: 1, c: 1}, {c: 1}]}));
+    assert.writeOK(coll.insert({a: 1}));
+    assert.writeOK(coll.insert({b: 1}));
 
-// assert the aggregation and the query produce the same thing
-assert.eq(c.aggregate({$project: {'a.b': 1}}).toArray(), c.find({}, {'a.b': 1}).toArray());
+    assert.eq(coll.aggregate([{$project: {'a.b': 1}}, {$sort: {_id: 1}}]).toArray(),
+              coll.find({}, {'a.b': 1}).sort({_id: 1}).toArray());
+}());

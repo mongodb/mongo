@@ -1,12 +1,11 @@
-// use aggdb
-db = db.getSiblingDB("aggdb");
-var article = db.article;
+(function() {
+    "use strict";
+    load('jstests/aggregation/data/articles.js');
 
-load('jstests/aggregation/data/articles.js');
+    const article = db.getSiblingDB("aggdb").getCollection("article");
+    const cursor = article.aggregate(
+        [{$sort: {_id: 1}}, {$project: {author: 1, _id: 0}}, {$project: {Writer: "$author"}}]);
+    const expected = [{Writer: "bob"}, {Writer: "dave"}, {Writer: "jane"}];
 
-// original crash from ticket
-var r3 = article.aggregate({$project: {author: 1, _id: 0}}, {$project: {Writer: "$author"}});
-
-var r3result = [{"Writer": "bob"}, {"Writer": "dave"}, {"Writer": "jane"}];
-
-assert.eq(r3.toArray(), r3result, 's5012 failed');
+    assert.eq(cursor.toArray(), expected);
+}());

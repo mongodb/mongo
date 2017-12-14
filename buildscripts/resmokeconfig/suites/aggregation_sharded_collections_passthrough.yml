@@ -28,8 +28,20 @@ selector:
   - jstests/aggregation/bugs/cursor_timeout.js
   - jstests/aggregation/bugs/lookup_unwind_getmore.js
   - jstests/aggregation/bugs/lookup_unwind_killcursor.js
-  # TODO: Remove after SERVER-23229 is fixed.
+  # This test makes assertions about whether aggregations will need to spill to disk, which assumes
+  # all the data is located on a single shard.
+  - jstests/aggregation/bugs/server9444.js
+  # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
+  - jstests/aggregation/match_swapping_renamed_fields.js
+  - jstests/aggregation/use_query_project_and_sort.js
+  - jstests/aggregation/use_query_projection.js
+  - jstests/aggregation/use_query_sort.js
+  # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
+  # TODO: Remove when SERVER-32282 is fixed.
+  - jstests/aggregation/bugs/server11675.js
+  # TODO: Remove when SERVER-32297 is fixed.
+  - jstests/aggregation/sources/sort/collation_sort.js
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.
   - assumes_no_implicit_collection_creation_after_drop
@@ -48,6 +60,7 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
+    num_shards: 2
     mongos_options:
       set_parameters:
         enableTestCommands: 1

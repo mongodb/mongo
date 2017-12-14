@@ -65,60 +65,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             }
           },
         ],
-        coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date"}}}}]).toArray());
-
-    assert.eq(
-        [
-          {
-            _id: 0,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 15,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 1,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 16,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 2,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 11,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-          {
-            _id: 3,
-            date: {
-                year: 2017,
-                month: 6,
-                day: 19,
-                hour: 11,
-                minute: 13,
-                second: 25,
-                millisecond: 713
-            }
-          },
-        ],
-        coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date", "timezone": "$tz"}}}}])
+        coll.aggregate([{$project: {date: {'$dateToParts': {date: "$date"}}}}, {$sort: {_id: 1}}])
             .toArray());
 
     assert.eq(
@@ -172,11 +119,72 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             }
           },
         ],
-        coll.aggregate([{
-                $project: {
-                    date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": false}}
-                }
-            }])
+        coll.aggregate([
+                {$project: {date: {'$dateToParts': {date: "$date", "timezone": "$tz"}}}},
+                {$sort: {_id: 1}}
+            ])
+            .toArray());
+
+    assert.eq(
+        [
+          {
+            _id: 0,
+            date: {
+                year: 2017,
+                month: 6,
+                day: 19,
+                hour: 15,
+                minute: 13,
+                second: 25,
+                millisecond: 713
+            }
+          },
+          {
+            _id: 1,
+            date: {
+                year: 2017,
+                month: 6,
+                day: 19,
+                hour: 16,
+                minute: 13,
+                second: 25,
+                millisecond: 713
+            }
+          },
+          {
+            _id: 2,
+            date: {
+                year: 2017,
+                month: 6,
+                day: 19,
+                hour: 11,
+                minute: 13,
+                second: 25,
+                millisecond: 713
+            }
+          },
+          {
+            _id: 3,
+            date: {
+                year: 2017,
+                month: 6,
+                day: 19,
+                hour: 11,
+                minute: 13,
+                second: 25,
+                millisecond: 713
+            }
+          },
+        ],
+        coll.aggregate([
+                {
+                  $project: {
+                      date:
+                          {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": false}}
+                  }
+                },
+                {$sort: {_id: 1}}
+            ])
             .toArray());
 
     assert.eq(
@@ -230,10 +238,14 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             }
           },
         ],
-        coll.aggregate([{
-                $project:
-                    {date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": true}}}
-            }])
+        coll.aggregate([
+                {
+                  $project: {
+                      date: {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": true}}
+                  }
+                },
+                {$sort: {_id: 1}}
+            ])
             .toArray());
 
     assert.eq(
@@ -267,17 +279,17 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
                 {$match: {iso: {$exists: true}}},
                 {
                   $project: {
-                      date: {
-                          '$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": "$iso"}
-                      }
+                      date:
+                          {'$dateToParts': {date: "$date", "timezone": "$tz", "iso8601": "$iso"}}
                   }
-                }
+                },
+                {$sort: {_id: 1}}
             ])
             .toArray());
 
     /* --------------------------------------------------------------------------------------- */
     /* Tests with timestamp */
-    coll.drop();
+    assert(coll.drop());
 
     assert.writeOK(coll.insert([
         {
@@ -380,7 +392,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             .toArray());
 
     /* --------------------------------------------------------------------------------------- */
-    coll.drop();
+    assert(coll.drop());
 
     assert.writeOK(coll.insert([
         {_id: 0, date: ISODate("2017-06-27T12:00:20Z")},
@@ -394,7 +406,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             .toArray());
 
     /* --------------------------------------------------------------------------------------- */
-    coll.drop();
+    assert(coll.drop());
 
     assert.writeOK(coll.insert([
         {_id: 0, date: ISODate("2017-06-27T12:00:20Z")},
@@ -408,7 +420,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             .toArray());
 
     /* --------------------------------------------------------------------------------------- */
-    coll.drop();
+    assert(coll.drop());
 
     assert.writeOK(coll.insert([
         {_id: 0, tz: "Europe/London"},
