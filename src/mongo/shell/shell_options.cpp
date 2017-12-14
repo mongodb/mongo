@@ -425,7 +425,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
         return Status(ErrorCodes::BadValue, sb.str());
     }
 
-    if ((shellGlobalParams.url.find("mongodb://") == 0) &&
+    if ((shellGlobalParams.url.find("mongodb://") == 0) ||
         (shellGlobalParams.url.find("mongodb+srv://") == 0)) {
         auto cs_status = MongoURI::parse(shellGlobalParams.url);
         if (!cs_status.isOK()) {
@@ -433,25 +433,31 @@ Status storeMongoShellOptions(const moe::Environment& params,
         }
 
         auto cs = cs_status.getValue();
+        auto uriOptions = cs.getOptions();
         StringBuilder sb;
         sb << "ERROR: Cannot specify ";
-        auto uriOptions = cs.getOptions();
-        if (!shellGlobalParams.username.empty() && !cs.getUser().empty()) {
-            sb << "username";
-        } else if (!shellGlobalParams.password.empty() && !cs.getPassword().empty()) {
-            sb << "password";
+
+        if (!shellGlobalParams.username.empty() && !cs.getUser().empty() &&
+            shellGlobalParams.username != cs.getUser()) {
+            sb << "different usernames";
+        } else if (!shellGlobalParams.password.empty() && !cs.getPassword().empty() &&
+                   shellGlobalParams.password != cs.getPassword()) {
+            sb << "different passwords";
         } else if (!shellGlobalParams.authenticationMechanism.empty() &&
-                   uriOptions.count("authMechanism")) {
-            sb << "the authentication mechanism";
+                   uriOptions.count("authMechanism") &&
+                   uriOptions["authMechanism"] != shellGlobalParams.authenticationMechanism) {
+            sb << "different authentication mechanisms";
         } else if (!shellGlobalParams.authenticationDatabase.empty() &&
-                   uriOptions.count("authSource")) {
-            sb << "the authentication database";
+                   uriOptions.count("authSource") &&
+                   uriOptions["authSource"] != shellGlobalParams.authenticationDatabase) {
+            sb << "different authentication databases ";
         } else if (shellGlobalParams.gssapiServiceName != saslDefaultServiceName &&
                    uriOptions.count("gssapiServiceName")) {
             sb << "the GSSAPI service name";
         } else {
             return Status::OK();
         }
+
         sb << " in connection URI and as a command-line option";
         return Status(ErrorCodes::InvalidOptions, sb.str());
     }
@@ -462,4 +468,4 @@ Status storeMongoShellOptions(const moe::Environment& params,
 
     return Status::OK();
 }
-}
+}  // namespace mongo
