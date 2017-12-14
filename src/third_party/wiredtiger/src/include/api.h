@@ -36,10 +36,16 @@
 
 /* Standard entry points to the API: declares/initializes local variables. */
 #define	API_SESSION_INIT(s, h, n, dh)					\
+	WT_TRACK_OP_DECL;						\
 	WT_DATA_HANDLE *__olddh = (s)->dhandle;				\
 	const char *__oldname = (s)->name;				\
 	(s)->dhandle = (dh);						\
 	(s)->name = (s)->lastop = #h "." #n;				\
+	/*								\
+	 * No code before this line, otherwise error handling  won't be	\
+	 * correct.							\
+	 */								\
+	WT_TRACK_OP_INIT(s);						\
 	WT_SINGLE_THREAD_CHECK_START(s);				\
 	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
 	__wt_verbose((s), WT_VERB_API, "%s", "CALL: " #h ":" #n)
@@ -57,14 +63,19 @@
 
 #define	API_END(s, ret)							\
 	if ((s) != NULL) {						\
-		WT_SINGLE_THREAD_CHECK_STOP(s);			\
-		(s)->dhandle = __olddh;					\
-		(s)->name = __oldname;					\
+		WT_TRACK_OP_END(s);					\
+		WT_SINGLE_THREAD_CHECK_STOP(s);				\
 		if (F_ISSET(&(s)->txn, WT_TXN_RUNNING) &&		\
 		    (ret) != 0 &&					\
 		    (ret) != WT_NOTFOUND &&				\
 		    (ret) != WT_DUPLICATE_KEY)				\
 			F_SET(&(s)->txn, WT_TXN_ERROR);			\
+		/*							\
+		 * No code after this line, otherwise error handling	\
+		 * won't be correct.					\
+		 */							\
+		(s)->dhandle = __olddh;					\
+		(s)->name = __oldname;					\
 	}								\
 } while (0)
 

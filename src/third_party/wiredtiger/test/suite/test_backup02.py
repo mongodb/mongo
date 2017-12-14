@@ -32,7 +32,7 @@ from wtthread import backup_thread, checkpoint_thread, op_thread
 from wtscenario import make_scenarios
 
 # test_backup02.py
-#   Run background checkpoints and backsups repeatedly while doing inserts
+#   Run background checkpoints and backups repeatedly while doing inserts
 #   in another thread
 class test_backup02(wttest.WiredTigerTestCase):
     scenarios = make_scenarios([

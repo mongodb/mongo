@@ -314,18 +314,19 @@ __evict_force_check(WT_SESSION_IMPL *session, WT_REF *ref)
 static int
 __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
-	struct timespec start, stop;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_ITEM tmp;
 	WT_PAGE *page;
 	size_t addr_size;
+	uint64_t time_start, time_stop;
 	uint32_t page_flags, new_state, previous_state;
 	const uint8_t *addr;
 	bool timer;
 
 	btree = S2BT(session);
 	page = NULL;
+	time_start = time_stop = 0;
 
 	/*
 	 * Don't pass an allocated buffer to the underlying block read function,
@@ -379,13 +380,13 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 */
 	timer = !F_ISSET(session, WT_SESSION_INTERNAL);
 	if (timer)
-		__wt_epoch(session, &start);
+		time_start = __wt_rdtsc(session);
 	WT_ERR(__wt_bt_read(session, &tmp, addr, addr_size));
 	if (timer) {
-		__wt_epoch(session, &stop);
+		time_stop = __wt_rdtsc(session);
 		WT_STAT_CONN_INCR(session, cache_read_app_count);
 		WT_STAT_CONN_INCRV(session, cache_read_app_time,
-		    WT_TIMEDIFF_US(stop, start));
+		    WT_TSCDIFF_US(session, time_stop, time_start));
 	}
 
 	/*
@@ -775,7 +776,6 @@ static void
 __btree_verbose_lookaside_read(
     WT_SESSION_IMPL *session, uint32_t las_id, uint64_t las_pageid)
 {
-#ifdef HAVE_VERBOSE
 	WT_CACHE *cache;
 	uint64_t ckpt_gen_current, ckpt_gen_last;
 
@@ -808,9 +808,4 @@ __btree_verbose_lookaside_read(
 			    las_id, las_pageid);
 		}
 	}
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(las_id);
-	WT_UNUSED(las_pageid);
-#endif
 }

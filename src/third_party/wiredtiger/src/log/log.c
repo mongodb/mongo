@@ -16,8 +16,9 @@ static int __log_write_internal(
 #define	WT_LOG_COMPRESS_SKIP	(offsetof(WT_LOG_RECORD, record))
 #define	WT_LOG_ENCRYPT_SKIP	(offsetof(WT_LOG_RECORD, record))
 
-/* Flags to __log_openfile */
-#define	WT_LOG_OPEN_CREATE_OK	0x01
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_LOG_OPEN_CREATE_OK	0x1u		/* Flag to __log_openfile() */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 /*
  * __wt_log_printf --
@@ -258,14 +259,14 @@ __wt_log_background(WT_SESSION_IMPL *session, WT_LSN *lsn)
 int
 __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 {
-	struct timespec fsync_start, fsync_stop;
 	WT_DECL_RET;
 	WT_FH *log_fh;
 	WT_LOG *log;
-	uint64_t fsync_duration_usecs;
+	uint64_t fsync_duration_usecs, time_start, time_stop;
 
 	log = S2C(session)->log;
 	log_fh = NULL;
+	time_start = time_stop = 0;
 
 	/*
 	 * We need to wait for the previous log file to get written
@@ -289,10 +290,11 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 		    "log_force_sync: sync directory %s to LSN %" PRIu32
 		    "/%" PRIu32,
 		    log->log_dir_fh->name, min_lsn->l.file, min_lsn->l.offset);
-		__wt_epoch(session, &fsync_start);
+		time_start = __wt_rdtsc(session);
 		WT_ERR(__wt_fsync(session, log->log_dir_fh, true));
-		__wt_epoch(session, &fsync_stop);
-		fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
+		time_stop = __wt_rdtsc(session);
+		fsync_duration_usecs = WT_TSCDIFF_US(session,
+		    time_stop, time_start);
 		log->sync_dir_lsn = *min_lsn;
 		WT_STAT_CONN_INCR(session, log_sync_dir);
 		WT_STAT_CONN_INCRV(session,
@@ -312,10 +314,11 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 		__wt_verbose(session, WT_VERB_LOG,
 		    "log_force_sync: sync %s to LSN %" PRIu32 "/%" PRIu32,
 		    log_fh->name, min_lsn->l.file, min_lsn->l.offset);
-		__wt_epoch(session, &fsync_start);
+		time_start = __wt_rdtsc(session);
 		WT_ERR(__wt_fsync(session, log_fh, true));
-		__wt_epoch(session, &fsync_stop);
-		fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
+		time_stop = __wt_rdtsc(session);
+		fsync_duration_usecs = WT_TSCDIFF_US(session,
+		    time_stop, time_start);
 		log->sync_lsn = *min_lsn;
 		WT_STAT_CONN_INCR(session, log_sync);
 		WT_STAT_CONN_INCRV(session,
@@ -484,18 +487,8 @@ static int
 __log_filename(WT_SESSION_IMPL *session,
     uint32_t id, const char *file_prefix, WT_ITEM *buf)
 {
-	const char *log_path;
-
-	log_path = S2C(session)->log_path;
-
-	if (log_path != NULL && log_path[0] != '\0')
-		WT_RET(__wt_buf_fmt(session, buf, "%s/%s.%010" PRIu32,
-		    log_path, file_prefix, id));
-	else
-		WT_RET(__wt_buf_fmt(session, buf, "%s.%010" PRIu32,
-		    file_prefix, id));
-
-	return (0);
+	return (__wt_filename_construct(session,
+	    S2C(session)->log_path, file_prefix, UINTMAX_MAX, id, buf));
 }
 
 /*
@@ -1012,6 +1005,7 @@ err:	__wt_scr_free(session, &buf);
 static int
 __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(from_path);
 	WT_DECL_ITEM(to_path);
 	WT_DECL_RET;
@@ -1023,7 +1017,8 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 	/*
 	 * If there are no pre-allocated files, return WT_NOTFOUND.
 	 */
-	log = S2C(session)->log;
+	conn = S2C(session);
+	log = conn->log;
 	logfiles = NULL;
 	WT_ERR(__log_get_files(session, WT_LOG_PREPNAME, &logfiles, &logcount));
 	if (logcount == 0)
@@ -1137,7 +1132,14 @@ __log_newfile(WT_SESSION_IMPL *session, bool conn_open, bool *created)
 	 * If we need to create the log file, do so now.
 	 */
 	if (create_log) {
-		log->prep_missed++;
+		/*
+		 * Increment the missed pre-allocated file counter only
+		 * if a hot backup is not in progress. We are deliberately
+		 * not using pre-allocated log files during backup
+		 * (see comment above).
+		 */
+		if (!conn->hot_backup)
+			log->prep_missed++;
 		WT_RET(__wt_log_allocfile(
 		    session, log->fileid, WT_LOG_FILENAME));
 	}
@@ -1709,18 +1711,18 @@ err:	__wt_free(session, buf);
 int
 __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 {
-	struct timespec fsync_start, fsync_stop;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LSN sync_lsn;
-	uint64_t fsync_duration_usecs;
+	uint64_t fsync_duration_usecs, time_start, time_stop;
 	int64_t release_buffered, release_bytes;
 	bool locked;
 
 	conn = S2C(session);
 	log = conn->log;
 	locked = false;
+	time_start = time_stop = 0;
 	if (freep != NULL)
 		*freep = 1;
 	release_buffered = WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
@@ -1825,11 +1827,11 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 			    "/%" PRIu32,
 			    log->log_dir_fh->name,
 			    sync_lsn.l.file, sync_lsn.l.offset);
-			__wt_epoch(session, &fsync_start);
+			time_start = __wt_rdtsc(session);
 			WT_ERR(__wt_fsync(session, log->log_dir_fh, true));
-			__wt_epoch(session, &fsync_stop);
-			fsync_duration_usecs =
-			    WT_TIMEDIFF_US(fsync_stop, fsync_start);
+			time_stop = __wt_rdtsc(session);
+			fsync_duration_usecs = WT_TSCDIFF_US(session,
+			    time_stop, time_start);
 			log->sync_dir_lsn = sync_lsn;
 			WT_STAT_CONN_INCR(session, log_sync_dir);
 			WT_STAT_CONN_INCRV(session,
@@ -1847,11 +1849,11 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 			    log->log_fh->name,
 			    sync_lsn.l.file, sync_lsn.l.offset);
 			WT_STAT_CONN_INCR(session, log_sync);
-			__wt_epoch(session, &fsync_start);
+			time_start = __wt_rdtsc(session);
 			WT_ERR(__wt_fsync(session, log->log_fh, true));
-			__wt_epoch(session, &fsync_stop);
-			fsync_duration_usecs =
-			    WT_TIMEDIFF_US(fsync_stop, fsync_start);
+			time_stop = __wt_rdtsc(session);
+			fsync_duration_usecs = WT_TSCDIFF_US(session,
+			    time_stop, time_start);
 			WT_STAT_CONN_INCRV(session,
 			    log_sync_duration, fsync_duration_usecs);
 			log->sync_lsn = sync_lsn;

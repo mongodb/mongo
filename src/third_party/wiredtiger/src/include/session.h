@@ -148,6 +148,30 @@ struct __wt_session_impl {
 	/* Sessions have an associated statistics bucket based on its ID. */
 	u_int	stat_bucket;		/* Statistics bucket offset */
 
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_SESSION_CAN_WAIT			0x000001u
+#define	WT_SESSION_IGNORE_CACHE_SIZE		0x000002u
+#define	WT_SESSION_INTERNAL			0x000004u
+#define	WT_SESSION_LOCKED_CHECKPOINT		0x000008u
+#define	WT_SESSION_LOCKED_HANDLE_LIST_READ	0x000010u
+#define	WT_SESSION_LOCKED_HANDLE_LIST_WRITE	0x000020u
+#define	WT_SESSION_LOCKED_METADATA		0x000040u
+#define	WT_SESSION_LOCKED_PASS			0x000080u
+#define	WT_SESSION_LOCKED_SCHEMA		0x000100u
+#define	WT_SESSION_LOCKED_SLOT			0x000200u
+#define	WT_SESSION_LOCKED_TABLE_READ		0x000400u
+#define	WT_SESSION_LOCKED_TABLE_WRITE		0x000800u
+#define	WT_SESSION_LOCKED_TURTLE		0x001000u
+#define	WT_SESSION_LOGGING_INMEM		0x002000u
+#define	WT_SESSION_LOOKASIDE_CURSOR		0x004000u
+#define	WT_SESSION_NO_DATA_HANDLES		0x008000u
+#define	WT_SESSION_NO_LOGGING			0x010000u
+#define	WT_SESSION_NO_RECONCILE			0x020000u
+#define	WT_SESSION_NO_SCHEMA_LOCK		0x040000u
+#define	WT_SESSION_QUIET_CORRUPT_FILE		0x080000u
+#define	WT_SESSION_READ_WONT_NEED		0x100000u
+#define	WT_SESSION_SERVER_ASYNC			0x200000u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 
 	/*
@@ -213,4 +237,12 @@ struct __wt_session_impl {
 	uint32_t   hazard_inuse;	/* Hazard pointer array slots in-use */
 	uint32_t   nhazard;		/* Count of active hazard pointers */
 	WT_HAZARD *hazard;		/* Hazard pointer array */
+
+	/*
+	 * Operation tracking.
+	 */
+	WT_OPTRACK_RECORD *optrack_buf;
+	u_int optrackbuf_ptr;
+	uint64_t optrack_offset;
+	WT_FH *optrack_fh;
 };

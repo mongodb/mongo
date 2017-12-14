@@ -106,10 +106,12 @@ struct __wt_track {
 		} col;
 	} u;
 
-#define	WT_TRACK_CHECK_START	0x01		/* Row: initial key updated */
-#define	WT_TRACK_CHECK_STOP	0x02		/* Row: last key updated */
-#define	WT_TRACK_MERGE		0x04		/* Page requires merging */
-#define	WT_TRACK_OVFL_REFD	0x08		/* Overflow page referenced */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_TRACK_CHECK_START	0x1u		/* Row: initial key updated */
+#define	WT_TRACK_CHECK_STOP	0x2u		/* Row: last key updated */
+#define	WT_TRACK_MERGE		0x4u		/* Page requires merging */
+#define	WT_TRACK_OVFL_REFD	0x8u		/* Overflow page referenced */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	u_int flags;
 };
 
@@ -1892,8 +1894,6 @@ __slvg_row_build_leaf(
 	WT_SALVAGE_COOKIE *cookie, _cookie;
 	uint32_t i, skip_start, skip_stop;
 	int cmp;
-
-	WT_UNUSED(ss);					/* !HAVE_VERBOSE */
 
 	btree = S2BT(session);
 	page = NULL;

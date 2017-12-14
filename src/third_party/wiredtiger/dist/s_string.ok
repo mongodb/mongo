@@ -162,6 +162,7 @@ HFS
 HHHH
 HHHHLL
 HHHLL
+HILQr
 Hendrik
 HyperLevelDB
 ID's
@@ -268,6 +269,7 @@ Noll
 Nul
 OOB
 OPLOG
+OPTRACK
 OPTYPE
 OUTBUFF
 OVFL
@@ -746,6 +748,7 @@ fsyncLock
 fsyncs
 ftruncate
 func
+funcid
 fvisibility
 gcc
 gdb
@@ -775,6 +778,7 @@ hashval
 havesize
 hdr
 highjack
+hilq
 hotbackup
 hselasky
 html
@@ -986,6 +990,7 @@ notsup
 notused
 novalue
 nowait
+nsec
 nset
 nsnap
 nul
@@ -1006,6 +1011,7 @@ openfile
 oplist
 oplog
 optimizations
+optrack
 optype
 ori
 os
@@ -1078,6 +1084,7 @@ rbrace
 rbracket
 rcursor
 rdonly
+rdtsc
 rduppo
 readlock
 readonly
@@ -1193,6 +1200,7 @@ tV
 tablename
 tcbench
 td
+teardown
 tempdir
 testutil
 th
@@ -1216,6 +1224,7 @@ trk
 trk's
 trunc
 trylock
+tsc
 tupdate
 tvalue
 txn

@@ -96,3 +96,13 @@ __wt_thread_str(char *buf, size_t buflen)
 	    "%" PRIu64 ":%" PRIu64,
 	    (uint64_t)GetCurrentProcessId(), (uint64_t)GetCurrentThreadId));
 }
+
+/*
+ * __wt_process_id --
+ *      Return the process ID assigned by the operating system.
+ */
+uintmax_t
+__wt_process_id(void)
+{
+	return (uintmax_t)GetCurrentProcessId();
+}

@@ -65,25 +65,20 @@ __wt_timestamp_to_hex_string(
 
 /*
  * __wt_verbose_timestamp --
- *	Output a verbose message along with the specified timestamp
+ *	Output a verbose message along with the specified timestamp.
  */
 void
 __wt_verbose_timestamp(WT_SESSION_IMPL *session,
     const wt_timestamp_t *ts, const char *msg)
 {
-#ifdef HAVE_VERBOSE
 	char timestamp_buf[2 * WT_TIMESTAMP_SIZE + 1];
 
-	if (__wt_timestamp_to_hex_string(session, timestamp_buf, ts) != 0)
+	if (!WT_VERBOSE_ISSET(session, WT_VERB_TIMESTAMP) ||
+	    (__wt_timestamp_to_hex_string(session, timestamp_buf, ts) != 0))
 	       return;
 
 	__wt_verbose(session,
 	    WT_VERB_TIMESTAMP, "Timestamp %s : %s", timestamp_buf, msg);
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(ts);
-	WT_UNUSED(msg);
-#endif
 }
 
 /*

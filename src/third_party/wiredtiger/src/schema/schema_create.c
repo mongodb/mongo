@@ -396,17 +396,27 @@ __create_index(WT_SESSION_IMPL *session,
 		    "should be <table name>:<index name>: %s", name);
 
 	/*
-	 * Note: it would be better to get the table exclusive here, while
+	 * Note: it would be better to keep the table exclusive here, while
 	 * changing its indexes.  We don't because some operation we perform
 	 * below reacquire the table handle (such as opening a cursor on the
-	 * table in order to fill the index).  If we get the handle exclusive
+	 * table in order to fill the index).  If we keep the handle exclusive
 	 * here, those operations wanting ordinary access will conflict,
-	 * leading to errors.
+	 * leading to errors.  At the same time, we don't want to allow
+	 * table cursors that have already been fully opened to remain open
+	 * across this call.
 	 *
-	 * Instead, we rely on the global table lock to protect the set of
-	 * available indexes.
+	 * Temporarily getting the table exclusively serves the purpose
+	 * of ensuring that cursors on the table that are already open
+	 * must at least be closed before this call proceeds.
 	 */
 	tlen = (size_t)(idxname++ - tablename);
+	if ((ret = __wt_schema_get_table(
+	    session, tablename, tlen, true, WT_DHANDLE_EXCLUSIVE, &table)) != 0)
+		WT_RET_MSG(session, ret,
+		    "Can't create an index for table: %.*s",
+		    (int)tlen, tablename);
+	WT_RET(__wt_schema_release_table(session, table));
+
 	if ((ret = __wt_schema_get_table(
 	    session, tablename, tlen, true, 0, &table)) != 0)
 		WT_RET_MSG(session, ret,

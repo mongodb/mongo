@@ -333,7 +333,6 @@ __wt_las_cursor_close(
 static int
 __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 {
-#ifdef HAVE_VERBOSE
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 #ifdef HAVE_TIMESTAMPS
@@ -385,7 +384,7 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 		    btree_id, multi->page_las.las_pageid,
 		    multi->page_las.las_max_txn,
 		    hex_timestamp,
-		    multi->page_las.las_skew_newest? "newest" : "oldest",
+		    multi->page_las.las_skew_newest ? "newest" : "oldest",
 		    WT_STAT_READ(conn->stats, cache_lookaside_entries),
 		    pct_dirty, pct_full);
 	}
@@ -393,10 +392,6 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 	/* Never skip updating the tracked generation */
 	if (WT_VERBOSE_ISSET(session, WT_VERB_LOOKASIDE))
 		cache->las_verb_gen_write = ckpt_gen_current;
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(multi);
-#endif
 	return (0);
 }
 
@@ -433,7 +428,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 	/* Wrap all the updates in a transaction. */
 	las_session = (WT_SESSION_IMPL *)cursor->session;
 	WT_RET(__wt_txn_begin(las_session, NULL));
-	las_session->txn.isolation = WT_TXN_ISO_READ_UNCOMMITTED;
+	las_session->txn.isolation = WT_ISO_READ_UNCOMMITTED;
 
 	/*
 	 * Make sure there are no leftover entries (e.g., from a handle
@@ -533,7 +528,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 	if (insert_cnt > 0) {
 		WT_STAT_CONN_INCRV(
 		    session, cache_lookaside_entries, insert_cnt);
-		__wt_atomic_add64(
+		(void)__wt_atomic_add64(
 		    &S2C(session)->cache->las_entry_count, insert_cnt);
 		WT_ERR(__las_insert_block_verbose(session, multi));
 	}
@@ -639,7 +634,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	 */
 	if (local_cursor) {
 		WT_ERR(__wt_txn_begin(las_session, NULL));
-		las_session->txn.isolation = WT_TXN_ISO_READ_UNCOMMITTED;
+		las_session->txn.isolation = WT_ISO_READ_UNCOMMITTED;
 		local_txn = true;
 	}
 
@@ -725,12 +720,10 @@ __las_sweep_init(WT_SESSION_IMPL *session)
 	cache->las_sweep_dropmin = UINT32_MAX;
 	cache->las_sweep_dropmax = 0;
 	for (i = 0; i < cache->las_dropped_next; i++) {
-		cache->las_sweep_dropmin = WT_MIN(
-		    cache->las_sweep_dropmin,
-		    cache->las_dropped[i]);
-		cache->las_sweep_dropmax = WT_MAX(
-		    cache->las_sweep_dropmax,
-		    cache->las_dropped[i]);
+		cache->las_sweep_dropmin =
+		    WT_MIN(cache->las_sweep_dropmin, cache->las_dropped[i]);
+		cache->las_sweep_dropmax =
+		    WT_MAX(cache->las_sweep_dropmax, cache->las_dropped[i]);
 	}
 
 	/* Initialize the bitmap. */

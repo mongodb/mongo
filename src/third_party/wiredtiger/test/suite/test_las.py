@@ -41,7 +41,7 @@ class test_las(wttest.WiredTigerTestCase):
         return 'cache_size=50MB'
 
     def large_updates(self, session, uri, value, ds, nrows, timestamp=False):
-        # Insert a large number of records, we'll hang if the lookaside table
+        # Update a large number of records, we'll hang if the lookaside table
         # isn't doing its thing.
         cursor = session.open_cursor(uri)
         for i in range(1, 10000):
@@ -50,6 +50,23 @@ class test_las(wttest.WiredTigerTestCase):
             cursor.set_key(ds.key(nrows + i))
             cursor.set_value(value)
             self.assertEquals(cursor.update(), 0)
+            if timestamp == True:
+                session.commit_transaction('commit_timestamp=' + timestamp_str(i + 1))
+        cursor.close()
+
+    def large_modifies(self, session, uri, offset, ds, nrows, timestamp=False):
+        # Modify a large number of records, we'll hang if the lookaside table
+        # isn't doing its thing.
+        cursor = session.open_cursor(uri)
+        for i in range(1, 10000):
+            if timestamp == True:
+                session.begin_transaction()
+            cursor.set_key(ds.key(nrows + i))
+            mods = []
+            mod = wiredtiger.Modify('A', offset, 1)
+            mods.append(mod)
+
+            self.assertEqual(cursor.modify(mods), 0)
             if timestamp == True:
                 session.commit_transaction('commit_timestamp=' + timestamp_str(i + 1))
         cursor.close()
@@ -66,8 +83,9 @@ class test_las(wttest.WiredTigerTestCase):
         # Skip the initial rows, which were not updated
         for i in range(0, nrows+1):
             self.assertEquals(cursor.next(), 0)
-        #print "Check value : " + str(check_value)
-        #print "value : " + str(cursor.get_value())
+        if (check_value != cursor.get_value()):
+            print "Check value : " + str(check_value)
+            print "value : " + str(cursor.get_value())
         self.assertTrue(check_value == cursor.get_value())
         cursor.close()
         session.close()
@@ -77,7 +95,7 @@ class test_las(wttest.WiredTigerTestCase):
         # Create a small table.
         uri = "table:test_las"
         nrows = 100
-        ds = SimpleDataSet(self, uri, nrows, key_format="S")
+        ds = SimpleDataSet(self, uri, nrows, key_format="S", value_format='u')
         ds.populate()
         bigvalue = "aaaaa" * 100
 
@@ -112,16 +130,30 @@ class test_las(wttest.WiredTigerTestCase):
         session2.close()
 
         # Scenario: 3
+        # Check to see LAS working with modify operations
+        bigvalue3 = "ccccc" * 100
+        bigvalue3 = 'AA' + bigvalue3[2:]
+        session2 = self.conn.open_session()
+        session2.begin_transaction('isolation=snapshot')
+        # Apply two modify operations - replacing the first two items with 'A'
+        self.large_modifies(self.session, uri, 0, ds, nrows)
+        self.large_modifies(self.session, uri, 1, ds, nrows)
+        # Check to see the value after recovery
+        self.durable_check(bigvalue3, uri, ds, nrows)
+        session2.rollback_transaction()
+        session2.close()
+
+        # Scenario: 4
         # Check to see LAS working with old timestamp
-        bigvalue3 = "ddddd" * 100
+        bigvalue4 = "ddddd" * 100
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(1))
-        self.large_updates(self.session, uri, bigvalue3, ds, nrows, timestamp=True)
+        self.large_updates(self.session, uri, bigvalue4, ds, nrows, timestamp=True)
         # Check to see data can be see only till the stable_timestamp
-        self.durable_check(bigvalue2, uri, ds, nrows)
+        self.durable_check(bigvalue3, uri, ds, nrows)
 
         self.conn.set_timestamp('stable_timestamp=' + timestamp_str(i + 1))
         # Check to see latest data can be seen
-        self.durable_check(bigvalue3, uri, ds, nrows)
+        self.durable_check(bigvalue4, uri, ds, nrows)
 
 if __name__ == '__main__':
     wttest.run()

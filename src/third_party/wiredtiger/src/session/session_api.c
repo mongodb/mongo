@@ -191,6 +191,24 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Free transaction information. */
 	__wt_txn_destroy(session);
 
+	/*
+	 * Close the file where we tracked long operations.  Do this before
+	 * releasing resources, as we do scratch buffer management when we flush
+	 * optrack buffers to disk
+	 */
+	if (F_ISSET(conn, WT_CONN_OPTRACK)) {
+		if (session->optrackbuf_ptr > 0) {
+			WT_IGNORE_RET((int)__wt_optrack_flush_buffer(session));
+			WT_IGNORE_RET(__wt_close(session,
+			    &session->optrack_fh));
+			/* Indicate that the file is closed */
+			session->optrack_fh = NULL;
+		}
+
+		/* Free the operation tracking buffer */
+		__wt_free(session, session->optrack_buf);
+	}
+
 	/* Release common session resources. */
 	WT_TRET(__wt_session_release_resources(session));
 
@@ -1552,17 +1570,18 @@ __transaction_sync_run_chk(WT_SESSION_IMPL *session)
 static int
 __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 {
-	struct timespec now, start;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
 	uint64_t remaining_usec, timeout_ms, waited_ms;
+	uint64_t time_start, time_stop;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, transaction_sync, config, cfg);
 	WT_STAT_CONN_INCR(session, txn_sync);
+	time_start = time_stop = 0;
 
 	conn = S2C(session);
 	WT_ERR(__wt_txn_context_check(session, false));
@@ -1600,7 +1619,7 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	if (timeout_ms == 0)
 		WT_ERR(ETIMEDOUT);
 
-	__wt_epoch(session, &start);
+	time_start = __wt_rdtsc(session);
 	/*
 	 * Keep checking the LSNs until we find it is stable or we reach
 	 * our timeout, or there's some other reason to quit.
@@ -1610,8 +1629,8 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 			WT_ERR(ETIMEDOUT);
 
 		__wt_cond_signal(session, conn->log_file_cond);
-		__wt_epoch(session, &now);
-		waited_ms = WT_TIMEDIFF_MS(now, start);
+		time_stop = __wt_rdtsc(session);
+		waited_ms = WT_TSCDIFF_MS(session, time_stop, time_start);
 		if (waited_ms < timeout_ms) {
 			remaining_usec = (timeout_ms - waited_ms) * WT_THOUSAND;
 			__wt_cond_wait(session, log->log_sync_cond,
@@ -1847,9 +1866,9 @@ __open_session(WT_CONNECTION_IMPL *conn,
 			break;
 	if (i == conn->session_size)
 		WT_ERR_MSG(session, WT_ERROR,
-		    "out of sessions, only configured to support %" PRIu32
-		    " sessions (including %d additional internal sessions)",
-		    conn->session_size, WT_EXTRA_INTERNAL_SESSIONS);
+		    "out of sessions, configured for %" PRIu32 " (including "
+		    "internal sessions)",
+		    conn->session_size);
 
 	/*
 	 * If the active session count is increasing, update it.  We don't worry
@@ -1904,6 +1923,12 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	/* Cache the offset of this session's statistics bucket. */
 	session_ret->stat_bucket = WT_STATS_SLOT_ID(session);
 
+	/* Allocate the buffer for operation tracking */
+	if (F_ISSET(conn, WT_CONN_OPTRACK)) {
+		WT_ERR(__wt_malloc(
+		    session, WT_OPTRACK_BUFSIZE, &session_ret->optrack_buf));
+		session_ret->optrackbuf_ptr = 0;
+	}
 	/*
 	 * Configuration: currently, the configuration for open_session is the
 	 * same as session.reconfigure, so use that function.

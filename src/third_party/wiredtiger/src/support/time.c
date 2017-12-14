@@ -71,3 +71,13 @@ __wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
 
 	*timep = t.tv_sec;
 }
+
+/*
+ * __wt_tsc_to_nsec --
+ *	Convert from rdtsc ticks to nanoseconds.
+ */
+uint64_t
+__wt_tsc_to_nsec(WT_SESSION_IMPL *session, uint64_t tsc_diff)
+{
+	return ((uint64_t)((double)tsc_diff / S2C(session)->tsc_nsec_ratio));
+}

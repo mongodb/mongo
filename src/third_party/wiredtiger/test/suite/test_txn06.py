@@ -40,11 +40,6 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
     source_uri = 'table:' + tablename + "_src"
     nrows = 100000
 
-    def conn_config(self):
-        if not wiredtiger.verbose_build():
-            self.skipTest('requires a verbose build')
-        return ''
-
     def test_long_running(self):
         # Populate a table
         SimpleDataSet(self, self.source_uri, self.nrows).populate()

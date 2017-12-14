@@ -557,13 +557,19 @@ retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 			if (strcmp(cursor->uri, chunk->uri) != 0)
 				break;
 
-			/* Make sure the checkpoint config matches. */
-			checkpoint = ((WT_CURSOR_BTREE *)cursor)->
-			    btree->dhandle->checkpoint;
-			if (checkpoint == NULL &&
-			    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
-			    !chunk->empty)
-				break;
+			/*
+			 * Make sure the checkpoint config matches when not
+			 * using a custom data source.
+			 */
+			if (lsm_tree->custom_generation == 0 ||
+			    chunk->generation < lsm_tree->custom_generation) {
+				checkpoint = ((WT_CURSOR_BTREE *)cursor)->
+				    btree->dhandle->checkpoint;
+				if (checkpoint == NULL &&
+				    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+				    !chunk->empty)
+					break;
+			}
 
 			/* Make sure the Bloom config matches. */
 			if (clsm->chunks[ngood]->bloom == NULL &&
@@ -721,13 +727,19 @@ err:
 			WT_ASSERT(
 			    session, strcmp(cursor->uri, chunk->uri) == 0);
 
-			/* Make sure the checkpoint config matches. */
-			checkpoint = ((WT_CURSOR_BTREE *)cursor)->
-			    btree->dhandle->checkpoint;
-			WT_ASSERT(session,
-			    (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
-			    !chunk->empty) ?
-			    checkpoint != NULL : checkpoint == NULL);
+			/*
+			 * Make sure the checkpoint config matches when not
+			 * using a custom data source.
+			 */
+			if (lsm_tree->custom_generation == 0 ||
+			    chunk->generation < lsm_tree->custom_generation) {
+				checkpoint = ((WT_CURSOR_BTREE *)cursor)->
+				    btree->dhandle->checkpoint;
+				WT_ASSERT(session,
+				    (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+				    !chunk->empty) ?
+				    checkpoint != NULL : checkpoint == NULL);
+			}
 
 			/* Make sure the Bloom config matches. */
 			WT_ASSERT(session,

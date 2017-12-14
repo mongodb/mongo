@@ -108,6 +108,7 @@ class test_collator(wttest.WiredTigerTestCase):
                     key = c.get_key()
                 self.assertEqual(value, expect)
             i += 1
+        cursor.close()
         self.assertEqual(self.nentries, i)
         for i in range(0, self.nindices):
             c = icursor[i]

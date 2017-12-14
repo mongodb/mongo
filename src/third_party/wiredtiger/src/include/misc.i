@@ -30,6 +30,31 @@ __wt_hex(int c)
 }
 
 /*
+ * __wt_rdtsc --
+ *      Get a timestamp from CPU registers.
+ */
+static inline uint64_t
+__wt_rdtsc(WT_SESSION_IMPL *session) {
+#if (defined __i386)
+	uint64_t x;
+
+	WT_UNUSED(session);
+
+	__asm__ volatile ("rdtsc" : "=A" (x));
+	return (x);
+#elif (defined __amd64)
+	uint64_t a, d;
+
+	WT_UNUSED(session);
+
+	__asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
+	return ((d << 32) | a);
+#else
+	return (__wt_optrack_get_expensive_timestamp(session));
+#endif
+}
+
+/*
  * __wt_strdup --
  *	ANSI strdup function.
  */

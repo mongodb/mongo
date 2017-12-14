@@ -65,7 +65,7 @@ class test_bug018(wttest.WiredTigerTestCase):
         # table out from underneath WiredTiger.  We do this right before
         # closing the connection so that the write error happens during close
         # when writing out the final data.  Allow table 1 to succeed and force
-        # an erorr writing out table 2.
+        # an error writing out table 2.
         #
         # This is Linux-specific code to figure out the file descriptor.
         for f in os.listdir('/proc/self/fd'):
