@@ -90,12 +90,10 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/catalog/database',
+        '$BUILD_DIR/mongo/db/catalog/catalog_raii',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/catalog/index_create',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/query/internal_plans',
         '$BUILD_DIR/mongo/s/client/shard_local',
         '$BUILD_DIR/mongo/s/coreshard',
@@ -106,8 +104,6 @@ env.Library(
         'migration_types',
         'sharding_task_executor',
         'type_shard_identity',
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-        #'$BUILD_DIR/mongo/db/db_raii', # CYCLE
         #'$BUILD_DIR/mongo/db/dbhelpers', # CYCLE
         #'$BUILD_DIR/mongo/db/write_ops', # CYCLE
         #'$BUILD_DIR/mongo/db/query/query', # CYCLE
@@ -286,37 +282,37 @@ env.Library(
         'split_chunk.cpp',
     ],
     LIBDEPS=[
-        'sharding',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/catalog/catalog_raii',
         '$BUILD_DIR/mongo/db/clientcursor',
-        '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/exec/exec',
         '$BUILD_DIR/mongo/db/pipeline/serveronly',
         '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager',
+        'sharding',
     ]
 )
 
 env.Library(
     target='split_vector',
     source=[
-    'split_vector.cpp',
+        'split_vector.cpp',
     ],
     LIBDEPS=[
-    '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-    '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
-    '$BUILD_DIR/mongo/db/commands/server_status',
-    '$BUILD_DIR/mongo/db/db_raii',
-    '$BUILD_DIR/mongo/db/dbhelpers',
-    '$BUILD_DIR/mongo/db/index_d',
-    '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
-    '$BUILD_DIR/mongo/s/sharding_request_types',
-    'balancer',
-    'collection_metadata',
-    'sharding',
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
+        '$BUILD_DIR/mongo/db/catalog/catalog_raii',
+        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/index_d',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/mongo/s/sharding_request_types',
+        'balancer',
+        'collection_metadata',
+        'sharding',
     ]
 )
 

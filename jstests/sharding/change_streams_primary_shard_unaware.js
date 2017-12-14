@@ -157,7 +157,7 @@
 
     // Since neither the mongos nor the shard are aware that the collection is sharded, the change
     // stream will miss the inserted document to the other shard.
-    // TODO: After SERVER-31056, the expected behavior is that the change stream will correctly
+    // TODO: After SERVER-32198, the expected behavior is that the change stream will correctly
     // resume since establishing the cursor on the restarted shard will trigger a refresh.
     // cstMongos2.assertNextChangesEqual({
     //     cursor: cursorMongos2,

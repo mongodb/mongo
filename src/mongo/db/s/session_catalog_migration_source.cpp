@@ -30,8 +30,8 @@
 
 #include "mongo/db/s/session_catalog_migration_source.h"
 
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -46,7 +46,6 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
 namespace {
 
 PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());

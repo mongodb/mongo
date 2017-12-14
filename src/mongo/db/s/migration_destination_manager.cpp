@@ -38,9 +38,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db_raii.h"
@@ -50,8 +48,6 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
@@ -434,7 +430,8 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
                                                  OID epoch,
                                                  WriteConcernOptions writeConcern) {
     Client::initThread("migrateThread");
-    auto opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+    auto opCtx = Client::getCurrent()->makeOperationContext();
+
 
     if (getGlobalAuthorizationManager()->isAuthEnabled()) {
         AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
@@ -471,6 +468,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
     invariant(_scopedRegisterReceiveChunk);
     invariant(!min.isEmpty());
     invariant(!max.isEmpty());
+
+    auto const serviceContext = opCtx->getServiceContext();
 
     log() << "Starting receiving end of migration of chunk " << redact(min) << " -> " << redact(max)
           << " for collection " << _nss.ns() << " from " << fromShardConnString << " at epoch "
@@ -655,7 +654,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
             for (auto&& infoObj : indexInfoObjs.getValue()) {
                 // make sure to create index on secondaries as well
-                getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                serviceContext->getOpObserver()->onCreateIndex(
                     opCtx, collection->ns(), collection->uuid(), infoObj, true /* fromMigrate */);
             }
 

@@ -35,12 +35,10 @@
 #include <algorithm>
 
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
@@ -49,7 +47,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
 namespace {
 
 // This is used to wait for the collection drops to replicate to a majority of the replica set.

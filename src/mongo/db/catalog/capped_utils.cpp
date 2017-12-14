@@ -34,10 +34,9 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -45,13 +44,11 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/views/view.h"
 #include "mongo/util/scopeguard.h"
 
 mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) {

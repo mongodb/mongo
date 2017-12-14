@@ -37,15 +37,14 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
@@ -66,11 +65,6 @@
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-
-#include <chrono>
-#include <ctime>
-#include <iomanip>
-#include <iostream>
 
 namespace mongo {
 
@@ -100,7 +94,7 @@ void updateShardIdentityConfigStringCB(const string& setName, const string& newC
     }
 
     Client::initThread("updateShardIdentityConfigConnString");
-    auto uniqOpCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+    auto uniqOpCtx = Client::getCurrent()->makeOperationContext();
 
     auto status = ShardingState::get(uniqOpCtx.get())
                       ->updateShardIdentityConfigString(uniqOpCtx.get(), newConnectionString);
