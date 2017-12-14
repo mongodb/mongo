@@ -919,7 +919,7 @@ functions:
           fi
 
           config_file=powertest.yml
-          eval python pytests/powertest.py \
+          eval $python pytests/powertest.py \
             "--saveConfigOptions=$config_file \
             ${connection_options}  \
             ${program_options}     \
@@ -934,7 +934,7 @@ functions:
             ${mongodb_options}     \
             ${mongod_options}      \
             ${mongod_extra_options}"
-          python -u pytests/powertest.py --configFile=$config_file
+          $python -u pytests/powertest.py --configFile=$config_file
 
   "do multiversion setup" :
     command: shell.exec
@@ -1413,26 +1413,29 @@ functions:
             --retries ${ssh_retries|0}                       \
             --commands "$cmds"
 
-  "copy EC2 artifacts":
+  "set EC2 address":
     - command: shell.exec
       params:
         shell: bash
         working_dir: src
         script: |
-          if [ -z "${ec2_artifacts}" ]; then
+          if [ -z "${instance_id}" ]; then
             exit 0
           fi
           # Ensure we use the latest ip_address, as it could change if the EC2 instance
           # has been stopped and started.
           ${activate_virtualenv}
-          aws_ec2=$(python buildscripts/aws_ec2.py --imageId ${instance_id} --mode status)
+          # Specify '--mode start' to ensure the remote instance is running.
+          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start)
           ip_address=$(echo $aws_ec2 | sed -e "s/.*private_ip_address: //; s/ .*//")
           sed -i -e "s/${ip_address}/$ip_address/" ${aws_ec2_yml}
+          echo "Instance status: $aws_ec2"
 
     - command: expansions.update
       params:
         file: src/${aws_ec2_yml}
 
+  "copy EC2 artifacts":
     - command: shell.exec
       params:
         shell: bash
@@ -1479,7 +1482,7 @@ functions:
         fi
         ${activate_virtualenv}
         echo "Terminating $instance_id"
-        aws_ec2=$(python buildscripts/aws_ec2.py --imageId ${instance_id} --mode terminate)
+        aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode terminate)
         echo "Terminated AMI EC2 instance: $aws_ec2"
 
 pre:
@@ -1549,6 +1552,7 @@ post:
     params:
       file_location: src/report.json
 
+  - func: "set EC2 address"
   - func: "copy EC2 artifacts"
   - func: "cleanup EC2 instance"
 
@@ -1921,6 +1925,7 @@ post:
 timeout:
   - func: "fetch debugsymbols archive"
   - func: "extract debugsymbols"
+  - func: "set EC2 address"
   - command: shell.exec
     params:
       working_dir: src
@@ -1946,7 +1951,7 @@ timeout:
         # Call hang_analyzer.py script for tasks that are running remote mongo processes
         # The file ${aws_ec2_yml} will define the remote's ${ip_address}.
         # Any task which uses remote processes will have previously loaded this file to set these
-        # expansions macros.
+        # expansion macros.
         if [ -f ${aws_ec2_yml|""} ]; then
           core_ext=core
           if [ "Windows_NT" = "$OS" ]; then
