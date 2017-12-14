@@ -41,19 +41,14 @@ namespace mongo {
  */
 class PathMatchExpression : public MatchExpression {
 public:
-    PathMatchExpression(MatchType matchType) : MatchExpression(matchType) {}
+    PathMatchExpression(MatchType matchType,
+                        ElementPath::LeafArrayBehavior leafArrayBehavior,
+                        ElementPath::NonLeafArrayBehavior nonLeafArrayBehavior)
+        : MatchExpression(matchType),
+          _leafArrayBehavior(leafArrayBehavior),
+          _nonLeafArrayBehavior(nonLeafArrayBehavior) {}
 
     virtual ~PathMatchExpression() {}
-
-    /**
-     * Returns whether or not this expression should match against each element of an array (in
-     * addition to the array as a whole).
-     *
-     * For example, returns true if a path match expression on "f" should match against 1, 2, and
-     * [1, 2] for document {f: [1, 2]}. Returns false if this expression should only match against
-     * [1, 2].
-     */
-    virtual bool shouldExpandLeafArray() const = 0;
 
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final {
         MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
@@ -76,12 +71,15 @@ public:
 
     Status setPath(StringData path) {
         _path = path;
+
         auto status = _elementPath.init(_path);
         if (!status.isOK()) {
             return status;
         }
 
-        _elementPath.setTraverseLeafArray(shouldExpandLeafArray());
+        _elementPath.setLeafArrayBehavior(_leafArrayBehavior);
+        _elementPath.setNonLeafArrayBehavior(_nonLeafArrayBehavior);
+
         return Status::OK();
     }
 
@@ -133,6 +131,8 @@ protected:
     }
 
 private:
+    ElementPath::LeafArrayBehavior _leafArrayBehavior;
+    ElementPath::NonLeafArrayBehavior _nonLeafArrayBehavior;
     StringData _path;
     ElementPath _elementPath;
 

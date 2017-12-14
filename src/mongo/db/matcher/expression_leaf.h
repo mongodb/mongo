@@ -47,9 +47,17 @@ class CollatorInterface;
 
 class LeafMatchExpression : public PathMatchExpression {
 public:
-    explicit LeafMatchExpression(MatchType matchType) : PathMatchExpression(matchType) {}
+    LeafMatchExpression(MatchType matchType)
+        : LeafMatchExpression(matchType,
+                              ElementPath::LeafArrayBehavior::kTraverse,
+                              ElementPath::NonLeafArrayBehavior::kTraverse) {}
 
-    virtual ~LeafMatchExpression() {}
+    LeafMatchExpression(MatchType matchType,
+                        ElementPath::LeafArrayBehavior leafArrBehavior,
+                        ElementPath::NonLeafArrayBehavior nonLeafArrBehavior)
+        : PathMatchExpression(matchType, leafArrBehavior, nonLeafArrBehavior) {}
+
+    virtual ~LeafMatchExpression() = default;
 
     size_t numChildren() const override {
         return 0;
@@ -61,10 +69,6 @@ public:
 
     std::vector<MatchExpression*>* getChildVector() override {
         return nullptr;
-    }
-
-    bool shouldExpandLeafArray() const override {
-        return true;
     }
 
     MatchCategory getCategory() const override {

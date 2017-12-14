@@ -36,7 +36,10 @@ class InternalSchemaObjectMatchExpression final : public PathMatchExpression {
 public:
     static constexpr StringData kName = "$_internalSchemaObjectMatch"_sd;
 
-    InternalSchemaObjectMatchExpression() : PathMatchExpression(INTERNAL_SCHEMA_OBJECT_MATCH) {}
+    InternalSchemaObjectMatchExpression()
+        : PathMatchExpression(INTERNAL_SCHEMA_OBJECT_MATCH,
+                              ElementPath::LeafArrayBehavior::kNoTraversal,
+                              ElementPath::NonLeafArrayBehavior::kTraverse) {}
 
     Status init(std::unique_ptr<MatchExpression> expr, StringData path) {
         _sub = std::move(expr);
@@ -70,10 +73,6 @@ public:
 
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
-    }
-
-    bool shouldExpandLeafArray() const final {
-        return false;
     }
 
 private:

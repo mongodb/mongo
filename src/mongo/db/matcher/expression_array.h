@@ -45,7 +45,10 @@ namespace mongo {
  */
 class ArrayMatchingMatchExpression : public PathMatchExpression {
 public:
-    ArrayMatchingMatchExpression(MatchType matchType) : PathMatchExpression(matchType) {}
+    ArrayMatchingMatchExpression(MatchType matchType)
+        : PathMatchExpression(matchType,
+                              ElementPath::LeafArrayBehavior::kNoTraversal,
+                              ElementPath::NonLeafArrayBehavior::kTraverse) {}
 
     virtual ~ArrayMatchingMatchExpression() {}
 
@@ -59,10 +62,6 @@ public:
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
     bool equivalent(const MatchExpression* other) const override;
-
-    bool shouldExpandLeafArray() const final {
-        return false;
-    }
 
     MatchCategory getCategory() const final {
         return MatchCategory::kArrayMatching;

@@ -36,7 +36,10 @@ namespace mongo {
 template <class T>
 class TypeMatchExpressionBase : public LeafMatchExpression {
 public:
-    explicit TypeMatchExpressionBase(MatchType matchType) : LeafMatchExpression(matchType) {}
+    explicit TypeMatchExpressionBase(MatchType matchType,
+                                     ElementPath::LeafArrayBehavior leafArrBehavior)
+        : LeafMatchExpression(
+              matchType, leafArrBehavior, ElementPath::NonLeafArrayBehavior::kTraverse) {}
 
     virtual ~TypeMatchExpressionBase() = default;
 
@@ -117,7 +120,9 @@ class TypeMatchExpression final : public TypeMatchExpressionBase<TypeMatchExpres
 public:
     static constexpr StringData kName = "$type"_sd;
 
-    TypeMatchExpression() : TypeMatchExpressionBase(MatchExpression::TYPE_OPERATOR) {}
+    TypeMatchExpression()
+        : TypeMatchExpressionBase(MatchExpression::TYPE_OPERATOR,
+                                  ElementPath::LeafArrayBehavior::kTraverse) {}
 
     StringData name() const final {
         return kName;
@@ -135,7 +140,8 @@ public:
     static constexpr StringData kName = "$_internalSchemaType"_sd;
 
     InternalSchemaTypeExpression()
-        : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_TYPE) {}
+        : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_TYPE,
+                                  ElementPath::LeafArrayBehavior::kNoTraversal) {}
 
     StringData name() const final {
         return kName;
@@ -143,10 +149,6 @@ public:
 
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
-    }
-
-    bool shouldExpandLeafArray() const final {
-        return false;
     }
 };
 
