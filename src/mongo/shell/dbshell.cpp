@@ -1,4 +1,3 @@
-// dbshell.cpp
 /*
  *    Copyright 2010 10gen Inc.
  *
@@ -57,6 +56,7 @@
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
@@ -81,6 +81,7 @@
 #endif
 
 using namespace std;
+using namespace std::literals::string_literals;
 using namespace mongo;
 
 string historyFile;
@@ -99,6 +100,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion36, ("EndStar
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
     return Status::OK();
 }
+const auto kAuthParam = "authSource"s;
 }  // namespace
 
 namespace mongo {
@@ -706,6 +708,20 @@ static void edit(const string& whatToEdit) {
     }
 }
 
+namespace {
+bool mechanismRequiresPassword() {
+    using std::begin;
+    using std::end;
+    const std::string passwordlessMechanisms[] = {"GSSAPI", "MONGODB-X509"};
+    auto isInShellParameters = [](const auto& mech) {
+        return mech == shellGlobalParams.authenticationMechanism;
+    };
+
+    return std::none_of(
+        begin(passwordlessMechanisms), end(passwordlessMechanisms), isInShellParameters);
+}
+}  // namespace
+
 int _main(int argc, char* argv[], char** envp) {
     registerShutdownTask([] {
         // NOTE: This function may be called at any time. It must not
@@ -743,13 +759,29 @@ int _main(int argc, char* argv[], char** envp) {
             new logger::ConsoleAppender<logger::MessageEventEphemeral>(
                 new logger::MessageEventUnadornedEncoder)));
 
+    std::string& cmdlineURI = shellGlobalParams.url;
+    MongoURI parsedURI;
+    if (!cmdlineURI.empty()) {
+        parsedURI = uassertStatusOK(MongoURI::parse(stdx::as_const(cmdlineURI)));
+    }
+
+    // We create an altered URI from the one passed so that we can pass that to replica set
+    // monitors.  This is to avoid making potentially breaking changes to the replica set monitor
+    // code.
+    std::string processedURI = cmdlineURI;
+    auto pos = cmdlineURI.find('@');
+    auto protocolLength = processedURI.find("://");
+    if (pos != std::string::npos && protocolLength != std::string::npos) {
+        processedURI =
+            processedURI.substr(0, protocolLength) + "://" + processedURI.substr(pos + 1);
+    }
+
     if (!shellGlobalParams.nodb) {  // connect to db
         stringstream ss;
         if (mongo::serverGlobalParams.quiet.load())
             ss << "__quiet = true;";
         ss << "db = connect( \""
-           << getURIFromArgs(
-                  shellGlobalParams.url, shellGlobalParams.dbhost, shellGlobalParams.port)
+           << getURIFromArgs(processedURI, shellGlobalParams.dbhost, shellGlobalParams.port)
            << "\");";
 
         if (shellGlobalParams.shouldRetryWrites) {
@@ -760,10 +792,39 @@ int _main(int argc, char* argv[], char** envp) {
 
         mongo::shell_utils::_dbConnect = ss.str();
 
-        if (shellGlobalParams.usingPassword && shellGlobalParams.password.empty()) {
+        if (cmdlineURI.size()) {
+            const auto mechanismKey = parsedURI.getOptions().find("authMechanism");
+            if (mechanismKey != end(parsedURI.getOptions()) &&
+                shellGlobalParams.authenticationMechanism.empty()) {
+                shellGlobalParams.authenticationMechanism = mechanismKey->second;
+            }
+
+            if (mechanismRequiresPassword() &&
+                (parsedURI.getUser().size() || shellGlobalParams.username.size())) {
+                shellGlobalParams.usingPassword = true;
+            }
+            if (shellGlobalParams.usingPassword && shellGlobalParams.password.empty()) {
+                shellGlobalParams.password =
+                    parsedURI.getPassword().size() ? parsedURI.getPassword() : mongo::askPassword();
+            }
+            if (parsedURI.getUser().size() && shellGlobalParams.username.empty()) {
+                shellGlobalParams.username = parsedURI.getUser();
+            }
+            auto authParam = parsedURI.getOptions().find(kAuthParam);
+            if (authParam != end(parsedURI.getOptions()) &&
+                shellGlobalParams.authenticationDatabase.empty()) {
+                shellGlobalParams.authenticationDatabase = authParam->second;
+            }
+        } else if (shellGlobalParams.usingPassword && shellGlobalParams.password.empty()) {
             shellGlobalParams.password = mongo::askPassword();
         }
     }
+
+    // We now substitute the altered URI to permit the replica set monitors to see it without
+    // usernames.  This is to avoid making potentially breaking changes to the replica set monitor
+    // code.
+    cmdlineURI = processedURI;
+
 
     // Construct the authentication-related code to execute on shell startup.
     //
