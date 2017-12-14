@@ -934,7 +934,12 @@ functions:
             ${mongodb_options}     \
             ${mongod_options}      \
             ${mongod_extra_options}"
+          set +o errexit
           $python -u pytests/powertest.py --configFile=$config_file
+          test_status=$?
+          aws_ec2=$(python buildscripts/aws_ec2.py --imageId ${instance_id} --mode status)
+          echo "Test completed, AMI EC2 instance ${instance_id} status: $aws_ec2"
+          exit $test_status
 
   "do multiversion setup" :
     command: shell.exec
@@ -1427,6 +1432,7 @@ functions:
           ${activate_virtualenv}
           # Specify '--mode start' to ensure the remote instance is running.
           aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start)
+          echo "AMI EC2 instance ${instance_id} status: $aws_ec2"
           ip_address=$(echo $aws_ec2 | sed -e "s/.*private_ip_address: //; s/ .*//")
           sed -i -e "s/${ip_address}/$ip_address/" ${aws_ec2_yml}
           echo "Instance status: $aws_ec2"
