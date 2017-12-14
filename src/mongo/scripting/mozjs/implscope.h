@@ -60,6 +60,7 @@
 #include "mongo/scripting/mozjs/oid.h"
 #include "mongo/scripting/mozjs/regexp.h"
 #include "mongo/scripting/mozjs/session.h"
+#include "mongo/scripting/mozjs/status.h"
 #include "mongo/scripting/mozjs/timestamp.h"
 #include "mongo/scripting/mozjs/uri.h"
 #include "mongo/stdx/unordered_set.h"
@@ -294,6 +295,12 @@ public:
     }
 
     template <typename T>
+    typename std::enable_if<std::is_same<T, MongoStatusInfo>::value, WrapType<T>&>::type
+    getProto() {
+        return _statusProto;
+    }
+
+    template <typename T>
     typename std::enable_if<std::is_same<T, TimestampInfo>::value, WrapType<T>&>::type getProto() {
         return _timestampProto;
     }
@@ -301,6 +308,11 @@ public:
     template <typename T>
     typename std::enable_if<std::is_same<T, URIInfo>::value, WrapType<T>&>::type getProto() {
         return _uriProto;
+    }
+
+    template <typename T>
+    typename std::enable_if<std::is_same<T, GlobalInfo>::value, WrapType<T>&>::type getProto() {
+        return _globalProto;
     }
 
     static const char* const kExecResult;
@@ -444,6 +456,7 @@ private:
     WrapType<OIDInfo> _oidProto;
     WrapType<RegExpInfo> _regExpProto;
     WrapType<SessionInfo> _sessionProto;
+    WrapType<MongoStatusInfo> _statusProto;
     WrapType<TimestampInfo> _timestampProto;
     WrapType<URIInfo> _uriProto;
 };

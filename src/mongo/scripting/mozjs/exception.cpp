@@ -64,18 +64,10 @@ MONGO_STATIC_ASSERT_MSG(
 void mongoToJSException(JSContext* cx) {
     auto status = exceptionToStatus();
 
-    auto callback =
-        status.code() == ErrorCodes::JSUncatchableError ? uncatchableErrorCallback : errorCallback;
+    JS::RootedValue val(cx);
+    statusToJSException(cx, status, &val);
 
-    JS_ReportErrorNumber(
-        cx, callback, nullptr, JSErr_Limit + status.code(), status.reason().c_str());
-}
-
-void setJSException(JSContext* cx, ErrorCodes::Error code, StringData sd) {
-    auto callback =
-        code == ErrorCodes::JSUncatchableError ? uncatchableErrorCallback : errorCallback;
-
-    JS_ReportErrorNumber(cx, callback, nullptr, JSErr_Limit + code, sd.rawData());
+    JS_SetPendingException(cx, val);
 }
 
 std::string currentJSStackToString(JSContext* cx) {
@@ -92,16 +84,7 @@ Status currentJSExceptionToStatus(JSContext* cx, ErrorCodes::Error altCode, Stri
     if (!JS_GetPendingException(cx, &vp))
         return Status(altCode, altReason.rawData());
 
-    if (!vp.isObject()) {
-        return Status(altCode, ValueWriter(cx, vp).toString());
-    }
-
-    JS::RootedObject obj(cx, vp.toObjectOrNull());
-    JSErrorReport* report = JS_ErrorFromException(cx, obj);
-    if (!report)
-        return Status(altCode, altReason.rawData());
-
-    return JSErrorReportToStatus(cx, report, altCode, altReason);
+    return jsExceptionToStatus(cx, vp, altCode, altReason);
 }
 
 Status JSErrorReportToStatus(JSContext* cx,
@@ -119,11 +102,7 @@ Status JSErrorReportToStatus(JSContext* cx,
             error = ErrorCodes::JSInterpreterFailure;
         } else {
             error = ErrorCodes::Error(report->errorNumber - JSErr_Limit);
-            if (ErrorCodes::shouldHaveExtraInfo(error)) {
-                // For now we can't propagate extra info through js exceptions.
-                // TODO SERVER-32239 delete this block.
-                error = ErrorCodes::UnknownError;
-            }
+            invariant(!ErrorCodes::shouldHaveExtraInfo(error));
         }
     }
 
@@ -133,6 +112,39 @@ Status JSErrorReportToStatus(JSContext* cx,
 void throwCurrentJSException(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {
     uassertStatusOK(currentJSExceptionToStatus(cx, altCode, altReason));
     MONGO_UNREACHABLE;
+}
+
+/**
+ * Turns a status into a js exception
+ */
+void statusToJSException(JSContext* cx, Status status, JS::MutableHandleValue out) {
+    MongoStatusInfo::fromStatus(cx, std::move(status), out);
+}
+
+/**
+ * Turns a js exception into a status
+ */
+Status jsExceptionToStatus(JSContext* cx,
+                           JS::HandleValue excn,
+                           ErrorCodes::Error altCode,
+                           StringData altReason) {
+    auto scope = getScope(cx);
+
+    if (!excn.isObject()) {
+        return Status(altCode, ValueWriter(cx, excn).toString());
+    }
+
+    if (scope->getProto<MongoStatusInfo>().instanceOf(excn)) {
+        return MongoStatusInfo::toStatus(cx, excn);
+    }
+
+    JS::RootedObject obj(cx, excn.toObjectOrNull());
+
+    JSErrorReport* report = JS_ErrorFromException(cx, obj);
+    if (!report)
+        return Status(altCode, altReason.rawData());
+
+    return JSErrorReportToStatus(cx, report, altCode, altReason);
 }
 
 }  // namespace mozjs

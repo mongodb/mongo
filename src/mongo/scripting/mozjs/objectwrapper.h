@@ -84,7 +84,12 @@ public:
         void set(JSContext* cx, JS::HandleObject o, JS::HandleValue value);
         bool has(JSContext* cx, JS::HandleObject o);
         bool hasOwn(JSContext* cx, JS::HandleObject o);
-        void define(JSContext* cx, JS::HandleObject o, JS::HandleValue value, unsigned attrs);
+        void define(JSContext* cx,
+                    JS::HandleObject o,
+                    JS::HandleValue value,
+                    unsigned attrs,
+                    JSNative getter,
+                    JSNative setter);
         void del(JSContext* cx, JS::HandleObject o);
         std::string toString(JSContext* cx);
         StringData toStringData(JSContext* cx, JSStringWrapper* jsstr);
@@ -118,11 +123,16 @@ public:
     void setBSONArray(Key key, const BSONObj& obj, bool readOnly);
     void setValue(Key key, JS::HandleValue value);
     void setObject(Key key, JS::HandleObject value);
+    void setPrototype(JS::HandleObject value);
 
     /**
      * See JS_DefineProperty for what sort of attributes might be useful
      */
-    void defineProperty(Key key, JS::HandleValue value, unsigned attrs);
+    void defineProperty(Key key,
+                        JS::HandleValue value,
+                        unsigned attrs,
+                        JSNative getter = nullptr,
+                        JSNative setter = nullptr);
 
     void deleteProperty(Key key);
 

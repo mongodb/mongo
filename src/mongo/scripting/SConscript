@@ -140,6 +140,7 @@ if usemozjs:
             'mozjs/proxyscope.cpp',
             'mozjs/regexp.cpp',
             'mozjs/session.cpp',
+            'mozjs/status.cpp',
             'mozjs/timestamp.cpp',
             'mozjs/uri.cpp',
             'mozjs/valuereader.cpp',

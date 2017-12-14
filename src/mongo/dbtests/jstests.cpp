@@ -2368,6 +2368,25 @@ public:
     }
 };
 
+class ErrorWithSidecarFromInvoke {
+public:
+    void run() {
+        auto sidecarThrowingFunc = [](const BSONObj& args, void* data) -> BSONObj {
+            uassertStatusOK(Status(ErrorExtraInfoExample(123), "foo"));
+            return {};
+        };
+
+        unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
+
+        s->injectNative("foo", sidecarThrowingFunc);
+
+        ASSERT_THROWS_WITH_CHECK(
+            s->invoke("try { foo(); } catch (e) { throw e; } throw new Error(\"bar\");", 0, 0),
+            ExceptionFor<ErrorCodes::ForTestingErrorExtraInfo>,
+            [](const auto& ex) { ASSERT_EQ(ex->data, 123); });
+    }
+};
+
 class RequiresOwnedObjects {
 public:
     void run() {
@@ -2467,6 +2486,7 @@ public:
 
         add<RecursiveInvoke>();
         add<ErrorCodeFromInvoke>();
+        add<ErrorWithSidecarFromInvoke>();
         add<RequiresOwnedObjects>();
 
         add<RoundTripTests::DBRefTest>();

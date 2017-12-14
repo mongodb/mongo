@@ -298,6 +298,17 @@ public:
         out.setObjectOrNull(obj);
     }
 
+    void newObjectWithProto(JS::MutableHandleObject out, JS::HandleObject proto) {
+        out.set(_assertPtr(JS_NewObjectWithGivenProto(_context, &_jsclass, proto)));
+    }
+
+    void newObjectWithProto(JS::MutableHandleValue out, JS::HandleObject proto) {
+        JS::RootedObject obj(_context);
+        newObjectWithProto(&obj, proto);
+
+        out.setObjectOrNull(obj);
+    }
+
     /**
      * newInstance calls the constructor, a la new Type() in js
      */
@@ -351,6 +362,10 @@ public:
 
     JS::HandleObject getProto() const {
         return _proto;
+    }
+
+    JS::HandleObject getCtor() const {
+        return _constructor;
     }
 
 private:

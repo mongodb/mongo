@@ -43,9 +43,17 @@ namespace mozjs {
 void mongoToJSException(JSContext* cx);
 
 /**
- * Sets an exception for javascript
+ * Turns a status into a js exception
  */
-void setJSException(JSContext* cx, ErrorCodes::Error code, StringData sd);
+void statusToJSException(JSContext* cx, Status status, JS::MutableHandleValue out);
+
+/**
+ * Turns a status into a js exception
+ */
+Status jsExceptionToStatus(JSContext* cx,
+                           JS::HandleValue excn,
+                           ErrorCodes::Error altCode,
+                           StringData altReason);
 
 /**
  * Converts the current pending js expection into a status

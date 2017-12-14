@@ -126,6 +126,7 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
 
         try {
             str::stream ss;
+
             ss << message;
 
             // TODO: something far more elaborate that mimics the stack printing from v8
@@ -133,7 +134,9 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
             if (JS_GetPendingException(cx, &excn) && excn.isObject()) {
                 JS::RootedValue stack(cx);
 
-                ObjectWrapper(cx, excn).getValue("stack", &stack);
+                JS::RootedObject obj(cx, excn.toObjectOrNull());
+                ObjectWrapper o(cx, obj);
+                o.getValue("stack", &stack);
 
                 auto str = ValueWriter(cx, stack).toString();
 
@@ -143,6 +146,12 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
                 } else {
                     ss << " :\n" << str;
                 }
+
+                scope->_status =
+                    jsExceptionToStatus(cx, excn, ErrorCodes::JSInterpreterFailure, message)
+                        .withReason(ss);
+
+                return;
             }
 
             exceptionMsg = ss;
@@ -151,7 +160,6 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
             log() << exceptionMsg << ":" << dbe.toString() << ":" << message;
         }
 
-        // TODO SERVER-32239 is this right?
         scope->_status =
             JSErrorReportToStatus(cx, report, ErrorCodes::JSInterpreterFailure, message)
                 .withReason(exceptionMsg);
@@ -437,6 +445,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine)
       _oidProto(_context),
       _regExpProto(_context),
       _sessionProto(_context),
+      _statusProto(_context),
       _timestampProto(_context),
       _uriProto(_context) {
     kCurrentScope = this;
@@ -850,23 +859,24 @@ void MozJSImplScope::reset() {
 }
 
 void MozJSImplScope::installBSONTypes() {
+    _objectProto.install(_global);
+    _errorProto.install(_global);
     _binDataProto.install(_global);
     _bsonProto.install(_global);
     _codeProto.install(_global);
     _dbPointerProto.install(_global);
     _dbRefProto.install(_global);
-    _errorProto.install(_global);
     _maxKeyProto.install(_global);
     _minKeyProto.install(_global);
     _nativeFunctionProto.install(_global);
     _numberIntProto.install(_global);
     _numberLongProto.install(_global);
     _numberDecimalProto.install(_global);
-    _objectProto.install(_global);
     _oidProto.install(_global);
     _regExpProto.install(_global);
     _timestampProto.install(_global);
     _uriProto.install(_global);
+    _statusProto.install(_global);
 
     // This builtin map is a javascript 6 thing.  We want our version.  so
     // take theirs out
