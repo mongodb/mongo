@@ -383,14 +383,20 @@ public:
         add<T>(demangleName(typeid(T)));
     }
 
-    template <class T, typename A>
+    template <class T, class A>
     void add(const A& a) {
-        add(demangleName(typeid(T)), stdx::bind(&Suite::runTestObjectWithArg<T, A>, a));
+        add(demangleName(typeid(T)), [a] {
+            T testObj(a);
+            testObj.run();
+        });
     }
 
     template <class T>
     void add(const std::string& name) {
-        add(name, &Suite::runTestObject<T>);
+        add(name, [] {
+            T testObj;
+            testObj.run();
+        });
     }
 
     void add(const std::string& name, const TestFunction& testFn);
@@ -415,18 +421,6 @@ protected:
 private:
     // TODO(C++11): Make this hold unique_ptrs.
     typedef std::vector<std::shared_ptr<TestHolder>> TestHolderList;
-
-    template <typename T>
-    static void runTestObject() {
-        T testObj;
-        testObj.run();
-    }
-
-    template <typename T, typename A>
-    static void runTestObjectWithArg(const A& a) {
-        T testObj(a);
-        testObj.run();
-    }
 
     std::string _name;
     TestHolderList _tests;
