@@ -36,9 +36,11 @@ constexpr StringData InternalSchemaObjectMatchExpression::kName;
 
 InternalSchemaObjectMatchExpression::InternalSchemaObjectMatchExpression(
     StringData path, std::unique_ptr<MatchExpression> expr)
-    : PathMatchExpression(INTERNAL_SCHEMA_OBJECT_MATCH, path), _sub(std::move(expr)) {
-    setTraverseLeafArray();
-}
+    : PathMatchExpression(INTERNAL_SCHEMA_OBJECT_MATCH,
+                          path,
+                          ElementPath::LeafArrayBehavior::kNoTraversal,
+                          ElementPath::NonLeafArrayBehavior::kTraverse),
+      _sub(std::move(expr)) {}
 
 bool InternalSchemaObjectMatchExpression::matchesSingleElement(const BSONElement& elem,
                                                                MatchDetails* details) const {

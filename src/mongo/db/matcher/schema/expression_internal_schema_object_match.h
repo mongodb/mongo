@@ -67,10 +67,6 @@ public:
         return MatchCategory::kOther;
     }
 
-    bool shouldExpandLeafArray() const final {
-        return false;
-    }
-
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
 

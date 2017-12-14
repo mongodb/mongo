@@ -101,6 +101,10 @@ public:
         INTERNAL_2D_KEY_IN_REGION,
         INTERNAL_2D_POINT_IN_ANNULUS,
 
+        // Used to represent an expression language equality in a match expression tree, since $eq
+        // in the expression language has different semantics than the equality match expression.
+        INTERNAL_EXPR_EQ,
+
         // JSON Schema expressions.
         INTERNAL_SCHEMA_ALLOWED_PROPERTIES,
         INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX,

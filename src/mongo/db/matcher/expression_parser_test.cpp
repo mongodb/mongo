@@ -465,4 +465,31 @@ TEST(MatchExpressionParserTest, ExprFailsToParseWithinInternalSchemaObjectMatch)
             query, expCtx, ExtensionsCallbackNoop(), MatchExpressionParser::AllowedFeatures::kExpr)
             .getStatus());
 }
+
+TEST(MatchExpressionParserTest, InternalExprEqParsesCorrectly) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+
+    auto query = fromjson("{a: {$_internalExprEq: 'foo'}}");
+    auto statusWith = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(statusWith.getStatus());
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: 'foo'}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: ['foo']}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: ['bar']}")));
+    ASSERT_FALSE(statusWith.getValue()->matchesBSON(fromjson("{a: 'bar'}")));
+
+    query = fromjson("{'a.b': {$_internalExprEq: 5}}");
+    statusWith = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(statusWith.getStatus());
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: 5}}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: [5]}}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: [6]}}")));
+    ASSERT_FALSE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: 6}}")));
+
+    query = fromjson("{'a.b': {$_internalExprEq: [5]}}");
+    statusWith = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(statusWith.getStatus());
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: [5]}}")));
+    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: [6]}}")));
+    ASSERT_FALSE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: 5}}")));
 }
+}  // namespace mongo

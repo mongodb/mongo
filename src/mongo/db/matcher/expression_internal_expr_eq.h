@@ -28,26 +28,35 @@
 
 #pragma once
 
-#include "mongo/bson/unordered_fields_bsonelement_comparator.h"
 #include "mongo/db/matcher/expression_leaf.h"
 
 namespace mongo {
 
 /**
- * MatchExpression for $_internalSchemaEq, which behaves similar to $eq except:
+ * An InternalExprEqMatchExpression is an equality expression with similar semantics to the $eq
+ * expression. It differs from the regular equality match expression in the following ways:
  *
- * - leaf arrays are not traversed.
- * - comparisons between objects do not consider field order.
- * - null element values only match the literal null, and not missing or undefined values.
- * - always uses simple string comparison semantics, even if the query has a non-simple collation.
+ * - The document will match if there is an array anywhere along the path. By always returning true
+ *   in such cases, we match a superset of documents that the related aggregation expression would
+ *   match. This sidesteps us having to implement field path expression evaluation as part of this
+ *   match expression.
+ *
+ * - Equality to null matches literal nulls, but not documents in which the field path is missing or
+ *   undefined.
+ *
+ * - Equality to undefined is legal, and matches either literal undefined, or documents in which the
+ *   field path is missing.
  */
-class InternalSchemaEqMatchExpression final : public LeafMatchExpression {
+class InternalExprEqMatchExpression final : public LeafMatchExpression {
 public:
-    static constexpr StringData kName = "$_internalSchemaEq"_sd;
+    static constexpr StringData kName = "$_internalExprEq"_sd;
 
-    InternalSchemaEqMatchExpression(StringData path, BSONElement rhs);
-
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    InternalExprEqMatchExpression(StringData path, BSONElement value)
+        : LeafMatchExpression(MatchType::INTERNAL_EXPR_EQ,
+                              path,
+                              ElementPath::LeafArrayBehavior::kNoTraversal,
+                              ElementPath::NonLeafArrayBehavior::kMatchSubpath),
+          _rhsElem(value) {}
 
     bool matchesSingleElement(const BSONElement&, MatchDetails*) const final;
 
@@ -57,24 +66,24 @@ public:
 
     bool equivalent(const MatchExpression* other) const final;
 
-    size_t numChildren() const final {
-        return 0;
+    std::unique_ptr<MatchExpression> shallowClone() const final;
+
+protected:
+    /**
+     * 'collator' must outlive the InternalExprEqMatchExpression and any clones made of it.
+     */
+    void _doSetCollator(const CollatorInterface* collator) final {
+        _collator = collator;
     }
 
-    MatchExpression* getChild(size_t i) const final {
-        MONGO_UNREACHABLE;
-    }
+    // Collator used to compare elements. By default, simple binary comparison will be used.
+    const CollatorInterface* _collator = nullptr;
 
-    std::vector<MatchExpression*>* getChildVector() final {
-        return nullptr;
-    }
+    BSONElement _rhsElem;
 
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
     }
-
-    UnorderedFieldsBSONElementComparator _eltCmp;
-    BSONElement _rhsElem;
 };
 }  // namespace mongo

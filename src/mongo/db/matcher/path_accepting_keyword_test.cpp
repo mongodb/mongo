@@ -108,6 +108,9 @@ TEST(PathAcceptingKeyword, CanParseKnownMatchTypes) {
     ASSERT_TRUE(PathAcceptingKeyword::INTERNAL_SCHEMA_MAX_LENGTH ==
                 MatchExpressionParser::parsePathAcceptingKeyword(
                     BSON("$_internalSchemaMaxLength" << 1).firstElement()));
+    ASSERT_TRUE(PathAcceptingKeyword::INTERNAL_EXPR_EQ ==
+                MatchExpressionParser::parsePathAcceptingKeyword(
+                    BSON("$_internalExprEq" << 1).firstElement()));
 }
 
 TEST(PathAcceptingKeyword, EqualityMatchReturnsDefault) {
