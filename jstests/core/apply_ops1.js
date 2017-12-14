@@ -524,18 +524,18 @@
     assert.neq(null, spec, "Foreground index 'c_1' not found: " + tojson(allIndexes));
     assert.eq(2, spec.v, "Expected v=2 index to be built");
 
-    // When applying a "u" (update) op, we default to 'ModifierInterface' update semantics, and
-    // $set operations get performed in user order.
+    // When applying a "u" (update) op, we default to 'UpdateNode' update semantics, and $set
+    // operations add new fields in lexicographic order.
     res = assert.commandWorked(db.adminCommand({
         applyOps: [
             {"op": "i", "ns": t.getFullName(), "o": {_id: 6}},
             {"op": "u", "ns": t.getFullName(), "o2": {_id: 6}, "o": {$set: {z: 1, a: 2}}}
         ]
     }));
-    assert.eq(t.findOne({_id: 6}), {_id: 6, z: 1, a: 2});
+    assert.eq(t.findOne({_id: 6}), {_id: 6, a: 2, z: 1});  // Note: 'a' and 'z' have been sorted.
 
-    // When we explicitly specify {$v: 0}, we should also get 'ModifierInterface' update semantics.
-    res = assert.commandWorked(db.adminCommand({
+    // 'ModifierInterface' semantics are not supported, so an update with {$v: 0} should fail.
+    res = assert.commandFailed(db.adminCommand({
         applyOps: [
             {"op": "i", "ns": t.getFullName(), "o": {_id: 7}},
             {
@@ -546,7 +546,7 @@
             }
         ]
     }));
-    assert.eq(t.findOne({_id: 7}), {_id: 7, z: 1, a: 2});
+    assert.eq(res.code, 50659);
 
     // When we explicitly specify {$v: 1}, we should get 'UpdateNode' update semantics, and $set
     // operations get performed in lexicographic order.

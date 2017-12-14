@@ -36,7 +36,6 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/ops/modifier_interface.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/update_object_node.h"
@@ -49,25 +48,11 @@ class OperationContext;
 
 class UpdateDriver {
 public:
-    struct Options;
-    UpdateDriver(const Options& opts);
-
-    ~UpdateDriver();
+    UpdateDriver(const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
-     * Parses the 'updateExpr' update expression. When parsing with the kUpdateNode update
-     * semantics, 'updateExpr' is parsed into the '_root' member variable, and when parsing with the
-     * kModifierInterface update semantics, 'updateExpr' is parsed into the '_mods' member variable.
-     * It is important that the secondary applies updates with the same semantics that the primary
-     * used.
-     *   - The primary can add a "$v" field with an integer value (storing on UpdateSemantics enum
-     *     value) that this function will use to determine which update semantics to use.
-     *   - When applying an oplog entry that has no "$v" field, this function assumes
-     *     kModifierInterface semantics.
-     *   - When applying an update on the primary, this function uses the feature compatibility
-     *     version to determine which update semantics to use.
-     * Uasserts if the featureCompatibilityVersion is 3.4 and 'arrayFilters' is non-empty. Uasserts
-     * or returns a non-ok status if 'updateExpr' fails to parse.
+     * Parses the 'updateExpr' update expression into the '_root' member variable. Uasserts or
+     * returns a non-ok status if 'updateExpr' fails to parse.
      */
     Status parse(
         const BSONObj& updateExpr,
@@ -108,11 +93,9 @@ public:
      *
      * If 'validateForStorage' is true, ensures that modified elements do not violate depth or DBRef
      * constraints. Ensures that no paths in 'immutablePaths' are modified (though they may be
-     * created, if they do not yet exist). The original document 'original' is needed for checking
-     * immutable paths for the ModifierInterface implementation.
+     * created, if they do not yet exist).
      */
     Status update(StringData matchedField,
-                  BSONObj original,
                   mutablebson::Document* doc,
                   bool validateForStorage,
                   const FieldRefSet& immutablePaths,
@@ -123,8 +106,6 @@ public:
     // Accessors
     //
 
-    size_t numMods() const;
-
     bool isDocReplacement() const;
     static bool isDocReplacement(const BSONObj& updateExpr);
 
@@ -134,8 +115,8 @@ public:
     bool logOp() const;
     void setLogOp(bool logOp);
 
-    ModifierInterface::Options modOptions() const;
-    void setModOptions(ModifierInterface::Options modOpts);
+    bool fromOplogApplication() const;
+    void setFromOplogApplication(bool fromOplogApplication);
 
     void setInsert(bool insert) {
         _insert = insert;
@@ -161,9 +142,6 @@ public:
     void setCollator(const CollatorInterface* collator);
 
 private:
-    /** Resets the state of the class associated with mods (not the error state) */
-    void clear();
-
     /** Create the modifier and add it to the back of the modifiers vector */
     inline Status addAndParse(const modifiertable::ModifierType type, const BSONElement& elem);
 
@@ -171,39 +149,37 @@ private:
     // immutable properties after parsing
     //
 
-    // Is there a list of $mod's on '_mods' or is it just full object replacement?
-    bool _replacementMode;
+    // Is this a full object replacement or do we have update modifiers in the '_root' UpdateNode
+    // tree?
+    bool _replacementMode = false;
 
-    // The root of the UpdateNode tree. If the featureCompatibilityVersion is 3.6, the update
-    // expression is parsed into '_root'.
+    // The root of the UpdateNode tree.
     std::unique_ptr<UpdateNode> _root;
-
-    // Collection of update mod instances. Owned here. If the featureCompatibilityVersion is 3.4,
-    // the update expression is parsed into '_mods'.
-    std::vector<ModifierInterface*> _mods;
 
     // What are the list of fields in the collection over which the update is going to be
     // applied that participate in indices?
     //
     // NOTE: Owned by the collection's info cache!.
-    const UpdateIndexData* _indexedFields;
+    const UpdateIndexData* _indexedFields = nullptr;
 
     //
     // mutable properties after parsing
     //
 
     // Should this driver generate an oplog record when it applies the update?
-    bool _logOp;
+    bool _logOp = false;
 
-    // The options to initiate the mods with
-    ModifierInterface::Options _modOptions;
+    // True if this update comes from an oplog application.
+    bool _fromOplogApplication = false;
+
+    boost::intrusive_ptr<ExpressionContext> _expCtx;
 
     // Are any of the fields mentioned in the mods participating in any index? Is set anew
     // at each call to update.
-    bool _affectIndices;
+    bool _affectIndices = false;
 
     // Do any of the mods require positional match details when calling 'prepare'?
-    bool _positional;
+    bool _positional = false;
 
     // Is this update going to be an upsert?
     bool _insert = false;
@@ -213,14 +189,6 @@ private:
 
     // The document used to build the oplog entry for the update.
     mutablebson::Document _logDoc;
-};
-
-struct UpdateDriver::Options {
-    bool logOp;
-    ModifierInterface::Options modOptions;
-
-    explicit Options(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : logOp(false), modOptions(ModifierInterface::Options::normal(expCtx)) {}
 };
 
 }  // namespace mongo

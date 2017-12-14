@@ -48,14 +48,6 @@ void storageValid(const mutablebson::Document& doc);
  */
 void storageValid(mutablebson::ConstElement elem, const bool deep, std::uint32_t recursionLevel);
 
-/**
- * Checks that all of the parents of the MutableBSON element 'elem' are valid for storage. Note that
- * 'elem' must be in a valid state when using this function. Uasserts if the validation fails, or if
- * 'recursionLevel' exceeds the maximum allowable depth. On success, an integer is returned that
- * represents the number of steps from this element to the root through ancestor nodes.
- */
-std::uint32_t storageValidParents(mutablebson::ConstElement elem, std::uint32_t recursionLevel);
-
 }  // namespace storage_validation
 
 }  // namespace mongo
