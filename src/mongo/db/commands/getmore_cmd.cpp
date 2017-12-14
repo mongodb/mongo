@@ -282,21 +282,19 @@ public:
         if (cursor->isReadCommitted())
             uassertStatusOK(opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
 
+        const bool hasOwnMaxTime = opCtx->hasDeadline();
+
         const bool disableAwaitDataFailpointActive =
             MONGO_FAIL_POINT(disableAwaitDataForGetMoreCmd);
-
         // We assume that cursors created through a DBDirectClient are always used from their
         // original OperationContext, so we do not need to move time to and from the cursor.
-        if (!opCtx->getClient()->isInDirectClient()) {
+        if (!hasOwnMaxTime && !opCtx->getClient()->isInDirectClient()) {
             // There is no time limit set directly on this getMore command. If the cursor is
             // awaitData, then we supply a default time of one second. Otherwise we roll over
             // any leftover time from the maxTimeMS of the operation that spawned this cursor,
             // applying it to this getMore.
             if (cursor->isAwaitData() && !disableAwaitDataFailpointActive) {
-                opCtx->clearDeadline();
-                awaitDataState(opCtx).waitForInsertsDeadline =
-                    opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                    request.awaitDataTimeout.value_or(Seconds{1});
+                opCtx->setDeadlineAfterNowBy(Seconds{1});
             } else if (cursor->getLeftoverMaxTimeMicros() < Microseconds::max()) {
                 opCtx->setDeadlineAfterNowBy(cursor->getLeftoverMaxTimeMicros());
             }
@@ -338,7 +336,7 @@ public:
         if (cursor->isAwaitData() && !disableAwaitDataFailpointActive) {
             if (request.lastKnownCommittedOpTime)
                 clientsLastKnownCommittedOpTime(opCtx) = request.lastKnownCommittedOpTime.get();
-            awaitDataState(opCtx).shouldWaitForInserts = true;
+            shouldWaitForInserts(opCtx) = true;
         }
 
         Status batchStatus = generateBatch(opCtx, cursor, request, &nextBatch, &state, &numResults);
@@ -368,7 +366,12 @@ public:
             exec->saveState();
             exec->detachFromOperationContext();
 
-            cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
+            // If maxTimeMS was set directly on the getMore rather than being rolled over
+            // from a previous find, then don't roll remaining micros over to the next
+            // getMore.
+            if (!hasOwnMaxTime) {
+                cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
+            }
 
             cursor->incPos(numResults);
         } else {
@@ -436,7 +439,7 @@ public:
                 }
 
                 // As soon as we get a result, this operation no longer waits.
-                awaitDataState(opCtx).shouldWaitForInserts = false;
+                shouldWaitForInserts(opCtx) = false;
                 // Add result to output buffer.
                 nextBatch->setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
                 nextBatch->append(obj);

@@ -45,7 +45,6 @@
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -63,6 +62,8 @@ using std::string;
 using std::unique_ptr;
 using std::vector;
 
+const OperationContext::Decoration<bool> shouldWaitForInserts =
+    OperationContext::declareDecoration<bool>();
 const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommittedOpTime =
     OperationContext::declareDecoration<repl::OpTime>();
 
@@ -423,9 +424,8 @@ bool PlanExecutor::shouldWaitForInserts() {
     // If this is an awaitData-respecting operation and we have time left and we're not interrupted,
     // we should wait for inserts.
     if (_cq && _cq->getQueryRequest().isTailableAndAwaitData() &&
-        awaitDataState(_opCtx).shouldWaitForInserts && _opCtx->checkForInterruptNoAssert().isOK() &&
-        awaitDataState(_opCtx).waitForInsertsDeadline >
-            _opCtx->getServiceContext()->getPreciseClockSource()->now()) {
+        mongo::shouldWaitForInserts(_opCtx) && _opCtx->checkForInterruptNoAssert().isOK() &&
+        _opCtx->getRemainingMaxTimeMicros() > Microseconds::zero()) {
         // We expect awaitData cursors to be yielding.
         invariant(_yieldPolicy->canReleaseLocksDuringExecution());
 
@@ -470,21 +470,15 @@ PlanExecutor::ExecState PlanExecutor::waitForInserts(CappedInsertNotifierData* n
     auto opCtx = _opCtx;
     uint64_t currentNotifierVersion = notifierData->notifier->getVersion();
     auto yieldResult = _yieldPolicy->yield(nullptr, [opCtx, notifierData] {
-        const auto deadline = awaitDataState(opCtx).waitForInsertsDeadline;
-        notifierData->notifier->waitUntil(notifierData->lastEOFVersion, deadline);
+        const auto timeout = opCtx->getRemainingMaxTimeMicros();
+        notifierData->notifier->wait(notifierData->lastEOFVersion, timeout);
     });
     notifierData->lastEOFVersion = currentNotifierVersion;
-
     if (yieldResult.isOK()) {
         // There may be more results, try to get more data.
         return ADVANCED;
     }
-
-    if (errorObj) {
-        *errorObj = Snapshotted<BSONObj>(SnapshotId(),
-                                         WorkingSetCommon::buildMemberStatusObject(yieldResult));
-    }
-    return DEAD;
+    return swallowTimeoutIfAwaitData(yieldResult, errorObj);
 }
 
 PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, RecordId* dlOut) {
@@ -540,11 +534,7 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
         if (_yieldPolicy->shouldYield()) {
             auto yieldStatus = _yieldPolicy->yield(fetcher.get());
             if (!yieldStatus.isOK()) {
-                if (objOut) {
-                    *objOut = Snapshotted<BSONObj>(
-                        SnapshotId(), WorkingSetCommon::buildMemberStatusObject(yieldStatus));
-                }
-                return PlanExecutor::DEAD;
+                return swallowTimeoutIfAwaitData(yieldStatus, objOut);
             }
         }
 
@@ -695,6 +685,23 @@ Status PlanExecutor::executePlan() {
 
 void PlanExecutor::enqueue(const BSONObj& obj) {
     _stash.push(obj.getOwned());
+}
+
+PlanExecutor::ExecState PlanExecutor::swallowTimeoutIfAwaitData(
+    Status yieldError, Snapshotted<BSONObj>* errorObj) const {
+    if (yieldError == ErrorCodes::ExceededTimeLimit) {
+        if (_cq && _cq->getQueryRequest().isTailableAndAwaitData()) {
+            // If the cursor is tailable then exceeding the time limit should not destroy this
+            // PlanExecutor, we should just stop waiting for inserts.
+            return PlanExecutor::IS_EOF;
+        }
+    }
+
+    if (errorObj) {
+        *errorObj = Snapshotted<BSONObj>(SnapshotId(),
+                                         WorkingSetCommon::buildMemberStatusObject(yieldError));
+    }
+    return PlanExecutor::DEAD;
 }
 
 Timestamp PlanExecutor::getLatestOplogTimestamp() {

@@ -34,7 +34,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/query/find_common.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/scopeguard.h"
 
@@ -105,7 +104,7 @@ void DocumentSourceCursor::loadBatch() {
                 // we need the whole pipeline to see each document to see if we should stop waiting.
                 // Furthermore, if we need to return the latest oplog time (in the tailable and
                 // needs-merge case), batching will result in a wrong time.
-                if (awaitDataState(pExpCtx->opCtx).shouldWaitForInserts ||
+                if (shouldWaitForInserts(pExpCtx->opCtx) ||
                     (pExpCtx->isTailableAwaitData() && pExpCtx->needsMerge) ||
                     memUsageBytes > internalDocumentSourceCursorBatchSizeBytes.load()) {
                     // End this batch and prepare PlanExecutor for yielding.
