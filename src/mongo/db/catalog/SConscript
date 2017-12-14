@@ -119,6 +119,21 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='catalog_raii',
+    source=[
+        'catalog_raii.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/views/views',
+        'collection',
+        'database',
+        'uuid_catalog',
+    ],
+)
+
 env.CppUnitTest(
     target='database_test',
     source=[
@@ -205,7 +220,7 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='catalog',
+    target='catalog_impl',
     source=[
         "collection_compact.cpp",
         "collection_impl.cpp",

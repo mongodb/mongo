@@ -32,10 +32,9 @@
 #include <vector>
 
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"

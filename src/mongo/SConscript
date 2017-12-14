@@ -281,7 +281,6 @@ env.Library(
         "db/mongod_options_init.cpp",
     ],
     LIBDEPS=[
-        'db/catalog/catalog',
         'db/clientcursor',
         'db/commands/core',
         'db/conn_pool_options',

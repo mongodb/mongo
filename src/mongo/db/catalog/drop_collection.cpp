@@ -33,8 +33,6 @@
 #include "mongo/db/catalog/drop_collection.h"
 
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"

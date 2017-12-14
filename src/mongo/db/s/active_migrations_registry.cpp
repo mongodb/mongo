@@ -31,7 +31,7 @@
 #include "mongo/db/s/active_migrations_registry.h"
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/migration_source_manager.h"

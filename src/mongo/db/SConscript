@@ -533,13 +533,10 @@ env.Library(
         'db_raii.cpp',
     ],
     LIBDEPS=[
+        'catalog/catalog_raii',
         'curop',
+        's/sharding',
         'stats/top',
-        'views/views',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/s/sharding',
-        '$BUILD_DIR/mongo/db/catalog/database',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
     ],
 )
 
@@ -793,7 +790,7 @@ env.Library(
         "auth/authmongod",
         "authz_manager_external_state_factory_d",
         "background",
-        "catalog/catalog",
+        "catalog/catalog_impl",
         "catalog/collection_options",
         "catalog/document_validation",
         "catalog/index_key_validate",

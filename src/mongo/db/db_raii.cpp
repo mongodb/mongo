@@ -30,95 +30,14 @@
 
 #include "mongo/db/db_raii.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
-
-namespace {
-MONGO_FP_DECLARE(setAutoGetCollectionWait);
-}  // namespace
-
-AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData ns, LockMode mode)
-    : _dbLock(opCtx, ns, mode), _db(dbHolder().get(opCtx, ns)) {}
-
-AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData ns, Lock::DBLock lock)
-    : _dbLock(std::move(lock)), _db(dbHolder().get(opCtx, ns)) {}
-
-AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const UUID& uuid,
-                                     LockMode modeAll)
-    : _viewMode(ViewMode::kViewsForbidden),
-      _autoDb(opCtx, nss.db(), Lock::DBLock(opCtx, nss.db(), modeAll)),
-      _collLock(opCtx->lockState(), nss.ns(), modeAll),
-      _coll(UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid)) {
-    // Wait for a configured amount of time after acquiring locks if the failpoint is enabled.
-    MONGO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
-        const BSONObj& data = customWait.getData();
-        sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
-    }
-}
-
-AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     LockMode modeDB,
-                                     LockMode modeColl,
-                                     ViewMode viewMode)
-    : AutoGetCollection(opCtx, nss, modeColl, viewMode, Lock::DBLock(opCtx, nss.db(), modeDB)) {}
-
-AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     LockMode modeColl,
-                                     ViewMode viewMode,
-                                     Lock::DBLock lock)
-    : _viewMode(viewMode),
-      _autoDb(opCtx, nss.db(), std::move(lock)),
-      _collLock(opCtx->lockState(), nss.ns(), modeColl),
-      _coll(_autoDb.getDb() ? _autoDb.getDb()->getCollection(opCtx, nss) : nullptr) {
-    Database* db = _autoDb.getDb();
-    // If the database exists, but not the collection, check for views.
-    if (_viewMode == ViewMode::kViewsForbidden && db && !_coll &&
-        db->getViewCatalog()->lookup(opCtx, nss.ns()))
-        uasserted(ErrorCodes::CommandNotSupportedOnView,
-                  str::stream() << "Namespace " << nss.ns() << " is a view, not a collection");
-
-    // Wait for a configured amount of time after acquiring locks if the failpoint is enabled.
-    MONGO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
-        const BSONObj& data = customWait.getData();
-        sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
-    }
-}
-
-AutoGetCollectionOrView::AutoGetCollectionOrView(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 LockMode modeAll)
-    : _autoColl(opCtx, nss, modeAll, modeAll, AutoGetCollection::ViewMode::kViewsPermitted),
-      _view(_autoColl.getDb() && !_autoColl.getCollection()
-                ? _autoColl.getDb()->getViewCatalog()->lookup(opCtx, nss.ns())
-                : nullptr) {}
-
-AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx, StringData ns, LockMode mode)
-    : _dbLock(opCtx, ns, mode), _db(dbHolder().get(opCtx, ns)) {
-    invariant(mode == MODE_IX || mode == MODE_X);
-    _justCreated = false;
-    // If the database didn't exist, relock in MODE_X
-    if (_db == NULL) {
-        if (mode != MODE_X) {
-            _dbLock.relockWithMode(MODE_X);
-        }
-        _db = dbHolder().openDb(opCtx, ns);
-        _justCreated = true;
-    }
-}
 
 AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
                                    const NamespaceString& nss,
@@ -133,6 +52,7 @@ AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
             dbProfilingLevel = autoDb.getDb()->getProfilingLevel();
         }
     }
+
     stdx::lock_guard<Client> clientLock(*_opCtx->getClient());
     CurOp::get(_opCtx)->enter_inlock(nss.ns().c_str(), dbProfilingLevel);
 }
