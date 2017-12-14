@@ -1231,20 +1231,12 @@ functions:
         working_dir: src
         script: |
           set -o errexit
-          # Copy buildscripts, mongoDB executables and debug symbols to the remote host.
+          # Copy buildscripts and mongoDB executables to the remote host.
           file_param="--file buildscripts"
           mongo_executables="mongo mongod mongos"
-          file_extensions=".debug .dSYM .pdb"
           for executable in $mongo_executables
           do
             file_param="$file_param --file $executable${exe}"
-            for extension in $file_extensions
-            do
-              file=$executable$extension
-              if [[ -f $file || -d $file ]]; then
-                file_param="$file_param --file $file"
-              fi
-            done
           done
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
@@ -1963,6 +1955,24 @@ timeout:
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           # buildscripts must be installed in ${remote_dir} on the remote host.
           remote_dir=${remote_dir|.}
+
+          # Copy mongoDB debug symbols to the remote host.
+          debug_files=$(ls *.debug *.dSYM *.pdb 2> /dev/null)
+          for debug_file in $debug_files
+          do
+            file_param="$file_param --file $debug_file"
+          done
+          if [ ! -z "$file_param" ]; then
+            ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+              --verbose                                        \
+              --userHost $USER@${ip_address}                   \
+              --operation "copy_to"                            \
+              --sshConnectionOptions "$ssh_connection_options" \
+              --retries ${ssh_retries}                         \
+              $file_param                                      \
+              --remoteDir $remote_dir
+          fi
+
           cmds="PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
             --verbose                                        \
