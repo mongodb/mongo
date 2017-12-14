@@ -27,9 +27,29 @@
  */
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+
+/**
+ * The state associated with tailable cursors.
+ */
+struct AwaitDataState {
+    /**
+     * The deadline for how long we wait on the tail of capped collection before returning IS_EOF.
+     */
+    Date_t waitForInsertsDeadline;
+
+    /**
+     * If true, when no results are available from a plan, then instead of returning immediately,
+     * the system should wait up to the length of the operation deadline for data to be inserted
+     * which causes results to become available.
+     */
+    bool shouldWaitForInserts;
+};
+
+extern const OperationContext::Decoration<AwaitDataState> awaitDataState;
 
 class BSONObj;
 class QueryRequest;
