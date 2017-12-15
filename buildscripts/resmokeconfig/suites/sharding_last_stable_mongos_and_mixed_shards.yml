@@ -109,6 +109,8 @@ selector:
   # New failpoint in v3.6 shard mongod.
   - jstests/sharding/cleanup_orphaned_cmd_prereload.js
   - jstests/sharding/pending_chunk.js
+  # New waitForClusterTime
+  - jstests/sharding/auth_slaveok_routing.js
 
 executor:
   config:

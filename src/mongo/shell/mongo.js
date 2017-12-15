@@ -441,3 +441,24 @@ Mongo.prototype.isCausalConsistency = function isCausalConsistency() {
 Mongo.prototype.setCausalConsistency = function setCausalConsistency(causalConsistency = true) {
     this._causalConsistency = causalConsistency;
 };
+
+Mongo.prototype.waitForClusterTime = function waitForClusterTime(maxRetries = 10) {
+    let isFirstTime = true;
+    let count = 0;
+    while (count < maxRetries) {
+        if (typeof this._clusterTime === "object" && this._clusterTime !== null) {
+            if (this._clusterTime.hasOwnProperty("signature") &&
+                this._clusterTime.signature.keyId > 0) {
+                return;
+            }
+        }
+        if (isFirstTime) {
+            isFirstTime = false;
+        } else {
+            sleep(500);
+        }
+        count++;
+        this.adminCommand({"ping": 1});
+    }
+    throw new Error("failed waiting for non default clusterTime");
+};
