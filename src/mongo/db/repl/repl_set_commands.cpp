@@ -167,7 +167,7 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
 
@@ -196,7 +196,7 @@ public:
         if (cmdObj["forShell"].trueValue())
             LastError::get(opCtx->getClient()).disable();
 
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
 
@@ -211,7 +211,8 @@ public:
         if (includeInitialSync) {
             responseStyle = ReplicationCoordinator::ReplSetGetStatusResponseStyle::kInitialSync;
         }
-        status = getGlobalReplicationCoordinator()->processReplSetGetStatus(&result, responseStyle);
+        status =
+            ReplicationCoordinator::get(opCtx)->processReplSetGetStatus(&result, responseStyle);
         return CommandHelpers::appendCommandStatus(result, status);
     }
 
@@ -233,11 +234,11 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
 
-        getGlobalReplicationCoordinator()->processReplSetGetConfig(&result);
+        ReplicationCoordinator::get(opCtx)->processReplSetGetConfig(&result);
         return true;
     }
 
@@ -403,7 +404,7 @@ public:
         }
 
         Status status =
-            getGlobalReplicationCoordinator()->processReplSetInitiate(opCtx, configObj, &result);
+            ReplicationCoordinator::get(opCtx)->processReplSetInitiate(opCtx, configObj, &result);
         return CommandHelpers::appendCommandStatus(result, status);
     }
 
@@ -425,7 +426,7 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatus(result, status);
         }
@@ -439,7 +440,7 @@ public:
         parsedArgs.newConfigObj = cmdObj["replSetReconfig"].Obj();
         parsedArgs.force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
         status =
-            getGlobalReplicationCoordinator()->processReplSetReconfig(opCtx, parsedArgs, &result);
+            ReplicationCoordinator::get(opCtx)->processReplSetReconfig(opCtx, parsedArgs, &result);
 
         Lock::GlobalWrite globalWrite(opCtx);
 
@@ -482,13 +483,13 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
 
         int secs = (int)cmdObj.firstElement().numberInt();
         return CommandHelpers::appendCommandStatus(
-            result, getGlobalReplicationCoordinator()->processReplSetFreeze(secs, &result));
+            result, ReplicationCoordinator::get(opCtx)->processReplSetFreeze(secs, &result));
     }
 
 private:
@@ -512,7 +513,7 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
 
@@ -554,7 +555,7 @@ public:
 
         log() << "Attempting to step down in response to replSetStepDown command";
 
-        status = getGlobalReplicationCoordinator()->stepDown(
+        status = ReplicationCoordinator::get(opCtx)->stepDown(
             opCtx, force, Seconds(secondaryCatchUpPeriodSecs), Seconds(stepDownForSecs));
         return CommandHelpers::appendCommandStatus(result, status);
     }
@@ -576,13 +577,13 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
 
         return CommandHelpers::appendCommandStatus(
             result,
-            getGlobalReplicationCoordinator()->setMaintenanceMode(
+            ReplicationCoordinator::get(opCtx)->setMaintenanceMode(
                 cmdObj["replSetMaintenance"].trueValue()));
     }
 
@@ -604,7 +605,7 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
 
@@ -615,7 +616,7 @@ public:
 
         return CommandHelpers::appendCommandStatus(
             result,
-            getGlobalReplicationCoordinator()->processReplSetSyncFrom(
+            ReplicationCoordinator::get(opCtx)->processReplSetSyncFrom(
                 opCtx, targetHostAndPort, &result));
     }
 
@@ -727,7 +728,7 @@ public:
         Status status = Status(ErrorCodes::InternalError, "status not set in heartbeat code");
         /* we don't call ReplSetCommand::check() here because heartbeat
            checks many things that are pre-initialization. */
-        if (!getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
+        if (!ReplicationCoordinator::get(opCtx)->getSettings().usingReplSets()) {
             status = Status(ErrorCodes::NoReplicationEnabled, "not running with --replSet");
             return CommandHelpers::appendCommandStatus(result, status);
         }
@@ -739,7 +740,7 @@ public:
             status = args.initialize(cmdObj);
             if (status.isOK()) {
                 ReplSetHeartbeatResponse response;
-                status = getGlobalReplicationCoordinator()->processHeartbeatV1(args, &response);
+                status = ReplicationCoordinator::get(opCtx)->processHeartbeatV1(args, &response);
                 if (status.isOK())
                     response.addToBSON(&result, true);
 
@@ -764,7 +765,7 @@ public:
         }
 
         ReplSetHeartbeatResponse response;
-        status = getGlobalReplicationCoordinator()->processHeartbeat(args, &response);
+        status = ReplicationCoordinator::get(opCtx)->processHeartbeat(args, &response);
         if (status.isOK())
             response.addToBSON(&result, false);
 
@@ -785,7 +786,7 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
 
@@ -802,7 +803,7 @@ public:
         parsedArgs.cfgver = cfgverElement.safeNumberLong();
         parsedArgs.opTime = Timestamp(cmdObj["opTime"].Date());
 
-        status = getGlobalReplicationCoordinator()->processReplSetFresh(parsedArgs, &result);
+        status = ReplicationCoordinator::get(opCtx)->processReplSetFresh(parsedArgs, &result);
         return CommandHelpers::appendCommandStatus(result, status);
     }
 } cmdReplSetFresh;
@@ -819,7 +820,7 @@ private:
         DEV log() << "received elect msg " << cmdObj.toString();
         else LOG(2) << "received elect msg " << cmdObj.toString();
 
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
 
@@ -835,7 +836,7 @@ private:
         parsedArgs.cfgver = cfgverElement.safeNumberLong();
         parsedArgs.round = cmdObj["round"].OID();
 
-        status = getGlobalReplicationCoordinator()->processReplSetElect(parsedArgs, &result);
+        status = ReplicationCoordinator::get(opCtx)->processReplSetElect(parsedArgs, &result);
         return CommandHelpers::appendCommandStatus(result, status);
     }
 } cmdReplSetElect;
@@ -848,13 +849,13 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
 
         log() << "Received replSetStepUp request";
 
-        status = getGlobalReplicationCoordinator()->stepUpIfEligible();
+        status = ReplicationCoordinator::get(opCtx)->stepUpIfEligible();
 
         if (!status.isOK()) {
             log() << "replSetStepUp request failed" << causedBy(status);
@@ -883,12 +884,12 @@ public:
                      const string&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK())
             return CommandHelpers::appendCommandStatus(result, status);
         log() << "Received replSetAbortPrimaryCatchUp request";
 
-        status = getGlobalReplicationCoordinator()->abortCatchupIfNeeded();
+        status = ReplicationCoordinator::get(opCtx)->abortCatchupIfNeeded();
         if (!status.isOK()) {
             log() << "replSetAbortPrimaryCatchUp request failed" << causedBy(status);
         }

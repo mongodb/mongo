@@ -711,7 +711,7 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx, const BSONObj& spec)
     } else {
         // for non _id indexes, we check to see if replication has turned off all indexes
         // we _always_ created _id index
-        if (!repl::getGlobalReplicationCoordinator()->buildsIndexes()) {
+        if (!repl::ReplicationCoordinator::get(opCtx)->buildsIndexes()) {
             // this is not exactly the right error code, but I think will make the most sense
             return Status(ErrorCodes::IndexAlreadyExists, "no indexes per repl");
         }

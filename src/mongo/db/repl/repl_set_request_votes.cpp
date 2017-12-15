@@ -51,7 +51,7 @@ private:
              const std::string&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
-        Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatus(result, status);
         }
@@ -63,7 +63,7 @@ private:
         }
 
         ReplSetRequestVotesResponse response;
-        status = getGlobalReplicationCoordinator()->processReplSetRequestVotes(
+        status = ReplicationCoordinator::get(opCtx)->processReplSetRequestVotes(
             opCtx, parsedArgs, &response);
         response.addToBSON(&result);
         return CommandHelpers::appendCommandStatus(result, status);

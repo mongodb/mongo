@@ -226,7 +226,7 @@ void RenameCollectionTest::setUp() {
     auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorMock>(service);
     _replCoord = replCoord.get();
     repl::ReplicationCoordinator::set(service, std::move(replCoord));
-    repl::setOplogCollectionName();
+    repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
 
     // Ensure that we are primary.

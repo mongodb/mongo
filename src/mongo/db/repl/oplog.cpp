@@ -218,8 +218,8 @@ private:
 
 }  // namespace
 
-void setOplogCollectionName() {
-    switch (getGlobalReplicationCoordinator()->getReplicationMode()) {
+void setOplogCollectionName(ServiceContext* service) {
+    switch (ReplicationCoordinator::get(service)->getReplicationMode()) {
         case ReplicationCoordinator::modeReplSet:
             _oplogCollectionName = NamespaceString::kRsOplogNamespace.ns();
             break;

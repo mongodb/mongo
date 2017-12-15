@@ -372,7 +372,7 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Databas
 unsigned long long checkIfReplMissingFromCommandLine(OperationContext* opCtx) {
     // This is helpful for the query below to work as you can't open files when readlocked
     Lock::GlobalWrite lk(opCtx);
-    if (!repl::getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->getSettings().usingReplSets()) {
         DBDirectClient c(opCtx);
         return c.count(kSystemReplSetCollection.ns());
     }
@@ -434,7 +434,8 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         }
     }
 
-    const repl::ReplSettings& replSettings = repl::getGlobalReplicationCoordinator()->getSettings();
+    const repl::ReplSettings& replSettings =
+        repl::ReplicationCoordinator::get(opCtx)->getSettings();
 
     if (!storageGlobalParams.readOnly) {
         StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> swIndexesToRebuild =
@@ -918,7 +919,7 @@ ExitCode _initAndListen(int listenPort) {
 
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
-            if (!repl::getGlobalReplicationCoordinator()->isReplEnabled()) {
+            if (!repl::ReplicationCoordinator::get(startupOpCtx.get())->isReplEnabled()) {
                 uassertStatusOK(ShardingStateRecovery::recover(startupOpCtx.get()));
             }
         } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
@@ -1202,7 +1203,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
         storageInterface,
         static_cast<int64_t>(curTimeMillis64()));
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
-    repl::setOplogCollectionName();
+    repl::setOplogCollectionName(serviceContext);
     return Status::OK();
 }
 

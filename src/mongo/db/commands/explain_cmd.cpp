@@ -152,7 +152,7 @@ public:
         // Check whether the child command is allowed to run here. TODO: this logic is
         // copied from Command::execCommand and should be abstracted. Until then, make
         // sure to keep it up to date.
-        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+        repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
         bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
         bool commandCanRunOnSecondary = commToExplain->slaveOk();
 

@@ -240,7 +240,7 @@ public:
                      BSONObjBuilder& result) {
         bool didRotate = rotateLogs(serverGlobalParams.logRenameOnRotate);
         if (didRotate)
-            logProcessDetailsForLogRotate();
+            logProcessDetailsForLogRotate(opCtx->getServiceContext());
         return didRotate;
     }
 

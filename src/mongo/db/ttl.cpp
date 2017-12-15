@@ -121,9 +121,9 @@ private:
         OperationContext& opCtx = *opCtxPtr;
 
         // If part of replSet but not in a readable state (e.g. during initial sync), skip.
-        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
+        if (repl::ReplicationCoordinator::get(&opCtx)->getReplicationMode() ==
                 repl::ReplicationCoordinator::modeReplSet &&
-            !repl::getGlobalReplicationCoordinator()->getMemberState().readable())
+            !repl::ReplicationCoordinator::get(&opCtx)->getMemberState().readable())
             return;
 
         TTLCollectionCache& ttlCollectionCache = TTLCollectionCache::get(getGlobalServiceContext());
@@ -195,7 +195,7 @@ private:
             return;
         }
 
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, collectionNSS)) {
+        if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionNSS)) {
             return;
         }
 

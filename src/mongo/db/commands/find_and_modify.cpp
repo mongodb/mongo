@@ -186,7 +186,7 @@ void appendCommandResponse(const PlanExecutor* exec,
 }
 
 Status checkCanAcceptWritesForDatabase(OperationContext* opCtx, const NamespaceString& nsString) {
-    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nsString)) {
+    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nsString)) {
         return Status(ErrorCodes::NotMaster,
                       str::stream()
                           << "Not primary while running findAndModify command on collection "

@@ -153,7 +153,7 @@ Status dropIndexes(OperationContext* opCtx,
             AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
 
             bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-                !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss);
+                !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);
 
             if (userInitiatedWritesAndNotPrimary) {
                 return Status(ErrorCodes::NotMaster,

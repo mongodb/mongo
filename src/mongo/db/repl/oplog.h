@@ -245,7 +245,7 @@ void setNewTimestamp(ServiceContext* opCtx, const Timestamp& newTime);
 /**
  * Detects the current replication mode and sets the "_oplogCollectionName" accordingly.
  */
-void setOplogCollectionName();
+void setOplogCollectionName(ServiceContext* service);
 
 /**
  * Signal any waiting AwaitData queries on the oplog that there is new data or metadata available.

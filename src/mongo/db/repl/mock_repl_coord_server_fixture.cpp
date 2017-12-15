@@ -81,7 +81,7 @@ void MockReplCoordServerFixture::setUp() {
     ASSERT_TRUE(
         client.createCollection(NamespaceString::kRsOplogNamespace.ns(), 1024 * 1024, true));
 
-    repl::setOplogCollectionName();
+    repl::setOplogCollectionName(service);
     repl::acquireOplogCollectionForLogging(opCtx());
 }
 

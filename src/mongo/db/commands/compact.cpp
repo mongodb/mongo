@@ -93,7 +93,7 @@ public:
                            BSONObjBuilder& result) {
         NamespaceString nss = CommandHelpers::parseNsCollectionRequired(db, cmdObj);
 
-        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+        repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (replCoord->getMemberState().primary() && !cmdObj["force"].trueValue()) {
             errmsg =
                 "will not run compact on an active replica set primary as this is a slow blocking "

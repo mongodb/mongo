@@ -233,7 +233,7 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     invariant(!_bgSync);
     log() << "Starting replication fetcher thread";
     _bgSync = stdx::make_unique<BackgroundSync>(
-        this, _replicationProcess, makeSteadyStateOplogBuffer(opCtx));
+        replCoord, this, _replicationProcess, makeSteadyStateOplogBuffer(opCtx));
     _bgSync->startup(opCtx);
 
     log() << "Starting replication applier thread";
@@ -348,7 +348,7 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
         // oplog. We record this update at the 'lastAppliedOpTime'. If there are any outstanding
         // checkpoints being taken, they should only reflect this write if they see all writes up
         // to our 'lastAppliedOpTime'.
-        auto lastAppliedOpTime = repl::getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();
+        auto lastAppliedOpTime = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
         _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
             opCtx, lastAppliedOpTime.getTimestamp());
     }
@@ -466,7 +466,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     // to our 'lastAppliedOpTime'.
     invariant(
         _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
-    auto lastAppliedOpTime = repl::getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();
+    auto lastAppliedOpTime = repl::ReplicationCoordinator::get(opCtx)->getMyLastAppliedOpTime();
     _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
         opCtx, lastAppliedOpTime.getTimestamp());
 
@@ -912,11 +912,11 @@ std::size_t ReplicationCoordinatorExternalStateImpl::getOplogFetcherMaxFetcherRe
 }
 
 JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken() {
-    return repl::getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();
+    return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTime();
 }
 
 void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::Token& token) {
-    repl::getGlobalReplicationCoordinator()->setMyLastDurableOpTimeForward(token);
+    repl::ReplicationCoordinator::get(_service)->setMyLastDurableOpTimeForward(token);
 }
 
 void ReplicationCoordinatorExternalStateImpl::startNoopWriter(OpTime opTime) {

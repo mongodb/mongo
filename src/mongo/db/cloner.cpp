@@ -148,7 +148,7 @@ struct Cloner::Fun {
                           << " to "
                           << to_collection.ns(),
             !opCtx->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, to_collection));
+                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, to_collection));
 
         // Make sure database still exists after we resume from the temp release
         Database* db = dbHolder().openDb(opCtx, _dbName);
@@ -204,7 +204,7 @@ struct Cloner::Fun {
                     uassert(ErrorCodes::PrimarySteppedDown,
                             str::stream() << "Cannot write to ns: " << to_collection.ns()
                                           << " after yielding",
-                            repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(
+                            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(
                                 opCtx, to_collection));
                 }
 
@@ -336,7 +336,7 @@ void Cloner::copy(OperationContext* opCtx,
                           << " with filter "
                           << query.toString(),
             !opCtx->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, to_collection));
+                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, to_collection));
 }
 
 void Cloner::copyIndexes(OperationContext* opCtx,
@@ -359,7 +359,7 @@ void Cloner::copyIndexes(OperationContext* opCtx,
                           << to_collection.ns()
                           << " (Cloner)",
             !opCtx->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, to_collection));
+                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, to_collection));
 
 
     if (indexesToBuild.empty())
@@ -472,7 +472,7 @@ bool Cloner::copyCollection(OperationContext* opCtx,
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while copying collection " << ns << " (Cloner)",
             !opCtx->writesAreReplicated() ||
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss));
+                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
     Database* db = dbHolder().openDb(opCtx, dbname);
 
@@ -714,7 +714,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
         str::stream() << "Not primary while cloning database " << opts.fromDB
                       << " (after getting list of collections to clone)",
         !opCtx->writesAreReplicated() ||
-            repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(opCtx, toDBName));
+            repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, toDBName));
 
     if (opts.syncData) {
         if (opts.createCollections) {

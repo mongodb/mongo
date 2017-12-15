@@ -311,7 +311,7 @@ Status _collModInternal(OperationContext* opCtx,
     OldClientContext ctx(opCtx, nss.ns());
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss);
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
@@ -650,7 +650,7 @@ void updateUUIDSchemaVersion(OperationContext* opCtx, bool upgrade) {
     const WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,
                                            WriteConcernOptions::SyncMode::UNSET,
                                            /*timeout*/ INT_MAX);
-    repl::getGlobalReplicationCoordinator()->awaitReplication(opCtx, awaitOpTime, writeConcern);
+    repl::ReplicationCoordinator::get(opCtx)->awaitReplication(opCtx, awaitOpTime, writeConcern);
 }
 
 Status updateUUIDSchemaVersionNonReplicated(OperationContext* opCtx, bool upgrade) {

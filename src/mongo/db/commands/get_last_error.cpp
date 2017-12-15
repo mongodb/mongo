@@ -146,7 +146,7 @@ public:
 
         // Always append lastOp and connectionId
         Client& c = *opCtx->getClient();
-        auto replCoord = repl::getGlobalReplicationCoordinator();
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
             const repl::OpTime lastOp = repl::ReplClientInfo::forClient(c).getLastOp();
             if (!lastOp.isNull()) {
@@ -227,7 +227,7 @@ public:
         WriteConcernOptions writeConcern;
 
         if (useDefaultGLEOptions) {
-            writeConcern = repl::getGlobalReplicationCoordinator()->getGetLastErrorDefault();
+            writeConcern = repl::ReplicationCoordinator::get(opCtx)->getGetLastErrorDefault();
         }
 
         Status status = writeConcern.parse(writeConcernDoc);
@@ -259,7 +259,7 @@ public:
 
         // If we got an electionId, make sure it matches
         if (electionIdPresent) {
-            if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+            if (repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
                 repl::ReplicationCoordinator::modeReplSet) {
                 // Ignore electionIds of 0 from mongos.
                 if (electionId != OID()) {
@@ -269,9 +269,9 @@ public:
                     return false;
                 }
             } else {
-                if (electionId != repl::getGlobalReplicationCoordinator()->getElectionId()) {
+                if (electionId != repl::ReplicationCoordinator::get(opCtx)->getElectionId()) {
                     LOG(3) << "oid passed in is " << electionId << ", but our id is "
-                           << repl::getGlobalReplicationCoordinator()->getElectionId();
+                           << repl::ReplicationCoordinator::get(opCtx)->getElectionId();
                     errmsg = "election occurred after write";
                     result.append("code", ErrorCodes::WriteConcernFailed);
                     result.append("codeName",

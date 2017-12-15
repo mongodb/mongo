@@ -98,7 +98,7 @@ public:
 
         getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserverImpl>());
 
-        repl::setOplogCollectionName();
+        repl::setOplogCollectionName(getGlobalServiceContext());
         repl::createOplog(_opCtx);
 
         ASSERT_OK(_clock->advanceClusterTime(LogicalTime(Timestamp(1, 0))));

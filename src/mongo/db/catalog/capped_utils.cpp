@@ -55,7 +55,7 @@ mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString&
     AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, collectionName);
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,
@@ -84,7 +84,7 @@ mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString&
                                     << collectionName.ns());
     }
 
-    if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+    if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
          repl::ReplicationCoordinator::modeNone) &&
         collectionName.isOplog()) {
         return Status(ErrorCodes::OplogOperationUnsupported,
@@ -258,7 +258,7 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
     AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, collectionName);
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,

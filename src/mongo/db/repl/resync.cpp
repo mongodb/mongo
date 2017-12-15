@@ -80,8 +80,8 @@ public:
         bool waitForResync = !cmdObj.hasField(kWaitFieldName) || cmdObj[kWaitFieldName].trueValue();
 
         // Replica set resync.
-        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
+        ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
+        if (replCoord->getSettings().usingReplSets()) {
             // Resync is disabled in production on replica sets until it stabilizes (SERVER-27081).
             if (!Command::testCommandsEnabled) {
                 return CommandHelpers::appendCommandStatus(

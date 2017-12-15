@@ -45,7 +45,8 @@ void ShardingEgressMetadataHookForMongod::_saveGLEStats(const BSONObj& metadata,
 
 repl::OpTime ShardingEgressMetadataHookForMongod::_getConfigServerOpTime() {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        return repl::getGlobalReplicationCoordinator()->getCurrentCommittedSnapshotOpTime();
+        return repl::ReplicationCoordinator::get(_serviceContext)
+            ->getCurrentCommittedSnapshotOpTime();
     } else {
         // TODO uncomment as part of SERVER-22663
         // invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);

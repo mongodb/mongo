@@ -55,7 +55,7 @@ private:
         // Set up ReplicationCoordinator and create oplog.
         repl::ReplicationCoordinator::set(
             service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service));
-        repl::setOplogCollectionName();
+        repl::setOplogCollectionName(service);
         repl::createOplog(opCtx.get());
 
         // Ensure that we are primary.

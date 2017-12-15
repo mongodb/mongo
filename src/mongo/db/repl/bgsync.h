@@ -77,7 +77,8 @@ public:
      */
     enum class ProducerState { Starting, Running, Stopped };
 
-    BackgroundSync(ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
+    BackgroundSync(ReplicationCoordinator* replicationCoordinator,
+                   ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
                    ReplicationProcess* replicationProcess,
                    std::unique_ptr<OplogBuffer> oplogBuffer);
 

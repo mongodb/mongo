@@ -70,7 +70,7 @@ void SyncTailTest::setUp() {
     StorageInterface::set(service, std::move(storageInterface));
     DropPendingCollectionReaper::set(
         service, stdx::make_unique<DropPendingCollectionReaper>(_storageInterface));
-    repl::setOplogCollectionName();
+    repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
     service->setOpObserver(stdx::make_unique<OpObserverImpl>());
 

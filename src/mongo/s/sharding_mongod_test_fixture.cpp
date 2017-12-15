@@ -143,7 +143,7 @@ void ShardingMongodTestFixture::setUp() {
     repl::StorageInterface::set(service, std::move(storagePtr));
 
     service->setOpObserver(stdx::make_unique<OpObserverImpl>());
-    repl::setOplogCollectionName();
+    repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
 
     // Set the highest FCV because otherwise it defaults to the lower FCV. This way we default to

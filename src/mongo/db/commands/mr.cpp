@@ -371,7 +371,7 @@ void State::dropTempCollections() {
                 WriteUnitOfWork wunit(_opCtx);
                 uassert(ErrorCodes::PrimarySteppedDown,
                         "no longer primary",
-                        repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(
+                        repl::ReplicationCoordinator::get(_opCtx)->canAcceptWritesFor(
                             _opCtx, _config.tempNamespace));
                 db->dropCollection(_opCtx, _config.tempNamespace.ns()).transitional_ignore();
                 wunit.commit();
@@ -498,8 +498,8 @@ void State::prepTempCollection() {
         WriteUnitOfWork wuow(_opCtx);
         uassert(ErrorCodes::PrimarySteppedDown,
                 "no longer primary",
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(_opCtx,
-                                                                            _config.tempNamespace));
+                repl::ReplicationCoordinator::get(_opCtx)->canAcceptWritesFor(
+                    _opCtx, _config.tempNamespace));
         Collection* tempColl = tempCtx.getCollection();
         invariant(!tempColl);
 
@@ -756,7 +756,7 @@ void State::insert(const NamespaceString& nss, const BSONObj& o) {
         WriteUnitOfWork wuow(_opCtx);
         uassert(ErrorCodes::PrimarySteppedDown,
                 "no longer primary",
-                repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(_opCtx, nss));
+                repl::ReplicationCoordinator::get(_opCtx)->canAcceptWritesFor(_opCtx, nss));
         Collection* coll = getCollectionOrUassert(_opCtx, ctx.db(), nss);
 
         BSONObjBuilder b;
@@ -1469,8 +1469,8 @@ public:
                 if (state.isOnDisk()) {
                     // this means that it will be doing a write operation, make sure it is safe to
                     // do so.
-                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx,
-                                                                                     config.nss)) {
+                    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx,
+                                                                                      config.nss)) {
                         uasserted(ErrorCodes::NotMaster, "not master");
                         return false;
                     }

@@ -155,7 +155,7 @@ void prefetchPagesForReplicatedOp(OperationContext* opCtx,
                                   const OplogEntry& oplogEntry) {
     invariant(db);
     const ReplSettings::IndexPrefetchConfig prefetchConfig =
-        getGlobalReplicationCoordinator()->getIndexPrefetchConfig();
+        ReplicationCoordinator::get(opCtx)->getIndexPrefetchConfig();
 
     // Prefetch ignores non-CRUD operations.
     if (!oplogEntry.isCrudOpType()) {

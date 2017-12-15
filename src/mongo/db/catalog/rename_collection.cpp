@@ -102,7 +102,7 @@ Status renameCollectionCommon(OperationContext* opCtx,
     ctx.emplace(opCtx, source.ns());
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
-        !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, source);
+        !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, source);
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotMaster,

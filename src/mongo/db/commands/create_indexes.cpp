@@ -258,7 +258,7 @@ public:
         // now we know we have to create index(es)
         // Note: createIndexes command does not currently respect shard versioning.
         Lock::DBLock dbLock(opCtx, ns.db(), MODE_X);
-        if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns)) {
+        if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
             return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::NotMaster,
@@ -337,7 +337,7 @@ public:
         if (indexer.getBuildInBackground()) {
             opCtx->recoveryUnit()->abandonSnapshot();
             dbLock.relockWithMode(MODE_IX);
-            if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns)) {
+            if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
                 return CommandHelpers::appendCommandStatus(
                     result,
                     Status(ErrorCodes::NotMaster,
@@ -359,7 +359,7 @@ public:
                     // that day, to avoid data corruption due to lack of index cleanup.
                     opCtx->recoveryUnit()->abandonSnapshot();
                     dbLock.relockWithMode(MODE_X);
-                    if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns)) {
+                    if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
                         return CommandHelpers::appendCommandStatus(
                             result,
                             Status(ErrorCodes::NotMaster,
@@ -381,7 +381,7 @@ public:
             dbLock.relockWithMode(MODE_X);
             uassert(ErrorCodes::NotMaster,
                     str::stream() << "Not primary while completing index build in " << dbname,
-                    repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, ns));
+                    repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns));
 
             Database* db = dbHolder().get(opCtx, ns.db());
             uassert(28551, "database dropped during index build", db);

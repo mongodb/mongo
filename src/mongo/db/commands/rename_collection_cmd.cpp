@@ -110,7 +110,7 @@ public:
                 str::stream() << "Invalid target namespace: " << target.ns(),
                 target.isValid());
 
-        if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+        if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone)) {
             if (source.isOplog()) {
                 errmsg = "can't rename live oplog while replicating";

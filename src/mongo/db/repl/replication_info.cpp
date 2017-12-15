@@ -69,7 +69,7 @@ using std::stringstream;
 namespace repl {
 
 void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int level) {
-    ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+    ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().usingReplSets()) {
         IsMasterResponse isMasterResponse;
         replCoord->fillIsMasterForReplSet(&isMasterResponse);
@@ -87,7 +87,7 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
         result.append("info", s);
     } else {
         result.appendBool("ismaster",
-                          getGlobalReplicationCoordinator()->isMasterForReportingPurposes());
+                          ReplicationCoordinator::get(opCtx)->isMasterForReportingPurposes());
     }
 
     if (level) {
@@ -162,7 +162,7 @@ public:
     }
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
-        if (!getGlobalReplicationCoordinator()->isReplEnabled()) {
+        if (!ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
             return BSONObj();
         }
 
@@ -189,7 +189,7 @@ public:
     }
 
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const {
-        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
         if (!replCoord->isReplEnabled()) {
             return BSONObj();
         }

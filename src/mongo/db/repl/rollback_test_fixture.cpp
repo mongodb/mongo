@@ -81,7 +81,7 @@ void RollbackTest::setUp() {
     _coordinator = new ReplicationCoordinatorRollbackMock(serviceContext);
     ReplicationCoordinator::set(serviceContext,
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));
-    setOplogCollectionName();
+    setOplogCollectionName(serviceContext);
 
     SessionCatalog::create(serviceContext);
 

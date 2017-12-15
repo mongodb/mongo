@@ -59,12 +59,12 @@ void logProcessDetails() {
     printCommandLineOpts();
 }
 
-void logProcessDetailsForLogRotate() {
+void logProcessDetailsForLogRotate(ServiceContext* serviceContext) {
     log() << "pid=" << ProcessId::getCurrent() << " port=" << serverGlobalParams.port
           << (is32bit() ? " 32" : " 64") << "-bit "
           << "host=" << getHostNameCached();
 
-    auto replCoord = repl::getGlobalReplicationCoordinator();
+    auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
     if (replCoord != nullptr &&
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
         auto rsConfig = replCoord->getConfig();

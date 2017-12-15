@@ -139,11 +139,12 @@ static ServerStatusMetricField<Counter64> displayBufferMaxSize("repl.buffer.maxS
 
 
 BackgroundSync::BackgroundSync(
+    ReplicationCoordinator* replicationCoordinator,
     ReplicationCoordinatorExternalState* replicationCoordinatorExternalState,
     ReplicationProcess* replicationProcess,
     std::unique_ptr<OplogBuffer> oplogBuffer)
     : _oplogBuffer(std::move(oplogBuffer)),
-      _replCoord(getGlobalReplicationCoordinator()),
+      _replCoord(replicationCoordinator),
       _replicationCoordinatorExternalState(replicationCoordinatorExternalState),
       _replicationProcess(replicationProcess) {
     // Update "repl.buffer.maxSizeBytes" server status metric to reflect the current oplog buffer's

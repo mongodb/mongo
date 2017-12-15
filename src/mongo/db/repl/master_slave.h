@@ -136,7 +136,7 @@ class ReplSource {
 
     bool _connect(OplogReader* reader, const HostAndPort& host, const OID& myRID);
 
-    Status _updateIfDoneWithInitialSync();
+    Status _updateIfDoneWithInitialSync(OperationContext* opCtx);
 
 public:
     OplogReader oplogReader;

@@ -129,7 +129,7 @@ public:
             timeoutSecs = cmdObj["timeoutSecs"].numberLong();
         }
 
-        Status status = repl::getGlobalReplicationCoordinator()->stepDown(
+        Status status = repl::ReplicationCoordinator::get(opCtx)->stepDown(
             opCtx, force, Seconds(timeoutSecs), Seconds(120));
         if (!status.isOK() && status.code() != ErrorCodes::NotMaster) {  // ignore not master
             return CommandHelpers::appendCommandStatus(result, status);
@@ -180,7 +180,7 @@ public:
                        "with --configsvr"));
         }
 
-        if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+        if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
             ((dbname == NamespaceString::kLocalDb) || (dbname == NamespaceString::kAdminDb))) {
             return CommandHelpers::appendCommandStatus(
@@ -430,7 +430,7 @@ public:
             return false;
         }
 
-        if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+        if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
             nsToDrop.isOplog()) {
             errmsg = "can't drop live oplog while replicating";
