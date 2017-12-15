@@ -994,6 +994,44 @@ class TestBinder(testcase.IDLTestcase):
                     foo1: string
         """)))
 
+        # Inline Chained struct with strict true
+        self.assert_bind(test_preamble + indent_text(1,
+                                                     textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: true
+                fields:
+                    field1: string
+
+            foobar:
+                description: foo
+                strict: false
+                inline_chained_structs: true
+                chained_structs:
+                    bar1: alias
+                fields:
+                    f1: string
+
+        """)))
+
+        # Inline Chained struct with strict true and inline_chained_structs defaulted
+        self.assert_bind(test_preamble + indent_text(1,
+                                                     textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: true
+                fields:
+                    field1: string
+
+            foobar:
+                description: foo
+                strict: false
+                chained_structs:
+                    bar1: alias
+                fields:
+                    f1: string
+        """)))
+
     def test_chained_struct_negative(self):
         # type: () -> None
         """Negative parser chaining test cases."""
@@ -1096,6 +1134,7 @@ class TestBinder(testcase.IDLTestcase):
             foobar:
                 description: foo
                 strict: false
+                inline_chained_structs: false
                 chained_structs:
                     bar1: alias
                 fields:

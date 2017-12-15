@@ -445,6 +445,7 @@ structs:
     chained_struct_mixed:
         description: Chained struct with chained structs and fields
         strict: true
+        inline_chained_structs: false
         chained_structs:
             chained_any_basic_type : chained_any_basic_type
             chained_object_basic_type : ChainedObjectBasicType

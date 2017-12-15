@@ -342,7 +342,7 @@ class Struct(common.SourceLocation):
         self.description = None  # type: unicode
         self.strict = True  # type: bool
         self.immutable = False  # type: bool
-        self.inline_chained_structs = False  # type: bool
+        self.inline_chained_structs = True  # type: bool
         self.generate_comparison_operators = False  # type: bool
         self.chained_types = None  # type: List[ChainedType]
         self.chained_structs = None  # type: List[ChainedStruct]

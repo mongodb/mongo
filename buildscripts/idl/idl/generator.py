@@ -236,8 +236,13 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
                     with writer.IndentedScopedBlock(self._writer, 'if (!usedFields[%s]) {' %
                                                     (_gen_field_usage_constant(field)), '}'):
                         if field.default:
-                            self._writer.write_line('%s = %s;' %
-                                                    (_get_field_member_name(field), field.default))
+                            if field.chained_struct_field:
+                                self._writer.write_line('%s.%s(%s);' % (
+                                    _get_field_member_name(field.chained_struct_field),
+                                    _get_field_member_setter_name(field), field.default))
+                            else:
+                                self._writer.write_line(
+                                    '%s = %s;' % (_get_field_member_name(field), field.default))
                         else:
                             self._writer.write_line('ctxt.throwMissingField(%s);' %
                                                     (_get_field_constant_name(field)))
@@ -817,7 +822,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             self._writer.write_line('++expectedFieldNumber;')
 
-        self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
+        if field.chained_struct_field:
+            self._writer.write_line('%s.%s(std::move(values));' %
+                                    (_get_field_member_name(field.chained_struct_field),
+                                     _get_field_member_setter_name(field)))
+        else:
+            self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
 
     def gen_field_deserializer(self, field, bson_object):
         # type: (ast.Field, unicode) -> None
@@ -976,7 +986,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             first_field = True
             for field in struct.fields:
                 # Do not parse chained fields as fields since they are actually chained types.
-                if field.chained:
+                if field.chained and not field.chained_struct_field:
                     continue
 
                 field_predicate = 'fieldName == %s' % (_get_field_constant_name(field))
@@ -1009,15 +1019,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     with self._predicate(command_predicate):
                         self._writer.write_line('ctxt.throwUnknownField(fieldName);')
 
-        # Parse chained types if not inlined
-        if not struct.inline_chained_structs:
-            for field in struct.fields:
-                if not field.chained:
-                    continue
+        # Parse chained structs if not inlined
+        # Parse chained types always here
+        for field in struct.fields:
+            if not field.chained or \
+                    (field.chained and field.struct_type and struct.inline_chained_structs):
+                continue
 
-                # Simply generate deserializers since these are all 'any' types
-                self.gen_field_deserializer(field, bson_object)
-        self._writer.write_empty_line()
+            # Simply generate deserializers since these are all 'any' types
+            self.gen_field_deserializer(field, bson_object)
+            self._writer.write_empty_line()
 
         self._writer.write_empty_line()
 
