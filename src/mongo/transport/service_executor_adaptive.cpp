@@ -89,6 +89,11 @@ constexpr auto kThreadsRunning = "threadsRunning"_sd;
 constexpr auto kThreadsPending = "threadsPending"_sd;
 constexpr auto kExecutorLabel = "executor"_sd;
 constexpr auto kExecutorName = "adaptive"_sd;
+constexpr auto kStuckDetection = "stuckThreadsDetected"_sd;
+constexpr auto kStarvation = "starvation"_sd;
+constexpr auto kReserveMinimum = "belowReserveMinimum"_sd;
+constexpr auto kBecauseOfError = "replacingCrashedThreads"_sd;
+constexpr auto kThreadReasons = "threadCreationCauses"_sd;
 
 int64_t ticksToMicros(TickSource::Tick ticks, TickSource* tickSource) {
     invariant(tickSource->getTicksPerSecond() >= 1000000);
@@ -170,7 +175,7 @@ Status ServiceExecutorAdaptive::start() {
     _isRunning.store(true);
     _controllerThread = stdx::thread(&ServiceExecutorAdaptive::_controllerThreadRoutine, this);
     for (auto i = 0; i < _config->reservedThreads(); i++) {
-        _startWorkerThread();
+        _startWorkerThread(ThreadCreationReason::kReserveMinimum);
     }
 
     return Status::OK();
@@ -264,6 +269,7 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
     // notify the controller thread that a task has been scheduled and we should monitor thread
     // starvation.
     if (_isStarved() && !(flags & kDeferredTask)) {
+        _starvationCheckRequests.addAndFetch(1);
         _scheduleCondition.notify_one();
     }
 
@@ -287,42 +293,139 @@ bool ServiceExecutorAdaptive::_isStarved() const {
     return (tasksQueued > available);
 }
 
+/*
+ * The pool of worker threads can become unhealthy in several ways, and the controller thread
+ * tries to keep the pool healthy by starting new threads when it is:
+ *
+ * Stuck: All threads are running a long-running task that's waiting on a network event, but
+ * there are no threads available to process network events. The thread pool cannot make progress
+ * without intervention.
+ *
+ * Starved: All threads are saturated with tasks and new tasks are having to queue for longer
+ * than the configured maxQueueLatency().
+ *
+ * Below reserve: An error has occurred and there are fewer threads than the reserved minimum.
+ *
+ * While the executor is running, it runs in a loop waiting to be woken up by schedule() or a
+ * timeout to occur. When it wakes up, it ensures that:
+ * - The thread pool is not stuck longer than the configured stuckThreadTimeout(). If it is, then
+ *   start a new thread and wait to be woken up again (or time out again and redo stuck thread
+ *   detection).
+ * - The number of threads is >= the reservedThreads() value. If it isn't, then start as many
+ *   threads as necessary.
+ * - Checking for starvation when requested by schedule(), and starting new threads if the
+ *   pool is saturated and is starved longer than the maxQueueLatency() after being woken up
+ *   by schedule().
+ */
 void ServiceExecutorAdaptive::_controllerThreadRoutine() {
+    stdx::mutex noopLock;
     setThreadName("worker-controller"_sd);
-    // The scheduleCondition needs a lock to wait on.
-    stdx::mutex fakeMutex;
-    stdx::unique_lock<stdx::mutex> fakeLk(fakeMutex);
 
-    TickTimer sinceLastControlRound(_tickSource);
-    stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
-    TickSource::Tick lastSpentExecuting = _getThreadTimerTotal(ThreadTimer::Executing, lk);
-    TickSource::Tick lastSpentRunning = _getThreadTimerTotal(ThreadTimer::Running, lk);
-    lk.unlock();
+    // Setup the timers/timeout values for stuck thread detection.
+    TickTimer sinceLastStuckThreadCheck(_tickSource);
+    auto stuckThreadTimeout = _config->stuckThreadTimeout();
+
+    // Get the initial values for our utilization percentage calculations
+    auto getTimerTotals = [this]() {
+        std::unique_lock<stdx::mutex> lk(_threadsMutex);
+        auto first = _getThreadTimerTotal(ThreadTimer::kExecuting, lk);
+        auto second = _getThreadTimerTotal(ThreadTimer::kRunning, lk);
+        return std::make_pair(first, second);
+    };
+
+    TickSource::Tick lastSpentExecuting, lastSpentRunning;
+    std::tie(lastSpentExecuting, lastSpentRunning) = getTimerTotals();
 
     while (_isRunning.load()) {
-        // Make sure that the timer gets reset whenever this loop completes
-        const auto timerResetGuard =
-            MakeGuard([&sinceLastControlRound] { sinceLastControlRound.reset(); });
+        // We want to wait for schedule() to wake us up, or for the stuck thread timeout to pass.
+        // So the timeout is the current stuck thread timeout - the last time we did stuck thread
+        // detection.
+        auto timeout = stuckThreadTimeout - sinceLastStuckThreadCheck.sinceStart();
 
-        _scheduleCondition.wait_for(fakeLk,
-                                    _config->stuckThreadTimeout().toSystemDuration(),
-                                    [this]() { return _isStarved() || !_isRunning.load(); });
+        bool maybeStarved = false;
+        // If the timeout is less than a millisecond then don't bother to go to sleep to wait for
+        // it, just do the stuck thread detection now.
+        if (timeout > Milliseconds{0}) {
+            stdx::unique_lock<decltype(noopLock)> scheduleLk(noopLock);
+            int checkRequests = 0;
+            maybeStarved = _scheduleCondition.wait_for(
+                scheduleLk, timeout.toSystemDuration(), [this, &checkRequests] {
+                    if (!_isRunning.load())
+                        return false;
+                    checkRequests = _starvationCheckRequests.load();
+                    return (checkRequests > 0);
+                });
+
+            _starvationCheckRequests.subtractAndFetch(checkRequests);
+        }
 
         // If the executor has stopped, then stop the controller altogether
         if (!_isRunning.load())
             break;
 
-        double utilizationPct;
-        {
+        if (sinceLastStuckThreadCheck.sinceStart() >= stuckThreadTimeout) {
+            // Reset our timer so we know how long to sleep for the next time around;
+            sinceLastStuckThreadCheck.reset();
 
-            stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
-            auto spentExecuting = _getThreadTimerTotal(ThreadTimer::Executing, lk);
-            auto spentRunning = _getThreadTimerTotal(ThreadTimer::Running, lk);
-            lk.unlock();
+            // Each call to schedule updates the last schedule ticks so we know the last time a
+            // task was scheduled
+            Milliseconds sinceLastSchedule = _lastScheduleTimer.sinceStart();
+
+            // If the number of tasks executing is the number of threads running (that is all
+            // threads are currently busy), and the last time a task was able to be scheduled was
+            // longer than our wait timeout, then we can assume all threads are stuck and we should
+            // start a new thread to unblock the pool.
+            //
+            if ((_threadsInUse.load() == _threadsRunning.load()) &&
+                (sinceLastSchedule >= stuckThreadTimeout)) {
+                // When the executor is stuck, we halve the stuck thread timeout to be more
+                // aggressive the next time out unsticking the executor, and then start a new
+                // thread to unblock the executor for now.
+                stuckThreadTimeout /= 2;
+                stuckThreadTimeout = std::max(Milliseconds{10}, stuckThreadTimeout);
+                log() << "Detected blocked worker threads, "
+                      << "starting new thread to unblock service executor. "
+                      << "Stuck thread timeout now: " << stuckThreadTimeout;
+                _startWorkerThread(ThreadCreationReason::kStuckDetection);
+
+                // Since we've just started a worker thread, then we know that the executor isn't
+                // starved, so just loop back around to wait for the next control event.
+                continue;
+            }
+
+            // If the executor wasn't stuck, then we should back off our stuck thread timeout back
+            // towards the configured value.
+            auto newStuckThreadTimeout = stuckThreadTimeout + (stuckThreadTimeout / 2);
+            newStuckThreadTimeout = std::min(_config->stuckThreadTimeout(), newStuckThreadTimeout);
+            if (newStuckThreadTimeout != stuckThreadTimeout) {
+                LOG(1) << "Increasing stuck thread timeout to " << newStuckThreadTimeout;
+                stuckThreadTimeout = newStuckThreadTimeout;
+            }
+        }
+
+        auto threadsRunning = _threadsRunning.load();
+        if (threadsRunning < _config->reservedThreads()) {
+            log() << "Starting " << _config->reservedThreads() - threadsRunning
+                  << " to replenish reserved worker threads";
+            while (_threadsRunning.load() < _config->reservedThreads()) {
+                _startWorkerThread(ThreadCreationReason::kReserveMinimum);
+            }
+        }
+
+        // If we were notified by schedule() to do starvation checking, then we first need to
+        // calculate the overall utilization of the executor.
+        if (maybeStarved) {
+
+            // Get the difference between the amount of time the executor has spent waiting for/
+            // running tasks since the last time we measured.
+            TickSource::Tick spentExecuting, spentRunning;
+            std::tie(spentExecuting, spentRunning) = getTimerTotals();
             auto diffExecuting = spentExecuting - lastSpentExecuting;
             auto diffRunning = spentRunning - lastSpentRunning;
 
-            // If no threads have run yet, then don't update anything
+            double utilizationPct;
+            // If we spent zero time running then the executor was fully idle and our utilization
+            // is zero percent
             if (spentRunning == 0 || diffRunning == 0)
                 utilizationPct = 0.0;
             else {
@@ -332,76 +435,39 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
                 utilizationPct = diffExecuting / static_cast<double>(diffRunning);
                 utilizationPct *= 100;
             }
-        }
 
-        // If the wait timed out then either the executor is idle or stuck
-        if (sinceLastControlRound.sinceStart() >= _config->stuckThreadTimeout()) {
-            // Each call to schedule updates the last schedule ticks so we know the last time a
-            // task was scheduled
-            Milliseconds sinceLastSchedule = _lastScheduleTimer.sinceStart();
-
-            // If the number of tasks executing is the number of threads running (that is all
-            // threads are currently busy), and the last time a task was able to be scheduled was
-            // longer than our wait timeout, then we can assume all threads are stuck.
-            //
-            // In that case we should start the reserve number of threads so fully unblock the
-            // thread pool.
-            //
-            if ((_threadsInUse.load() == _threadsRunning.load()) &&
-                (sinceLastSchedule >= _config->stuckThreadTimeout())) {
-                log() << "Detected blocked worker threads, "
-                      << "starting new reserve threads to unblock service executor";
-                for (int i = 0; i < _config->reservedThreads(); i++) {
-                    _startWorkerThread();
-                }
-            }
-            continue;
-        }
-
-        auto threadsRunning = _threadsRunning.load();
-        if (threadsRunning < _config->reservedThreads()) {
-            log() << "Starting " << _config->reservedThreads() - threadsRunning
-                  << " to replenish reserved worker threads";
-            while (_threadsRunning.load() < _config->reservedThreads()) {
-                _startWorkerThread();
+            // If the utilization percentage is less than our threshold then we don't want to
+            // do anything because the threads are not actually saturated with work.
+            if (utilizationPct < _config->idlePctThreshold()) {
+                continue;
             }
         }
 
-        // If the utilization percentage is lower than our idle threshold, then the threads we
-        // already have aren't saturated and we shouldn't consider adding new threads at this
-        // time.
-        if (utilizationPct < _config->idlePctThreshold()) {
-            continue;
-        }
-
-        // While there are threads pending sleep for 50 microseconds (this is our thread latency
-        // perf budget).
-        //
-        // If waiting for pending threads takes longer than the stuckThreadTimeout, then the
-        // pending threads may be stuck and we should loop back around.
+        // While there are threads that are still starting up, wait for the max queue latency,
+        // up to the current stuck thread timeout.
         do {
             stdx::this_thread::sleep_for(_config->maxQueueLatency().toSystemDuration());
         } while ((_threadsPending.load() > 0) &&
-                 (sinceLastControlRound.sinceStart() < _config->stuckThreadTimeout()));
-
+                 (sinceLastStuckThreadCheck.sinceStart() < stuckThreadTimeout));
 
         // If the number of pending tasks is greater than the number of running threads minus the
         // number of tasks executing (the number of free threads), then start a new worker to
         // avoid starvation.
         if (_isStarved()) {
             log() << "Starting worker thread to avoid starvation.";
-            _startWorkerThread();
+            _startWorkerThread(ThreadCreationReason::kStarvation);
         }
     }
 }
 
-void ServiceExecutorAdaptive::_startWorkerThread() {
+void ServiceExecutorAdaptive::_startWorkerThread(ThreadCreationReason reason) {
     stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
     auto it = _threads.emplace(_threads.begin(), _tickSource);
     auto num = _threads.size();
 
     _threadsPending.addAndFetch(1);
     _threadsRunning.addAndFetch(1);
+    _threadStartCounters[static_cast<size_t>(reason)] += 1;
 
     lk.unlock();
 
@@ -413,6 +479,7 @@ void ServiceExecutorAdaptive::_startWorkerThread() {
         lk.lock();
         _threadsPending.subtractAndFetch(1);
         _threadsRunning.subtractAndFetch(1);
+        _threadStartCounters[static_cast<size_t>(reason)] -= 1;
         _threads.erase(it);
     }
 }
@@ -463,20 +530,20 @@ TickSource::Tick ServiceExecutorAdaptive::_getThreadTimerTotal(
     ThreadTimer which, const stdx::unique_lock<stdx::mutex>& lk) const {
     TickSource::Tick accumulator;
     switch (which) {
-        case ThreadTimer::Running:
+        case ThreadTimer::kRunning:
             accumulator = _pastThreadsSpentRunning.load();
             break;
-        case ThreadTimer::Executing:
+        case ThreadTimer::kExecuting:
             accumulator = _pastThreadsSpentExecuting.load();
             break;
     }
 
     for (auto& thread : _threads) {
         switch (which) {
-            case ThreadTimer::Running:
+            case ThreadTimer::kRunning:
                 accumulator += thread.running.totalTime();
                 break;
-            case ThreadTimer::Executing:
+            case ThreadTimer::kExecuting:
                 accumulator += thread.executing.totalTime();
                 break;
         }
@@ -487,7 +554,7 @@ TickSource::Tick ServiceExecutorAdaptive::_getThreadTimerTotal(
 
 void ServiceExecutorAdaptive::_workerThreadRoutine(
     int threadId, ServiceExecutorAdaptive::ThreadList::iterator state) {
-
+    _threadsPending.subtractAndFetch(1);
     _localThreadState = &(*state);
     {
         std::string threadName = str::stream() << "worker-" << threadId;
@@ -496,16 +563,8 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
 
     log() << "Started new database worker thread " << threadId;
 
-    // Whether a thread is "pending" reflects whether its had a chance to do any useful work.
-    // When a thread is pending, it will only try to run one task through ASIO, and report back
-    // as soon as possible so that the thread controller knows not to keep starting threads while
-    // the threads it's already created are finishing starting up.
-    bool stillPending = true;
     bool guardThreadsRunning = true;
-
-    const auto guard = MakeGuard([this, &stillPending, &guardThreadsRunning, state] {
-        if (stillPending)
-            _threadsPending.subtractAndFetch(1);
+    const auto guard = MakeGuard([this, &guardThreadsRunning, state] {
         if (guardThreadsRunning)
             _threadsRunning.subtractAndFetch(1);
         _pastThreadsSpentRunning.addAndFetch(state->running.totalTime());
@@ -535,41 +594,27 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
             // If we're still "pending" only try to run one task, that way the controller will
             // know that it's okay to start adding threads to avoid starvation again.
             state->running.markRunning();
-            if (stillPending) {
-                _ioContext->run_one_for(runTime.toSystemDuration());
-            } else {  // Otherwise, just run for the full run period
-                _ioContext->run_for(runTime.toSystemDuration());
-            }
+            _ioContext->run_for(runTime.toSystemDuration());
 
             // _ioContext->run_one() will return when all the scheduled handlers are completed, and
             // you must call restart() to call run_one() again or else it will return immediately.
             // In the case where the server has just started and there has been no work yet, this
-            // means this loop will spin until the first client connect. Thsi call to restart avoids
+            // means this loop will spin until the first client connect. This call to restart avoids
             // that.
             if (_ioContext->stopped())
                 _ioContext->restart();
-            // If an exceptione escaped from ASIO, then break from this thread and start a new one.
+            // If an exception escaped from ASIO, then break from this thread and start a new one.
         } catch (std::exception& e) {
             log() << "Exception escaped worker thread: " << e.what()
                   << " Starting new worker thread.";
-            _startWorkerThread();
+            _startWorkerThread(ThreadCreationReason::kError);
             break;
         } catch (...) {
             log() << "Unknown exception escaped worker thread. Starting new worker thread.";
-            _startWorkerThread();
+            _startWorkerThread(ThreadCreationReason::kError);
             break;
         }
         auto spentRunning = state->running.markStopped();
-
-        // If we're still pending, let the controller know and go back around for another go
-        //
-        // Otherwise we can think about exiting if the last call to run_for() wasn't very
-        // productive
-        if (stillPending) {
-            _threadsPending.subtractAndFetch(1);
-            stillPending = false;
-            continue;
-        }
 
         // If we spent less than our idle threshold actually running tasks then exit the thread.
         // This is a helper lambda to perform that calculation.
@@ -625,20 +670,44 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
     }
 }
 
+StringData ServiceExecutorAdaptive::_threadStartedByToString(
+    ServiceExecutorAdaptive::ThreadCreationReason reason) {
+    switch (reason) {
+        case ThreadCreationReason::kStuckDetection:
+            return kStuckDetection;
+        case ThreadCreationReason::kStarvation:
+            return kStarvation;
+        case ThreadCreationReason::kReserveMinimum:
+            return kReserveMinimum;
+        case ThreadCreationReason::kError:
+            return kBecauseOfError;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
 void ServiceExecutorAdaptive::appendStats(BSONObjBuilder* bob) const {
     stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
     BSONObjBuilder section(bob->subobjStart("serviceExecutorTaskStats"));
-    section << kExecutorLabel << kExecutorName                                               //
-            << kTotalQueued << _totalQueued.load()                                           //
-            << kTotalExecuted << _totalExecuted.load()                                       //
-            << kThreadsInUse << _threadsInUse.load()                                         //
-            << kTotalTimeRunningUs                                                           //
-            << ticksToMicros(_getThreadTimerTotal(ThreadTimer::Running, lk), _tickSource)    //
-            << kTotalTimeExecutingUs                                                         //
-            << ticksToMicros(_getThreadTimerTotal(ThreadTimer::Executing, lk), _tickSource)  //
-            << kTotalTimeQueuedUs << ticksToMicros(_totalSpentQueued.load(), _tickSource)    //
-            << kThreadsRunning << _threadsRunning.load()                                     //
+    section << kExecutorLabel << kExecutorName                                                //
+            << kTotalQueued << _totalQueued.load()                                            //
+            << kTotalExecuted << _totalExecuted.load()                                        //
+            << kThreadsInUse << _threadsInUse.load()                                          //
+            << kTotalTimeRunningUs                                                            //
+            << ticksToMicros(_getThreadTimerTotal(ThreadTimer::kRunning, lk), _tickSource)    //
+            << kTotalTimeExecutingUs                                                          //
+            << ticksToMicros(_getThreadTimerTotal(ThreadTimer::kExecuting, lk), _tickSource)  //
+            << kTotalTimeQueuedUs << ticksToMicros(_totalSpentQueued.load(), _tickSource)     //
+            << kThreadsRunning << _threadsRunning.load()                                      //
             << kThreadsPending << _threadsPending.load();
+
+    BSONObjBuilder threadStartReasons(section.subobjStart(kThreadReasons));
+    for (size_t i = 0; i < _threadStartCounters.size(); i++) {
+        threadStartReasons << _threadStartedByToString(static_cast<ThreadCreationReason>(i))
+                           << _threadStartCounters[i];
+    }
+
+    threadStartReasons.doneFast();
 
     BSONObjBuilder metricsByTask(section.subobjStart("metricsByTask"));
     MetricsArray totalMetrics;

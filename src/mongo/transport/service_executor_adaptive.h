@@ -177,6 +177,9 @@ private:
     using MetricsArray =
         std::array<Metrics, static_cast<size_t>(ServiceExecutorTaskName::kMaxTaskName)>;
 
+    enum class ThreadCreationReason { kStuckDetection, kStarvation, kReserveMinimum, kError, kMax };
+    enum class ThreadTimer { kRunning, kExecuting };
+
     struct ThreadState {
         ThreadState(TickSource* ts) : running(ts), executing(ts) {}
 
@@ -190,13 +193,12 @@ private:
 
     using ThreadList = stdx::list<ThreadState>;
 
-    void _startWorkerThread();
+    void _startWorkerThread(ThreadCreationReason reason);
+    static StringData _threadStartedByToString(ThreadCreationReason reason);
     void _workerThreadRoutine(int threadId, ThreadList::iterator it);
     void _controllerThreadRoutine();
     bool _isStarved() const;
     Milliseconds _getThreadJitter() const;
-
-    enum class ThreadTimer { Running, Executing };
 
     void _accumulateTaskMetrics(MetricsArray* outArray, const MetricsArray& inputArray) const;
     void _accumulateAllTaskMetrics(MetricsArray* outputMetricsArray,
@@ -210,6 +212,8 @@ private:
 
     mutable stdx::mutex _threadsMutex;
     ThreadList _threads;
+    std::array<int64_t, static_cast<size_t>(ThreadCreationReason::kMax)> _threadStartCounters;
+
     stdx::thread _controllerThread;
 
     TickSource* const _tickSource;
@@ -237,6 +241,7 @@ private:
 
     // Tasks should signal this condition variable if they want the thread controller to
     // track their progress and do fast stuck detection
+    AtomicWord<int> _starvationCheckRequests{0};
     stdx::condition_variable _scheduleCondition;
 
     MetricsArray _accumulatedMetrics;
