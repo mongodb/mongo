@@ -1,0 +1,41 @@
+# Copyright (C) 2018 MongoDB Inc.
+#
+# This program is free software: you can redistribute it and/or  modify
+# it under the terms of the GNU Affero General Public License, version 3,
+# as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# This IDL file describes the BSON format for a LogicalSessionId, and
+# handles the serialization to and deserialization from its BSON representation
+# for that class.
+
+global:
+  cpp_namespace: "mongo"
+
+imports:
+  - "mongo/idl/basic_types.idl"
+
+structs:
+
+  TransactionsStats:
+    description: "A struct representing the section of the server status
+                  command with information about transactions"
+    strict: true
+    fields:
+      retriedCommandsCount:
+        type: long
+        default: 0
+      retriedStatementsCount:
+        type: long
+        default: 0
+      transactionsCollectionWriteCount:
+        type: long
+        default: 0

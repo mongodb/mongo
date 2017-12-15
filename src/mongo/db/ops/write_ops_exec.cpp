@@ -60,6 +60,7 @@
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session_catalog.h"
@@ -81,6 +82,12 @@ namespace {
 MONGO_FP_DECLARE(failAllInserts);
 MONGO_FP_DECLARE(failAllUpdates);
 MONGO_FP_DECLARE(failAllRemoves);
+
+void updateRetryStats(OperationContext* opCtx, bool containsRetry) {
+    if (containsRetry) {
+        RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
+    }
+}
 
 void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
     try {
@@ -459,6 +466,9 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
     WriteResult out;
     out.results.reserve(wholeOp.getDocuments().size());
 
+    bool containsRetry = false;
+    ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
+
     size_t stmtIdIndex = 0;
     size_t bytesInBatch = 0;
     std::vector<InsertStatement> batch;
@@ -478,6 +488,8 @@ WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& who
                 auto session = OperationContextSession::get(opCtx);
                 if (session->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(),
                                                                      stmtId)) {
+                    containsRetry = true;
+                    RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                     out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
                     continue;
                 }
@@ -617,6 +629,9 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
         opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
     LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
+    bool containsRetry = false;
+    ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
+
     size_t stmtIdIndex = 0;
     WriteResult out;
     out.results.reserve(wholeOp.getUpdates().size());
@@ -627,6 +642,8 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
             auto session = OperationContextSession::get(opCtx);
             if (auto entry =
                     session->checkStatementExecuted(opCtx, *opCtx->getTxnNumber(), stmtId)) {
+                containsRetry = true;
+                RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 out.results.emplace_back(parseOplogEntryForUpdate(*entry));
                 continue;
             }
@@ -745,6 +762,9 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
         opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
     LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
+    bool containsRetry = false;
+    ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
+
     size_t stmtIdIndex = 0;
     WriteResult out;
     out.results.reserve(wholeOp.getDeletes().size());
@@ -754,6 +774,8 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
         if (opCtx->getTxnNumber()) {
             auto session = OperationContextSession::get(opCtx);
             if (session->checkStatementExecutedNoOplogEntryFetch(*opCtx->getTxnNumber(), stmtId)) {
+                containsRetry = true;
+                RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
                 continue;
             }

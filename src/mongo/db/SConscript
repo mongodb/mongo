@@ -1623,11 +1623,13 @@ env.Library(
         'ops/insert.cpp',
         'ops/update.cpp',
         'ops/write_ops_retryability.cpp',
+        'retryable_writes_stats.cpp',
         'session.cpp',
         'session_catalog.cpp',
         'transaction_history_iterator.cpp',
         env.Idlc('ops/single_write_result.idl')[0],
         env.Idlc('session_txn_record.idl')[0],
+        env.Idlc('transactions_stats.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

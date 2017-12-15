@@ -18,11 +18,36 @@
         assert.docEq(expected.lastErrorObject, toCheck.lastErrorObject);
     }
 
+    function verifyServerStatusFields(serverStatusResponse) {
+        assert(serverStatusResponse.hasOwnProperty("transactions"),
+               "Expected the serverStatus response to have a 'transactions' field");
+        assert.hasFields(
+            serverStatusResponse.transactions,
+            ["retriedCommandsCount", "retriedStatementsCount", "transactionsCollectionWriteCount"],
+            "The 'transactions' field in serverStatus did not have all of the expected fields");
+    }
+
+    function verifyServerStatusChanges(
+        initialStats, newStats, newCommands, newStatements, newCollectionWrites) {
+        assert.eq(initialStats.retriedCommandsCount + newCommands,
+                  newStats.retriedCommandsCount,
+                  "expected retriedCommandsCount to increase by " + newCommands);
+        assert.eq(initialStats.retriedStatementsCount + newStatements,
+                  newStats.retriedStatementsCount,
+                  "expected retriedStatementsCount to increase by " + newStatements);
+        assert.eq(initialStats.transactionsCollectionWriteCount + newCollectionWrites,
+                  newStats.transactionsCollectionWriteCount,
+                  "expected retriedCommandsCount to increase by " + newCollectionWrites);
+    }
+
     function runTests(mainConn, priConn) {
         var lsid = UUID();
 
         ////////////////////////////////////////////////////////////////////////
         // Test insert command
+
+        let initialStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(initialStatus);
 
         var cmd = {
             insert: 'user',
@@ -50,8 +75,19 @@
         assert.eq(2, testDBPri.user.find().itcount());
         assert.eq(insertOplogEntries, oplog.find({ns: 'test.user', op: 'i'}).itcount());
 
+        let newStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(newStatus);
+        verifyServerStatusChanges(initialStatus.transactions,
+                                  newStatus.transactions,
+                                  1 /* newCommands */,
+                                  2 /* newStatements */,
+                                  1 /* newCollectionWrites */);
+
         ////////////////////////////////////////////////////////////////////////
         // Test update command
+
+        initialStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(initialStatus);
 
         cmd = {
             update: 'user',
@@ -91,8 +127,19 @@
         assert.eq(updateOplogEntries, oplog.find({ns: 'test.user', op: 'u'}).itcount());
         assert.eq(insertOplogEntries, oplog.find({ns: 'test.user', op: 'i'}).itcount());
 
+        newStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(newStatus);
+        verifyServerStatusChanges(initialStatus.transactions,
+                                  newStatus.transactions,
+                                  1 /* newCommands */,
+                                  3 /* newStatements */,
+                                  3 /* newCollectionWrites */);
+
         ////////////////////////////////////////////////////////////////////////
         // Test delete command
+
+        initialStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(initialStatus);
 
         assert.writeOK(testDBMain.user.insert({_id: 40, x: 1}));
         assert.writeOK(testDBMain.user.insert({_id: 50, y: 1}));
@@ -126,8 +173,19 @@
 
         assert.eq(deleteOplogEntries, oplog.find({ns: 'test.user', op: 'd'}).itcount());
 
+        newStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(newStatus);
+        verifyServerStatusChanges(initialStatus.transactions,
+                                  newStatus.transactions,
+                                  1 /* newCommands */,
+                                  2 /* newStatements */,
+                                  2 /* newCollectionWrites */);
+
         ////////////////////////////////////////////////////////////////////////
         // Test findAndModify command (upsert)
+
+        initialStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(initialStatus);
 
         cmd = {
             findAndModify: 'user',
@@ -152,8 +210,19 @@
 
         checkFindAndModifyResult(result, retryResult);
 
+        newStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(newStatus);
+        verifyServerStatusChanges(initialStatus.transactions,
+                                  newStatus.transactions,
+                                  1 /* newCommands */,
+                                  1 /* newStatements */,
+                                  1 /* newCollectionWrites */);
+
         ////////////////////////////////////////////////////////////////////////
         // Test findAndModify command (update, return pre-image)
+
+        initialStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(initialStatus);
 
         cmd = {
             findAndModify: 'user',
@@ -176,8 +245,19 @@
 
         checkFindAndModifyResult(result, retryResult);
 
+        newStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(newStatus);
+        verifyServerStatusChanges(initialStatus.transactions,
+                                  newStatus.transactions,
+                                  1 /* newCommands */,
+                                  1 /* newStatements */,
+                                  1 /* newCollectionWrites */);
+
         ////////////////////////////////////////////////////////////////////////
         // Test findAndModify command (update, return post-image)
+
+        initialStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(initialStatus);
 
         cmd = {
             findAndModify: 'user',
@@ -200,8 +280,19 @@
 
         checkFindAndModifyResult(result, retryResult);
 
+        newStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(newStatus);
+        verifyServerStatusChanges(initialStatus.transactions,
+                                  newStatus.transactions,
+                                  1 /* newCommands */,
+                                  1 /* newStatements */,
+                                  1 /* newCollectionWrites */);
+
         ////////////////////////////////////////////////////////////////////////
         // Test findAndModify command (remove, return pre-image)
+
+        initialStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(initialStatus);
 
         assert.writeOK(testDBMain.user.insert({_id: 70, f: 1}));
         assert.writeOK(testDBMain.user.insert({_id: 80, f: 1}));
@@ -224,6 +315,14 @@
         assert.eq(docCount, testDBPri.user.find().itcount());
 
         checkFindAndModifyResult(result, retryResult);
+
+        newStatus = priConn.adminCommand({serverStatus: 1});
+        verifyServerStatusFields(newStatus);
+        verifyServerStatusChanges(initialStatus.transactions,
+                                  newStatus.transactions,
+                                  1 /* newCommands */,
+                                  1 /* newStatements */,
+                                  1 /* newCollectionWrites */);
     }
 
     function runFailpointTests(mainConn, priConn) {

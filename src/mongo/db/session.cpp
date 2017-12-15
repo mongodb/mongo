@@ -42,6 +42,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/transaction_history_iterator.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/transport_layer.h"
@@ -491,6 +492,8 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
         stmtIdsWritten = std::move(stmtIdsWritten),
         lastStmtIdWriteOpTime
     ] {
+        RetryableWritesStats::get(opCtx)->incrementTransactionsCollectionWriteCount();
+
         stdx::lock_guard<stdx::mutex> lg(_mutex);
 
         if (!_isValid)
