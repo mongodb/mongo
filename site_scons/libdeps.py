@@ -264,6 +264,11 @@ def libdeps_emitter(target, source, env):
     for dependent in env.get('LIBDEPS_DEPENDENTS', []):
         if dependent is None:
             continue
+
+        # Ignore any tuple'd in visibility override.
+        if isinstance(dependent, tuple):
+            dependent = dependent[0]
+
         dependentWithIxes = SCons.Util.adjustixes(
             dependent, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
         dependentNode = lib_node_factory(dependentWithIxes)
@@ -320,10 +325,16 @@ def shlibdeps_emitter(target, source, env):
     for dependent in env.get('LIBDEPS_DEPENDENTS', []):
         if dependent is None:
             continue
+
+        visibility = dependency.Private
+        if isinstance(dependent, tuple):
+            visibility = dependent[1]
+            dependent = dependent[0]
+
         dependentWithIxes = SCons.Util.adjustixes(
             dependent, lib_builder.get_prefix(env), lib_builder.get_suffix(env))
         dependentNode = lib_node_factory(dependentWithIxes)
-        __append_direct_libdeps(dependentNode, [dependency(target[0], True, dependency.Public)])
+        __append_direct_libdeps(dependentNode, [dependency(target[0], True, visibility)])
 
     for dependent in env.get('PROGDEPS_DEPENDENTS', []):
         if dependent is None:
