@@ -1,6 +1,8 @@
 // Basic tests for the $listLocalCursors aggregation stage.
+//
+// $listLocalCursors relies on in-memory state, which may not survive failovers.
 // Uses features that require featureCompatibilityVersion 3.6.
-// @tags: [requires_fcv36]
+// @tags: [does_not_support_stepdowns, requires_fcv36]
 
 (function() {
     "use strict";
