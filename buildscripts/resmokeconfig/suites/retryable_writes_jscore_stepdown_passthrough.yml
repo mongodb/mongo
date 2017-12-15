@@ -50,11 +50,6 @@ selector:
   - jstests/core/find1.js
   - jstests/core/sortc.js
 
-  # Use $listLocalSessions aggregation stage command:
-  - jstests/core/list_all_local_cursors.js
-  - jstests/core/list_all_local_sessions.js
-  - jstests/core/list_local_sessions.js
-
   - jstests/core/bench_test*.js # benchRun() used for writes
   - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
   - jstests/core/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
@@ -86,6 +81,8 @@ selector:
   # "Refusing to run a test that issues commands that may return different values after a failover"
   # "Refusing to run a test that issues an aggregation command with explain because it may return
   #   incomplete results"
+  # "Refusing to run a test that issues an aggregation command with $listLocalCursors or
+  #   $listLocalSessions because they rely on in-memory state that may not survive failovers"
   # "Refusing to run a test that issues a mapReduce command, because it calls std::terminate() if
   #   interrupted by a stepdown"
   - does_not_support_stepdowns
