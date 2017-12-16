@@ -280,7 +280,7 @@ env.Library(
         "db/db.cpp",
         "db/mongod_options_init.cpp",
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         'db/clientcursor',
         'db/commands/core',
         'db/conn_pool_options',
@@ -339,6 +339,7 @@ mongod = env.Program(
         "db/dbmain.cpp",
     ] + env.WindowsResourceFile("db/db.rc"),
     LIBDEPS=[
+        'base',
         'mongodmain',
     ],
 )
