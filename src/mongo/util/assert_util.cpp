@@ -232,10 +232,9 @@ NOINLINE_DECL void msgassertedWithLocation(int msgid,
                                            const char* msg,
                                            const char* file,
                                            unsigned line) {
-    assertionCount.condrollover(++assertionCount.warning);
+    assertionCount.condrollover(++assertionCount.msg);
     log() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
           << endl;
-    logContext();
     throw MsgAssertionException(msgid, msg);
 }
 
@@ -243,7 +242,7 @@ NOINLINE_DECL void msgassertedNoTraceWithLocation(int msgid,
                                                   const char* msg,
                                                   const char* file,
                                                   unsigned line) {
-    assertionCount.condrollover(++assertionCount.warning);
+    assertionCount.condrollover(++assertionCount.msg);
     log() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
           << endl;
     throw MsgAssertionException(msgid, msg);
