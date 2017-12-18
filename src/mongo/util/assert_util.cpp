@@ -217,14 +217,13 @@ void msgasserted(int msgid, const string& msg) {
 }
 
 NOINLINE_DECL void msgasserted(int msgid, const char* msg) {
-    assertionCount.condrollover(++assertionCount.warning);
+    assertionCount.condrollover(++assertionCount.msg);
     log() << "Assertion: " << msgid << ":" << msg << endl;
-    logContext();
     throw MsgAssertionException(msgid, msg);
 }
 
 NOINLINE_DECL void msgassertedNoTrace(int msgid, const char* msg) {
-    assertionCount.condrollover(++assertionCount.warning);
+    assertionCount.condrollover(++assertionCount.msg);
     log() << "Assertion: " << msgid << ":" << msg << endl;
     throw MsgAssertionException(msgid, msg);
 }
