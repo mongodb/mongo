@@ -1284,39 +1284,30 @@ functions:
           set -o errexit
           ${set_sudo}
           # Setup curator to collect system & process stats on remote.
-          # TODO: Update command once curator supports displaying all processes.
-          # Note: On Windows using 'process-tree --pid 1' does not work, as it does on Linux.
           if [ "Windows_NT" = "$OS" ]; then
-            cmds="cygrunsrv --install curator_sys --path $(which curator) --args 'stat system' -1 $HOME/${monitor_system_file}"
-            cmds="$cmds; cygrunsrv --install curator_proc --path $(which curator) --args 'stat process-tree --pid 1' -1 $HOME/${monitor_proc_file}"
+             variant=windows-64
           else
-            cmds="cmd='@reboot ${sudo} $(which curator) stat system >> ${monitor_system_file}'"
-            cmds="$cmds; (crontab -l ; echo \"\$cmd\") | crontab -"
-            cmds="$cmds; cmd='@reboot ${sudo} $(which curator) stat process-tree --pid 1 >> ${monitor_proc_file}'"
-            cmds="$cmds; (crontab -l ; echo "\$cmd") | crontab -"
+             variant=ubuntu1604
           fi
-          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
-            --verbose                                        \
-            --userHost $USER@${ip_address}                   \
-            --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
-            --commands "$cmds"
-
-    - command: shell.exec
-      params:
-        shell: bash
-        working_dir: src
-        script: |
-          set -o errexit
-          ${set_sudo}
-          # Start curator to collect system & process stats on remote.
+          # Download latest version of curator
+          latest_curator_hash=$(git ls-remote https://github.com/mongodb/curator.git | grep HEAD | cut -f1)
+          curator_url="https://s3.amazonaws.com/boxes.10gen.com/build/curator/curator-dist-$variant-$latest_curator_hash.tar.gz"
+          cmds="curl -s $curator_url | tar -xzv"
           if [ "Windows_NT" = "$OS" ]; then
-            cmds="cygrunsrv --start curator_sys"
+            # Since curator runs as SYSTEM user, ensure the output files can be accessed.
+            cmds="$cmds; touch ${monitor_system_file}; chmod 777 ${monitor_system_file}"
+            cmds="$cmds; cygrunsrv --install curator_sys --path curator --chdir \$HOME --args 'stat system --file ${monitor_system_file}'"
+            cmds="$cmds; touch ${monitor_proc_file}; chmod 777 ${monitor_proc_file}"
+            cmds="$cmds; cygrunsrv --install curator_proc --path curator --chdir \$HOME --args 'stat process-all --file ${monitor_proc_file}'"
+            cmds="$cmds; cygrunsrv --start curator_sys"
             cmds="$cmds; cygrunsrv --start curator_proc"
           else
-            cmds="{ ${sudo} $(which curator) stat system > ${monitor_system_file} &"
-            cmds="$cmds ${sudo} $(which curator) stat process-tree --pid 1 > ${monitor_proc_file} & } & disown"
+            cmds="$cmds; cmd=\"@reboot cd \$HOME && ${sudo} ./curator stat system >> ${monitor_system_file}\""
+            cmds="$cmds; (crontab -l ; echo \"\$cmd\") | crontab -"
+            cmds="$cmds; cmd=\"@reboot cd \$HOME && ${sudo} ./curator stat process-all >> ${monitor_proc_file}\""
+            cmds="$cmds; (crontab -l ; echo \"\$cmd\") | crontab -"
+            cmds="$cmds; crontab -l"
+            cmds="$cmds; { ${sudo} \$HOME/curator stat system --file ${monitor_system_file} > /dev/null 2>&1 & ${sudo} \$HOME/curator stat process-all --file ${monitor_proc_file} > /dev/null 2>&1 & } & disown"
           fi
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
