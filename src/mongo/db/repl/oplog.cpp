@@ -1101,27 +1101,56 @@ Status applyOperation_inlock(OperationContext* opCtx,
     //      that violate oplog ordering. Disallow this regardless of whether the timestamps chosen
     //      are otherwise legal.
     //
-    // Use cases: Secondary oplog application: Use the timestamp in the operation document. These
+    // Use cases:
+    //   Secondary oplog application: Use the timestamp in the operation document. These
     //     operations are replicated to the oplog and this is not nested in a parent
     //     `WriteUnitOfWork`.
     //
     //   Non-atomic `applyOps`: The server receives an `applyOps` command with a series of
     //     operations that cannot be run under a single transaction. The common exemption from
     //     being "transactionable" is containing a command operation. These will not be under a
-    //     parent `WriteUnitOfWork`. The timestamps on the operations will only be used if the
-    //     writes are not being replicated, as that would violate the guiding requirement. This is
-    //     primarily allowed for unit testing. See `dbtest/storage_timestamp_tests.cpp`.
+    //     parent `WriteUnitOfWork`. We do not use the timestamps provided by the operations; if
+    //     replicated, these operations will be assigned timestamps when logged in the oplog.
     //
-    //  Atomic `applyOps`: The server receives an `applyOps` command with operations that can be
+    //   Atomic `applyOps`: The server receives an `applyOps` command with operations that can be
     //    run under a single transaction. In this case the caller has already opened a
     //    `WriteUnitOfWork` and expects all writes to become visible at the same time. Moreover,
     //    the individual operations will not contain a `ts` field. The caller is responsible for
     //    setting the timestamp before committing. Assigning a competing timestamp in this
     //    codepath would break that atomicity. Sharding is a consumer of this use-case.
-    const bool assignOperationTimestamp = !opCtx->writesAreReplicated() &&
-        !haveWrappingWriteUnitOfWork && fieldTs &&
-        getGlobalReplicationCoordinator()->getReplicationMode() !=
-            ReplicationCoordinator::modeMasterSlave;
+    const bool assignOperationTimestamp = [opCtx, haveWrappingWriteUnitOfWork] {
+        const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
+        if (opCtx->writesAreReplicated()) {
+            // We do not assign timestamps on replicated writes since they will get their oplog
+            // timestamp once they are logged.
+            return false;
+        } else {
+            switch (replMode) {
+                case ReplicationCoordinator::modeReplSet: {
+                    if (haveWrappingWriteUnitOfWork) {
+                        // We do not assign timestamps to non-replicated writes that have a wrapping
+                        // WUOW. These must be operations inside of atomic 'applyOps' commands being
+                        // applied on a secondary. They will get the timestamp of the outer
+                        // 'applyOps' oplog entry in their wrapper WUOW.
+                        return false;
+                    }
+                    break;
+                }
+                case ReplicationCoordinator::modeNone: {
+                    // We do not assign timestamps on standalones.
+                    return false;
+                }
+                case ReplicationCoordinator::modeMasterSlave: {
+                    // Master-slave does not support timestamps so we do not assign a timestamp.
+                    return false;
+                }
+            }
+        }
+        return true;
+    }();
+
+    invariant(!assignOperationTimestamp || !fieldTs.eoo(),
+              str::stream() << "Oplog entry did not have 'ts' field when expected: " << redact(op));
 
     if (*opType == 'i') {
         if (requestNss.isSystemDotIndexes()) {
