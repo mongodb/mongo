@@ -218,12 +218,20 @@ def find_mutex_holder(graph, thread_dict, show):
     mutex_value = mutex_this.value(frame)
     # The mutex holder is a LWPID
     mutex_holder = int(mutex_value["_M_mutex"]["__data"]["__owner"])
-    mutex_holder_id = thread_dict[mutex_holder]
+    # At time thread_dict was initialized, the mutex holder may not have been found.
+    # Use the thread LWP as a substitute for showing output or generating the graph.
+    if mutex_holder not in thread_dict:
+        print("Warning: Mutex at {} held by thread with LWP {}"
+            " not found in thread_dict. Using LWP to track thread.".format(mutex_value,
+                                                                           mutex_holder))
+        mutex_holder_id = mutex_holder
+    else:
+        mutex_holder_id = thread_dict[mutex_holder]
 
     (_, mutex_waiter_lwpid, _) = gdb.selected_thread().ptid
     mutex_waiter_id = thread_dict[mutex_waiter_lwpid]
     if show:
-        print("Mutex at {} held by thread 0x{:x} (LWP {}) "
+        print("Mutex at {} held by thread 0x{:x} (LWP {})"
               " waited on by thread 0x{:x} (LWP {})".format(mutex_value,
                                                             mutex_holder_id,
                                                             mutex_holder,
