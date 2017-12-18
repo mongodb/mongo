@@ -4746,7 +4746,7 @@ buildvariants:
   modules:
   - wtdevelop
   expansions:
-    use_wt_develop: true 
+    use_wt_develop: true
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
     compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     use_scons_cache: true
@@ -8176,6 +8176,92 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
 
+- name: debian92
+  display_name: SSL Debian 9.2
+  run_on:
+  - debian92-test
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags ssl"
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-debian92
+    compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    multiversion_platform_arch: "debian92"
+    multiversion_edition: "targeted"
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: debian92
+    repo_edition: org
+    use_scons_cache: true
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - debian92-build
+  - name: compile_all
+    distros:
+    - debian92-build
+  - name: aggregation
+  - name: aggregation_auth
+  - name: auth
+  - name: dbtest
+  - name: disk_wiredtiger
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth
+  - name: gle_auth_write_cmd
+  - name: gle_auth_basics_passthrough
+  - name: gle_auth_basics_passthrough_write_cmd
+  - name: sharding_gle_auth_basics_passthrough
+  - name: sharding_gle_auth_basics_passthrough_write_cmd
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: aggregation_fuzzer
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: mongosTest
+  - name: multiversion
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: bulk_gle_passthrough
+  - name: parallel
+  - name: parallel_compatibility
+  - name: concurrency
+  - name: concurrency_replication
+  - name: concurrency_sharded
+  - name: concurrency_simultaneous
+  - name: replica_sets
+  - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
+  - name: master_slave
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough
+  - name: sharding
+  - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: slow1
+  - name: serial_run
+  - name: sharded_collections_jscore_passthrough
+  - name: sharding_jscore_passthrough
+  - name: sharding_jscore_op_query_passthrough
+  - name: sharding_jscore_passthrough_wire_ops
+  - name: ssl
+  - name: sslSpecial
+  - name: tool
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
 
 ################################
 # storage engine buildvariants #
