@@ -46,6 +46,11 @@ using std::vector;
 
 namespace {
 
+// Conservative overhead per element contained in the write batch. This value was calculated as 1
+// byte (element type) + 5 bytes (max string encoding of the array index encoded as string and the
+// maximum key is 99999) + 1 byte (zero terminator) = 7 bytes
+const int kBSONArrayPerElementOverheadBytes = 7;
+
 struct BatchSize {
     int numOps{0};
     int sizeBytes{0};
@@ -214,7 +219,7 @@ void trackErrors(const ShardEndpoint& endpoint,
 }  // namespace
 
 BatchWriteOp::BatchWriteOp(OperationContext* opCtx, const BatchedCommandRequest& clientRequest)
-    : _opCtx(opCtx), _clientRequest(clientRequest) {
+    : _opCtx(opCtx), _clientRequest(clientRequest), _batchTxnNum(_opCtx->getTxnNumber()) {
     _writeOps.reserve(_clientRequest.sizeWriteOps());
 
     for (size_t i = 0; i < _clientRequest.sizeWriteOps(); ++i) {
@@ -330,11 +335,12 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
             }
         }
 
-        //
-        // If this write will push us over some sort of size limit, stop targeting
-        //
+        // Account the array overhead once for the actual updates array and once for the statement
+        // ids array, if retryable writes are used
+        const int writeSizeBytes = getWriteSizeBytes(writeOp) + kBSONArrayPerElementOverheadBytes +
+            (_batchTxnNum ? kBSONArrayPerElementOverheadBytes + 4 : 0);
 
-        int writeSizeBytes = getWriteSizeBytes(writeOp);
+        // If this write will push us over some sort of size limit, stop targeting
         if (wouldMakeBatchesTooBig(writes, writeSizeBytes, batchSizes)) {
             invariant(!batchMap.empty());
             writeOp.cancelWrites(NULL);
@@ -362,6 +368,9 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
             BatchSize& batchSize = batchSizeIt->second;
 
             ++batchSize.numOps;
+
+            // If the request contains transaction number, this means the end result will contain a
+            // statement ids array, so we need to account for that overhead.
             batchSize.sizeBytes += writeSizeBytes;
             batch->addWrite(write);
         }
@@ -402,10 +411,9 @@ Status BatchWriteOp::targetBatch(const NSTargeter& targeter,
 BatchedCommandRequest BatchWriteOp::buildBatchRequest(
     const TargetedWriteBatch& targetedBatch) const {
     const auto batchType = _clientRequest.getBatchType();
-    const auto batchTxnNum = _opCtx->getTxnNumber();
 
     boost::optional<std::vector<int32_t>> stmtIdsForOp;
-    if (batchTxnNum) {
+    if (_batchTxnNum) {
         stmtIdsForOp.emplace();
     }
 
@@ -476,7 +484,7 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
             _clientRequest.getWriteCommandBase().getBypassDocumentValidation());
         wcb.setOrdered(_clientRequest.getWriteCommandBase().getOrdered());
 
-        if (batchTxnNum) {
+        if (_batchTxnNum) {
             wcb.setStmtIds(std::move(stmtIdsForOp));
         }
 
