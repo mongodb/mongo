@@ -262,6 +262,8 @@ class Distro(object):
                 return 'wheezy'
             elif build_os == 'debian81':
                 return 'jessie'
+            elif build_os == 'debian92':
+                return 'stretch'
             else:
                 raise Exception("unsupported build_os: %s" % build_os)
         else:
@@ -291,7 +293,7 @@ class Distro(object):
         elif self.n == 'ubuntu':
             return [ "ubuntu1204", "ubuntu1404", "ubuntu1604", ]
         elif self.n == 'debian':
-            return [ "debian71", "debian81" ]
+            return [ "debian71", "debian81", "debian92" ]
         else:
             raise Exception("BUG: unsupported platform?")
 
