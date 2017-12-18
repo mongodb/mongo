@@ -606,7 +606,7 @@ functions:
           set -o errexit
 
           # 74 is exit code for IOError on POSIX systems.
-          if [[ $resmoke_exit_code = 74 ]]; then
+          if [ $resmoke_exit_code = 74 ]; then
             echo $resmoke_exit_code > run_tests_system_failure
             exit 0
           fi
