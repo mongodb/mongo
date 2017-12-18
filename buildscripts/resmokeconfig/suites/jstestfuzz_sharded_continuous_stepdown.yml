@@ -11,14 +11,12 @@ executor:
       global_vars:
         TestData:
           runningWithConfigStepdowns: true
-          # TODO SERVER-31452: Run this test suite with shard stepdowns as well.
-          runningWithShardStepdowns: false
+          runningWithShardStepdowns: true
           usingReplicaSetShards: true
   hooks:
   - class: ContinuousStepdown
     config_stepdown: true
-    # TODO SERVER-31452: Run this test suite with shard stepdowns as well.
-    shard_stepdown: false
+    shard_stepdown: true
   - class: ValidateCollections
     shell_options:
       global_vars:
@@ -46,6 +44,4 @@ executor:
     configsvr_options:
       all_nodes_electable: true
     shard_options:
-      # TODO SERVER-31452: Make all nodes in the replica set shards electable when we go to run this
-      # test suite with shard stepdowns as well.
-      all_nodes_electable: false
+      all_nodes_electable: true
