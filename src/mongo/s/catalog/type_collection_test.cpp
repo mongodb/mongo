@@ -69,6 +69,41 @@ TEST(CollectionType, Basic) {
     ASSERT_EQUALS(coll.getUnique(), true);
     ASSERT_EQUALS(coll.getAllowBalance(), true);
     ASSERT_EQUALS(coll.getDropped(), false);
+    ASSERT_EQUALS(coll.isAssignedShardKey(), true);
+}
+
+TEST(CollectionType, AllFieldsPresent) {
+    const OID oid = OID::gen();
+    const auto uuid = UUID::gen();
+    StatusWith<CollectionType> status =
+        CollectionType::fromBSON(BSON(CollectionType::fullNs("db.coll")
+                                      << CollectionType::epoch(oid)
+                                      << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
+                                      << CollectionType::keyPattern(BSON("a" << 1))
+                                      << CollectionType::defaultCollation(BSON("locale"
+                                                                               << "fr_CA"))
+                                      << CollectionType::unique(true)
+                                      << CollectionType::uuid()
+                                      << uuid
+                                      << "isAssignedShardKey"
+                                      << false));
+    ASSERT_TRUE(status.isOK());
+
+    CollectionType coll = status.getValue();
+    ASSERT_TRUE(coll.validate().isOK());
+    ASSERT(coll.getNs() == NamespaceString{"db.coll"});
+    ASSERT_EQUALS(coll.getEpoch(), oid);
+    ASSERT_EQUALS(coll.getUpdatedAt(), Date_t::fromMillisSinceEpoch(1));
+    ASSERT_BSONOBJ_EQ(coll.getKeyPattern().toBSON(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(coll.getDefaultCollation(),
+                      BSON("locale"
+                           << "fr_CA"));
+    ASSERT_EQUALS(coll.getUnique(), true);
+    ASSERT_EQUALS(coll.getAllowBalance(), true);
+    ASSERT_EQUALS(coll.getDropped(), false);
+    ASSERT_TRUE(coll.getUUID());
+    ASSERT_EQUALS(*coll.getUUID(), uuid);
+    ASSERT_EQUALS(coll.isAssignedShardKey(), false);
 }
 
 TEST(CollectionType, EmptyDefaultCollationFailsToParse) {

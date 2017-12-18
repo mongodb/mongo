@@ -62,7 +62,8 @@ class StatusWith;
  *      },
  *      "unique" : false,
  *      "uuid" : UUID,
- *      "noBalance" : false
+ *      "noBalance" : false,
+ *      "allowSplit" : false
  *   }
  *
  */
@@ -157,6 +158,10 @@ public:
         return _allowBalance.get_value_or(true);
     }
 
+    bool isAssignedShardKey() const {
+        return _isAssignedShardKey.get_value_or(true);
+    }
+
     bool hasSameOptions(CollectionType& other);
 
 private:
@@ -186,6 +191,10 @@ private:
 
     // Optional whether balancing is allowed for this collection. If missing, implies true.
     boost::optional<bool> _allowBalance;
+
+    // Optional whether user has assigned a shard key to this collection before.
+    // Implicitly true if missing.
+    boost::optional<bool> _isAssignedShardKey;
 };
 
 }  // namespace mongo
