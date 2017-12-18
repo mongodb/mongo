@@ -78,10 +78,8 @@ private:
 class AutoGetCollection {
     MONGO_DISALLOW_COPYING(AutoGetCollection);
 
-    enum class ViewMode;
-
 public:
-    AutoGetCollection(OperationContext*, const NamespaceString&, const UUID&, LockMode modeAll);
+    enum class ViewMode { kViewsPermitted, kViewsForbidden };
 
     AutoGetCollection(OperationContext* opCtx, const NamespaceString& nss, LockMode modeAll)
         : AutoGetCollection(opCtx, nss, modeAll, modeAll, ViewMode::kViewsForbidden) {}
@@ -91,6 +89,11 @@ public:
                       LockMode modeDB,
                       LockMode modeColl)
         : AutoGetCollection(opCtx, nss, modeDB, modeColl, ViewMode::kViewsForbidden) {}
+
+    AutoGetCollection(OperationContext* opCtx,
+                      const NamespaceString& nss,
+                      const UUID& uuid,
+                      LockMode modeAll);
 
     AutoGetCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
@@ -125,17 +128,11 @@ public:
     }
 
 private:
-    enum class ViewMode { kViewsPermitted, kViewsForbidden };
-
     const ViewMode _viewMode;
     const AutoGetDb _autoDb;
     const Lock::CollectionLock _collLock;
-    Collection* const _coll;
 
-    friend class AutoGetCollectionOrView;
-    friend class AutoGetCollectionForRead;
-    friend class AutoGetCollectionForReadCommand;
-    friend class AutoGetCollectionOrViewForReadCommand;
+    Collection* const _coll;
 };
 
 /**

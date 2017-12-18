@@ -64,13 +64,6 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
 
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     LockMode modeDB,
-                                     LockMode modeColl,
-                                     ViewMode viewMode)
-    : AutoGetCollection(opCtx, nss, modeColl, viewMode, Lock::DBLock(opCtx, nss.db(), modeDB)) {}
-
-AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
-                                     const NamespaceString& nss,
                                      LockMode modeColl,
                                      ViewMode viewMode,
                                      Lock::DBLock lock)
@@ -93,6 +86,13 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
     }
 }
+
+AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     LockMode modeDB,
+                                     LockMode modeColl,
+                                     ViewMode viewMode)
+    : AutoGetCollection(opCtx, nss, modeColl, viewMode, Lock::DBLock(opCtx, nss.db(), modeDB)) {}
 
 AutoGetCollectionOrView::AutoGetCollectionOrView(OperationContext* opCtx,
                                                  const NamespaceString& nss,

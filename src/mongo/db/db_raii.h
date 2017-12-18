@@ -85,10 +85,6 @@ public:
     AutoGetCollectionForRead(OperationContext* opCtx, const NamespaceString& nss)
         : AutoGetCollectionForRead(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
 
-    AutoGetCollectionForRead(OperationContext* opCtx, const NamespaceString& nss, Lock::DBLock lock)
-        : AutoGetCollectionForRead(
-              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, std::move(lock)) {}
-
     AutoGetCollectionForRead(OperationContext* opCtx, const StringData dbName, const UUID& uuid);
 
     /**
