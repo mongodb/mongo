@@ -153,6 +153,7 @@ variables:
 # TODO: Remove psutil from virtualenv_requirements when BUILD-3083 is done
 - &powercycle_ec2_instance
   aws_ec2_yml: aws_ec2.yml
+  ec2_monitor_files: proc.json system.json
   monitor_proc_file: proc.json
   monitor_system_file: system.json
   remote_dir: powercycle
@@ -181,7 +182,7 @@ variables:
        value: ${remote_dir}/mongod.log
 
 - &powercycle_test
-  ec2_artifacts: ${monitor_proc_file} ${monitor_system_file} ${log_path} ${backup_path_after} ${backup_path_before}
+  ec2_artifacts: ${log_path} ${backup_path_after} ${backup_path_before}
   program_options: --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
   connection_options: --sshUserHost=${ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
   test_options: --testLoops=15 --seedDocNum=10000 --rsync --validate=local --canary=local
@@ -1408,6 +1409,8 @@ functions:
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --commands "$cmds"
+    - *copy_ec2_monitor_files
+
 
   "set EC2 address":
     - command: shell.exec
@@ -1424,7 +1427,7 @@ functions:
           # Specify '--mode start' to ensure the remote instance is running.
           aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start)
           echo "AMI EC2 instance ${instance_id} status: $aws_ec2"
-          ip_address=$(echo $aws_ec2 | sed -e "s/.*private_ip_address: //; s/ .*//")
+          ip_address=$(echo $aws_ec2 | sed -e "s/[^[:print:]\t]//g; s/.*private_ip_address: //; s/ .*//")
           sed -i -e "s/${ip_address}/$ip_address/" ${aws_ec2_yml}
           echo "Instance status: $aws_ec2"
 
@@ -1468,6 +1471,47 @@ functions:
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --file ec2_artifacts.tgz
+
+  "copy ec2 monitor files": &copy_ec2_monitor_files
+    command: shell.exec
+    params:
+      background: true
+      system_log: true
+      working_dir: src
+      silent: false
+      script: |
+        while [ 1 ]
+        do
+          # Tar/zip monitor files on remote host.
+          if [ -z "${ec2_monitor_files}" ] || [ -z "${instance_id}" ]; then
+            exit 0
+          fi
+          # Ensure we use the latest ip_address, as it could change if the EC2 instance
+          # has been stopped and started.
+          ${activate_virtualenv}
+          # Specify '--mode start' to ensure the remote instance is running.
+          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start)
+          echo "AMI EC2 instance ${instance_id} status: $aws_ec2"
+          ip_address=$(echo $aws_ec2 | sed -e "s/[^[:print:]\t]//g; s/.*private_ip_address: //; s/ .*//")
+          cmd="${tar|tar} czf ec2_monitor_files.tgz ${ec2_monitor_files}"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+          ssh_connection_options="$ssh_connection_options -o ConnectionAttempts=3"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                                        \
+            --userHost $USER@$ip_address                     \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --commands "$cmd"
+          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+            --verbose                                        \
+            --userHost $USER@$ip_address                     \
+            --operation "copy_from"                          \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --file ec2_monitor_files.tgz
+          sleep 30
+        done
+
 
   "cleanup EC2 instance":
     command: shell.exec
@@ -1617,6 +1661,19 @@ post:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: FTDC Diagnostic Data - Execution ${execution}
+      optional: true
+
+  # Archive remote EC2 monitor files.
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/ec2_monitor_files.tgz
+      remote_file: ${project}/${build_variant}/${revision}/remote_ec2/remote_ec2_monitor-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Remote EC2 Monitor - Execution ${execution}
       optional: true
 
   # Archive remote EC2 artifacts.
