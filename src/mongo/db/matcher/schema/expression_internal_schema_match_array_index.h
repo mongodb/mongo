@@ -58,7 +58,7 @@ public:
      */
     bool matchesArray(const BSONObj& array, MatchDetails* details) const final {
         BSONElement element;
-        auto iterator = array.begin();
+        auto iterator = BSONObjIterator(array);
 
         // Skip ahead to the element we want, bailing early if there aren't enough elements.
         for (auto i = 0LL; i <= _index; ++i) {

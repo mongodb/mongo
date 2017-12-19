@@ -49,8 +49,7 @@ Status bsonCheckOnlyHasFieldsImpl(StringData objectName,
                                   const BSONObj& obj,
                                   const Condition& allowed) {
     StringMap<bool> seenFields;
-    for (BSONObj::iterator iter(obj); iter.more();) {
-        const BSONElement e = iter.next();
+    for (auto&& e : obj) {
         const auto name = e.fieldNameStringData();
 
         if (!allowed(name)) {

@@ -271,7 +271,7 @@ KeyV1Owned::KeyV1Owned(const KeyV1& rhs) {
 
 // fromBSON to Key format
 KeyV1Owned::KeyV1Owned(const BSONObj& obj) {
-    BSONObj::iterator i(obj);
+    BSONObjIterator i(obj);
     unsigned char bits = 0;
     while (1) {
         BSONElement e = i.next();

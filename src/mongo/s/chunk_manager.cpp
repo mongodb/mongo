@@ -50,7 +50,7 @@ namespace {
 AtomicUInt32 nextCMSequenceNumber(0);
 
 void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
-    for (const auto&& element : o) {
+    for (auto&& element : o) {
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Not all elements of " << o << " are of type " << typeName(type),
                 element.type() == type);

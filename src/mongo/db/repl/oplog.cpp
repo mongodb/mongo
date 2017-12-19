@@ -1221,9 +1221,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     !fieldO.Obj().isEmpty() && !fieldTs.Obj().isEmpty() && !fieldT.Obj().isEmpty());
 
             std::vector<InsertStatement> insertObjs;
-            auto fieldOIt = fieldO.Obj().begin();
-            auto fieldTsIt = fieldTs.Obj().begin();
-            auto fieldTIt = fieldT.Obj().begin();
+            auto fieldOIt = BSONObjIterator(fieldO.Obj());
+            auto fieldTsIt = BSONObjIterator(fieldTs.Obj());
+            auto fieldTIt = BSONObjIterator(fieldT.Obj());
 
             while (true) {
                 auto oElem = fieldOIt.next();

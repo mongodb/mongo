@@ -106,8 +106,8 @@ BSONObj ls(const BSONObj& args, void* data) {
     BSONArrayBuilder ret;
     BSONObj o = listFiles(args, data);
     if (!o.isEmpty()) {
-        for (BSONObj::iterator i = o.firstElement().Obj().begin(); i.more();) {
-            BSONObj f = i.next().Obj();
+        for (auto&& elem : o.firstElement().Obj()) {
+            BSONObj f = elem.Obj();
             string name = f["name"].String();
             if (f["isDirectory"].trueValue()) {
                 name += '/';

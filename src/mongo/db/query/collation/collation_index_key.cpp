@@ -101,12 +101,12 @@ void translateElement(StringData fieldName,
         }
         case BSONType::Object: {
             invariant(ctxStack);
-            ctxStack->emplace(element.Obj().begin(), &out->subobjStart(fieldName));
+            ctxStack->emplace(BSONObjIterator(element.Obj()), &out->subobjStart(fieldName));
             return;
         }
         case BSONType::Array: {
             invariant(ctxStack);
-            ctxStack->emplace(element.Obj().begin(), &out->subarrayStart(fieldName));
+            ctxStack->emplace(BSONObjIterator(element.Obj()), &out->subarrayStart(fieldName));
             return;
         }
         case BSONType::Symbol: {
@@ -128,7 +128,7 @@ void translate(BSONObj obj, const CollatorInterface* collator, BufBuilder* out) 
     invariant(collator);
 
     TranslateStack ctxStack;
-    ctxStack.emplace(obj.begin(), out);
+    ctxStack.emplace(BSONObjIterator(obj), out);
 
     while (!ctxStack.empty()) {
         TranslateContext& ctx = ctxStack.top();
