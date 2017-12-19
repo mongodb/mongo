@@ -1,6 +1,4 @@
-// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
-// command.
-// @tags: [assumes_unsharded_collection, requires_getmore, requires_non_retryable_writes]
+// @tags: [requires_getmore, requires_non_retryable_writes]
 
 var t = db.get_s2nearcomplex;
 t.drop();

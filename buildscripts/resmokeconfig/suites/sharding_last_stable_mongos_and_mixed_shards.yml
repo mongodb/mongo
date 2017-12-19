@@ -20,6 +20,9 @@ selector:
   - jstests/sharding/covered_shard_key_indexes.js
   # Enable when 3.8 becomes last-stable.
   - jstests/sharding/dump_coll_metadata.js
+  - jstests/sharding/geo_near_random1.js
+  - jstests/sharding/geo_near_random2.js
+  - jstests/sharding/geo_near_sort.js
   # Enable when 3.6 becomes last-stable.
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
   - jstests/sharding/views.js

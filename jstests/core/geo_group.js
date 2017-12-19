@@ -1,5 +1,5 @@
-// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
-// command.
+// Cannot implicitly shard accessed collections because group is not supported on sharded
+// collections.
 // @tags: [assumes_unsharded_collection]
 
 t = db.geo_group;

@@ -73,12 +73,20 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
                                                  executor::TaskExecutor* executor,
                                                  ClusterClientCursorParams&& params,
                                                  boost::optional<LogicalSessionId> lsid)
-    : _params(std::move(params)), _root(buildMergerPlan(opCtx, executor, &_params)), _lsid(lsid) {}
+    : _params(std::move(params)), _root(buildMergerPlan(opCtx, executor, &_params)), _lsid(lsid) {
+    dassert(!_params.compareWholeSortKey ||
+            SimpleBSONObjComparator::kInstance.evaluate(
+                _params.sort == ClusterClientCursorParams::kWholeSortKeySortPattern));
+}
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock> root,
                                                  ClusterClientCursorParams&& params,
                                                  boost::optional<LogicalSessionId> lsid)
-    : _params(std::move(params)), _root(std::move(root)), _lsid(lsid) {}
+    : _params(std::move(params)), _root(std::move(root)), _lsid(lsid) {
+    dassert(!_params.compareWholeSortKey ||
+            SimpleBSONObjComparator::kInstance.evaluate(
+                _params.sort == ClusterClientCursorParams::kWholeSortKeySortPattern));
+}
 
 StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(
     RouterExecStage::ExecContext execContext) {
