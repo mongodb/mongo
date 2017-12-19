@@ -622,7 +622,7 @@ public:
     /** pre-increment */
     BSONObjStlIterator& operator++() {
         dassert(!_cur.eoo());
-        *this = BSONObjStlIterator(BSONElement(_cur.rawdata() + _curSize));
+        *this = BSONObjStlIterator(BSONElement(_cur.rawdata() + _cur.size()));
         return *this;
     }
 
@@ -648,13 +648,9 @@ public:
     }
 
 private:
-    explicit BSONObjStlIterator(BSONElement elem)
-        : _cur(elem),
-          // Make sure the lazy size fields are filled in.
-          _curSize(_cur.size()) {}
+    explicit BSONObjStlIterator(BSONElement elem) : _cur(elem) {}
 
     BSONElement _cur;
-    int _curSize = 0;  // TODO consider removing if we make the size cache in BSONElement eager.
 };
 
 /**
@@ -695,26 +691,6 @@ public:
      * always at the end. */
     bool moreWithEOO() {
         return _pos <= _theend;
-    }
-
-    /**
-     * @return the next element in the object. For the final element, element.eoo() will be true.
-     */
-    BSONElement next(bool checkEnd) {
-        verify(_pos <= _theend);
-
-        int maxLen = -1;
-        if (checkEnd) {
-            maxLen = _theend + 1 - _pos;
-            verify(maxLen > 0);
-        }
-
-        BSONElement e(_pos, maxLen);
-        int esize = e.size(maxLen);
-        massert(16446, "BSONElement has bad size", esize > 0);
-        _pos += esize;
-
-        return e;
     }
 
     BSONElement next() {

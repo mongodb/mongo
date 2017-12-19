@@ -237,11 +237,12 @@ public:
         return type() == EOO;
     }
 
-    /** Size of the element.
-        @param maxLen If maxLen is specified, don't scan more than maxLen bytes to calculate size.
-    */
-    int size(int maxLen) const;
-    int size() const;
+    /**
+     * Size of the element.
+     */
+    int size() const {
+        return totalSize;
+    }
 
     /** Wrap this element up as a singleton object. */
     BSONObj wrap() const;
@@ -263,8 +264,6 @@ public:
      * NOTE: size includes the NULL terminator.
      */
     int fieldNameSize() const {
-        if (fieldNameSize_ == -1)
-            fieldNameSize_ = (int)strlen(fieldName()) + 1;
         return fieldNameSize_;
     }
 
@@ -653,27 +652,13 @@ public:
     }
 
     // @param maxLen don't scan more than maxLen bytes
-    explicit BSONElement(const char* d, int maxLen) : data(d) {
-        if (eoo()) {
-            totalSize = 1;
-            fieldNameSize_ = 0;
-        } else {
-            totalSize = -1;
-            fieldNameSize_ = -1;
-            if (maxLen != -1) {
-                size_t size = strnlen(fieldName(), maxLen - 1);
-                uassert(10333, "Invalid field name", size < size_t(maxLen - 1));
-                fieldNameSize_ = size + 1;
-            }
-        }
-    }
-
     explicit BSONElement(const char* d) : data(d) {
-        fieldNameSize_ = -1;
-        totalSize = -1;
         if (eoo()) {
             fieldNameSize_ = 0;
             totalSize = 1;
+        } else {
+            fieldNameSize_ = strlen(d + 1 /*skip type*/) + 1 /*include NUL byte*/;
+            totalSize = computeSize();
         }
     }
 
@@ -684,11 +669,19 @@ public:
      *  represent an EOO. You may pass -1 to indicate that you don't actually know the
      *  size.
      */
-    BSONElement(const char* d, int fieldNameSize, FieldNameSizeTag)
-        : data(d),
-          fieldNameSize_(fieldNameSize)  // internal size includes null terminator
-          ,
-          totalSize(-1) {}
+    BSONElement(const char* d, int fieldNameSize, FieldNameSizeTag) : data(d) {
+        if (eoo()) {
+            fieldNameSize_ = 0;
+            totalSize = 1;
+        } else {
+            if (fieldNameSize == -1) {
+                fieldNameSize_ = strlen(d + 1 /*skip type*/) + 1 /*include NUL byte*/;
+            } else {
+                fieldNameSize_ = fieldNameSize;
+            }
+            totalSize = computeSize();
+        }
+    }
 
     std::string _asCode() const;
 
@@ -697,9 +690,8 @@ public:
 
 private:
     const char* data;
-    mutable int fieldNameSize_;  // cached value
-
-    mutable int totalSize; /* caches the computed size */
+    int fieldNameSize_;  // internal size includes null terminator
+    int totalSize;
 
     friend class BSONObjIterator;
     friend class BSONObjStlIterator;
@@ -715,6 +707,9 @@ private:
         }
         return *this;
     }
+
+    // Only called from constructors.
+    int computeSize() const;
 };
 
 inline bool BSONElement::trueValue() const {

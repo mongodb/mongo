@@ -590,99 +590,7 @@ BSONElement BSONElement::operator[](StringData field) const {
     return o[field];
 }
 
-int BSONElement::size(int maxLen) const {
-    if (totalSize >= 0)
-        return totalSize;
-
-    int remain = maxLen - fieldNameSize() - 1;
-
-    int x = 0;
-    switch (type()) {
-        case EOO:
-        case Undefined:
-        case jstNULL:
-        case MaxKey:
-        case MinKey:
-            break;
-        case mongo::Bool:
-            x = 1;
-            break;
-        case NumberInt:
-            x = 4;
-            break;
-        case bsonTimestamp:
-        case mongo::Date:
-        case NumberDouble:
-        case NumberLong:
-            x = 8;
-            break;
-        case NumberDecimal:
-            x = 16;
-            break;
-        case jstOID:
-            x = OID::kOIDSize;
-            break;
-        case Symbol:
-        case Code:
-        case mongo::String:
-            massert(
-                10313, "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3);
-            x = valuestrsize() + 4;
-            break;
-        case CodeWScope:
-            massert(
-                10314, "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3);
-            x = objsize();
-            break;
-
-        case DBRef:
-            massert(
-                10315, "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3);
-            x = valuestrsize() + 4 + 12;
-            break;
-        case Object:
-        case mongo::Array:
-            massert(
-                10316, "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3);
-            x = objsize();
-            break;
-        case BinData:
-            massert(
-                10317, "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3);
-            x = valuestrsize() + 4 + 1 /*subtype*/;
-            break;
-        case RegEx: {
-            const char* p = value();
-            size_t len1 = (maxLen == -1) ? strlen(p) : strnlen(p, remain);
-            massert(10318, "Invalid regex string", maxLen == -1 || len1 < size_t(remain));
-            p = p + len1 + 1;
-            size_t len2;
-            if (maxLen == -1)
-                len2 = strlen(p);
-            else {
-                size_t x = remain - len1 - 1;
-                verify(x <= 0x7fffffff);
-                len2 = strnlen(p, x);
-                massert(10319, "Invalid regex options string", len2 < x);
-            }
-            x = (int)(len1 + 1 + len2 + 1);
-        } break;
-        default: {
-            StringBuilder ss;
-            ss << "BSONElement: bad type " << (int)type();
-            std::string msg = ss.str();
-            massert(13655, msg.c_str(), false);
-        }
-    }
-    totalSize = x + fieldNameSize() + 1;  // BSONType
-
-    return totalSize;
-}
-
-int BSONElement::size() const {
-    if (totalSize >= 0)
-        return totalSize;
-
+int BSONElement::computeSize() const {
     int x = 0;
     switch (type()) {
         case EOO:
@@ -740,9 +648,7 @@ int BSONElement::size() const {
             massert(10320, msg.c_str(), false);
         }
     }
-    totalSize = x + fieldNameSize() + 1;  // BSONType
-
-    return totalSize;
+    return x + fieldNameSize() + 1;  // BSONType
 }
 
 std::string BSONElement::toString(bool includeFieldName, bool full) const {
