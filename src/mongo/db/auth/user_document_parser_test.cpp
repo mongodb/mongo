@@ -30,11 +30,11 @@
  */
 
 
+#include "mongo/db/auth/user_document_parser.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 
@@ -401,6 +401,7 @@ TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
                                                                       << BSON("MONGODB-CR"
                                                                               << "a"))));
     ASSERT(user->getCredentials().password == "a");
+    ASSERT(!user->getCredentials().scram.isValid());
     ASSERT(!user->getCredentials().isExternal);
 
     // Credentials are {external:true if users's db is $external
@@ -413,6 +414,7 @@ TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
                                                                 << "credentials"
                                                                 << BSON("external" << true))));
     ASSERT(user->getCredentials().password.empty());
+    ASSERT(!user->getCredentials().scram.isValid());
     ASSERT(user->getCredentials().isExternal);
 }
 

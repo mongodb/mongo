@@ -66,6 +66,17 @@ public:
         std::string salt;
         std::string serverKey;
         std::string storedKey;
+
+        bool isValid() const {
+            // 160bit -> 20octets -> * 4/3 -> 26.667 -> padded to 28
+            const size_t kEncodedSHA1Length = 28;
+            // 128bit -> 16octets -> * 4/3 -> 21.333 -> padded to 24
+            const size_t kEncodedSaltLength = 24;
+
+            return (salt.size() == kEncodedSaltLength) &&
+                (serverKey.size() == kEncodedSHA1Length) &&
+                (storedKey.size() == kEncodedSHA1Length);
+        }
     };
     struct CredentialData {
         CredentialData() : password(""), scram(), isExternal(false) {}
