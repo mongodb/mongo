@@ -28,8 +28,12 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/mongo_process_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 
 namespace mongo {
 /**
@@ -55,9 +59,7 @@ public:
             MONGO_UNREACHABLE;
         }
 
-        bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final {
-            MONGO_UNREACHABLE;
-        }
+        bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
 
         BSONObj insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                        const NamespaceString& ns,
@@ -103,10 +105,8 @@ public:
             MONGO_UNREACHABLE;
         }
 
-        Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                            Pipeline* pipeline) final {
-            MONGO_UNREACHABLE;
-        }
+        StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> attachCursorSourceToPipeline(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
 
         std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
                                            CurrentOpConnectionsMode connMode,
@@ -128,9 +128,7 @@ public:
         StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
             const std::vector<BSONObj>& rawPipeline,
             const boost::intrusive_ptr<ExpressionContext>& expCtx,
-            const MakePipelineOptions pipelineOptions) final {
-            MONGO_UNREACHABLE;
-        }
+            const MakePipelineOptions pipelineOptions) final;
 
         boost::optional<Document> lookupSingleDocument(
             const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -142,6 +140,61 @@ public:
         std::vector<GenericCursor> getCursors(
             const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
     };
+
+    struct DispatchShardPipelineResults {
+        // True if this pipeline was split, and the second half of the pipeline needs to be run on
+        // the
+        // primary shard for the database.
+        bool needsPrimaryShardMerge;
+
+        // Populated if this *is not* an explain, this vector represents the cursors on the remote
+        // shards.
+        std::vector<ClusterClientCursorParams::RemoteCursor> remoteCursors;
+
+        // Populated if this *is* an explain, this vector represents the results from each shard.
+        std::vector<AsyncRequestsSender::Response> remoteExplainOutput;
+
+        // The half of the pipeline that was sent to each shard, or the entire pipeline if there was
+        // only one shard targeted.
+        std::unique_ptr<Pipeline, PipelineDeleter> pipelineForTargetedShards;
+
+        // The merging half of the pipeline if more than one shard was targeted, otherwise nullptr.
+        std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging;
+
+        // The command object to send to the targeted shards.
+        BSONObj commandForTargetedShards;
+    };
+
+    static BSONObj createCommandForTargetedShards(
+        const AggregationRequest&,
+        const BSONObj originalCmdObj,
+        const std::unique_ptr<Pipeline, PipelineDeleter>& pipelineForTargetedShards);
+
+    static BSONObj establishMergingMongosCursor(
+        OperationContext*,
+        const AggregationRequest&,
+        const NamespaceString& requestedNss,
+        BSONObj cmdToRunOnNewShards,
+        const LiteParsedPipeline&,
+        std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging,
+        std::vector<ClusterClientCursorParams::RemoteCursor>);
+
+    /**
+     * Targets shards for the pipeline and returns a struct with the remote cursors or results, and
+     * the pipeline that will need to be executed to merge the results from the remotes. If a stale
+     * shard version is encountered, refreshes the routing table and tries again.
+     */
+    static StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
+        const boost::intrusive_ptr<ExpressionContext>&,
+        const NamespaceString& executionNss,
+        const BSONObj originalCmdObj,
+        const AggregationRequest&,
+        const LiteParsedPipeline&,
+        std::unique_ptr<Pipeline, PipelineDeleter>);
+
+    static bool mustRunOnAllShards(const NamespaceString& nss,
+                                   const CachedCollectionRoutingInfo& routingInfo,
+                                   const LiteParsedPipeline& litePipe);
 
 private:
     PipelineS() = delete;  // Should never be instantiated.

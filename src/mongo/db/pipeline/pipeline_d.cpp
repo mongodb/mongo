@@ -585,8 +585,8 @@ DBClientBase* PipelineD::MongoDInterface::directClient() {
 }
 
 bool PipelineD::MongoDInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetCollectionForReadCommand autoColl(opCtx, nss);
-    // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
+    AutoGetCollectionForRead autoColl(opCtx, nss);
+    // TODO SERVER-32198: Use CollectionShardingState::collectionIsSharded() to confirm sharding
     // state.
     auto css = CollectionShardingState::get(opCtx, nss);
     return bool(css->getMetadata());
@@ -689,16 +689,15 @@ StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> PipelineD::MongoDInterfac
         pipeline.getValue()->optimizePipeline();
     }
 
-    Status cursorStatus = Status::OK();
-
     if (opts.attachCursorSource) {
-        cursorStatus = attachCursorSourceToPipeline(expCtx, pipeline.getValue().get());
+        pipeline = attachCursorSourceToPipeline(expCtx, pipeline.getValue().release());
     }
 
-    return cursorStatus.isOK() ? std::move(pipeline) : cursorStatus;
+    return pipeline;
 }
 
-Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
+StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>>
+PipelineD::MongoDInterface::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) {
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceCursor*>(pipeline->getSources().front().get()));
@@ -729,7 +728,7 @@ Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
 
     PipelineD::prepareCursorSource(autoColl->getCollection(), expCtx->ns, nullptr, pipeline);
 
-    return Status::OK();
+    return std::unique_ptr<Pipeline, PipelineDeleter>(pipeline, PipelineDeleter(expCtx->opCtx));
 }
 
 std::vector<BSONObj> PipelineD::MongoDInterface::getCurrentOps(
