@@ -226,6 +226,10 @@ bool verifyClientProof(StringData clientProof, StringData storedKey, StringData 
     SHA1Block computedStoredKey =
         SHA1Block::computeHash(clientSignature.data(), clientSignature.size());
 
+    if (storedKey.size() != computedStoredKey.size()) {
+        return false;
+    }
+
     return consttimeMemEqual(reinterpret_cast<const unsigned char*>(storedKey.rawData()),
                              computedStoredKey.data(),
                              computedStoredKey.size());

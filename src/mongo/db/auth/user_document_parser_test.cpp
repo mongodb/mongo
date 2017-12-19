@@ -434,6 +434,7 @@ TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
                                                                       << BSON("MONGODB-CR"
                                                                               << "a"))));
     ASSERT(user->getCredentials().password == "a");
+    ASSERT(!user->getCredentials().scram.isValid());
     ASSERT(!user->getCredentials().isExternal);
 
     // Credentials are {external:true if users's db is $external
@@ -446,6 +447,7 @@ TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
                                                                 << "credentials"
                                                                 << BSON("external" << true))));
     ASSERT(user->getCredentials().password.empty());
+    ASSERT(!user->getCredentials().scram.isValid());
     ASSERT(user->getCredentials().isExternal);
 }
 

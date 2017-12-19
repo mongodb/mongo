@@ -198,6 +198,12 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_firstStep(std::vector<string>
         _creds.scram.serverKey = scramCreds[scram::serverKeyFieldName].String();
     }
 
+    if (!_creds.scram.isValid()) {
+        return Status(ErrorCodes::AuthenticationFailed,
+                      "Unable to perform SCRAM-SHA-1 authentication for a user with missing "
+                      "or invalid SCRAM credentials");
+    }
+
     // Generate server-first-message
     // Create text-based nonce as base64 encoding of a binary blob of length multiple of 3
     const int nonceLenQWords = 3;
@@ -280,6 +286,7 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_secondStep(const std::vector<
     // ClientSignature := HMAC(StoredKey, AuthMessage)
     // ClientKey := ClientSignature XOR ClientProof
     // ServerSignature := HMAC(ServerKey, AuthMessage)
+    invariant(_creds.scram.isValid());
 
     if (!scram::verifyClientProof(
             base64::decode(clientProof), base64::decode(_creds.scram.storedKey), _authMessage)) {
