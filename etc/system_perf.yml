@@ -601,6 +601,32 @@ tasks:
     - func: "make test log artifact"
     - func: "analyze"
 
+- name: change_streams
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "change_streams"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "make test log artifact"
+
+- name: change_streams_multi_mongos
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "change_streams_multi_mongos"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "make test log artifact"
+
 
 #######################################
 #               Modules               #
@@ -647,6 +673,7 @@ buildvariants:
     - name: non_sharded_workloads_MMAPv1
     - name: agg_query_comparison_bestbuy_WT
     - name: agg_query_comparison_bestbuy_MMAPv1
+    - name: change_streams
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -701,6 +728,8 @@ buildvariants:
     - name: move_chunk_workloads_MMAPv1
     - name: agg_query_comparison_bestbuy_WT
     - name: agg_query_comparison_bestbuy_MMAPv1
+    - name: change_streams
+    - name: change_streams_multi_mongos
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
@@ -727,6 +756,7 @@ buildvariants:
     - name: non_sharded_workloads_MMAPv1
     - name: agg_query_comparison_bestbuy_WT
     - name: agg_query_comparison_bestbuy_MMAPv1
+    - name: change_streams
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
