@@ -608,7 +608,7 @@ void BSONObj::toString(
     bool first = true;
     while (1) {
         massert(10327, "Object does not end with EOO", i.moreWithEOO());
-        BSONElement e = i.next(true);
+        BSONElement e = i.next();
         massert(10328, "Invalid element size", e.size() > 0);
         massert(10329, "Element too large", e.size() < (1 << 30));
         int offset = (int)(e.rawdata() - this->objdata());
