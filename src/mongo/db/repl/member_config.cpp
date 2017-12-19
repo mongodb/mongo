@@ -185,8 +185,7 @@ Status MemberConfig::initialize(const BSONObj& mcfg, ReplSetTagConfig* tagConfig
     BSONElement tagsElement;
     status = bsonExtractTypedField(mcfg, kTagsFieldName, Object, &tagsElement);
     if (status.isOK()) {
-        for (BSONObj::iterator tagIter(tagsElement.Obj()); tagIter.more();) {
-            const BSONElement& tag = tagIter.next();
+        for (auto&& tag : tagsElement.Obj()) {
             if (tag.type() != String) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "tags." << tag.fieldName()

@@ -1661,7 +1661,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                   << " must be an array");
             }
             auto elemMatchObj = e.embeddedObject();
-            auto iter = elemMatchObj.begin();
+            auto iter = BSONObjIterator(elemMatchObj);
             if (!iter.more()) {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream()

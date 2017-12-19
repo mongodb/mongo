@@ -52,6 +52,8 @@
 
 namespace mongo {
 
+class BSONObjStlIterator;
+
 /**
    C++ representation of a "BSON" object -- that is, an extended JSON-style
    object in a binary representation.
@@ -516,7 +518,9 @@ public:
     void elems(std::list<BSONElement>&) const;
 
     friend class BSONObjIterator;
-    typedef BSONObjIterator iterator;
+    friend class BSONObjStlIterator;
+    typedef BSONObjStlIterator iterator;
+    typedef BSONObjStlIterator const_iterator;
 
     /**
      * These enable range-based for loops over BSONObjs:
@@ -525,8 +529,8 @@ public:
      *          ... // Do something with elem
      *      }
      */
-    BSONObjIterator begin() const;
-    BSONObjIterator end() const;
+    iterator begin() const;
+    iterator end() const;
 
     void appendSelfToBufBuilder(BufBuilder& b) const {
         verify(objsize());
@@ -580,18 +584,89 @@ struct BSONArray : BSONObj {
     explicit BSONArray(const BSONObj& obj) : BSONObj(obj) {}
 };
 
-/** iterator for a BSONObj
+/**
+ * An stl-compatible forward iterator over the elements of a BSONObj.
+ *
+ * The BSONObj must stay in scope for the duration of the iterator's execution.
+ */
+class BSONObjStlIterator {
+public:
+    using iterator_category = std::forward_iterator_tag;
+    using difference_type = ptrdiff_t;
+    using value_type = BSONElement;
+    using pointer = const BSONElement*;
+    using reference = const BSONElement&;
 
-   Note each BSONObj ends with an EOO element: so you will get more() on an empty
-   object, although next().eoo() will be true.
+    /**
+     * All default constructed iterators are equal to each other.
+     * They are in a dereferencable state, and return an EOO BSONElement.
+     * They must not be incremented.
+     */
+    BSONObjStlIterator() = default;
 
-   The BSONObj must stay in scope for the duration of the iterator's execution.
+    /**
+     * Constructs an iterator pointing to the first element in obj or EOO if it is empty.
+     */
+    explicit BSONObjStlIterator(const BSONObj& obj) : BSONObjStlIterator(obj.firstElement()) {}
 
-   todo: Finish making this an STL-compatible iterator.
-            Need iterator_catagory et al (maybe inherit from std::iterator).
-            Need operator->
-            operator* should return a const reference not a value.
-*/
+    /**
+     * Returns an iterator pointing to the EOO element in obj.
+     */
+    static BSONObjStlIterator endOf(const BSONObj& obj) {
+        auto eooElem = BSONElement();
+        eooElem.data = (obj.objdata() + obj.objsize() - 1);
+        dassert(eooElem.eoo());  // This is checked in the BSONObj constructor.
+        return BSONObjStlIterator(eooElem);
+    }
+
+    /** pre-increment */
+    BSONObjStlIterator& operator++() {
+        dassert(!_cur.eoo());
+        *this = BSONObjStlIterator(BSONElement(_cur.rawdata() + _curSize));
+        return *this;
+    }
+
+    /** post-increment */
+    BSONObjStlIterator operator++(int) {
+        BSONObjStlIterator oldPos = *this;
+        ++*this;
+        return oldPos;
+    }
+
+    const BSONElement& operator*() const {
+        return _cur;
+    }
+    const BSONElement* operator->() const {
+        return &_cur;
+    }
+
+    bool operator==(const BSONObjStlIterator& other) {
+        return _cur.rawdata() == other._cur.rawdata();
+    }
+    bool operator!=(const BSONObjStlIterator& other) {
+        return !(*this == other);
+    }
+
+private:
+    explicit BSONObjStlIterator(BSONElement elem)
+        : _cur(elem),
+          // Make sure the lazy size fields are filled in.
+          _curSize(_cur.size()) {}
+
+    BSONElement _cur;
+    int _curSize = 0;  // TODO consider removing if we make the size cache in BSONElement eager.
+};
+
+/**
+ * Non-STL iterator for a BSONObj
+ *
+ * For simple loops over BSONObj, do this instead: for (auto&& elem : obj) { ... }
+ *
+ * Note each BSONObj ends with an EOO element: so you will get moreWithEOO() on an empty
+ * object, although more() will be false and next().eoo() will be true.
+ *
+ * The BSONObj must stay in scope for the duration of the iterator's execution.
+ */
 class BSONObjIterator {
 public:
     /** Create an iterator for a BSON object.
@@ -609,12 +684,6 @@ public:
     BSONObjIterator(const char* start, const char* end) {
         _pos = start + 4;
         _theend = end - 1;
-    }
-
-    static BSONObjIterator endOf(const BSONObj& obj) {
-        BSONObjIterator end(obj);
-        end._pos = end._theend;
-        return end;
     }
 
     /** @return true if more elements exist to be enumerated. */
@@ -733,11 +802,11 @@ public:
     BSONArrayIteratorSorted(const BSONArray& array);
 };
 
-inline BSONObjIterator BSONObj::begin() const {
-    return BSONObjIterator(*this);
+inline BSONObj::iterator BSONObj::begin() const {
+    return BSONObj::iterator(*this);
 }
-inline BSONObjIterator BSONObj::end() const {
-    return BSONObjIterator::endOf(*this);
+inline BSONObj::iterator BSONObj::end() const {
+    return BSONObj::iterator::endOf(*this);
 }
 
 /**
@@ -780,9 +849,7 @@ template <size_t N>
 inline void BSONObj::getFields(const std::array<StringData, N>& fieldNames,
                                std::array<BSONElement, N>* fields) const {
     std::bitset<N> foundFields;
-    auto iter = this->begin();
-    while (iter.more() && !foundFields.all()) {
-        auto el = iter.next();
+    for (auto&& el : *this) {
         auto fieldName = el.fieldNameStringData();
         for (std::size_t i = 0; i < N; ++i) {
             if (!foundFields.test(i) && (fieldNames[i] == fieldName)) {
@@ -791,6 +858,8 @@ inline void BSONObj::getFields(const std::array<StringData, N>& fieldNames,
                 break;
             }
         }
+        if (foundFields.all())
+            break;
     }
 }
 }  // namespace mongo

@@ -52,7 +52,7 @@ BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames)
     invariant(replace.nFields() == fieldNames.nFields());
 
     BSONObjBuilder bob;
-    BSONObjIterator iter = fieldNames.begin();
+    auto iter = fieldNames.begin();
 
     for (const BSONElement& el : replace) {
         bob.appendAs(el, (*iter++).fieldNameStringData());

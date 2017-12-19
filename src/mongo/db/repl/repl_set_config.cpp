@@ -131,8 +131,7 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg,
     if (!status.isOK())
         return status;
 
-    for (BSONObj::iterator membersIterator(membersElement.Obj()); membersIterator.more();) {
-        BSONElement memberElement = membersIterator.next();
+    for (auto&& memberElement : membersElement.Obj()) {
         if (memberElement.type() != Object) {
             return Status(ErrorCodes::TypeMismatch,
                           str::stream() << "Expected type of " << kMembersFieldName << "."
@@ -345,8 +344,7 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
         return status;
     }
 
-    for (BSONObj::iterator gleModeIter(gleModes); gleModeIter.more();) {
-        const BSONElement modeElement = gleModeIter.next();
+    for (auto&& modeElement : gleModes) {
         if (_customWriteConcernModes.find(modeElement.fieldNameStringData()) !=
             _customWriteConcernModes.end()) {
             return Status(ErrorCodes::DuplicateKey,
@@ -364,8 +362,7 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
                                         << typeName(modeElement.type()));
         }
         ReplSetTagPattern pattern = _tagConfig.makePattern();
-        for (BSONObj::iterator constraintIter(modeElement.Obj()); constraintIter.more();) {
-            const BSONElement constraintElement = constraintIter.next();
+        for (auto&& constraintElement : modeElement.Obj()) {
             if (!constraintElement.isNumber()) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Expected " << kSettingsFieldName << '.'

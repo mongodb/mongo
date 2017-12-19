@@ -702,6 +702,7 @@ private:
     mutable int totalSize; /* caches the computed size */
 
     friend class BSONObjIterator;
+    friend class BSONObjStlIterator;
     friend class BSONObj;
     const BSONElement& chk(BSONType t) const {
         if (t != type()) {
