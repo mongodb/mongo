@@ -570,6 +570,9 @@ if sconsflags:
 env_vars.Add('ABIDW',
     help="Configures the path to the 'abidw' (a libabigail) utility")
 
+env_vars.Add('AR',
+    help='Sets path for the archiver')
+
 env_vars.Add('ARFLAGS',
     help='Sets flags for the archiver',
     converter=variable_shlex_converter)
