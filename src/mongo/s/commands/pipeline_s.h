@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/mongo_process_interface.h"
 #include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo {
@@ -39,9 +40,108 @@ namespace mongo {
 class PipelineS {
 public:
     /**
-     * Injects a MongosProcessInterface into stages which require access to its functionality.
+     * Class to provide access to mongos-specific implementations of methods required by some
+     * document sources.
      */
-    static void injectMongosInterface(Pipeline* pipeline);
+    class MongoSProcessInterface final : public MongoProcessInterface {
+    public:
+        MongoSProcessInterface() = default;
+
+        virtual ~MongoSProcessInterface() = default;
+
+        void setOperationContext(OperationContext* opCtx) final {}
+
+        DBClientBase* directClient() final {
+            MONGO_UNREACHABLE;
+        }
+
+        bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final {
+            MONGO_UNREACHABLE;
+        }
+
+        BSONObj insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       const NamespaceString& ns,
+                       const std::vector<BSONObj>& objs) final {
+            MONGO_UNREACHABLE;
+        }
+
+        CollectionIndexUsageMap getIndexStats(OperationContext* opCtx,
+                                              const NamespaceString& ns) final {
+            MONGO_UNREACHABLE;
+        }
+
+        void appendLatencyStats(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                bool includeHistograms,
+                                BSONObjBuilder* builder) const final {
+            MONGO_UNREACHABLE;
+        }
+
+        Status appendStorageStats(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  const BSONObj& param,
+                                  BSONObjBuilder* builder) const final {
+            MONGO_UNREACHABLE;
+        }
+
+        Status appendRecordCount(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 BSONObjBuilder* builder) const final {
+            MONGO_UNREACHABLE;
+        }
+
+        BSONObj getCollectionOptions(const NamespaceString& nss) final {
+            MONGO_UNREACHABLE;
+        }
+
+        Status renameIfOptionsAndIndexesHaveNotChanged(
+            OperationContext* opCtx,
+            const BSONObj& renameCommandObj,
+            const NamespaceString& targetNs,
+            const BSONObj& originalCollectionOptions,
+            const std::list<BSONObj>& originalIndexes) final {
+            MONGO_UNREACHABLE;
+        }
+
+        Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                            Pipeline* pipeline) final {
+            MONGO_UNREACHABLE;
+        }
+
+        std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
+                                           CurrentOpConnectionsMode connMode,
+                                           CurrentOpUserMode userMode,
+                                           CurrentOpTruncateMode truncateMode) const final {
+            MONGO_UNREACHABLE;
+        }
+
+        std::string getShardName(OperationContext* opCtx) const final {
+            MONGO_UNREACHABLE;
+        }
+
+        std::vector<FieldPath> collectDocumentKeyFields(OperationContext*,
+                                                        const NamespaceString&,
+                                                        UUID) const final {
+            MONGO_UNREACHABLE;
+        }
+
+        StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
+            const std::vector<BSONObj>& rawPipeline,
+            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+            const MakePipelineOptions pipelineOptions) final {
+            MONGO_UNREACHABLE;
+        }
+
+        boost::optional<Document> lookupSingleDocument(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx,
+            const NamespaceString& nss,
+            UUID collectionUUID,
+            const Document& documentKey,
+            boost::optional<BSONObj> readConcern) final;
+
+        std::vector<GenericCursor> getCursors(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx) const final;
+    };
 
 private:
     PipelineS() = delete;  // Should never be instantiated.

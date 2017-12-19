@@ -50,6 +50,7 @@ class ExpressionContext;
 class DocumentSource;
 class CollatorInterface;
 class OperationContext;
+class PipelineDeleter;
 
 /**
  * A Pipeline object represents a list of DocumentSources and is responsible for optimizing the
@@ -64,46 +65,6 @@ public:
      * split for merging.
      */
     enum class SplitState { kUnsplit, kSplitForShards, kSplitForMerge };
-
-    /**
-     * This class will ensure a Pipeline is disposed before it is deleted.
-     */
-    class Deleter {
-    public:
-        /**
-         * Constructs an empty deleter. Useful for creating a
-         * unique_ptr<Pipeline, Pipeline::Deleter> without populating it.
-         */
-        Deleter() {}
-
-        explicit Deleter(OperationContext* opCtx) : _opCtx(opCtx) {}
-
-        /**
-         * If an owner of a std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> wants to assume
-         * responsibility for calling PlanExecutor::dispose(), they can call dismissDisposal(). If
-         * dismissed, a Deleter will not call dispose() when deleting the PlanExecutor.
-         */
-        void dismissDisposal() {
-            _dismissed = true;
-        }
-
-        /**
-         * Calls dispose() on 'pipeline', unless this Deleter has been dismissed.
-         */
-        void operator()(Pipeline* pipeline) {
-            // It is illegal to call this method on a default-constructed Deleter.
-            invariant(_opCtx);
-            if (!_dismissed) {
-                pipeline->dispose(_opCtx);
-            }
-            delete pipeline;
-        }
-
-    private:
-        OperationContext* _opCtx = nullptr;
-
-        bool _dismissed = false;
-    };
 
     /**
      * List of supported match expression features in a pipeline.
@@ -122,7 +83,7 @@ public:
      * will not be used during execution of the pipeline. Doing so may cause comparisons made during
      * parse-time to return the wrong results.
      */
-    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> parse(
+    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> parse(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -133,7 +94,7 @@ public:
      * optimized, but the caller may convert it to an optimized pipeline by calling
      * optimizePipeline().
      */
-    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> parseFacetPipeline(
+    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> parseFacetPipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
@@ -143,7 +104,7 @@ public:
      * Returns a non-OK status if any stage is in an invalid position. For example, if an $out stage
      * is present but is not the last stage.
      */
-    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> create(
+    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> create(
         SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
@@ -152,7 +113,7 @@ public:
      * Returns a non-OK status if any stage is invalid. For example, if the pipeline is empty or if
      * any stage is an initial source.
      */
-    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> createFacetPipeline(
+    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> createFacetPipeline(
         SourceContainer sources, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
@@ -185,7 +146,7 @@ public:
      * Must be called before deleting a Pipeline.
      *
      * There are multiple cleanup scenarios:
-     *  - This Pipeline will only ever use one OperationContext. In this case the Pipeline::Deleter
+     *  - This Pipeline will only ever use one OperationContext. In this case the PipelineDeleter
      *    will automatically call dispose() before deleting the Pipeline, and the owner need not
      *    call dispose().
      *  - This Pipeline may use multiple OperationContexts over its lifetime. In this case it
@@ -199,7 +160,7 @@ public:
      * results within mongos. This permanently alters this pipeline for the merging operation, and
      * returns a Pipeline object that should be executed on each targeted shard.
     */
-    std::unique_ptr<Pipeline, Pipeline::Deleter> splitForSharded();
+    std::unique_ptr<Pipeline, PipelineDeleter> splitForSharded();
 
     /**
      * Reassemble a split shard pipeline into its original form. Upon return, this pipeline will
@@ -207,7 +168,7 @@ public:
      * returned by a call to splitForSharded(). It is an error to call this on the merge part of the
      * pipeline, or on a pipeline that has not been split.
      */
-    void unsplitFromSharded(std::unique_ptr<Pipeline, Pipeline::Deleter> pipelineForMergingShard);
+    void unsplitFromSharded(std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMergingShard);
 
     /**
      * Returns true if this pipeline has not been split.
@@ -334,12 +295,13 @@ private:
     };
 
     friend class Optimizations::Sharded;
+    friend class PipelineDeleter;
 
     /**
      * Used by both Pipeline::parse() and Pipeline::parseFacetPipeline() to build and validate the
      * pipeline.
      */
-    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> parseTopLevelOrFacetPipeline(
+    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> parseTopLevelOrFacetPipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const bool isFacetPipeline);
@@ -348,7 +310,7 @@ private:
      * Used by both Pipeline::create() and Pipeline::createFacetPipeline() to build and validate the
      * pipeline.
      */
-    static StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> createTopLevelOrFacetPipeline(
+    static StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> createTopLevelOrFacetPipeline(
         SourceContainer sources,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const bool isSubPipeline);
@@ -410,4 +372,45 @@ private:
     boost::intrusive_ptr<ExpressionContext> pCtx;
     bool _disposed = false;
 };
+
+/**
+ * This class will ensure a Pipeline is disposed before it is deleted.
+ */
+class PipelineDeleter {
+public:
+    /**
+     * Constructs an empty deleter. Useful for creating a
+     * unique_ptr<Pipeline, PipelineDeleter> without populating it.
+     */
+    PipelineDeleter() {}
+
+    explicit PipelineDeleter(OperationContext* opCtx) : _opCtx(opCtx) {}
+
+    /**
+     * If an owner of a std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> wants to assume
+     * responsibility for calling PlanExecutor::dispose(), they can call dismissDisposal(). If
+     * dismissed, a PipelineDeleter will not call dispose() when deleting the PlanExecutor.
+     */
+    void dismissDisposal() {
+        _dismissed = true;
+    }
+
+    /**
+     * Calls dispose() on 'pipeline', unless this PipelineDeleter has been dismissed.
+     */
+    void operator()(Pipeline* pipeline) {
+        // It is illegal to call this method on a default-constructed PipelineDeleter.
+        invariant(_opCtx);
+        if (!_dismissed) {
+            pipeline->dispose(_opCtx);
+        }
+        delete pipeline;
+    }
+
+private:
+    OperationContext* _opCtx = nullptr;
+
+    bool _dismissed = false;
+};
+
 }  // namespace mongo

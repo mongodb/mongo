@@ -57,7 +57,7 @@ using std::vector;
 
 DocumentSourceFacet::DocumentSourceFacet(std::vector<FacetPipeline> facetPipelines,
                                          const intrusive_ptr<ExpressionContext>& expCtx)
-    : DocumentSourceNeedsMongoProcessInterface(expCtx),
+    : DocumentSource(expCtx),
       _teeBuffer(TeeBuffer::create(facetPipelines.size())),
       _facets(std::move(facetPipelines)) {
     for (size_t facetId = 0; facetId < _facets.size(); ++facetId) {
@@ -215,25 +215,13 @@ intrusive_ptr<DocumentSource> DocumentSourceFacet::optimize() {
     return this;
 }
 
-void DocumentSourceFacet::doInjectMongoProcessInterface(
-    std::shared_ptr<MongoProcessInterface> pipelineContext) {
-    for (auto&& facet : _facets) {
-        for (auto&& stage : facet.pipeline->getSources()) {
-            if (auto stageNeedingMongoProcessInterface =
-                    dynamic_cast<DocumentSourceNeedsMongoProcessInterface*>(stage.get())) {
-                stageNeedingMongoProcessInterface->injectMongoProcessInterface(pipelineContext);
-            }
-        }
-    }
-}
-
-void DocumentSourceFacet::doDetachFromOperationContext() {
+void DocumentSourceFacet::detachFromOperationContext() {
     for (auto&& facet : _facets) {
         facet.pipeline->detachFromOperationContext();
     }
 }
 
-void DocumentSourceFacet::doReattachToOperationContext(OperationContext* opCtx) {
+void DocumentSourceFacet::reattachToOperationContext(OperationContext* opCtx) {
     for (auto&& facet : _facets) {
         facet.pipeline->reattachToOperationContext(opCtx);
     }

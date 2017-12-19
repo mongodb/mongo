@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_test_service_context.h"
 
@@ -48,7 +49,8 @@ public:
         : ExpressionContextForTest(NamespaceString{"test"_sd, "namespace"_sd}) {}
 
     ExpressionContextForTest(NamespaceString nss)
-        : ExpressionContext(std::move(nss), kNullTimeZoneDatabase),
+        : ExpressionContext(
+              std::move(nss), std::make_shared<StubMongoProcessInterface>(), kNullTimeZoneDatabase),
           _testOpCtx(_serviceContext.makeOperationContext()) {
         TimeZoneDatabase::set(_serviceContext.getServiceContext(),
                               stdx::make_unique<TimeZoneDatabase>());
@@ -60,7 +62,8 @@ public:
     }
 
     ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
-        : ExpressionContext(opCtx, request, nullptr, {}) {}
+        : ExpressionContext(
+              opCtx, request, nullptr, std::make_shared<StubMongoProcessInterface>(), {}) {}
 
     /**
      * Sets the resolved definition for an involved namespace.

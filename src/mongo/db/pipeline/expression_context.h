@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_comparator.h"
+#include "mongo/db/pipeline/mongo_process_interface.h"
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -100,6 +101,7 @@ public:
     ExpressionContext(OperationContext* opCtx,
                       const AggregationRequest& request,
                       std::unique_ptr<CollatorInterface> collator,
+                      std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces);
 
     /**
@@ -180,6 +182,12 @@ public:
 
     OperationContext* opCtx;
 
+    // An interface for accessing information or performing operations that have different
+    // implementations on mongod and mongos, or that only make sense on one of the two.
+    // Additionally, putting some of this functionality behind an interface prevents aggregation
+    // libraries from having large numbers of dependencies. This pointer is always non-null.
+    std::shared_ptr<MongoProcessInterface> mongoProcessInterface;
+
     const TimeZoneDatabase* timeZoneDatabase;
 
     // Collation requested by the user for this pipeline. Empty if the user did not request a
@@ -197,10 +205,9 @@ public:
 protected:
     static const int kInterruptCheckPeriod = 128;
 
-    ExpressionContext(NamespaceString nss, const TimeZoneDatabase* tzDb)
-        : ns(std::move(nss)),
-          timeZoneDatabase(tzDb),
-          variablesParseState(variables.useIdGenerator()) {}
+    ExpressionContext(NamespaceString nss,
+                      std::shared_ptr<MongoProcessInterface>,
+                      const TimeZoneDatabase* tzDb);
 
     /**
      * Sets '_ownedCollator' and resets '_collator', 'documentComparator' and 'valueComparator'.

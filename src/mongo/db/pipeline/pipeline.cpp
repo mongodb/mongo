@@ -78,17 +78,17 @@ Pipeline::~Pipeline() {
     invariant(_disposed);
 }
 
-StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::parse(
+StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> Pipeline::parse(
     const std::vector<BSONObj>& rawPipeline, const intrusive_ptr<ExpressionContext>& expCtx) {
     return parseTopLevelOrFacetPipeline(rawPipeline, expCtx, false);
 }
 
-StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::parseFacetPipeline(
+StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> Pipeline::parseFacetPipeline(
     const std::vector<BSONObj>& rawPipeline, const intrusive_ptr<ExpressionContext>& expCtx) {
     return parseTopLevelOrFacetPipeline(rawPipeline, expCtx, true);
 }
 
-StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::parseTopLevelOrFacetPipeline(
+StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> Pipeline::parseTopLevelOrFacetPipeline(
     const std::vector<BSONObj>& rawPipeline,
     const intrusive_ptr<ExpressionContext>& expCtx,
     const bool isFacetPipeline) {
@@ -103,22 +103,22 @@ StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::parseTopLevel
     return createTopLevelOrFacetPipeline(std::move(stages), expCtx, isFacetPipeline);
 }
 
-StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::create(
+StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> Pipeline::create(
     SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
     return createTopLevelOrFacetPipeline(std::move(stages), expCtx, false);
 }
 
-StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::createFacetPipeline(
+StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> Pipeline::createFacetPipeline(
     SourceContainer stages, const intrusive_ptr<ExpressionContext>& expCtx) {
     return createTopLevelOrFacetPipeline(std::move(stages), expCtx, true);
 }
 
-StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> Pipeline::createTopLevelOrFacetPipeline(
+StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> Pipeline::createTopLevelOrFacetPipeline(
     SourceContainer stages,
     const intrusive_ptr<ExpressionContext>& expCtx,
     const bool isFacetPipeline) {
-    std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline(new Pipeline(std::move(stages), expCtx),
-                                                          Pipeline::Deleter(expCtx->opCtx));
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(new Pipeline(std::move(stages), expCtx),
+                                                        PipelineDeleter(expCtx->opCtx));
     try {
         if (isFacetPipeline) {
             pipeline->validateFacetPipeline();
@@ -276,6 +276,7 @@ bool Pipeline::aggSupportsWriteConcern(const BSONObj& cmd) {
 
 void Pipeline::detachFromOperationContext() {
     pCtx->opCtx = nullptr;
+    pCtx->mongoProcessInterface->setOperationContext(nullptr);
 
     for (auto&& source : _sources) {
         source->detachFromOperationContext();
@@ -284,6 +285,7 @@ void Pipeline::detachFromOperationContext() {
 
 void Pipeline::reattachToOperationContext(OperationContext* opCtx) {
     pCtx->opCtx = opCtx;
+    pCtx->mongoProcessInterface->setOperationContext(opCtx);
 
     for (auto&& source : _sources) {
         source->reattachToOperationContext(opCtx);
@@ -307,7 +309,7 @@ void Pipeline::dispose(OperationContext* opCtx) {
     }
 }
 
-std::unique_ptr<Pipeline, Pipeline::Deleter> Pipeline::splitForSharded() {
+std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::splitForSharded() {
     invariant(!isSplitForShards());
     invariant(!isSplitForMerge());
     invariant(!_unsplitSources);
@@ -315,8 +317,8 @@ std::unique_ptr<Pipeline, Pipeline::Deleter> Pipeline::splitForSharded() {
     // Create and initialize the shard spec we'll return. We start with an empty pipeline on the
     // shards and all work being done in the merger. Optimizations can move operations between
     // the pipelines to be more efficient.
-    std::unique_ptr<Pipeline, Pipeline::Deleter> shardPipeline(new Pipeline(pCtx),
-                                                               Pipeline::Deleter(pCtx->opCtx));
+    std::unique_ptr<Pipeline, PipelineDeleter> shardPipeline(new Pipeline(pCtx),
+                                                             PipelineDeleter(pCtx->opCtx));
 
     // Keep a copy of the original source list in case we need to reset the pipeline from split to
     // unsplit later.
@@ -337,7 +339,7 @@ std::unique_ptr<Pipeline, Pipeline::Deleter> Pipeline::splitForSharded() {
 }
 
 void Pipeline::unsplitFromSharded(
-    std::unique_ptr<Pipeline, Pipeline::Deleter> pipelineForMergingShard) {
+    std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMergingShard) {
     invariant(isSplitForShards());
     invariant(!isSplitForMerge());
     invariant(pipelineForMergingShard);

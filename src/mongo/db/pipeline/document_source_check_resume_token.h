@@ -54,7 +54,7 @@ namespace mongo {
  * This source need only run on a sharded collection.  For unsharded collections,
  * DocumentSourceEnsureResumeTokenPresent is sufficient.
  */
-class DocumentSourceShardCheckResumability final : public DocumentSourceNeedsMongoProcessInterface {
+class DocumentSourceShardCheckResumability final : public DocumentSource {
 public:
     GetNextResult getNext() final;
     const char* getSourceName() const final;

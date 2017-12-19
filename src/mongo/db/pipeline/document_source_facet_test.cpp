@@ -463,8 +463,22 @@ TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {
     ASSERT_TRUE(dummy->isOptimized);
 }
 
-TEST_F(DocumentSourceFacetTest, ShouldPropogateDetachingAndReattachingOfOpCtx) {
+/**
+ * An implementation of the MongoProcessInterface that is okay with changing the OperationContext,
+ * but has no other parts of the interface implemented.
+ */
+class StubMongoProcessOkWithOpCtxChanges : public StubMongoProcessInterface {
+public:
+    void setOperationContext(OperationContext* opCtx) final {
+        return;
+    }
+};
+
+TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     auto ctx = getExpCtx();
+    // We're going to be changing the OperationContext, so we need to use a MongoProcessInterface
+    // that won't throw when we do so.
+    ctx->mongoProcessInterface = stdx::make_unique<StubMongoProcessOkWithOpCtxChanges>();
 
     auto firstDummy = DocumentSourcePassthrough::create();
     auto firstPipeline = unittest::assertGet(Pipeline::createFacetPipeline({firstDummy}, ctx));
@@ -480,12 +494,12 @@ TEST_F(DocumentSourceFacetTest, ShouldPropogateDetachingAndReattachingOfOpCtx) {
     // Test detaching.
     ASSERT_FALSE(firstDummy->isDetachedFromOpCtx);
     ASSERT_FALSE(secondDummy->isDetachedFromOpCtx);
-    facetStage->doDetachFromOperationContext();
+    facetStage->detachFromOperationContext();
     ASSERT_TRUE(firstDummy->isDetachedFromOpCtx);
     ASSERT_TRUE(secondDummy->isDetachedFromOpCtx);
 
     // Test reattaching.
-    facetStage->doReattachToOperationContext(ctx->opCtx);
+    facetStage->reattachToOperationContext(ctx->opCtx);
     ASSERT_FALSE(firstDummy->isDetachedFromOpCtx);
     ASSERT_FALSE(secondDummy->isDetachedFromOpCtx);
 }

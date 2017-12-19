@@ -47,7 +47,7 @@ namespace mongo {
 class PipelineProxyStage final : public PlanStage {
 public:
     PipelineProxyStage(OperationContext* opCtx,
-                       std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline,
+                       std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                        WorkingSet* ws);
 
     PlanStage::StageState doWork(WorkingSetID* out) final;
@@ -95,7 +95,7 @@ private:
     boost::optional<BSONObj> getNextBson();
 
     // Things in the _stash should be returned before pulling items from _pipeline.
-    std::unique_ptr<Pipeline, Pipeline::Deleter> _pipeline;
+    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
     std::vector<BSONObj> _stash;
     const bool _includeMetaData;
 

@@ -56,12 +56,12 @@ using DocumentSourceGraphLookUpTest = AggregationContextFixture;
  * A MongoProcessInterface use for testing that supports making pipelines with an initial
  * DocumentSourceMock source.
  */
-class MockMongoProcessInterfaceImplementation final : public StubMongoProcessInterface {
+class MockMongoProcess final : public StubMongoProcessInterface {
 public:
-    MockMongoProcessInterfaceImplementation(std::deque<DocumentSource::GetNextResult> results)
+    MockMongoProcess(std::deque<DocumentSource::GetNextResult> results)
         : _results(std::move(results)) {}
 
-    StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
+    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts) final {
@@ -82,7 +82,7 @@ public:
     }
 
     Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        Pipeline* pipeline) override {
+                                        Pipeline* pipeline) final {
         pipeline->addInitialSource(DocumentSourceMock::create(_results));
         return Status::OK();
     }
@@ -94,7 +94,6 @@ private:
 TEST_F(DocumentSourceGraphLookUpTest,
        ShouldErrorWhenDoingInitialMatchIfDocumentInFromCollectionIsMissingId) {
     auto expCtx = getExpCtx();
-
     std::deque<DocumentSource::GetNextResult> inputs{Document{{"_id", 0}}};
     auto inputMock = DocumentSourceMock::create(std::move(inputs));
 
@@ -102,6 +101,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoProcess>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -114,9 +114,6 @@ TEST_F(DocumentSourceGraphLookUpTest,
                                           boost::none,
                                           boost::none);
     graphLookupStage->setSource(inputMock.get());
-    graphLookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterfaceImplementation>(std::move(fromContents)));
-
     ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
 }
 
@@ -132,6 +129,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoProcess>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -144,8 +142,6 @@ TEST_F(DocumentSourceGraphLookUpTest,
                                           boost::none,
                                           boost::none);
     graphLookupStage->setSource(inputMock.get());
-    graphLookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterfaceImplementation>(std::move(fromContents)));
 
     ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
 }
@@ -161,6 +157,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoProcess>(std::move(fromContents));
     auto unwindStage = DocumentSourceUnwind::create(expCtx, "results", false, boost::none);
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
@@ -173,8 +170,6 @@ TEST_F(DocumentSourceGraphLookUpTest,
                                           boost::none,
                                           boost::none,
                                           unwindStage);
-    graphLookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterfaceImplementation>(std::move(fromContents)));
     graphLookupStage->setSource(inputMock.get());
 
     ASSERT_THROWS_CODE(graphLookupStage->getNext(), AssertionException, 40271);
@@ -205,6 +200,7 @@ TEST_F(DocumentSourceGraphLookUpTest,
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoProcess>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -217,8 +213,6 @@ TEST_F(DocumentSourceGraphLookUpTest,
                                           boost::none,
                                           boost::none);
     graphLookupStage->setSource(inputMock.get());
-    graphLookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterfaceImplementation>(std::move(fromContents)));
     graphLookupStage->setSource(inputMock.get());
 
     auto next = graphLookupStage->getNext();
@@ -270,6 +264,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
 
     NamespaceString fromNs("test", "foreign");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoProcess>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -283,9 +278,6 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePauses) {
                                           boost::none);
 
     graphLookupStage->setSource(inputMock.get());
-
-    graphLookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterfaceImplementation>(std::move(fromContents)));
 
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -338,6 +330,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
 
     NamespaceString fromNs("test", "foreign");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoProcess>(std::move(fromContents));
 
     const bool preserveNullAndEmptyArrays = false;
     const boost::optional<std::string> includeArrayIndex = boost::none;
@@ -357,9 +350,6 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldPropagatePausesWhileUnwinding) {
                                           unwindStage);
 
     graphLookupStage->setSource(inputMock.get());
-
-    graphLookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterfaceImplementation>(std::move(fromContents)));
 
     // Assert it has the expected results. Note the results can be in either order.
     auto expectedA =
@@ -403,6 +393,8 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportAsFieldIsModified) 
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "foreign");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcess>(std::deque<DocumentSource::GetNextResult>{});
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -425,6 +417,8 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupShouldReportFieldsModifiedByAbs
     auto expCtx = getExpCtx();
     NamespaceString fromNs("test", "foreign");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcess>(std::deque<DocumentSource::GetNextResult>{});
     auto unwindStage =
         DocumentSourceUnwind::create(expCtx, "results", false, std::string("arrIndex"));
     auto graphLookupStage =
@@ -455,6 +449,7 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupWithComparisonExpressionForStar
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
     std::deque<DocumentSource::GetNextResult> fromContents{Document{{"_id", 0}, {"to", true}},
                                                            Document{{"_id", 1}, {"to", false}}};
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoProcess>(std::move(fromContents));
 
     auto graphLookupStage = DocumentSourceGraphLookUp::create(
         expCtx,
@@ -472,8 +467,6 @@ TEST_F(DocumentSourceGraphLookUpTest, GraphLookupWithComparisonExpressionForStar
         boost::none);
 
     graphLookupStage->setSource(inputMock.get());
-    graphLookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterfaceImplementation>(std::move(fromContents)));
 
     auto next = graphLookupStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -519,6 +512,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField)
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoProcess>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -531,8 +525,6 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldExpandArraysAtEndOfConnectFromField)
                                           boost::none,
                                           boost::none);
     graphLookupStage->setSource(inputMock.get());
-    graphLookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterfaceImplementation>(std::move(fromContents)));
     graphLookupStage->setSource(inputMock.get());
 
     auto next = graphLookupStage->getNext();
@@ -592,6 +584,7 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
 
     NamespaceString fromNs("test", "graph_lookup");
     expCtx->setResolvedNamespace(fromNs, {fromNs, std::vector<BSONObj>{}});
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoProcess>(std::move(fromContents));
     auto graphLookupStage =
         DocumentSourceGraphLookUp::create(expCtx,
                                           fromNs,
@@ -604,8 +597,6 @@ TEST_F(DocumentSourceGraphLookUpTest, ShouldNotExpandArraysWithinArraysAtEndOfCo
                                           boost::none,
                                           boost::none);
     graphLookupStage->setSource(inputMock.get());
-    graphLookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterfaceImplementation>(std::move(fromContents)));
     graphLookupStage->setSource(inputMock.get());
 
     auto next = graphLookupStage->getNext();

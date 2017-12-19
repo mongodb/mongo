@@ -46,7 +46,7 @@ DocumentSourceSingleDocumentTransformation::DocumentSourceSingleDocumentTransfor
     const intrusive_ptr<ExpressionContext>& pExpCtx,
     std::unique_ptr<TransformerInterface> parsedTransform,
     std::string name)
-    : DocumentSourceNeedsMongoProcessInterface(pExpCtx),
+    : DocumentSource(pExpCtx),
       _parsedTransform(std::move(parsedTransform)),
       _name(std::move(name)) {}
 

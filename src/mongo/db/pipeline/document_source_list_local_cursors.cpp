@@ -73,5 +73,5 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListLocalCursors::createFromB
 
 DocumentSourceListLocalCursors::DocumentSourceListLocalCursors(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSourceNeedsMongoProcessInterface(pExpCtx) {}
+    : DocumentSource(pExpCtx), _cursors(pExpCtx->mongoProcessInterface->getCursors(pExpCtx)) {}
 }

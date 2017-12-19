@@ -45,8 +45,7 @@ namespace mongo {
  * Queries separate collection for equality matches with documents in the pipeline collection.
  * Adds matching documents to a new array field in the input document.
  */
-class DocumentSourceLookUp final : public DocumentSourceNeedsMongoProcessInterface,
-                                   public SplittableDocumentSource {
+class DocumentSourceLookUp final : public DocumentSource, public SplittableDocumentSource {
 public:
     static constexpr size_t kMaxSubPipelineDepth = 20;
 
@@ -135,9 +134,9 @@ public:
         collections->push_back(_fromNs);
     }
 
-    void doDetachFromOperationContext() final;
+    void detachFromOperationContext() final;
 
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void reattachToOperationContext(OperationContext* opCtx) final;
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
@@ -183,7 +182,7 @@ public:
         return _variablesParseState;
     }
 
-    std::unique_ptr<Pipeline, Pipeline::Deleter> getSubPipeline_forTest(const Document& inputDoc) {
+    std::unique_ptr<Pipeline, PipelineDeleter> getSubPipeline_forTest(const Document& inputDoc) {
         return buildPipeline(inputDoc);
     }
 
@@ -267,7 +266,7 @@ private:
      * Builds the $lookup pipeline and resolves any variables using the passed 'inputDoc', adding a
      * cursor and/or cache source as appropriate.
      */
-    std::unique_ptr<Pipeline, Pipeline::Deleter> buildPipeline(const Document& inputDoc);
+    std::unique_ptr<Pipeline, PipelineDeleter> buildPipeline(const Document& inputDoc);
 
     /**
      * The pipeline supplied via the $lookup 'pipeline' argument. This may differ from pipeline that
@@ -319,7 +318,7 @@ private:
     std::vector<BSONObj> _userPipeline;
     // A pipeline parsed from _resolvedPipeline at creation time, intended to support introspective
     // functions. If sub-$lookup stages are present, their pipelines are constructed recursively.
-    std::unique_ptr<Pipeline, Pipeline::Deleter> _parsedIntrospectionPipeline;
+    std::unique_ptr<Pipeline, PipelineDeleter> _parsedIntrospectionPipeline;
 
     std::vector<LetVariable> _letVariables;
 
@@ -329,7 +328,7 @@ private:
     // The following members are used to hold onto state across getNext() calls when '_unwindSrc' is
     // not null.
     long long _cursorIndex = 0;
-    std::unique_ptr<Pipeline, Pipeline::Deleter> _pipeline;
+    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
     boost::optional<Document> _input;
     boost::optional<Document> _nextValue;
 };

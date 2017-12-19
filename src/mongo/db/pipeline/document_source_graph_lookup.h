@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class DocumentSourceGraphLookUp final : public DocumentSourceNeedsMongoProcessInterface {
+class DocumentSourceGraphLookUp final : public DocumentSource {
 public:
     static std::unique_ptr<LiteParsedDocumentSourceForeignCollections> liteParse(
         const AggregationRequest& request, const BSONElement& spec);
@@ -73,9 +73,9 @@ public:
         collections->push_back(_from);
     }
 
-    void doDetachFromOperationContext() final;
+    void detachFromOperationContext() final;
 
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void reattachToOperationContext(OperationContext* opCtx) final;
 
     static boost::intrusive_ptr<DocumentSourceGraphLookUp> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

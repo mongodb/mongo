@@ -47,7 +47,7 @@ using stdx::make_unique;
 const char* PipelineProxyStage::kStageType = "PIPELINE_PROXY";
 
 PipelineProxyStage::PipelineProxyStage(OperationContext* opCtx,
-                                       std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline,
+                                       std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                        WorkingSet* ws)
     : PlanStage(kStageType, opCtx),
       _pipeline(std::move(pipeline)),

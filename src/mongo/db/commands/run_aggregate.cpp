@@ -234,7 +234,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
  * Round trips the pipeline through serialization by calling serialize(), then Pipeline::parse().
  * fasserts if it fails to parse after being serialized.
  */
-std::unique_ptr<Pipeline, Pipeline::Deleter> reparsePipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> reparsePipeline(
     const Pipeline* pipeline,
     const AggregationRequest& request,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -460,6 +460,7 @@ Status runAggregate(OperationContext* opCtx,
             new ExpressionContext(opCtx,
                                   request,
                                   std::move(*collatorToUse),
+                                  std::make_shared<PipelineD::MongoDProcessInterface>(opCtx),
                                   uassertStatusOK(resolveInvolvedNamespaces(opCtx, request))));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 

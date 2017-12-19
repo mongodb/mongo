@@ -493,11 +493,11 @@ public:
         : _mockResults(std::move(mockResults)),
           _removeLeadingQueryStages(removeLeadingQueryStages) {}
 
-    bool isSharded(const NamespaceString& ns) final {
+    bool isSharded(OperationContext* opCtx, const NamespaceString& ns) final {
         return false;
     }
 
-    StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
+    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts) final {
@@ -564,8 +564,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePauses) {
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
                                                              Document{{"_id", 1}}};
-    lookup->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterface>(std::move(mockForeignContents)));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(std::move(mockForeignContents));
 
     auto next = lookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -619,8 +619,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldPropagatePausesWhileUnwinding) {
     // Mock out the foreign collection.
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
                                                              Document{{"_id", 1}}};
-    lookup->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterface>(std::move(mockForeignContents)));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(std::move(mockForeignContents));
 
     auto next = lookup->getNext();
     ASSERT_TRUE(next.isAdvanced());
@@ -710,8 +710,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheNonCorrelatedSubPipelinePrefix) {
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
     ASSERT(lookupStage);
 
-    lookupStage->injectMongoProcessInterface(
-        std::shared_ptr<MockMongoProcessInterface>(new MockMongoProcessInterface({})));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(std::deque<DocumentSource::GetNextResult>{});
 
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
@@ -744,8 +744,8 @@ TEST_F(DocumentSourceLookUpTest,
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
     ASSERT(lookupStage);
 
-    lookupStage->injectMongoProcessInterface(
-        std::shared_ptr<MockMongoProcessInterface>(new MockMongoProcessInterface({})));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(std::deque<DocumentSource::GetNextResult>{});
 
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
@@ -774,8 +774,8 @@ TEST_F(DocumentSourceLookUpTest, ExprEmbeddedInMatchExpressionShouldBeOptimized)
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
     ASSERT(lookupStage);
 
-    lookupStage->injectMongoProcessInterface(
-        std::shared_ptr<MockMongoProcessInterface>(new MockMongoProcessInterface({})));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(std::deque<DocumentSource::GetNextResult>{});
 
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
@@ -815,8 +815,8 @@ TEST_F(DocumentSourceLookUpTest,
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
     ASSERT(lookupStage);
 
-    lookupStage->injectMongoProcessInterface(
-        std::shared_ptr<MockMongoProcessInterface>(new MockMongoProcessInterface({})));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(std::deque<DocumentSource::GetNextResult>{});
 
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
@@ -850,8 +850,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldInsertCacheBeforeCorrelatedNestedLookup) 
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
     ASSERT(lookupStage);
 
-    lookupStage->injectMongoProcessInterface(
-        std::shared_ptr<MockMongoProcessInterface>(new MockMongoProcessInterface({})));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(std::deque<DocumentSource::GetNextResult>{});
 
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
@@ -886,8 +886,8 @@ TEST_F(DocumentSourceLookUpTest,
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
     ASSERT(lookupStage);
 
-    lookupStage->injectMongoProcessInterface(
-        std::shared_ptr<MockMongoProcessInterface>(new MockMongoProcessInterface({})));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(std::deque<DocumentSource::GetNextResult>{});
 
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
@@ -917,8 +917,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldCacheEntirePipelineIfNonCorrelated) {
     auto lookupStage = static_cast<DocumentSourceLookUp*>(docSource.get());
     ASSERT(lookupStage);
 
-    lookupStage->injectMongoProcessInterface(
-        std::shared_ptr<MockMongoProcessInterface>(new MockMongoProcessInterface({})));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(std::deque<DocumentSource::GetNextResult>{});
 
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 5));
     ASSERT(subPipeline);
@@ -959,8 +959,8 @@ TEST_F(DocumentSourceLookUpTest,
     deque<DocumentSource::GetNextResult> mockForeignContents{
         Document{{"x", 0}}, Document{{"x", 1}}, Document{{"x", 2}}};
 
-    lookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterface>(mockForeignContents));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(mockForeignContents);
 
     // Confirm that the empty 'kBuilding' cache is placed just before the correlated $addFields.
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));
@@ -1036,8 +1036,8 @@ TEST_F(DocumentSourceLookUpTest,
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"x", 0}},
                                                              Document{{"x", 1}}};
 
-    lookupStage->injectMongoProcessInterface(
-        std::make_shared<MockMongoProcessInterface>(mockForeignContents));
+    expCtx->mongoProcessInterface =
+        std::make_shared<MockMongoProcessInterface>(mockForeignContents);
 
     // Confirm that the empty 'kBuilding' cache is placed just before the correlated $addFields.
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));
@@ -1093,8 +1093,8 @@ TEST_F(DocumentSourceLookUpTest, ShouldNotCacheIfCorrelatedStageIsAbsorbedIntoPl
 
     const bool removeLeadingQueryStages = true;
 
-    lookupStage->injectMongoProcessInterface(std::shared_ptr<MockMongoProcessInterface>(
-        new MockMongoProcessInterface({}, removeLeadingQueryStages)));
+    expCtx->mongoProcessInterface = std::make_shared<MockMongoProcessInterface>(
+        std::deque<DocumentSource::GetNextResult>{}, removeLeadingQueryStages);
 
     auto subPipeline = lookupStage->getSubPipeline_forTest(DOC("_id" << 0));
     ASSERT(subPipeline);

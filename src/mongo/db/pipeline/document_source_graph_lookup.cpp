@@ -205,8 +205,8 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
 
             // We've already allocated space for the trailing $match stage in '_fromPipeline'.
             _fromPipeline.back() = *matchStage;
-            auto pipeline =
-                uassertStatusOK(_mongoProcessInterface->makePipeline(_fromPipeline, _fromExpCtx));
+            auto pipeline = uassertStatusOK(
+                pExpCtx->mongoProcessInterface->makePipeline(_fromPipeline, _fromExpCtx));
             while (auto next = pipeline->getNext()) {
                 uassert(40271,
                         str::stream()
@@ -436,11 +436,11 @@ void DocumentSourceGraphLookUp::serializeToArray(
     }
 }
 
-void DocumentSourceGraphLookUp::doDetachFromOperationContext() {
+void DocumentSourceGraphLookUp::detachFromOperationContext() {
     _fromExpCtx->opCtx = nullptr;
 }
 
-void DocumentSourceGraphLookUp::doReattachToOperationContext(OperationContext* opCtx) {
+void DocumentSourceGraphLookUp::reattachToOperationContext(OperationContext* opCtx) {
     _fromExpCtx->opCtx = opCtx;
 }
 
@@ -455,7 +455,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
     boost::optional<FieldPath> depthField,
     boost::optional<long long> maxDepth,
     boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc)
-    : DocumentSourceNeedsMongoProcessInterface(expCtx),
+    : DocumentSource(expCtx),
       _from(std::move(from)),
       _as(std::move(as)),
       _connectFromField(std::move(connectFromField)),

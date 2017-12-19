@@ -55,15 +55,14 @@ class NamespaceString;
  * stage which will produce a document like the following:
  * {facetA: [<all input documents except the first one>], facetB: [<the first document>]}.
  */
-class DocumentSourceFacet final : public DocumentSourceNeedsMongoProcessInterface,
-                                  public SplittableDocumentSource {
+class DocumentSourceFacet final : public DocumentSource, public SplittableDocumentSource {
 public:
     struct FacetPipeline {
-        FacetPipeline(std::string name, std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline)
+        FacetPipeline(std::string name, std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
             : name(std::move(name)), pipeline(std::move(pipeline)) {}
 
         std::string name;
-        std::unique_ptr<Pipeline, Pipeline::Deleter> pipeline;
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
     };
 
     class LiteParsed : public LiteParsedDocumentSource {
@@ -136,9 +135,8 @@ public:
 
     // The following are overridden just to forward calls to sub-pipelines.
     void addInvolvedCollections(std::vector<NamespaceString>* collections) const final;
-    void doInjectMongoProcessInterface(std::shared_ptr<MongoProcessInterface>) final;
-    void doDetachFromOperationContext() final;
-    void doReattachToOperationContext(OperationContext* opCtx) final;
+    void detachFromOperationContext() final;
+    void reattachToOperationContext(OperationContext* opCtx) final;
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
 protected:

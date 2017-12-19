@@ -1783,8 +1783,8 @@ public:
     virtual ~Base() {}
 
 protected:
-    std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipe;
-    std::unique_ptr<Pipeline, Pipeline::Deleter> shardPipe;
+    std::unique_ptr<Pipeline, PipelineDeleter> mergePipe;
+    std::unique_ptr<Pipeline, PipelineDeleter> shardPipe;
 
 private:
     OperationContextNoop _opCtx;

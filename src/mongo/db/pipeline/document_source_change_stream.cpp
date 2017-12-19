@@ -433,7 +433,7 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         // the documentKey fields to include the shard key. We only need to re-check the documentKey
         // while the collection is unsharded; if the collection is or becomes sharded, then the
         // documentKey is final and will not change.
-        if (_mongoProcess && !_documentKeyFieldsSharded) {
+        if (!_documentKeyFieldsSharded) {
             // If this is not a shard server, 'catalogCache' will be nullptr and we will skip the
             // routing table check.
             auto catalogCache = Grid::get(_expCtx->opCtx)->catalogCache();
@@ -443,7 +443,8 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
                 return routingInfo.isOK() && routingInfo.getValue().cm();
             }();
             if (_documentKeyFields.empty() || collectionIsSharded) {
-                _documentKeyFields = _mongoProcess->collectDocumentKeyFields(uuid.getUuid());
+                _documentKeyFields = _expCtx->mongoProcessInterface->collectDocumentKeyFields(
+                    _expCtx->opCtx, _expCtx->ns, uuid.getUuid());
                 _documentKeyFieldsSharded = collectionIsSharded;
             }
         }

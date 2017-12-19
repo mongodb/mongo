@@ -90,13 +90,13 @@ DocumentSource::GetNextResult DocumentSourceCurrentOp::getNext() {
     pExpCtx->checkForInterrupt();
 
     if (_ops.empty()) {
-        _ops = _mongoProcessInterface->getCurrentOps(
-            _includeIdleConnections, _includeOpsFromAllUsers, _truncateOps);
+        _ops = pExpCtx->mongoProcessInterface->getCurrentOps(
+            pExpCtx->opCtx, _includeIdleConnections, _includeOpsFromAllUsers, _truncateOps);
 
         _opsIter = _ops.begin();
 
         if (pExpCtx->fromMongos) {
-            _shardName = _mongoProcessInterface->getShardName(pExpCtx->opCtx);
+            _shardName = pExpCtx->mongoProcessInterface->getShardName(pExpCtx->opCtx);
 
             uassert(40465,
                     "Aggregation request specified 'fromMongos' but unable to retrieve shard name "

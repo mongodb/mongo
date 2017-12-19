@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -244,6 +245,10 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
         new ExpressionContext(opCtx,
                               request,
                               CollatorInterface::cloneCollator(viewDef.defaultCollator()),
+                              // We can use a stub MongoProcessInterface because we are only parsing
+                              // the Pipeline for validation here. We won't do anything with the
+                              // pipeline that will require a real implementation.
+                              std::make_shared<StubMongoProcessInterface>(),
                               std::move(resolvedNamespaces));
     auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), std::move(expCtx));
     if (!pipelineStatus.isOK()) {
