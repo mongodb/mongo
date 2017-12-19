@@ -574,19 +574,17 @@ void PipelineD::getPlanSummaryStats(const Pipeline* pPipeline, PlanSummaryStats*
     statsOut->hasSortStage = hasSortStage;
 }
 
-PipelineD::MongoDProcessInterface::MongoDProcessInterface(OperationContext* opCtx)
-    : _client(opCtx) {}
+PipelineD::MongoDInterface::MongoDInterface(OperationContext* opCtx) : _client(opCtx) {}
 
-void PipelineD::MongoDProcessInterface::setOperationContext(OperationContext* opCtx) {
+void PipelineD::MongoDInterface::setOperationContext(OperationContext* opCtx) {
     _client.setOpCtx(opCtx);
 }
 
-DBClientBase* PipelineD::MongoDProcessInterface::directClient() {
+DBClientBase* PipelineD::MongoDInterface::directClient() {
     return &_client;
 }
 
-bool PipelineD::MongoDProcessInterface::isSharded(OperationContext* opCtx,
-                                                  const NamespaceString& nss) {
+bool PipelineD::MongoDInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
     // TODO SERVER-24960: Use CollectionShardingState::collectionIsSharded() to confirm sharding
     // state.
@@ -594,10 +592,9 @@ bool PipelineD::MongoDProcessInterface::isSharded(OperationContext* opCtx,
     return bool(css->getMetadata());
 }
 
-BSONObj PipelineD::MongoDProcessInterface::insert(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const NamespaceString& ns,
-    const std::vector<BSONObj>& objs) {
+BSONObj PipelineD::MongoDInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                           const NamespaceString& ns,
+                                           const std::vector<BSONObj>& objs) {
     boost::optional<DisableDocumentValidation> maybeDisableValidation;
     if (expCtx->bypassDocumentValidation)
         maybeDisableValidation.emplace(expCtx->opCtx);
@@ -606,8 +603,8 @@ BSONObj PipelineD::MongoDProcessInterface::insert(
     return _client.getLastErrorDetailed();
 }
 
-CollectionIndexUsageMap PipelineD::MongoDProcessInterface::getIndexStats(
-    OperationContext* opCtx, const NamespaceString& ns) {
+CollectionIndexUsageMap PipelineD::MongoDInterface::getIndexStats(OperationContext* opCtx,
+                                                                  const NamespaceString& ns) {
     AutoGetCollectionForReadCommand autoColl(opCtx, ns);
 
     Collection* collection = autoColl.getCollection();
@@ -619,32 +616,32 @@ CollectionIndexUsageMap PipelineD::MongoDProcessInterface::getIndexStats(
     return collection->infoCache()->getIndexUsageStats();
 }
 
-void PipelineD::MongoDProcessInterface::appendLatencyStats(OperationContext* opCtx,
-                                                           const NamespaceString& nss,
-                                                           bool includeHistograms,
-                                                           BSONObjBuilder* builder) const {
+void PipelineD::MongoDInterface::appendLatencyStats(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    bool includeHistograms,
+                                                    BSONObjBuilder* builder) const {
     Top::get(opCtx->getServiceContext()).appendLatencyStats(nss.ns(), includeHistograms, builder);
 }
 
-Status PipelineD::MongoDProcessInterface::appendStorageStats(OperationContext* opCtx,
-                                                             const NamespaceString& nss,
-                                                             const BSONObj& param,
-                                                             BSONObjBuilder* builder) const {
+Status PipelineD::MongoDInterface::appendStorageStats(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const BSONObj& param,
+                                                      BSONObjBuilder* builder) const {
     return appendCollectionStorageStats(opCtx, nss, param, builder);
 }
 
-Status PipelineD::MongoDProcessInterface::appendRecordCount(OperationContext* opCtx,
-                                                            const NamespaceString& nss,
-                                                            BSONObjBuilder* builder) const {
+Status PipelineD::MongoDInterface::appendRecordCount(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     BSONObjBuilder* builder) const {
     return appendCollectionRecordCount(opCtx, nss, builder);
 }
 
-BSONObj PipelineD::MongoDProcessInterface::getCollectionOptions(const NamespaceString& nss) {
+BSONObj PipelineD::MongoDInterface::getCollectionOptions(const NamespaceString& nss) {
     const auto infos = _client.getCollectionInfos(nss.db().toString(), BSON("name" << nss.coll()));
     return infos.empty() ? BSONObj() : infos.front().getObjectField("options").getOwned();
 }
 
-Status PipelineD::MongoDProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
+Status PipelineD::MongoDInterface::renameIfOptionsAndIndexesHaveNotChanged(
     OperationContext* opCtx,
     const BSONObj& renameCommandObj,
     const NamespaceString& targetNs,
@@ -679,8 +676,7 @@ Status PipelineD::MongoDProcessInterface::renameIfOptionsAndIndexesHaveNotChange
                                       str::stream() << "renameCollection failed: " << info};
 }
 
-StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>>
-PipelineD::MongoDProcessInterface::makePipeline(
+StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> PipelineD::MongoDInterface::makePipeline(
     const std::vector<BSONObj>& rawPipeline,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const MakePipelineOptions opts) {
@@ -702,7 +698,7 @@ PipelineD::MongoDProcessInterface::makePipeline(
     return cursorStatus.isOK() ? std::move(pipeline) : cursorStatus;
 }
 
-Status PipelineD::MongoDProcessInterface::attachCursorSourceToPipeline(
+Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) {
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceCursor*>(pipeline->getSources().front().get()));
@@ -736,7 +732,7 @@ Status PipelineD::MongoDProcessInterface::attachCursorSourceToPipeline(
     return Status::OK();
 }
 
-std::vector<BSONObj> PipelineD::MongoDProcessInterface::getCurrentOps(
+std::vector<BSONObj> PipelineD::MongoDInterface::getCurrentOps(
     OperationContext* opCtx,
     CurrentOpConnectionsMode connMode,
     CurrentOpUserMode userMode,
@@ -813,7 +809,7 @@ std::vector<BSONObj> PipelineD::MongoDProcessInterface::getCurrentOps(
     return ops;
 }
 
-std::string PipelineD::MongoDProcessInterface::getShardName(OperationContext* opCtx) const {
+std::string PipelineD::MongoDInterface::getShardName(OperationContext* opCtx) const {
     if (ShardingState::get(opCtx)->enabled()) {
         return ShardingState::get(opCtx)->getShardName();
     }
@@ -821,7 +817,7 @@ std::string PipelineD::MongoDProcessInterface::getShardName(OperationContext* op
     return std::string();
 }
 
-std::vector<FieldPath> PipelineD::MongoDProcessInterface::collectDocumentKeyFields(
+std::vector<FieldPath> PipelineD::MongoDInterface::collectDocumentKeyFields(
     OperationContext* opCtx, const NamespaceString& nss, UUID uuid) const {
     if (!ShardingState::get(opCtx)->enabled()) {
         return {"_id"};  // Nothing is sharded.
@@ -854,12 +850,12 @@ std::vector<FieldPath> PipelineD::MongoDProcessInterface::collectDocumentKeyFiel
     return result;
 }
 
-std::vector<GenericCursor> PipelineD::MongoDProcessInterface::getCursors(
+std::vector<GenericCursor> PipelineD::MongoDInterface::getCursors(
     const intrusive_ptr<ExpressionContext>& expCtx) const {
     return CursorManager::getAllCursors(expCtx->opCtx);
 }
 
-boost::optional<Document> PipelineD::MongoDProcessInterface::lookupSingleDocument(
+boost::optional<Document> PipelineD::MongoDInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     UUID collectionUUID,
@@ -891,7 +887,7 @@ boost::optional<Document> PipelineD::MongoDProcessInterface::lookupSingleDocumen
     return lookedUpDocument;
 }
 
-std::unique_ptr<CollatorInterface> PipelineD::MongoDProcessInterface::_getCollectionDefaultCollator(
+std::unique_ptr<CollatorInterface> PipelineD::MongoDInterface::_getCollectionDefaultCollator(
     OperationContext* opCtx, const NamespaceString& nss, UUID collectionUUID) {
     if (_collatorCache.find(collectionUUID) == _collatorCache.end()) {
         AutoGetCollection autoColl(opCtx, nss, collectionUUID, MODE_IS);

@@ -89,7 +89,7 @@ StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(
 
 }  // namespace
 
-boost::optional<Document> PipelineS::MongoSProcessInterface::lookupSingleDocument(
+boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& nss,
     UUID collectionUUID,
@@ -184,7 +184,7 @@ boost::optional<Document> PipelineS::MongoSProcessInterface::lookupSingleDocumen
     return (!batch.empty() ? Document(batch.front()) : boost::optional<Document>{});
 }
 
-std::vector<GenericCursor> PipelineS::MongoSProcessInterface::getCursors(
+std::vector<GenericCursor> PipelineS::MongoSInterface::getCursors(
     const intrusive_ptr<ExpressionContext>& expCtx) const {
     invariant(hasGlobalServiceContext());
     auto cursorManager = Grid::get(expCtx->opCtx->getServiceContext())->getCursorManager();

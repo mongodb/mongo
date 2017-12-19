@@ -731,7 +731,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         new ExpressionContext(opCtx,
                               request,
                               std::move(collation),
-                              std::make_shared<PipelineS::MongoSProcessInterface>(),
+                              std::make_shared<PipelineS::MongoSInterface>(),
                               std::move(resolvedNamespaces));
     mergeCtx->inMongos = true;
     // explicitly *not* setting mergeCtx->tempDir

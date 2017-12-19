@@ -57,13 +57,12 @@ public:
 /**
  * A MongoProcessInterface used for testing which returns artificial currentOp entries.
  */
-class MockMongoProcessInterfaceImplementation final : public StubMongoProcessInterface {
+class MockMongoInterface final : public StubMongoProcessInterface {
 public:
-    MockMongoProcessInterfaceImplementation(std::vector<BSONObj> ops, bool hasShardName = true)
+    MockMongoInterface(std::vector<BSONObj> ops, bool hasShardName = true)
         : _ops(std::move(ops)), _hasShardName(hasShardName) {}
 
-    MockMongoProcessInterfaceImplementation(bool hasShardName = true)
-        : _hasShardName(hasShardName) {}
+    MockMongoInterface(bool hasShardName = true) : _hasShardName(hasShardName) {}
 
     std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
                                        CurrentOpConnectionsMode connMode,
@@ -184,8 +183,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldSerializeOmittedOptionalArgumentsAsDef
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldReturnEOFImmediatelyIfNoCurrentOps) {
-    getExpCtx()->mongoProcessInterface =
-        std::make_shared<MockMongoProcessInterfaceImplementation>();
+    getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>();
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -197,8 +195,7 @@ TEST_F(DocumentSourceCurrentOpTest,
     getExpCtx()->fromMongos = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
-    getExpCtx()->mongoProcessInterface =
-        std::make_shared<MockMongoProcessInterfaceImplementation>(ops);
+    getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -215,8 +212,7 @@ TEST_F(DocumentSourceCurrentOpTest,
     getExpCtx()->fromMongos = false;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 430 }")};
-    getExpCtx()->mongoProcessInterface =
-        std::make_shared<MockMongoProcessInterfaceImplementation>(ops);
+    getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -229,8 +225,7 @@ TEST_F(DocumentSourceCurrentOpTest,
 TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfNoShardNameAvailableForShardedRequest) {
     getExpCtx()->fromMongos = true;
 
-    getExpCtx()->mongoProcessInterface =
-        std::make_shared<MockMongoProcessInterfaceImplementation>(false);
+    getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(false);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 
@@ -241,8 +236,7 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailIfOpIDIsNonNumericWhenModifyingInS
     getExpCtx()->fromMongos = true;
 
     std::vector<BSONObj> ops{fromjson("{ client: '192.168.1.10:50844', opid: 'string' }")};
-    getExpCtx()->mongoProcessInterface =
-        std::make_shared<MockMongoProcessInterfaceImplementation>(ops);
+    getExpCtx()->mongoProcessInterface = std::make_shared<MockMongoInterface>(ops);
 
     const auto currentOp = DocumentSourceCurrentOp::create(getExpCtx());
 

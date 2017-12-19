@@ -43,11 +43,11 @@ public:
      * Class to provide access to mongos-specific implementations of methods required by some
      * document sources.
      */
-    class MongoSProcessInterface final : public MongoProcessInterface {
+    class MongoSInterface final : public MongoProcessInterface {
     public:
-        MongoSProcessInterface() = default;
+        MongoSInterface() = default;
 
-        virtual ~MongoSProcessInterface() = default;
+        virtual ~MongoSInterface() = default;
 
         void setOperationContext(OperationContext* opCtx) final {}
 

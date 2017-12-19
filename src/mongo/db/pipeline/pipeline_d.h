@@ -61,9 +61,9 @@ struct DepsTracker;
  */
 class PipelineD {
 public:
-    class MongoDProcessInterface final : public MongoProcessInterface {
+    class MongoDInterface final : public MongoProcessInterface {
     public:
-        MongoDProcessInterface(OperationContext* opCtx);
+        MongoDInterface(OperationContext* opCtx);
 
         void setOperationContext(OperationContext* opCtx) final;
         DBClientBase* directClient() final;

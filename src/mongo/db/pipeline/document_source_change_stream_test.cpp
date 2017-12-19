@@ -107,9 +107,9 @@ public:
 };
 
 // This is needed only for the "insert" tests.
-struct MockMongoProcessInterface final : public StubMongoProcessInterface {
+struct MockMongoInterface final : public StubMongoProcessInterface {
 
-    MockMongoProcessInterface(std::vector<FieldPath> fields) : _fields(std::move(fields)) {}
+    MockMongoInterface(std::vector<FieldPath> fields) : _fields(std::move(fields)) {}
 
     std::vector<FieldPath> collectDocumentKeyFields(OperationContext*,
                                                     const NamespaceString&,
@@ -134,8 +134,7 @@ public:
         vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry);
         auto transform = stages[2].get();
 
-        getExpCtx()->mongoProcessInterface =
-            stdx::make_unique<MockMongoProcessInterface>(docKeyFields);
+        getExpCtx()->mongoProcessInterface = stdx::make_unique<MockMongoInterface>(docKeyFields);
 
         auto next = transform->getNext();
         // Match stage should pass the doc down if expectedDoc is given.
@@ -155,7 +154,7 @@ public:
             DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
         vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
         getExpCtx()->mongoProcessInterface =
-            stdx::make_unique<MockMongoProcessInterface>(std::vector<FieldPath>{});
+            stdx::make_unique<MockMongoInterface>(std::vector<FieldPath>{});
 
         // This match stage is a DocumentSourceOplogMatch, which we explicitly disallow from
         // executing as a safety mechanism, since it needs to use the collection-default collation,

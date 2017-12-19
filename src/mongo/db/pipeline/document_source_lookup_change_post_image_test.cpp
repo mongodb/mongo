@@ -78,9 +78,9 @@ public:
 /**
  * A mock MongoProcessInterface which allows mocking a foreign pipeline.
  */
-class MockMongoProcessInterface final : public StubMongoProcessInterface {
+class MockMongoInterface final : public StubMongoProcessInterface {
 public:
-    MockMongoProcessInterface(deque<DocumentSource::GetNextResult> mockResults)
+    MockMongoInterface(deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
 
     bool isSharded(OperationContext* opCtx, const NamespaceString& ns) final {
@@ -160,7 +160,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingDocumentKeyO
 
     // Mock out the foreign collection.
     getExpCtx()->mongoProcessInterface =
-        stdx::make_unique<MockMongoProcessInterface>(deque<DocumentSource::GetNextResult>{});
+        stdx::make_unique<MockMongoInterface>(deque<DocumentSource::GetNextResult>{});
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
@@ -182,7 +182,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingOperationTyp
 
     // Mock out the foreign collection.
     getExpCtx()->mongoProcessInterface =
-        stdx::make_unique<MockMongoProcessInterface>(deque<DocumentSource::GetNextResult>{});
+        stdx::make_unique<MockMongoInterface>(deque<DocumentSource::GetNextResult>{});
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
@@ -204,7 +204,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfMissingNamespace) {
 
     // Mock out the foreign collection.
     getExpCtx()->mongoProcessInterface =
-        stdx::make_unique<MockMongoProcessInterface>(deque<DocumentSource::GetNextResult>{});
+        stdx::make_unique<MockMongoInterface>(deque<DocumentSource::GetNextResult>{});
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
@@ -226,7 +226,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldHasWrongType
 
     // Mock out the foreign collection.
     getExpCtx()->mongoProcessInterface =
-        stdx::make_unique<MockMongoProcessInterface>(deque<DocumentSource::GetNextResult>{});
+        stdx::make_unique<MockMongoInterface>(deque<DocumentSource::GetNextResult>{});
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40578);
 }
@@ -248,7 +248,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfNsFieldDoesNotMatch
 
     // Mock out the foreign collection.
     getExpCtx()->mongoProcessInterface =
-        stdx::make_unique<MockMongoProcessInterface>(deque<DocumentSource::GetNextResult>{});
+        stdx::make_unique<MockMongoInterface>(deque<DocumentSource::GetNextResult>{});
 
     ASSERT_THROWS_CODE(lookupChangeStage->getNext(), AssertionException, 40579);
 }
@@ -272,7 +272,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldErrorIfDocumentKeyIsNotUni
     deque<DocumentSource::GetNextResult> foreignCollection = {Document{{"_id", 0}},
                                                               Document{{"_id", 0}}};
     getExpCtx()->mongoProcessInterface =
-        stdx::make_unique<MockMongoProcessInterface>(std::move(foreignCollection));
+        stdx::make_unique<MockMongoInterface>(std::move(foreignCollection));
 
     ASSERT_THROWS_CODE(
         lookupChangeStage->getNext(), AssertionException, ErrorCodes::TooManyMatchingDocuments);
@@ -304,7 +304,7 @@ TEST_F(DocumentSourceLookupChangePostImageTest, ShouldPropagatePauses) {
     deque<DocumentSource::GetNextResult> mockForeignContents{Document{{"_id", 0}},
                                                              Document{{"_id", 1}}};
     getExpCtx()->mongoProcessInterface =
-        stdx::make_unique<MockMongoProcessInterface>(std::move(mockForeignContents));
+        stdx::make_unique<MockMongoInterface>(std::move(mockForeignContents));
 
     auto next = lookupChangeStage->getNext();
     ASSERT_TRUE(next.isAdvanced());
