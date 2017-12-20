@@ -225,9 +225,8 @@ Status TransportLayerASIO::setup() {
 
 #ifdef MONGO_CONFIG_SSL
     const auto& sslParams = getSSLGlobalParams();
-    _sslMode = static_cast<SSLParams::SSLModes>(sslParams.sslMode.load());
 
-    if (_sslMode != SSLParams::SSLMode_disabled) {
+    if (_sslMode() != SSLParams::SSLMode_disabled) {
         _sslContext = stdx::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
         const auto sslManager = getSSLManager();
@@ -266,7 +265,7 @@ Status TransportLayerASIO::start() {
 
     const char* ssl = "";
 #ifdef MONGO_CONFIG_SSL
-    if (_sslMode != SSLParams::SSLMode_disabled) {
+    if (_sslMode() != SSLParams::SSLMode_disabled) {
         ssl = " ssl";
     }
 #endif
@@ -330,6 +329,12 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
 
     acceptor.async_accept(*_workerIOContext, std::move(acceptCb));
 }
+
+#ifdef MONGO_CONFIG_SSL
+SSLParams::SSLModes TransportLayerASIO::_sslMode() const {
+    return static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load());
+}
+#endif
 
 }  // namespace transport
 }  // namespace mongo

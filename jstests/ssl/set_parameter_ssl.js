@@ -13,6 +13,19 @@ function testSSLTransition(oldMode, newMode, shouldSucceed) {
     var res = adminDB.runCommand({"setParameter": 1, "sslMode": newMode});
 
     assert(res["ok"] == shouldSucceed, tojson(res));
+    if (!shouldSucceed) {
+        MongoRunner.stopMongod(conn);
+        return;
+    }
+
+    if (newMode != "requireSSL") {
+        MongoRunner.stopMongod(conn);
+        return;
+    }
+
+    let uri = `mongodb://localhost:${conn.port}/admin`;
+    let exitCode = runMongoProgram("mongo", uri, "--eval", "assert.commandWorked(db.isMaster())");
+    assert.neq(exitCode, 0, "Was able to connect without SSL when SSLMode was requireSSL");
     MongoRunner.stopMongod(conn);
 }
 
