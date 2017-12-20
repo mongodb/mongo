@@ -212,14 +212,16 @@ TEST_F(CreateCollectionTest,
     ASSERT_TRUE(collectionExists(opCtx.get(), dropPendingNss));
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
 
-    // Before SERVER-32098, this will erroneously rename the drop pending collection to 'newNss'.
-    ASSERT_OK(createCollectionForApplyOps(opCtx.get(),
-                                          newNss.db().toString(),
-                                          uuid.toBSON()["uuid"],
-                                          BSON("create" << newNss.coll())));
+    // This should fail because we are not allowed to take a collection out of its drop-pending
+    // state.
+    ASSERT_EQUALS(ErrorCodes::NamespaceExists,
+                  createCollectionForApplyOps(opCtx.get(),
+                                              newNss.db().toString(),
+                                              uuid.toBSON()["uuid"],
+                                              BSON("create" << newNss.coll())));
 
-    ASSERT_FALSE(collectionExists(opCtx.get(), dropPendingNss));
-    ASSERT_TRUE(collectionExists(opCtx.get(), newNss));
+    ASSERT_TRUE(collectionExists(opCtx.get(), dropPendingNss));
+    ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
 }
 
 }  // namespace
