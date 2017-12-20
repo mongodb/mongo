@@ -49,9 +49,9 @@
 namespace mongo {
 
 using std::string;
-using std::stringstream;
 using std::shared_ptr;
 using std::vector;
+using str::stream;
 
 namespace {
 
@@ -320,7 +320,7 @@ class MergeChunksCommand : public ErrmsgCommandDeprecated {
 public:
     MergeChunksCommand() : ErrmsgCommandDeprecated("mergeChunks") {}
 
-    void help(stringstream& h) const override {
+    void help(std::stringstream& h) const override {
         h << "Merge Chunks command\n"
           << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ],"
           << " (opt) epoch : <epoch> }";

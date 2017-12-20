@@ -318,10 +318,6 @@ public:
                               const BSONField<std::map<K, T>>& field,
                               std::map<K, T>* out,
                               std::string* errMsg = NULL);
-
-private:
-    template <typename T>
-    static void clearOwnedVector(std::vector<T*>* vec);
 };
 
 }  // namespace mongo

@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <map>
 #include <set>
 #include <vector>
 
@@ -247,11 +248,20 @@ public:
         return _writes.vector();
     }
 
+    size_t getNumOps() const {
+        return _writes.size();
+    }
+
+    int getEstimatedSizeBytes() const {
+        return _estimatedSizeBytes;
+    }
+
     /**
-     * TargetedWrite is owned here once given to the TargetedWriteBatch
+     * TargetedWrite is owned here once given to the TargetedWriteBatch.
      */
-    void addWrite(TargetedWrite* targetedWrite) {
+    void addWrite(TargetedWrite* targetedWrite, int estWriteSize) {
         _writes.mutableVector().push_back(targetedWrite);
+        _estimatedSizeBytes += estWriteSize;
     }
 
 private:
@@ -261,6 +271,10 @@ private:
     // Where the responses go
     // TargetedWrite*s are owned by the TargetedWriteBatch
     OwnedPointerVector<TargetedWrite> _writes;
+
+    // Conservatvely estimated size of the batch, for ensuring it doesn't grow past the maximum BSON
+    // size
+    int _estimatedSizeBytes{0};
 };
 
 /**
@@ -268,20 +282,18 @@ private:
  */
 class TrackedErrors {
 public:
-    ~TrackedErrors();
+    TrackedErrors() = default;
 
     void startTracking(int errCode);
 
     bool isTracking(int errCode) const;
 
-    void addError(ShardError* error);
+    void addError(ShardError error);
 
-    const std::vector<ShardError*>& getErrors(int errCode) const;
-
-    void clear();
+    const std::vector<ShardError>& getErrors(int errCode) const;
 
 private:
-    typedef stdx::unordered_map<int, std::vector<ShardError*>> TrackedErrorMap;
+    using TrackedErrorMap = stdx::unordered_map<int, std::vector<ShardError>>;
     TrackedErrorMap _errorMap;
 };
 
