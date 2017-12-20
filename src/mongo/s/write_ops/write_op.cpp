@@ -53,67 +53,56 @@ const WriteErrorDetail& WriteOp::getOpError() const {
 Status WriteOp::targetWrites(OperationContext* opCtx,
                              const NSTargeter& targeter,
                              std::vector<TargetedWrite*>* targetedWrites) {
-    bool isUpdate = _itemRef.getOpType() == BatchedCommandRequest::BatchType_Update;
-    bool isDelete = _itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete;
-    bool isIndexInsert = _itemRef.getRequest()->isInsertIndexRequest();
+    const bool isIndexInsert = _itemRef.getRequest()->isInsertIndexRequest();
 
-    Status targetStatus = Status::OK();
-    std::vector<std::unique_ptr<ShardEndpoint>> endpoints;
+    auto swEndpoints = [&]() -> StatusWith<std::vector<ShardEndpoint>> {
+        if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert) {
+            if (isIndexInsert) {
+                // TODO: Remove the index targeting stuff once there is a command for it?
+                // TODO: Retry index writes with stale version?
+                return targeter.targetCollection();
+            }
 
-    if (isUpdate) {
-        targetStatus = targeter.targetUpdate(opCtx, _itemRef.getUpdate(), &endpoints);
-    } else if (isDelete) {
-        targetStatus = targeter.targetDelete(opCtx, _itemRef.getDelete(), &endpoints);
-    } else {
-        dassert(_itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert);
+            auto swEndpoint = targeter.targetInsert(opCtx, _itemRef.getDocument());
+            if (!swEndpoint.isOK())
+                return swEndpoint.getStatus();
 
-        ShardEndpoint* endpoint = NULL;
-        // TODO: Remove the index targeting stuff once there is a command for it
-        if (!isIndexInsert) {
-            targetStatus = targeter.targetInsert(opCtx, _itemRef.getDocument(), &endpoint);
+            return std::vector<ShardEndpoint>{std::move(swEndpoint.getValue())};
+        } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Update) {
+            return targeter.targetUpdate(opCtx, _itemRef.getUpdate());
+        } else if (_itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete) {
+            return targeter.targetDelete(opCtx, _itemRef.getDelete());
         } else {
-            // TODO: Retry index writes with stale version?
-            targetStatus = targeter.targetCollection(&endpoints);
+            MONGO_UNREACHABLE;
         }
+    }();
 
-        if (!targetStatus.isOK()) {
-            dassert(NULL == endpoint);
-            return targetStatus;
-        }
-
-        // Store single endpoint result if we targeted a single endpoint
-        if (endpoint)
-            endpoints.push_back(std::unique_ptr<ShardEndpoint>{endpoint});
-    }
-
-    // If we're targeting more than one endpoint with an update/delete, we have to target
-    // everywhere since we cannot currently retry partial results.
-    // NOTE: Index inserts are currently specially targeted only at the current collection to
-    // avoid creating collections everywhere.
-    if (targetStatus.isOK() && endpoints.size() > 1u && !isIndexInsert) {
-        endpoints.clear();
-        invariant(endpoints.empty());
-        targetStatus = targeter.targetAllShards(&endpoints);
+    // If we're targeting more than one endpoint with an update/delete, we have to target everywhere
+    // since we cannot currently retry partial results.
+    //
+    // NOTE: Index inserts are currently specially targeted only at the current collection to avoid
+    // creating collections everywhere.
+    if (swEndpoints.isOK() && swEndpoints.getValue().size() > 1u && !isIndexInsert) {
+        swEndpoints = targeter.targetAllShards(opCtx);
     }
 
     // If we had an error, stop here
-    if (!targetStatus.isOK())
-        return targetStatus;
+    if (!swEndpoints.isOK())
+        return swEndpoints.getStatus();
 
-    for (auto it = endpoints.begin(); it != endpoints.end(); ++it) {
-        ShardEndpoint* endpoint = it->get();
+    auto& endpoints = swEndpoints.getValue();
 
+    for (auto&& endpoint : endpoints) {
         _childOps.emplace_back(this);
 
         WriteOpRef ref(_itemRef.getItemIndex(), _childOps.size() - 1);
 
         // For now, multiple endpoints imply no versioning - we can't retry half a multi-write
-        if (endpoints.size() == 1u) {
-            targetedWrites->push_back(new TargetedWrite(*endpoint, ref));
-        } else {
-            ShardEndpoint broadcastEndpoint(endpoint->shardName, ChunkVersion::IGNORED());
-            targetedWrites->push_back(new TargetedWrite(broadcastEndpoint, ref));
+        if (endpoints.size() > 1u) {
+            endpoint.shardVersion = ChunkVersion::IGNORED();
         }
+
+        targetedWrites->push_back(new TargetedWrite(std::move(endpoint), ref));
 
         _childOps.back().pendingWrite = targetedWrites->back();
         _childOps.back().state = WriteOpState_Pending;

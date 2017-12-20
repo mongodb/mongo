@@ -171,7 +171,7 @@ public:
         const BSONObj query = cmdObj.getObjectField("query");
         const BSONObj collation = getCollation(cmdObj);
         const BSONObj shardKey = getShardKey(opCtx, *chunkMgr, query);
-        const auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
+        auto chunk = chunkMgr->findIntersectingChunk(shardKey, collation);
 
         _runCommand(opCtx,
                     chunk->getShardId(),

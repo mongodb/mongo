@@ -623,7 +623,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
     const auto cm = routingInfo.cm().get();
 
-    auto chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
+    const auto chunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
 
     try {
         const auto splitPoints = uassertStatusOK(shardutil::selectChunkSplitPoints(

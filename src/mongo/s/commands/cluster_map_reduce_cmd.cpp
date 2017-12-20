@@ -579,12 +579,13 @@ public:
                 invariant(size < std::numeric_limits<int>::max());
 
                 // Key reported should be the chunk's minimum
-                auto c = outputCM->findIntersectingChunkWithSimpleCollation(key);
-                if (!c) {
+                auto chunkWritten = outputCM->findIntersectingChunkWithSimpleCollation(key);
+                if (!chunkWritten) {
                     warning() << "Mongod reported " << size << " bytes inserted for key " << key
                               << " but can't find chunk";
                 } else {
-                    updateChunkWriteStatsAndSplitIfNeeded(opCtx, outputCM.get(), c.get(), size);
+                    updateChunkWriteStatsAndSplitIfNeeded(
+                        opCtx, outputCM.get(), chunkWritten.get(), size);
                 }
             }
         }

@@ -68,9 +68,6 @@ public:
     BatchedCommandResponse(BatchedCommandResponse&&) = default;
     BatchedCommandResponse& operator=(BatchedCommandResponse&&) = default;
 
-    /** Copies all the fields present in 'this' to 'other'. */
-    void cloneTo(BatchedCommandResponse* other) const;
-
     bool isValid(std::string* errMsg) const;
     BSONObj toBSON() const;
     bool parseBSON(const BSONObj& source, std::string* errMsg);

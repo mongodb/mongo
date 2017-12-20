@@ -44,9 +44,7 @@
 
 namespace mongo {
 
-using std::shared_ptr;
 using std::string;
-using std::stringstream;
 using std::vector;
 
 namespace {
@@ -58,7 +56,7 @@ class ClusterMergeChunksCommand : public ErrmsgCommandDeprecated {
 public:
     ClusterMergeChunksCommand() : ErrmsgCommandDeprecated("mergeChunks") {}
 
-    void help(stringstream& h) const override {
+    void help(std::stringstream& h) const override {
         h << "Merge Chunks command\n"
           << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ] }";
     }
@@ -141,17 +139,17 @@ public:
 
         if (!cm->getShardKeyPattern().isShardKey(minKey) ||
             !cm->getShardKeyPattern().isShardKey(maxKey)) {
-            errmsg = stream() << "shard key bounds "
-                              << "[" << minKey << "," << maxKey << ")"
-                              << " are not valid for shard key pattern "
-                              << cm->getShardKeyPattern().toBSON();
+            errmsg = str::stream() << "shard key bounds "
+                                   << "[" << minKey << "," << maxKey << ")"
+                                   << " are not valid for shard key pattern "
+                                   << cm->getShardKeyPattern().toBSON();
             return false;
         }
 
         minKey = cm->getShardKeyPattern().normalizeShardKey(minKey);
         maxKey = cm->getShardKeyPattern().normalizeShardKey(maxKey);
 
-        shared_ptr<Chunk> firstChunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
+        const auto firstChunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
 
         BSONObjBuilder remoteCmdObjB;
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::nsField()]);

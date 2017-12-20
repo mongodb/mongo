@@ -29,14 +29,9 @@
 #pragma once
 
 #include "mongo/db/range_arithmetic.h"
-#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
-
-class ChunkType;
 
 /**
  * The collection metadata has metadata information about a collection, in particular the
