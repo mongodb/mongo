@@ -30,6 +30,8 @@
 
 #include "mongo/db/conn_pool_options.h"
 
+#include <limits>
+
 #include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
@@ -40,6 +42,12 @@ namespace mongo {
 
 int ConnPoolOptions::maxConnsPerHost(200);
 int ConnPoolOptions::maxShardedConnsPerHost(200);
+
+int ConnPoolOptions::maxInUseConnsPerHost(std::numeric_limits<int>::max());
+int ConnPoolOptions::maxShardedInUseConnsPerHost(std::numeric_limits<int>::max());
+
+int ConnPoolOptions::globalConnPoolIdleTimeout(std::numeric_limits<int>::max());
+int ConnPoolOptions::shardedConnPoolIdleTimeout(std::numeric_limits<int>::max());
 
 namespace {
 
@@ -53,6 +61,26 @@ ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
                                     "connPoolMaxShardedConnsPerHost",
                                     &ConnPoolOptions::maxShardedConnsPerHost);
 
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
+    maxInUseConnsPerHostParameter(ServerParameterSet::getGlobal(),
+                                  "connPoolMaxInUseConnsPerHost",
+                                  &ConnPoolOptions::maxInUseConnsPerHost);
+
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
+    maxShardedInUseConnsPerHostParameter(ServerParameterSet::getGlobal(),
+                                         "connPoolMaxShardedInUseConnsPerHost",
+                                         &ConnPoolOptions::maxShardedInUseConnsPerHost);
+
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
+    globalConnPoolIdleTimeoutParameter(ServerParameterSet::getGlobal(),
+                                       "globalConnPoolIdleTimeoutMinutes",
+                                       &ConnPoolOptions::globalConnPoolIdleTimeout);
+
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
+    shardedConnPoolIdleTimeoutParameter(ServerParameterSet::getGlobal(),
+                                        "shardedConnPoolIdleTimeoutMinutes",
+                                        &ConnPoolOptions::shardedConnPoolIdleTimeout);
+
 MONGO_INITIALIZER(InitializeConnectionPools)(InitializerContext* context) {
     // Initialize the sharded and unsharded outgoing connection pools
     // NOTES:
@@ -62,9 +90,13 @@ MONGO_INITIALIZER(InitializeConnectionPools)(InitializerContext* context) {
 
     globalConnPool.setName("connection pool");
     globalConnPool.setMaxPoolSize(ConnPoolOptions::maxConnsPerHost);
+    globalConnPool.setMaxInUse(ConnPoolOptions::maxInUseConnsPerHost);
+    globalConnPool.setIdleTimeout(ConnPoolOptions::globalConnPoolIdleTimeout);
 
     shardConnectionPool.setName("sharded connection pool");
     shardConnectionPool.setMaxPoolSize(ConnPoolOptions::maxShardedConnsPerHost);
+    shardConnectionPool.setMaxInUse(ConnPoolOptions::maxShardedInUseConnsPerHost);
+    shardConnectionPool.setIdleTimeout(ConnPoolOptions::shardedConnPoolIdleTimeout);
 
     return Status::OK();
 }
