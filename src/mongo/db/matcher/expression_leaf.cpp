@@ -47,11 +47,10 @@
 
 namespace mongo {
 
-bool ComparisonMatchExpression::equivalent(const MatchExpression* other) const {
+bool ComparisonMatchExpressionBase::equivalent(const MatchExpression* other) const {
     if (other->matchType() != matchType())
         return false;
-    const ComparisonMatchExpression* realOther =
-        static_cast<const ComparisonMatchExpression*>(other);
+    auto realOther = static_cast<const ComparisonMatchExpressionBase*>(other);
 
     if (!CollatorInterface::collatorsMatch(_collator, realOther->_collator)) {
         return false;
@@ -62,7 +61,25 @@ bool ComparisonMatchExpression::equivalent(const MatchExpression* other) const {
     return path() == realOther->path() && eltCmp.evaluate(_rhs == realOther->_rhs);
 }
 
-Status ComparisonMatchExpression::init(StringData path, const BSONElement& rhs) {
+void ComparisonMatchExpressionBase::debugString(StringBuilder& debug, int level) const {
+    _debugAddSpace(debug, level);
+    debug << path() << " " << name();
+    debug << " " << _rhs.toString(false);
+
+    MatchExpression::TagData* td = getTag();
+    if (td) {
+        debug << " ";
+        td->debugString(&debug);
+    }
+
+    debug << "\n";
+}
+
+void ComparisonMatchExpressionBase::serialize(BSONObjBuilder* out) const {
+    out->append(path(), BSON(name() << _rhs));
+}
+
+Status ComparisonMatchExpression::init(StringData path, BSONElement rhs) {
     _rhs = rhs;
 
     invariant(_rhs);
@@ -143,63 +160,11 @@ bool ComparisonMatchExpression::matchesSingleElement(const BSONElement& e,
     }
 }
 
-void ComparisonMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
-    debug << path() << " ";
-    switch (matchType()) {
-        case LT:
-            debug << "$lt";
-            break;
-        case LTE:
-            debug << "$lte";
-            break;
-        case EQ:
-            debug << "==";
-            break;
-        case GT:
-            debug << "$gt";
-            break;
-        case GTE:
-            debug << "$gte";
-            break;
-        default:
-            invariant(false);
-    }
-    debug << " " << _rhs.toString(false);
-
-    MatchExpression::TagData* td = getTag();
-    if (NULL != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-
-    debug << "\n";
-}
-
-void ComparisonMatchExpression::serialize(BSONObjBuilder* out) const {
-    std::string opString = "";
-    switch (matchType()) {
-        case LT:
-            opString = "$lt";
-            break;
-        case LTE:
-            opString = "$lte";
-            break;
-        case EQ:
-            opString = "$eq";
-            break;
-        case GT:
-            opString = "$gt";
-            break;
-        case GTE:
-            opString = "$gte";
-            break;
-        default:
-            invariant(false);
-    }
-
-    out->append(path(), BSON(opString << _rhs));
-}
+constexpr StringData EqualityMatchExpression::kName;
+constexpr StringData LTMatchExpression::kName;
+constexpr StringData LTEMatchExpression::kName;
+constexpr StringData GTMatchExpression::kName;
+constexpr StringData GTEMatchExpression::kName;
 
 // ---------------
 

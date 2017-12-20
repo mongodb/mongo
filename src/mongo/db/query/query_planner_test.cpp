@@ -85,6 +85,24 @@ TEST_F(QueryPlannerTest, EqualityIndexScanWithTrailingFields) {
     assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {x: 1, y: 1}}}}}");
 }
 
+TEST_F(QueryPlannerTest, ExprEqCanUseIndex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1));
+    runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {pattern: {a: 1}, bounds: {a: "
+        "[[1,1,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ExprEqCannotUseMultikeyFieldOfIndex) {
+    MultikeyPaths multikeyPaths{{0U}};
+    addIndex(BSON("a.b" << 1), multikeyPaths);
+    runQuery(fromjson("{'a.b': {$_internalExprEq: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {'a.b': {$_internalExprEq: 1}}}}");
+}
+
 // $eq can use a hashed index because it looks for values of type regex;
 // it doesn't evaluate the regex itself.
 TEST_F(QueryPlannerTest, EqCanUseHashedIndexWithRegex) {
@@ -92,6 +110,28 @@ TEST_F(QueryPlannerTest, EqCanUseHashedIndexWithRegex) {
                   << "hashed"));
     runQuery(fromjson("{a: {$eq: /abc/}}"));
     ASSERT_EQUALS(getNumSolutions(), 2U);
+}
+
+TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a"
+                  << "hashed"));
+    runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$_internalExprEq: 1}}, node: {ixscan: {filter: null, pattern: {a: "
+        "'hashed'}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndexWithRegex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a"
+                  << "hashed"));
+    runQuery(fromjson("{a: {$_internalExprEq: /abc/}}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$_internalExprEq: /abc/}}, node: {ixscan: {filter: null, pattern: "
+        "{a: 'hashed'}}}}}");
 }
 
 //
@@ -2479,6 +2519,28 @@ TEST_F(QueryPlannerTest, SparseIndexForQuery) {
     assertSolutionExists(
         "{fetch: {filter: null, node: {ixscan: "
         "{filter: null, pattern: {a: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ExprEqCanUseSparseIndex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(fromjson("{a: 1}"), false, true);
+    runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: "
+        "{filter: null, pattern: {a: 1}, bounds: {a: [[1,1,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ExprEqCanUseSparseIndexForEqualityToNull) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(fromjson("{a: 1}"), false, true);
+    runQuery(fromjson("{a: {$_internalExprEq: null}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$_internalExprEq: null}}, node: {ixscan: "
+        "{filter: null, pattern: {a: 1}, bounds: {a: [[null,null,true,true]]}}}}}");
 }
 
 //

@@ -479,5 +479,15 @@ TEST_F(QueryPlannerTest, PartialIndexNoStringComparisonNonMatchingCollators) {
         "bounds: {a: [[1, 1, true, true]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest, InternalExprEqCannotUsePartialIndex) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    BSONObj filterObj(fromjson("{a: {$gte: 0}}"));
+    auto filterExpr = parseMatchExpression(filterObj);
+    addIndex(fromjson("{a: 1}"), filterExpr.get());
+
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {a: {$_internalExprEq: 1}}}"));
+    assertNumSolutions(0U);
+}
+
 }  // namespace
 }  // namespace mongo

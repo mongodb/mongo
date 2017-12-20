@@ -84,8 +84,6 @@ public:
      *
      * For an index to be useful to a predicate, the index must be compatible (see above).
      *
-     * If an index is prefixed by the predicate's path, it's always useful.
-     *
      * If an index is compound but not prefixed by a predicate's path, it's only useful if
      * there exists another predicate that 1. will use that index and 2. is related to the
      * original predicate by having an AND as a parent.
@@ -130,6 +128,12 @@ public:
      */
     static void stripUnneededAssignments(MatchExpression* node,
                                          const std::vector<IndexEntry>& indices);
+
+    /**
+     * Returns true if the indexed field has any multikey components. Illegal to call unless
+     * 'indexedField' is present in the key pattern for 'index'.
+     */
+    static bool indexedFieldHasMultikeyComponents(StringData indexedField, const IndexEntry& index);
 
 private:
     /**

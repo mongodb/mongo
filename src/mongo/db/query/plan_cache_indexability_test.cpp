@@ -72,6 +72,12 @@ TEST(PlanCacheIndexabilityTest, SparseIndexSimple) {
               disc.isMatchCompatibleWithIndex(parseMatchExpression(BSON("a" << BSONNULL)).get()));
     ASSERT_EQ(true,
               disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(BSON("a" << BSON("$_internalExprEq" << 1))).get()));
+    ASSERT_EQ(true,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(BSON("a" << BSON("$_internalExprEq" << BSONNULL))).get()));
+    ASSERT_EQ(true,
+              disc.isMatchCompatibleWithIndex(
                   parseMatchExpression(BSON("a" << BSON("$in" << BSON_ARRAY(1)))).get()));
     ASSERT_EQ(false,
               disc.isMatchCompatibleWithIndex(
@@ -329,8 +335,13 @@ TEST(PlanCacheIndexabilityTest, DiscriminatorForCollationIndicatesWhenCollations
     ASSERT_EQ(true,
               disc.isMatchCompatibleWithIndex(
                   parseMatchExpression(fromjson("{a: {$in: ['abc', 'xyz']}}"), &collator).get()));
+    ASSERT_EQ(
+        true,
+        disc.isMatchCompatibleWithIndex(
+            parseMatchExpression(fromjson("{a: {$_internalExprEq: 'abc'}}}"), &collator).get()));
 
-    // Expression is not a ComparisonMatchExpression or InMatchExpression.
+    // Expression is not a ComparisonMatchExpression, InternalExprEqMatchExpression or
+    // InMatchExpression.
     ASSERT_EQ(true,
               disc.isMatchCompatibleWithIndex(
                   parseMatchExpression(fromjson("{a: {$exists: true}}"), nullptr).get()));
@@ -348,6 +359,18 @@ TEST(PlanCacheIndexabilityTest, DiscriminatorForCollationIndicatesWhenCollations
     ASSERT_EQ(false,
               disc.isMatchCompatibleWithIndex(
                   parseMatchExpression(fromjson("{a: ['abc', 'xyz']}"), nullptr).get()));
+
+    // Expression is an InternalExprEqMatchExpression with non-matching collator.
+    ASSERT_EQ(true,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: {$_internalExprEq:  5}}"), nullptr).get()));
+    ASSERT_EQ(false,
+              disc.isMatchCompatibleWithIndex(
+                  parseMatchExpression(fromjson("{a: {$_internalExprEq: 'abc'}}"), nullptr).get()));
+    ASSERT_EQ(
+        false,
+        disc.isMatchCompatibleWithIndex(
+            parseMatchExpression(fromjson("{a: {$_internalExprEq: {b: 'abc'}}}"), nullptr).get()));
 
     // Expression is an InMatchExpression with non-matching collator.
     ASSERT_EQ(true,

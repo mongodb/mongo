@@ -1652,4 +1652,118 @@ TEST_F(QueryPlannerTest, 2dNearInexactFetchPredicateOverTrailingFieldMultikey) {
         "{fetch: {filter: {b: {$exists: true}}, node: {geoNear2d: {a: '2d', b: 1}}}}");
 }
 
+TEST_F(QueryPlannerTest, 2dNearWithInternalExprEqOverTrailingField) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("a"
+                  << "2d"
+                  << "b"
+                  << 1));
+
+    runQuery(fromjson("{a: {$near: [0, 0]}, b: {$_internalExprEq: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{geoNear2d: {a: '2d', b: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2dNearWithInternalExprEqOverTrailingFieldMultikey) {
+    const bool multikey = true;
+    addIndex(BSON("a"
+                  << "2d"
+                  << "b"
+                  << 1),
+             multikey);
+
+    runQuery(fromjson("{a: {$near: [0, 0]}, b: {$_internalExprEq: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {b: {$_internalExprEq: 1}}, node: {geoNear2d: {a: '2d', b: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2dGeoWithinWithInternalExprEqOverTrailingField) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("a"
+                  << "2d"
+                  << "b"
+                  << 1));
+
+    runQuery(
+        fromjson("{a: {$within: {$polygon: [[0,0], [2,0], [4,0]]}}, b: {$_internalExprEq: 2}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$within: {$polygon: [[0,0], [2,0], [4,0]]}}}, node:"
+        "{ixscan: {filter: {b: {$_internalExprEq: 2}}, pattern: {a: '2d', b: 1}}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2dsphereNearWithInternalExprEq) {
+    addIndex(BSON("a" << 1 << "b"
+                      << "2dsphere"));
+    runQuery(
+        fromjson("{a: {$_internalExprEq: 0}, b: {$near: {$geometry: "
+                 "{type: 'Point', coordinates: [2, 2]}}}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{geoNear2dsphere: {pattern: {a: 1, b: '2dsphere'}, "
+        "bounds: {a: [[0,0,true,true]], b: [['MinKey','MaxKey',true,true]]}}}");
+}
+
+TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverLeadingField) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("a" << 1 << "b"
+                      << "2dsphere"));
+
+    runQuery(
+        fromjson("{a: {$_internalExprEq: 0}, b: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {b: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}, node: "
+        "{ixscan: {pattern: {a: 1, b: '2dsphere'}, filter: null, bounds:"
+        "{a: [[0,0,true,true]], b: []}}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverLeadingFieldMultikey) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    const bool multikey = true;
+    addIndex(BSON("a" << 1 << "b"
+                      << "2dsphere"),
+             multikey);
+
+    runQuery(
+        fromjson("{a: {$_internalExprEq: 0}, b: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}"));
+    assertNumSolutions(0U);
+}
+
+TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverTrailingField) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("a"
+                  << "2dsphere"
+                  << "b"
+                  << 1));
+
+    runQuery(
+        fromjson("{b: {$_internalExprEq: 0}, a: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$geoWithin: {$centerSphere: [[0, 0], 10]}}}, node: "
+        "{ixscan: {pattern: {a : '2dsphere', b: 1}, filter: null, bounds:"
+        "{a: [], b: [[0,0,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverTrailingFieldMultikey) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    const bool multikey = true;
+    addIndex(BSON("a"
+                  << "2dsphere"
+                  << "b"
+                  << 1),
+             multikey);
+
+    runQuery(
+        fromjson("{a: {$geoWithin: {$centerSphere: [[0, 0], 10]}}, b: {$_internalExprEq: 0}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$geoWithin: {$centerSphere: [[0,0],10]}}, b: {$_internalExprEq: 0}},"
+        "node: {ixscan: {pattern: {a : '2dsphere', b: 1}, filter: null, bounds:"
+        "{a: [], b: [['MinKey','MaxKey',true,true]]}}}}}");
+}
+
 }  // namespace
