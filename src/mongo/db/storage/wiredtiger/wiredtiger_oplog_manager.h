@@ -35,6 +35,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo {
 
@@ -83,7 +84,7 @@ private:
                                  WiredTigerRecordStore* oplogRecordStore,
                                  bool isMasterSlave) noexcept;
 
-    void _setOplogReadTimestamp(uint64_t newTimestamp);
+    void _setOplogReadTimestamp(WithLock, uint64_t newTimestamp);
 
     uint64_t _fetchAllCommittedValue(WT_CONNECTION* conn);
 
