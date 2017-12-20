@@ -662,24 +662,28 @@ public:
         }
     }
 
-    struct FieldNameSizeTag {};  // For disambiguation with ctor taking 'maxLen' above.
+    struct CachedSizeTag {};  // Opts in to next constructor.
 
-    /** Construct a BSONElement where you already know the length of the name. The value
-     *  passed here includes the null terminator. The data pointed to by 'd' must not
-     *  represent an EOO. You may pass -1 to indicate that you don't actually know the
-     *  size.
+    /**
+     * Construct a BSONElement where you already know the length of the name and/or the total size
+     * of the element. fieldNameSize includes the null terminator. You may pass -1 for either or
+     * both sizes to indicate that they are unknown and should be computed.
      */
-    BSONElement(const char* d, int fieldNameSize, FieldNameSizeTag) : data(d) {
+    BSONElement(const char* d, int fieldNameSize, int totalSize, CachedSizeTag) : data(d) {
         if (eoo()) {
             fieldNameSize_ = 0;
-            totalSize = 1;
+            this->totalSize = 1;
         } else {
             if (fieldNameSize == -1) {
                 fieldNameSize_ = strlen(d + 1 /*skip type*/) + 1 /*include NUL byte*/;
             } else {
                 fieldNameSize_ = fieldNameSize;
             }
-            totalSize = computeSize();
+            if (totalSize == -1) {
+                this->totalSize = computeSize();
+            } else {
+                this->totalSize = totalSize;
+            }
         }
     }
 
