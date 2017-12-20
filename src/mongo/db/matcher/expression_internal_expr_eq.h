@@ -44,46 +44,30 @@ namespace mongo {
  * - Equality to null matches literal nulls, but not documents in which the field path is missing or
  *   undefined.
  *
- * - Equality to undefined is legal, and matches either literal undefined, or documents in which the
- *   field path is missing.
+ * - Equality to an array is illegal. It is invalid usage to construct a
+ *   InternalExprEqMatchExpression node which compares to an array.
  */
-class InternalExprEqMatchExpression final : public LeafMatchExpression {
+class InternalExprEqMatchExpression final : public ComparisonMatchExpressionBase {
 public:
     static constexpr StringData kName = "$_internalExprEq"_sd;
 
     InternalExprEqMatchExpression(StringData path, BSONElement value)
-        : LeafMatchExpression(MatchType::INTERNAL_EXPR_EQ,
-                              path,
-                              ElementPath::LeafArrayBehavior::kNoTraversal,
-                              ElementPath::NonLeafArrayBehavior::kMatchSubpath),
-          _rhsElem(value) {}
+        : ComparisonMatchExpressionBase(MatchType::INTERNAL_EXPR_EQ,
+                                        path,
+                                        value,
+                                        ElementPath::LeafArrayBehavior::kNoTraversal,
+                                        ElementPath::NonLeafArrayBehavior::kMatchSubpath) {
+        invariant(_rhs.type() != BSONType::Undefined);
+        invariant(_rhs.type() != BSONType::Array);
+    }
+
+    StringData name() const final {
+        return kName;
+    }
 
     bool matchesSingleElement(const BSONElement&, MatchDetails*) const final;
 
-    void debugString(StringBuilder& debug, int level) const final;
-
-    void serialize(BSONObjBuilder* out) const final;
-
-    bool equivalent(const MatchExpression* other) const final;
-
     std::unique_ptr<MatchExpression> shallowClone() const final;
-
-protected:
-    /**
-     * 'collator' must outlive the InternalExprEqMatchExpression and any clones made of it.
-     */
-    void _doSetCollator(const CollatorInterface* collator) final {
-        _collator = collator;
-    }
-
-    // Collator used to compare elements. By default, simple binary comparison will be used.
-    const CollatorInterface* _collator = nullptr;
-
-    BSONElement _rhsElem;
-
-private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
 };
+
 }  // namespace mongo

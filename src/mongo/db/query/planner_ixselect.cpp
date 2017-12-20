@@ -39,6 +39,7 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_expr_eq.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_tag.h"
@@ -99,16 +100,14 @@ static bool twoDWontWrap(const Circle& circle, const IndexEntry& index) {
 // Checks whether 'node' contains any comparison to an element of type 'type'. Nested objects and
 // arrays are not checked recursively. We assume 'node' is bounds-generating or is a recursive child
 // of a bounds-generating node, i.e. it does not contain AND, OR, ELEM_MATCH_OBJECT, or NOR.
-// TODO SERVER-23172: Check nested objects and arrays.
 static bool boundsGeneratingNodeContainsComparisonToType(MatchExpression* node, BSONType type) {
     invariant(node->matchType() != MatchExpression::AND &&
               node->matchType() != MatchExpression::OR &&
               node->matchType() != MatchExpression::NOR &&
               node->matchType() != MatchExpression::ELEM_MATCH_OBJECT);
 
-    if (Indexability::isEqualityOrInequality(node)) {
-        const ComparisonMatchExpression* expr = static_cast<const ComparisonMatchExpression*>(node);
-        return expr->getData().type() == type;
+    if (const auto* comparisonExpr = dynamic_cast<const ComparisonMatchExpressionBase*>(node)) {
+        return comparisonExpr->getData().type() == type;
     }
 
     if (node->matchType() == MatchExpression::MATCH_IN) {
@@ -217,9 +216,19 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
     // We know elt.fieldname() == node->path().
     MatchExpression::MatchType exprtype = node->matchType();
 
+    if (exprtype == MatchExpression::INTERNAL_EXPR_EQ &&
+        indexedFieldHasMultikeyComponents(elt.fieldNameStringData(), index)) {
+        // Expression language equality cannot be indexed if the field path has multikey components.
+        return false;
+    }
+
     if (indexedFieldType.empty()) {
         // Can't use a sparse index for $eq with a null element, unless the equality is within a
         // $elemMatch expression since the latter implies a match on the literal element 'null'.
+        //
+        // We can use a sparse index for $_internalExprEq with a null element. Expression language
+        // equality-to-null semantics are that only literal nulls match. Sparse indexes contain
+        // index keys for literal nulls, but not for missing elements.
         if (exprtype == MatchExpression::EQ && index.sparse && !elemMatchChild) {
             const EqualityMatchExpression* expr = static_cast<const EqualityMatchExpression*>(node);
             if (expr->getData().isNull()) {
@@ -317,7 +326,7 @@ bool QueryPlannerIXSelect::compatible(const BSONElement& elt,
         invariant(0);
         return true;
     } else if (IndexNames::HASHED == indexedFieldType) {
-        if (exprtype == MatchExpression::EQ) {
+        if (ComparisonMatchExpressionBase::isEquality(exprtype)) {
             return true;
         }
         if (exprtype == MatchExpression::MATCH_IN) {
@@ -405,8 +414,8 @@ void QueryPlannerIXSelect::rateIndices(MatchExpression* node,
         }
 
         verify(NULL == node->getTag());
-        RelevantTag* rt = new RelevantTag();
-        node->setTag(rt);
+        node->setTag(new RelevantTag());
+        auto rt = static_cast<RelevantTag*>(node->getTag());
         rt->path = fullPath;
 
         // TODO: This is slow, with all the string compares.
@@ -464,6 +473,24 @@ void QueryPlannerIXSelect::stripInvalidAssignments(MatchExpression* node,
     }
 
     stripInvalidAssignmentsToPartialIndices(node, indices);
+}
+
+bool QueryPlannerIXSelect::indexedFieldHasMultikeyComponents(StringData indexedField,
+                                                             const IndexEntry& index) {
+    if (index.multikeyPaths.empty()) {
+        // The index has no path-level multikeyness metadata.
+        return index.multikey;
+    }
+
+    size_t pos = 0;
+    for (auto&& key : index.keyPattern) {
+        if (key.fieldNameStringData() == indexedField) {
+            return !index.multikeyPaths[pos].empty();
+        }
+        ++pos;
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 namespace {

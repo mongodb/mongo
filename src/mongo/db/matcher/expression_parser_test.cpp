@@ -484,12 +484,17 @@ TEST(MatchExpressionParserTest, InternalExprEqParsesCorrectly) {
     ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: [5]}}")));
     ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: [6]}}")));
     ASSERT_FALSE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: 6}}")));
+}
 
-    query = fromjson("{'a.b': {$_internalExprEq: [5]}}");
-    statusWith = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_OK(statusWith.getStatus());
-    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: [5]}}")));
-    ASSERT_TRUE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: [6]}}")));
-    ASSERT_FALSE(statusWith.getValue()->matchesBSON(fromjson("{a: {b: 5}}")));
+TEST(MatchesExpressionParserTest, InternalExprEqComparisonToArrayDoesNotParse) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = fromjson("{'a.b': {$_internalExprEq: [5]}}");
+    ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);
+}
+
+TEST(MatchesExpressionParserTest, InternalExprEqComparisonToUndefinedDoesNotParse) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto query = fromjson("{'a.b': {$_internalExprEq: undefined}}");
+    ASSERT_EQ(MatchExpressionParser::parse(query, expCtx).getStatus(), ErrorCodes::BadValue);
 }
 }  // namespace mongo

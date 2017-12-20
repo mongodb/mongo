@@ -39,6 +39,7 @@
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_expr_eq.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/expression_index.h"
@@ -302,8 +303,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
     }
 
     if (isHashed) {
-        verify(MatchExpression::EQ == expr->matchType() ||
-               MatchExpression::MATCH_IN == expr->matchType());
+        invariant(MatchExpression::MATCH_IN == expr->matchType() ||
+                  ComparisonMatchExpressionBase::isEquality(expr->matchType()));
     }
 
     if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
@@ -395,8 +396,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
         } else {
             *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
         }
-    } else if (MatchExpression::EQ == expr->matchType()) {
-        const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
+    } else if (ComparisonMatchExpressionBase::isEquality(expr->matchType())) {
+        const auto* node = static_cast<const ComparisonMatchExpressionBase*>(expr);
         translateEquality(node->getData(), index, isHashed, oilOut, tightnessOut);
     } else if (MatchExpression::LTE == expr->matchType()) {
         const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);

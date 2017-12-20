@@ -34,6 +34,7 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_internal_expr_eq.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -82,9 +83,8 @@ void PlanCacheIndexabilityState::processIndexCollation(const std::string& indexN
     for (BSONElement elem : keyPattern) {
         _pathDiscriminatorsMap[elem.fieldNameStringData()][indexName].addDiscriminator([collator](
             const MatchExpression* queryExpr) {
-            if (ComparisonMatchExpression::isComparisonMatchExpression(queryExpr)) {
-                const auto* queryExprComparison =
-                    static_cast<const ComparisonMatchExpression*>(queryExpr);
+            if (const auto* queryExprComparison =
+                    dynamic_cast<const ComparisonMatchExpressionBase*>(queryExpr)) {
                 const bool collatorsMatch =
                     CollatorInterface::collatorsMatch(queryExprComparison->getCollator(), collator);
                 const bool isCollatableType =
