@@ -123,6 +123,9 @@ private:
     using GenericAcceptor = asio::basic_socket_acceptor<asio::generic::stream_protocol>;
 
     void _acceptConnection(GenericAcceptor& acceptor);
+#ifdef MONGO_CONFIG_SSL
+    SSLParams::SSLModes _sslMode() const;
+#endif
 
     stdx::mutex _mutex;
 
@@ -154,7 +157,6 @@ private:
 
 #ifdef MONGO_CONFIG_SSL
     std::unique_ptr<asio::ssl::context> _sslContext;
-    SSLParams::SSLModes _sslMode;
 #endif
 
     std::vector<std::pair<SockAddr, GenericAcceptor>> _acceptors;
