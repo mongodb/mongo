@@ -155,7 +155,7 @@
                 <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Text="{\WixUI_Font_Title}Install MongoDB Compass" TabSkip="yes" Transparent="yes" NoPrefix="yes" />
                 <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Text="MongoDB Compass is the official graphical user interface for MongoDB." TabSkip="yes" Transparent="yes" NoPrefix="yes" />
                 <Control Id="LongDescription" Type="Text" X="25" Y="50"
-                         Width="280" Height="30" Text="By checking below this installer will automatically download and install the latest version of MongoDB Compass on this machine. You can learn more about MongDB Compass here: https://www.mongodb.com/products/compass" TabSkip="yes" NoPrefix="yes" />
+                         Width="280" Height="30" Text="By checking below this installer will automatically download and install the latest version of MongoDB Compass on this machine. You can learn more about MongoDB Compass here: https://www.mongodb.com/products/compass" TabSkip="yes" NoPrefix="yes" />
 
                 <Control Id="InstallCompass" CheckBoxValue="1" Property="SHOULD_INSTALL_COMPASS" X="15" Y="243" Width="150" Height="17" Text="Install MongoDB Compass" Type="CheckBox" />
 
