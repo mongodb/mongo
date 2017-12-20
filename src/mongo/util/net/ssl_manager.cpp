@@ -77,6 +77,14 @@ namespace mongo {
 
 namespace {
 
+std::string removeFQDNRoot(std::string name) {
+    if (name.back() == '.') {
+        name.pop_back();
+    }
+    return name;
+};
+
+
 // Because the hostname having a slash is used by `mongo::SockAddr` to determine if a hostname is a
 // Unix Domain Socket endpoint, this function uses the same logic.  (See
 // `mongo::SockAddr::Sockaddr(StringData, int, sa_family_t)`).  A user explicitly specifying a Unix
@@ -1282,7 +1290,8 @@ SSLConnection* SSLManager::connect(Socket* socket) {
     std::unique_ptr<SSLConnection> sslConn =
         stdx::make_unique<SSLConnection>(_clientContext.get(), socket, (const char*)NULL, 0);
 
-    int ret = ::SSL_set_tlsext_host_name(sslConn->ssl, socket->remoteAddr().hostOrIp().c_str());
+    const auto undotted = removeFQDNRoot(socket->remoteAddr().hostOrIp());
+    int ret = ::SSL_set_tlsext_host_name(sslConn->ssl, undotted.c_str());
     if (ret != 1)
         _handleSSLError(SSL_get_error(sslConn.get(), ret), ret);
 
@@ -1604,13 +1613,6 @@ void SSLManager::_handleSSLError(int code, int ret) {
 
 // TODO SERVER-11601 Use NFC Unicode canonicalization
 bool mongo::hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName) {
-    auto removeFQDNRoot = [](std::string name) -> std::string {
-        if (name.back() == '.') {
-            name.pop_back();
-        }
-        return name;
-    };
-
     nameToMatch = removeFQDNRoot(std::move(nameToMatch));
     certHostName = removeFQDNRoot(std::move(certHostName));
 
