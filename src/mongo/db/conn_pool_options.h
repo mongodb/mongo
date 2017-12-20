@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
+
 namespace mongo {
 
 // NOTE:
@@ -40,13 +42,33 @@ namespace mongo {
  */
 struct ConnPoolOptions {
     /**
-     * Maximum connections per host the connection pool should use
+     * Maximum connections per host the connection pool should store.
      */
     static int maxConnsPerHost;
 
     /**
-     * Maximum connections per host the sharded conn pool should use
+     * Maximum connections per host the sharded conn pool should store.
      */
     static int maxShardedConnsPerHost;
+
+    /**
+     * Maximum in-use connections per host in the global connection pool.
+     */
+    static int maxInUseConnsPerHost;
+
+    /**
+     * Maximum in-use connections per host in the sharded connection pool.
+     */
+    static int maxShardedInUseConnsPerHost;
+
+    /**
+     * Amount of time, in minutes, to keep idle connections in the global connection pool.
+     */
+    static int globalConnPoolIdleTimeout;
+
+    /**
+     * Amount of time, in minutes, to keep idle connections in the sharded connection pool.
+     */
+    static int shardedConnPoolIdleTimeout;
 };
 }

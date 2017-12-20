@@ -193,6 +193,17 @@ clientDriverEnv.Library(
     ],
 )
 
+env.CppIntegrationTest(
+    target='connpool_integration_test',
+    source=[
+        'connpool_integration_test.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver',
+        '$BUILD_DIR/mongo/util/version_impl',
+    ],
+)
+
 env.Library(
     target='connection_pool',
     source=[
