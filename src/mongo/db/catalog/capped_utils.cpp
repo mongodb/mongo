@@ -129,6 +129,12 @@ mongo::Status mongo::cloneCollectionAsCapped(OperationContext* opCtx,
                       str::stream() << "source collection " << fromNss.ns() << " does not exist");
     }
 
+    if (fromNss.isDropPendingNamespace()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "source collection " << fromNss.ns()
+                                    << " is currently in a drop-pending state.");
+    }
+
     if (db->getCollection(opCtx, toNss)) {
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "cloneCollectionAsCapped failed - destination collection "

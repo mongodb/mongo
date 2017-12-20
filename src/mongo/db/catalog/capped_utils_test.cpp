@@ -137,9 +137,7 @@ TEST_F(CappedUtilsTest, ConvertToCappedReturnsNamespaceNotFoundIfCollectionIsDro
     auto options = getCollectionOptions(opCtx.get(), dropPendingNss);
     ASSERT_FALSE(options.capped);
 
-    // Before SERVER-32098, convertToCapped() would reject writes to a drop-pending collection
-    // because the namespace contained ".system.".
-    ASSERT_EQUALS(ErrorCodes::BadValue,
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   convertToCapped(opCtx.get(), dropPendingNss, cappedCollectionSize));
     options = getCollectionOptions(opCtx.get(), dropPendingNss);
     ASSERT_FALSE(options.capped);
