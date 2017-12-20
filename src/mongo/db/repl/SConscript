@@ -8,6 +8,7 @@ env.Library(
     target='oplog',
     source=[
         'apply_ops.cpp',
+        'do_txn.cpp',
         'oplog.cpp',
     ],
     LIBDEPS_PRIVATE=[
@@ -66,6 +67,22 @@ env.CppUnitTest(
         'oplog',
         'oplog_entry',
         'replmocks',
+    ],
+)
+
+env.CppUnitTest(
+    target='do_txn_test',
+    source=[
+        'do_txn_test.cpp',
+    ],
+    LIBDEPS=[
+        'oplog',
+        'oplog_entry',
+        'replmocks',
+        'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/op_observer_noop',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/rpc/command_status',
     ],
 )
 

@@ -1970,6 +1970,43 @@
         assert.eq(8, coll.findOne({_id: "foo"}).x);
     }
 
+    // doTxn
+    if (!isMongos) {
+        coll.drop();
+        assert.commandWorked(
+            db.createCollection("collation", {collation: {locale: "en_US", strength: 2}}));
+        assert.writeOK(coll.insert({_id: "foo", x: 5, str: "bar"}));
+
+        // preCondition.q respects collection default collation.
+        assert.commandFailed(db.runCommand({
+            doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 6}}}],
+            preCondition: [{ns: coll.getFullName(), q: {_id: "not foo"}, res: {str: "bar"}}]
+        }));
+        assert.eq(5, coll.findOne({_id: "foo"}).x);
+        assert.commandWorked(db.runCommand({
+            doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 6}}}],
+            preCondition: [{ns: coll.getFullName(), q: {_id: "FOO"}, res: {str: "bar"}}]
+        }));
+        assert.eq(6, coll.findOne({_id: "foo"}).x);
+
+        // preCondition.res respects collection default collation.
+        assert.commandFailed(db.runCommand({
+            doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 7}}}],
+            preCondition: [{ns: coll.getFullName(), q: {_id: "foo"}, res: {str: "not bar"}}]
+        }));
+        assert.eq(6, coll.findOne({_id: "foo"}).x);
+        assert.commandWorked(db.runCommand({
+            doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 7}}}],
+            preCondition: [{ns: coll.getFullName(), q: {_id: "foo"}, res: {str: "BAR"}}]
+        }));
+        assert.eq(7, coll.findOne({_id: "foo"}).x);
+
+        // <operation>.o2 respects collection default collation.
+        assert.commandWorked(db.runCommand(
+            {doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "FOO"}, o: {$set: {x: 8}}}]}));
+        assert.eq(8, coll.findOne({_id: "foo"}).x);
+    }
+
     // Test that the collections created with the "copydb" command inherit the default collation of
     // the corresponding collection.
     {

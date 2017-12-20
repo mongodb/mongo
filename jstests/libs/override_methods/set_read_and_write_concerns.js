@@ -92,6 +92,7 @@
             "createRole",
             "createUser",
             "delete",
+            "doTxn",
             "drop",
             "dropAllRolesFromDatabase",
             "dropAllUsersFromDatabase",

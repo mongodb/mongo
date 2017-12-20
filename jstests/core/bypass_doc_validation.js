@@ -6,6 +6,7 @@
  * - aggregation with $out
  * - applyOps (when not sharded)
  * - copyDb
+ * - doTxn (when not sharded)
  * - findAndModify
  * - insert
  * - mapReduce
@@ -39,13 +40,23 @@
         assert.writeOK(coll.insert({_id: 2}));
         assert.commandWorked(myDb.runCommand({collMod: collName, validator: validator}));
 
+        const isMongos = db.runCommand({isdbgrid: 1}).isdbgrid;
         // Test applyOps with a simple insert if not on mongos.
-        if (!db.runCommand({isdbgrid: 1}).isdbgrid) {
+        if (!isMongos) {
             const op = [{h: 1, v: 2, op: 'i', ns: coll.getFullName(), o: {_id: 9}}];
             assertFailsValidation(myDb.runCommand({applyOps: op, bypassDocumentValidation: false}));
             assert.eq(0, coll.count({_id: 9}));
             assert.commandWorked(myDb.runCommand({applyOps: op, bypassDocumentValidation: true}));
             assert.eq(1, coll.count({_id: 9}));
+        }
+
+        // Test doTxn with a simple insert if not on mongos.
+        if (!isMongos) {
+            const op = [{h: 1, v: 2, op: 'i', ns: coll.getFullName(), o: {_id: 10}}];
+            assertFailsValidation(myDb.runCommand({doTxn: op, bypassDocumentValidation: false}));
+            assert.eq(0, coll.count({_id: 10}));
+            assert.commandWorked(myDb.runCommand({doTxn: op, bypassDocumentValidation: true}));
+            assert.eq(1, coll.count({_id: 10}));
         }
 
         // Test the aggregation command with a $out stage.
