@@ -150,6 +150,9 @@ selector:
   # creates collection, does movePrimary, then shards the collection and moves a chunk to the old
   # primary (SERVER-31909)
   - jstests/sharding/mongos_validate_writes.js
+  # Test expects a specific chunk distribution after shardCollection and it can be broken when
+  # a step down occurs.
+  - jstests/sharding/regex_targeting.js
 
 executor:
   config:
