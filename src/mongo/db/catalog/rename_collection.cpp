@@ -74,6 +74,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
                               OptionalCollectionUUID targetUUID,
                               repl::OpTime renameOpTimeFromApplyOps,
                               const RenameCollectionOptions& options) {
+    auto uuidString = targetUUID ? targetUUID->toString() : "no UUID";
+    log() << "renameCollection: renaming collection " << source << " to " << target << " ("
+          << uuidString << ")";
+
     // A valid 'renameOpTimeFromApplyOps' is not allowed when writes are replicated.
     if (!renameOpTimeFromApplyOps.isNull() && opCtx->writesAreReplicated()) {
         return Status(
