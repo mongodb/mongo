@@ -306,6 +306,10 @@ string PlanEnumerator::NodeAssignment::toString() const {
                 for (size_t k = 0; k < oie.preds.size(); ++k) {
                     ss << "\t\t\tpos " << oie.positions[k] << " pred " << oie.preds[k]->toString();
                 }
+
+                for (auto&& pushdown : oie.orPushdowns) {
+                    ss << "\t\torPushdownPred: " << pushdown.first->toString();
+                }
             }
         }
         return ss;
