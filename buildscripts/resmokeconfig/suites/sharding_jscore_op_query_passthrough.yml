@@ -58,6 +58,7 @@ executor:
       rpcProtocols: opQueryOnly
       readMode: commands
   hooks:
+  - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20

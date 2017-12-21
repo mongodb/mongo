@@ -53,6 +53,7 @@ executor:
       readMode: commands
       eval: load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js")
   hooks:
+  - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20
