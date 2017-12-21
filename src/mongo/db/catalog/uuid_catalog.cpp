@@ -65,7 +65,10 @@ void UUIDCatalogObserver::onCollMod(OperationContext* opCtx,
         return;
     UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
     Collection* catalogColl = catalog.lookupCollectionByUUID(uuid.get());
-    invariant(catalogColl->uuid() == uuid, uuid + "," + catalogColl->uuid);
+    invariant(
+        catalogColl->uuid() == uuid,
+        str::stream() << (uuid ? uuid->toString() : "<no uuid>") << ","
+                      << (catalogColl->uuid() ? catalogColl->uuid()->toString() : "<no uuid>"));
 }
 
 repl::OpTime UUIDCatalogObserver::onDropCollection(OperationContext* opCtx,
