@@ -49,7 +49,7 @@ def jsToHeader(target, source):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print "Must specify [target] [source] "
+        print("Must specify [target] [source] ")
         sys.exit(1)
 
     jsToHeader(sys.argv[1], sys.argv[2:])

@@ -47,7 +47,8 @@ def idl_scanner(node, env, path):
 
     deps_list = deps_str.splitlines()
 
-    nodes_deps_list = [ env.File(d) for d in deps_list]
+    # scons likes ascii encoded "files" so lets provide one to it...
+    nodes_deps_list = [ env.File(d.decode("ascii", "ignore")) for d in deps_list]
     nodes_deps_list.extend(env.Glob('#buildscripts/idl/*.py'))
     nodes_deps_list.extend(env.Glob('#buildscripts/idl/idl/*.py'))
 
