@@ -4381,7 +4381,6 @@ tasks:
     vars:
       <<: *powercycle_test
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
-      crash_options: --crashMethod=aws_ec2 --crashOption=private_ip_address --crashWaitTime=45 --jitterForCrashWaitTime=5 --instanceId=${instance_id}
 
 - name: powercycle_fcv3.4_WT
   depends_on:
