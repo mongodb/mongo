@@ -21,6 +21,7 @@ executor:
         load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         load('jstests/libs/override_methods/set_read_preference_secondary.js');
   hooks:
+  - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20
