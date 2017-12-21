@@ -8,7 +8,6 @@ selector:
 executor:
   config: {}
   hooks:
-  - class: CheckReplDBHash
   - class: ValidateCollections
   fixture:
     class: ShardedClusterFixture
