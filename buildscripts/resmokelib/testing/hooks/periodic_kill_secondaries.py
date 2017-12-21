@@ -216,6 +216,14 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
 
             null_ts = bson.Timestamp(0, 0)
 
+            # The oplog could be empty during initial sync. If so, we default it to null.
+            latest_oplog_entry_ts = null_ts
+            if latest_oplog_doc is not None:
+                latest_oplog_entry_ts = latest_oplog_doc.get("ts")
+                if latest_oplog_entry_ts is None:
+                    raise errors.ServerFailure("Latest oplog entry had no 'ts' field: {}".format(
+                        latest_oplog_doc))
+
             # The "oplogTruncateAfterPoint" document may not exist at startup. If so, we default
             # it to null.
             oplog_truncate_after_ts = null_ts
@@ -240,8 +248,9 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
                     # value is the null timestamp.
                     minvalid_ts = applied_through_ts
 
-                # If the oplog is empty, we treat the "minValid" as the latest oplog entry.
-                latest_oplog_entry_ts = latest_oplog_doc.get("ts", minvalid_ts)
+                if latest_oplog_entry_ts == null_ts:
+                    # If the oplog is empty, we treat the "minValid" as the latest oplog entry.
+                    latest_oplog_entry_ts = minvalid_ts
 
                 if oplog_truncate_after_ts == null_ts:
                     # The server treats the "oplogTruncateAfterPoint" field as missing when its
