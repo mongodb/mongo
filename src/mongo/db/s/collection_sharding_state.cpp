@@ -340,8 +340,7 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
 
 auto CollectionShardingState::makeDeleteState(BSONObj const& doc) -> DeleteState {
     return {getMetadata().extractDocumentKey(doc).getOwned(),
-            _sourceMgr && _sourceMgr->getCloner()->isDocumentInMigratingChunk(doc),
-            /*aboutToDeleteCalled*/ false};
+            _sourceMgr && _sourceMgr->getCloner()->isDocumentInMigratingChunk(doc)};
 }
 
 void CollectionShardingState::onDeleteOp(OperationContext* opCtx,

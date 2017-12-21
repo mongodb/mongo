@@ -85,6 +85,7 @@ struct TTLCollModInfo {
 
 class OpObserver {
 public:
+    virtual ~OpObserver() = default;
     virtual void onCreateIndex(OperationContext* opCtx,
                                const NamespaceString& nss,
                                OptionalCollectionUUID uuid,
