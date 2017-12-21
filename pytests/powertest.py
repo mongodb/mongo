@@ -392,13 +392,6 @@ def execute_cmd(cmd, use_file=False):
     return error_code, output
 
 
-def get_aws_crash_option(option):
-    """ Returns a tuple (instance_id, address_type) of the AWS crash option. """
-    if ":" in option:
-        return tuple(option.split(":"))
-    return option, None
-
-
 def get_user_host(user_host):
     """ Returns a tuple (user, host) from the user_host string. """
     if "@" in user_host:
@@ -1345,8 +1338,7 @@ def crash_server(options, crash_canary, canary_port, local_ops, script_name, cli
     elif options.crash_method == "aws_ec2":
         ec2 = aws_ec2.AwsEc2()
         crash_func = ec2.control_instance
-        instance_id, _ = get_aws_crash_option(options.crash_option)
-        crash_args = ["force-stop", instance_id, 600, True]
+        crash_args = ["force-stop", options.instance_id, 600, True]
 
     else:
         message = "Unsupported crash method '{}' provided".format(options.crash_method)
@@ -1749,13 +1741,21 @@ Examples:
         "private_ip_address", "public_ip_address", "private_dns_name", "public_dns_name"]
     crash_options.add_option("--crashOption",
                              dest="crash_option",
-                             help="Secondary argument (REQUIRED) for the following --crashMethod:"
-                                  " 'aws_ec2': specify EC2 'instance_id[:address_type]'."
-                                  " The address_type is one of {} and defaults to"
-                                  " 'public_ip_address'. 'mpower': specify output<num> to turn"
-                                  " off/on, i.e., 'output1'. 'internal': for Windows, optionally"
-                                  " specify a crash method, i.e., 'notmyfault/notmyfaultc64.exe"
+                             help="Secondary argument for the following --crashMethod:"
+                                  " 'aws_ec2': specify EC2 'address_type', which is one of {} and defaults"
+                                  " to 'public_ip_address'."
+                                  " 'mpower': specify output<num> to turn"
+                                  " off/on, i.e., 'output1' (REQUIRED)."
+                                  " 'internal': for Windows, optionally specify a crash method,"
+                                  " i.e., 'notmyfault/notmyfaultc64.exe"
                                   " -accepteula crash 1'".format(aws_address_types),
+                             default=None)
+
+    crash_options.add_option("--instanceId",
+                             dest="instance_id",
+                             help="The instance ID of an AWS EC2 host. If specified, this instance"
+                                  " will be started after a crash, if it is not in a running state."
+                                  " This is required if --crashOption is 'aws_ec2'.",
                              default=None)
 
     crash_options.add_option("--crashWaitTime",
@@ -2071,19 +2071,20 @@ Examples:
         options.report_json_file = None
 
     # Setup the crash options
-    if ((options.crash_method == "aws_ec2" or options.crash_method == "mpower") and
-            options.crash_option is None):
+    if options.crash_method == "mpower" and options.crash_option is None:
         parser.error("Missing required argument --crashOption for crashMethod '{}'".format(
             options.crash_method))
 
     if options.crash_method == "aws_ec2":
-        instance_id, address_type = get_aws_crash_option(options.crash_option)
-        address_type = address_type if address_type is not None else "public_ip_address"
+        if not options.instance_id:
+            parser.error("Missing required argument --instanceId for crashMethod '{}'".format(
+                options.crash_method))
+        address_type = "public_ip_address"
+        if options.crash_option:
+            address_type = options.crash_option
         if address_type not in aws_address_types:
-            LOGGER.error("Invalid crashOption address_type '%s' specified for crashMethod"
-                         " 'aws_ec2', specify one of %s", address_type, aws_address_types)
-            sys.exit(1)
-        options.crash_option = "{}:{}".format(instance_id, address_type)
+            parser.error("Invalid crashOption address_type '{}' specified for crashMethod"
+                         " 'aws_ec2', specify one of {}".format(address_type, aws_address_types))
 
     # Initialize the mongod options
     # Note - We use posixpath for Windows client to Linux server scenarios.
@@ -2111,6 +2112,10 @@ Examples:
     # Required option for non-remote commands.
     if options.ssh_user_host is None and not options.remote_operation:
         parser.error("Missing required argument --sshUserHost")
+
+    # Establish EC2 connection if an instance_id is specified.
+    if options.instance_id:
+        ec2 = aws_ec2.AwsEc2()
 
     secret_port = options.usable_ports[1]
     standard_port = options.usable_ports[0]
@@ -2474,11 +2479,16 @@ Examples:
         for temp_file in temp_client_files:
             NamedTempFile.delete(temp_file)
 
-        # The EC2 instance address changes if the crash_method is 'aws_ec2'.
-        if options.crash_method == "aws_ec2":
-            ec2 = aws_ec2.AwsEc2()
+        instance_running = True
+        if options.instance_id:
+            ret, aws_status = ec2.control_instance(mode="status", image_id=options.instance_id)
+            LOGGER.info("AWS EC2 instance status: %d %s****", ret, aws_status)
+            instance_running = ret == 0 and getattr(aws_status, "state")["Name"] == "running"
+
+        # The EC2 instance address changes if the instance is restarted.
+        if options.crash_method == "aws_ec2" or not instance_running:
             ret, aws_status = ec2.control_instance(
-                mode="start", image_id=instance_id, wait_time_secs=600, show_progress=True)
+                mode="start", image_id=options.instance_id, wait_time_secs=600, show_progress=True)
             LOGGER.info("Start instance: %d %s****", ret, aws_status)
             if ret:
                 raise Exception("Start instance failed: {}".format(aws_status))
