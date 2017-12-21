@@ -36,6 +36,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace {
@@ -217,6 +218,30 @@ DEATH_TEST(MassertionTerminationTest, massertStatusOK, "Terminating with massert
 
 DEATH_TEST(MassertionTerminationTest, msgasserted, "Terminating with msgasserted") {
     msgasserted(40215, "Terminating with msgasserted");
+}
+
+// invariant and its friends
+DEATH_TEST(InvariantTerminationTest, invariant, "Invariant failure false " __FILE__) {
+    invariant(false);
+}
+
+DEATH_TEST(InvariantTerminationTest, invariantOK, "Terminating with invariantOK") {
+    invariantOK(Status(ErrorCodes::InternalError, "Terminating with invariantOK"));
+}
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantWithStringLiteralMsg,
+           "Terminating with string literal invariant message") {
+    const char* msg = "Terminating with string literal invariant message";
+    invariant(false, msg);
+}
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantWithStdStringMsg,
+           "Terminating with std::string invariant message: 12345") {
+    const std::string msg = str::stream() << "Terminating with std::string invariant message: "
+                                          << 12345;
+    invariant(false, msg);
 }
 
 }  // namespace
