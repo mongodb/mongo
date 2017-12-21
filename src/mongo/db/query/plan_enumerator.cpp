@@ -281,7 +281,7 @@ std::string PlanEnumerator::dumpMemo() {
     mongoutils::str::stream ss;
 
     // Note that this needs to be kept in sync with allocateAssignment which assigns memo IDs.
-    for (size_t i = 1; i < _memo.size(); ++i) {
+    for (size_t i = 1; i <= _memo.size(); ++i) {
         ss << "[Node #" << i << "]: " << _memo[i]->toString() << "\n";
     }
     return ss;
