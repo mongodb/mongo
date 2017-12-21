@@ -141,6 +141,13 @@ NOINLINE_DECL void invariantFailedWithMsg(const char* expr,
     std::abort();
 }
 
+NOINLINE_DECL void invariantFailedWithMsg(const char* expr,
+                                          const std::string& msg,
+                                          const char* file,
+                                          unsigned line) noexcept {
+    invariantFailedWithMsg(expr, msg.c_str(), file, line);
+}
+
 NOINLINE_DECL void invariantOKFailed(const char* expr,
                                      const Status& status,
                                      const char* file,

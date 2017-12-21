@@ -28,6 +28,7 @@
 #pragma once
 
 #include <boost/preprocessor/facilities/overload.hpp>
+#include <string>
 
 #include "mongo/platform/compiler.h"
 #include "mongo/util/debug_util.h"
@@ -66,6 +67,11 @@ MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
                                                     const char* file,
                                                     unsigned line) noexcept;
 
+MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
+                                                    const std::string& msg,
+                                                    const char* file,
+                                                    unsigned line) noexcept;
+
 // This invariant overload accepts a condition and a message, to be logged if the condition is
 // false.
 //
@@ -73,11 +79,11 @@ MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
 //
 //       Invariant failure !condition "hello!" some/file.cpp 528
 //
-#define MONGO_invariant_2(_Expression, _Message)                                          \
-    do {                                                                                  \
-        if (MONGO_unlikely(!(_Expression))) {                                             \
-            ::mongo::invariantFailedWithMsg(#_Expression, #_Message, __FILE__, __LINE__); \
-        }                                                                                 \
+#define MONGO_invariant_2(_Expression, _Message)                                           \
+    do {                                                                                   \
+        if (MONGO_unlikely(!(_Expression))) {                                              \
+            ::mongo::invariantFailedWithMsg(#_Expression, (_Message), __FILE__, __LINE__); \
+        }                                                                                  \
     } while (false)
 
 // This helper macro is necessary to make the __VAR_ARGS__ expansion work properly on MSVC.
