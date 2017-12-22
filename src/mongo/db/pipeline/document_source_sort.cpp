@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 
 namespace mongo {
 
@@ -411,15 +412,52 @@ void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& curs
     _populated = true;
 }
 
+Value DocumentSourceSort::getCollationComparisonKey(const Value& val) const {
+    const auto collator = pExpCtx->getCollator();
+
+    // If the collation is the simple collation, the value itself is the comparison key.
+    if (!collator) {
+        return val;
+    }
+
+    // If 'val' is not a collatable type, there's no need to do any work.
+    if (!CollationIndexKey::isCollatableType(val.getType())) {
+        return val;
+    }
+
+    // If 'val' is a string, directly use the collator to obtain a comparison key.
+    if (val.getType() == BSONType::String) {
+        auto compKey = collator->getComparisonKey(val.getString());
+        return Value(compKey.getKeyData());
+    }
+
+    // Otherwise, for non-string collatable types, take the slow path and round-trip the value
+    // through BSON.
+    BSONObjBuilder input;
+    val.addToBsonObj(&input, ""_sd);
+
+    BSONObjBuilder output;
+    CollationIndexKey::collationAwareIndexKeyAppend(input.obj().firstElement(), collator, &output);
+    return Value(output.obj().firstElement());
+}
+
 StatusWith<Value> DocumentSourceSort::extractKeyPart(const Document& doc,
                                                      const SortPatternPart& patternPart) const {
+    Value plainKey;
     if (patternPart.fieldPath) {
         invariant(!patternPart.expression);
-        return document_path_support::extractElementAlongNonArrayPath(doc, *patternPart.fieldPath);
+        auto key =
+            document_path_support::extractElementAlongNonArrayPath(doc, *patternPart.fieldPath);
+        if (!key.isOK()) {
+            return key;
+        }
+        plainKey = key.getValue();
     } else {
         invariant(patternPart.expression);
-        return patternPart.expression->evaluate(doc);
+        plainKey = patternPart.expression->evaluate(doc);
     }
+
+    return getCollationComparisonKey(plainKey);
 }
 
 StatusWith<Value> DocumentSourceSort::extractKeyFast(const Document& doc) const {
@@ -490,24 +528,24 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
 }
 
 int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
-    /*
-      populate() already checked that there is a non-empty sort key,
-      so we shouldn't have to worry about that here.
-
-      However, the tricky part is what to do is none of the sort keys are
-      present.  In this case, consider the document less.
-    */
+    // DocumentSourceSort::populate() has already guaranteed that the sort key is non-empty.
+    // However, the tricky part is deciding what to do if none of the sort keys are present. In that
+    // case, consider the document "less".
+    //
+    // Note that 'comparator' must use binary comparisons here, as both 'lhs' and 'rhs' are
+    // collation comparison keys.
+    ValueComparator comparator;
     const size_t n = _sortPattern.size();
     if (n == 1) {  // simple fast case
         if (_sortPattern[0].isAscending)
-            return pExpCtx->getValueComparator().compare(lhs, rhs);
+            return comparator.compare(lhs, rhs);
         else
-            return -pExpCtx->getValueComparator().compare(lhs, rhs);
+            return -comparator.compare(lhs, rhs);
     }
 
     // compound sort
     for (size_t i = 0; i < n; i++) {
-        int cmp = pExpCtx->getValueComparator().compare(lhs[i], rhs[i]);
+        int cmp = comparator.compare(lhs[i], rhs[i]);
         if (cmp) {
             /* if necessary, adjust the return value by the key ordering */
             if (!_sortPattern[i].isAscending)
