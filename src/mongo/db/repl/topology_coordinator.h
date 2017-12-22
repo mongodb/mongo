@@ -1043,11 +1043,31 @@ public:
     /**
      * Gets the number of failures since start() was last called.
      *
-     * This value is incremented by calls to miss(), cleared by calls to start() and
-     * set to the maximum possible value by calls to hit().
+     * This value is incremented by calls to miss() and cleared by calls to start().
+     * 
      */
     int getNumFailuresSinceLastStart() const {
         return _numFailuresSinceLastStart;
+    }
+
+    /**
+     * Gets a flag that indicates whether the number of failed heartbeats has
+     * exceeded the max number of heartbeat retries or whether a good
+     * heartbeat has been received since the last call to start(). 
+     */
+    bool noMoreRetries() const {
+        return _numFailuresSinceLastStart > 2 || _goodHeartbeatReceived == true;
+    }
+	
+    /**
+     * Gets a flag that indicates whether a good heartbeat was received
+     * since the last call to start().
+     *
+     * This value is set to false on calls to start() and set to true on
+     * call to hit().
+     */
+    bool getGoodHeartbeatReceived() const {
+        return _goodHeartbeatReceived;
     }
 
 private:
@@ -1057,6 +1077,7 @@ private:
     Milliseconds value = UninitializedPing;
     Date_t _lastHeartbeatStartDate;
     int _numFailuresSinceLastStart = std::numeric_limits<int>::max();
+    bool _goodHeartbeatReceived = false;
 };
 
 //

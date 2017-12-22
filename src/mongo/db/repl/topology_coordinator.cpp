@@ -149,10 +149,11 @@ void appendOpTime(BSONObjBuilder* bob,
 void TopologyCoordinator::PingStats::start(Date_t now) {
     _lastHeartbeatStartDate = now;
     _numFailuresSinceLastStart = 0;
+    _goodHeartbeatReceived = false;
 }
 
 void TopologyCoordinator::PingStats::hit(Milliseconds millis) {
-    _numFailuresSinceLastStart = std::numeric_limits<int>::max();
+    _goodHeartbeatReceived = true;
     ++count;
 
     value = value == UninitializedPing ? millis : Milliseconds((value * 4 + millis) / 5);
@@ -907,9 +908,9 @@ std::pair<ReplSetHeartbeatArgs, Milliseconds> TopologyCoordinator::prepareHeartb
     Date_t now, const std::string& ourSetName, const HostAndPort& target) {
     PingStats& hbStats = _pings[target];
     Milliseconds alreadyElapsed = now - hbStats.getLastHeartbeatStartDate();
-    if (!_rsConfig.isInitialized() ||
-        (hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries) ||
-        (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriodMillis())) {
+    if (!_rsConfig.isInitialized() || (hbStats.noMoreRetries() == true) ||		    
+       (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriodMillis())
+        ) {
         // This is either the first request ever for "target", or the heartbeat timeout has
         // passed, so we're starting a "new" heartbeat.
         hbStats.start(now);
@@ -946,9 +947,9 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHear
     Date_t now, const std::string& ourSetName, const HostAndPort& target) {
     PingStats& hbStats = _pings[target];
     Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
-    if (!_rsConfig.isInitialized() ||
-        (hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries) ||
-        (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriodMillis())) {
+    if (!_rsConfig.isInitialized() || (hbStats.noMoreRetries() == true) ||
+        (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriodMillis())
+        ) {
         // This is either the first request ever for "target", or the heartbeat timeout has
         // passed, so we're starting a "new" heartbeat.
         hbStats.start(now);
@@ -1025,8 +1026,10 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     const Milliseconds alreadyElapsed = now - hbStats.getLastHeartbeatStartDate();
     Date_t nextHeartbeatStartDate;
     // Determine next heartbeat start time.
-    if (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries &&
-        alreadyElapsed < _rsConfig.getHeartbeatTimeoutPeriod()) {
+    if ((hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
+        (hbStats.getGoodHeartbeatReceived() == false) &&
+        (alreadyElapsed < _rsConfig.getHeartbeatTimeoutPeriod())
+        ) {
         // There are still retries left, let's use one.
         nextHeartbeatStartDate = now;
     } else {
@@ -1093,8 +1096,9 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     if (!hbResponse.isOK()) {
         if (isUnauthorized) {
             hbData.setAuthIssue(now);
-        } else if (hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries ||
-                   alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriod()) {
+        } else if ((hbStats.noMoreRetries() == true) ||
+                   (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriod())
+                   ) {
             hbData.setDownValues(now, hbResponse.getStatus().reason());
         } else {
             LOG(3) << "Bad heartbeat response from " << target << "; trying again; Retries left: "
