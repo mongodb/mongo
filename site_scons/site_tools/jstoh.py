@@ -39,10 +39,10 @@ def jsToHeader(target, source):
 
     text = '\n'.join(h)
 
-    print "writing: %s" % outFile
+    print("writing: %s" % outFile)
     with open(outFile, 'wb') as out:
         try:
-            out.write(text)
+            out.write(text.encode(encoding='utf_8',errors='strict'))
         finally:
             out.close()
 

@@ -83,8 +83,8 @@ def generate_cpp_file(data_file_path, cpp_file_path):
 #include "mongo/base/init.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo {
-namespace {
+namespace mongo {{
+namespace {{
 
 // alignas() is used here to ensure 16-alignment of ICU data.  See the following excerpt from the
 // ICU user guide (<http://userguide.icu-project.org/icudata#TOC-Alignment>):
@@ -95,24 +95,23 @@ namespace {
 // n-alignment of types of size n bytes (and crash on unaligned reads), other CPUs usually operate
 // faster on data that is aligned properly.  Some of the ICU code explicitly checks for proper
 // alignment."
-alignas(16) const uint8_t kRawData[] = {%(decimal_encoded_data)s};
+alignas(16) const uint8_t kRawData[] = {{ {decimal_encoded_data} }};
+}}  // namespace
 
-}  // namespace
-
-MONGO_INITIALIZER(LoadICUData)(InitializerContext* context) {
+MONGO_INITIALIZER(LoadICUData)(InitializerContext* context) {{
     UErrorCode status = U_ZERO_ERROR;
     udata_setCommonData(kRawData, &status);
     fassert(40088, U_SUCCESS(status));
     return Status::OK();
-}
+}}
 
-}  // namespace mongo
+}}  // namespace mongo
 '''
     decimal_encoded_data = ''
     with open(data_file_path, 'rb') as data_file:
-        decimal_encoded_data = ','.join([str(ord(byte)) for byte in data_file.read()])
+        decimal_encoded_data = ','.join([str(byte) for byte in data_file.read()])
     with open(cpp_file_path, 'wb') as cpp_file:
-        cpp_file.write(source_template % dict(decimal_encoded_data=decimal_encoded_data))
-
+        tmp_buf = source_template.format(decimal_encoded_data=decimal_encoded_data)
+        cpp_file.write(tmp_buf.encode(encoding='utf_8',errors='strict'))
 if __name__ == '__main__':
     main(sys.argv)
