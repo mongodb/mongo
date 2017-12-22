@@ -1084,6 +1084,8 @@ err:	/*
 			WT_TRET(wt_session->close(wt_session, config));
 		}
 
+	WT_TRET(__wt_async_flush(session));
+
 	/*
 	 * Disable lookaside eviction: it doesn't help us shut down and can
 	 * lead to pages being marked dirty, causing spurious assertions to
@@ -1281,6 +1283,35 @@ __conn_rollback_to_stable(WT_CONNECTION *wt_conn, const char *config)
 	CONNECTION_API_CALL(conn, session, rollback_to_stable, config, cfg);
 	WT_TRET(__wt_txn_rollback_to_stable(session, cfg));
 err:	API_END_RET(session, ret);
+}
+
+/*
+ * __conn_calibrate_ticks --
+ *	Calibrate a ratio from rdtsc ticks to nanoseconds.
+ */
+static void
+__conn_calibrate_ticks(WT_SESSION_IMPL *session)
+{
+#if (defined __i386) || (defined __amd64)
+	struct timespec start, stop;
+	uint64_t diff_nsec, diff_tsc, tsc_start, tsc_stop;
+	volatile uint64_t i;
+
+	__wt_epoch(session, &start);
+	tsc_start = __wt_rdtsc(session);
+	/*
+	 * This needs to be CPU intensive and large enough.
+	 */
+	for (i = 0; i < WT_MILLION; i++)
+		;
+	tsc_stop = __wt_rdtsc(session);
+	__wt_epoch(session, &stop);
+	diff_nsec = WT_TIMEDIFF_NS(stop, start);
+	diff_tsc = tsc_stop - tsc_start;
+	S2C(session)->tsc_nsec_ratio = (double)diff_tsc/(double)diff_nsec;
+#else
+	S2C(session)->tsc_nsec_ratio = 1.0;
+#endif
 }
 
 /*
@@ -1794,7 +1825,7 @@ err:	/*
 /* Simple structure for name and flag configuration searches. */
 typedef struct {
 	const char *name;
-	uint32_t flag;
+	uint64_t flag;
 } WT_NAME_FLAG;
 
 /*
@@ -1831,6 +1862,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "salvage",		WT_VERB_SALVAGE },
 		{ "shared_cache",	WT_VERB_SHARED_CACHE },
 		{ "split",		WT_VERB_SPLIT },
+		{ "temporary",		WT_VERB_TEMPORARY },
 		{ "thread_group",	WT_VERB_THREAD_GROUP },
 		{ "timestamp",		WT_VERB_TIMESTAMP },
 		{ "transaction",	WT_VERB_TRANSACTION },
@@ -1843,7 +1875,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
-	uint32_t flags;
+	uint64_t flags;
 
 	conn = S2C(session);
 
@@ -1852,17 +1884,8 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 	flags = 0;
 	for (ft = verbtypes; ft->name != NULL; ft++) {
 		if ((ret = __wt_config_subgets(
-		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0) {
-#ifdef HAVE_VERBOSE
+		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
 			LF_SET(ft->flag);
-#else
-			WT_RET_MSG(session, EINVAL,
-			    "Verbose option specified when WiredTiger built "
-			    "without verbose support. Add --enable-verbose to "
-			    "configure command and rebuild to include support "
-			    "for verbose messages");
-#endif
-		}
 		WT_RET_NOTFOUND_OK(ret);
 	}
 
@@ -2002,7 +2025,7 @@ __wt_timing_stress_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	const WT_NAME_FLAG *ft;
-	uint32_t flags;
+	uint64_t flags;
 
 	conn = S2C(session);
 
@@ -2169,6 +2192,44 @@ __conn_set_file_system(
 	conn->file_system = file_system;
 
 err:	API_END_RET(session, ret);
+}
+
+/*
+ * __conn_session_size --
+ *	Return the session count for this run.
+ */
+static int
+__conn_session_size(
+    WT_SESSION_IMPL *session, const char *cfg[], uint32_t *vp)
+{
+	WT_CONFIG_ITEM cval;
+	int64_t v;
+
+	/*
+	 * Start with 20 internal sessions to cover threads the application
+	 * can't configure (for example, checkpoint or statistics log server
+	 * threads).
+	 */
+#define	WT_EXTRA_INTERNAL_SESSIONS	20
+	v = WT_EXTRA_INTERNAL_SESSIONS;
+
+	/* Then, add in the thread counts applications can configure. */
+	WT_RET(__wt_config_gets(session, cfg, "async.threads", &cval));
+	v += cval.val;
+
+	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_max", &cval));
+	v += cval.val;
+
+	WT_RET(__wt_config_gets(
+	    session, cfg, "lsm_manager.worker_thread_max", &cval));
+	v += cval.val;
+
+	WT_RET(__wt_config_gets(session, cfg, "session_max", &cval));
+	v += cval.val;
+
+	*vp = (uint32_t)v;
+
+	return (0);
 }
 
 /*
@@ -2498,8 +2559,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_verbose_config(session, cfg));
 	WT_ERR(__wt_timing_stress_config(session, cfg));
 
-	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
-	conn->session_size = (uint32_t)cval.val + WT_EXTRA_INTERNAL_SESSIONS;
+	/* Set up operation tracking if configured. */
+	WT_ERR(__wt_conn_optrack_setup(session, cfg, false));
+
+	WT_ERR(__conn_session_size(session, cfg, &conn->session_size));
 
 	WT_ERR(__wt_config_gets(session, cfg, "session_scratch_max", &cval));
 	conn->session_scratch_max = (size_t)cval.val;
@@ -2617,6 +2680,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Configuration completed; optionally write a base configuration file.
 	 */
 	WT_ERR(__conn_write_base_config(session, cfg));
+
+	/*
+	 * Calibrate the ratio of rdtsc ticks to nanoseconds.
+	 */
+	__conn_calibrate_ticks(session);
 
 	/*
 	 * Check on the turtle and metadata files, creating them if necessary

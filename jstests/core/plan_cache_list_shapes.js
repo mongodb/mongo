@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test the planCacheListQueryShapes command, which returns a list of query shapes
 // for the queries currently cached in the collection.
 

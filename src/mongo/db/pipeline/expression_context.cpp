@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 
@@ -43,6 +44,7 @@ ExpressionContext::ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregationRequest& request,
                                      std::unique_ptr<CollatorInterface> collator,
+                                     std::shared_ptr<MongoProcessInterface> processInterface,
                                      StringMap<ResolvedNamespace> resolvedNamespaces)
     : ExpressionContext(opCtx, collator.get()) {
     explain = request.getExplain();
@@ -51,14 +53,16 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     needsMerge = request.needsMerge();
     allowDiskUse = request.shouldAllowDiskUse();
     bypassDocumentValidation = request.shouldBypassDocumentValidation();
-    from34Mongos = request.isFrom34Mongos();
     ns = request.getNamespaceString();
+    mongoProcessInterface = std::move(processInterface);
     collation = request.getCollation();
     _ownedCollator = std::move(collator);
     _resolvedNamespaces = std::move(resolvedNamespaces);
 }
+
 ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInterface* collator)
     : opCtx(opCtx),
+      mongoProcessInterface(std::make_shared<StubMongoProcessInterface>()),
       timeZoneDatabase(opCtx && opCtx->getServiceContext()
                            ? TimeZoneDatabase::get(opCtx->getServiceContext())
                            : nullptr),
@@ -66,6 +70,14 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx, const CollatorInte
       _collator(collator),
       _documentComparator(_collator),
       _valueComparator(_collator) {}
+
+ExpressionContext::ExpressionContext(NamespaceString nss,
+                                     std::shared_ptr<MongoProcessInterface> processInterface,
+                                     const TimeZoneDatabase* tzDb)
+    : ns(std::move(nss)),
+      mongoProcessInterface(std::move(processInterface)),
+      timeZoneDatabase(tzDb),
+      variablesParseState(variables.useIdGenerator()) {}
 
 void ExpressionContext::checkForInterrupt() {
     // This check could be expensive, at least in relative terms, so don't check every time.
@@ -128,14 +140,13 @@ intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     boost::optional<UUID> uuid,
     boost::optional<std::unique_ptr<CollatorInterface>> collator) const {
     intrusive_ptr<ExpressionContext> expCtx =
-        new ExpressionContext(std::move(ns), timeZoneDatabase);
+        new ExpressionContext(std::move(ns), mongoProcessInterface, timeZoneDatabase);
 
     expCtx->uuid = std::move(uuid);
     expCtx->explain = explain;
     expCtx->comment = comment;
     expCtx->needsMerge = needsMerge;
     expCtx->fromMongos = fromMongos;
-    expCtx->from34Mongos = from34Mongos;
     expCtx->inMongos = inMongos;
     expCtx->allowDiskUse = allowDiskUse;
     expCtx->bypassDocumentValidation = bypassDocumentValidation;

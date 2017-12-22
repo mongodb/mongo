@@ -55,7 +55,9 @@
     // Node C should connect to new master as a sync source because chaining is disallowed.
     // C is ahead of master but it will still connect to it.
     clearRawMongoProgramOutput();
-    replTest.restart(CID);
+    // Don't wait for a connection to the node after startup, since it might roll back and crash
+    // immediately.
+    replTest.start(CID, {waitForConnect: false}, true /*restart*/);
 
     assert.soon(function() {
         try {

@@ -271,8 +271,7 @@ Status ReplicationCoordinatorMock::resyncData(OperationContext* opCtx, bool wait
     return Status::OK();
 }
 
-StatusWith<BSONObj> ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
-    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle) const {
+StatusWith<BSONObj> ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand() const {
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("replSetUpdatePosition", 1);
     return cmdBuilder.obj();
@@ -358,12 +357,6 @@ Status ReplicationCoordinatorMock::processReplSetFresh(const ReplSetFreshArgs& a
 
 Status ReplicationCoordinatorMock::processReplSetElect(const ReplSetElectArgs& args,
                                                        BSONObjBuilder* resultObj) {
-    // TODO
-    return Status::OK();
-}
-
-Status ReplicationCoordinatorMock::processReplSetUpdatePosition(
-    const OldUpdatePositionArgs& updates, long long* configVersion) {
     // TODO
     return Status::OK();
 }

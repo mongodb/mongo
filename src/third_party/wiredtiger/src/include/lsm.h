@@ -66,16 +66,17 @@ struct __wt_cursor_lsm {
 
 	u_int update_count;		/* Updates performed. */
 
-#define	WT_CLSM_ACTIVE		0x001   /* Incremented the session count */
-#define	WT_CLSM_BULK		0x002   /* Open for snapshot isolation */
-#define	WT_CLSM_ITERATE_NEXT    0x004   /* Forward iteration */
-#define	WT_CLSM_ITERATE_PREV    0x008   /* Backward iteration */
-#define	WT_CLSM_MERGE           0x010   /* Merge cursor, don't update */
-#define	WT_CLSM_MINOR_MERGE	0x020   /* Minor merge, include tombstones */
-#define	WT_CLSM_MULTIPLE        0x040   /* Multiple cursors have values for the
-					   current key */
-#define	WT_CLSM_OPEN_READ	0x080   /* Open for reads */
-#define	WT_CLSM_OPEN_SNAPSHOT	0x100   /* Open for snapshot isolation */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CLSM_ACTIVE		0x001u	/* Incremented the session count */
+#define	WT_CLSM_BULK		0x002u	/* Open for snapshot isolation */
+#define	WT_CLSM_ITERATE_NEXT    0x004u	/* Forward iteration */
+#define	WT_CLSM_ITERATE_PREV    0x008u	/* Backward iteration */
+#define	WT_CLSM_MERGE           0x010u	/* Merge cursor, don't update */
+#define	WT_CLSM_MINOR_MERGE	0x020u	/* Minor merge, include tombstones */
+#define	WT_CLSM_MULTIPLE        0x040u	/* Multiple cursors have values */
+#define	WT_CLSM_OPEN_READ	0x080u	/* Open for reads */
+#define	WT_CLSM_OPEN_SNAPSHOT	0x100u	/* Open for snapshot isolation */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };
 
@@ -112,11 +113,13 @@ struct __wt_lsm_chunk {
 	int8_t evicted;			/* 1/0: in-memory chunk was evicted */
 	uint8_t flushing;		/* 1/0: chunk flush in progress */
 
-#define	WT_LSM_CHUNK_BLOOM		0x01
-#define	WT_LSM_CHUNK_HAS_TIMESTAMP	0x02
-#define	WT_LSM_CHUNK_MERGING		0x04
-#define	WT_LSM_CHUNK_ONDISK		0x08
-#define	WT_LSM_CHUNK_STABLE		0x10
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_LSM_CHUNK_BLOOM		0x01u
+#define	WT_LSM_CHUNK_HAS_TIMESTAMP	0x02u
+#define	WT_LSM_CHUNK_MERGING		0x04u
+#define	WT_LSM_CHUNK_ONDISK		0x08u
+#define	WT_LSM_CHUNK_STABLE		0x10u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };
 
@@ -125,11 +128,13 @@ struct __wt_lsm_chunk {
  * type of work they will execute, and by work units to define which action
  * is required.
  */
-#define	WT_LSM_WORK_BLOOM	0x01	/* Create a bloom filter */
-#define	WT_LSM_WORK_DROP	0x02	/* Drop unused chunks */
-#define	WT_LSM_WORK_FLUSH	0x04	/* Flush a chunk to disk */
-#define	WT_LSM_WORK_MERGE	0x08	/* Look for a tree merge */
-#define	WT_LSM_WORK_SWITCH	0x10	/* Switch to new in-memory chunk */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_LSM_WORK_BLOOM	0x01u	/* Create a bloom filter */
+#define	WT_LSM_WORK_DROP	0x02u	/* Drop unused chunks */
+#define	WT_LSM_WORK_FLUSH	0x04u	/* Flush a chunk to disk */
+#define	WT_LSM_WORK_MERGE	0x08u	/* Look for a tree merge */
+#define	WT_LSM_WORK_SWITCH	0x10u	/* Switch to new in-memory chunk */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 /*
  * WT_LSM_WORK_UNIT --
@@ -138,7 +143,9 @@ struct __wt_lsm_chunk {
 struct __wt_lsm_work_unit {
 	TAILQ_ENTRY(__wt_lsm_work_unit) q;	/* Worker unit queue */
 	uint32_t	type;			/* Type of operation */
-#define	WT_LSM_WORK_FORCE	0x0001		/* Force operation */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_LSM_WORK_FORCE	0x1u		/* Force operation */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t	flags;			/* Flags for operation */
 	WT_LSM_TREE *lsm_tree;
 };
@@ -172,7 +179,9 @@ struct __wt_lsm_manager {
 #define	WT_LSM_MIN_WORKERS	3
 	WT_LSM_WORKER_ARGS lsm_worker_cookies[WT_LSM_MAX_WORKERS];
 
-#define	WT_LSM_MANAGER_SHUTDOWN	0x01	/* Manager has shut down */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_LSM_MANAGER_SHUTDOWN	0x1u	/* Manager has shut down */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };
 
@@ -191,6 +200,11 @@ struct __wt_lsm_tree {
 	const char *name, *config, *filename;
 	const char *key_format, *value_format;
 	const char *bloom_config, *file_config;
+
+	uint32_t custom_generation;	/* Level at which a custom data source
+					   should be used for merges. */
+	const char *custom_prefix;	/* Prefix for custom data source */
+	const char *custom_suffix;	/* Suffix for custom data source */
 
 	WT_COLLATOR *collator;
 	const char *collator_name;
@@ -226,9 +240,11 @@ struct __wt_lsm_tree {
 	uint64_t chunk_max;		/* Maximum chunk a merge creates */
 	u_int merge_min, merge_max;
 
-#define	WT_LSM_BLOOM_MERGED				0x00000001
-#define	WT_LSM_BLOOM_OFF				0x00000002
-#define	WT_LSM_BLOOM_OLDEST				0x00000004
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_LSM_BLOOM_MERGED	0x1u
+#define	WT_LSM_BLOOM_OFF	0x2u
+#define	WT_LSM_BLOOM_OLDEST	0x4u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t bloom;			/* Bloom creation policy */
 
 	WT_LSM_CHUNK **chunk;		/* Array of active LSM chunks */
@@ -274,10 +290,12 @@ struct __wt_lsm_tree {
 	 * flags here are not protected for concurrent access, don't put
 	 * anything here that is susceptible to races.
 	 */
-#define	WT_LSM_TREE_COMPACTING		0x01	/* Tree being compacted */
-#define	WT_LSM_TREE_MERGES		0x02	/* Tree should run merges */
-#define	WT_LSM_TREE_OPEN		0x04	/* The tree is open */
-#define	WT_LSM_TREE_THROTTLE		0x08	/* Throttle updates */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_LSM_TREE_COMPACTING		0x1u	/* Tree being compacted */
+#define	WT_LSM_TREE_MERGES		0x2u	/* Tree should run merges */
+#define	WT_LSM_TREE_OPEN		0x4u	/* The tree is open */
+#define	WT_LSM_TREE_THROTTLE		0x8u	/* Throttle updates */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };
 

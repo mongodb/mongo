@@ -70,14 +70,14 @@ bool setUpSecurityKey(const string& filename) {
         return false;
     }
 
-    // Generate MONGODB-CR and SCRAM credentials for the internal user based on
+    // Generate SCRAM-SHA-1 credentials for the internal user based on
     // the keyfile.
     User::CredentialData credentials;
-    credentials.password =
+    const auto password =
         mongo::createPasswordDigest(internalSecurity.user->getName().getUser().toString(), str);
 
-    BSONObj creds = scram::generateCredentials(credentials.password,
-                                               saslGlobalParams.scramIterationCount.load());
+    BSONObj creds =
+        scram::generateCredentials(password, saslGlobalParams.scramIterationCount.load());
     credentials.scram.iterationCount = creds[scram::iterationCountFieldName].Int();
     credentials.scram.salt = creds[scram::saltFieldName].String();
     credentials.scram.storedKey = creds[scram::storedKeyFieldName].String();
@@ -94,7 +94,7 @@ bool setUpSecurityKey(const string& filename) {
                                                << saslCommandUserFieldName
                                                << internalSecurity.user->getName().getUser()
                                                << saslCommandPasswordFieldName
-                                               << credentials.password
+                                               << password
                                                << saslCommandDigestPasswordFieldName
                                                << false));
     }

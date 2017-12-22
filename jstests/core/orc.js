@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // test that or duplicates are dropped in certain special cases
 t = db.jstests_orc;
 t.drop();

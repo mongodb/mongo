@@ -52,7 +52,6 @@
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/member_data.h"
-#include "mongo/db/repl/old_update_position_args.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
@@ -504,12 +503,9 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     // that the server's networking layer be up and running and accepting connections, which
     // doesn't happen until startReplication finishes.
     auto handle =
-        _replExecutor->scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
-                                               this,
-                                               stdx::placeholders::_1,
-                                               localConfig,
-                                               lastOpTimeStatus,
-                                               lastVote));
+        _replExecutor->scheduleWork([=](const executor::TaskExecutor::CallbackArgs& args) {
+            _finishLoadLocalConfig(args, localConfig, lastOpTimeStatus, lastVote);
+        });
     if (handle == ErrorCodes::ShutdownInProgress) {
         handle = CallbackHandle{};
     }
@@ -1149,6 +1145,11 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
         if (opTime <= _topCoord->getLastCommittedOpTime()) {
             _setStableTimestampForStorage_inlock();
         }
+    } else if (_getMemberState_inlock().startup2()) {
+        // The oplog application phase of initial sync starts timestamping writes, causing
+        // WiredTiger to pin this data in memory. Advancing the oldest timestamp in step with the
+        // last applied optime here will permit WiredTiger to evict this data as it sees fit.
+        _service->getGlobalStorageEngine()->setOldestTimestamp(opTime.getTimestamp());
     }
 }
 
@@ -1367,73 +1368,6 @@ Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer
     const auto status = _setLastOptime_inlock(update, &configVersion);
     _updateLastCommittedOpTime_inlock();
     return status;
-}
-
-Status ReplicationCoordinatorImpl::_setLastOptime_inlock(
-    const OldUpdatePositionArgs::UpdateInfo& args, long long* configVersion) {
-    if (_selfIndex == -1) {
-        // Ignore updates when we're in state REMOVED
-        return Status(ErrorCodes::NotMasterOrSecondary,
-                      "Received replSetUpdatePosition command but we are in state REMOVED");
-    }
-    invariant(getReplicationMode() == modeReplSet);
-
-    if (args.memberId < 0) {
-        std::string errmsg = str::stream()
-            << "Received replSetUpdatePosition for node with memberId " << args.memberId
-            << " which is negative and therefore invalid";
-        LOG(1) << errmsg;
-        return Status(ErrorCodes::NodeNotFound, errmsg);
-    }
-
-    if (args.memberId == _rsConfig.getMemberAt(_selfIndex).getId()) {
-        // Do not let remote nodes tell us what our optime is.
-        return Status::OK();
-    }
-
-    LOG(2) << "received notification that node with memberID " << args.memberId
-           << " in config with version " << args.cfgver
-           << " has durably reached optime: " << args.ts;
-
-    if (args.cfgver != _rsConfig.getConfigVersion()) {
-        std::string errmsg = str::stream()
-            << "Received replSetUpdatePosition for node with memberId " << args.memberId
-            << " whose config version of " << args.cfgver << " doesn't match our config version of "
-            << _rsConfig.getConfigVersion();
-        LOG(1) << errmsg;
-        *configVersion = _rsConfig.getConfigVersion();
-        return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
-    }
-
-    auto* memberData = _topCoord->findMemberDataByMemberId(args.memberId);
-    if (!memberData) {
-        invariant(!_rsConfig.findMemberByID(args.memberId));
-
-        std::string errmsg = str::stream()
-            << "Received replSetUpdatePosition for node with memberId " << args.memberId
-            << " which doesn't exist in our config";
-        LOG(1) << errmsg;
-        return Status(ErrorCodes::NodeNotFound, errmsg);
-    }
-
-    invariant(args.memberId == memberData->getMemberId());
-
-    LOG(3) << "Node with memberID " << args.memberId << " has durably applied operations through "
-           << memberData->getLastDurableOpTime() << " and has applied operations through "
-           << memberData->getLastAppliedOpTime()
-           << "; updating to new durable operation with timestamp " << args.ts;
-
-    auto now(_replExecutor->now());
-    bool advancedOpTime = memberData->advanceLastAppliedOpTime(args.ts, now);
-    advancedOpTime = memberData->advanceLastDurableOpTime(args.ts, now) || advancedOpTime;
-
-    // Only update committed optime if the remote optimes increased.
-    if (advancedOpTime) {
-        _updateLastCommittedOpTime_inlock();
-    }
-
-    _cancelAndRescheduleLivenessUpdate_inlock(args.memberId);
-    return Status::OK();
 }
 
 Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArgs::UpdateInfo& args,
@@ -1845,9 +1779,9 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     onExitGuard.Dismiss();
     updateMemberState();
     // Schedule work to (potentially) step back up once the stepdown period has ended.
-    _scheduleWorkAt(
-        stepDownUntil,
-        stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing, this, stdx::placeholders::_1));
+    _scheduleWorkAt(stepDownUntil, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+        _handleTimePassing(cbData);
+    });
     return Status::OK();
 }
 
@@ -2055,11 +1989,10 @@ Status ReplicationCoordinatorImpl::resyncData(OperationContext* opCtx, bool wait
     return Status::OK();
 }
 
-StatusWith<BSONObj> ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
-    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle) const {
+StatusWith<BSONObj> ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand() const {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     return _topCoord->prepareReplSetUpdatePositionCommand(
-        commandStyle, _getCurrentCommittedSnapshotOpTime_inlock());
+        _getCurrentCommittedSnapshotOpTime_inlock());
 }
 
 Status ReplicationCoordinatorImpl::processReplSetGetStatus(
@@ -2310,10 +2243,8 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     }
 
     _setConfigState_inlock(kConfigReconfiguring);
-    ScopeGuard configStateGuard = MakeGuard(
-        lockAndCall,
-        &lk,
-        stdx::bind(&ReplicationCoordinatorImpl::_setConfigState_inlock, this, kConfigSteady));
+    ScopeGuard configStateGuard =
+        MakeGuard(lockAndCall, &lk, [=] { _setConfigState_inlock(kConfigSteady); });
 
     ReplSetConfig oldConfig = _rsConfig;
     lk.unlock();
@@ -2367,14 +2298,10 @@ Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* opCt
     }
 
     auto reconfigFinished = uassertStatusOK(_replExecutor->makeEvent());
-    uassertStatusOK(
-        _replExecutor->scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
-                                               this,
-                                               stdx::placeholders::_1,
-                                               newConfig,
-                                               args.force,
-                                               myIndex.getValue(),
-                                               reconfigFinished)));
+    uassertStatusOK(_replExecutor->scheduleWork([ =, f = args.force, v = myIndex.getValue() ](
+        const executor::TaskExecutor::CallbackArgs& cbData) {
+        _finishReplSetReconfig(cbData, newConfig, f, v, reconfigFinished);
+    }));
     configStateGuard.Dismiss();
     _replExecutor->waitForEvent(reconfigFinished);
     return Status::OK();
@@ -2408,13 +2335,10 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
         // Wait for the election to complete and the node's Role to be set to follower.
         _replExecutor
             ->onEvent(electionFinishedEvent,
-                      stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
-                                 this,
-                                 stdx::placeholders::_1,
-                                 newConfig,
-                                 isForceReconfig,
-                                 myIndex,
-                                 finishedEvent))
+                      [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+                          _finishReplSetReconfig(
+                              cbData, newConfig, isForceReconfig, myIndex, finishedEvent);
+                      })
             .status_with_transitional_ignore();
         return;
     }
@@ -2454,11 +2378,8 @@ Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* opCt
     invariant(!_rsConfig.isInitialized());
     _setConfigState_inlock(kConfigInitiating);
 
-    ScopeGuard configStateGuard = MakeGuard(
-        lockAndCall,
-        &lk,
-        stdx::bind(
-            &ReplicationCoordinatorImpl::_setConfigState_inlock, this, kConfigUninitialized));
+    ScopeGuard configStateGuard =
+        MakeGuard(lockAndCall, &lk, [=] { _setConfigState_inlock(kConfigUninitialized); });
     lk.unlock();
 
     ReplSetConfig newConfig;
@@ -2976,29 +2897,6 @@ void ReplicationCoordinatorImpl::_wakeReadyWaiters_inlock() {
     });
 }
 
-Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
-    const OldUpdatePositionArgs& updates, long long* configVersion) {
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    Status status = Status::OK();
-    bool somethingChanged = false;
-    for (OldUpdatePositionArgs::UpdateIterator update = updates.updatesBegin();
-         update != updates.updatesEnd();
-         ++update) {
-        status = _setLastOptime_inlock(*update, configVersion);
-        if (!status.isOK()) {
-            break;
-        }
-        somethingChanged = true;
-    }
-
-    if (somethingChanged && !_getMemberState_inlock().primary()) {
-        lock.unlock();
-        // Must do this outside _mutex
-        _externalState->forwardSlaveProgress();
-    }
-    return status;
-}
-
 Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                                 long long* configVersion) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
@@ -3166,11 +3064,9 @@ void ReplicationCoordinatorImpl::_unblacklistSyncSource(
 void ReplicationCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Date_t until) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _topCoord->blacklistSyncSource(host, until);
-    _scheduleWorkAt(until,
-                    stdx::bind(&ReplicationCoordinatorImpl::_unblacklistSyncSource,
-                               this,
-                               stdx::placeholders::_1,
-                               host));
+    _scheduleWorkAt(until, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+        _unblacklistSyncSource(cbData, host);
+    });
 }
 
 void ReplicationCoordinatorImpl::resetLastOpTimesFromOplog(OperationContext* opCtx,

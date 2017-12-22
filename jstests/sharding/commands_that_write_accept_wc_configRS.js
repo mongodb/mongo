@@ -59,38 +59,6 @@ load('jstests/multiVersion/libs/auth_helpers.js');
 
     var commands = [];
 
-    commands.push({
-        req: {authSchemaUpgrade: 1},
-        setupFunc: function() {
-            shardCollectionWithChunks(st, coll);
-            adminDB.system.version.update(
-                {_id: "authSchema"}, {"currentVersion": 3}, {upsert: true});
-            localDB.getSiblingDB('admin').system.version.update(
-                {_id: "authSchema"}, {"currentVersion": 3}, {upsert: true});
-
-            db.createUser({user: 'user1', pwd: 'pass', roles: jsTest.basicUserRoles});
-            assert(db.auth({mechanism: 'MONGODB-CR', user: 'user1', pwd: 'pass'}));
-            db.logout();
-
-            localDB.createUser({user: 'user2', pwd: 'pass', roles: jsTest.basicUserRoles});
-            assert(localDB.auth({mechanism: 'MONGODB-CR', user: 'user2', pwd: 'pass'}));
-            localDB.logout();
-        },
-        confirmFunc: function() {
-            // All users should only have SCRAM credentials.
-            verifyUserDoc(db, 'user1', false, true);
-            verifyUserDoc(localDB, 'user2', false, true);
-
-            // After authSchemaUpgrade MONGODB-CR no longer works.
-            verifyAuth(db, 'user1', 'pass', false, true);
-            verifyAuth(localDB, 'user2', 'pass', false, true);
-        },
-        requiresMajority: true,
-        runsOnShards: true,
-        failsOnShards: false,
-        admin: true
-    });
-
     // Drop an unsharded database.
     commands.push({
         req: {dropDatabase: 1},

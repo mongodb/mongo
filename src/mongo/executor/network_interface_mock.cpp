@@ -161,7 +161,9 @@ void NetworkInterfaceMock::_interruptWithResponse_inlock(
     const CallbackHandle& cbHandle,
     const std::vector<NetworkOperationList*> queuesToCheck,
     const ResponseStatus& response) {
-    auto matchFn = stdx::bind(&NetworkOperation::isForCallback, stdx::placeholders::_1, cbHandle);
+
+    auto matchFn = [&cbHandle](const auto& ops) { return ops.isForCallback(cbHandle); };
+
     for (auto list : queuesToCheck) {
         auto noi = std::find_if(list->begin(), list->end(), matchFn);
         if (noi == list->end()) {
@@ -447,11 +449,9 @@ void NetworkInterfaceMock::_enqueueOperation_inlock(
         invariant(op.getRequest().timeout >= Milliseconds(0));
         ResponseStatus rs(ErrorCodes::NetworkTimeout, "Network timeout", Milliseconds(0));
         std::vector<NetworkOperationList*> queuesToCheck{&_unscheduled, &_blackHoled, &_scheduled};
-        auto action = stdx::bind(&NetworkInterfaceMock::_interruptWithResponse_inlock,
-                                 this,
-                                 op.getCallbackHandle(),
-                                 queuesToCheck,
-                                 rs);
+        auto action = [ =, cbh = op.getCallbackHandle() ] {
+            _interruptWithResponse_inlock(cbh, queuesToCheck, rs);
+        };
         _alarms.emplace(_now_inlock() + op.getRequest().timeout, action);
     }
 }

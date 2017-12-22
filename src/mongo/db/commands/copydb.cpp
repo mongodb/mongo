@@ -166,30 +166,10 @@ public:
 
         Cloner cloner;
 
-        // Get MONGODB-CR parameters
-        string username = cmdObj.getStringField("username");
-        string nonce = cmdObj.getStringField("nonce");
-        string key = cmdObj.getStringField("key");
-
         auto& authConn = CopyDbAuthConnection::forClient(opCtx->getClient());
 
-        if (!username.empty() && !nonce.empty() && !key.empty()) {
-            uassert(13008, "must call copydbgetnonce first", authConn.get());
-            BSONObj ret;
-            {
-                if (!authConn->runCommand(
-                        cloneOptions.fromDB,
-                        BSON("authenticate" << 1 << "user" << username << "nonce" << nonce << "key"
-                                            << key),
-                        ret)) {
-                    errmsg = "unable to login " + ret.toString();
-                    authConn.reset();
-                    return false;
-                }
-            }
-            cloner.setConnection(std::move(authConn));
-        } else if (cmdObj.hasField(saslCommandConversationIdFieldName) &&
-                   cmdObj.hasField(saslCommandPayloadFieldName)) {
+        if (cmdObj.hasField(saslCommandConversationIdFieldName) &&
+            cmdObj.hasField(saslCommandPayloadFieldName)) {
             uassert(25487, "must call copydbsaslstart first", authConn.get());
             BSONObj ret;
             if (!authConn->runCommand(

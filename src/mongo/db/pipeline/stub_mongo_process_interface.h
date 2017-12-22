@@ -26,20 +26,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/mongo_process_interface.h"
+#include "mongo/db/pipeline/pipeline.h"
 
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 
 /**
- * A stub MongoProcessInterface that can be used for testing. Create a subclass and override
- * methods as needed.
+ * A stub MongoProcessInterface that provides default implementations of all methods, which can then
+ * be individually overridden for testing. This class may also be used in scenarios where a
+ * placeholder MongoProcessInterface is required by an interface but will not be called. To
+ * guarantee the latter, method implementations in this class are marked MONGO_UNREACHABLE.
  */
-class StubMongoProcessInterface
-    : public DocumentSourceNeedsMongoProcessInterface::MongoProcessInterface {
+class StubMongoProcessInterface : public MongoProcessInterface {
 public:
     virtual ~StubMongoProcessInterface() = default;
 
@@ -51,11 +53,13 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool isSharded(const NamespaceString& ns) override {
+    bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
         MONGO_UNREACHABLE;
     }
 
-    BSONObj insert(const NamespaceString& ns, const std::vector<BSONObj>& objs) override {
+    BSONObj insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                   const NamespaceString& ns,
+                   const std::vector<BSONObj>& objs) override {
         MONGO_UNREACHABLE;
     }
 
@@ -64,19 +68,23 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void appendLatencyStats(const NamespaceString& nss,
+    void appendLatencyStats(OperationContext* opCtx,
+                            const NamespaceString& nss,
                             bool includeHistograms,
                             BSONObjBuilder* builder) const override {
         MONGO_UNREACHABLE;
     }
 
-    Status appendStorageStats(const NamespaceString& nss,
+    Status appendStorageStats(OperationContext* opCtx,
+                              const NamespaceString& nss,
                               const BSONObj& param,
                               BSONObjBuilder* builder) const override {
         MONGO_UNREACHABLE;
     }
 
-    Status appendRecordCount(const NamespaceString& nss, BSONObjBuilder* builder) const override {
+    Status appendRecordCount(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             BSONObjBuilder* builder) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -85,6 +93,7 @@ public:
     }
 
     Status renameIfOptionsAndIndexesHaveNotChanged(
+        OperationContext* opCtx,
         const BSONObj& renameCommandObj,
         const NamespaceString& targetNs,
         const BSONObj& originalCollectionOptions,
@@ -92,7 +101,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    StatusWith<std::unique_ptr<Pipeline, Pipeline::Deleter>> makePipeline(
+    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> makePipeline(
         const std::vector<BSONObj>& rawPipeline,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const MakePipelineOptions opts) override {
@@ -104,7 +113,8 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::vector<BSONObj> getCurrentOps(CurrentOpConnectionsMode connMode,
+    std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
+                                       CurrentOpConnectionsMode connMode,
                                        CurrentOpUserMode userMode,
                                        CurrentOpTruncateMode truncateMode) const override {
         MONGO_UNREACHABLE;
@@ -114,14 +124,18 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::vector<FieldPath> collectDocumentKeyFields(UUID) const override {
+    std::vector<FieldPath> collectDocumentKeyFields(OperationContext*,
+                                                    const NamespaceString&,
+                                                    UUID) const override {
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<Document> lookupSingleDocument(const NamespaceString& nss,
-                                                   UUID collectionUUID,
-                                                   const Document& documentKey,
-                                                   boost::optional<BSONObj> readConcern) {
+    boost::optional<Document> lookupSingleDocument(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const NamespaceString& nss,
+        UUID collectionUUID,
+        const Document& documentKey,
+        boost::optional<BSONObj> readConcern) {
         MONGO_UNREACHABLE;
     }
 

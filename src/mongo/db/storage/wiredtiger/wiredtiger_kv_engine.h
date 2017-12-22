@@ -167,6 +167,12 @@ public:
 
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
+    /**
+     * This method will force the oldest timestamp to the input value. Callers must be serialized
+     * along with `_advanceOldestTimestamp`
+     */
+    void setOldestTimestamp(Timestamp oldestTimestamp);
+
     virtual bool supportsRecoverToStableTimestamp() const override;
 
     // wiredtiger specific
@@ -246,8 +252,8 @@ private:
 
     std::string _uri(StringData ident) const;
 
-    // Not threadsafe; callers must be serialized.
-    void _setOldestTimestamp(Timestamp oldestTimestamp);
+    // Not threadsafe; callers must be serialized along with `setOldestTimestamp`.
+    void _advanceOldestTimestamp(Timestamp oldestTimestamp);
     Timestamp _previousSetOldestTimestamp;
 
     WT_CONNECTION* _conn;

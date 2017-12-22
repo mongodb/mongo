@@ -52,7 +52,6 @@ public:
     static constexpr StringData kBatchSizeName = "batchSize"_sd;
     static constexpr StringData kFromMongosName = "fromMongos"_sd;
     static constexpr StringData kNeedsMergeName = "needsMerge"_sd;
-    static constexpr StringData kNeedsMerge34Name = "fromRouter"_sd;
     static constexpr StringData kPipelineName = "pipeline"_sd;
     static constexpr StringData kCollationName = "collation"_sd;
     static constexpr StringData kExplainName = "explain"_sd;
@@ -141,13 +140,6 @@ public:
     }
 
     /**
-     * Returns true if this request originated from a 3.4 mongos.
-     */
-    bool isFrom34Mongos() const {
-        return _from34Mongos;
-    }
-
-    /**
      * Returns true if this request represents the shards part of a split pipeline, and should
      * produce mergeable output.
      */
@@ -230,10 +222,6 @@ public:
         _fromMongos = isFromMongos;
     }
 
-    void setFrom34Mongos(bool isFrom34Mongos) {
-        _from34Mongos = isFrom34Mongos;
-    }
-
     void setNeedsMerge(bool needsMerge) {
         _needsMerge = needsMerge;
     }
@@ -291,12 +279,6 @@ private:
     bool _fromMongos = false;
     bool _needsMerge = false;
     bool _bypassDocumentValidation = false;
-
-    // We track whether the aggregation request came from a 3.4 mongos. If so, the merge may occur
-    // on a 3.4 shard (which does not understand sort key metadata), and we should not serialize the
-    // sort key.
-    // TODO SERVER-30924: remove this.
-    bool _from34Mongos = false;
 
     // A user-specified maxTimeMS limit, or a value of '0' if not specified.
     unsigned int _maxTimeMS = 0;

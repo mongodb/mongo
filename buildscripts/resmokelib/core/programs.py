@@ -201,6 +201,12 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
     if "eval_prepend" in kwargs:
         eval_sb.append(str(kwargs.pop("eval_prepend")))
 
+    # If nodb is specified, pass the connection string through TestData so it can be used inside the
+    # test, then delete it so it isn't given as an argument to the mongo shell.
+    if "nodb" in kwargs and connection_string is not None:
+        test_data["connectionString"] = connection_string
+        connection_string = None
+
     for var_name in global_vars:
         _format_shell_vars(eval_sb, var_name, global_vars[var_name])
 

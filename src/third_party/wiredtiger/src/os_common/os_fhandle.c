@@ -135,9 +135,8 @@ static inline int
 __open_verbose(
     WT_SESSION_IMPL *session, const char *name, int file_type, u_int flags)
 {
-#ifdef HAVE_VERBOSE
-	WT_DECL_RET;
 	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
 	const char *file_type_tag, *sep;
 
 	if (!WT_VERBOSE_ISSET(session, WT_VERB_FILEOPS))
@@ -193,13 +192,6 @@ __open_verbose(
 
 err:	__wt_scr_free(session, &tmp);
 	return (ret);
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(name);
-	WT_UNUSED(file_type);
-	WT_UNUSED(flags);
-	return (0);
-#endif
 }
 
 /*
@@ -218,6 +210,8 @@ __wt_open(WT_SESSION_IMPL *session,
 	bool lock_file, open_called;
 
 	WT_ASSERT(session, file_type != 0);	/* A file type is required. */
+
+	*fhp = NULL;
 
 	conn = S2C(session);
 	file_system = conn->file_system;

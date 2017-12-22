@@ -395,8 +395,7 @@ const stdx::unordered_set<std::string> userManagementCommands{"createUser",
                                                               "revokePrivilegesFromRole",
                                                               "grantRolesToRole",
                                                               "revokeRolesFromRole",
-                                                              "_mergeAuthzCollections",
-                                                              "authSchemaUpgrade"};
+                                                              "_mergeAuthzCollections"};
 }  // namespace
 
 bool Command::isUserManagementCommand(const std::string& name) {

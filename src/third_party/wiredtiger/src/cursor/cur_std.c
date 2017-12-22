@@ -96,9 +96,16 @@ __wt_cursor_equals_notsup(WT_CURSOR *cursor, WT_CURSOR *other, int *equalp)
 int
 __wt_cursor_modify_notsup(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 {
+	WT_SESSION_IMPL *session;
+
 	WT_UNUSED(entries);
 	WT_UNUSED(nentries);
 
+	if (cursor->value_format != NULL && strlen(cursor->value_format) != 0) {
+		session = (WT_SESSION_IMPL *)cursor->session;
+		WT_RET_MSG(session, ENOTSUP,
+		    "WT_CURSOR.modify only supported for 'u' value formats");
+	}
 	return (__wt_cursor_notsup(cursor));
 }
 

@@ -40,7 +40,7 @@ namespace mongo {
  * Uses the ExpressionContext to determine what collection to look up into.
  * TODO SERVER-29134 When we allow change streams on multiple collections, this will need to change.
  */
-class DocumentSourceLookupChangePostImage final : public DocumentSourceNeedsMongoProcessInterface {
+class DocumentSourceLookupChangePostImage final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$_internalLookupChangePostImage"_sd;
     static constexpr StringData kFullDocumentFieldName =
@@ -106,7 +106,7 @@ public:
 
 private:
     DocumentSourceLookupChangePostImage(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceNeedsMongoProcessInterface(expCtx) {}
+        : DocumentSource(expCtx) {}
 
     /**
      * Uses the "documentKey" field from 'updateOp' to look up the current version of the document.

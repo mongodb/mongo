@@ -112,8 +112,8 @@ Value DocumentSourceLookupChangePostImage::lookupPostImage(const Document& updat
                                         << resumeToken.getData().clusterTime))
         : boost::none;
     invariant(resumeToken.getData().uuid);
-    auto lookedUpDoc = _mongoProcessInterface->lookupSingleDocument(
-        nss, *resumeToken.getData().uuid, documentKey, readConcern);
+    auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocument(
+        pExpCtx, nss, *resumeToken.getData().uuid, documentKey, readConcern);
 
     // Check whether the lookup returned any documents. Even if the lookup itself succeeded, it may
     // not have returned any results if the document was deleted in the time since the update op.

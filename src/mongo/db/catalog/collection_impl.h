@@ -36,7 +36,6 @@
 
 namespace mongo {
 class IndexConsistency;
-class IndexObserver;
 class UUIDCatalog;
 class CollectionImpl final : virtual public Collection::Impl,
                              virtual CappedCallback,
@@ -371,15 +370,6 @@ public:
      */
     const CollatorInterface* getDefaultCollator() const final;
 
-    /**
-     * Calls the Inform function in the IndexObserver if it's hooked.
-     */
-    void informIndexObserver(OperationContext* opCtx,
-                             const IndexDescriptor* descriptor,
-                             const IndexKeyEntry& indexEntry,
-                             const ValidationOperation operation) const;
-
-
 private:
     inline DatabaseCatalogEntry* dbce() const final {
         return this->_dbce;
@@ -388,16 +378,6 @@ private:
     inline CollectionCatalogEntry* details() const final {
         return this->_details;
     }
-
-    /**
-     * Hooks the IndexObserver into the collection.
-     */
-    void hookIndexObserver(IndexConsistency* consistency);
-
-    /**
-     * Unhooks the IndexObserver from the collection.
-     */
-    void unhookIndexObserver();
 
     /**
      * Returns a non-ok Status if document does not pass this collection's validator.
@@ -447,8 +427,6 @@ private:
     CollectionInfoCache _infoCache;
     IndexCatalog _indexCatalog;
 
-    mutable stdx::mutex _indexObserverMutex;
-    mutable std::unique_ptr<IndexObserver> _indexObserver;
 
     // The default collation which is applied to operations and indices which have no collation of
     // their own. The collection's validator will respect this collation.

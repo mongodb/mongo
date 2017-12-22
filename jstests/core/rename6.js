@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // Test for SERVER-7017
 // We shouldn't rename a collection when one of its indexes will generate a namespace
 // that is greater than 120 chars. To do this we create a long index name and try

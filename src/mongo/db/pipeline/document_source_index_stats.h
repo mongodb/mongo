@@ -37,7 +37,7 @@ namespace mongo {
  * Provides a document source interface to retrieve index statistics for a given namespace.
  * Each document returned represents a single index and mongod instance.
  */
-class DocumentSourceIndexStats final : public DocumentSourceNeedsMongoProcessInterface {
+class DocumentSourceIndexStats final : public DocumentSource {
 public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:

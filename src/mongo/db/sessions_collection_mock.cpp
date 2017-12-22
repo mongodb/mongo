@@ -33,11 +33,8 @@
 namespace mongo {
 
 MockSessionsCollectionImpl::MockSessionsCollectionImpl()
-    : _sessions(),
-      _refresh(
-          stdx::bind(&MockSessionsCollectionImpl::_refreshSessions, this, stdx::placeholders::_1)),
-      _remove(
-          stdx::bind(&MockSessionsCollectionImpl::_removeRecords, this, stdx::placeholders::_1)) {}
+    : _refresh([=](const LogicalSessionRecordSet& sessions) { return _refreshSessions(sessions); }),
+      _remove([=](const LogicalSessionIdSet& sessions) { return _removeRecords(sessions); }) {}
 
 void MockSessionsCollectionImpl::setRefreshHook(RefreshHook hook) {
     _refresh = std::move(hook);
@@ -48,9 +45,8 @@ void MockSessionsCollectionImpl::setRemoveHook(RemoveHook hook) {
 }
 
 void MockSessionsCollectionImpl::clearHooks() {
-    _refresh =
-        stdx::bind(&MockSessionsCollectionImpl::_refreshSessions, this, stdx::placeholders::_1);
-    _remove = stdx::bind(&MockSessionsCollectionImpl::_removeRecords, this, stdx::placeholders::_1);
+    _refresh = [=](const LogicalSessionRecordSet& sessions) { return _refreshSessions(sessions); };
+    _remove = [=](const LogicalSessionIdSet& sessions) { return _removeRecords(sessions); };
 }
 
 Status MockSessionsCollectionImpl::refreshSessions(const LogicalSessionRecordSet& sessions) {

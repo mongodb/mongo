@@ -51,7 +51,7 @@ private:
     Status _checkAuth(Client* client, const NamespaceString& nss, CursorId id) const final {
         auto opCtx = client->getOperationContext();
         const auto check = [client, opCtx, id](CursorManager* manager) {
-            auto ccPin = manager->pinCursor(opCtx, id);
+            auto ccPin = manager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
             if (!ccPin.isOK()) {
                 return ccPin.getStatus();
             }

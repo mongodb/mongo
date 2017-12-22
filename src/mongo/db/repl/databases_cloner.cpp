@@ -268,7 +268,8 @@ void DatabasesCloner::_setAdminAsFirst(std::vector<BSONElement>& dbsArray) {
     }
 }
 
-void DatabasesCloner::_onListDatabaseFinish(const CommandCallbackArgs& cbd) {
+void DatabasesCloner::_onListDatabaseFinish(
+    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbd) {
     Status respStatus = cbd.response.status;
     if (respStatus.isOK()) {
         respStatus = getStatusFromCommandResult(cbd.response.data);

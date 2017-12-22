@@ -253,18 +253,6 @@ AC_ARG_WITH(timestamp-size,
 AC_MSG_RESULT($with_timestamp_size)
 AC_DEFINE_UNQUOTED(WT_TIMESTAMP_SIZE, [$with_timestamp_size], [Size of a transaction timestamp in bytes])
 
-AH_TEMPLATE(HAVE_VERBOSE, [Enable verbose message configuration.])
-AC_MSG_CHECKING(if --enable-verbose option specified)
-AC_ARG_ENABLE(verbose,
-	[AS_HELP_STRING([--enable-verbose],
-	    [Enable verbose message configuration.])], r=$enableval, r=no)
-case "$r" in
-no)	wt_cv_enable_verbose=no;;
-*)	AC_DEFINE(HAVE_VERBOSE)
-	wt_cv_enable_verbose=yes;;
-esac
-AC_MSG_RESULT($wt_cv_enable_verbose)
-
 AC_MSG_CHECKING(if --enable-zlib option specified)
 AC_ARG_ENABLE(zlib,
 	[AS_HELP_STRING([--enable-zlib],

@@ -210,8 +210,8 @@ static BSONElement extractKeyElementFromMatchable(const MatchableDocument& match
                                                   StringData pathStr) {
     ElementPath path;
     path.init(pathStr);
-    path.setTraverseNonleafArrays(false);
-    path.setTraverseLeafArray(false);
+    path.setLeafArrayBehavior(ElementPath::LeafArrayBehavior::kNoTraversal);
+    path.setNonLeafArrayBehavior(ElementPath::NonLeafArrayBehavior::kNoTraversal);
 
     MatchableDocument::IteratorHolder matchIt(&matchable, &path);
     if (!matchIt->more())

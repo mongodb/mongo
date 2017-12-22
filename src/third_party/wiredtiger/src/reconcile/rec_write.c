@@ -5475,8 +5475,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				goto leaf_insert;
 			case WT_UPDATE_MODIFIED:
 				cbt->slot = WT_ROW_SLOT(page, rip);
-				WT_ERR(__wt_value_return_upd(
-				    session, cbt, upd,
+				WT_ERR(__wt_value_return_upd(session, cbt, upd,
 				    F_ISSET(r, WT_REC_VISIBLE_ALL)));
 				WT_ERR(__rec_cell_build_val(session, r,
 				    cbt->iface.value.data,
@@ -5697,8 +5696,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 			 */
 			cbt->slot = UINT32_MAX;
 			WT_RET(__wt_value_return_upd(
-			    session, cbt, upd,
-			    F_ISSET(r, WT_REC_VISIBLE_ALL)));
+			    session, cbt, upd, F_ISSET(r, WT_REC_VISIBLE_ALL)));
 			WT_RET(__rec_cell_build_val(session, r,
 			    cbt->iface.value.data,
 			    cbt->iface.value.size, (uint64_t)0));

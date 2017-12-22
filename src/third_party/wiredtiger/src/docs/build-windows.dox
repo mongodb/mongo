@@ -89,6 +89,10 @@ Configure WiredTiger to sleep and wait for a debugger to attach on failure.
 Configure WiredTiger to perform various run-time diagnostic tests.
 <b>DO NOT</b> configure this option in production environments.
 
+@par \c --enable-java
+Build the WiredTiger <a href="http://www.java.com">Java</a> API,
+requires path to swig.exe and path to Java JDK directory, comma separated.
+
 @par \c --enable-python
 Build the WiredTiger <a href="http://www.python.org">Python</a> API,
 requires path to swig.exe on Windows.
@@ -96,10 +100,6 @@ requires path to swig.exe on Windows.
 @par \c --enable-snappy
 Configure WiredTiger for <a href="http://code.google.com/p/snappy/">snappy</a>
 compression; see @ref compression for more information.
-
-@par \c --enable-verbose
-Configure WiredTiger to support the \c verbose configuration string to
-::wiredtiger_open.
 
 @par \c --enable-zlib
 Configure WiredTiger for <a href="http://www.zlib.net/">zlib</a>

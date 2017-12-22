@@ -167,7 +167,10 @@ public:
      * handle this error, as it should only happen if a misbehaving client attempts to
      * simultaneously issue two operations against the same cursor id.
      */
-    StatusWith<ClientCursorPin> pinCursor(OperationContext* opCtx, CursorId id);
+    enum AuthCheck { kCheckSession = true, kNoCheckSession = false };
+    StatusWith<ClientCursorPin> pinCursor(OperationContext* opCtx,
+                                          CursorId id,
+                                          AuthCheck checkSessionAuth = kCheckSession);
 
     /**
      * Returns an OK status if the cursor was successfully erased.

@@ -367,7 +367,7 @@ bool initializeServerGlobalState() {
     Listener::globalTicketHolder.resize(serverGlobalParams.maxConns).transitional_ignore();
 
 #ifndef _WIN32
-    if (!fs::is_directory(serverGlobalParams.socket)) {
+    if (!serverGlobalParams.noUnixSocket && !fs::is_directory(serverGlobalParams.socket)) {
         cout << serverGlobalParams.socket << " must be a directory" << endl;
         return false;
     }

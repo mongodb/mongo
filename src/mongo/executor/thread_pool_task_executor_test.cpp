@@ -54,10 +54,6 @@ MONGO_INITIALIZER(ThreadPoolExecutorCommonTests)(InitializerContext*) {
     return Status::OK();
 }
 
-void setStatus(const TaskExecutor::CallbackArgs& cbData, Status* outStatus) {
-    *outStatus = cbData.status;
-}
-
 TEST_F(ThreadPoolExecutorTest, TimelyCancelationOfScheduleWorkAt) {
     auto net = getNet();
     auto& executor = getExecutor();
@@ -65,7 +61,8 @@ TEST_F(ThreadPoolExecutorTest, TimelyCancelationOfScheduleWorkAt) {
     auto status1 = getDetectableErrorStatus();
     const auto now = net->now();
     const auto cb1 = unittest::assertGet(executor.scheduleWorkAt(
-        now + Milliseconds(5000), stdx::bind(setStatus, stdx::placeholders::_1, &status1)));
+        now + Milliseconds(5000),
+        [&](const TaskExecutor::CallbackArgs& cbData) { status1 = cbData.status; }));
 
     const auto startTime = net->now();
     net->enterNetwork();

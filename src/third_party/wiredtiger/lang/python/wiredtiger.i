@@ -511,7 +511,6 @@ COMPARE_NOTFOUND_OK(__wt_cursor::_search_near)
 %exception wiredtiger_version;
 %exception diagnostic_build;
 %exception timestamp_build;
-%exception verbose_build;
 
 /* WT_ASYNC_OP customization. */
 /* First, replace the varargs get / set methods with Python equivalents. */
@@ -1013,18 +1012,9 @@ int diagnostic_build() {
 int timestamp_build() {
 	return WT_TIMESTAMP_SIZE > 0;
 }
-
-int verbose_build() {
-#ifdef HAVE_VERBOSE
-	return 1;
-#else
-	return 0;
-#endif
-}
 %}
 int diagnostic_build();
 int timestamp_build();
-int verbose_build();
 
 /* Remove / rename parts of the C API that we don't want in Python. */
 %immutable __wt_cursor::session;

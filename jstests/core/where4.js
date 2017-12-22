@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 var myDB = db.getSiblingDB("where4");
 
 myDB.dropDatabase();

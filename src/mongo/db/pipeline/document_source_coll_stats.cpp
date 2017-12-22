@@ -106,7 +106,7 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
 
     builder.append("ns", pExpCtx->ns.ns());
 
-    auto shardName = _mongoProcessInterface->getShardName(pExpCtx->opCtx);
+    auto shardName = pExpCtx->mongoProcessInterface->getShardName(pExpCtx->opCtx);
 
     if (!shardName.empty()) {
         builder.append("shard", shardName);
@@ -121,14 +121,15 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
         if (_collStatsSpec["latencyStats"].type() == BSONType::Object) {
             includeHistograms = _collStatsSpec["latencyStats"]["histograms"].boolean();
         }
-        _mongoProcessInterface->appendLatencyStats(pExpCtx->ns, includeHistograms, &builder);
+        pExpCtx->mongoProcessInterface->appendLatencyStats(
+            pExpCtx->opCtx, pExpCtx->ns, includeHistograms, &builder);
     }
 
     if (_collStatsSpec.hasField("storageStats")) {
         // If the storageStats field exists, it must have been validated as an object when parsing.
         BSONObjBuilder storageBuilder(builder.subobjStart("storageStats"));
-        Status status = _mongoProcessInterface->appendStorageStats(
-            pExpCtx->ns, _collStatsSpec["storageStats"].Obj(), &storageBuilder);
+        Status status = pExpCtx->mongoProcessInterface->appendStorageStats(
+            pExpCtx->opCtx, pExpCtx->ns, _collStatsSpec["storageStats"].Obj(), &storageBuilder);
         storageBuilder.doneFast();
         if (!status.isOK()) {
             uasserted(40280,
@@ -138,7 +139,8 @@ DocumentSource::GetNextResult DocumentSourceCollStats::getNext() {
     }
 
     if (_collStatsSpec.hasField("count")) {
-        Status status = _mongoProcessInterface->appendRecordCount(pExpCtx->ns, &builder);
+        Status status = pExpCtx->mongoProcessInterface->appendRecordCount(
+            pExpCtx->opCtx, pExpCtx->ns, &builder);
         if (!status.isOK()) {
             uasserted(40481,
                       str::stream() << "Unable to retrieve count in $collStats stage: "

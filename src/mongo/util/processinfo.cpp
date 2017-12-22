@@ -34,6 +34,7 @@
 #include "mongo/base/init.h"
 #include "mongo/util/processinfo.h"
 
+#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 #include <fstream>
 #include <iostream>
@@ -67,6 +68,18 @@ public:
             } else {
                 log() << "ERROR: Cannot write pid file to " << path.string() << ": "
                       << errAndStr.second;
+            }
+        } else {
+            boost::system::error_code ec;
+            boost::filesystem::permissions(
+                path,
+                boost::filesystem::owner_read | boost::filesystem::owner_write |
+                    boost::filesystem::group_read | boost::filesystem::others_read,
+                ec);
+            if (ec) {
+                log() << "Could not set permissions on pid file " << path.string() << ": "
+                      << ec.message();
+                return false;
             }
         }
         return out.good();

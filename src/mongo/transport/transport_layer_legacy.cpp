@@ -66,9 +66,10 @@ void TransportLayerLegacy::ListenerLegacy::accepted(std::unique_ptr<AbstractMess
 TransportLayerLegacy::TransportLayerLegacy(const TransportLayerLegacy::Options& opts,
                                            ServiceEntryPoint* sep)
     : _sep(sep),
-      _listener(stdx::make_unique<ListenerLegacy>(
-          opts,
-          stdx::bind(&TransportLayerLegacy::_handleNewConnection, this, stdx::placeholders::_1))),
+      _listener(stdx::make_unique<ListenerLegacy>(opts,
+                                                  [=](std::unique_ptr<AbstractMessagingPort> port) {
+                                                      _handleNewConnection(std::move(port));
+                                                  })),
       _running(false),
       _options(opts) {}
 

@@ -21,6 +21,7 @@ selector:
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
   - jstests/core/diagdata.js # Command not supported in mongos
+  - jstests/core/do_txn*.js  # doTxn
   - jstests/core/dropdb_race.js  # syncdelay.
   - jstests/core/evalb.js  # db.eval() and profiling.
   - jstests/core/fsync.js  # uses fsync.
@@ -139,6 +140,8 @@ selector:
   - jstests/core/views/views_stats.js
   - jstests/core/orf.js #explain.executionStats is not CC
   - jstests/core/rename7.js
+  # getMore is not causally consistent if collection is dropped
+  - jstests/core/drop3.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
 

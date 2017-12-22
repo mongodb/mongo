@@ -1,3 +1,4 @@
+// @tags: [requires_getmore]
 
 t = db.geo_box1;
 t.drop();

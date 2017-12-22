@@ -35,15 +35,7 @@ global:
 imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/logical_session_id.idl"
-
-# TODO: SERVER-31278 import from repl/replication_types.idl instead
-types:
-    optime:
-        bson_serialization_type: object
-        description: A document representing an OpTime.
-        cpp_type: "repl::OpTime"
-        serializer: repl::OpTime::toBSON
-        deserializer: repl::OpTime::parse
+    - "mongo/db/repl/replication_types.idl"
 
 structs:
     sessionTxnRecord:

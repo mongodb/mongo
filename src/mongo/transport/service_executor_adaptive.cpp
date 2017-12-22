@@ -39,6 +39,7 @@
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
@@ -121,7 +122,16 @@ struct ServerParameterOptions : public ServiceExecutorAdaptive::Options {
     }
 
     Microseconds maxQueueLatency() const final {
-        return Microseconds{adaptiveServiceExecutorMaxQueueLatencyMicros.load()};
+        static Nanoseconds minTimerResolution = getMinimumTimerResolution();
+        Microseconds value{adaptiveServiceExecutorMaxQueueLatencyMicros.load()};
+        if (value < minTimerResolution) {
+            log() << "Target MaxQueueLatencyMicros (" << value
+                  << ") is less than minimum timer resolution of OS (" << minTimerResolution
+                  << "). Using " << minTimerResolution;
+            value = duration_cast<Microseconds>(minTimerResolution) + Microseconds{1};
+            adaptiveServiceExecutorMaxQueueLatencyMicros.store(value.count());
+        }
+        return value;
     }
 
     int idlePctThreshold() const final {
@@ -287,7 +297,9 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
         const auto timerResetGuard =
             MakeGuard([&sinceLastControlRound] { sinceLastControlRound.reset(); });
 
-        _scheduleCondition.wait_for(fakeLk, _config->stuckThreadTimeout().toSystemDuration());
+        _scheduleCondition.wait_for(fakeLk,
+                                    _config->stuckThreadTimeout().toSystemDuration(),
+                                    [this]() { return _isStarved() || !_isRunning.load(); });
 
         // If the executor has stopped, then stop the controller altogether
         if (!_isRunning.load())
@@ -482,11 +494,13 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
     // as soon as possible so that the thread controller knows not to keep starting threads while
     // the threads it's already created are finishing starting up.
     bool stillPending = true;
+    bool guardThreadsRunning = true;
 
-    const auto guard = MakeGuard([this, &stillPending, state] {
+    const auto guard = MakeGuard([this, &stillPending, &guardThreadsRunning, state] {
         if (stillPending)
             _threadsPending.subtractAndFetch(1);
-        _threadsRunning.subtractAndFetch(1);
+        if (guardThreadsRunning)
+            _threadsRunning.subtractAndFetch(1);
         _pastThreadsSpentRunning.addAndFetch(state->running.totalTime());
         _pastThreadsSpentExecuting.addAndFetch(state->executing.totalTime());
 
@@ -547,27 +561,59 @@ void ServiceExecutorAdaptive::_workerThreadRoutine(
         if (stillPending) {
             _threadsPending.subtractAndFetch(1);
             stillPending = false;
-        } else if (_threadsRunning.load() > _config->reservedThreads()) {
-            // If we spent less than our idle threshold actually running tasks then exit the thread.
-            // This time measurement doesn't include time spent running network callbacks, so the
-            // threshold is lower than you'd expect.
+            continue;
+        }
+
+        // If we spent less than our idle threshold actually running tasks then exit the thread.
+        // This is a helper lambda to perform that calculation.
+        const auto calculatePctExecuting = [&spentRunning, &state]() {
+            // This time measurement doesn't include time spent running network callbacks,
+            // so the threshold is lower than you'd expect.
             dassert(spentRunning < std::numeric_limits<double>::max());
 
-            // First get the ratio of ticks spent executing to ticks spent running. We expect this
-            // to be <= 1.0
+            // First get the ratio of ticks spent executing to ticks spent running. We
+            // expect this to be <= 1.0
             double executingToRunning = state->executingCurRun / static_cast<double>(spentRunning);
 
-            // Multiply that by 100 to get the percentage of time spent executing tasks. We expect
-            // this to be <= 100.
+            // Multiply that by 100 to get the percentage of time spent executing tasks. We
+            // expect this to be <= 100.
             executingToRunning *= 100;
             dassert(executingToRunning <= 100);
 
-            int pctExecuting = static_cast<int>(executingToRunning);
-            if (pctExecuting < _config->idlePctThreshold()) {
-                log() << "Thread was only executing tasks " << pctExecuting << "% over the last "
-                      << runTime << ". Exiting thread.";
-                break;
+            return static_cast<int>(executingToRunning);
+        };
+
+        bool terminateThread = false;
+        int pctExecuting;
+        int runningThreads;
+
+        // Make sure we don't terminate threads below the reserved threshold. As there can be
+        // several worker threads concurrently in this terminate logic atomically reduce the threads
+        // one by one to avoid racing using a lockless compare-and-swap loop where we retry if there
+        // is contention on the atomic.
+        do {
+            runningThreads = _threadsRunning.load();
+
+            if (runningThreads <= _config->reservedThreads()) {
+                terminateThread = false;
+                break;  // keep thread
             }
+
+            if (!terminateThread) {
+                pctExecuting = calculatePctExecuting();
+                terminateThread = pctExecuting <= _config->idlePctThreshold();
+            }
+        } while (terminateThread &&
+                 _threadsRunning.compareAndSwap(runningThreads, runningThreads - 1) !=
+                     runningThreads);
+        if (terminateThread) {
+            log() << "Thread was only executing tasks " << pctExecuting << "% over the last "
+                  << runTime << ". Exiting thread.";
+
+            // Because we've already modified _threadsRunning, make sure the thread guard also
+            // doesn't do it.
+            guardThreadsRunning = false;
+            break;
         }
     }
 }

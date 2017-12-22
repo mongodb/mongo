@@ -302,10 +302,9 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(Oper
     const auto& dbDesc = opTimeWithDb.value;
 
     // Load the sharded collections entries
-    std::vector<CollectionType> collections;
     repl::OpTime collLoadConfigOptime;
-    uassertStatusOK(
-        catalogClient->getCollections(opCtx, &dbNameCopy, &collections, &collLoadConfigOptime));
+    const std::vector<CollectionType> collections =
+        uassertStatusOK(catalogClient->getCollections(opCtx, &dbNameCopy, &collLoadConfigOptime));
 
     StringMap<CollectionRoutingInfoEntry> collectionEntries;
     for (const auto& coll : collections) {

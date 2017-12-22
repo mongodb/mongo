@@ -242,7 +242,7 @@ void DBClientCursor::requestMore() {
 /** with QueryOption_Exhaust, the server just blasts data at us (marked at end with cursorid==0). */
 void DBClientCursor::exhaustReceiveMore() {
     verify(cursorId && batch.pos == batch.objs.size());
-    uassert(50657, "Cannot have limit for exhaust query", !haveLimit);
+    uassert(40675, "Cannot have limit for exhaust query", !haveLimit);
     Message response;
     verify(_client);
     if (!_client->recv(response, _lastRequestId)) {

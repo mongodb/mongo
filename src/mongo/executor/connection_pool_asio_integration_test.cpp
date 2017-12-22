@@ -178,7 +178,7 @@ TEST(ConnectionPoolASIO, ConnSetupTimeout) {
                      [&](RemoteCommandResponse resp) { deferred.emplace(std::move(resp)); })
         .transitional_ignore();
 
-    ASSERT_EQ(deferred.get().status.code(), ErrorCodes::ExceededTimeLimit);
+    ASSERT_EQ(deferred.get().status.code(), ErrorCodes::NetworkInterfaceExceededTimeLimit);
 }
 
 /**

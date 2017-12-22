@@ -706,7 +706,7 @@ BenchRunWorker::BenchRunWorker(size_t id,
 BenchRunWorker::~BenchRunWorker() = default;
 
 void BenchRunWorker::start() {
-    stdx::thread(stdx::bind(&BenchRunWorker::run, this)).detach();
+    stdx::thread([this] { run(); }).detach();
 }
 
 bool BenchRunWorker::shouldStop() const {

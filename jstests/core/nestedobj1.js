@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 /**
  * Inserts documents with an indexed nested document field, progressively increasing the nesting
  * depth until the key is too large to index. This tests that we support at least the minimum

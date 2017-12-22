@@ -44,6 +44,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
@@ -57,6 +58,7 @@
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -78,7 +80,6 @@
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
-#include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/log_process_details.h"
@@ -89,6 +90,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repair_database.h"
@@ -689,7 +691,10 @@ ExitCode _initAndListen(int listenPort) {
     auto serviceContext = checked_cast<ServiceContextMongoD*>(getGlobalServiceContext());
 
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
-    serviceContext->setOpObserver(stdx::make_unique<OpObserverImpl>());
+    auto opObserverRegistry = stdx::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(stdx::make_unique<OpObserverImpl>());
+    opObserverRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
+    serviceContext->setOpObserver(std::move(opObserverRegistry));
 
     DBDirectClientFactory::get(serviceContext).registerImplementation([](OperationContext* opCtx) {
         return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
@@ -875,24 +880,13 @@ ExitCode _initAndListen(int listenPort) {
             exitCleanly(EXIT_NEED_UPGRADE);
         }
 
-        if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
-            log() << "Auth schema version is incompatible: "
-                  << "User and role management commands require auth data to have "
-                  << "at least schema version " << AuthorizationManager::schemaVersion26Final
-                  << " but found " << foundSchemaVersion << ". In order to upgrade "
-                  << "the auth schema, first downgrade MongoDB binaries to version "
-                  << "2.6 and then run the authSchemaUpgrade command.";
-            exitCleanly(EXIT_NEED_UPGRADE);
-        }
-
         if (foundSchemaVersion <= AuthorizationManager::schemaVersion26Final) {
-            log() << startupWarningsLog;
-            log() << "** WARNING: This server is using MONGODB-CR, a deprecated authentication "
-                  << "mechanism." << startupWarningsLog;
-            log() << "**          Support will be dropped in a future release."
-                  << startupWarningsLog;
-            log() << "**          See http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1"
-                  << startupWarningsLog;
+            log() << "This server is using MONGODB-CR, an authentication mechanism which "
+                  << "has been removed from MongoDB 3.8. In order to upgrade the auth schema, "
+                  << "first downgrade MongoDB binaries to version 3.6 and then run the "
+                  << "authSchemaUpgrade command. "
+                  << "See http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1";
+            exitCleanly(EXIT_NEED_UPGRADE);
         }
     } else if (globalAuthzManager->isAuthEnabled()) {
         error() << "Auth must be disabled when starting without auth schema validation";
@@ -946,7 +940,7 @@ ExitCode _initAndListen(int listenPort) {
                 makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
         } else if (replSettings.usingReplSets()) {  // standalone replica set
             auto keysCollectionClient = stdx::make_unique<KeysCollectionClientDirect>();
-            auto keyManager = std::make_shared<KeysCollectionManagerSharding>(
+            auto keyManager = std::make_shared<KeysCollectionManager>(
                 KeysCollectionManager::kKeyManagerPurposeString,
                 std::move(keysCollectionClient),
                 Seconds(KeysRotationIntervalSec));
@@ -1241,6 +1235,9 @@ void shutdownTask() {
         log(LogComponent::kNetwork) << "shutdown: going to close listening sockets...";
         tl->shutdown();
     }
+
+    // Shut down the global dbclient pool so callers stop waiting for connections.
+    globalConnPool.shutdown();
 
     if (serviceContext->getGlobalStorageEngine()) {
         ServiceContext::UniqueOperationContext uniqueOpCtx;

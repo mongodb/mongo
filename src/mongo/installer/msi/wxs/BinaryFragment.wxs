@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi" xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
 	<Fragment>
     <DirectoryRef Id="BIN">
       <Component Id="c_bsondump" Guid="DEEA45CA-5175-453B-9D0B-6168B4C0C891">
@@ -17,8 +17,38 @@
         <File Id="f_mongod" Name="mongod.exe" Source="$(var.BinarySource)\mongod.exe"
               DiskId ="1" KeyPath="yes"/>
       </Component>
+      <Component Id="c_mongodWithService" Guid="1E7C89DA-4B96-41E2-8106-DDBA64631249">
+        <File Id="f_mongodWithService" Name="mongod.exe" Source="$(var.BinarySource)\mongod.exe"
+              DiskId ="1" KeyPath="yes"/>
+        <ServiceInstall Id='MyServiceInstall'
+              Description="MongoDB Database Server"
+              Arguments='--config "[BIN]mongod.cfg" --service'
+              DisplayName='MongoDB Server'
+              Name='MongoDB'
+              ErrorControl='normal'
+              Start='auto'
+              Type='ownProcess'
+              Account='[MONGO_SERVICE_FULL_ACCOUNT_NAME]'
+              Password='[MONGO_SERVICE_ACCOUNT_PASSWORD]'
+              Vital='yes' />
+        <ServiceControl Id="StartStopService" Name="MongoDB" Start="install" Stop="both" Remove="uninstall" Wait="no" />
+      </Component>
+      <Component Id="c_mongodWithServiceUser" Guid="961B0579-4074-4437-B168-9B6C5E3C9E6A" KeyPath="yes">
+        <Condition><![CDATA[MONGO_SERVICE_INSTALL AND MONGO_SERVICE_ACCOUNT_TYPE <> "ServiceLocalNetwork"]]></Condition>
+        <util:User Id="GrantLogonAsService"
+          Name="[MONGO_SERVICE_ACCOUNT_NAME]"
+          Domain="[MONGO_SERVICE_ACCOUNT_DOMAIN_GRANT]"
+           CreateUser="no" LogonAsService="yes" UpdateIfExists="yes" FailIfExists="no" >
+          <!-- Grant membership to performance counter group so FTDC is happy -->
+          <util:GroupRef Id="PerfmonGroup" />
+        </util:User>
+      </Component>
       <Component Id="c_mongodPdb" Guid="8B41A2E2-911C-4399-8E9F-D3C1AD3B9EDD">
         <File Id="f_mongodPdb" Name="mongod.pdb" Source="$(var.BinarySource)\mongod.pdb"
+              DiskId ="1" KeyPath="yes"/>
+      </Component>
+      <Component Id="c_mongodCfg" Guid="EA715A4C-7C63-4C5C-8F73-A82E84668AEE">
+        <File Id="f_mongodCfg" Name="mongod.cfg" Source="$(var.ProjectDir)mongod.yaml"
               DiskId ="1" KeyPath="yes"/>
       </Component>
       <Component Id="c_mongodump" Guid="FFE32884-ACAD-4EC6-AF84-6BC94F55819E">
@@ -122,6 +152,20 @@
         </Component>
       </DirectoryRef>
     <?endif ?>
+    <DirectoryRef Id="MONGO_DATA_PATH" >
+      <Component Id="c_MONGO_DATA_PATH" Guid="F695F048-E262-4871-A31B-0E2361BB4BCB">
+          <CreateFolder Directory="MONGO_DATA_PATH" >
+            <util:PermissionEx User="[MONGO_SERVICE_ACCOUNT_NAME]" GenericAll="yes"/>
+          </CreateFolder>
+      </Component>
+    </DirectoryRef>
+    <DirectoryRef Id="MONGO_LOG_PATH" >
+      <Component Id="c_MONGO_LOG_PATH" Guid="D7DBC821-5BD2-4EB7-AEFB-7AC92945146D">
+        <CreateFolder Directory="MONGO_LOG_PATH" >
+            <util:PermissionEx User="[MONGO_SERVICE_ACCOUNT_NAME]" GenericAll="yes"/>
+          </CreateFolder>
+      </Component>
+    </DirectoryRef>
 
 
     <?if $(var.Edition) = Enterprise or $(var.Edition) = SSL ?>

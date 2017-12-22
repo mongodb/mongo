@@ -32,13 +32,12 @@
 
 #include "mongo/transport/transport_layer_asio.h"
 
-#include "boost/algorithm/string.hpp"
-
-#include "asio.hpp"
+#include <asio.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "mongo/config.h"
 #ifdef MONGO_CONFIG_SSL
-#include "asio/ssl.hpp"
+#include <asio/ssl.hpp>
 #endif
 
 #include "mongo/base/checked_cast.h"
@@ -145,6 +144,9 @@ Status TransportLayerASIO::setup() {
         listenAddrs.emplace_back(makeUnixSockPath(_listenerOptions.port));
     }
 #endif
+
+    _listenerPort = _listenerOptions.port;
+
     for (auto& ip : listenAddrs) {
         std::error_code ec;
         if (ip.empty()) {
@@ -199,7 +201,21 @@ Status TransportLayerASIO::setup() {
                 }
             }
 #endif
-            _acceptors.emplace_back(std::move(acceptor));
+            if (_listenerOptions.port == 0 &&
+                (addr.getType() == AF_INET || addr.getType() == AF_INET6)) {
+                if (_listenerPort != _listenerOptions.port) {
+                    return Status(ErrorCodes::BadValue,
+                                  "Port 0 (ephemeral port) is not allowed when"
+                                  " listening on multiple IP interfaces");
+                }
+                std::error_code ec;
+                auto endpoint = acceptor.local_endpoint(ec);
+                if (ec) {
+                    return errorCodeToStatus(ec);
+                }
+                _listenerPort = endpointToHostAndPort(endpoint).port();
+            }
+            _acceptors.emplace_back(std::move(addr), std::move(acceptor));
         }
     }
 
@@ -209,9 +225,8 @@ Status TransportLayerASIO::setup() {
 
 #ifdef MONGO_CONFIG_SSL
     const auto& sslParams = getSSLGlobalParams();
-    _sslMode = static_cast<SSLParams::SSLModes>(sslParams.sslMode.load());
 
-    if (_sslMode != SSLParams::SSLMode_disabled) {
+    if (_sslMode() != SSLParams::SSLMode_disabled) {
         _sslContext = stdx::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
         const auto sslManager = getSSLManager();
@@ -244,17 +259,17 @@ Status TransportLayerASIO::start() {
     });
 
     for (auto& acceptor : _acceptors) {
-        acceptor.listen(serverGlobalParams.listenBacklog);
-        _acceptConnection(acceptor);
+        acceptor.second.listen(serverGlobalParams.listenBacklog);
+        _acceptConnection(acceptor.second);
     }
 
     const char* ssl = "";
 #ifdef MONGO_CONFIG_SSL
-    if (_sslMode != SSLParams::SSLMode_disabled) {
+    if (_sslMode() != SSLParams::SSLMode_disabled) {
         ssl = " ssl";
     }
 #endif
-    log() << "waiting for connections on port " << _listenerOptions.port << ssl;
+    log() << "waiting for connections on port " << _listenerPort << ssl;
 
     return Status::OK();
 }
@@ -266,7 +281,16 @@ void TransportLayerASIO::shutdown() {
     // Loop through the acceptors and cancel their calls to async_accept. This will prevent new
     // connections from being opened.
     for (auto& acceptor : _acceptors) {
-        acceptor.cancel();
+        acceptor.second.cancel();
+        auto& addr = acceptor.first;
+        if (addr.getType() == AF_UNIX && !addr.isAnonymousUNIXSocket()) {
+            auto path = addr.getAddr();
+            log() << "removing socket file: " << path;
+            if (::unlink(path.c_str()) != 0) {
+                const auto ewd = errnoWithDescription();
+                warning() << "Unable to remove UNIX socket " << path << ": " << ewd;
+            }
+        }
     }
 
     // If the listener thread is joinable (that is, we created/started a listener thread), then
@@ -305,6 +329,12 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
 
     acceptor.async_accept(*_workerIOContext, std::move(acceptCb));
 }
+
+#ifdef MONGO_CONFIG_SSL
+SSLParams::SSLModes TransportLayerASIO::_sslMode() const {
+    return static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load());
+}
+#endif
 
 }  // namespace transport
 }  // namespace mongo

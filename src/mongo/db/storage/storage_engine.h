@@ -329,6 +329,12 @@ public:
     virtual void setInitialDataTimestamp(Timestamp timestamp) {}
 
     /**
+     * Sets the oldest timestamp for which the storage engine must maintain snapshot history
+     * through. Additionally, all future writes must be newer or equal to this value.
+     */
+    virtual void setOldestTimestamp(Timestamp timestampa) {}
+
+    /**
      *  Notifies the storage engine that a replication batch has completed.
      *  This means that all the writes associated with the oplog entries in the batch are
      *  finished and no new writes with timestamps associated with those oplog entries will show

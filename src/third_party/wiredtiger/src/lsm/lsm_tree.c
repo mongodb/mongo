@@ -28,6 +28,8 @@ __lsm_tree_discard_state(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	__wt_free(session, lsm_tree->key_format);
 	__wt_free(session, lsm_tree->value_format);
 	__wt_free(session, lsm_tree->collator_name);
+	__wt_free(session, lsm_tree->custom_prefix);
+	__wt_free(session, lsm_tree->custom_suffix);
 	__wt_free(session, lsm_tree->bloom_config);
 	__wt_free(session, lsm_tree->file_config);
 
@@ -208,14 +210,22 @@ err:	__wt_scr_free(session, &tmp);
  */
 int
 __wt_lsm_tree_chunk_name(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, uint32_t id, const char **retp)
+    WT_LSM_TREE *lsm_tree, uint32_t id, uint32_t generation, const char **retp)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
-	WT_ERR(__wt_buf_fmt(
-	    session, tmp, "file:%s-%06" PRIu32 ".lsm", lsm_tree->filename, id));
+
+	if (lsm_tree->custom_generation != 0 &&
+	    generation >= lsm_tree->custom_generation)
+		WT_ERR(__wt_buf_fmt(session, tmp, "%s:%s-%06" PRIu32 "%s",
+		    lsm_tree->custom_prefix, lsm_tree->filename, id,
+		    lsm_tree->custom_suffix));
+	else
+		WT_ERR(__wt_buf_fmt(session, tmp, "file:%s-%06" PRIu32 ".lsm",
+		    lsm_tree->filename, id));
+
 	WT_ERR(__wt_strndup(session, tmp->data, tmp->size, retp));
 
 err:	__wt_scr_free(session, &tmp);
@@ -229,16 +239,32 @@ err:	__wt_scr_free(session, &tmp);
  */
 int
 __wt_lsm_tree_set_chunk_size(
-    WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk)
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
+	WT_DATA_SOURCE *dsrc;
 	wt_off_t size;
 	const char *filename;
 
-	filename = chunk->uri;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		WT_RET_MSG(session, EINVAL,
-		    "Expected a 'file:' URI: %s", chunk->uri);
-	WT_RET(__wt_fs_size(session, filename, &size));
+	size = 0;
+	if (lsm_tree->custom_generation != 0 &&
+	    chunk->generation >= lsm_tree->custom_generation) {
+		dsrc = __wt_schema_get_source(session, chunk->uri);
+		/*
+		 * We can only retrieve a size if the data source exposes the
+		 * information.
+		 */
+		if (dsrc != NULL && dsrc->size != NULL) {
+			/* Call the callback. */
+			WT_RET(dsrc->size(
+			    dsrc, (WT_SESSION*)session, chunk->uri, &size));
+		}
+	} else {
+		filename = chunk->uri;
+		if (!WT_PREFIX_SKIP(filename, "file:"))
+			WT_RET_MSG(session, EINVAL,
+			    "Expected a 'file:' URI: %s", chunk->uri);
+		WT_RET(__wt_fs_size(session, filename, &size));
+	}
 
 	chunk->size = (uint64_t)size;
 
@@ -257,10 +283,13 @@ __lsm_tree_cleanup_old(WT_SESSION_IMPL *session, const char *uri)
 	WT_DECL_RET;
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, WT_SESSION_drop), "force", NULL };
-	bool exists;
+	bool exists, is_file;
 
-	WT_RET(__wt_fs_exist(session, uri + strlen("file:"), &exists));
-	if (exists)
+	exists = false;
+	is_file = WT_PREFIX_MATCH(uri, "file:");
+	if (is_file)
+		WT_RET(__wt_fs_exist(session, uri + strlen("file:"), &exists));
+	if (!is_file || exists)
 		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_schema_drop(session, uri, cfg));
 	return (ret);
@@ -280,7 +309,7 @@ __wt_lsm_tree_setup_chunk(
 	WT_RET(__wt_spin_init(session,
 	    &chunk->timestamp_spinlock, "LSM chunk timestamp"));
 	WT_RET(__wt_lsm_tree_chunk_name(
-	    session, lsm_tree, chunk->id, &chunk->uri));
+	    session, lsm_tree, chunk->id, chunk->generation, &chunk->uri));
 
 	/*
 	 * If the underlying file exists, drop the chunk first - there may be
@@ -959,8 +988,8 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 		old = chunk->uri;
 		chunk->uri = NULL;
 
-		WT_ERR(__wt_lsm_tree_chunk_name(
-		    session, lsm_tree, chunk->id, &chunk->uri));
+		WT_ERR(__wt_lsm_tree_chunk_name(session, lsm_tree,
+		    chunk->id, chunk->generation, &chunk->uri));
 		WT_ERR(__wt_schema_rename(session, old, chunk->uri, cfg));
 		__wt_free(session, old);
 

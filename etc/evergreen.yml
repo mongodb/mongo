@@ -153,6 +153,7 @@ variables:
 # TODO: Remove psutil from virtualenv_requirements when BUILD-3083 is done
 - &powercycle_ec2_instance
   aws_ec2_yml: aws_ec2.yml
+  ec2_monitor_files: proc.json system.json
   monitor_proc_file: proc.json
   monitor_system_file: system.json
   remote_dir: powercycle
@@ -181,11 +182,11 @@ variables:
        value: ${remote_dir}/mongod.log
 
 - &powercycle_test
-  ec2_artifacts: ${monitor_proc_file} ${monitor_system_file} ${log_path} ${backup_path_after} ${backup_path_before}
+  ec2_artifacts: ${log_path} ${backup_path_after} ${backup_path_before}
   program_options: --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
   connection_options: --sshUserHost=${ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
   test_options: --testLoops=15 --seedDocNum=10000 --rsync --validate=local --canary=local
-  crash_options: --crashMethod=internal --crashOption=${windows_crash_cmd} --crashWaitTime=45 --jitterForCrashWaitTime=5
+  crash_options: --crashMethod=internal --crashOption=${windows_crash_cmd} --crashWaitTime=45 --jitterForCrashWaitTime=5 --instanceId=${instance_id}
   client_options: --numCrudClients=20 --numFsmClients=20
   mongodb_options: --rootDir=${remote_dir}-${task_id} --mongodbBinDir=${remote_dir}
   mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path}
@@ -491,118 +492,136 @@ functions:
           virtualenv --python $python_loc --system-site-packages ./venv
 
   "run tests" :
-    command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
 
-        if [ ${disable_unit_tests|false} = "false" ]; then
+          if [ ${disable_unit_tests|false} = "false" ]; then
 
-        # activate the virtualenv if it has been set up
-        ${activate_virtualenv}
+          # activate the virtualenv if it has been set up
+          ${activate_virtualenv}
 
-        if [ -f /proc/self/coredump_filter ]; then
-          # Set the shell process (and its children processes) to dump ELF headers (bit 4),
-          # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
-          echo 0x13 > /proc/self/coredump_filter
+          if [ -f /proc/self/coredump_filter ]; then
+            # Set the shell process (and its children processes) to dump ELF headers (bit 4),
+            # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
+            echo 0x13 > /proc/self/coredump_filter
 
-          if [ -f /sbin/sysctl ]; then
-            # Check that the core pattern is set explicitly on our distro image instead
-            # of being the OS's default value. This ensures that coredump names are consistent
-            # across distros and can be picked up by Evergreen.
-            core_pattern=$(/sbin/sysctl -n "kernel.core_pattern")
-            if [ "$core_pattern" = "dump_%e.%p.core" ]; then
-              echo "Enabling coredumps"
-              ulimit -c unlimited
+            if [ -f /sbin/sysctl ]; then
+              # Check that the core pattern is set explicitly on our distro image instead
+              # of being the OS's default value. This ensures that coredump names are consistent
+              # across distros and can be picked up by Evergreen.
+              core_pattern=$(/sbin/sysctl -n "kernel.core_pattern")
+              if [ "$core_pattern" = "dump_%e.%p.core" ]; then
+                echo "Enabling coredumps"
+                ulimit -c unlimited
+              fi
             fi
           fi
-        fi
 
-        extra_args=""
-        if [ ${run_multiple_jobs|false} = true ]; then
-          processor_architecture=$(uname -m)
-          num_jobs_available=${num_jobs_available|1}
-          # Reduce the number of available jobs by half when running any sharding*, replica_sets*
-          # and select jsCore passthrough tasks on Windows and ARM to avoid overwhelming test hosts.
-          if [ "Windows_NT" = "$OS" ] || [ "aarch64" = $processor_architecture ]; then
-            case "${task_name}" in
-            replica_sets_initsync_jscore_passthrough          \
-            |replica_sets_initsync_static_jscore_passthrough  \
-            |replica_sets_resync_static_jscore_passthrough    \
-            |replica_sets*                           \
-            |sharding*                              \
-            )
-              num_jobs_available=$((${num_jobs_available|2} / 2))
-              echo "Reducing jobs from ${num_jobs_available|1} to $num_jobs_available"
-              ;;
-            esac
+          extra_args=""
+          if [ ${run_multiple_jobs|false} = true ]; then
+            processor_architecture=$(uname -m)
+            num_jobs_available=${num_jobs_available|1}
+            # Reduce the number of available jobs by half when running any sharding*, replica_sets*
+            # and select jsCore passthrough tasks on Windows and ARM to avoid overwhelming test hosts.
+            if [ "Windows_NT" = "$OS" ] || [ "aarch64" = $processor_architecture ]; then
+              case "${task_name}" in
+              replica_sets_initsync_jscore_passthrough          \
+              |replica_sets_initsync_static_jscore_passthrough  \
+              |replica_sets_resync_static_jscore_passthrough    \
+              |replica_sets*                           \
+              |sharding*                              \
+              )
+                num_jobs_available=$((${num_jobs_available|2} / 2))
+                echo "Reducing jobs from ${num_jobs_available|1} to $num_jobs_available"
+                ;;
+              esac
+            fi
+
+            if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt $num_jobs_available ]; then
+              extra_args="$extra_args --jobs=${max_jobs}"
+            else
+              extra_args="$extra_args --jobs=$num_jobs_available"
+            fi
           fi
 
-          if [ ${max_jobs|0} -gt 0 ] && [ ${max_jobs|0} -lt $num_jobs_available ]; then
-            extra_args="$extra_args --jobs=${max_jobs}"
+          if [ ${should_shuffle|true} = true ]; then
+            extra_args="$extra_args --shuffle"
+          fi
+
+          if [ ${continue_on_failure|true} = true ]; then
+            extra_args="$extra_args --continueOnFailure"
+          fi
+
+          # Default storageEngineCacheSizeGB to 1. Override on individual test config if needed.
+          # resmoke will assign to the appropriate parameter on storage engines that support it.
+          set +o errexit
+          echo "${resmoke_args}" | grep -q storageEngineCacheSizeGB
+          if [ $? -eq 1 ]; then
+            extra_args="$extra_args --storageEngineCacheSizeGB=1"
+          fi
+          set -o errexit
+
+          path_value="$PATH"
+          if [ ${variant_path_suffix} ]; then
+            path_value="$path_value:${variant_path_suffix}"
+          fi
+          if [ ${task_path_suffix} ]; then
+            path_value="$path_value:${task_path_suffix}"
+          fi
+
+          if [ "${is_patch|}" = "true" ]; then
+            extra_args="$extra_args --tagFile=etc/test_lifecycle.yml --patchBuild"
           else
-            extra_args="$extra_args --jobs=$num_jobs_available"
+            extra_args="$extra_args --tagFile=etc/test_retrial.yml"
           fi
-        fi
 
-        if [ ${should_shuffle|true} = true ]; then
-          extra_args="$extra_args --shuffle"
-        fi
+          # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
+          # invocation. It doesn't set any environment variables and should therefore come last in
+          # this list of expansions.
+          set +o errexit
+          PATH="$path_value"                              \
+              ${gcov_environment}                         \
+              ${rlp_environment}                          \
+              ${lang_environment}                         \
+              ${san_options}                              \
+              ${san_symbolizer}                           \
+              ${snmp_config_path}                         \
+              ${resmoke_wrapper}                          \
+              $python buildscripts/evergreen_run_tests.py \
+                  ${resmoke_args}                         \
+                  $extra_args                             \
+                  ${test_flags}                           \
+                  --log=buildlogger                       \
+                  --staggerJobs=on                        \
+                  --taskId=${task_id}                     \
+                  --taskName=${task_name}                 \
+                  --variantName=${build_variant}          \
+                  --distroId=${distro_id}                 \
+                  --reportFile=report.json
+          resmoke_exit_code=$?
+          set -o errexit
 
-        if [ ${continue_on_failure|true} = true ]; then
-          extra_args="$extra_args --continueOnFailure"
-        fi
+          # 74 is exit code for IOError on POSIX systems.
+          if [ $resmoke_exit_code = 74 ]; then
+            echo $resmoke_exit_code > run_tests_system_failure
+            exit 0
+          fi
+          exit $resmoke_exit_code
+          fi # end if ${disable_unit_tests}
 
-        # Default storageEngineCacheSizeGB to 1. Override on individual test config if needed.
-        # resmoke will assign to the appropriate parameter on storage engines that support it.
-        set +o errexit
-        echo "${resmoke_args}" | grep -q storageEngineCacheSizeGB
-        if [ $? -eq 1 ]; then
-          extra_args="$extra_args --storageEngineCacheSizeGB=1"
-        fi
-        set -o errexit
-
-        path_value="$PATH"
-        if [ ${variant_path_suffix} ]; then
-          path_value="$path_value:${variant_path_suffix}"
-        fi
-        if [ ${task_path_suffix} ]; then
-          path_value="$path_value:${task_path_suffix}"
-        fi
-
-        if [ "${is_patch|}" = "true" ]; then
-          extra_args="$extra_args --tagFile=etc/test_lifecycle.yml --patchBuild"
-        else
-          extra_args="$extra_args --tagFile=etc/test_retrial.yml"
-        fi
-
-        # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
-        # invocation. It doesn't set any environment variables and should therefore come last in
-        # this list of expansions.
-        PATH="$path_value"                              \
-            ${gcov_environment}                         \
-            ${rlp_environment}                          \
-            ${lang_environment}                         \
-            ${san_options}                              \
-            ${san_symbolizer}                           \
-            ${snmp_config_path}                         \
-            ${resmoke_wrapper}                          \
-            $python buildscripts/evergreen_run_tests.py \
-                ${resmoke_args}                         \
-                $extra_args                             \
-                ${test_flags}                           \
-                --log=buildlogger                       \
-                --staggerJobs=on                        \
-                --taskId=${task_id}                     \
-                --taskName=${task_name}                 \
-                --variantName=${build_variant}          \
-                --distroId=${distro_id}                 \
-                --reportFile=report.json
-
-        fi # end if ${disable_unit_tests}
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          if [ -f run_tests_system_failure ]; then
+            exit $(cat run_tests_system_failure)
+          fi
 
   "do jepsen setup" :
     - command: shell.exec
@@ -901,7 +920,7 @@ functions:
           fi
 
           config_file=powertest.yml
-          eval python pytests/powertest.py \
+          eval $python pytests/powertest.py \
             "--saveConfigOptions=$config_file \
             ${connection_options}  \
             ${program_options}     \
@@ -916,7 +935,12 @@ functions:
             ${mongodb_options}     \
             ${mongod_options}      \
             ${mongod_extra_options}"
-          python -u pytests/powertest.py --configFile=$config_file
+          set +o errexit
+          $python -u pytests/powertest.py --configFile=$config_file
+          test_status=$?
+          aws_ec2=$(python buildscripts/aws_ec2.py --imageId ${instance_id} --mode status)
+          echo "Test completed, AMI EC2 instance ${instance_id} status: $aws_ec2"
+          exit $test_status
 
   "do multiversion setup" :
     command: shell.exec
@@ -1104,6 +1128,46 @@ functions:
           exit 0
         fi
 
+  "copy ec2 monitor files": &copy_ec2_monitor_files
+    command: shell.exec
+    params:
+      background: true
+      system_log: true
+      working_dir: src
+      silent: false
+      script: |
+        while [ 1 ]
+        do
+          # Tar/zip monitor files on remote host.
+          if [ -z "${ec2_monitor_files}" ] || [ -z "${instance_id}" ]; then
+            exit 0
+          fi
+          # Ensure we use the latest ip_address, as it could change if the EC2 instance
+          # has been stopped and started.
+          ${activate_virtualenv}
+          # Specify '--mode start' to ensure the remote instance is running.
+          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start)
+          echo "AMI EC2 instance ${instance_id} status: $aws_ec2"
+          ip_address=$(echo $aws_ec2 | sed -e "s/[^[:print:]\t]//g; s/.*private_ip_address: //; s/ .*//")
+          cmd="${tar|tar} czf ec2_monitor_files.tgz ${ec2_monitor_files}"
+          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+          ssh_connection_options="$ssh_connection_options -o ConnectionAttempts=3"
+          $python buildscripts/remote_operations.py          \
+            --verbose                                        \
+            --userHost $USER@$ip_address                     \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --commands "$cmd"
+          $python buildscripts/remote_operations.py          \
+            --verbose                                        \
+            --userHost $USER@$ip_address                     \
+            --operation "copy_from"                          \
+            --sshConnectionOptions "$ssh_connection_options" \
+            --retries ${ssh_retries|0}                       \
+            --file ec2_monitor_files.tgz
+          sleep 30
+        done
+
   "set up EC2 instance":
     - command: shell.exec
       params:
@@ -1213,20 +1277,12 @@ functions:
         working_dir: src
         script: |
           set -o errexit
-          # Copy buildscripts, mongoDB executables and debug symbols to the remote host.
+          # Copy buildscripts and mongoDB executables to the remote host.
           file_param="--file buildscripts"
           mongo_executables="mongo mongod mongos"
-          file_extensions=".debug .dSYM .pdb"
           for executable in $mongo_executables
           do
             file_param="$file_param --file $executable${exe}"
-            for extension in $file_extensions
-            do
-              file=$executable$extension
-              if [[ -f $file || -d $file ]]; then
-                file_param="$file_param --file $file"
-              fi
-            done
           done
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
@@ -1269,39 +1325,30 @@ functions:
           set -o errexit
           ${set_sudo}
           # Setup curator to collect system & process stats on remote.
-          # TODO: Update command once curator supports displaying all processes.
-          # Note: On Windows using 'process-tree --pid 1' does not work, as it does on Linux.
           if [ "Windows_NT" = "$OS" ]; then
-            cmds="cygrunsrv --install curator_sys --path $(which curator) --args 'stat system' -1 $HOME/${monitor_system_file}"
-            cmds="$cmds; cygrunsrv --install curator_proc --path $(which curator) --args 'stat process-tree --pid 1' -1 $HOME/${monitor_proc_file}"
+             variant=windows-64
           else
-            cmds="cmd='@reboot ${sudo} $(which curator) stat system >> ${monitor_system_file}'"
-            cmds="$cmds; (crontab -l ; echo \"\$cmd\") | crontab -"
-            cmds="$cmds; cmd='@reboot ${sudo} $(which curator) stat process-tree --pid 1 >> ${monitor_proc_file}'"
-            cmds="$cmds; (crontab -l ; echo "\$cmd") | crontab -"
+             variant=ubuntu1604
           fi
-          ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
-          ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
-            --verbose                                        \
-            --userHost $USER@${ip_address}                   \
-            --sshConnectionOptions "$ssh_connection_options" \
-            --retries ${ssh_retries|0}                       \
-            --commands "$cmds"
-
-    - command: shell.exec
-      params:
-        shell: bash
-        working_dir: src
-        script: |
-          set -o errexit
-          ${set_sudo}
-          # Start curator to collect system & process stats on remote.
+          # Download latest version of curator
+          latest_curator_hash=$(git ls-remote https://github.com/mongodb/curator.git | grep HEAD | cut -f1)
+          curator_url="https://s3.amazonaws.com/boxes.10gen.com/build/curator/curator-dist-$variant-$latest_curator_hash.tar.gz"
+          cmds="curl -s $curator_url | tar -xzv"
           if [ "Windows_NT" = "$OS" ]; then
-            cmds="cygrunsrv --start curator_sys"
+            # Since curator runs as SYSTEM user, ensure the output files can be accessed.
+            cmds="$cmds; touch ${monitor_system_file}; chmod 777 ${monitor_system_file}"
+            cmds="$cmds; cygrunsrv --install curator_sys --path curator --chdir \$HOME --args 'stat system --file ${monitor_system_file}'"
+            cmds="$cmds; touch ${monitor_proc_file}; chmod 777 ${monitor_proc_file}"
+            cmds="$cmds; cygrunsrv --install curator_proc --path curator --chdir \$HOME --args 'stat process-all --file ${monitor_proc_file}'"
+            cmds="$cmds; cygrunsrv --start curator_sys"
             cmds="$cmds; cygrunsrv --start curator_proc"
           else
-            cmds="{ ${sudo} $(which curator) stat system > ${monitor_system_file} &"
-            cmds="$cmds ${sudo} $(which curator) stat process-tree --pid 1 > ${monitor_proc_file} & } & disown"
+            cmds="$cmds; cmd=\"@reboot cd \$HOME && ${sudo} ./curator stat system >> ${monitor_system_file}\""
+            cmds="$cmds; (crontab -l ; echo \"\$cmd\") | crontab -"
+            cmds="$cmds; cmd=\"@reboot cd \$HOME && ${sudo} ./curator stat process-all >> ${monitor_proc_file}\""
+            cmds="$cmds; (crontab -l ; echo \"\$cmd\") | crontab -"
+            cmds="$cmds; crontab -l"
+            cmds="$cmds; { ${sudo} \$HOME/curator stat system --file ${monitor_system_file} > /dev/null 2>&1 & ${sudo} \$HOME/curator stat process-all --file ${monitor_proc_file} > /dev/null 2>&1 & } & disown"
           fi
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
@@ -1402,27 +1449,33 @@ functions:
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --commands "$cmds"
+    - *copy_ec2_monitor_files
 
-  "copy EC2 artifacts":
+
+  "set EC2 address":
     - command: shell.exec
       params:
         shell: bash
         working_dir: src
         script: |
-          if [ -z "${ec2_artifacts}" ]; then
+          if [ -z "${instance_id}" ]; then
             exit 0
           fi
           # Ensure we use the latest ip_address, as it could change if the EC2 instance
           # has been stopped and started.
           ${activate_virtualenv}
-          aws_ec2=$(python buildscripts/aws_ec2.py --imageId ${instance_id} --mode status)
-          ip_address=$(echo $aws_ec2 | sed -e "s/.*private_ip_address: //; s/ .*//")
+          # Specify '--mode start' to ensure the remote instance is running.
+          aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode start)
+          echo "AMI EC2 instance ${instance_id} status: $aws_ec2"
+          ip_address=$(echo $aws_ec2 | sed -e "s/[^[:print:]\t]//g; s/.*private_ip_address: //; s/ .*//")
           sed -i -e "s/${ip_address}/$ip_address/" ${aws_ec2_yml}
+          echo "Instance status: $aws_ec2"
 
     - command: expansions.update
       params:
         file: src/${aws_ec2_yml}
 
+  "copy EC2 artifacts":
     - command: shell.exec
       params:
         shell: bash
@@ -1469,7 +1522,7 @@ functions:
         fi
         ${activate_virtualenv}
         echo "Terminating $instance_id"
-        aws_ec2=$(python buildscripts/aws_ec2.py --imageId ${instance_id} --mode terminate)
+        aws_ec2=$($python buildscripts/aws_ec2.py --imageId ${instance_id} --mode terminate)
         echo "Terminated AMI EC2 instance: $aws_ec2"
 
 pre:
@@ -1539,6 +1592,7 @@ post:
     params:
       file_location: src/report.json
 
+  - func: "set EC2 address"
   - func: "copy EC2 artifacts"
   - func: "cleanup EC2 instance"
 
@@ -1606,6 +1660,19 @@ post:
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
       display_name: FTDC Diagnostic Data - Execution ${execution}
+      optional: true
+
+  # Archive remote EC2 monitor files.
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/ec2_monitor_files.tgz
+      remote_file: ${project}/${build_variant}/${revision}/remote_ec2/remote_ec2_monitor-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/x-gzip}
+      display_name: Remote EC2 Monitor - Execution ${execution}
       optional: true
 
   # Archive remote EC2 artifacts.
@@ -1911,6 +1978,7 @@ post:
 timeout:
   - func: "fetch debugsymbols archive"
   - func: "extract debugsymbols"
+  - func: "set EC2 address"
   - command: shell.exec
     params:
       working_dir: src
@@ -1936,7 +2004,7 @@ timeout:
         # Call hang_analyzer.py script for tasks that are running remote mongo processes
         # The file ${aws_ec2_yml} will define the remote's ${ip_address}.
         # Any task which uses remote processes will have previously loaded this file to set these
-        # expansions macros.
+        # expansion macros.
         if [ -f ${aws_ec2_yml|""} ]; then
           core_ext=core
           if [ "Windows_NT" = "$OS" ]; then
@@ -1945,6 +2013,24 @@ timeout:
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           # buildscripts must be installed in ${remote_dir} on the remote host.
           remote_dir=${remote_dir|.}
+
+          # Copy mongoDB debug symbols to the remote host.
+          debug_files=$(ls *.debug *.dSYM *.pdb 2> /dev/null)
+          for debug_file in $debug_files
+          do
+            file_param="$file_param --file $debug_file"
+          done
+          if [ ! -z "$file_param" ]; then
+            ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+              --verbose                                        \
+              --userHost $USER@${ip_address}                   \
+              --operation "copy_to"                            \
+              --sshConnectionOptions "$ssh_connection_options" \
+              --retries ${ssh_retries}                         \
+              $file_param                                      \
+              --remoteDir $remote_dir
+          fi
+
           cmds="PATH=\"/opt/mongodbtoolchain/gdb/bin:\$PATH\" $sudo ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/hang_analyzer.py $hang_analyzer_option"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
             --verbose                                        \
@@ -3933,15 +4019,6 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: replica_sets_rollback_refetch_no_uuid
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=replica_sets_rollback_refetch_no_uuid
-      run_multiple_jobs: true
-
-- <<: *task_template
   name: master_slave
   commands:
   - func: "do setup"
@@ -4221,6 +4298,17 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=retryable_writes_jscore_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
+  name: retryable_writes_jscore_stepdown_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=retryable_writes_jscore_stepdown_passthrough --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -5143,8 +5231,8 @@ buildvariants:
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_pv0
-  - name: replica_sets_rollback_refetch_no_uuid
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: master_slave_WT
   - name: master_slave_auth
   - name: master_slave_jscore_passthrough_WT
@@ -6145,6 +6233,9 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough_WT
     distros:
     - windows-64-vs2015-large
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
+    distros:
+    - windows-64-vs2015-large
   - name: session_jscore_passthrough_WT
   - name: sharding_WT
     distros:
@@ -6640,6 +6731,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: rollback_fuzzer_WT
   - name: serial_run_WT
   - name: session_jscore_passthrough_WT
@@ -6918,9 +7010,6 @@ buildvariants:
   - name: replica_sets_pv0
     distros:
     - rhel62-large
-  - name: replica_sets_rollback_refetch_no_uuid
-    distros:
-    - rhel62-large
   - name: replica_sets_jscore_passthrough_WT
     distros:
     - rhel62-large
@@ -6937,6 +7026,9 @@ buildvariants:
     distros:
     - rhel62-large
   - name: retryable_writes_jscore_passthrough_WT
+    distros:
+    - rhel62-large
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
     distros:
     - rhel62-large
   - name: rlp_WT
@@ -7074,6 +7166,7 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough_WT
@@ -8795,6 +8888,7 @@ buildvariants:
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: rlp
   - name: rollback_fuzzer_WT
   - name: sasl
@@ -9189,6 +9283,7 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough_WT
@@ -9341,6 +9436,7 @@ buildvariants:
   - name: replica_sets_resync_static_jscore_passthrough_WT
   - name: replica_sets_kill_secondaries_jscore_passthrough_WT
   - name: retryable_writes_jscore_passthrough_WT
+  - name: retryable_writes_jscore_stepdown_passthrough_WT
   - name: sasl
   - name: session_jscore_passthrough_WT
   - name: sharded_collections_jscore_passthrough_WT

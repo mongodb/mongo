@@ -141,10 +141,10 @@ public:
 
         if (!cm->getShardKeyPattern().isShardKey(minKey) ||
             !cm->getShardKeyPattern().isShardKey(maxKey)) {
-            errmsg = stream() << "shard key bounds "
-                              << "[" << minKey << "," << maxKey << ")"
-                              << " are not valid for shard key pattern "
-                              << cm->getShardKeyPattern().toBSON();
+            errmsg = str::stream() << "shard key bounds "
+                                   << "[" << minKey << "," << maxKey << ")"
+                                   << " are not valid for shard key pattern "
+                                   << cm->getShardKeyPattern().toBSON();
             return false;
         }
 

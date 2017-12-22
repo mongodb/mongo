@@ -1,4 +1,4 @@
-
+// @tags: [requires_non_retryable_commands]
 
 a = db.rename2a;
 b = db.rename2b;

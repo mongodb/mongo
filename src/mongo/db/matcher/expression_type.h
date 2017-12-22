@@ -36,8 +36,13 @@ namespace mongo {
 template <class T>
 class TypeMatchExpressionBase : public LeafMatchExpression {
 public:
-    explicit TypeMatchExpressionBase(MatchType matchType, StringData path, MatcherTypeSet typeSet)
-        : LeafMatchExpression(matchType, path), _typeSet(std::move(typeSet)) {}
+    explicit TypeMatchExpressionBase(MatchType matchType,
+                                     StringData path,
+                                     ElementPath::LeafArrayBehavior leafArrBehavior,
+                                     MatcherTypeSet typeSet)
+        : LeafMatchExpression(
+              matchType, path, leafArrBehavior, ElementPath::NonLeafArrayBehavior::kTraverse),
+          _typeSet(std::move(typeSet)) {}
 
     virtual ~TypeMatchExpressionBase() = default;
 
@@ -113,7 +118,10 @@ public:
     static constexpr StringData kName = "$type"_sd;
 
     TypeMatchExpression(StringData path, MatcherTypeSet typeSet)
-        : TypeMatchExpressionBase(MatchExpression::TYPE_OPERATOR, path, typeSet) {}
+        : TypeMatchExpressionBase(MatchExpression::TYPE_OPERATOR,
+                                  path,
+                                  ElementPath::LeafArrayBehavior::kTraverse,
+                                  typeSet) {}
 
     StringData name() const final {
         return kName;
@@ -131,9 +139,10 @@ public:
     static constexpr StringData kName = "$_internalSchemaType"_sd;
 
     InternalSchemaTypeExpression(StringData path, MatcherTypeSet typeSet)
-        : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_TYPE, path, typeSet) {
-        setTraverseLeafArray();
-    }
+        : TypeMatchExpressionBase(MatchExpression::INTERNAL_SCHEMA_TYPE,
+                                  path,
+                                  ElementPath::LeafArrayBehavior::kNoTraversal,
+                                  typeSet) {}
 
     StringData name() const final {
         return kName;
@@ -141,10 +150,6 @@ public:
 
     MatchCategory getCategory() const final {
         return MatchCategory::kOther;
-    }
-
-    bool shouldExpandLeafArray() const final {
-        return false;
     }
 };
 

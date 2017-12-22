@@ -292,9 +292,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	const char **cfg, *enc_cfg[] = { NULL, NULL };
 	bool fixed;
 
-	WT_UNUSED(maj_version);				/* !HAVE_VERBOSE */
-	WT_UNUSED(min_version);				/* !HAVE_VERBOSE */
-
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
 	conn = S2C(session);

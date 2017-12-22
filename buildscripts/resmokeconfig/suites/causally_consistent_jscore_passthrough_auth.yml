@@ -36,6 +36,7 @@ selector:
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
   - jstests/core/diagdata.js # Command not supported in mongos
+  - jstests/core/do_txn*.js  # doTxn
   - jstests/core/dropdb_race.js  # syncdelay.
   - jstests/core/evalb.js  # db.eval() and profiling.
   - jstests/core/fsync.js  # uses fsync.
@@ -153,6 +154,8 @@ selector:
   - jstests/core/views/views_stats.js
   - jstests/core/orf.js #explain.executionStats is not CC
   - jstests/core/rename7.js
+  # getMore is not causally consistent if collection is dropped
+  - jstests/core/drop3.js
   # Logical sessions require that only one user be authenticated,
   # but this suite puts us in a multi-auth state.
   - jstests/core/list_local_sessions.js # Too many users authenticated

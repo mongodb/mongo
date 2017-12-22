@@ -113,12 +113,12 @@ public:
 
     Status putSingleton(OperationContext* opCtx,
                         const NamespaceString& nss,
-                        const BSONObj& update) override;
+                        const TimestampedBSONObj& update) override;
 
     Status updateSingleton(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& query,
-                           const BSONObj& update) override;
+                           const TimestampedBSONObj& update) override;
 
     StatusWith<BSONObj> findById(OperationContext* opCtx,
                                  const NamespaceString& nss,

@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Unsorted plan on {a:1}, sorted plan on {b:1}.  The unsorted plan exhausts its memory limit before
 // the sorted plan is chosen by the query optimizer.
 

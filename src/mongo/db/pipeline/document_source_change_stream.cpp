@@ -33,7 +33,6 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
@@ -282,15 +281,6 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(
-        ErrorCodes::InvalidOptions,
-        str::stream()
-            << "The featureCompatibilityVersion must be 3.6 to use the $changeStream stage. See "
-            << feature_compatibility_version::kDochubLink
-            << ".",
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-
     // A change stream is a tailable + awaitData cursor.
     expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
 
@@ -329,7 +319,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
         }
     }
     if (auto resumeAfterClusterTime = spec.getResumeAfterClusterTime()) {
-        uassert(50656,
+        uassert(40674,
                 str::stream() << "Do not specify both "
                               << DocumentSourceChangeStreamSpec::kResumeAfterFieldName
                               << " and "
@@ -443,7 +433,7 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         // the documentKey fields to include the shard key. We only need to re-check the documentKey
         // while the collection is unsharded; if the collection is or becomes sharded, then the
         // documentKey is final and will not change.
-        if (_mongoProcess && !_documentKeyFieldsSharded) {
+        if (!_documentKeyFieldsSharded) {
             // If this is not a shard server, 'catalogCache' will be nullptr and we will skip the
             // routing table check.
             auto catalogCache = Grid::get(_expCtx->opCtx)->catalogCache();
@@ -453,7 +443,8 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
                 return routingInfo.isOK() && routingInfo.getValue().cm();
             }();
             if (_documentKeyFields.empty() || collectionIsSharded) {
-                _documentKeyFields = _mongoProcess->collectDocumentKeyFields(uuid.getUuid());
+                _documentKeyFields = _expCtx->mongoProcessInterface->collectDocumentKeyFields(
+                    _expCtx->opCtx, _expCtx->ns, uuid.getUuid());
                 _documentKeyFieldsSharded = collectionIsSharded;
             }
         }

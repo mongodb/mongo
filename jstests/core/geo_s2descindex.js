@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 //
 // Tests 2dsphere with descending fields, ensures correct lookup
 //

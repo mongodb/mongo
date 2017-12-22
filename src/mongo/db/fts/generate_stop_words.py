@@ -1,12 +1,6 @@
 import sys
 
 def generate( header, source, language_files ):
-    print( "header: %s" % header )
-    print( "source: %s" % source )
-    print( "language_files:" )
-    for x in language_files:
-        print( "\t%s" % x )
-
     out = open( header, "wb" )
     out.write( """
 #pragma once

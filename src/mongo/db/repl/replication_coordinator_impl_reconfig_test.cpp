@@ -309,8 +309,7 @@ TEST_F(ReplCoordTest,
 
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
-    stdx::thread reconfigThread(
-        stdx::bind(doReplSetReconfig, getReplCoord(), &status, opCtx.get()));
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
 
     NetworkInterfaceMock* net = getNet();
     getNet()->enterNetwork();
@@ -353,8 +352,7 @@ TEST_F(ReplCoordTest, NodeReturnsOutOfDiskSpaceWhenSavingANewConfigFailsDuringRe
     getExternalState()->setStoreLocalConfigDocumentStatus(
         Status(ErrorCodes::OutOfDiskSpace, "The test set this"));
     const auto opCtx = makeOperationContext();
-    stdx::thread reconfigThread(
-        stdx::bind(doReplSetReconfig, getReplCoord(), &status, opCtx.get()));
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
 
     replyToReceivedHeartbeatV1();
     reconfigThread.join();
@@ -382,8 +380,7 @@ TEST_F(ReplCoordTest,
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
     // first reconfig
-    stdx::thread reconfigThread(
-        stdx::bind(doReplSetReconfig, getReplCoord(), &status, opCtx.get()));
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
     getNet()->enterNetwork();
     getNet()->blackHole(getNet()->getNextReadyRequest());
     getNet()->exitNetwork();
@@ -420,7 +417,7 @@ TEST_F(ReplCoordTest, NodeReturnsConfigurationInProgressWhenReceivingAReconfigWh
     // initiate
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
-    stdx::thread initateThread(stdx::bind(doReplSetInitiate, getReplCoord(), &status, opCtx.get()));
+    stdx::thread initateThread([&] { doReplSetInitiate(getReplCoord(), &status, opCtx.get()); });
     getNet()->enterNetwork();
     getNet()->blackHole(getNet()->getNextReadyRequest());
     getNet()->exitNetwork();
@@ -467,8 +464,7 @@ TEST_F(ReplCoordTest, PrimaryNodeAcceptsNewConfigWhenReceivingAReconfigWithAComp
 
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
-    stdx::thread reconfigThread(
-        stdx::bind(doReplSetReconfig, getReplCoord(), &status, opCtx.get()));
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
 
     NetworkInterfaceMock* net = getNet();
     getNet()->enterNetwork();
@@ -579,8 +575,7 @@ TEST_F(ReplCoordTest, NodeDoesNotAcceptHeartbeatReconfigWhileInTheMidstOfReconfi
     // start reconfigThread
     Status status(ErrorCodes::InternalError, "Not Set");
     const auto opCtx = makeOperationContext();
-    stdx::thread reconfigThread(
-        stdx::bind(doReplSetReconfig, getReplCoord(), &status, opCtx.get()));
+    stdx::thread reconfigThread([&] { doReplSetReconfig(getReplCoord(), &status, opCtx.get()); });
 
     // wait for reconfigThread to create network requests to ensure the replication coordinator
     // is in state kConfigReconfiguring

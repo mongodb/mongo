@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 /**
  * SERVER-7140 test. Checks that process info is re-logged on log rotation
  */

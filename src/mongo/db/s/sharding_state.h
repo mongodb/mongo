@@ -158,12 +158,6 @@ public:
     void interruptChunkSplitter();
 
     /**
-     * Iterates through all known sharded collections and marks them (in memory only) as not sharded
-     * so that no filtering will be happening for slaveOk queries.
-     */
-    void markCollectionsNotShardedAtStepdown();
-
-    /**
      * Refreshes the local metadata based on whether the expected version is higher than what we
      * have cached.
      */

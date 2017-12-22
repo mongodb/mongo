@@ -100,7 +100,7 @@ __log_slot_close(
 	WT_LOG *log;
 	int64_t end_offset, new_state, old_state;
 #ifdef	HAVE_DIAGNOSTIC
-	struct timespec begin, now;
+	uint64_t time_start, time_stop;
 	int count;
 #endif
 
@@ -133,7 +133,8 @@ retry:
 	/*
 	 * If someone completely processed this slot, we're done.
 	 */
-	if (FLD64_ISSET((uint64_t)slot->slot_state, WT_LOG_SLOT_RESERVED)) {
+	if (FLD_LOG_SLOT_ISSET(
+	    (uint64_t)slot->slot_state, WT_LOG_SLOT_RESERVED)) {
 		WT_STAT_CONN_INCR(session, log_slot_close_race);
 		return (WT_NOTFOUND);
 	}
@@ -160,7 +161,7 @@ retry:
 	 */
 #ifdef	HAVE_DIAGNOSTIC
 	count = 0;
-	__wt_epoch(session, &begin);
+	time_start = __wt_rdtsc(session);
 #endif
 	if (WT_LOG_SLOT_UNBUFFERED_ISSET(old_state)) {
 		while (slot->slot_unbuffered == 0) {
@@ -169,8 +170,9 @@ retry:
 #ifdef	HAVE_DIAGNOSTIC
 			++count;
 			if (count > WT_MILLION) {
-				__wt_epoch(session, &now);
-				if (WT_TIMEDIFF_SEC(now, begin) > 10) {
+				time_stop = __wt_rdtsc(session);
+				if (WT_TSCDIFF_SEC(
+				    session, time_stop, time_start) > 10) {
 					__wt_errx(session, "SLOT_CLOSE: Slot %"
 					PRIu32 " Timeout unbuffered, state 0x%"
 					PRIx64 " unbuffered %" PRId64,
@@ -211,7 +213,7 @@ __log_slot_new(WT_SESSION_IMPL *session)
 	WT_LOGSLOT *slot;
 	int32_t i, pool_i;
 #ifdef	HAVE_DIAGNOSTIC
-	struct timespec begin, now;
+	uint64_t time_start, time_stop;
 	int count;
 #endif
 
@@ -229,7 +231,7 @@ __log_slot_new(WT_SESSION_IMPL *session)
 
 #ifdef	HAVE_DIAGNOSTIC
 	count = 0;
-	__wt_epoch(session, &begin);
+	time_start = __wt_rdtsc(session);
 #endif
 	/*
 	 * Keep trying until we can find a free slot.
@@ -269,8 +271,9 @@ __log_slot_new(WT_SESSION_IMPL *session)
 #ifdef	HAVE_DIAGNOSTIC
 		++count;
 		if (count > WT_MILLION) {
-			__wt_epoch(session, &now);
-			if (WT_TIMEDIFF_SEC(now, begin) > 10) {
+			time_stop = __wt_rdtsc(session);
+			if (WT_TSCDIFF_SEC(
+			    session, time_stop, time_start) > 10) {
 				__wt_errx(session,
 				    "SLOT_NEW: Timeout free slot");
 				__log_slot_dump(session);
@@ -482,7 +485,7 @@ __wt_log_slot_destroy(WT_SESSION_IMPL *session)
 	 */
 	for (i = 0; i < WT_SLOT_POOL; i++) {
 		slot = &log->slot_pool[i];
-		if (!FLD64_ISSET(
+		if (!FLD_LOG_SLOT_ISSET(
 		    (uint64_t)slot->slot_state, WT_LOG_SLOT_RESERVED)) {
 			rel = WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
 			if (rel != 0)
@@ -503,17 +506,17 @@ void
 __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
     uint32_t flags, WT_MYSLOT *myslot)
 {
-	struct timespec start, stop;
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	uint64_t usecs;
+	uint64_t time_start, time_stop, usecs;
 	int64_t flag_state, new_state, old_state, released;
 	int32_t join_offset, new_join, wait_cnt;
 	bool closed, diag_yield, raced, slept, unbuffered, yielded;
 
 	conn = S2C(session);
 	log = conn->log;
+	time_start = time_stop = 0;
 
 	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_LOCKED_SLOT));
 	WT_ASSERT(session, mysize != 0);
@@ -575,7 +578,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 			++wait_cnt;
 		}
 		if (!yielded)
-			__wt_epoch(session, &start);
+			time_start = __wt_rdtsc(session);
 		yielded = true;
 		/*
 		 * The slot is no longer open or we lost the race to
@@ -596,8 +599,8 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 		WT_STAT_CONN_INCR(session, log_slot_immediate);
 	else {
 		WT_STAT_CONN_INCR(session, log_slot_yield);
-		__wt_epoch(session, &stop);
-		usecs = WT_TIMEDIFF_US(stop, start);
+		time_stop = __wt_rdtsc(session);
+		usecs = WT_TSCDIFF_US(session, time_stop, time_start);
 		WT_STAT_CONN_INCRV(session, log_slot_yield_duration, usecs);
 		if (closed)
 			WT_STAT_CONN_INCR(session, log_slot_yield_close);

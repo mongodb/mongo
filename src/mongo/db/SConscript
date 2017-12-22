@@ -116,6 +116,14 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target= 'op_observer_registry_test',
+    source= 'op_observer_registry_test.cpp',
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+env.CppUnitTest(
     target= 'op_observer_impl_test',
     source= 'op_observer_impl_test.cpp',
     LIBDEPS=[
@@ -533,13 +541,10 @@ env.Library(
         'db_raii.cpp',
     ],
     LIBDEPS=[
+        'catalog/catalog_raii',
         'curop',
+        's/sharding',
         'stats/top',
-        'views/views',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/s/sharding',
-        '$BUILD_DIR/mongo/db/catalog/database',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
     ],
 )
 
@@ -612,9 +617,9 @@ env.Library(
         "op_observer_impl.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         'repl/serveronly',
         'views/views_mongod',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
@@ -793,7 +798,7 @@ env.Library(
         "auth/authmongod",
         "authz_manager_external_state_factory_d",
         "background",
-        "catalog/catalog",
+        "catalog/catalog_impl",
         "catalog/collection_options",
         "catalog/document_validation",
         "catalog/index_key_validate",
@@ -902,8 +907,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/sha1_block',
         'keys_collection_document',
-        'keys_collection_manager',
-        'keys_collection_manager_zero',
         'logical_clock',
     ],
 )
@@ -1240,40 +1243,6 @@ env.Library(
 )
 
 env.Library(
-    target='keys_collection_manager',
-    source=[
-        'keys_collection_manager.cpp',
-    ],
-    LIBDEPS=[
-        'server_parameters',
-    ],
-)
-
-env.Library(
-    target='keys_collection_manager_direct',
-    source=[
-        'keys_collection_manager_direct.cpp',
-    ],
-    LIBDEPS=[
-        'dbdirectclient',
-        'keys_collection_manager',
-        'logical_clock',
-        'logical_time',
-    ],
-)
-
-env.Library(
-    target='keys_collection_manager_zero',
-    source=[
-        'keys_collection_manager_zero.cpp',
-    ],
-    LIBDEPS=[
-        'keys_collection_manager',
-        'logical_time',
-    ],
-)
-
-env.Library(
     target='keys_collection_client_direct',
     source=[
         'keys_collection_client_direct.cpp',
@@ -1302,16 +1271,15 @@ env.Library(
 )
 
 env.Library(
-    target='keys_collection_manager_sharding',
+    target='keys_collection_manager',
     source=[
-        'keys_collection_manager_sharding.cpp',
+        'keys_collection_manager.cpp',
         'keys_collection_cache_reader.cpp',
         'keys_collection_cache_reader_and_updater.cpp',
     ],
     LIBDEPS=[
         'logical_clock',
         'keys_collection_document',
-        'keys_collection_manager',
         'logical_time',
         'server_options',
         'keys_collection_client_sharded',
@@ -1336,7 +1304,7 @@ env.Library(
         'logical_time_validator.cpp',
     ],
     LIBDEPS=[
-        'keys_collection_manager_sharding',
+        'keys_collection_manager',
         'service_context',
         'signed_logical_time',
         'time_proof_service',
@@ -1394,7 +1362,7 @@ env.CppUnitTest(
         'logical_time_validator_test.cpp',
     ],
     LIBDEPS=[
-        'keys_collection_manager_sharding',
+        'keys_collection_manager',
         'logical_time_validator',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
         '$BUILD_DIR/mongo/s/coreshard',
@@ -1466,20 +1434,8 @@ env.CppUnitTest(
         'keys_collection_manager_sharding_test.cpp',
     ],
     LIBDEPS=[
-        'keys_collection_manager_sharding',
+        'keys_collection_manager',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
-    ],
-)
-
-env.Library(
-    target= 'op_observer_noop',
-    source= [
-        'op_observer_noop.cpp',
-    ],
-    LIBDEPS= [
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
     ],
 )
 
@@ -1489,7 +1445,6 @@ env.Library(
         'service_context_d_test_fixture.cpp',
     ],
     LIBDEPS= [
-        'op_observer_noop',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',

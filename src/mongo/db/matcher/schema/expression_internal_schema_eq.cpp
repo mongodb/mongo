@@ -39,9 +39,12 @@ namespace mongo {
 constexpr StringData InternalSchemaEqMatchExpression::kName;
 
 InternalSchemaEqMatchExpression::InternalSchemaEqMatchExpression(StringData path, BSONElement rhs)
-    : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_EQ, path), _rhsElem(rhs) {
+    : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_EQ,
+                          path,
+                          ElementPath::LeafArrayBehavior::kNoTraversal,
+                          ElementPath::NonLeafArrayBehavior::kTraverse),
+      _rhsElem(rhs) {
     invariant(_rhsElem);
-    setTraverseLeafArray();
 }
 
 bool InternalSchemaEqMatchExpression::matchesSingleElement(const BSONElement& elem,

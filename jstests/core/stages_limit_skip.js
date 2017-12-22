@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test limit and skip
 t = db.stages_limit_skip;
 t.drop();

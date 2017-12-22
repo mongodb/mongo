@@ -43,7 +43,7 @@ namespace mongo {
 ParsedUpdate::ParsedUpdate(OperationContext* opCtx, const UpdateRequest* request)
     : _opCtx(opCtx),
       _request(request),
-      _driver(UpdateDriver::Options(new ExpressionContext(opCtx, nullptr))),
+      _driver(new ExpressionContext(opCtx, nullptr)),
       _canonicalQuery() {}
 
 Status ParsedUpdate::parseRequest() {
@@ -141,19 +141,9 @@ Status ParsedUpdate::parseQueryToCQ() {
 }
 
 Status ParsedUpdate::parseUpdate() {
-    const NamespaceString& ns(_request->getNamespaceString());
-
-    // Should the modifiers validate their embedded docs via okForStorage
-    // Only user updates should be checked. Any system or replication stuff should pass through.
-    // Config db docs shouldn't get checked for valid field names since the shard key can have
-    // a dot (".") in it.
-    const bool shouldValidate =
-        !(_request->isFromOplogApplication() || ns.isConfigDB() || _request->isFromMigration());
-
+    _driver.setCollator(_collator.get());
     _driver.setLogOp(true);
-    boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(_opCtx, _collator.get()));
-    _driver.setModOptions(ModifierInterface::Options(
-        _request->isFromOplogApplication(), shouldValidate, std::move(expCtx)));
+    _driver.setFromOplogApplication(_request->isFromOplogApplication());
 
     return _driver.parse(_request->getUpdates(), _arrayFilters, _request->isMulti());
 }

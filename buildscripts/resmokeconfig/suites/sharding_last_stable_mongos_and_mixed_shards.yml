@@ -30,6 +30,7 @@ selector:
   - jstests/sharding/moveChunk_recipient_rejects_chunk_if_UUID_mismatch.js
   - jstests/sharding/write_cmd_auto_split.js
   - jstests/sharding/index_and_collection_option_propagation.js
+  - jstests/sharding/agg_project_limit_pipe_split.js
   # New feature in v3.6 mongos
   - jstests/sharding/logical_time_metadata.js
   # New feature in v3.6 mongos and mongod.
@@ -108,6 +109,8 @@ selector:
   # New failpoint in v3.6 shard mongod.
   - jstests/sharding/cleanup_orphaned_cmd_prereload.js
   - jstests/sharding/pending_chunk.js
+  # New waitForClusterTime
+  - jstests/sharding/auth_slaveok_routing.js
 
 executor:
   config:

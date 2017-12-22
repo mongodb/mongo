@@ -37,7 +37,6 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -57,6 +56,11 @@ namespace mongo {
 namespace {
 
 MONGO_FP_DECLARE(failCollectionUpdates);
+
+using DeleteState = CollectionShardingState::DeleteState;
+
+const OperationContext::Decoration<DeleteState> getDeleteState =
+    OperationContext::declareDecoration<DeleteState>();
 
 /**
  * Returns whether we're a master using master-slave replication.
@@ -203,7 +207,6 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                            OptionalCollectionUUID uuid,
                            Session* session,
                            StmtId stmtId,
-                           const CollectionShardingState::DeleteState& deleteState,
                            bool fromMigrate,
                            const boost::optional<BSONObj>& deletedDoc) {
     OperationSessionInfo sessionInfo;
@@ -234,6 +237,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
         oplogLink.preImageOpTime = noteOplog;
     }
 
+    CollectionShardingState::DeleteState& deleteState = getDeleteState(opCtx);
     opTimes.writeOpTime = repl::logOp(opCtx,
                                       "d",
                                       nss,
@@ -407,27 +411,31 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                        opTime.wallClockTime);
 }
 
-auto OpObserverImpl::aboutToDelete(OperationContext* opCtx,
+void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,
-                                   BSONObj const& doc) -> CollectionShardingState::DeleteState {
+                                   BSONObj const& doc) {
+    auto& deleteState = getDeleteState(opCtx);
     auto* css = CollectionShardingState::get(opCtx, nss.ns());
-    return css->makeDeleteState(doc);
+    deleteState = css->makeDeleteState(doc);
+    deleteState.aboutToDeleteCalled = true;
 }
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const NamespaceString& nss,
                               OptionalCollectionUUID uuid,
                               StmtId stmtId,
-                              CollectionShardingState::DeleteState deleteState,
                               bool fromMigrate,
                               const boost::optional<BSONObj>& deletedDoc) {
+    auto& deleteState = getDeleteState(opCtx);
+    invariant(deleteState.aboutToDeleteCalled);
+    deleteState.aboutToDeleteCalled = false;
+
     if (deleteState.documentKey.isEmpty()) {
         return;
     }
 
     Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
-    const auto opTime =
-        replLogDelete(opCtx, nss, uuid, session, stmtId, deleteState, fromMigrate, deletedDoc);
+    const auto opTime = replLogDelete(opCtx, nss, uuid, session, stmtId, fromMigrate, deletedDoc);
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "d", nss, deleteState.documentKey, nullptr);
@@ -523,8 +531,6 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 
     if (options.uuid) {
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-        catalog.onCreateCollection(opCtx, coll, options.uuid.get());
         opCtx->recoveryUnit()->onRollback([opCtx, collectionName]() {
             NamespaceUUIDCache::get(opCtx).evictNamespace(collectionName);
         });
@@ -582,12 +588,6 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
     invariant(coll->uuid() == uuid);
     CollectionCatalogEntry* entry = coll->getCatalogEntry();
     invariant(entry->isEqualToMetadataUUID(opCtx, uuid));
-
-    if (uuid) {
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
-        Collection* catalogColl = catalog.lookupCollectionByUUID(uuid.get());
-        invariant(catalogColl && catalogColl->uuid() == uuid);
-    }
 }
 
 void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
@@ -626,7 +626,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
 
     repl::OpTime dropOpTime;
     if (!collectionName.isSystemDotProfile()) {
-        // Do not replicate system.profile modifications
+        // Do not replicate system.profile modifications.
         dropOpTime = repl::logOp(opCtx,
                                  "c",
                                  cmdNss,
@@ -656,12 +656,6 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
 
     // Evict namespace entry from the namespace/uuid cache if it exists.
     NamespaceUUIDCache::get(opCtx).evictNamespace(collectionName);
-
-    // Remove collection from the uuid catalog.
-    if (uuid) {
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-        catalog.onDropCollection(opCtx, uuid.get());
-    }
 
     return dropOpTime;
 }
@@ -737,18 +731,6 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* opCtx,
     cache.evictNamespace(toCollection);
     opCtx->recoveryUnit()->onRollback(
         [&cache, toCollection]() { cache.evictNamespace(toCollection); });
-
-    // Finally update the UUID Catalog.
-    if (uuid) {
-        auto getNewCollection = [opCtx, toCollection] {
-            auto db = dbHolder().get(opCtx, toCollection.db());
-            auto newColl = db->getCollection(opCtx, toCollection);
-            invariant(newColl);
-            return newColl;
-        };
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-        catalog.onRenameCollection(opCtx, getNewCollection, uuid.get());
-    }
 
     return renameOpTime;
 }

@@ -16,17 +16,20 @@ typedef struct __wt_dbg WT_DBG;
 struct __wt_dbg {
 	WT_SESSION_IMPL *session;		/* Enclosing session */
 
+	bool integer_key;			/* Integer key formats */
+	bool unsigned_key;
+
 	/*
 	 * When using the standard event handlers, the debugging output has to
 	 * do its own message handling because its output isn't line-oriented.
 	 */
-	FILE		*fp;			/* Optional file handle */
-	WT_ITEM		*msg;			/* Buffered message */
+	FILE	*fp;				/* Optional file handle */
+	WT_ITEM	*msg;				/* Buffered message */
 
 	int (*f)(WT_DBG *, const char *, ...)	/* Function to write */
 	    WT_GCC_FUNC_DECL_ATTRIBUTE((format (printf, 2, 3)));
 
-	WT_ITEM		*tmp;			/* Temporary space */
+	WT_ITEM *tmp;				/* Temporary space */
 };
 
 static const					/* Output separator */
@@ -102,7 +105,7 @@ __debug_bytes(WT_DBG *ds, const void *data_arg, size_t size)
 
 /*
  * __debug_item --
- *	Dump a single data/size pair, with an optional tag.
+ *	Dump a single data/size item, with an optional tag.
  */
 static int
 __debug_item(WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
@@ -112,6 +115,34 @@ __debug_item(WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
 	WT_RET(__debug_bytes(ds, data_arg, size));
 	WT_RET(ds->f(ds, "}\n"));
 	return (0);
+}
+
+/*
+ * __debug_item_key --
+ *	Dump a single data/size key item, with an optional tag.
+ */
+static int
+__debug_item_key(WT_DBG *ds, const char *tag, const void *data_arg, size_t size)
+{
+	uint64_t ukey;
+	int64_t ikey;
+	const uint8_t *p;
+
+	if (ds->integer_key) {
+		p = data_arg;
+		WT_RET(__wt_vunpack_int(&p, 0, &ikey));
+		WT_RET(ds->f(ds, "\t%s%s{%" PRId64 "}\n",
+		    tag == NULL ? "" : tag, tag == NULL ? "" : " ", ikey));
+		return (0);
+	}
+	if (ds->unsigned_key) {
+		p = data_arg;
+		WT_RET(__wt_vunpack_uint(&p, 0, &ukey));
+		WT_RET(ds->f(ds, "\t%s%s{%" PRIu64 "}\n",
+		    tag == NULL ? "" : tag, tag == NULL ? "" : " ", ukey));
+		return (0);
+	}
+	return (__debug_item(ds, tag, data_arg, size));
 }
 
 /*
@@ -193,6 +224,8 @@ __dmsg_file(WT_DBG *ds, const char *fmt, ...)
 static int
 __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 {
+	WT_BTREE *btree;
+
 	memset(ds, 0, sizeof(WT_DBG));
 
 	ds->session = session;
@@ -213,6 +246,13 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 		ds->f = __dmsg_file;
 	}
 
+	btree = S2BT_SAFE(session);
+	ds->integer_key = btree != NULL &&
+	    strchr("hilq", btree->key_format[0]) != NULL &&
+	    btree->key_format[1] == '\0';
+	ds->unsigned_key = btree != NULL &&
+	    strchr("HILQr", btree->key_format[0]) != NULL &&
+	    btree->key_format[1] == '\0';
 	return (0);
 }
 
@@ -557,8 +597,10 @@ __wt_debug_tree_shape(
 	return (__dmsg_wrapup(ds));
 }
 
-#define	WT_DEBUG_TREE_LEAF	0x01			/* Debug leaf pages */
-#define	WT_DEBUG_TREE_WALK	0x02			/* Descend the tree */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_DEBUG_TREE_LEAF	0x1u			/* Debug leaf pages */
+#define	WT_DEBUG_TREE_WALK	0x2u			/* Descend the tree */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 /*
  * __wt_debug_tree_all --
@@ -920,7 +962,7 @@ __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 
 	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		__wt_ref_key(page, ref, &p, &len);
-		WT_RET(__debug_item(ds, "K", p, len));
+		WT_RET(__debug_item_key(ds, "K", p, len));
 		WT_RET(__debug_ref(ds, ref));
 	} WT_INTL_FOREACH_END;
 
@@ -965,7 +1007,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 	/* Dump the page's K/V pairs. */
 	WT_ROW_FOREACH(page, rip, i) {
 		WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
-		WT_ERR(__debug_item(ds, "K", key->data, key->size));
+		WT_ERR(__debug_item_key(ds, "K", key->data, key->size));
 
 		if ((cell = __wt_row_leaf_value_cell(page, rip, NULL)) == NULL)
 			WT_ERR(ds->f(ds, "\tV {}\n"));
@@ -1014,7 +1056,7 @@ __debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
 	WT_INSERT *ins;
 
 	WT_SKIP_FOREACH(ins, head) {
-		WT_RET(__debug_item(ds,
+		WT_RET(__debug_item_key(ds,
 		    "insert", WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins)));
 		WT_RET(__debug_update(ds, ins->upd, false));
 	}

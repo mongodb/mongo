@@ -135,7 +135,9 @@ class _StepdownThread(threading.Thread):
             now = time.time()
             if now - self._last_exec > self._stepdown_interval_secs:
                 self._step_down_all()
-                self._last_exec = now
+                # Wait until each replica set has a primary, so the test can make progress.
+                self._await_primaries()
+                self._last_exec = time.time()
             now = time.time()
             # 'wait_secs' is used to wait 'self._stepdown_interval_secs' from the moment the last
             # stepdown command was sent.
@@ -158,8 +160,7 @@ class _StepdownThread(threading.Thread):
         # Wait until we are no longer executing stepdowns.
         self._is_idle_evt.wait()
         # Wait until we all the replica sets have primaries.
-        for fixture in self._rs_fixtures:
-            fixture.get_primary()
+        self._await_primaries()
 
     def resume(self):
         """Resumes the thread."""
@@ -176,6 +177,10 @@ class _StepdownThread(threading.Thread):
     def _wait(self, timeout):
         # Wait until stop or timeout.
         self._is_stopped_evt.wait(timeout)
+
+    def _await_primaries(self):
+        for fixture in self._rs_fixtures:
+            fixture.get_primary()
 
     def _step_down_all(self):
         self._is_idle_evt.clear()

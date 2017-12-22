@@ -339,8 +339,12 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
         loadLastOpTime(opCtx) ==
             _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx)) {
         // Clear the appliedThrough marker to indicate we are consistent with the top of the
-        // oplog.
-        _replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});
+        // oplog. We record this update at the 'lastAppliedOpTime'. If there are any outstanding
+        // checkpoints being taken, they should only reflect this write if they see all writes up
+        // to our 'lastAppliedOpTime'.
+        auto lastAppliedOpTime = repl::getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();
+        _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
+            opCtx, lastAppliedOpTime.getTimestamp());
     }
 }
 
@@ -445,9 +449,14 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must be
     // done before we add anything to our oplog.
+    // We record this update at the 'lastAppliedOpTime'. If there are any outstanding
+    // checkpoints being taken, they should only reflect this write if they see all writes up
+    // to our 'lastAppliedOpTime'.
     invariant(
         _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
-    _replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});
+    auto lastAppliedOpTime = repl::getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();
+    _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
+        opCtx, lastAppliedOpTime.getTimestamp());
 
     if (isV1ElectionProtocol) {
         writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {
@@ -663,8 +672,6 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
         CatalogCacheLoader::get(_service).onStepDown();
     }
 
-    ShardingState::get(_service)->markCollectionsNotShardedAtStepdown();
-
     if (auto validator = LogicalTimeValidator::get(_service)) {
         auto opCtx = cc().getOperationContext();
 
@@ -755,10 +762,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
     }
 
     SessionCatalog::get(_service)->onStepUp(opCtx);
-
-    // There is a slight chance that some stale metadata might have been loaded before the latest
-    // optime has been recovered, so throw out everything that we have up to now
-    ShardingState::get(opCtx)->markCollectionsNotShardedAtStepdown();
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {

@@ -52,7 +52,6 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    virtual void redactForLogging(mutablebson::Document* cmdObj);
 
     CmdAuthenticate() : BasicCommand("authenticate") {}
     bool run(OperationContext* opCtx,

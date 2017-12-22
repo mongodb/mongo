@@ -35,6 +35,7 @@
 #include "mongo/util/net/op_msg.h"
 
 using namespace mongo::idl::test;
+using namespace mongo::idl::import;
 
 namespace mongo {
 
@@ -173,6 +174,10 @@ void TestLoopback(TestT test_value) {
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+
+        // Validate the operator == works
+        // Use ASSERT instead of ASSERT_EQ to avoid operator<<
+        ASSERT(one_new == testStruct);
     }
 }
 
@@ -478,6 +483,102 @@ TEST(IDLStructTests, TestNonStrictStruct) {
         auto testDoc =
             BSON("field4" << 1234 << "1" << 12 << "2" << 123 << "3" << 1234 << "field4" << 1234);
         ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
+    }
+}
+
+/// Struct default comparison tests
+TEST(IDLCompareTests, TestAllFields) {
+    IDLParserErrorContext ctxt("root");
+
+    // Positive: equality works
+    {
+        CompareAllField3 origStruct;
+        origStruct.setField1(12);
+        origStruct.setField2(123);
+        origStruct.setField3(1234);
+
+        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
+        auto parsedStruct = CompareAllField3::parse(ctxt, testDoc);
+
+        // Avoid ASSET_<RelOp> to avoid operator <<
+        ASSERT_TRUE(origStruct == parsedStruct);
+        ASSERT_FALSE(origStruct != parsedStruct);
+        ASSERT_FALSE(origStruct < parsedStruct);
+        ASSERT_FALSE(parsedStruct < origStruct);
+    }
+
+    // Positive: not equality works in field 3
+    {
+        CompareAllField3 origStruct;
+        origStruct.setField1(12);
+        origStruct.setField2(123);
+        origStruct.setField3(12345);
+
+        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
+        auto parsedStruct = CompareAllField3::parse(ctxt, testDoc);
+
+        // Avoid ASSET_<RelOp> to avoid operator <<
+        ASSERT_FALSE(origStruct == parsedStruct);
+        ASSERT_TRUE(origStruct != parsedStruct);
+        ASSERT_FALSE(origStruct < parsedStruct);
+        ASSERT_TRUE(parsedStruct < origStruct);
+    }
+}
+
+
+/// Struct partial comparison tests
+TEST(IDLCompareTests, TestSomeFields) {
+    IDLParserErrorContext ctxt("root");
+
+    // Positive: partial equality works when field 2 is different
+    {
+        CompareSomeField3 origStruct;
+        origStruct.setField1(12);
+        origStruct.setField2(12345);
+        origStruct.setField3(1234);
+
+        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
+        auto parsedStruct = CompareSomeField3::parse(ctxt, testDoc);
+
+        // Avoid ASSET_<RelOp> to avoid operator <<
+        ASSERT_TRUE(origStruct == parsedStruct);
+        ASSERT_FALSE(origStruct != parsedStruct);
+        ASSERT_FALSE(origStruct < parsedStruct);
+        ASSERT_FALSE(parsedStruct < origStruct);
+    }
+
+    // Positive: partial equality works when field 3 is different
+    {
+        CompareSomeField3 origStruct;
+        origStruct.setField1(12);
+        origStruct.setField2(1);
+        origStruct.setField3(12345);
+
+        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
+        auto parsedStruct = CompareSomeField3::parse(ctxt, testDoc);
+
+        // Avoid ASSET_<RelOp> to avoid operator <<
+        ASSERT_FALSE(origStruct == parsedStruct);
+        ASSERT_TRUE(origStruct != parsedStruct);
+        ASSERT_FALSE(origStruct < parsedStruct);
+        ASSERT_TRUE(parsedStruct < origStruct);
+    }
+
+    // Positive: partial equality works when field 1 is different
+    {
+        CompareSomeField3 origStruct;
+        origStruct.setField1(123);
+        origStruct.setField2(1);
+        origStruct.setField3(1234);
+
+        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
+        auto parsedStruct = CompareSomeField3::parse(ctxt, testDoc);
+
+        // Avoid ASSET_<RelOp> to avoid operator <<
+        ASSERT_FALSE(origStruct == parsedStruct);
+        ASSERT_TRUE(origStruct != parsedStruct);
+        ASSERT_FALSE(origStruct < parsedStruct);
+        ASSERT_TRUE(parsedStruct < origStruct);
     }
 }
 
@@ -896,7 +997,8 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     assert_same_types<decltype(testStruct.getField4()),
                       const std::vector<mongo::ObjectBasicType>&>();
     assert_same_types<decltype(testStruct.getField5()), const std::vector<mongo::BSONObj>&>();
-    assert_same_types<decltype(testStruct.getField6()), const std::vector<mongo::One_string>&>();
+    assert_same_types<decltype(testStruct.getField6()),
+                      const std::vector<mongo::idl::import::One_string>&>();
 
     assert_same_types<decltype(testStruct.getField1o()),
                       const boost::optional<std::vector<std::int64_t>>&>();
@@ -909,7 +1011,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     assert_same_types<decltype(testStruct.getField5o()),
                       const boost::optional<std::vector<mongo::BSONObj>>&>();
     assert_same_types<decltype(testStruct.getField6o()),
-                      const boost::optional<std::vector<mongo::One_string>>&>();
+                      const boost::optional<std::vector<mongo::idl::import::One_string>>&>();
 
     std::vector<std::int64_t> field1{1, 2, 3};
     ASSERT_TRUE(field1 == testStruct.getField1());
@@ -957,6 +1059,10 @@ void TestBinDataVector() {
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+
+        // Validate the operator == works
+        // Use ASSERT instead of ASSERT_EQ to avoid operator<<
+        ASSERT(one_new == testStruct);
     }
 }
 

@@ -118,7 +118,7 @@ struct ClusterClientCursorParams {
     boost::optional<long long> limit;
 
     // If set, we use this pipeline to merge the output of aggregations on each remote.
-    std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline;
+    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
 
     // Whether this cursor is tailing a capped collection, and whether it has the awaitData option
     // set.

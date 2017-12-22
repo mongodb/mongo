@@ -174,6 +174,32 @@ TEST_F(DocumentSourceFacetTest, ShouldAcceptLegalSpecification) {
     ASSERT_TRUE(facetStage.get());
 }
 
+TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsWithinSinglePipeline) {
+    auto ctx = getExpCtx();
+    ctx->inMongos = true;
+
+    auto spec = fromjson(
+        "{$facet: {badPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}, "
+        "{$_internalSplitPipeline: {mergeType: 'mongos'}}]}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                       AssertionException,
+                       ErrorCodes::IllegalOperation);
+}
+
+TEST_F(DocumentSourceFacetTest, ShouldRejectConflictingHostTypeRequirementsAcrossPipelines) {
+    auto ctx = getExpCtx();
+    ctx->inMongos = true;
+
+    auto spec = fromjson(
+        "{$facet: {shardPipe: [{$_internalSplitPipeline: {mergeType: 'anyShard'}}], mongosPipe: "
+        "[{$_internalSplitPipeline: {mergeType: 'mongos'}}]}}");
+
+    ASSERT_THROWS_CODE(DocumentSourceFacet::createFromBson(spec.firstElement(), ctx),
+                       AssertionException,
+                       ErrorCodes::IllegalOperation);
+}
+
 //
 // Evaluation.
 //
@@ -437,8 +463,22 @@ TEST_F(DocumentSourceFacetTest, ShouldOptimizeInnerPipelines) {
     ASSERT_TRUE(dummy->isOptimized);
 }
 
-TEST_F(DocumentSourceFacetTest, ShouldPropogateDetachingAndReattachingOfOpCtx) {
+/**
+ * An implementation of the MongoProcessInterface that is okay with changing the OperationContext,
+ * but has no other parts of the interface implemented.
+ */
+class StubMongoProcessOkWithOpCtxChanges : public StubMongoProcessInterface {
+public:
+    void setOperationContext(OperationContext* opCtx) final {
+        return;
+    }
+};
+
+TEST_F(DocumentSourceFacetTest, ShouldPropagateDetachingAndReattachingOfOpCtx) {
     auto ctx = getExpCtx();
+    // We're going to be changing the OperationContext, so we need to use a MongoProcessInterface
+    // that won't throw when we do so.
+    ctx->mongoProcessInterface = stdx::make_unique<StubMongoProcessOkWithOpCtxChanges>();
 
     auto firstDummy = DocumentSourcePassthrough::create();
     auto firstPipeline = unittest::assertGet(Pipeline::createFacetPipeline({firstDummy}, ctx));
@@ -454,12 +494,12 @@ TEST_F(DocumentSourceFacetTest, ShouldPropogateDetachingAndReattachingOfOpCtx) {
     // Test detaching.
     ASSERT_FALSE(firstDummy->isDetachedFromOpCtx);
     ASSERT_FALSE(secondDummy->isDetachedFromOpCtx);
-    facetStage->doDetachFromOperationContext();
+    facetStage->detachFromOperationContext();
     ASSERT_TRUE(firstDummy->isDetachedFromOpCtx);
     ASSERT_TRUE(secondDummy->isDetachedFromOpCtx);
 
     // Test reattaching.
-    facetStage->doReattachToOperationContext(ctx->opCtx);
+    facetStage->reattachToOperationContext(ctx->opCtx);
     ASSERT_FALSE(firstDummy->isDetachedFromOpCtx);
     ASSERT_FALSE(secondDummy->isDetachedFromOpCtx);
 }
@@ -675,7 +715,7 @@ TEST_F(DocumentSourceFacetTest, ShouldNotRequirePrimaryShardIfNoStagesRequiresPr
     auto facetStage = DocumentSourceFacet::create(std::move(facets), ctx);
 
     ASSERT(facetStage->constraints(Pipeline::SplitState::kUnsplit).hostRequirement ==
-           DocumentSource::StageConstraints::HostTypeRequirement::kAnyShard);
+           DocumentSource::StageConstraints::HostTypeRequirement::kNone);
 }
 
 }  // namespace

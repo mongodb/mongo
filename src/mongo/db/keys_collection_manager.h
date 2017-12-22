@@ -31,34 +31,47 @@
 #include <memory>
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/keys_collection_cache_reader.h"
+#include "mongo/db/keys_collection_cache_reader_and_updater.h"
 #include "mongo/db/keys_collection_document.h"
+#include "mongo/stdx/functional.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/notification.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
 class OperationContext;
 class LogicalTime;
 class ServiceContext;
+class KeysCollectionClient;
 
 extern int KeysRotationIntervalSec;
+
 /**
- * This is responsible for providing keys that can be used for HMAC computation. This also supports
- * automatic key rotation that happens on a configurable interval.
+ * The KeysCollectionManager queries the config servers for keys that can be used for
+ * HMAC computation. It maintains an internal background thread that is used to periodically
+ * refresh the local key cache against the keys collection stored on the config servers.
  */
 class KeysCollectionManager {
 public:
     static const Seconds kKeyValidInterval;
     static const std::string kKeyManagerPurposeString;
 
-    virtual ~KeysCollectionManager();
+    KeysCollectionManager(std::string purpose,
+                          std::unique_ptr<KeysCollectionClient> client,
+                          Seconds keyValidForInterval);
 
     /**
      * Return a key that is valid for the given time and also matches the keyId. Note that this call
-     * can block if it will need to do a refresh and we are on a sharded cluster.
+     * can block if it will need to do a refresh.
      *
      * Throws ErrorCode::ExceededTimeLimit if it times out.
      */
-    virtual StatusWith<KeysCollectionDocument> getKeyForValidation(
-        OperationContext* opCtx, long long keyId, const LogicalTime& forThisTime) = 0;
+    StatusWith<KeysCollectionDocument> getKeyForValidation(OperationContext* opCtx,
+                                                           long long keyId,
+                                                           const LogicalTime& forThisTime);
 
     /**
      * Returns a key that is valid for the given time. Note that unlike getKeyForValidation, this
@@ -66,8 +79,121 @@ public:
      *
      * Throws ErrorCode::ExceededTimeLimit if it times out.
      */
-    virtual StatusWith<KeysCollectionDocument> getKeyForSigning(OperationContext* opCtx,
-                                                                const LogicalTime& forThisTime) = 0;
+    StatusWith<KeysCollectionDocument> getKeyForSigning(OperationContext* opCtx,
+                                                        const LogicalTime& forThisTime);
+
+    /**
+     * Request this manager to perform a refresh.
+     */
+    void refreshNow(OperationContext* opCtx);
+
+    /**
+     * Starts a background thread that will constantly update the internal cache of keys.
+     *
+     * Cannot call this after stopMonitoring was called at least once.
+     */
+    void startMonitoring(ServiceContext* service);
+
+    /**
+     * Stops the background thread updating the cache.
+     */
+    void stopMonitoring();
+
+    /**
+     * Enable writing new keys to the config server primary. Should only be called if current node
+     * is the config primary.
+     */
+    void enableKeyGenerator(OperationContext* opCtx, bool doEnable);
+
+    /**
+     * Returns true if the refresher has ever successfully returned keys from the config server.
+     */
+    bool hasSeenKeys();
+
+private:
+    /**
+     * This is responsible for periodically performing refresh in the background.
+     */
+    class PeriodicRunner {
+    public:
+        using RefreshFunc = stdx::function<StatusWith<KeysCollectionDocument>(OperationContext*)>;
+
+        /**
+         * Preemptively inform the monitoring thread it needs to perform a refresh. Returns an
+         * object
+         * that gets notified after the current round of refresh is over. Note that being notified
+         * can
+         * mean either of these things:
+         *
+         * 1. An error occurred and refresh was not performed.
+         * 2. No error occurred but no new key was found.
+         * 3. No error occurred and new keys were found.
+         */
+        void refreshNow(OperationContext* opCtx);
+
+        /**
+         * Sets the refresh function to use.
+         * Should only be used to bootstrap this refresher with initial strategy.
+         */
+        void setFunc(RefreshFunc newRefreshStrategy);
+
+        /**
+         * Switches the current strategy with a new one. This also waits to make sure that the old
+         * strategy is not being used and will no longer be used after this call.
+         */
+        void switchFunc(OperationContext* opCtx, RefreshFunc newRefreshStrategy);
+
+        /**
+         * Starts the refresh thread.
+         */
+        void start(ServiceContext* service,
+                   const std::string& threadName,
+                   Milliseconds refreshInterval);
+
+        /**
+         * Stops the refresh thread.
+         */
+        void stop();
+
+        /**
+         * Returns true if keys have ever successfully been returned from the config server.
+         */
+        bool hasSeenKeys();
+
+    private:
+        void _doPeriodicRefresh(ServiceContext* service,
+                                std::string threadName,
+                                Milliseconds refreshInterval);
+
+        stdx::mutex _mutex;  // protects all the member variables below.
+        std::shared_ptr<Notification<void>> _refreshRequest;
+        stdx::condition_variable _refreshNeededCV;
+
+        stdx::thread _backgroundThread;
+        std::shared_ptr<RefreshFunc> _doRefresh;
+
+        bool _hasSeenKeys = false;
+        bool _inShutdown = false;
+    };
+
+    /**
+     * Return a key that is valid for the given time and also matches the keyId.
+     */
+    StatusWith<KeysCollectionDocument> _getKeyWithKeyIdCheck(long long keyId,
+                                                             const LogicalTime& forThisTime);
+
+    /**
+     * Return a key that is valid for the given time.
+     */
+    StatusWith<KeysCollectionDocument> _getKey(const LogicalTime& forThisTime);
+
+    std::unique_ptr<KeysCollectionClient> _client;
+    const std::string _purpose;
+    const Seconds _keyValidForInterval;
+
+    // No mutex needed since the members below have their own mutexes.
+    KeysCollectionCacheReader _keysCache;
+    PeriodicRunner _refresher;
 };
 
 }  // namespace mongo

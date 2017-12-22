@@ -86,7 +86,7 @@ void RollbackTest::setUp() {
     SessionCatalog::create(serviceContext);
 
     _opCtx = cc().makeOperationContext();
-    _replicationProcess->getConsistencyMarkers()->setAppliedThrough(_opCtx.get(), OpTime{});
+    _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(_opCtx.get(), {});
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(), OpTime{});
     _replicationProcess->initializeRollbackID(_opCtx.get()).transitional_ignore();
 

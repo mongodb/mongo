@@ -36,8 +36,8 @@
 namespace mongo {
 
 void ElementPath::init(StringData path) {
-    _shouldTraverseNonleafArrays = true;
-    _shouldTraverseLeafArray = true;
+    _nonLeafArrayBehavior = NonLeafArrayBehavior::kTraverse;
+    _leafArrayBehavior = LeafArrayBehavior::kTraverse;
     _fieldRef.parse(path);
 }
 
@@ -195,11 +195,12 @@ bool BSONElementIterator::subCursorHasMore() {
             _subCursorPath.reset(new ElementPath());
             _subCursorPath->init(_arrayIterationState.restOfPath.substr(
                 _arrayIterationState.nextPieceOfPath.size() + 1));
-            _subCursorPath->setTraverseLeafArray(_path->shouldTraverseLeafArray());
+            _subCursorPath->setLeafArrayBehavior(_path->leafArrayBehavior());
 
             // If we're here, we must be able to traverse nonleaf arrays.
-            dassert(_path->shouldTraverseNonleafArrays());
-            dassert(_subCursorPath->shouldTraverseNonleafArrays());
+            dassert(_path->nonLeafArrayBehavior() == ElementPath::NonLeafArrayBehavior::kTraverse);
+            dassert(_subCursorPath->nonLeafArrayBehavior() ==
+                    ElementPath::NonLeafArrayBehavior::kTraverse);
 
             _subCursor.reset(
                 new BSONElementIterator(_subCursorPath.get(), _arrayIterationState._current.Obj()));
@@ -238,11 +239,19 @@ bool BSONElementIterator::more() {
 
         _arrayIterationState.reset(_path->fieldRef(), _traversalStartIndex + 1);
 
-        if (_arrayIterationState.hasMore && !_path->shouldTraverseNonleafArrays()) {
+        if (_arrayIterationState.hasMore &&
+            _path->nonLeafArrayBehavior() != ElementPath::NonLeafArrayBehavior::kTraverse) {
             // Don't allow traversing the array.
+            if (_path->nonLeafArrayBehavior() == ElementPath::NonLeafArrayBehavior::kMatchSubpath) {
+                _next.reset(_traversalStart, BSONElement());
+                _state = DONE;
+                return true;
+            }
+
             _state = DONE;
             return false;
-        } else if (!_arrayIterationState.hasMore && !_path->shouldTraverseLeafArray()) {
+        } else if (!_arrayIterationState.hasMore &&
+                   _path->leafArrayBehavior() == ElementPath::LeafArrayBehavior::kNoTraversal) {
             // Return the leaf array.
             _next.reset(_traversalStart, BSONElement());
             _state = DONE;
@@ -275,7 +284,7 @@ bool BSONElementIterator::more() {
                 // any elements matching the remaining subpath.
                 _subCursorPath.reset(new ElementPath());
                 _subCursorPath->init(_arrayIterationState.restOfPath);
-                _subCursorPath->setTraverseLeafArray(_path->shouldTraverseLeafArray());
+                _subCursorPath->setLeafArrayBehavior(_path->leafArrayBehavior());
 
                 _subCursor.reset(new BSONElementIterator(_subCursorPath.get(), eltInArray.Obj()));
                 if (subCursorHasMore()) {
@@ -302,7 +311,7 @@ bool BSONElementIterator::more() {
                     _subCursorPath.reset(new ElementPath());
                     _subCursorPath->init(_arrayIterationState.restOfPath.substr(
                         _arrayIterationState.nextPieceOfPath.size() + 1));
-                    _subCursorPath->setTraverseLeafArray(_path->shouldTraverseLeafArray());
+                    _subCursorPath->setLeafArrayBehavior(_path->leafArrayBehavior());
                     BSONElementIterator* real = new BSONElementIterator(
                         _subCursorPath.get(), _arrayIterationState._current.Obj());
                     _subCursor.reset(real);

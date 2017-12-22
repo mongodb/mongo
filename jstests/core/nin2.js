@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Check that $nin is the opposite of $in SERVER-3264
 
 t = db.jstests_nin2;

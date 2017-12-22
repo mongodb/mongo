@@ -83,15 +83,15 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
         shardToChunksMap[chunkEntry->getShardId()].push_back(chunk);
     }
 
-    vector<TagsType> collectionTags;
-    Status tagsStatus = Grid::get(opCtx)->catalogClient()->getTagsForCollection(
-        opCtx, chunkMgr->getns(), &collectionTags);
-    if (!tagsStatus.isOK()) {
-        return {tagsStatus.code(),
+    const auto swCollectionTags =
+        Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, chunkMgr->getns());
+    if (!swCollectionTags.isOK()) {
+        return {swCollectionTags.getStatus().code(),
                 str::stream() << "Unable to load tags for collection " << chunkMgr->getns()
                               << " due to "
-                              << tagsStatus.toString()};
+                              << swCollectionTags.getStatus().toString()};
     }
+    const auto& collectionTags = swCollectionTags.getValue();
 
     DistributionStatus distribution(NamespaceString(chunkMgr->getns()),
                                     std::move(shardToChunksMap));
@@ -191,13 +191,13 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 
     const auto shardStats = std::move(shardStatsStatus.getValue());
 
-    vector<CollectionType> collections;
-
-    Status collsStatus =
-        Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, &collections, nullptr);
-    if (!collsStatus.isOK()) {
-        return collsStatus;
+    const auto swCollections =
+        Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, nullptr);
+    if (!swCollections.isOK()) {
+        return swCollections.getStatus();
     }
+
+    const auto& collections = swCollections.getValue();
 
     if (collections.empty()) {
         return SplitInfoVector{};
@@ -243,13 +243,14 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         return MigrateInfoVector{};
     }
 
-    vector<CollectionType> collections;
 
-    Status collsStatus =
-        Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, &collections, nullptr);
-    if (!collsStatus.isOK()) {
-        return collsStatus;
+    const auto swCollections =
+        Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, nullptr);
+    if (!swCollections.isOK()) {
+        return swCollections.getStatus();
     }
+
+    const auto& collections = swCollections.getValue();
 
     if (collections.empty()) {
         return MigrateInfoVector{};

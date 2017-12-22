@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test basic delete stage functionality.
 var coll = db.stages_delete;
 var collScanStage = {cscan: {args: {direction: 1}, filter: {deleteMe: true}}};

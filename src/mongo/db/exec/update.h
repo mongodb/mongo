@@ -141,6 +141,7 @@ public:
                                            mutablebson::Document* doc,
                                            bool isInternalRequest,
                                            const NamespaceString& ns,
+                                           bool enforceOkForStorage,
                                            UpdateStats* stats);
 
 private:
@@ -191,6 +192,9 @@ private:
 
     // Stats
     UpdateStats _specificStats;
+
+    // True if updated documents should be validated with storage_validation::storageValid().
+    bool _enforceOkForStorage;
 
     // If the update was in-place, we may see it again.  This only matters if we're doing
     // a multi-update; if we're not doing a multi-update we stop after one update and we

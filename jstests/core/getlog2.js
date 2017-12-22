@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // tests getlog as well as slow querying logging
 
 // We turn off gossiping the mongo shell's clusterTime because it causes the slow command log

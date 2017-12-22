@@ -113,6 +113,22 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
             children.insert(children.end(), absorbedExpressions.begin(), absorbedExpressions.end());
         }
 
+        // Remove all children of AND that are $alwaysTrue and all children of OR that are
+        // $alwaysFalse.
+        if (matchType == AND || matchType == OR) {
+            for (MatchExpression*& childExpression : children) {
+                if ((childExpression->isTriviallyTrue() && matchType == MatchExpression::AND) ||
+                    (childExpression->isTriviallyFalse() && matchType == MatchExpression::OR)) {
+                    std::unique_ptr<MatchExpression> childPtr(childExpression);
+                    childExpression = nullptr;
+                }
+            }
+
+            // We replaced each destroyed child expression with nullptr. Now we remove those
+            // nullptrs from the vector.
+            children.erase(std::remove(children.begin(), children.end(), nullptr), children.end());
+        }
+
         if (children.size() == 1) {
             if ((matchType == AND || matchType == OR || matchType == INTERNAL_SCHEMA_XOR)) {
                 // Simplify AND/OR/XOR with exactly one operand to an expression consisting of just
@@ -127,6 +143,23 @@ MatchExpression::ExpressionOptimizerFunc ListOfMatchExpression::getOptimizer() c
                 return std::move(simplifiedExpression);
             }
         }
+
+        if (matchType == MatchExpression::AND || matchType == MatchExpression::OR) {
+            for (auto& childExpression : children) {
+                // An AND containing an expression that always evaluates to false can be
+                // optimized to a single $alwaysFalse expression.
+                if (childExpression->isTriviallyFalse() && matchType == MatchExpression::AND) {
+                    return stdx::make_unique<AlwaysFalseMatchExpression>();
+                }
+
+                // Likewise, an OR containing an expression that always evaluates to true can be
+                // optimized to a single $alwaysTrue expression.
+                if (childExpression->isTriviallyTrue() && matchType == MatchExpression::OR) {
+                    return stdx::make_unique<AlwaysTrueMatchExpression>();
+                }
+            }
+        }
+
 
         return expression;
     };
@@ -190,6 +223,10 @@ void AndMatchExpression::serialize(BSONObjBuilder* out) const {
     arrBob.doneFast();
 }
 
+bool AndMatchExpression::isTriviallyTrue() const {
+    return numChildren() == 0;
+}
+
 // -----
 
 bool OrMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
@@ -224,6 +261,10 @@ void OrMatchExpression::serialize(BSONObjBuilder* out) const {
     }
     BSONArrayBuilder arrBob(out->subarrayStart("$or"));
     _listToBSON(&arrBob);
+}
+
+bool OrMatchExpression::isTriviallyFalse() const {
+    return numChildren() == 0;
 }
 
 // ----

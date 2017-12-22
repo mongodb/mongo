@@ -409,7 +409,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		WT_ERR_MSG(session, ret, "LSM checkpoint");
 
 	/* Now the file is written, get the chunk size. */
-	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
+	WT_ERR(__wt_lsm_tree_set_chunk_size(session, lsm_tree, chunk));
 
 	++lsm_tree->chunks_flushed;
 

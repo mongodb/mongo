@@ -14,6 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 """Test cases for IDL parser."""
+# pylint: disable=too-many-lines
 
 from __future__ import absolute_import, print_function, unicode_literals
 
@@ -278,6 +279,7 @@ class TestParser(testcase.IDLTestcase):
                 strict: true
                 immutable: true
                 inline_chained_structs: true
+                generate_comparison_operators: true
                 fields:
                     foo: bar
             """))
@@ -291,6 +293,7 @@ class TestParser(testcase.IDLTestcase):
                 strict: false
                 immutable: false
                 inline_chained_structs: false
+                generate_comparison_operators: false
                 fields:
                     foo: bar
             """))
@@ -348,6 +351,28 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
             """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
 
+        # inline_chained_structs is a bool
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                inline_chained_structs: bar
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
+        # generate_comparison_operators is a bool
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                generate_comparison_operators: bar
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
     def test_field_positive(self):
         # type: () -> None
         """Positive field test cases."""
@@ -375,6 +400,7 @@ class TestParser(testcase.IDLTestcase):
                         optional: true
                         ignore: true
                         cpp_name: bar
+                        comparison_order: 3
             """))
 
         # Test false bools
@@ -432,6 +458,47 @@ class TestParser(testcase.IDLTestcase):
                         type: string
                         ignore: bar
             """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
+        # Test bad int scalar
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                strict: false
+                fields:
+                    foo:
+                        type: string
+                        comparison_order:
+                            - a
+                            - b
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        # Test bad int
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                strict: false
+                fields:
+                    foo:
+                        type: string
+                        comparison_order: 3.14159
+            """), idl.errors.ERROR_ID_IS_NODE_VALID_INT)
+
+        # Test bad negative int
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                strict: false
+                fields:
+                    foo:
+                        type: string
+                        comparison_order: -1
+            """), idl.errors.ERROR_ID_IS_NODE_VALID_NON_NEGATIVE_INT)
 
     def test_name_collisions_negative(self):
         # type: () -> None
@@ -758,6 +825,9 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 strict: true
                 namespace: ignored
+                immutable: true
+                inline_chained_structs: true
+                generate_comparison_operators: true
                 fields:
                     foo: bar
             """))
@@ -770,6 +840,9 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 namespace: ignored
+                immutable: false
+                inline_chained_structs: false
+                generate_comparison_operators: false
                 fields:
                     foo: bar
             """))

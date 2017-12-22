@@ -56,7 +56,6 @@
 namespace mongo {
 
 using namespace transport;
-using namespace stdx::placeholders;
 
 using TicketCallback = TransportLayer::TicketCallback;
 using SEPTestSession = ServiceEntryPointTestSuite::SEPTestSession;
@@ -102,11 +101,13 @@ const auto kEndConnectionStatus = Status(ErrorCodes::HostUnreachable, "connectio
 }  // namespace
 
 ServiceEntryPointTestSuite::MockTLHarness::MockTLHarness()
-    : _sourceMessage(
-          stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_defaultSource, this, _1, _2, _3)),
-      _sinkMessage(
-          stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_defaultSink, this, _1, _2, _3)),
-      _wait(stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_defaultWait, this, _1)),
+    : _sourceMessage([this](const transport::SessionHandle& h, Message * m, Date_t d) {
+          return _defaultSource(h, m, d);
+      }),
+      _sinkMessage([this](const transport::SessionHandle& h, const Message& m, Date_t d) {
+          return _defaultSink(h, m, d);
+      }),
+      _wait([this](transport::Ticket t) { return _defaultWait(std::move(t)); }),
       _asyncWait(kDefaultAsyncWait),
       _end(kDefaultEnd) {}
 
@@ -160,7 +161,7 @@ Status ServiceEntryPointTestSuite::MockTLHarness::_waitError(transport::Ticket t
 }
 
 Status ServiceEntryPointTestSuite::MockTLHarness::_waitOnceThenError(transport::Ticket ticket) {
-    _wait = stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_waitError, this, _1);
+    _wait = [this](transport::Ticket t) { return _waitError(std::move(t)); };
     return _defaultWait(std::move(ticket));
 }
 
@@ -179,16 +180,18 @@ Ticket ServiceEntryPointTestSuite::MockTLHarness::_defaultSink(const SessionHand
 Ticket ServiceEntryPointTestSuite::MockTLHarness::_sinkThenErrorOnWait(const SessionHandle& s,
                                                                        const Message& m,
                                                                        Date_t d) {
-    _wait = stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_waitOnceThenError, this, _1);
+    _wait = [=](transport::Ticket t) { return _waitOnceThenError(std::move(t)); };
     return _defaultSink(s, m, d);
 }
 
 void ServiceEntryPointTestSuite::MockTLHarness::_resetHooks() {
-    _sourceMessage =
-        stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_defaultSource, this, _1, _2, _3);
-    _sinkMessage =
-        stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_defaultSink, this, _1, _2, _3);
-    _wait = stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_defaultWait, this, _1);
+    _sourceMessage = [this](const transport::SessionHandle& h, Message* m, Date_t d) {
+        return _defaultSource(h, m, d);
+    };
+    _sinkMessage = [this](const transport::SessionHandle& h, const Message& m, Date_t d) {
+        return _defaultSink(h, m, d);
+    };
+    _wait = [this](transport::Ticket t) { return _defaultWait(std::move(t)); };
     _asyncWait = kDefaultAsyncWait;
     _end = kDefaultEnd;
     _destroy_hook = kDefaultDestroyHook;
@@ -220,7 +223,9 @@ void ServiceEntryPointTestSuite::noLifeCycleTest() {
 
     // Step 1: SEP gets a ticket to source a Message
     // Step 2: SEP calls wait() on the ticket and receives an error
-    _tl->_wait = stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_waitError, _tl.get(), _1);
+    _tl->_wait = [tlp = _tl.get()](transport::Ticket t) {
+        return tlp->_waitError(std::move(t));
+    };
 
     // Step 3: SEP destroys the session, which calls end()
     _tl->_destroy_hook = [&testComplete](SEPTestSession&) { testComplete.set_value(); };
@@ -245,8 +250,9 @@ void ServiceEntryPointTestSuite::halfLifeCycleTest() {
     _tl->_sinkMessage = [this](const SessionHandle& session, const Message& m, Date_t expiration) {
 
         // Step 4: SEP calls wait() on the ticket and receives an error
-        _tl->_wait =
-            stdx::bind(&ServiceEntryPointTestSuite::MockTLHarness::_waitError, _tl.get(), _1);
+        _tl->_wait = [tlp = _tl.get()](transport::Ticket t) {
+            return tlp->_waitError(std::move(t));
+        };
 
         return _tl->_defaultSink(session, m, expiration);
     };
@@ -270,8 +276,9 @@ void ServiceEntryPointTestSuite::fullLifeCycleTest() {
 
     // Step 1: SEP gets a ticket to source a Message
     // Step 2: SEP calls wait() on the ticket and receives a Message
-    _tl->_sinkMessage = stdx::bind(
-        &ServiceEntryPointTestSuite::MockTLHarness::_sinkThenErrorOnWait, _tl.get(), _1, _2, _3);
+    _tl->_sinkMessage = [tlp = _tl.get()](auto&& a1, auto&& a2, auto&& a3) {
+        return tlp->_sinkThenErrorOnWait(a1, a2, a3);
+    };
 
     // Step 3: SEP gets a ticket to sink a Message
     // Step 4: SEP calls wait() on the ticket and receives Status::OK()
@@ -325,8 +332,9 @@ void ServiceEntryPointTestSuite::interruptingSessionTest() {
         startB.set_value();
         resumeAFuture.wait();
 
-        _tl->_wait = stdx::bind(
-            &ServiceEntryPointTestSuite::MockTLHarness::_waitOnceThenError, _tl.get(), _1);
+        _tl->_wait = [tlp = _tl.get()](transport::Ticket t) {
+            return tlp->_waitOnceThenError(std::move(t));
+        };
 
         return Status::OK();
     };
@@ -338,7 +346,7 @@ void ServiceEntryPointTestSuite::interruptingSessionTest() {
     // Step 7: SEP calls sourceMessage() for B, gets tB3
     // Step 8: SEP calls wait() for tB3, gets an error
     // Step 9: SEP calls end(B)
-    _tl->_destroy_hook = [this, idA, idB, &resumeA, &testComplete](SEPTestSession& session) {
+    _tl->_destroy_hook = [idA, idB, &resumeA, &testComplete](SEPTestSession& session) {
         // When end(B) is called, time to resume session A
         if (session.id() == idB) {
             // Resume session A
@@ -380,8 +388,7 @@ void ServiceEntryPointTestSuite::burstStressTest(int numSessions,
     _tl->_resetHooks();
 
     // Same wait() callback for all sessions.
-    _tl->_wait = [this, &completedCycles, &cyclesLock, numSessions, numCycles, &delay](
-        Ticket ticket) -> Status {
+    _tl->_wait = [this, &completedCycles, &cyclesLock, numCycles, &delay](Ticket ticket) -> Status {
         auto id = ticket.sessionId();
         int cycleCount;
 

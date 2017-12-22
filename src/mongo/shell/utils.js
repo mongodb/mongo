@@ -261,6 +261,9 @@ jsTestOptions = function() {
             alwaysInjectTransactionNumber: TestData.alwaysInjectTransactionNumber,
             skipGossipingClusterTime: TestData.skipGossipingClusterTime || false,
             disableEnableSessions: TestData.disableEnableSessions,
+            overrideRetryAttempts: TestData.overrideRetryAttempts || 0,
+            logRetryAttempts: TestData.logRetryAttempts || false,
+            connectionString: TestData.connectionString || "",
         });
     }
     return _jsTestOptions;
@@ -296,7 +299,7 @@ jsTest.authenticate = function(conn) {
             // back into authenticate.
             conn.authenticated = true;
             print("Authenticating as user " + jsTestOptions().authUser + " with mechanism " +
-                  DB.prototype._defaultAuthenticationMechanism + " on connection: " + conn);
+                  DB.prototype._getDefaultAuthenticationMechanism() + " on connection: " + conn);
             conn.authenticated = conn.getDB(jsTestOptions().authenticationDatabase).auth({
                 user: jsTestOptions().authUser,
                 pwd: jsTestOptions().authPassword,

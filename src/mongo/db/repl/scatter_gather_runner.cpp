@@ -152,10 +152,9 @@ void ScatterGatherRunner::RunnerImpl::processResponse(
 
 void ScatterGatherRunner::RunnerImpl::_signalSufficientResponsesReceived() {
     if (_sufficientResponsesReceived.isValid()) {
-        std::for_each(
-            _callbacks.begin(),
-            _callbacks.end(),
-            stdx::bind(&executor::TaskExecutor::cancel, _executor, stdx::placeholders::_1));
+        for (const CallbackHandle& cbh : _callbacks) {
+            _executor->cancel(cbh);
+        };
         // Clear _callbacks to break the cycle of shared_ptr.
         _callbacks.clear();
         _executor->signalEvent(_sufficientResponsesReceived);

@@ -376,10 +376,8 @@ StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientImpl::getColle
     return repl::OpTimeWith<CollectionType>(collType, retOpTimePair.opTime);
 }
 
-Status ShardingCatalogClientImpl::getCollections(OperationContext* opCtx,
-                                                 const std::string* dbName,
-                                                 std::vector<CollectionType>* collections,
-                                                 OpTime* opTime) {
+StatusWith<std::vector<CollectionType>> ShardingCatalogClientImpl::getCollections(
+    OperationContext* opCtx, const std::string* dbName, OpTime* opTime) {
     BSONObjBuilder b;
     if (dbName) {
         invariant(!dbName->empty());
@@ -400,10 +398,10 @@ Status ShardingCatalogClientImpl::getCollections(OperationContext* opCtx,
 
     const auto& docsOpTimePair = findStatus.getValue();
 
+    std::vector<CollectionType> collections;
     for (const BSONObj& obj : docsOpTimePair.value) {
         const auto collectionResult = CollectionType::fromBSON(obj);
         if (!collectionResult.isOK()) {
-            collections->clear();
             return {ErrorCodes::FailedToParse,
                     str::stream() << "error while parsing " << CollectionType::ConfigNS
                                   << " document: "
@@ -412,14 +410,14 @@ Status ShardingCatalogClientImpl::getCollections(OperationContext* opCtx,
                                   << collectionResult.getStatus().toString()};
         }
 
-        collections->push_back(collectionResult.getValue());
+        collections.push_back(collectionResult.getValue());
     }
 
     if (opTime) {
         *opTime = docsOpTimePair.opTime;
     }
 
-    return Status::OK();
+    return collections;
 }
 
 Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
@@ -671,9 +669,8 @@ StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     return versionTypeResult.getValue();
 }
 
-Status ShardingCatalogClientImpl::getDatabasesForShard(OperationContext* opCtx,
-                                                       const ShardId& shardId,
-                                                       vector<string>* dbs) {
+StatusWith<std::vector<std::string>> ShardingCatalogClientImpl::getDatabasesForShard(
+    OperationContext* opCtx, const ShardId& shardId) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               kConfigReadSelector,
                                               repl::ReadConcernLevel::kMajorityReadConcern,
@@ -685,30 +682,29 @@ Status ShardingCatalogClientImpl::getDatabasesForShard(OperationContext* opCtx,
         return findStatus.getStatus();
     }
 
+    std::vector<std::string> dbs;
     for (const BSONObj& obj : findStatus.getValue().value) {
         string dbName;
         Status status = bsonExtractStringField(obj, DatabaseType::name(), &dbName);
         if (!status.isOK()) {
-            dbs->clear();
             return status;
         }
 
-        dbs->push_back(dbName);
+        dbs.push_back(dbName);
     }
 
-    return Status::OK();
+    return dbs;
 }
 
-Status ShardingCatalogClientImpl::getChunks(OperationContext* opCtx,
-                                            const BSONObj& query,
-                                            const BSONObj& sort,
-                                            boost::optional<int> limit,
-                                            vector<ChunkType>* chunks,
-                                            OpTime* opTime,
-                                            repl::ReadConcernLevel readConcern) {
+StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
+    OperationContext* opCtx,
+    const BSONObj& query,
+    const BSONObj& sort,
+    boost::optional<int> limit,
+    OpTime* opTime,
+    repl::ReadConcernLevel readConcern) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
               readConcern == repl::ReadConcernLevel::kMajorityReadConcern);
-    chunks->clear();
 
     // Convert boost::optional<int> to boost::optional<long long>.
     auto longLimit = limit ? boost::optional<long long>(*limit) : boost::none;
@@ -726,31 +722,29 @@ Status ShardingCatalogClientImpl::getChunks(OperationContext* opCtx,
     }
 
     const auto& chunkDocsOpTimePair = findStatus.getValue();
+
+    std::vector<ChunkType> chunks;
     for (const BSONObj& obj : chunkDocsOpTimePair.value) {
         auto chunkRes = ChunkType::fromConfigBSON(obj);
         if (!chunkRes.isOK()) {
-            chunks->clear();
             return {chunkRes.getStatus().code(),
                     stream() << "Failed to parse chunk with id " << obj[ChunkType::name()]
                              << " due to "
                              << chunkRes.getStatus().reason()};
         }
 
-        chunks->push_back(chunkRes.getValue());
+        chunks.push_back(chunkRes.getValue());
     }
 
     if (opTime) {
         *opTime = chunkDocsOpTimePair.opTime;
     }
 
-    return Status::OK();
+    return chunks;
 }
 
-Status ShardingCatalogClientImpl::getTagsForCollection(OperationContext* opCtx,
-                                                       const std::string& collectionNs,
-                                                       std::vector<TagsType>* tags) {
-    tags->clear();
-
+StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollection(
+    OperationContext* opCtx, const std::string& collectionNs) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               kConfigReadSelector,
                                               repl::ReadConcernLevel::kMajorityReadConcern,
@@ -764,20 +758,21 @@ Status ShardingCatalogClientImpl::getTagsForCollection(OperationContext* opCtx,
     }
 
     const auto& tagDocsOpTimePair = findStatus.getValue();
+
+    std::vector<TagsType> tags;
     for (const BSONObj& obj : tagDocsOpTimePair.value) {
         auto tagRes = TagsType::fromBSON(obj);
         if (!tagRes.isOK()) {
-            tags->clear();
             return {tagRes.getStatus().code(),
                     str::stream() << "Failed to parse tag with id " << obj[TagsType::tag()]
                                   << " due to "
                                   << tagRes.getStatus().toString()};
         }
 
-        tags->push_back(tagRes.getValue());
+        tags.push_back(tagRes.getValue());
     }
 
-    return Status::OK();
+    return tags;
 }
 
 StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::getAllShards(
@@ -980,16 +975,15 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
 
         // Look for the chunk in this shard whose version got bumped. We assume that if that
         // mod made it to the config server, then applyOps was successful.
-        std::vector<ChunkType> newestChunk;
         BSONObjBuilder query;
         lastChunkVersion.addToBSON(query, ChunkType::lastmod());
         query.append(ChunkType::ns(), nss);
-        Status chunkStatus =
-            getChunks(opCtx, query.obj(), BSONObj(), 1, &newestChunk, nullptr, readConcern);
+        auto swChunks = getChunks(opCtx, query.obj(), BSONObj(), 1, nullptr, readConcern);
+        const auto& newestChunk = swChunks.getValue();
 
-        if (!chunkStatus.isOK()) {
+        if (!swChunks.isOK()) {
             errMsg = str::stream() << "getChunks function failed, unable to validate chunk "
-                                   << "operation metadata: " << chunkStatus.toString()
+                                   << "operation metadata: " << swChunks.getStatus().toString()
                                    << ". applyChunkOpsDeprecated failed to get confirmation "
                                    << "of commit. Unable to save chunk ops. Command: " << cmd
                                    << ". Result: " << response.getValue().response;

@@ -93,7 +93,7 @@ class test_txn18(wttest.WiredTigerTestCase, suite_subprocess):
             lambda:self.wiredtiger_open(errdir, self.conn_recerror), msg)
 
         # If recover=error is run on the directory and returns an error,
-        # make sure when we subsequenty open with recover=on it properly
+        # make sure when we subsequently open with recover=on it properly
         # recovers all the data.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.wiredtiger_open(newdir, self.conn_recerror), msg)

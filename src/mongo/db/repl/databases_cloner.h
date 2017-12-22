@@ -51,13 +51,6 @@ namespace mongo {
 class OldThreadPool;
 
 namespace repl {
-namespace {
-
-using CBHStatus = StatusWith<executor::TaskExecutor::CallbackHandle>;
-using CommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
-
-}  // namespace.
 
 /**
  * Clones all databases.
@@ -136,17 +129,17 @@ private:
     void _setStatus_inlock(Status s);
 
     /** Will fail the cloner, call the completion function, and become inactive. */
-    void _fail_inlock(UniqueLock* lk, Status s);
+    void _fail_inlock(stdx::unique_lock<stdx::mutex>* lk, Status s);
 
     /** Will call the completion function, and become inactive. */
-    void _succeed_inlock(UniqueLock* lk);
+    void _succeed_inlock(stdx::unique_lock<stdx::mutex>* lk);
 
     /** Called each time a database clone is finished */
     void _onEachDBCloneFinish(const Status& status, const std::string& name);
 
     //  Callbacks
 
-    void _onListDatabaseFinish(const CommandCallbackArgs& cbd);
+    void _onListDatabaseFinish(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbd);
 
     /**
      * Takes a vector of BSONElements and scans for an element that contains a 'name' field with the

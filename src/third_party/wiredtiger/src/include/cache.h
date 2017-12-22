@@ -89,9 +89,7 @@ struct __wt_cache {
 	uint64_t worker_evicts;		/* Pages evicted by worker threads */
 
 	uint64_t evict_max_page_size;	/* Largest page seen at eviction */
-#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 	struct timespec stuck_time;	/* Stuck time */
-#endif
 
 	/*
 	 * Read information.
@@ -142,7 +140,8 @@ struct __wt_cache {
 	 */
 	WT_SPINLOCK evict_pass_lock;	/* Eviction pass lock */
 	WT_SESSION_IMPL *walk_session;	/* Eviction pass session */
-	WT_DATA_HANDLE *evict_file_next;/* LRU next file to search */
+	WT_DATA_HANDLE *walk_tree;	/* LRU walk current tree */
+	uint32_t walk_progress, walk_target;/* Progress in current tree */
 
 	WT_SPINLOCK evict_queue_lock;	/* Eviction current queue lock */
 	WT_EVICT_QUEUE evict_queues[WT_EVICT_QUEUE_MAX];
@@ -232,17 +231,21 @@ struct __wt_cache {
 	/*
 	 * Flags.
 	 */
-#define	WT_CACHE_POOL_MANAGER	  0x001 /* The active cache pool manager */
-#define	WT_CACHE_POOL_RUN	  0x002 /* Cache pool thread running */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CACHE_POOL_MANAGER	  0x1u	/* The active cache pool manager */
+#define	WT_CACHE_POOL_RUN	  0x2u	/* Cache pool thread running */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t pool_flags;		/* Cache pool flags */
 
-#define	WT_CACHE_EVICT_CLEAN	  0x001 /* Evict clean pages */
-#define	WT_CACHE_EVICT_CLEAN_HARD 0x002 /* Clean % blocking app threads */
-#define	WT_CACHE_EVICT_DIRTY	  0x004 /* Evict dirty pages */
-#define	WT_CACHE_EVICT_DIRTY_HARD 0x008 /* Dirty % blocking app threads */
-#define	WT_CACHE_EVICT_LOOKASIDE  0x010 /* Try lookaside eviction */
-#define	WT_CACHE_EVICT_SCRUB	  0x020 /* Scrub dirty pages */
-#define	WT_CACHE_EVICT_URGENT	  0x040 /* Pages are in the urgent queue */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CACHE_EVICT_CLEAN	  0x01u	/* Evict clean pages */
+#define	WT_CACHE_EVICT_CLEAN_HARD 0x02u	/* Clean % blocking app threads */
+#define	WT_CACHE_EVICT_DIRTY	  0x04u	/* Evict dirty pages */
+#define	WT_CACHE_EVICT_DIRTY_HARD 0x08u	/* Dirty % blocking app threads */
+#define	WT_CACHE_EVICT_LOOKASIDE  0x10u	/* Try lookaside eviction */
+#define	WT_CACHE_EVICT_SCRUB	  0x20u	/* Scrub dirty pages */
+#define	WT_CACHE_EVICT_URGENT	  0x40u	/* Pages are in the urgent queue */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 #define	WT_CACHE_EVICT_ALL	(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY)
 	uint32_t flags;
 };
@@ -271,6 +274,8 @@ struct __wt_cache_pool {
 
 	uint8_t pool_managed;		/* Cache pool has a manager thread */
 
-#define	WT_CACHE_POOL_ACTIVE	0x01	/* Cache pool is active */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CACHE_POOL_ACTIVE	0x1u	/* Cache pool is active */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint8_t flags;
 };

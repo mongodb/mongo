@@ -119,8 +119,7 @@ public:
     }
 
     void run() {
-        _thread.reset(
-            new stdx::thread(stdx::bind(&ScatterGatherRunnerRunner::_run, this, _executor)));
+        _thread = stdx::make_unique<stdx::thread>([this] { _run(_executor); });
     }
 
 private:

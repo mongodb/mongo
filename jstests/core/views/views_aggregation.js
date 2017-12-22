@@ -1,6 +1,7 @@
 /**
  * Tests aggregation on views for proper pipeline concatenation and semantics.
- * @tags: [requires_find_command]
+ * @tags: [requires_find_command, does_not_support_stepdowns, requires_getmore,
+ * requires_non_retryable_commands]
  */
 (function() {
     "use strict";

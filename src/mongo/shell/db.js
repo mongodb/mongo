@@ -562,7 +562,7 @@ var DB;
         }
 
         // Fall back to MONGODB-CR
-        var n = this._adminCommand({copydbgetnonce: 1, fromhost: fromhost});
+        var n = assert.commandWorked(this._adminCommand({copydbgetnonce: 1, fromhost: fromhost}));
         return this._adminCommand({
             copydb: 1,
             fromhost: fromhost,
@@ -1568,11 +1568,6 @@ var DB;
         if (this._defaultAuthenticationMechanism != null)
             return this._defaultAuthenticationMechanism;
 
-        // Use MONGODB-CR for v2.6 and earlier.
-        maxWireVersion = this.isMaster().maxWireVersion;
-        if (maxWireVersion == undefined || maxWireVersion < 3) {
-            return "MONGODB-CR";
-        }
         return "SCRAM-SHA-1";
     };
 

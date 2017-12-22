@@ -79,6 +79,10 @@ public:
         // is being migrated out. (Not to be confused with "fromMigrate", which tags operations
         // that are steps in performing the migration.)
         bool isMigrating;
+
+        // For verifying the protocol used by OpObserver that aboutToDelete must be called before
+        // onDelete. Set by the OpObserverImpl::aboutToDelete and cleared by onDelete.
+        bool aboutToDeleteCalled;
     };
 
     DeleteState makeDeleteState(BSONObj const& doc);

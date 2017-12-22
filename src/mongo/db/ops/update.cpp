@@ -113,8 +113,7 @@ BSONObj applyUpdateOperators(OperationContext* opCtx,
                              const BSONObj& operators) {
     const CollatorInterface* collator = nullptr;
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
-    UpdateDriver::Options opts(std::move(expCtx));
-    UpdateDriver driver(opts);
+    UpdateDriver driver(std::move(expCtx));
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     Status status = driver.parse(operators, arrayFilters);
     if (!status.isOK()) {
@@ -123,13 +122,9 @@ BSONObj applyUpdateOperators(OperationContext* opCtx,
 
     mutablebson::Document doc(from, mutablebson::Document::kInPlaceDisabled);
 
-    // The original document can be empty because it is only needed for validation of immutable
-    // paths.
-    const BSONObj emptyOriginal;
     const bool validateForStorage = false;
     const FieldRefSet emptyImmutablePaths;
-    status =
-        driver.update(StringData(), emptyOriginal, &doc, validateForStorage, emptyImmutablePaths);
+    status = driver.update(StringData(), &doc, validateForStorage, emptyImmutablePaths);
     if (!status.isOK()) {
         uasserted(16839, status.reason());
     }

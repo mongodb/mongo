@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Basic test which checks the number of documents returned, keys examined, and documents
 // examined as reported by explain.
 

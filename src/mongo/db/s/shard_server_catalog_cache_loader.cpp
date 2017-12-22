@@ -254,7 +254,7 @@ void forcePrimaryRefreshAndWaitForReplication(OperationContext* opCtx, const Nam
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
-        BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
+        BSON("forceRoutingTableRefresh" << nss.ns()),
         Seconds{30},
         Shard::RetryPolicy::kIdempotent));
 

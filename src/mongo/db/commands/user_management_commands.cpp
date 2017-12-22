@@ -544,23 +544,23 @@ Status writeAuthSchemaVersionIfNeeded(OperationContext* opCtx,
 
 /**
  * Returns Status::OK() if the current Auth schema version is at least the auth schema version
- * for the MongoDB 2.6 and 3.0 MongoDB-CR/SCRAM mixed auth mode.
+ * for the MongoDB 3.0 SCRAM auth mode.
  * Returns an error otherwise.
  */
-Status requireAuthSchemaVersion26Final(OperationContext* opCtx,
-                                       AuthorizationManager* authzManager) {
+Status requireWritableAuthSchema28SCRAM(OperationContext* opCtx,
+                                        AuthorizationManager* authzManager) {
     int foundSchemaVersion;
     Status status = authzManager->getAuthorizationVersion(opCtx, &foundSchemaVersion);
     if (!status.isOK()) {
         return status;
     }
 
-    if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
+    if (foundSchemaVersion < AuthorizationManager::schemaVersion28SCRAM) {
         return Status(ErrorCodes::AuthSchemaIncompatible,
                       str::stream()
                           << "User and role management commands require auth data to have "
                           << "at least schema version "
-                          << AuthorizationManager::schemaVersion26Final
+                          << AuthorizationManager::schemaVersion28SCRAM
                           << " but found "
                           << foundSchemaVersion);
     }
@@ -571,9 +571,16 @@ Status requireAuthSchemaVersion26Final(OperationContext* opCtx,
  * Returns Status::OK() if the current Auth schema version is at least the auth schema version
  * for MongoDB 2.6 during the upgrade process.
  * Returns an error otherwise.
+ *
+ * This method should only be called by READ-ONLY commands (usersInfo & rolesInfo)
+ * because getAuthorizationVersion() will return the current max version without
+ * reifying the authSchema setting in the admin database.
+ *
+ * If records are added thinking we're at one schema level, then the default is changed,
+ * then the auth database would wind up in an inconsistent state.
  */
-Status requireAuthSchemaVersion26UpgradeOrFinal(OperationContext* opCtx,
-                                                AuthorizationManager* authzManager) {
+Status requireReadableAuthSchema26Upgrade(OperationContext* opCtx,
+                                          AuthorizationManager* authzManager) {
     int foundSchemaVersion;
     Status status = authzManager->getAuthorizationVersion(opCtx, &foundSchemaVersion);
     if (!status.isOK()) {
@@ -683,14 +690,10 @@ public:
             // Must be an external user
             credentialsBuilder.append("external", true);
         } else {
-            // Add SCRAM credentials for appropriate authSchemaVersions.
-            if (authzVersion > AuthorizationManager::schemaVersion26Final) {
-                BSONObj scramCred = scram::generateCredentials(
-                    args.hashedPassword, saslGlobalParams.scramIterationCount.load());
-                credentialsBuilder.append("SCRAM-SHA-1", scramCred);
-            } else {  // Otherwise default to MONGODB-CR.
-                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
-            }
+            // Add SCRAM credentials.
+            BSONObj scramCred = scram::generateCredentials(
+                args.hashedPassword, saslGlobalParams.scramIterationCount.load());
+            credentialsBuilder.append("SCRAM-SHA-1", scramCred);
         }
         credentialsBuilder.done();
 
@@ -714,7 +717,7 @@ public:
 
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -797,21 +800,11 @@ public:
         if (args.hasHashedPassword) {
             BSONObjBuilder credentialsBuilder(updateSetBuilder.subobjStart("credentials"));
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            int authzVersion;
-            Status status = authzManager->getAuthorizationVersion(opCtx, &authzVersion);
-            if (!status.isOK()) {
-                return appendCommandStatus(result, status);
-            }
+            // Add SCRAM credentials.
+            BSONObj scramCred = scram::generateCredentials(
+                args.hashedPassword, saslGlobalParams.scramIterationCount.load());
+            credentialsBuilder.append("SCRAM-SHA-1", scramCred);
 
-            // Add SCRAM credentials for appropriate authSchemaVersions
-            if (authzVersion > AuthorizationManager::schemaVersion26Final) {
-                BSONObj scramCred = scram::generateCredentials(
-                    args.hashedPassword, saslGlobalParams.scramIterationCount.load());
-                credentialsBuilder.append("SCRAM-SHA-1", scramCred);
-            } else {  // Otherwise default to MONGODB-CR
-                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
-            }
             credentialsBuilder.done();
         }
 
@@ -852,7 +845,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -922,7 +915,7 @@ public:
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -988,7 +981,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1048,7 +1041,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1120,7 +1113,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1190,7 +1183,7 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        status = requireAuthSchemaVersion26UpgradeOrFinal(opCtx, getGlobalAuthorizationManager());
+        status = requireReadableAuthSchema26Upgrade(opCtx, getGlobalAuthorizationManager());
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1373,7 +1366,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1469,7 +1462,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1557,7 +1550,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1666,7 +1659,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1787,7 +1780,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1867,7 +1860,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -1953,7 +1946,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2104,7 +2097,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2243,7 +2236,7 @@ public:
             return appendCommandStatus(result, status);
         }
 
-        status = requireAuthSchemaVersion26UpgradeOrFinal(opCtx, getGlobalAuthorizationManager());
+        status = requireReadableAuthSchema26Upgrade(opCtx, getGlobalAuthorizationManager());
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2452,14 +2445,14 @@ public:
         if (create) {
             audit::logCreateUser(Client::getCurrent(),
                                  userName,
-                                 userObj["credentials"].Obj().hasField("MONGODB-CR"),
+                                 userObj["credentials"].Obj().hasField("SCRAM-SHA-1"),
                                  userObj.hasField("customData") ? &customData : NULL,
                                  roles,
                                  authenticationRestrictions);
         } else {
             audit::logUpdateUser(Client::getCurrent(),
                                  userName,
-                                 userObj["credentials"].Obj().hasField("MONGODB-CR"),
+                                 userObj["credentials"].Obj().hasField("SCRAM-SHA-1"),
                                  userObj.hasField("customData") ? &customData : NULL,
                                  &roles,
                                  authenticationRestrictions);
@@ -2743,7 +2736,7 @@ public:
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-        status = requireAuthSchemaVersion26Final(opCtx, authzManager);
+        status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
         }
@@ -2769,218 +2762,4 @@ public:
 
 } cmdMergeAuthzCollections;
 
-/**
- * Logs that the auth schema upgrade failed because of "status" and returns "status".
- */
-Status logUpgradeFailed(const Status& status) {
-    log() << "Auth schema upgrade failed with " << redact(status);
-    return status;
-}
-
-/**
- * Updates a single user document from MONGODB-CR to SCRAM credentials.
- *
- * Throws a DBException on errors.
- */
-void updateUserCredentials(OperationContext* opCtx,
-                           const StringData& sourceDB,
-                           const BSONObj& userDoc) {
-    // Skip users in $external, SERVER-18475
-    if (userDoc["db"].String() == "$external") {
-        return;
-    }
-
-    BSONElement credentialsElement = userDoc["credentials"];
-    uassert(18806,
-            mongoutils::str::stream()
-                << "While preparing to upgrade user doc from "
-                   "2.6/3.0 user data schema to the 3.0+ SCRAM only schema, found a user doc "
-                   "with missing or incorrectly formatted credentials: "
-                << userDoc.toString(),
-            credentialsElement.type() == Object);
-
-    BSONObj credentialsObj = credentialsElement.Obj();
-    BSONElement mongoCRElement = credentialsObj["MONGODB-CR"];
-    BSONElement scramElement = credentialsObj["SCRAM-SHA-1"];
-
-    // Ignore any user documents that already have SCRAM credentials. This should only
-    // occur if a previous authSchemaUpgrade was interrupted halfway.
-    if (!scramElement.eoo()) {
-        return;
-    }
-
-    uassert(18744,
-            mongoutils::str::stream()
-                << "While preparing to upgrade user doc from "
-                   "2.6/3.0 user data schema to the 3.0+ SCRAM only schema, found a user doc "
-                   "missing MONGODB-CR credentials :"
-                << userDoc.toString(),
-            !mongoCRElement.eoo());
-
-    std::string hashedPassword = mongoCRElement.String();
-
-    BSONObj query = BSON("_id" << userDoc["_id"].String());
-    BSONObjBuilder updateBuilder;
-    {
-        BSONObjBuilder toSetBuilder(updateBuilder.subobjStart("$set"));
-        toSetBuilder << "credentials"
-                     << BSON("SCRAM-SHA-1" << scram::generateCredentials(
-                                 hashedPassword, saslGlobalParams.scramIterationCount.load()));
-    }
-
-    uassertStatusOK(updateOneAuthzDocument(
-        opCtx, NamespaceString("admin", "system.users"), query, updateBuilder.obj(), true));
-}
-
-/** Loop through all the user documents in the admin.system.users collection.
- *  For each user document:
- *   1. Compute SCRAM credentials based on the MONGODB-CR hash
- *   2. Remove the MONGODB-CR hash
- *   3. Add SCRAM credentials to the user document credentials section
- */
-Status updateCredentials(OperationContext* opCtx) {
-    // Loop through and update the user documents in admin.system.users.
-    Status status = queryAuthzDocument(
-        opCtx,
-        NamespaceString("admin", "system.users"),
-        BSONObj(),
-        BSONObj(),
-        [opCtx](const BSONObj& userDoc) { return updateUserCredentials(opCtx, "admin", userDoc); });
-    if (!status.isOK())
-        return logUpgradeFailed(status);
-
-    // Update the schema version document.
-    status =
-        updateOneAuthzDocument(opCtx,
-                               AuthorizationManager::versionCollectionNamespace,
-                               AuthorizationManager::versionDocumentQuery,
-                               BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName
-                                                   << AuthorizationManager::schemaVersion28SCRAM)),
-                               true);
-    if (!status.isOK())
-        return logUpgradeFailed(status);
-
-    return Status::OK();
-}
-
-/**
- * Performs one step in the process of upgrading the stored authorization data to the
- * newest schema.
- *
- * On success, returns Status::OK(), and *isDone will indicate whether there are more
- * steps to perform.
- *
- * If the authorization data is already fully upgraded, returns Status::OK and sets *isDone
- * to true, so this is safe to call on a fully upgraded system.
- *
- * On failure, returns a status other than Status::OK().  In this case, is is typically safe
- * to try again.
- */
-Status upgradeAuthSchemaStep(OperationContext* opCtx,
-                             AuthorizationManager* authzManager,
-                             bool* isDone) {
-    int authzVersion;
-    Status status = authzManager->getAuthorizationVersion(opCtx, &authzVersion);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    switch (authzVersion) {
-        case AuthorizationManager::schemaVersion26Final:
-        case AuthorizationManager::schemaVersion28SCRAM: {
-            Status status = updateCredentials(opCtx);
-            if (status.isOK())
-                *isDone = true;
-            return status;
-        }
-        default:
-            return Status(ErrorCodes::AuthSchemaIncompatible,
-                          mongoutils::str::stream()
-                              << "Do not know how to upgrade auth schema from version "
-                              << authzVersion);
-    }
-}
-
-/**
- * Performs up to maxSteps steps in the process of upgrading the stored authorization data
- * to the newest schema.  Behaves as if by repeatedly calling upgradeSchemaStep up to
- * maxSteps times until either it completes the upgrade or returns a non-OK status.
- *
- * Invalidates the user cache before the first step and after each attempted step.
- *
- * Returns Status::OK() to indicate that the upgrade process has completed successfully.
- * Returns ErrorCodes::OperationIncomplete to indicate that progress was made, but that more
- * steps must be taken to complete the process.  Other returns indicate a failure to make
- * progress performing the upgrade, and the specific code and message in the returned status
- * may provide additional information.
- */
-Status upgradeAuthSchema(OperationContext* opCtx,
-                         AuthorizationManager* authzManager,
-                         int maxSteps) {
-    if (maxSteps < 1) {
-        return Status(ErrorCodes::BadValue,
-                      "Minimum value for maxSteps parameter to upgradeAuthSchema is 1");
-    }
-    authzManager->invalidateUserCache();
-    for (int i = 0; i < maxSteps; ++i) {
-        bool isDone;
-        Status status = upgradeAuthSchemaStep(opCtx, authzManager, &isDone);
-        authzManager->invalidateUserCache();
-        if (!status.isOK() || isDone) {
-            return status;
-        }
-    }
-    return Status(ErrorCodes::OperationIncomplete,
-                  mongoutils::str::stream() << "Auth schema upgrade incomplete after " << maxSteps
-                                            << " successful steps.");
-}
-
-class CmdAuthSchemaUpgrade : public BasicCommand {
-public:
-    CmdAuthSchemaUpgrade() : BasicCommand("authSchemaUpgrade") {}
-
-    virtual bool slaveOk() const {
-        return false;
-    }
-
-    virtual bool adminOnly() const {
-        return true;
-    }
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    virtual void help(stringstream& ss) const {
-        ss << "Upgrades the auth data storage schema";
-    }
-
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
-        return auth::checkAuthForAuthSchemaUpgradeCommand(client);
-    }
-
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        auth::AuthSchemaUpgradeArgs parsedArgs;
-        Status status = auth::parseAuthSchemaUpgradeCommand(cmdObj, dbname, &parsedArgs);
-        if (!status.isOK()) {
-            return appendCommandStatus(result, status);
-        }
-
-        ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-
-        stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
-
-        status = upgradeAuthSchema(opCtx, authzManager, parsedArgs.maxSteps);
-        if (status.isOK())
-            result.append("done", true);
-        return appendCommandStatus(result, status);
-    }
-
-} cmdAuthSchemaUpgrade;
 }  // namespace mongo

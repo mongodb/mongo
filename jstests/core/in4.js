@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // SERVER-2343 Test $in empty array matching.
 
 t = db.jstests_in9;

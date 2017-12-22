@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 NUM = 20;
 M = 5;
 

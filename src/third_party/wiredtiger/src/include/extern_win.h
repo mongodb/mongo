@@ -27,6 +27,7 @@ extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, WT_
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_thread_id(uintmax_t *id);
 extern int __wt_thread_str(char *buf, size_t buflen) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern uintmax_t __wt_process_id(void);
 extern void __wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp);
 extern int __wt_to_utf16_string( WT_SESSION_IMPL *session, const char*utf8, WT_ITEM **outbuf) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_to_utf8_string( WT_SESSION_IMPL *session, const wchar_t*wide, WT_ITEM **outbuf) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

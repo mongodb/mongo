@@ -42,7 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/insert.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logger/redaction.h"
 #include "mongo/util/log.h"
 
@@ -88,9 +88,10 @@ Status createCollection(OperationContext* opCtx,
 
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         Lock::DBLock dbXLock(opCtx, nss.db(), MODE_X);
-        OldClientContext ctx(opCtx, nss.ns());
+        const bool shardVersionCheck = true;
+        OldClientContext ctx(opCtx, nss.ns(), shardVersionCheck);
         if (opCtx->writesAreReplicated() &&
-            !repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss)) {
+            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
             return Status(ErrorCodes::NotMaster,
                           str::stream() << "Not primary while creating collection " << nss.ns());
         }
@@ -130,9 +131,12 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const BSONObj& cmdObj,
                                    const BSONObj& idIndex) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
-    auto db = dbHolder().get(opCtx, dbName);
+
     const NamespaceString newCollName(Command::parseNsCollectionRequired(dbName, cmdObj));
     auto newCmd = cmdObj;
+
+    auto* const serviceContext = opCtx->getServiceContext();
+    auto* const db = dbHolder().get(opCtx, dbName);
 
     // If a UUID is given, see if we need to rename a collection out of the way, and whether the
     // collection already exists under a different name. If so, rename it into place. As this is
@@ -154,8 +158,8 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                         uuid.isRFC4122v4());
 
                 auto& catalog = UUIDCatalog::get(opCtx);
-                auto currentName = catalog.lookupNSSByUUID(uuid);
-                OpObserver* opObserver = getGlobalServiceContext()->getOpObserver();
+                const auto currentName = catalog.lookupNSSByUUID(uuid);
+                OpObserver* const opObserver = serviceContext->getOpObserver();
                 if (currentName == newCollName)
                     return Result(Status::OK());
 

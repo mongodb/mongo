@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Test covered index projection with $or clause, specifically in getMore
 // SERVER-4980
 

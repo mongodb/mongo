@@ -176,10 +176,14 @@ public:
      * The applied through point is a persistent record of which oplog entries we've applied.
      * If we crash while applying a batch of oplog entries, this OpTime tells us where to start
      * applying operations on startup.
-     *
-     * If null, the applied through point is the top of the oplog.
      */
     virtual void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) = 0;
+
+    /**
+     * Unsets the applied through OpTime at the given 'writeTimestamp'.
+     * Once cleared, the applied through point is the top of the oplog.
+     */
+    virtual void clearAppliedThrough(OperationContext* opCtx, const Timestamp& writeTimestamp) = 0;
 
     /**
      * You should probably be calling ReplicationCoordinator::getLastAppliedOpTime() instead.

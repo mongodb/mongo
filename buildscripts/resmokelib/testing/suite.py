@@ -63,8 +63,6 @@ class Suite(object):
         filtering policy.
         """
         test_info = self.get_selector_config()
-        if not test_info:
-            return [], []
 
         # The mongos_test doesn't have to filter anything, the test_info is just the arguments to
         # the mongos program to be used as the test case.
@@ -102,7 +100,7 @@ class Suite(object):
         """
 
         if "selector" not in self._suite_config:
-            return None
+            return {}
         selector = self._suite_config["selector"].copy()
 
         if self.options.include_tags is not None:

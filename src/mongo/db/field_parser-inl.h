@@ -30,8 +30,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-using mongoutils::str::stream;
+namespace {
 
 template <class T>
 void _genFieldErrMsg(const BSONElement& elem,
@@ -40,9 +39,18 @@ void _genFieldErrMsg(const BSONElement& elem,
                      std::string* errMsg) {
     if (!errMsg)
         return;
-    *errMsg = stream() << "wrong type for '" << field() << "' field, expected " << expected
-                       << ", found " << elem.toString();
+    *errMsg = str::stream() << "wrong type for '" << field() << "' field, expected " << expected
+                            << ", found " << elem.toString();
 }
+
+template <typename T>
+void _clearOwnedVector(std::vector<T*>* vec) {
+    for (typename std::vector<T*>::iterator it = vec->begin(); it != vec->end(); ++it) {
+        delete (*it);
+    }
+}
+
+}  // namespace
 
 template <typename T>
 FieldParser::FieldState FieldParser::extract(BSONObj doc,
@@ -121,9 +129,9 @@ FieldParser::FieldState FieldParser::extract(BSONObj doc,
 
     if (elem.type() != Object && elem.type() != Array) {
         if (errMsg) {
-            *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
-                               << "vector or array"
-                               << ", found " << doc[field.name()].toString();
+            *errMsg = str::stream() << "wrong type for '" << field() << "' field, expected "
+                                    << "vector or array"
+                                    << ", found " << doc[field.name()].toString();
         }
         return FIELD_INVALID;
     }
@@ -176,8 +184,8 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
 
             if (!FieldParser::extract(next, fieldFor, &out->at(initialSize + i), &elErrMsg)) {
                 if (errMsg) {
-                    *errMsg = stream() << "error parsing element " << i << " of field " << field()
-                                       << causedBy(elErrMsg);
+                    *errMsg = str::stream() << "error parsing element " << i << " of field "
+                                            << field() << causedBy(elErrMsg);
                 }
                 return FIELD_INVALID;
             }
@@ -188,9 +196,9 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
     }
 
     if (errMsg) {
-        *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
-                           << "vector array"
-                           << ", found " << elem.toString();
+        *errMsg = str::stream() << "wrong type for '" << field() << "' field, expected "
+                                << "vector array"
+                                << ", found " << elem.toString();
     }
     return FIELD_INVALID;
 }
@@ -217,9 +225,9 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
                                              std::string* errMsg) {
     if (elem.type() != Array) {
         if (errMsg) {
-            *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
-                               << "vector array"
-                               << ", found " << elem.toString();
+            *errMsg = str::stream() << "wrong type for '" << field() << "' field, expected "
+                                    << "vector array"
+                                    << ", found " << elem.toString();
         }
         return FIELD_INVALID;
     }
@@ -231,15 +239,15 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
 
         if (next.type() != Object) {
             if (errMsg) {
-                *errMsg = stream() << "wrong type for '" << field() << "' field contents, "
-                                   << "expected object, found " << elem.type();
+                *errMsg = str::stream() << "wrong type for '" << field() << "' field contents, "
+                                        << "expected object, found " << elem.type();
             }
             return FIELD_INVALID;
         }
 
         std::unique_ptr<T> toInsert(new T);
 
-        if (!toInsert->parseBSON(next.embeddedObject(), errMsg) || !toInsert->isValid(errMsg)) {
+        if (!toInsert->parseBSON(next.embeddedObject(), errMsg)) {
             return FIELD_INVALID;
         }
 
@@ -247,13 +255,6 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
     }
 
     return FIELD_SET;
-}
-
-template <typename T>
-void FieldParser::clearOwnedVector(std::vector<T*>* vec) {
-    for (typename std::vector<T*>::iterator it = vec->begin(); it != vec->end(); ++it) {
-        delete (*it);
-    }
 }
 
 template <typename T>
@@ -270,9 +271,9 @@ FieldParser::FieldState FieldParser::extract(BSONObj doc,
 
     if (elem.type() != Array) {
         if (errMsg) {
-            *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
-                               << "vector array"
-                               << ", found " << doc[field.name()].toString();
+            *errMsg = str::stream() << "wrong type for '" << field() << "' field, expected "
+                                    << "vector array"
+                                    << ", found " << doc[field.name()].toString();
         }
         return FIELD_INVALID;
     }
@@ -286,16 +287,16 @@ FieldParser::FieldState FieldParser::extract(BSONObj doc,
 
         if (next.type() != Object) {
             if (errMsg) {
-                *errMsg = stream() << "wrong type for '" << field() << "' field contents, "
-                                   << "expected object, found " << elem.type();
+                *errMsg = str::stream() << "wrong type for '" << field() << "' field contents, "
+                                        << "expected object, found " << elem.type();
             }
-            clearOwnedVector(tempVector.get());
+            _clearOwnedVector(tempVector.get());
             return FIELD_INVALID;
         }
 
         std::unique_ptr<T> toInsert(new T);
         if (!toInsert->parseBSON(next.embeddedObject(), errMsg)) {
-            clearOwnedVector(tempVector.get());
+            _clearOwnedVector(tempVector.get());
             return FIELD_INVALID;
         }
 
@@ -341,8 +342,8 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
             BSONField<T> fieldFor(next.fieldName(), value);
             if (!FieldParser::extract(next, fieldFor, &value, &elErrMsg)) {
                 if (errMsg) {
-                    *errMsg = stream() << "error parsing map element " << next.fieldName()
-                                       << " of field " << field() << causedBy(elErrMsg);
+                    *errMsg = str::stream() << "error parsing map element " << next.fieldName()
+                                            << " of field " << field() << causedBy(elErrMsg);
                 }
                 return FIELD_INVALID;
             }
@@ -352,9 +353,9 @@ FieldParser::FieldState FieldParser::extract(BSONElement elem,
     }
 
     if (errMsg) {
-        *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
-                           << "vector array"
-                           << ", found " << elem.toString();
+        *errMsg = str::stream() << "wrong type for '" << field() << "' field, expected "
+                                << "vector array"
+                                << ", found " << elem.toString();
     }
     return FIELD_INVALID;
 }

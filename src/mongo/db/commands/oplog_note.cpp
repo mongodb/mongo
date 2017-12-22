@@ -148,7 +148,7 @@ public:
                 result, _performNoopWrite(opCtx, dataElement.Obj(), "appendOpLogNote"));
         } else {
             std::stringstream ss;
-            ss << "Requested maxClusterTime" << LogicalTime(maxClusterTime).toString()
+            ss << "Requested maxClusterTime " << LogicalTime(maxClusterTime).toString()
                << " is less or equal to the last primary OpTime: "
                << LogicalTime(lastAppliedOpTime).toString();
             return appendCommandStatus(result, {ErrorCodes::StaleClusterTime, ss.str()});

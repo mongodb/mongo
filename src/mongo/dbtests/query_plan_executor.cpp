@@ -296,7 +296,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfExceedsTimeLimitDuringYield) {
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, WorkingSetCommon::getMemberObjectStatus(resultObj));
 }
 
-TEST_F(PlanExecutorTest, ShouldReportEOFIfExceedsTimeLimitDuringYieldButIsTailableAndAwaitData) {
+TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwaitData) {
     OldClientWriteContext ctx(&_opCtx, nss.ns());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
@@ -310,7 +310,8 @@ TEST_F(PlanExecutorTest, ShouldReportEOFIfExceedsTimeLimitDuringYieldButIsTailab
                                  TailableMode::kTailableAndAwaitData);
 
     BSONObj resultObj;
-    ASSERT_EQ(PlanExecutor::IS_EOF, exec->getNext(&resultObj, nullptr));
+    ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, WorkingSetCommon::getMemberObjectStatus(resultObj));
 }
 
 TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailableButNotAwaitData) {

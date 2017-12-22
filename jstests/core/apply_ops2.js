@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // Test applyops upsert flag SERVER-7452
 
 var t = db.apply_ops2;

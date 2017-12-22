@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // Test that client gets stack trace on failed invoke
 
 f = db.jstests_error2;

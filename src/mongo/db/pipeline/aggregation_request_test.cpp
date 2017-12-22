@@ -81,16 +81,6 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
                            << "nearest"));
 }
 
-TEST(AggregationRequestTest, ShouldParseNeedsMerge34) {
-    NamespaceString nss("a.collection");
-    const BSONObj inputBson =
-        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromRouter: true}");
-    auto request = unittest::assertGet(AggregationRequest::parseFromBSON(nss, inputBson));
-    ASSERT_TRUE(request.needsMerge());
-    ASSERT_TRUE(request.isFromMongos());
-    ASSERT_TRUE(request.isFrom34Mongos());
-}
-
 TEST(AggregationRequestTest, ShouldParseExplicitExplainTrue) {
     NamespaceString nss("a.collection");
     const BSONObj inputBson = fromjson("{pipeline: [], explain: true, cursor: {}}");
@@ -433,6 +423,13 @@ TEST(AggregationRequestTest, ShouldRejectExplainExecStatsVerbosityWithWriteConce
     ASSERT_NOT_OK(
         AggregationRequest::parseFromBSON(nss, inputBson, ExplainOptions::Verbosity::kExecStats)
             .getStatus());
+}
+
+TEST(AggregationRequestTest, CannotParseNeedsMerge34) {
+    NamespaceString nss("a.collection");
+    const BSONObj inputBson =
+        fromjson("{pipeline: [{$match: {a: 'abc'}}], cursor: {}, fromRouter: true}");
+    ASSERT_NOT_OK(AggregationRequest::parseFromBSON(nss, inputBson).getStatus());
 }
 
 TEST(AggregationRequestTest, ParseNSShouldReturnAggregateOneNSIfAggregateFieldIsOne) {

@@ -33,72 +33,70 @@
 namespace mongo {
 
 class OpObserverNoop : public OpObserver {
-    MONGO_DISALLOW_COPYING(OpObserverNoop);
-
 public:
-    OpObserverNoop() = default;
-    virtual ~OpObserverNoop() = default;
-
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        OptionalCollectionUUID uuid,
                        BSONObj indexDoc,
-                       bool fromMigrate) override;
+                       bool fromMigrate) override {}
     void onInserts(OperationContext* opCtx,
                    const NamespaceString& nss,
                    OptionalCollectionUUID uuid,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
-                   bool fromMigrate) override;
-    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
-    CollectionShardingState::DeleteState aboutToDelete(OperationContext* opCtx,
-                                                       const NamespaceString& nss,
-                                                       const BSONObj& doc) override;
+                   bool fromMigrate) override {}
+    void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override{};
+    void aboutToDelete(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       const BSONObj& doc) override {}
     void onDelete(OperationContext* opCtx,
                   const NamespaceString& nss,
                   OptionalCollectionUUID uuid,
                   StmtId stmtId,
-                  CollectionShardingState::DeleteState deleteState,
                   bool fromMigrate,
-                  const boost::optional<BSONObj>& deletedDoc) override;
+                  const boost::optional<BSONObj>& deletedDoc) override {}
     void onInternalOpMessage(OperationContext* opCtx,
                              const NamespaceString& nss,
                              const boost::optional<UUID> uuid,
                              const BSONObj& msgObj,
-                             const boost::optional<BSONObj> o2MsgObj) override;
+                             const boost::optional<BSONObj> o2MsgObj) override {}
     void onCreateCollection(OperationContext* opCtx,
                             Collection* coll,
                             const NamespaceString& collectionName,
                             const CollectionOptions& options,
-                            const BSONObj& idIndex) override;
+                            const BSONObj& idIndex) override {}
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,
                    OptionalCollectionUUID uuid,
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
-                   boost::optional<TTLCollModInfo> ttlInfo) override;
-    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override;
+                   boost::optional<TTLCollModInfo> ttlInfo) override {}
+    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override {}
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
-                                  OptionalCollectionUUID uuid) override;
+                                  OptionalCollectionUUID uuid) override {
+        return {};
+    }
     void onDropIndex(OperationContext* opCtx,
                      const NamespaceString& nss,
                      OptionalCollectionUUID uuid,
                      const std::string& indexName,
-                     const BSONObj& idxDescriptor) override;
+                     const BSONObj& idxDescriptor) override {}
     repl::OpTime onRenameCollection(OperationContext* opCtx,
                                     const NamespaceString& fromCollection,
                                     const NamespaceString& toCollection,
                                     OptionalCollectionUUID uuid,
                                     bool dropTarget,
                                     OptionalCollectionUUID dropTargetUUID,
-                                    bool stayTemp) override;
+                                    bool stayTemp) override {
+        return {};
+    }
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,
-                    const BSONObj& applyOpCmd) override;
+                    const BSONObj& applyOpCmd) override {}
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,
-                       OptionalCollectionUUID uuid);
+                       OptionalCollectionUUID uuid) override {}
 };
 
 }  // namespace mongo

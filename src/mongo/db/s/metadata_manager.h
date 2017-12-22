@@ -225,17 +225,6 @@ private:
      */
     void _pushListToClean(WithLock, std::list<Deletion> range);
 
-    /**
-     * Adds a range from the receiving map, so getNextOrphanRange will skip ranges migrating in.
-     */
-    void _addToReceiving(WithLock, ChunkRange const& range);
-
-    /**
-     * Removes a range from the receiving map after a migration failure. The range must
-     * exactly match an element of _receivingChunks.
-     */
-    void _removeFromReceiving(WithLock, ChunkRange const& range);
-
     // ServiceContext from which to obtain instances of global support objects
     ServiceContext* const _serviceContext;
 

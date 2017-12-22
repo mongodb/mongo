@@ -4,8 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library('serverauth', ['mongo_authentication_session.cpp'])
-
 generateActionTypes = env.Command(
     target=['action_type.h', 'action_type.cpp'],
     source=['generate_action_types.py', 'action_types.txt'],

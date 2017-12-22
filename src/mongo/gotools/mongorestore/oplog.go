@@ -170,9 +170,7 @@ func ParseTimestampFlag(ts string) (bson.MongoTimestamp, error) {
 // filterUUIDs removes 'ui' entries from ops, including nested applyOps ops.
 func filterUUIDs(op db.Oplog) (db.Oplog, error) {
 	// Remove UUIDs from oplog entries
-	if op.UI != nil {
-		op.UI = nil
-	}
+	op.UI = nil
 
 	// Check for and filter nested applyOps ops
 	if op.Operation == "c" && isApplyOpsCmd(op.Object) {

@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/oplog_application_checks.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -75,109 +76,20 @@ bool checkCOperationType(const BSONObj& opObj, const StringData opName) {
     return false;
 };
 
-UUID getUUIDFromOplogEntry(const BSONObj& oplogEntry) {
-    BSONElement uiElem = oplogEntry["ui"];
-    return uassertStatusOK(UUID::parse(uiElem));
-};
-
-Status checkOperationAuthorization(OperationContext* opCtx,
-                                   const std::string& dbname,
-                                   const BSONObj& oplogEntry,
-                                   bool alwaysUpsert) {
-    AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-
-    BSONElement opTypeElem = oplogEntry["op"];
-    checkBSONType(BSONType::String, opTypeElem);
-    const StringData opType = opTypeElem.checkAndGetStringData();
-
-    if (opType == "n"_sd) {
-        // oplog notes require cluster permissions, and may not have a ns
-        if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::appendOplogNote)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-        return Status::OK();
-    }
-
-    BSONElement nsElem = oplogEntry["ns"];
-    checkBSONType(BSONType::String, nsElem);
-    NamespaceString ns(oplogEntry["ns"].checkAndGetStringData());
-
-    if (oplogEntry.hasField("ui"_sd)) {
-        // ns by UUID overrides the ns specified if they are different.
-        auto& uuidCatalog = UUIDCatalog::get(opCtx);
-        NamespaceString uuidCollNS = uuidCatalog.lookupNSSByUUID(getUUIDFromOplogEntry(oplogEntry));
-        if (!uuidCollNS.isEmpty() && uuidCollNS != ns)
-            ns = uuidCollNS;
-    }
-
-    BSONElement oElem = oplogEntry["o"];
-    checkBSONType(BSONType::Object, oElem);
-    BSONObj o = oElem.Obj();
-
-    if (opType == "c"_sd) {
-        StringData commandName = o.firstElement().fieldNameStringData();
-        Command* command = Command::findCommand(commandName);
-        if (!command) {
-            return Status(ErrorCodes::FailedToParse, "Unrecognized command in op");
-        }
-
-        std::string dbNameForAuthCheck = ns.db().toString();
-        if (commandName == "renameCollection") {
-            // renameCollection commands must be run on the 'admin' database. Its arguments are
-            // fully qualified namespaces. Catalog internals don't know the op produced by running
-            // renameCollection was originally run on 'admin', so we must restore this.
-            dbNameForAuthCheck = "admin";
-        }
-
-        return Command::checkAuthorization(
-            command, opCtx, OpMsgRequest::fromDBAndBody(dbNameForAuthCheck, o));
-    }
-
-    if (opType == "i"_sd) {
-        return authSession->checkAuthForInsert(opCtx, ns, o);
-    } else if (opType == "u"_sd) {
-        BSONElement o2Elem = oplogEntry["o2"];
-        checkBSONType(BSONType::Object, o2Elem);
-        BSONObj o2 = o2Elem.Obj();
-
-        BSONElement bElem = oplogEntry["b"];
-        if (!bElem.eoo()) {
-            checkBSONType(BSONType::Bool, bElem);
-        }
-        bool b = bElem.trueValue();
-
-        const bool upsert = b || alwaysUpsert;
-
-        return authSession->checkAuthForUpdate(opCtx, ns, o, o2, upsert);
-    } else if (opType == "d"_sd) {
-
-        return authSession->checkAuthForDelete(opCtx, ns, o);
-    } else if (opType == "db"_sd) {
-        // It seems that 'db' isn't used anymore. Require all actions to prevent casual use.
-        ActionSet allActions;
-        allActions.addAllActions();
-        if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forAnyResource(),
-                                                           allActions)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-        return Status::OK();
-    }
-
-    return Status(ErrorCodes::FailedToParse, "Unrecognized opType");
-}
-
-enum class ApplyOpsValidity { kOk, kNeedsUseUUID, kNeedsForceAndUseUUID, kNeedsSuperuser };
-
 /**
- * Returns kNeedsSuperuser, if the provided applyOps command contains
- * an empty applyOps command or createCollection/renameCollection commands are mixed in applyOps
- * batch. Returns kNeedForceAndUseUUID if an operation contains a UUID, and will create a collection
- * with the user-specified UUID. Returns
- * kNeedsUseUUID if the operation contains a UUID. Returns kOk if no conditions
- * which must be specially handled are detected. May throw exceptions if the input is malformed.
+ * Returns kNeedsSuperuser, if the provided applyOps command contains an empty applyOps command or
+ * createCollection/renameCollection commands are mixed in applyOps batch.
+ *
+ * Returns kNeedForceAndUseUUID if an operation contains a UUID, and will create a collection with
+ * the user-specified UUID.
+ *
+ * Returns kNeedsUseUUID if the operation contains a UUID.
+ *
+ * Returns kOk if no conditions which must be specially handled are detected.
+ *
+ * May throw exceptions if the input is malformed.
  */
-ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
+OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
     const size_t maxApplyOpsDepth = 10;
     std::stack<std::pair<size_t, BSONObj>> toCheck;
 
@@ -212,7 +124,7 @@ ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
         return false;
     };
 
-    ApplyOpsValidity ret = ApplyOpsValidity::kOk;
+    OplogApplicationValidity ret = OplogApplicationValidity::kOk;
 
     // Insert the top level applyOps command into the stack.
     toCheck.emplace(std::make_pair(0, cmdObj));
@@ -227,7 +139,7 @@ ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
         // Check if the applyOps command is empty. This is probably not something that should
         // happen, so require a superuser to do this.
         if (applyOpsObj.firstElement().Array().empty()) {
-            return ApplyOpsValidity::kNeedsSuperuser;
+            return OplogApplicationValidity::kNeedsSuperuser;
         }
 
         // createCollection and renameCollection are only allowed to be applied
@@ -239,7 +151,7 @@ ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
                 auto oplogEntry = e.Obj();
                 if (checkCOperationType(oplogEntry, "create"_sd) ||
                     checkCOperationType(oplogEntry, "renameCollection"_sd)) {
-                    return ApplyOpsValidity::kNeedsSuperuser;
+                    return OplogApplicationValidity::kNeedsSuperuser;
                 }
             }
         }
@@ -259,12 +171,12 @@ ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
             }
 
             // If the op uses any UUIDs at all then the user must possess extra privileges.
-            if (opHasUUIDs && ret == ApplyOpsValidity::kOk)
-                ret = ApplyOpsValidity::kNeedsUseUUID;
+            if (opHasUUIDs && ret == OplogApplicationValidity::kOk)
+                ret = OplogApplicationValidity::kNeedsUseUUID;
             if (opHasUUIDs && checkCOperationType(opObj, "create"_sd)) {
                 // If the op is 'c' and forces the server to ingest a collection
                 // with a specific, user defined UUID.
-                ret = ApplyOpsValidity::kNeedsForceAndUseUUID;
+                ret = OplogApplicationValidity::kNeedsForceAndUseUUID;
             }
 
             // If the op contains a nested applyOps...
@@ -286,9 +198,9 @@ ApplyOpsValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
     return ret;
 }
 
-class ApplyOpsCmd : public ErrmsgCommandDeprecated {
+class ApplyOpsCmd : public BasicCommand {
 public:
-    ApplyOpsCmd() : ErrmsgCommandDeprecated("applyOps") {}
+    ApplyOpsCmd() : BasicCommand("applyOps") {}
 
     bool slaveOk() const override {
         return false;
@@ -306,95 +218,24 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) override {
-        AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-
-        ApplyOpsValidity validity = validateApplyOpsCommand(cmdObj);
-        if (validity == ApplyOpsValidity::kNeedsSuperuser) {
-            std::vector<Privilege> universalPrivileges;
-            RoleGraph::generateUniversalPrivileges(&universalPrivileges);
-            if (!authSession->isAuthorizedForPrivileges(universalPrivileges)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-            return Status::OK();
-        }
-        if (validity == ApplyOpsValidity::kNeedsForceAndUseUUID) {
-            if (!authSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(),
-                    {ActionType::forceUUID, ActionType::useUUID})) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-            validity = ApplyOpsValidity::kOk;
-        }
-        if (validity == ApplyOpsValidity::kNeedsUseUUID) {
-            if (!authSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::useUUID)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized");
-            }
-            validity = ApplyOpsValidity::kOk;
-        }
-        fassert(40314, validity == ApplyOpsValidity::kOk);
-
-        boost::optional<DisableDocumentValidation> maybeDisableValidation;
-        if (shouldBypassDocumentValidationForCommand(cmdObj))
-            maybeDisableValidation.emplace(opCtx);
-
-        const bool alwaysUpsert =
-            cmdObj.hasField("alwaysUpsert") ? cmdObj["alwaysUpsert"].trueValue() : true;
-
-        checkBSONType(BSONType::Array, cmdObj.firstElement());
-        for (const BSONElement& e : cmdObj.firstElement().Array()) {
-            checkBSONType(BSONType::Object, e);
-            Status status = checkOperationAuthorization(opCtx, dbname, e.Obj(), alwaysUpsert);
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-
-        BSONElement preconditions = cmdObj["preCondition"];
-        if (!preconditions.eoo()) {
-            for (const BSONElement& precondition : preconditions.Array()) {
-                checkBSONType(BSONType::Object, precondition);
-                BSONElement nsElem = precondition.Obj()["ns"];
-                checkBSONType(BSONType::String, nsElem);
-                NamespaceString nss(nsElem.checkAndGetStringData());
-
-                if (!authSession->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forExactNamespace(nss), ActionType::find)) {
-                    return Status(ErrorCodes::Unauthorized, "Unauthorized to check precondition");
-                }
-            }
-        }
-
-        return Status::OK();
+        OplogApplicationValidity validity = validateApplyOpsCommand(cmdObj);
+        return OplogApplicationChecks::checkAuthForCommand(
+            opCtx, dbname, cmdObj, validity, OplogApplicationCommand::kApplyOpsCmd);
     }
 
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& cmdObj,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) override {
+    bool run(OperationContext* opCtx,
+             const std::string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         validateApplyOpsCommand(cmdObj);
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))
             maybeDisableValidation.emplace(opCtx);
 
-        if (cmdObj.firstElement().type() != Array) {
-            errmsg = "ops has to be an array";
-            return false;
-        }
-
-        BSONObj ops = cmdObj.firstElement().Obj();
-
-        {
-            // check input
-            BSONObjIterator i(ops);
-            while (i.more()) {
-                BSONElement e = i.next();
-                if (!_checkOperation(e, errmsg)) {
-                    return false;
-                }
-            }
+        auto status = OplogApplicationChecks::checkOperationArray(cmdObj.firstElement());
+        if (!status.isOK()) {
+            return appendCommandStatus(result, status);
         }
 
         // TODO (SERVER-30217): When a write concern is provided to the applyOps command, we
@@ -412,7 +253,7 @@ public:
         repl::OplogApplication::Mode oplogApplicationMode =
             repl::OplogApplication::Mode::kApplyOpsCmd;  // the default mode.
         std::string oplogApplicationModeString;
-        auto status = bsonExtractStringField(
+        status = bsonExtractStringField(
             cmdObj, ApplyOps::kOplogApplicationModeFieldName, &oplogApplicationModeString);
 
         if (status.isOK()) {
@@ -440,58 +281,6 @@ public:
             result, applyOps(opCtx, dbname, cmdObj, oplogApplicationMode, &result));
 
         return applyOpsStatus;
-    }
-
-private:
-    /**
-     * Returns true if 'e' contains a valid operation.
-     */
-    static bool _checkOperation(const BSONElement& e, std::string& errmsg) {
-        if (e.type() != Object) {
-            errmsg = str::stream() << "op not an object: " << e.fieldName();
-            return false;
-        }
-        BSONObj obj = e.Obj();
-        // op - operation type
-        BSONElement opElement = obj.getField("op");
-        if (opElement.eoo()) {
-            errmsg = str::stream() << "op does not contain required \"op\" field: "
-                                   << e.fieldName();
-            return false;
-        }
-        if (opElement.type() != mongo::String) {
-            errmsg = str::stream() << "\"op\" field is not a string: " << e.fieldName();
-            return false;
-        }
-        // operation type -- see logOp() comments for types
-        const char* opType = opElement.valuestrsafe();
-        if (*opType == '\0') {
-            errmsg = str::stream() << "\"op\" field value cannot be empty: " << e.fieldName();
-            return false;
-        }
-
-        // ns - namespace
-        // Only operations of type 'n' are allowed to have an empty namespace.
-        BSONElement nsElement = obj.getField("ns");
-        if (nsElement.eoo()) {
-            errmsg = str::stream() << "op does not contain required \"ns\" field: "
-                                   << e.fieldName();
-            return false;
-        }
-        if (nsElement.type() != mongo::String) {
-            errmsg = str::stream() << "\"ns\" field is not a string: " << e.fieldName();
-            return false;
-        }
-        if (nsElement.String().find('\0') != std::string::npos) {
-            errmsg = str::stream() << "namespaces cannot have embedded null characters";
-            return false;
-        }
-        if (*opType != 'n' && nsElement.String().empty()) {
-            errmsg = str::stream() << "\"ns\" field value cannot be empty when op type is not 'n': "
-                                   << e.fieldName();
-            return false;
-        }
-        return true;
     }
 
 } applyOpsCmd;

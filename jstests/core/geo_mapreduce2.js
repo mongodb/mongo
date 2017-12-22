@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Geo mapreduce 2 from SERVER-3478
 
 var coll = db.geoMR2;

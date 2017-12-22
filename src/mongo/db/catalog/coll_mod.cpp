@@ -37,10 +37,8 @@
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
@@ -177,28 +175,10 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
 
         } else if (fieldName == "validator" && !isView) {
             MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-                MatchExpressionParser::kBanAllSpecialFeatures;
-            if (!serverGlobalParams.validateFeaturesAsMaster.load() ||
-                (serverGlobalParams.featureCompatibility.getVersion() ==
-                 ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
-                // Note that we don't enforce this restriction on the secondary or on backup
-                // instances, as indicated by !validateFeaturesAsMaster.
-                allowedFeatures |= MatchExpressionParser::kJSONSchema;
-                allowedFeatures |= MatchExpressionParser::kExpr;
-            }
+                MatchExpressionParser::kDefaultSpecialFeatures;
             auto statusW = coll->parseValidator(opCtx, e.Obj(), allowedFeatures);
             if (!statusW.isOK()) {
-                if (statusW.getStatus().code() == ErrorCodes::QueryFeatureNotAllowed) {
-                    // The default error message for disallowed $jsonSchema and $expr is not
-                    // descriptive enough, so we rewrite it here.
-                    return {ErrorCodes::QueryFeatureNotAllowed,
-                            str::stream() << "The featureCompatibilityVersion must be 3.6 to add a "
-                                             "collection validator using 3.6 query features. See "
-                                          << feature_compatibility_version::kDochubLink
-                                          << "."};
-                } else {
-                    return statusW.getStatus();
-                }
+                return statusW.getStatus();
             }
 
             cmr.collValidator = e;
@@ -442,7 +422,7 @@ Status _collModInternal(OperationContext* opCtx,
             CollectionCatalogEntry* cce = coll->getCatalogEntry();
             cce->removeUUID(opCtx);
         } else if (uuid && coll->uuid() && uuid.get() != coll->uuid().get()) {
-            return Status(ErrorCodes::Error(50658),
+            return Status(ErrorCodes::Error(40676),
                           str::stream() << "collMod " << redact(cmdObj) << " provides a UUID ("
                                         << uuid.get().toString()
                                         << ") that does not match the UUID ("

@@ -69,10 +69,6 @@ public:
         return nullptr;
     }
 
-    bool shouldExpandLeafArray() const final {
-        return false;
-    }
-
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };

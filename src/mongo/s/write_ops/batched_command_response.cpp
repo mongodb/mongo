@@ -302,61 +302,6 @@ void BatchedCommandResponse::clear() {
     _wcErrDetails.reset();
 }
 
-void BatchedCommandResponse::cloneTo(BatchedCommandResponse* other) const {
-    other->clear();
-
-    other->_ok = _ok;
-    other->_isOkSet = _isOkSet;
-
-    other->_errCode = _errCode;
-    other->_isErrCodeSet = _isErrCodeSet;
-
-    other->_errMessage = _errMessage;
-    other->_isErrMessageSet = _isErrMessageSet;
-
-    other->_nModified = _nModified;
-    other->_isNModifiedSet = _isNModifiedSet;
-
-    other->_n = _n;
-    other->_isNSet = _isNSet;
-
-    other->_singleUpserted = _singleUpserted;
-    other->_isSingleUpsertedSet = _isSingleUpsertedSet;
-
-    other->unsetUpsertDetails();
-    if (_upsertDetails.get()) {
-        for (std::vector<BatchedUpsertDetail*>::const_iterator it = _upsertDetails->begin();
-             it != _upsertDetails->end();
-             ++it) {
-            BatchedUpsertDetail* upsertDetailsItem = new BatchedUpsertDetail;
-            (*it)->cloneTo(upsertDetailsItem);
-            other->addToUpsertDetails(upsertDetailsItem);
-        }
-    }
-
-    other->_lastOp = _lastOp;
-    other->_isLastOpSet = _isLastOpSet;
-
-    other->_electionId = _electionId;
-    other->_isElectionIdSet = _isElectionIdSet;
-
-    other->unsetErrDetails();
-    if (_writeErrorDetails.get()) {
-        for (std::vector<WriteErrorDetail*>::const_iterator it = _writeErrorDetails->begin();
-             it != _writeErrorDetails->end();
-             ++it) {
-            WriteErrorDetail* errDetailsItem = new WriteErrorDetail;
-            (*it)->cloneTo(errDetailsItem);
-            other->addToErrDetails(errDetailsItem);
-        }
-    }
-
-    if (_wcErrDetails.get()) {
-        other->_wcErrDetails.reset(new WriteConcernErrorDetail());
-        _wcErrDetails->cloneTo(other->_wcErrDetails.get());
-    }
-}
-
 std::string BatchedCommandResponse::toString() const {
     return toBSON().toString();
 }

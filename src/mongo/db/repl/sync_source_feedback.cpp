@@ -61,8 +61,7 @@ Milliseconds calculateKeepAliveInterval(const ReplSetConfig& rsConfig) {
  */
 Reporter::PrepareReplSetUpdatePositionCommandFn makePrepareReplSetUpdatePositionCommandFn(
     ReplicationCoordinator* replCoord, const HostAndPort& syncTarget, BackgroundSync* bgsync) {
-    return [syncTarget, replCoord, bgsync](ReplicationCoordinator::ReplSetUpdatePositionCommandStyle
-                                               commandStyle) -> StatusWith<BSONObj> {
+    return [syncTarget, replCoord, bgsync]() -> StatusWith<BSONObj> {
         auto currentSyncTarget = bgsync->getSyncTarget();
         if (currentSyncTarget != syncTarget) {
             if (currentSyncTarget.empty()) {
@@ -84,7 +83,7 @@ Reporter::PrepareReplSetUpdatePositionCommandFn makePrepareReplSetUpdatePosition
                           "Currently primary - no one to send updates to");
         }
 
-        return replCoord->prepareReplSetUpdatePositionCommand(commandStyle);
+        return replCoord->prepareReplSetUpdatePositionCommand();
     };
 }
 

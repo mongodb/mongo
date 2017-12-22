@@ -185,7 +185,7 @@ BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {
 void DocumentSourceGeoNear::runCommand() {
     massert(16603, "Already ran geoNearCommand", !resultsIterator);
 
-    bool ok = _mongoProcessInterface->directClient()->runCommand(
+    bool ok = pExpCtx->mongoProcessInterface->directClient()->runCommand(
         pExpCtx->ns.db().toString(), buildGeoNearCmd(), cmdOutput);
     if (!ok) {
         uassertStatusOK(getStatusFromCommandResult(cmdOutput));
@@ -275,7 +275,7 @@ void DocumentSourceGeoNear::parseOptions(BSONObj options) {
 }
 
 DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSourceNeedsMongoProcessInterface(pExpCtx),
+    : DocumentSource(pExpCtx),
       coordsIsArray(false),
       limit(DocumentSourceGeoNear::kDefaultLimit),
       maxDistance(-1.0),

@@ -48,8 +48,10 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/unittest/unittest.h"
@@ -63,6 +65,16 @@ public:
     OperationContext* _opCtx = _opCtxRaii.get();
     LogicalClock* _clock = LogicalClock::get(_opCtx);
 
+    // Set up Timestamps in the past, present, and future.
+    const LogicalTime pastLt = _clock->reserveTicks(1);
+    const Timestamp pastTs = pastLt.asTimestamp();
+    const LogicalTime presentLt = _clock->reserveTicks(1);
+    const Timestamp presentTs = presentLt.asTimestamp();
+    const LogicalTime futureLt = presentLt.addTicks(1);
+    const Timestamp futureTs = futureLt.asTimestamp();
+    const Timestamp nullTs = Timestamp();
+    const int presentTerm = 1;
+
     StorageTimestampTest() {
         if (mongo::storageGlobalParams.engine != "wiredTiger") {
             return;
@@ -75,6 +87,8 @@ public:
             new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings);
         coordinatorMock->alwaysAllowWrites(true);
         setGlobalReplicationCoordinator(coordinatorMock);
+        repl::StorageInterface::set(_opCtx->getServiceContext(),
+                                    stdx::make_unique<repl::StorageInterfaceImpl>());
 
         // Since the Client object persists across tests, even though the global
         // ReplicationCoordinator does not, we need to clear the last op associated with the client
@@ -87,6 +101,9 @@ public:
         repl::createOplog(_opCtx);
 
         ASSERT_OK(_clock->advanceClusterTime(LogicalTime(Timestamp(1, 0))));
+
+        ASSERT_EQUALS(presentTs, pastLt.addTicks(1).asTimestamp());
+        setReplCoordAppliedOpTime(repl::OpTime(presentTs, presentTerm));
     }
 
     ~StorageTimestampTest() {
@@ -192,6 +209,35 @@ public:
         }
 
         return {result.obj()};
+    }
+
+    void assertMinValidDocumentAtTimestamp(Collection* coll,
+                                           const Timestamp& ts,
+                                           const repl::MinValidDocument& expectedDoc) {
+        auto recoveryUnit = _opCtx->recoveryUnit();
+        recoveryUnit->abandonSnapshot();
+        ASSERT_OK(recoveryUnit->selectSnapshot(ts));
+        auto doc =
+            repl::MinValidDocument::parse(IDLParserErrorContext("MinValidDocument"), findOne(coll));
+        ASSERT_EQ(expectedDoc.getMinValidTimestamp(), doc.getMinValidTimestamp())
+            << "minValid timestamps weren't equal at " << ts.toString()
+            << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
+        ASSERT_EQ(expectedDoc.getMinValidTerm(), doc.getMinValidTerm())
+            << "minValid terms weren't equal at " << ts.toString()
+            << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
+        ASSERT_EQ(expectedDoc.getAppliedThrough(), doc.getAppliedThrough())
+            << "appliedThrough OpTimes weren't equal at " << ts.toString()
+            << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
+        ASSERT_EQ(expectedDoc.getOldOplogDeleteFromPoint(), doc.getOldOplogDeleteFromPoint())
+            << "Old oplogDeleteFromPoint timestamps weren't equal at " << ts.toString()
+            << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
+        ASSERT_EQ(expectedDoc.getInitialSyncFlag(), doc.getInitialSyncFlag())
+            << "Initial sync flags weren't equal at " << ts.toString()
+            << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();
+    }
+
+    void setReplCoordAppliedOpTime(const repl::OpTime& opTime) {
+        repl::getGlobalReplicationCoordinator()->setMyLastAppliedOpTime(opTime);
     }
 };
 
@@ -675,6 +721,173 @@ public:
     }
 };
 
+class InitializeMinValid : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
+        reset(nss);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        auto minValidColl = autoColl.getCollection();
+
+        repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
+            repl::StorageInterface::get(_opCtx));
+        consistencyMarkers.initializeMinValidDocument(_opCtx);
+
+        repl::MinValidDocument expectedMinValid;
+        expectedMinValid.setMinValidTerm(repl::OpTime::kUninitializedTerm);
+        expectedMinValid.setMinValidTimestamp(nullTs);
+
+        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValid);
+        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValid);
+        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValid);
+        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValid);
+    }
+};
+
+class SetMinValidInitialSyncFlag : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
+        reset(nss);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        auto minValidColl = autoColl.getCollection();
+
+        repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
+            repl::StorageInterface::get(_opCtx));
+        consistencyMarkers.initializeMinValidDocument(_opCtx);
+        consistencyMarkers.setInitialSyncFlag(_opCtx);
+
+        repl::MinValidDocument expectedMinValidWithSetFlag;
+        expectedMinValidWithSetFlag.setMinValidTerm(repl::OpTime::kUninitializedTerm);
+        expectedMinValidWithSetFlag.setMinValidTimestamp(nullTs);
+        expectedMinValidWithSetFlag.setInitialSyncFlag(true);
+
+        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidWithSetFlag);
+        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidWithSetFlag);
+        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidWithSetFlag);
+        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidWithSetFlag);
+
+        consistencyMarkers.clearInitialSyncFlag(_opCtx);
+
+        repl::MinValidDocument expectedMinValidWithUnsetFlag;
+        expectedMinValidWithUnsetFlag.setMinValidTerm(presentTerm);
+        expectedMinValidWithUnsetFlag.setMinValidTimestamp(presentTs);
+        expectedMinValidWithUnsetFlag.setAppliedThrough(repl::OpTime(presentTs, presentTerm));
+
+        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidWithUnsetFlag);
+        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidWithSetFlag);
+        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidWithUnsetFlag);
+        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidWithUnsetFlag);
+    }
+};
+
+class SetMinValidToAtLeast : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
+        reset(nss);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        auto minValidColl = autoColl.getCollection();
+
+        repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
+            repl::StorageInterface::get(_opCtx));
+        consistencyMarkers.initializeMinValidDocument(_opCtx);
+
+        // Setting minValid sets it at the provided OpTime.
+        consistencyMarkers.setMinValidToAtLeast(_opCtx, repl::OpTime(presentTs, presentTerm));
+
+        repl::MinValidDocument expectedMinValidInit;
+        expectedMinValidInit.setMinValidTerm(repl::OpTime::kUninitializedTerm);
+        expectedMinValidInit.setMinValidTimestamp(nullTs);
+
+        repl::MinValidDocument expectedMinValidPresent;
+        expectedMinValidPresent.setMinValidTerm(presentTerm);
+        expectedMinValidPresent.setMinValidTimestamp(presentTs);
+
+        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidPresent);
+
+        consistencyMarkers.setMinValidToAtLeast(_opCtx, repl::OpTime(futureTs, presentTerm));
+
+        repl::MinValidDocument expectedMinValidFuture;
+        expectedMinValidFuture.setMinValidTerm(presentTerm);
+        expectedMinValidFuture.setMinValidTimestamp(futureTs);
+
+        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidFuture);
+        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidFuture);
+
+        // Setting the timestamp to the past should be a noop.
+        consistencyMarkers.setMinValidToAtLeast(_opCtx, repl::OpTime(pastTs, presentTerm));
+
+        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidFuture);
+        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidFuture);
+    }
+};
+
+class SetMinValidAppliedThrough : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        NamespaceString nss(repl::ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace);
+        reset(nss);
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        auto minValidColl = autoColl.getCollection();
+
+        repl::ReplicationConsistencyMarkersImpl consistencyMarkers(
+            repl::StorageInterface::get(_opCtx));
+        consistencyMarkers.initializeMinValidDocument(_opCtx);
+
+        consistencyMarkers.setAppliedThrough(_opCtx, repl::OpTime(presentTs, presentTerm));
+
+        repl::MinValidDocument expectedMinValidInit;
+        expectedMinValidInit.setMinValidTerm(repl::OpTime::kUninitializedTerm);
+        expectedMinValidInit.setMinValidTimestamp(nullTs);
+
+        repl::MinValidDocument expectedMinValidPresent;
+        expectedMinValidPresent.setMinValidTerm(repl::OpTime::kUninitializedTerm);
+        expectedMinValidPresent.setMinValidTimestamp(nullTs);
+        expectedMinValidPresent.setAppliedThrough(repl::OpTime(presentTs, presentTerm));
+
+        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidPresent);
+
+        // appliedThrough opTime can be unset.
+        consistencyMarkers.clearAppliedThrough(_opCtx, futureTs);
+
+        assertMinValidDocumentAtTimestamp(minValidColl, nullTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(minValidColl, pastTs, expectedMinValidInit);
+        assertMinValidDocumentAtTimestamp(minValidColl, presentTs, expectedMinValidPresent);
+        assertMinValidDocumentAtTimestamp(minValidColl, futureTs, expectedMinValidInit);
+    }
+};
+
 class AllStorageTimestampTests : public unittest::Suite {
 public:
     AllStorageTimestampTests() : unittest::Suite("StorageTimestampTests") {}
@@ -686,6 +899,10 @@ public:
         add<SecondaryInsertToUpsert>();
         add<SecondaryAtomicApplyOps>();
         add<SecondaryAtomicApplyOpsWCEToNonAtomic>();
+        add<InitializeMinValid>();
+        add<SetMinValidInitialSyncFlag>();
+        add<SetMinValidToAtLeast>();
+        add<SetMinValidAppliedThrough>();
     }
 };
 

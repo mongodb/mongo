@@ -292,10 +292,8 @@ func (dump *MongoDump) NewIntentFromOptions(dbName string, ci *db.CollectionInfo
 		Options: ci.Options,
 	}
 
-	// If UUID is available, populate the intent with it
-	if uuid := ci.GetUUID(); uuid != "" {
-		intent.UUID = uuid
-	}
+	// Populate the intent with the collection UUID or the empty string
+	intent.UUID = ci.GetUUID()
 
 	// Setup output location
 	if dump.OutputOptions.Out == "-" { // regular standard output

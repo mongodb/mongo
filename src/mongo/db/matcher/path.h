@@ -40,35 +40,75 @@ namespace mongo {
 
 class ElementPath {
 public:
-    ElementPath(StringData path, bool traverseNonLeafArr = true, bool traverseLeafArr = true)
-        : _shouldTraverseNonleafArrays(traverseNonLeafArr),
-          _shouldTraverseLeafArray(traverseLeafArr),
+    /**
+     * Controls how the element path interacts with leaf arrays, e.g. how we will handle the path
+     * "a.b" when "b" is an array.
+     */
+    enum class LeafArrayBehavior {
+        // Matches against the elements of arrays at the end of the path (in addition to the array
+        // as a whole).
+        //
+        // For example, for the path "f" and document {f: [1, 2]}, causes the path iterator to
+        // return 1, 2, and [1, 2].
+        kTraverse,
+
+        // Does not traverse arrays at the end of the path. For the path "f" and document {f: [1,
+        // 2]}, the path iterator returns only the entire array [1, 2].
+        kNoTraversal,
+    };
+
+    /**
+     * Controls how the element path interacts with non-leaf arrays, e.g. how we will handle the
+     * path "a.b" when "a" is an array.
+     */
+    enum class NonLeafArrayBehavior {
+        // Path traversal spans non-leaf arrays.
+        kTraverse,
+
+        // Path traversal stops at non-leaf array boundaries. The path iterator will return no
+        // elements.
+        kNoTraversal,
+
+        // Path traversal stops at non-leaf array boundaries. The path iterator will return the
+        // array element.
+        kMatchSubpath,
+    };
+
+    ElementPath(StringData path,
+                LeafArrayBehavior leafArrayBehavior = LeafArrayBehavior::kTraverse,
+                NonLeafArrayBehavior nonLeafArrayBehavior = NonLeafArrayBehavior::kTraverse)
+        : _leafArrayBehavior(leafArrayBehavior),
+          _nonLeafArrayBehavior(nonLeafArrayBehavior),
           _fieldRef(path) {}
 
     // TODO: replace uses of members below with regular construction.
     ElementPath() {}
     void init(StringData path);
 
-    void setTraverseNonleafArrays(bool b) {
-        _shouldTraverseNonleafArrays = b;
+    void setLeafArrayBehavior(LeafArrayBehavior leafArrBehavior) {
+        _leafArrayBehavior = leafArrBehavior;
     }
-    void setTraverseLeafArray(bool b) {
-        _shouldTraverseLeafArray = b;
+
+    LeafArrayBehavior leafArrayBehavior() const {
+        return _leafArrayBehavior;
+    }
+
+    void setNonLeafArrayBehavior(NonLeafArrayBehavior value) {
+        _nonLeafArrayBehavior = value;
+    }
+
+    NonLeafArrayBehavior nonLeafArrayBehavior() const {
+        return _nonLeafArrayBehavior;
     }
 
     const FieldRef& fieldRef() const {
         return _fieldRef;
     }
-    bool shouldTraverseNonleafArrays() const {
-        return _shouldTraverseNonleafArrays;
-    }
-    bool shouldTraverseLeafArray() const {
-        return _shouldTraverseLeafArray;
-    }
 
 private:
-    bool _shouldTraverseNonleafArrays;
-    bool _shouldTraverseLeafArray;
+    LeafArrayBehavior _leafArrayBehavior;
+    NonLeafArrayBehavior _nonLeafArrayBehavior;
+
     FieldRef _fieldRef;
 };
 

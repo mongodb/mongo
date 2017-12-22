@@ -610,7 +610,12 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
 
     OpTime minValid = fassertStatusOK(40492, OpTime::parseFromOplogEntry(newMinValidDoc));
     log() << "Setting minvalid to " << minValid;
-    replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});  // Use top of oplog.
+
+    // This method is only used with storage engines that do not support recover to stable
+    // timestamp. As a result, the timestamp on the 'appliedThrough' update does not matter.
+    invariant(
+        !opCtx->getServiceContext()->getGlobalStorageEngine()->supportsRecoverToStableTimestamp());
+    replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, {});
     replicationProcess->getConsistencyMarkers()->setMinValid(opCtx, minValid);
 
     if (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {

@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 t = db.update_arraymatch2;
 t.drop();
 

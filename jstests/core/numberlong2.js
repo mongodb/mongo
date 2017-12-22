@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Test precision of NumberLong values with v1 index code SERVER-3717
 
 t = db.jstests_numberlong2;

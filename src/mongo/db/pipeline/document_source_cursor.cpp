@@ -31,10 +31,10 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/scopeguard.h"
 
@@ -105,7 +105,7 @@ void DocumentSourceCursor::loadBatch() {
                 // we need the whole pipeline to see each document to see if we should stop waiting.
                 // Furthermore, if we need to return the latest oplog time (in the tailable and
                 // needs-merge case), batching will result in a wrong time.
-                if (shouldWaitForInserts(pExpCtx->opCtx) ||
+                if (awaitDataState(pExpCtx->opCtx).shouldWaitForInserts ||
                     (pExpCtx->isTailableAwaitData() && pExpCtx->needsMerge) ||
                     memUsageBytes > internalDocumentSourceCursorBatchSizeBytes.load()) {
                     // End this batch and prepare PlanExecutor for yielding.
@@ -120,22 +120,28 @@ void DocumentSourceCursor::loadBatch() {
                 return;
             }
         }
-    }
 
-    // If we got here, there won't be any more documents, so destroy our PlanExecutor. Note we can't
-    // use dispose() since we want to keep the current batch.
-    cleanupExecutor();
+        // If we got here, there won't be any more documents, so destroy our PlanExecutor. Note we
+        // must hold a collection lock to destroy '_exec', but we can only assume that our locks are
+        // still held if '_exec' did not end in an error. If '_exec' encountered an error during a
+        // yield, the locks might be yielded.
+        if (state != PlanExecutor::DEAD && state != PlanExecutor::FAILURE) {
+            cleanupExecutor(autoColl);
+        }
+    }
 
     switch (state) {
         case PlanExecutor::ADVANCED:
         case PlanExecutor::IS_EOF:
             return;  // We've reached our limit or exhausted the cursor.
         case PlanExecutor::DEAD: {
+            cleanupExecutor();
             uasserted(ErrorCodes::QueryPlanKilled,
                       str::stream() << "collection or index disappeared when cursor yielded: "
                                     << WorkingSetCommon::toStatusString(resultObj));
         }
         case PlanExecutor::FAILURE: {
+            cleanupExecutor();
             uasserted(17285,
                       str::stream() << "cursor encountered an error: "
                                     << WorkingSetCommon::toStatusString(resultObj));
@@ -250,6 +256,14 @@ void DocumentSourceCursor::cleanupExecutor() {
     auto collection = dbLock.getDb() ? dbLock.getDb()->getCollection(opCtx, _exec->nss()) : nullptr;
     auto cursorManager = collection ? collection->getCursorManager() : nullptr;
     _exec->dispose(opCtx, cursorManager);
+    _exec.reset();
+}
+
+void DocumentSourceCursor::cleanupExecutor(const AutoGetCollectionForRead& readLock) {
+    invariant(_exec);
+    auto cursorManager =
+        readLock.getCollection() ? readLock.getCollection()->getCursorManager() : nullptr;
+    _exec->dispose(pExpCtx->opCtx, cursorManager);
     _exec.reset();
 }
 

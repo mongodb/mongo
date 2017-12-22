@@ -689,7 +689,7 @@ __conn_dhandle_remove(WT_SESSION_IMPL *session, bool final)
 
 	WT_ASSERT(session,
 	    F_ISSET(session, WT_SESSION_LOCKED_HANDLE_LIST_WRITE));
-	WT_ASSERT(session, dhandle != conn->cache->evict_file_next);
+	WT_ASSERT(session, dhandle != conn->cache->walk_tree);
 
 	/* Check if the handle was reacquired by a session while we waited. */
 	if (!final &&

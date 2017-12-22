@@ -104,12 +104,6 @@ struct __wt_named_extractor {
 };
 
 /*
- * Allocate some additional slots for internal sessions so the user cannot
- * configure too few sessions for us to run.
- */
-#define	WT_EXTRA_INTERNAL_SESSIONS	20
-
-/*
  * WT_CONN_CHECK_PANIC --
  *	Check if we've panicked and return the appropriate error.
  */
@@ -191,6 +185,12 @@ struct __wt_connection_impl {
 
 					/* Configuration */
 	const WT_CONFIG_ENTRY **config_entries;
+
+	const char *optrack_path;	/* Directory for operation logs */
+	WT_FH *optrack_map_fh;		/* Name to id translation file. */
+	WT_SPINLOCK optrack_map_spinlock; /* Translation file spinlock. */
+	uintmax_t optrack_pid;		/* Cache the process ID. */
+	uint16_t  optrack_uid;		/* Unique function ID */
 
 	void  **foc;			/* Free-on-close array */
 	size_t  foc_cnt;		/* Array entries */
@@ -312,15 +312,17 @@ struct __wt_connection_impl {
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	uint64_t	 stat_usecs;	/* Statistics log period */
 
-#define	WT_CONN_LOG_ARCHIVE		0x001	/* Archive is enabled */
-#define	WT_CONN_LOG_DOWNGRADED		0x002	/* Running older version */
-#define	WT_CONN_LOG_ENABLED		0x004	/* Logging is enabled */
-#define	WT_CONN_LOG_EXISTED		0x008	/* Log files found */
-#define	WT_CONN_LOG_FORCE_DOWNGRADE	0x010	/* Force downgrade */
-#define	WT_CONN_LOG_RECOVER_DIRTY	0x020	/* Recovering unclean */
-#define	WT_CONN_LOG_RECOVER_DONE	0x040	/* Recovery completed */
-#define	WT_CONN_LOG_RECOVER_ERR		0x080	/* Error if recovery required */
-#define	WT_CONN_LOG_ZERO_FILL		0x100	/* Manually zero files */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CONN_LOG_ARCHIVE		0x001u	/* Archive is enabled */
+#define	WT_CONN_LOG_DOWNGRADED		0x002u	/* Running older version */
+#define	WT_CONN_LOG_ENABLED		0x004u	/* Logging is enabled */
+#define	WT_CONN_LOG_EXISTED		0x008u	/* Log files found */
+#define	WT_CONN_LOG_FORCE_DOWNGRADE	0x010u	/* Force downgrade */
+#define	WT_CONN_LOG_RECOVER_DIRTY	0x020u	/* Recovering unclean */
+#define	WT_CONN_LOG_RECOVER_DONE	0x040u	/* Recovery completed */
+#define	WT_CONN_LOG_RECOVER_ERR		0x080u	/* Error if recovery required */
+#define	WT_CONN_LOG_ZERO_FILL		0x100u	/* Manually zero files */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t	 log_flags;	/* Global logging configuration */
 	WT_CONDVAR	*log_cond;	/* Log server wait mutex */
 	WT_SESSION_IMPL *log_session;	/* Log server session */
@@ -391,22 +393,65 @@ struct __wt_connection_impl {
 	wt_off_t data_extend_len;	/* file_extend data length */
 	wt_off_t log_extend_len;	/* file_extend log length */
 
-#define	WT_DIRECT_IO_CHECKPOINT	0x01	/* Checkpoints */
-#define	WT_DIRECT_IO_DATA	0x02	/* Data files */
-#define	WT_DIRECT_IO_LOG	0x04	/* Log files */
-	uint32_t direct_io;		/* O_DIRECT, FILE_FLAG_NO_BUFFERING */
-
-	uint32_t write_through;		/* FILE_FLAG_WRITE_THROUGH */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_DIRECT_IO_CHECKPOINT	0x1u	/* Checkpoints */
+#define	WT_DIRECT_IO_DATA	0x2u	/* Data files */
+#define	WT_DIRECT_IO_LOG	0x4u	/* Log files */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+	uint64_t direct_io;		/* O_DIRECT, FILE_FLAG_NO_BUFFERING */
+	uint64_t write_through;		/* FILE_FLAG_WRITE_THROUGH */
 
 	bool	 mmap;			/* mmap configuration */
 	int page_size;			/* OS page size for mmap alignment */
-	uint32_t verbose;
+	double	 tsc_nsec_ratio;	/* rdtsc ticks to nanoseconds */
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_VERB_API			0x000000001u
+#define	WT_VERB_BLOCK			0x000000002u
+#define	WT_VERB_CHECKPOINT		0x000000004u
+#define	WT_VERB_CHECKPOINT_PROGRESS	0x000000008u
+#define	WT_VERB_COMPACT			0x000000010u
+#define	WT_VERB_EVICT			0x000000020u
+#define	WT_VERB_EVICTSERVER		0x000000040u
+#define	WT_VERB_EVICT_STUCK		0x000000080u
+#define	WT_VERB_FILEOPS			0x000000100u
+#define	WT_VERB_HANDLEOPS		0x000000200u
+#define	WT_VERB_LOG			0x000000400u
+#define	WT_VERB_LOOKASIDE		0x000000800u
+#define	WT_VERB_LOOKASIDE_ACTIVITY	0x000001000u
+#define	WT_VERB_LSM			0x000002000u
+#define	WT_VERB_LSM_MANAGER		0x000004000u
+#define	WT_VERB_METADATA		0x000008000u
+#define	WT_VERB_MUTEX			0x000010000u
+#define	WT_VERB_OVERFLOW		0x000020000u
+#define	WT_VERB_READ			0x000040000u
+#define	WT_VERB_REBALANCE		0x000080000u
+#define	WT_VERB_RECONCILE		0x000100000u
+#define	WT_VERB_RECOVERY		0x000200000u
+#define	WT_VERB_RECOVERY_PROGRESS	0x000400000u
+#define	WT_VERB_SALVAGE			0x000800000u
+#define	WT_VERB_SHARED_CACHE		0x001000000u
+#define	WT_VERB_SPLIT			0x002000000u
+#define	WT_VERB_TEMPORARY		0x004000000u
+#define	WT_VERB_THREAD_GROUP		0x008000000u
+#define	WT_VERB_TIMESTAMP		0x010000000u
+#define	WT_VERB_TRANSACTION		0x020000000u
+#define	WT_VERB_VERIFY			0x040000000u
+#define	WT_VERB_VERSION			0x080000000u
+#define	WT_VERB_WRITE			0x100000000u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+	uint64_t verbose;
 
 	/*
 	 * Variable with flags for which subsystems the diagnostic stress timing
 	 * delays have been requested.
 	 */
-	uint32_t timing_stress_flags;
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_TIMING_STRESS_CHECKPOINT_SLOW		0x1u
+#define	WT_TIMING_STRESS_INTERNAL_PAGE_SPLIT_RACE	0x2u
+#define	WT_TIMING_STRESS_PAGE_SPLIT_RACE		0x4u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+	uint64_t timing_stress_flags;
 
 #define	WT_STDERR(s)	(&S2C(s)->wt_stderr)
 #define	WT_STDOUT(s)	(&S2C(s)->wt_stdout)
@@ -418,5 +463,28 @@ struct __wt_connection_impl {
 	 */
 	WT_FILE_SYSTEM *file_system;
 
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CONN_CACHE_POOL		0x000001u
+#define	WT_CONN_CKPT_SYNC		0x000002u
+#define	WT_CONN_CLOSING			0x000004u
+#define	WT_CONN_CLOSING_NO_MORE_OPENS	0x000008u
+#define	WT_CONN_EVICTION_NO_LOOKASIDE	0x000010u
+#define	WT_CONN_EVICTION_RUN		0x000020u
+#define	WT_CONN_IN_MEMORY		0x000040u
+#define	WT_CONN_LEAK_MEMORY		0x000080u
+#define	WT_CONN_LOOKASIDE_OPEN		0x000100u
+#define	WT_CONN_LSM_MERGE		0x000200u
+#define	WT_CONN_OPTRACK			0x000400u
+#define	WT_CONN_PANIC			0x000800u
+#define	WT_CONN_READONLY		0x001000u
+#define	WT_CONN_RECOVERING		0x002000u
+#define	WT_CONN_SERVER_ASYNC		0x004000u
+#define	WT_CONN_SERVER_CHECKPOINT	0x008000u
+#define	WT_CONN_SERVER_LOG		0x010000u
+#define	WT_CONN_SERVER_LSM		0x020000u
+#define	WT_CONN_SERVER_STATISTICS	0x040000u
+#define	WT_CONN_SERVER_SWEEP		0x080000u
+#define	WT_CONN_WAS_BACKUP		0x100000u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };

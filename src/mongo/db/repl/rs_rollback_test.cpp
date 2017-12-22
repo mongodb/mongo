@@ -46,6 +46,8 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface.h"
@@ -76,6 +78,10 @@ private:
 void RSRollbackTest::setUp() {
     RollbackTest::setUp();
     enableCollectionUUIDs = true;
+    auto observerRegistry = stdx::make_unique<OpObserverRegistry>();
+    observerRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
+    _serviceContextMongoDTest.getServiceContext()->setOpObserver(
+        std::unique_ptr<OpObserver>(observerRegistry.release()));
 }
 
 void RSRollbackTest::tearDown() {

@@ -257,6 +257,11 @@ public:
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) {}
 
     /**
+     * See `StorageEngine::setOldestTimestamp`
+     */
+    virtual void setOldestTimestamp(Timestamp oldestTimestamp) {}
+
+    /**
      * See `StorageEngine::supportsRecoverToStableTimestamp`
      */
     virtual bool supportsRecoverToStableTimestamp() const {

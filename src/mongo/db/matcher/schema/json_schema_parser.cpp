@@ -493,16 +493,7 @@ StatusWithMatchExpression translateRequired(
     auto andExpr = stdx::make_unique<AndMatchExpression>();
 
     for (auto&& propertyName : requiredProperties) {
-        auto existsExpr = stdx::make_unique<ExistsMatchExpression>(propertyName);
-
-        if (path.empty()) {
-            andExpr->add(existsExpr.release());
-        } else {
-            auto objectMatch =
-                stdx::make_unique<InternalSchemaObjectMatchExpression>(path, std::move(existsExpr));
-
-            andExpr->add(objectMatch.release());
-        }
+        andExpr->add(new ExistsMatchExpression(propertyName));
     }
 
     // If this is a top-level schema, then we know that we are matching against objects, and there
@@ -511,7 +502,10 @@ StatusWithMatchExpression translateRequired(
         return {std::move(andExpr)};
     }
 
-    return makeRestriction(BSONType::Object, path, std::move(andExpr), typeExpr);
+    auto objectMatch =
+        stdx::make_unique<InternalSchemaObjectMatchExpression>(path, std::move(andExpr));
+
+    return makeRestriction(BSONType::Object, path, std::move(objectMatch), typeExpr);
 }
 
 StatusWithMatchExpression parseProperties(

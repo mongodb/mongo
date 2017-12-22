@@ -1064,17 +1064,7 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
         // We check the status of the parse to see if there are any banned features, but we don't
         // actually need the result for now.
         if (!statusWithMatcher.isOK()) {
-            if (statusWithMatcher.getStatus().code() == ErrorCodes::QueryFeatureNotAllowed) {
-                // The default error message for disallowed $jsonSchema and $expr is not descriptive
-                // enough, so we rewrite it here.
-                return {ErrorCodes::QueryFeatureNotAllowed,
-                        str::stream() << "The featureCompatibilityVersion must be 3.6 to create a "
-                                         "collection validator using 3.6 query features. See "
-                                      << feature_compatibility_version::kDochubLink
-                                      << "."};
-            } else {
-                return statusWithMatcher.getStatus();
-            }
+            return statusWithMatcher.getStatus();
         }
     }
 

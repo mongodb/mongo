@@ -33,6 +33,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
@@ -195,6 +196,50 @@ public:
             collection->validate(opCtx, level, background, std::move(collLk), &results, &result);
         if (!status.isOK()) {
             return appendCommandStatus(result, status);
+        }
+
+        CollectionCatalogEntry* catalogEntry = collection->getCatalogEntry();
+        CollectionOptions opts = catalogEntry->getCollectionOptions(opCtx);
+
+        // Skip checking UUID on system.indexes and system.namespaces until SERVER-30095 and
+        // SERVER-29926 are resolved.
+        bool skipUUIDCheck = nss.coll() == "system.indexes" || nss.coll() == "system.namespaces";
+
+        // Skip checking UUID on local database for shard secondaries until SERVER-32255 is
+        // resolved.
+        bool isShardServer = serverGlobalParams.clusterRole == ClusterRole::ShardServer;
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        bool isReplSet =
+            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
+        bool isPrimary =
+            isReplSet ? replCoord->getMemberState() == repl::MemberState::RS_PRIMARY : false;
+
+        if (isShardServer && isReplSet && !isPrimary && nss.db() == "local") {
+            skipUUIDCheck = true;
+        }
+
+        if (!skipUUIDCheck) {
+            ServerGlobalParams::FeatureCompatibility::Version version =
+                serverGlobalParams.featureCompatibility.getVersion();
+
+            if (version == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+                // All collections must have a UUID.
+                if (!opts.uuid) {
+                    results.errors.push_back(str::stream() << "UUID missing on collection "
+                                                           << nss.ns()
+                                                           << " but SchemaVersion=3.6");
+                    results.valid = false;
+                }
+            } else if (version ==
+                       ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
+                // All collections must not have a UUID.
+                if (opts.uuid) {
+                    results.errors.push_back(str::stream() << "UUID present in collection "
+                                                           << nss.ns()
+                                                           << " but SchemaVersion=3.4");
+                    results.valid = false;
+                }
+            }
         }
 
         if (!full) {

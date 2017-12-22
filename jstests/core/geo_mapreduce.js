@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test script from SERVER-1742
 
 // MongoDB test script for mapreduce with geo query

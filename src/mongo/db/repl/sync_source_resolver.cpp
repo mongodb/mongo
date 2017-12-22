@@ -173,11 +173,11 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
                     << BSON(OplogEntryBase::kTimestampFieldName << 1
                                                                 << OplogEntryBase::kTermFieldName
                                                                 << 1)),
-        stdx::bind(&SyncSourceResolver::_firstOplogEntryFetcherCallback,
-                   this,
-                   stdx::placeholders::_1,
-                   candidate,
-                   earliestOpTimeSeen),
+        [=](const StatusWith<Fetcher::QueryResponse>& response,
+            Fetcher::NextAction*,
+            BSONObjBuilder*) {
+            return _firstOplogEntryFetcherCallback(response, candidate, earliestOpTimeSeen);
+        },
         ReadPreferenceSetting::secondaryPreferredMetadata(),
         kFetcherTimeout /* find network timeout */,
         kFetcherTimeout /* getMore network timeout */);
@@ -195,12 +195,11 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
         BSON("find" << kLocalOplogNss.coll() << "oplogReplay" << true << "filter"
                     << BSON("ts" << BSON("$gte" << _requiredOpTime.getTimestamp() << "$lte"
                                                 << _requiredOpTime.getTimestamp()))),
-        stdx::bind(&SyncSourceResolver::_requiredOpTimeFetcherCallback,
-                   this,
-                   stdx::placeholders::_1,
-                   candidate,
-                   earliestOpTimeSeen,
-                   rbid),
+        [=](const StatusWith<Fetcher::QueryResponse>& response,
+            Fetcher::NextAction*,
+            BSONObjBuilder*) {
+            return _requiredOpTimeFetcherCallback(response, candidate, earliestOpTimeSeen, rbid);
+        },
         ReadPreferenceSetting::secondaryPreferredMetadata(),
         kFetcherTimeout /* find network timeout */,
         kFetcherTimeout /* getMore network timeout */);
@@ -354,12 +353,9 @@ Status SyncSourceResolver::_scheduleRBIDRequest(HostAndPort candidate, OpTime ea
     invariant(_state == State::kRunning);
     auto handle = _taskExecutor->scheduleRemoteCommand(
         {candidate, "admin", BSON("replSetGetRBID" << 1), nullptr, kFetcherTimeout},
-        stdx::bind(&SyncSourceResolver::_rbidRequestCallback,
-                   this,
-                   candidate,
-                   earliestOpTimeSeen,
-                   stdx::placeholders::_1));
-
+        [=](const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply) {
+            _rbidRequestCallback(candidate, earliestOpTimeSeen, rbidReply);
+        });
     if (!handle.isOK()) {
         return handle.getStatus();
     }

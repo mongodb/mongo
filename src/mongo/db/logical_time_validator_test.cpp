@@ -31,7 +31,6 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
-#include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/logical_time_validator.h"
@@ -73,7 +72,7 @@ protected:
         const LogicalTime currentTime(LogicalTime(Timestamp(1, 0)));
         LogicalClock::get(operationContext())->setClusterTimeFromTrustedSource(currentTime);
 
-        _keyManager = std::make_shared<KeysCollectionManagerSharding>(
+        _keyManager = std::make_shared<KeysCollectionManager>(
             "dummy", std::move(catalogClient), Seconds(1000));
         _validator = stdx::make_unique<LogicalTimeValidator>(_keyManager);
         _validator->init(operationContext()->getServiceContext());
@@ -99,7 +98,7 @@ protected:
 
 private:
     std::unique_ptr<LogicalTimeValidator> _validator;
-    std::shared_ptr<KeysCollectionManagerSharding> _keyManager;
+    std::shared_ptr<KeysCollectionManager> _keyManager;
 };
 
 TEST_F(LogicalTimeValidatorTest, GetTimeWithIncreasingTimes) {

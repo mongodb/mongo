@@ -84,12 +84,7 @@ struct TTLCollModInfo {
 };
 
 class OpObserver {
-    MONGO_DISALLOW_COPYING(OpObserver);
-
 public:
-    OpObserver() = default;
-    virtual ~OpObserver() = default;
-
     virtual void onCreateIndex(OperationContext* opCtx,
                                const NamespaceString& nss,
                                OptionalCollectionUUID uuid,
@@ -102,14 +97,13 @@ public:
                            std::vector<InsertStatement>::const_iterator end,
                            bool fromMigrate) = 0;
     virtual void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) = 0;
-    virtual CollectionShardingState::DeleteState aboutToDelete(OperationContext* opCtx,
-                                                               const NamespaceString& nss,
-                                                               const BSONObj& doc) = 0;
+    virtual void aboutToDelete(OperationContext* opCtx,
+                               const NamespaceString& nss,
+                               const BSONObj& doc) = 0;
     /**
      * Handles logging before document is deleted.
      *
      * "ns" name of the collection from which deleteState.idDoc will be deleted.
-     * "deleteState" holds information about the deleted document.
      * "fromMigrate" indicates whether the delete was induced by a chunk migration, and
      * so should be ignored by the user as an internal maintenance operation and not a
      * real delete.
@@ -118,7 +112,6 @@ public:
                           const NamespaceString& nss,
                           OptionalCollectionUUID uuid,
                           StmtId stmtId,
-                          CollectionShardingState::DeleteState deleteState,
                           bool fromMigrate,
                           const boost::optional<BSONObj>& deletedDoc) = 0;
     /**

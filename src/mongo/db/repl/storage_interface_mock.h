@@ -218,14 +218,14 @@ public:
 
     Status putSingleton(OperationContext* opCtx,
                         const NamespaceString& nss,
-                        const BSONObj& update) override {
+                        const TimestampedBSONObj& update) override {
         return Status{ErrorCodes::IllegalOperation, "putSingleton not implemented."};
     }
 
     Status updateSingleton(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& query,
-                           const BSONObj& update) override {
+                           const TimestampedBSONObj& update) override {
         return Status{ErrorCodes::IllegalOperation, "updateSingleton not implemented."};
     }
 

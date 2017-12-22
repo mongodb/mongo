@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Tests for explaining the delete command.
 
 var collName = "jstests_explain_delete";

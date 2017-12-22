@@ -1,3 +1,5 @@
+// @tags: [requires_getmore, requires_non_retryable_writes]
+
 // Regression test for edge cases in which .snapshot() queries could historically miss documents or
 // return the same document twice.
 (function() {

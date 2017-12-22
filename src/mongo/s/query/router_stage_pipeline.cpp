@@ -40,7 +40,7 @@
 namespace mongo {
 
 RouterStagePipeline::RouterStagePipeline(std::unique_ptr<RouterExecStage> child,
-                                         std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline)
+                                         std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline)
     : RouterExecStage(mergePipeline->getContext()->opCtx),
       _mergePipeline(std::move(mergePipeline)),
       _mongosOnlyPipeline(!_mergePipeline->isSplitForMerge()) {

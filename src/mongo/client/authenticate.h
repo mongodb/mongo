@@ -48,11 +48,15 @@ using RunCommandResultHandler = AuthCompletionHandler;
 using RunCommandHook =
     stdx::function<void(executor::RemoteCommandRequest, RunCommandResultHandler)>;
 
+/* Hook for legacy MONGODB-CR support provided by shell client only */
+using AuthMongoCRHandler =
+    stdx::function<void(RunCommandHook, const BSONObj&, AuthCompletionHandler)>;
+extern AuthMongoCRHandler authMongoCR;
+
 /**
  * Names for supported authentication mechanisms.
  */
 
-extern const char* const kMechanismMongoCR;
 extern const char* const kMechanismMongoX509;
 extern const char* const kMechanismSaslPlain;
 extern const char* const kMechanismGSSAPI;

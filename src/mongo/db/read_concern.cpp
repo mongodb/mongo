@@ -148,7 +148,7 @@ Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime) {
 
         if (!remainingAttempts--) {
             std::stringstream ss;
-            ss << "Requested clusterTime" << clusterTime.toString()
+            ss << "Requested clusterTime " << clusterTime.toString()
                << " is greater than the last primary OpTime: " << lastAppliedOpTime.toString()
                << " no retries left";
             return Status(ErrorCodes::InternalError, ss.str());

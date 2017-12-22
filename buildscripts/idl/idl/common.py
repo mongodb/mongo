@@ -31,6 +31,12 @@ COMMAND_NAMESPACE_IGNORED = "ignored"
 def title_case(name):
     # type: (unicode) -> unicode
     """Return a CapitalCased version of a string."""
+
+    # Only capitalize the last part of a fully-qualified name
+    pos = name.rfind("::")
+    if pos > -1:
+        return name[:pos + 2] + name[pos + 2:pos + 3].upper() + name[pos + 3:]
+
     return name[0:1].upper() + name[1:]
 
 
@@ -38,6 +44,15 @@ def camel_case(name):
     # type: (unicode) -> unicode
     """Return a camelCased version of a string."""
     return name[0:1].lower() + name[1:]
+
+
+def qualify_cpp_name(cpp_namespace, cpp_type_name):
+    # type: (unicode, unicode) -> unicode
+    """Preprend a type name with a C++ namespace if cpp_namespace is not None."""
+    if cpp_namespace:
+        return cpp_namespace + "::" + cpp_type_name
+
+    return cpp_type_name
 
 
 def _escape_template_string(template):

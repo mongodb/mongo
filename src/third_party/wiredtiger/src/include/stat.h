@@ -84,6 +84,17 @@
 #define	WT_STATS_FIELD_TO_OFFSET(stats, fld)				\
 	(int)(&(stats)[0]->fld - (int64_t *)(stats)[0])
 
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_STAT_CLEAR		0x01u
+#define	WT_STAT_JSON		0x02u
+#define	WT_STAT_ON_CLOSE	0x04u
+#define	WT_STAT_TYPE_ALL	0x08u
+#define	WT_STAT_TYPE_CACHE_WALK	0x10u
+#define	WT_STAT_TYPE_FAST	0x20u
+#define	WT_STAT_TYPE_SIZE	0x40u
+#define	WT_STAT_TYPE_TREE_WALK	0x80u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+
 /*
  * Sum the values from all structures in the array.
  */

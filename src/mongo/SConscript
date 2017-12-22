@@ -280,8 +280,7 @@ env.Library(
         "db/db.cpp",
         "db/mongod_options_init.cpp",
     ],
-    LIBDEPS=[
-        'db/catalog/catalog',
+    LIBDEPS_PRIVATE=[
         'db/clientcursor',
         'db/commands/core',
         'db/conn_pool_options',
@@ -289,7 +288,6 @@ env.Library(
         'db/ftdc/ftdc_mongod',
         'db/index_d',
         'db/initialize_snmp',
-        'db/keys_collection_manager_direct',
         'db/kill_sessions_local',
         'db/logical_session_cache_factory_mongod',
         'db/mongod_options',
@@ -341,6 +339,7 @@ mongod = env.Program(
         "db/dbmain.cpp",
     ] + env.WindowsResourceFile("db/db.rc"),
     LIBDEPS=[
+        'base',
         'mongodmain',
     ],
 )
@@ -484,7 +483,10 @@ if not has_option('noshell') and usemozjs:
 
     mongo_shell = shellEnv.Program(
         "mongo",
-        ["shell/dbshell.cpp"] + env.WindowsResourceFile("shell/shell.rc"),
+        [
+            "shell/dbshell.cpp",
+            "shell/mongodbcr.cpp",
+        ] + env.WindowsResourceFile("shell/shell.rc"),
         LIBDEPS=[
             "$BUILD_DIR/third_party/shim_pcrecpp",
             "shell_core",
@@ -637,9 +639,14 @@ if env.TargetOSIs('windows'):
     # On windows the .in needs to be explicitly added to the file.
     compass_script = "Install-Compass.ps1.in"
 
+compass_python_interpreter = '/usr/bin/env python2'
+if env.TargetOSIs('darwin'):
+    compass_python_interpreter = '/usr/bin/env python'
+
 compass_installer = env.Substfile('#/src/mongo/installer/compass/' + compass_script,
                                   SUBST_DICT=[
-                                      ('@compass_type@', compass_type)
+                                      ('@compass_type@', compass_type),
+                                      ('@python_interpreter@', compass_python_interpreter),
                                   ])
 distBinaries.append(compass_installer)
 

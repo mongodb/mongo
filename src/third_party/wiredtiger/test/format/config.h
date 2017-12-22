@@ -35,19 +35,19 @@ typedef struct {
 	const char	*desc;			/* Configuration description */
 
 	/* Value is a boolean, yes if roll of 1-to-100 is <= CONFIG->min. */
-#define	C_BOOL		0x001
+#define	C_BOOL		0x01u
 
 	/* Not a simple randomization, handle outside the main loop. */
-#define	C_IGNORE	0x002
+#define	C_IGNORE	0x02u
 
 	/* Value was set from command-line or file, ignore for all runs. */
-#define	C_PERM		0x004
+#define	C_PERM		0x04u
 
 	/* Value isn't random for this run, ignore just for this run. */
-#define	C_TEMP		0x008
+#define	C_TEMP		0x08u
 
 	/* Value is a string. */
-#define	C_STRING	0x020
+#define	C_STRING	0x20u
 	u_int	 	flags;
 
 	uint32_t	min;		/* Minimum value */

@@ -8,6 +8,33 @@
 
 #define	WT_RECNO_OOB	0		/* Illegal record number */
 
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_READ_CACHE			0x0001u
+#define	WT_READ_IGNORE_CACHE_SIZE	0x0002u
+#define	WT_READ_LOOKASIDE		0x0004u
+#define	WT_READ_NOTFOUND_OK		0x0008u
+#define	WT_READ_NO_EMPTY		0x0010u
+#define	WT_READ_NO_GEN			0x0020u
+#define	WT_READ_NO_SPLIT		0x0040u
+#define	WT_READ_NO_WAIT			0x0080u
+#define	WT_READ_PREV			0x0100u
+#define	WT_READ_RESTART_OK		0x0200u
+#define	WT_READ_SKIP_INTL		0x0400u
+#define	WT_READ_TRUNCATE		0x0800u
+#define	WT_READ_WONT_NEED		0x1000u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_REC_CHECKPOINT	0x01u
+#define	WT_REC_EVICT		0x02u
+#define	WT_REC_IN_MEMORY	0x04u
+#define	WT_REC_LOOKASIDE	0x08u
+#define	WT_REC_SCRUB		0x10u
+#define	WT_REC_UPDATE_RESTORE	0x20u
+#define	WT_REC_VISIBILITY_ERR	0x40u
+#define	WT_REC_VISIBLE_ALL	0x80u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
+
 /*
  * WT_PAGE_HEADER --
  *	Blocks have a common header, a WT_PAGE_HEADER structure followed by a
@@ -41,11 +68,15 @@ struct __wt_page_header {
 
 	uint8_t type;			/* 24: page type */
 
-#define	WT_PAGE_COMPRESSED	0x01	/* Page is compressed on disk */
-#define	WT_PAGE_EMPTY_V_ALL	0x02	/* Page has all zero-length values */
-#define	WT_PAGE_EMPTY_V_NONE	0x04	/* Page has no zero-length values */
-#define	WT_PAGE_ENCRYPTED	0x08	/* Page is encrypted on disk */
-#define	WT_PAGE_LAS_UPDATE	0x10	/* Page updates in lookaside store */
+	/*
+	 * No automatic generation: flag values cannot change, they're written
+	 * to disk.
+	 */
+#define	WT_PAGE_COMPRESSED	0x01u	/* Page is compressed on disk */
+#define	WT_PAGE_EMPTY_V_ALL	0x02u	/* Page has all zero-length values */
+#define	WT_PAGE_EMPTY_V_NONE	0x04u	/* Page has no zero-length values */
+#define	WT_PAGE_ENCRYPTED	0x08u	/* Page is encrypted on disk */
+#define	WT_PAGE_LAS_UPDATE	0x10u	/* Page updates in lookaside store */
 	uint8_t flags;			/* 25: flags */
 
 	/*
@@ -145,8 +176,10 @@ struct __wt_ovfl_reuse {
 	 * skiplist entry; if reconciliation fails for any reason, discard the
 	 * newly added skiplist entries, along with their underlying blocks.
 	 */
-#define	WT_OVFL_REUSE_INUSE		0x01
-#define	WT_OVFL_REUSE_JUST_ADDED	0x02
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_OVFL_REUSE_INUSE		0x1u
+#define	WT_OVFL_REUSE_JUST_ADDED	0x2u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint8_t	 flags;
 
 	/*
@@ -604,14 +637,16 @@ struct __wt_page {
 #define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
 	uint8_t type;			/* Page type */
 
-#define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
-#define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
-#define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
-#define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
-#define	WT_PAGE_OVERFLOW_KEYS	0x10	/* Page has overflow keys */
-#define	WT_PAGE_READ_NO_EVICT	0x20	/* Page read with eviction disabled */
-#define	WT_PAGE_SPLIT_INSERT	0x40	/* A leaf page was split for append */
-#define	WT_PAGE_UPDATE_IGNORE	0x80	/* Ignore updates on page discard */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_PAGE_BUILD_KEYS	0x01u	/* Keys have been built in memory */
+#define	WT_PAGE_DISK_ALLOC	0x02u	/* Disk image in allocated memory */
+#define	WT_PAGE_DISK_MAPPED	0x04u	/* Disk image in mapped memory */
+#define	WT_PAGE_EVICT_LRU	0x08u	/* Page is on the LRU queue */
+#define	WT_PAGE_OVERFLOW_KEYS	0x10u	/* Page has overflow keys */
+#define	WT_PAGE_READ_NO_EVICT	0x20u	/* Page read with eviction disabled */
+#define	WT_PAGE_SPLIT_INSERT	0x40u	/* A leaf page was split for append */
+#define	WT_PAGE_UPDATE_IGNORE	0x80u	/* Ignore updates on page discard */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 
 	uint8_t unused[2];		/* Unused padding */

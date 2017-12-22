@@ -45,6 +45,7 @@
 
     const clusterTestDB = mongosConn.getDB(jsTestName());
     const clusterAdminDB = mongosConn.getDB("admin");
+    shardConn.waitForClusterTime(60);
     let shardAdminDB = shardConn.getDB("admin");
 
     function createUsers(conn) {

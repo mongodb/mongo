@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Tests that explicitly invoke the find and getMore commands.
 (function() {
     'use strict';

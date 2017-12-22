@@ -35,4 +35,4 @@
 namespace mongo {
 
 std::string askPassword();
-}
+}  // namespace mongo

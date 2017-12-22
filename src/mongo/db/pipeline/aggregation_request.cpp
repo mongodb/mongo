@@ -52,7 +52,6 @@ constexpr StringData AggregationRequest::kCursorName;
 constexpr StringData AggregationRequest::kBatchSizeName;
 constexpr StringData AggregationRequest::kFromMongosName;
 constexpr StringData AggregationRequest::kNeedsMergeName;
-constexpr StringData AggregationRequest::kNeedsMerge34Name;
 constexpr StringData AggregationRequest::kPipelineName;
 constexpr StringData AggregationRequest::kCollationName;
 constexpr StringData AggregationRequest::kExplainName;
@@ -110,7 +109,6 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
 
     bool hasFromMongosElem = false;
     bool hasNeedsMergeElem = false;
-    bool hasNeedsMerge34Elem = false;
 
     // Parse optional parameters.
     for (auto&& elem : cmdObj) {
@@ -203,17 +201,6 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
 
             hasNeedsMergeElem = true;
             request.setNeedsMerge(elem.Bool());
-        } else if (kNeedsMerge34Name == fieldName) {
-            if (elem.type() != BSONType::Bool) {
-                return {ErrorCodes::TypeMismatch,
-                        str::stream() << kNeedsMerge34Name << " must be a boolean, not a "
-                                      << typeName(elem.type())};
-            }
-
-            hasNeedsMerge34Elem = true;
-            request.setNeedsMerge(elem.Bool());
-            request.setFromMongos(elem.Bool());
-            request.setFrom34Mongos(elem.Bool());
         } else if (kAllowDiskUseName == fieldName) {
             if (storageGlobalParams.readOnly) {
                 return {ErrorCodes::IllegalOperation,
@@ -266,23 +253,6 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
                 str::stream() << "Cannot specify '" << kNeedsMergeName << "' without '"
                               << kFromMongosName
                               << "'"};
-    }
-
-    // If 'fromRouter' is specified, the request is from a 3.4 mongos, so we do not expect
-    // 'fromMongos' or 'needsMerge' to be specified.
-    if (hasNeedsMerge34Elem) {
-        if (hasNeedsMergeElem) {
-            return {ErrorCodes::FailedToParse,
-                    str::stream() << "Cannot specify both '" << kNeedsMergeName << "' and '"
-                                  << kNeedsMerge34Name
-                                  << "'"};
-        }
-        if (hasFromMongosElem) {
-            return {ErrorCodes::FailedToParse,
-                    str::stream() << "Cannot specify both '" << kFromMongosName << "' and '"
-                                  << kNeedsMerge34Name
-                                  << "'"};
-        }
     }
 
     return request;

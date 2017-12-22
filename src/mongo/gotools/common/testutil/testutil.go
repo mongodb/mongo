@@ -72,49 +72,43 @@ func GetBareSessionProvider() (*db.SessionProvider, *options.ToolOptions, error)
 // or the empty string if it can't be found.
 func GetFCV(s *mgo.Session) string {
 	coll := s.DB("admin").C("system.version")
-	iter := coll.Find(bson.M{"_id": "featureCompatibilityVersion"}).Iter()
-	defer iter.Close()
-
 	var result struct {
 		Version string
 	}
-
-	if !iter.Next(&result) {
-		return ""
-	}
-
+	_ = coll.Find(bson.M{"_id": "featureCompatibilityVersion"}).One(&result)
 	return result.Version
 }
 
+// CompareFCV compares two strings as dot-delimited tuples of integers
 func CompareFCV(x, y string) (int, error) {
-	xs, err := dottedStringToSlice(x)
+	left, err := dottedStringToSlice(x)
 	if err != nil {
 		return 0, err
 	}
-	ys, err := dottedStringToSlice(y)
+	right, err := dottedStringToSlice(y)
 	if err != nil {
 		return 0, err
 	}
 
-	// Ensure xs is the shorter one, flip logic if necesary
+	// Ensure left is the shorter one, flip logic if necesary
 	inverter := 1
-	if len(ys) < len(xs) {
+	if len(right) < len(left) {
 		inverter = -1
-		xs, ys = ys, xs
+		left, right = right, left
 	}
 
-	for i := range xs {
+	for i := range left {
 		switch {
-		case xs[i] < ys[i]:
+		case left[i] < right[i]:
 			return -1 * inverter, nil
-		case xs[i] > ys[i]:
+		case left[i] > right[i]:
 			return 1 * inverter, nil
 		}
 	}
 
-	// compared equal to length of xs. If ys are longer, then xs is less
-	// than ys (-1) (modulo the inverter)
-	if len(xs) < len(ys) {
+	// compared equal to length of left. If right is longer, then left is less
+	// than right (-1) (modulo the inverter)
+	if len(left) < len(right) {
 		return -1 * inverter, nil
 	}
 

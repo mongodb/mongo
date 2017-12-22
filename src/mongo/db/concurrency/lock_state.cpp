@@ -785,7 +785,10 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
         }
     }
 
-    // Cleanup the state, since this is an unused lock now
+    // Cleanup the state, since this is an unused lock now.
+    // Note: in case of the _notify object returning LOCK_TIMEOUT, it is possible to find that the
+    // lock was still granted after all, but we don't try to take advantage of that and will return
+    // a timeout.
     if (result != LOCK_OK) {
         LockRequestsMap::Iterator it = _requests.find(resId);
         _unlockImpl(&it);

@@ -74,6 +74,8 @@ class test_pack(wttest.WiredTigerTestCase):
         forw_idx.set_key(*v)
         self.assertEquals(forw_idx.search(), 0)
         self.assertEquals(forw_idx.get_value(), 1234)
+        forw.close()
+        forw_idx.close()
 
     def test_packing(self):
         self.check('iii', 0, 101, -99)

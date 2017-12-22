@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // to run:
 //   ./mongo jstests/<this-file>
 

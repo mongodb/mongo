@@ -1,3 +1,4 @@
+// @tags: [requires_non_retryable_writes]
 
 t = db.getCollection("basic2");
 t.drop();

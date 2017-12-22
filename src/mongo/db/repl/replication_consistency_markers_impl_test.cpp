@@ -282,7 +282,7 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     // Set min valid without waiting for the changes to be durable.
     OpTime endOpTime2({Seconds(789), 0}, 1LL);
     consistencyMarkers.setMinValid(opCtx, endOpTime2);
-    consistencyMarkers.setAppliedThrough(opCtx, {});
+    consistencyMarkers.clearAppliedThrough(opCtx, {});
     ASSERT_EQUALS(consistencyMarkers.getAppliedThrough(opCtx), OpTime());
     ASSERT_EQUALS(consistencyMarkers.getMinValid(opCtx), endOpTime2);
     ASSERT_FALSE(recoveryUnit->waitUntilDurableCalled);

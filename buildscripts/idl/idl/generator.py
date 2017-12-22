@@ -236,8 +236,13 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
                     with writer.IndentedScopedBlock(self._writer, 'if (!usedFields[%s]) {' %
                                                     (_gen_field_usage_constant(field)), '}'):
                         if field.default:
-                            self._writer.write_line('%s = %s;' %
-                                                    (_get_field_member_name(field), field.default))
+                            if field.chained_struct_field:
+                                self._writer.write_line('%s.%s(%s);' % (
+                                    _get_field_member_name(field.chained_struct_field),
+                                    _get_field_member_setter_name(field), field.default))
+                            else:
+                                self._writer.write_line(
+                                    '%s = %s;' % (_get_field_member_name(field), field.default))
                         else:
                             self._writer.write_line('ctxt.throwMissingField(%s);' %
                                                     (_get_field_constant_name(field)))
@@ -549,10 +554,55 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         self._writer.write_line("static const std::vector<StringData> _knownFields;")
         self.write_empty_line()
 
+    def gen_comparison_operators_declarations(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate comparison operators declarations for the type."""
+        # pylint: disable=invalid-name
+
+        template_params = {'class_name': common.title_case(struct.name)}
+
+        with self._with_template(template_params):
+            self._writer.write_template(
+                'friend bool operator==(const ${class_name}& left, const ${class_name}& right);')
+            self._writer.write_template(
+                'friend bool operator!=(const ${class_name}& left, const ${class_name}& right);')
+            self._writer.write_template(
+                'friend bool operator<(const ${class_name}& left, const ${class_name}& right);')
+
+        self.write_empty_line()
+
+    def gen_comparison_operators_definitions(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate comparison operators definitions for the type."""
+        # pylint: disable=invalid-name
+
+        sorted_fields = sorted(
+            [
+                field for field in struct.fields
+                if (not field.ignore) and field.comparison_order != -1
+            ],
+            key=lambda f: f.comparison_order)
+        fields = [_get_field_member_name(field) for field in sorted_fields]
+
+        for rel_op in ['==', '!=', '<']:
+            decl = common.template_args(
+                "inline bool operator${rel_op}(const ${class_name}& left, const ${class_name}& right) {",
+                rel_op=rel_op,
+                class_name=common.title_case(struct.name))
+
+            with self._block(decl, "}"):
+                self._writer.write_line('return std::tie(%s) %s std::tie(%s);' % (','.join(
+                    ["left.%s" % (field) for field in fields]), rel_op, ','.join(
+                        ["right.%s" % (field) for field in fields])))
+
+            self.write_empty_line()
+
+        self.write_empty_line()
+
     def generate(self, spec):
         # type: (ast.IDLAST) -> None
         """Generate the C++ header to a stream."""
-        # pylint: disable=too-many-branches
+        # pylint: disable=too-many-branches,too-many-statements
         self.gen_file_header()
 
         self._writer.write_unindented_line('#pragma once')
@@ -634,6 +684,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             if not struct.immutable:
                                 self.gen_setter(field)
 
+                    if struct.generate_comparison_operators:
+                        self.gen_comparison_operators_declarations(struct)
+
                     self.write_unindented_line('protected:')
                     self.gen_protected_serializer_methods(struct)
 
@@ -659,6 +712,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             self.gen_serializer_member(field)
 
                 self.write_empty_line()
+
+                if struct.generate_comparison_operators:
+                    self.gen_comparison_operators_definitions(struct)
 
 
 class _CppSourceFileWriter(_CppFileWriterBase):
@@ -766,7 +822,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             self._writer.write_line('++expectedFieldNumber;')
 
-        self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
+        if field.chained_struct_field:
+            self._writer.write_line('%s.%s(std::move(values));' %
+                                    (_get_field_member_name(field.chained_struct_field),
+                                     _get_field_member_setter_name(field)))
+        else:
+            self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
 
     def gen_field_deserializer(self, field, bson_object):
         # type: (ast.Field, unicode) -> None
@@ -925,7 +986,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             first_field = True
             for field in struct.fields:
                 # Do not parse chained fields as fields since they are actually chained types.
-                if field.chained:
+                if field.chained and not field.chained_struct_field:
                     continue
 
                 field_predicate = 'fieldName == %s' % (_get_field_constant_name(field))
@@ -958,15 +1019,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     with self._predicate(command_predicate):
                         self._writer.write_line('ctxt.throwUnknownField(fieldName);')
 
-        # Parse chained types if not inlined
-        if not struct.inline_chained_structs:
-            for field in struct.fields:
-                if not field.chained:
-                    continue
+        # Parse chained structs if not inlined
+        # Parse chained types always here
+        for field in struct.fields:
+            if not field.chained or \
+                    (field.chained and field.struct_type and struct.inline_chained_structs):
+                continue
 
-                # Simply generate deserializers since these are all 'any' types
-                self.gen_field_deserializer(field, bson_object)
-        self._writer.write_empty_line()
+            # Simply generate deserializers since these are all 'any' types
+            self.gen_field_deserializer(field, bson_object)
+            self._writer.write_empty_line()
 
         self._writer.write_empty_line()
 

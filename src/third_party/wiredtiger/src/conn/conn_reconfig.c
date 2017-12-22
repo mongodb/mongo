@@ -57,6 +57,106 @@ __wt_conn_compat_config(WT_SESSION_IMPL *session, const char **cfg)
 }
 
 /*
+ * __wt_conn_optrack_setup --
+ *     Set up operation logging.
+ */
+int
+__wt_conn_optrack_setup(WT_SESSION_IMPL *session,
+    const char *cfg[], bool reconfig)
+{
+	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(buf);
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	/* Once an operation tracking path has been set it can't be changed. */
+	if (!reconfig) {
+		WT_RET(__wt_config_gets(session,
+		    cfg, "operation_tracking.path", &cval));
+		WT_RET(__wt_strndup(session,
+		    cval.str, cval.len, &conn->optrack_path));
+	}
+
+	WT_RET(__wt_config_gets(session,
+	    cfg, "operation_tracking.enabled", &cval));
+	if (cval.val == 0) {
+		if (F_ISSET(conn, WT_CONN_OPTRACK)) {
+			WT_RET(__wt_conn_optrack_teardown(session, reconfig));
+			F_CLR(conn, WT_CONN_OPTRACK);
+		}
+		return (0);
+	} else if (F_ISSET(conn, WT_CONN_READONLY))
+		/* Operation tracking isn't supported in read-only mode */
+		WT_RET_MSG(session, EINVAL,
+		    "Operation tracking is incompatible with read only "
+		    "configuration.");
+	else if (F_ISSET(conn, WT_CONN_OPTRACK))
+		/* Already enabled, nothing else to do */
+		return (0);
+
+	/*
+	 * Operation tracking files will include the ID of the creating process
+	 * in their name, so we can distinguish between log files created by
+	 * different WiredTiger processes in the same directory. We cache the
+	 * process id for future use.
+	 */
+	conn->optrack_pid = __wt_process_id();
+
+	/*
+	 * Open the file in the same directory that will hold a map of
+	 * translations between function names and function IDs. If the file
+	 * exists, remove it.
+	 */
+	WT_RET(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__wt_filename_construct(session, conn->optrack_path,
+	    "optrack-map", conn->optrack_pid, UINT32_MAX, buf));
+	WT_ERR(__wt_open(session,
+	    (const char *)buf->data, WT_FS_OPEN_FILE_TYPE_REGULAR,
+	    WT_FS_OPEN_CREATE, &conn->optrack_map_fh));
+
+	WT_ERR(__wt_spin_init(session,
+	    &conn->optrack_map_spinlock, "optrack map spinlock"));
+
+	WT_ERR(__wt_malloc(session, WT_OPTRACK_BUFSIZE,
+	    &conn->dummy_session.optrack_buf));
+
+	/* Set operation tracking on */
+	F_SET(conn, WT_CONN_OPTRACK);
+
+err:	__wt_scr_free(session, &buf);
+	return (ret);
+}
+
+/*
+ * __wt_conn_optrack_teardown --
+ *      Clean up connection-wide resources used for operation logging.
+ */
+int
+__wt_conn_optrack_teardown(WT_SESSION_IMPL *session, bool reconfig)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	if (!reconfig)
+		/* Looks like we are shutting down */
+		__wt_free(session, conn->optrack_path);
+
+	if (!F_ISSET(conn, WT_CONN_OPTRACK))
+		return (0);
+
+	__wt_spin_destroy(session, &conn->optrack_map_spinlock);
+
+	WT_TRET(__wt_close(session, &conn->optrack_map_fh));
+	__wt_free(session, conn->dummy_session.optrack_buf);
+
+	return (ret);
+}
+
+/*
  * __wt_conn_statistics_config --
  *	Set statistics configuration.
  */
@@ -189,6 +289,7 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 	WT_WITH_CHECKPOINT_LOCK(session,
 	    ret = __wt_conn_compat_config(session, cfg));
 	WT_ERR(ret);
+	WT_ERR(__wt_conn_optrack_setup(session, cfg, true));
 	WT_ERR(__wt_conn_statistics_config(session, cfg));
 	WT_ERR(__wt_async_reconfig(session, cfg));
 	WT_ERR(__wt_cache_config(session, true, cfg));

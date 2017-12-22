@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test very basic functionality of text stage
 
 t = db.stages_text;

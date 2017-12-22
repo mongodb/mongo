@@ -122,6 +122,7 @@ class test_schema05(wttest.WiredTigerTestCase):
                     value = c.get_value()
                 self.assertEqual(value, expect)
             i += 1
+        cursor.close()
         self.assertEqual(self.nentries, i)
         for i in range(0, self.nindices):
             icursor[i].close()

@@ -21,7 +21,7 @@
             let res = coll.find(docId).hint(indexKeyPattern).min(key).returnKey().toArray();
             if (res.length > 0) {
                 assert.eq(1, res.length, tojson(res));
-                assert.neq(key, res[0]);
+                assert.neq(0, bsonWoCompare(key, res[0]), tojson(res[0]));
             }
         }
     }
