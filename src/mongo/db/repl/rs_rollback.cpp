@@ -803,7 +803,6 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
     // Finds the UUID of the collection that we are renaming out of the way.
     auto collection = db->getCollection(opCtx, info.renameTo);
     invariant(collection);
-    BSONObj tempRenameCollUUID = collection->uuid().get().toBSON();
 
     // Creates the oplog entry to temporarily rename the collection that is
     // preventing the renameCollection command from rolling back to a unique
@@ -822,15 +821,10 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
            << info.renameTo << " with UUID " << collection->uuid().get() << " out of the way to "
            << tempNss;
 
-    BSONObjBuilder tempRenameCmd;
-    tempRenameCmd.append("renameCollection", info.renameTo.ns());
-    tempRenameCmd.append("to", tempNss.ns());
-    tempRenameCmd.append("dropTarget", false);
-
     // Renaming the collection that was clashing with the attempted rename
     // operation to a different collection name.
-    auto renameStatus = renameCollectionForApplyOps(
-        opCtx, db->name(), tempRenameCollUUID.getField("uuid"), tempRenameCmd.obj(), {});
+    auto uuid = collection->uuid().get();
+    auto renameStatus = renameCollectionForRollback(opCtx, tempNss, uuid);
 
     if (!renameStatus.isOK()) {
         severe() << "Unable to rename collection " << info.renameTo << " out of the way to "
@@ -844,8 +838,7 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
  */
 void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollectionInfo info) {
 
-    std::string dbName = info.renameFrom.db().toString();
-    BSONObj ui = uuid.toBSON();
+    auto dbName = info.renameFrom.db();
 
     log() << "Attempting to rename collection with UUID: " << uuid << ", from: " << info.renameFrom
           << ", to: " << info.renameTo;
@@ -853,13 +846,7 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
     auto db = dbHolder().openDb(opCtx, dbName);
     invariant(db);
 
-    BSONObjBuilder cmd;
-    cmd.append("renameCollection", info.renameFrom.ns());
-    cmd.append("to", info.renameTo.ns());
-    cmd.append("dropTarget", false);
-    BSONObj obj = cmd.obj();
-
-    auto status = renameCollectionForApplyOps(opCtx, dbName, ui.getField("uuid"), obj, {});
+    auto status = renameCollectionForRollback(opCtx, info.renameTo, uuid);
 
     // If we try to roll back a collection to a collection name that currently exists
     // because another collection was renamed or created with the same collection name,
@@ -870,7 +857,7 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
 
         // Retrying to renameCollection command again now that the conflicting
         // collection has been renamed out of the way.
-        status = renameCollectionForApplyOps(opCtx, dbName, ui.getField("uuid"), obj, {});
+        status = renameCollectionForRollback(opCtx, info.renameTo, uuid);
 
         if (!status.isOK()) {
             severe() << "Rename collection failed to roll back twice. We were unable to rename "

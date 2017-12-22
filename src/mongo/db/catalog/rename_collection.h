@@ -29,6 +29,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 class NamespaceString;
@@ -64,5 +65,15 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
                                    const BSONElement& ui,
                                    const BSONObj& cmd,
                                    const repl::OpTime& renameOpTime);
+
+/**
+ * Same as renameCollection(), but used for rolling back renameCollection operations only.
+ *
+ * 'uuid' is used to look up the source namespace.
+ * The 'target' namespace must refer to the same database as the source.
+ */
+Status renameCollectionForRollback(OperationContext* opCtx,
+                                   const NamespaceString& target,
+                                   const UUID& uuid);
 
 }  // namespace mongo
