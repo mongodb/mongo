@@ -47,17 +47,17 @@ DecorationContainer::DecorationDescriptor DecorationRegistry::declareDecoration(
     return result;
 }
 
-void DecorationRegistry::construct(DecorationContainer* decorable) const {
+void DecorationRegistry::construct(DecorationContainer* container, void* owner) const {
     auto iter = _decorationInfo.cbegin();
     try {
         for (; iter != _decorationInfo.cend(); ++iter) {
-            iter->constructor(decorable->getDecoration(iter->descriptor));
+            iter->constructor(container->getDecoration(iter->descriptor), owner);
         }
     } catch (...) {
         try {
             while (iter != _decorationInfo.cbegin()) {
                 --iter;
-                iter->destructor(decorable->getDecoration(iter->descriptor));
+                iter->destructor(container->getDecoration(iter->descriptor));
             }
         } catch (...) {
             std::terminate();
@@ -66,13 +66,13 @@ void DecorationRegistry::construct(DecorationContainer* decorable) const {
     }
 }
 
-void DecorationRegistry::destruct(DecorationContainer* decorable) const {
+void DecorationRegistry::destruct(DecorationContainer* container) const {
     try {
         for (DecorationInfoVector::const_reverse_iterator iter = _decorationInfo.rbegin(),
                                                           end = _decorationInfo.rend();
              iter != end;
              ++iter) {
-            iter->destructor(decorable->getDecoration(iter->descriptor));
+            iter->destructor(container->getDecoration(iter->descriptor));
         }
     } catch (...) {
         std::terminate();

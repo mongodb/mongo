@@ -34,10 +34,10 @@
 
 namespace mongo {
 
-DecorationContainer::DecorationContainer(const DecorationRegistry* registry)
+DecorationContainer::DecorationContainer(const DecorationRegistry* registry, void* owner)
     : _registry(registry),
       _decorationData(new unsigned char[registry->getDecorationBufferSizeBytes()]) {
-    _registry->construct(this);
+    _registry->construct(this, owner);
 }
 
 DecorationContainer::~DecorationContainer() {

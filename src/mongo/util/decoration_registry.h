@@ -66,6 +66,18 @@ public:
             sizeof(T), std::alignment_of<T>::value, &constructAt<T>, &destructAt<T>)));
     }
 
+    template <typename T, typename Owner>
+    DecorationContainer::DecorationDescriptorWithType<T> declareDecorationWithOwner() {
+        MONGO_STATIC_ASSERT_MSG(std::is_nothrow_destructible<T>::value,
+                                "Decorations must be nothrow destructible");
+        return DecorationContainer::DecorationDescriptorWithType<T>(
+            std::move(declareDecoration(sizeof(T),
+                                        std::alignment_of<T>::value,
+                                        &constructAtWithOwner<T, Owner>,
+                                        &destructAt<T>)));
+    }
+
+
     size_t getDecorationBufferSizeBytes() const {
         return _totalSizeBytes;
     }
@@ -76,7 +88,7 @@ public:
      *
      * Called by the DecorationContainer constructor. Do not call directly.
      */
-    void construct(DecorationContainer* decorable) const;
+    void construct(DecorationContainer* decorable, void* owner) const;
 
     /**
      * Destroys the decorations declared in this registry on the given instance of "decorable".
@@ -89,7 +101,7 @@ private:
     /**
      * Function that constructs (initializes) a single instance of a decoration.
      */
-    using DecorationConstructorFn = stdx::function<void(void*)>;
+    using DecorationConstructorFn = stdx::function<void(void*, void*)>;
 
     /**
      * Function that destructs (deinitializes) a single instance of a decoration.
@@ -110,8 +122,13 @@ private:
     using DecorationInfoVector = std::vector<DecorationInfo>;
 
     template <typename T>
-    static void constructAt(void* location) {
+    static void constructAt(void* location, void* owner) {
         new (location) T();
+    }
+
+    template <typename T, typename Owner>
+    static void constructAtWithOwner(void* location, void* owner) {
+        new (location) T(static_cast<Owner*>(owner));
     }
 
     template <typename T>
