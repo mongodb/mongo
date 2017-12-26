@@ -291,6 +291,24 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='create_collection_test',
+    source=[
+        'create_collection_test.cpp',
+    ],
+    LIBDEPS=[
+        'catalog_helpers',
+        'uuid_catalog',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/util/uuid',
+    ],
+)
+
+env.CppUnitTest(
     target='rename_collection_test',
     source=[
         'rename_collection_test.cpp',
