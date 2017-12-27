@@ -37,7 +37,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                  write_concern_majority_journal_default=None,
                  auth_options=None,
                  replset_config_options=None,
-                 voting_secondaries=True):
+                 voting_secondaries=False):
 
         interface.ReplFixture.__init__(self, logger, job_num)
 
