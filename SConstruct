@@ -667,6 +667,10 @@ env_vars.Add('MONGO_BUILDINFO_ENVIRONMENT_DATA',
     help='Sets the info returned from the buildInfo command and --version command-line flag',
     default=mongo_generators.default_buildinfo_environment_data())
 
+# Exposed to be able to cross compile Android/*nix from Windows without ending up with the .exe suffix.
+env_vars.Add('PROGSUFFIX',
+    help='Sets the suffix for built executable files')
+
 env_vars.Add('MONGO_DIST_SRC_PREFIX',
     help='Sets the prefix for files in the source distribution archive',
     converter=variable_distsrc_converter,
