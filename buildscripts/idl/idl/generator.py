@@ -1529,9 +1529,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.write_empty_line()
 
 
-def _generate_header(spec, file_name):
-    # type: (ast.IDLAST, unicode) -> None
-    """Generate a C++ header."""
+def generate_header_str(spec):
+    # type: (ast.IDLAST) -> unicode
+    """Generate a C++ header in-memory."""
     stream = io.StringIO()
     text_writer = writer.IndentedTextWriter(stream)
 
@@ -1539,14 +1539,23 @@ def _generate_header(spec, file_name):
 
     header.generate(spec)
 
+    return stream.getvalue()
+
+
+def _generate_header(spec, file_name):
+    # type: (ast.IDLAST, unicode) -> None
+    """Generate a C++ header."""
+
+    str_value = generate_header_str(spec)
+
     # Generate structs
     with io.open(file_name, mode='wb') as file_handle:
-        file_handle.write(stream.getvalue().encode())
+        file_handle.write(str_value.encode())
 
 
-def _generate_source(spec, target_arch, file_name, header_file_name):
-    # type: (ast.IDLAST, unicode, unicode, unicode) -> None
-    """Generate a C++ source file."""
+def generate_source_str(spec, target_arch, header_file_name):
+    # type: (ast.IDLAST, unicode, unicode) -> unicode
+    """Generate a C++ source file in-memory."""
     stream = io.StringIO()
     text_writer = writer.IndentedTextWriter(stream)
 
@@ -1554,9 +1563,17 @@ def _generate_source(spec, target_arch, file_name, header_file_name):
 
     source.generate(spec, header_file_name)
 
+    return stream.getvalue()
+
+
+def _generate_source(spec, target_arch, file_name, header_file_name):
+    # type: (ast.IDLAST, unicode, unicode, unicode) -> None
+    """Generate a C++ source file."""
+    str_value = generate_source_str(spec, target_arch, header_file_name)
+
     # Generate structs
     with io.open(file_name, mode='wb') as file_handle:
-        file_handle.write(stream.getvalue().encode())
+        file_handle.write(str_value.encode())
 
 
 def generate_code(spec, target_arch, output_base_dir, header_file_name, source_file_name):

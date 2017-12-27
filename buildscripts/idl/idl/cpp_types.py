@@ -178,8 +178,21 @@ class _CppTypeBasic(CppTypeBase):
 
     def is_const_type(self):
         # type: () -> bool
+        # Enum types are never const since they are mapped to primitive types, and coverity warns.
+        if self._field.enum_type:
+            return False
+
         type_name = self.get_type_name().replace(' ', '')
-        return not _is_primitive_type(type_name) or type_name == _STD_ARRAY_UINT8_16
+
+        # If it is not a primitive type, then it is const.
+        if not _is_primitive_type(type_name):
+            return True
+
+        # Arrays of bytes should also be const though.
+        if type_name == _STD_ARRAY_UINT8_16:
+            return True
+
+        return False
 
     def return_by_reference(self):
         # type: () -> bool
