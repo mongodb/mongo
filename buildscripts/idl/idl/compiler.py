@@ -23,6 +23,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 import io
 import logging
 import os
+import platform
 from typing import Any, List
 
 from . import binder
@@ -35,11 +36,14 @@ from . import syntax
 class CompilerArgs(object):
     """Set of compiler arguments."""
 
+    # pylint: disable=too-many-instance-attributes
+
     def __init__(self):
         # type: () -> None
         """Create a container for compiler arguments."""
         self.import_directories = None  # type: List[unicode]
         self.input_file = None  # type: unicode
+        self.target_arch = None  # type: unicode
 
         self.output_source = None  # type: unicode
         self.output_header = None  # type: unicode
@@ -176,6 +180,9 @@ def compile_idl(args):
         source_file_name = args.output_source
         header_file_name = args.output_header
 
+    if args.target_arch is None:
+        args.target_arch = platform.machine()
+
     # Compile the IDL through the 3 passes
     with io.open(args.input_file, encoding='utf-8') as file_stream:
         parsed_doc = parser.parse(file_stream, args.input_file,
@@ -191,8 +198,8 @@ def compile_idl(args):
 
             bound_doc = binder.bind(parsed_doc.spec)
             if not bound_doc.errors:
-                generator.generate_code(bound_doc.spec, args.output_base_dir, header_file_name,
-                                        source_file_name)
+                generator.generate_code(bound_doc.spec, args.target_arch, args.output_base_dir,
+                                        header_file_name, source_file_name)
 
                 return True
             else:

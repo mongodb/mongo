@@ -720,9 +720,10 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 class _CppSourceFileWriter(_CppFileWriterBase):
     """C++ .cpp File writer."""
 
-    def __init__(self, indented_writer):
-        # type: (writer.IndentedTextWriter) -> None
+    def __init__(self, indented_writer, target_arch):
+        # type: (writer.IndentedTextWriter, unicode) -> None
         """Create a C++ .cpp file code writer."""
+        self._target_arch = target_arch
         super(_CppSourceFileWriter, self).__init__(indented_writer)
 
     def _gen_field_deserializer_expression(self, element_name, field):
@@ -815,7 +816,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 with self._predicate(_get_bson_type_check('arrayElement', 'arrayCtxt', field)):
                     array_value = self._gen_field_deserializer_expression('arrayElement', field)
-                    self._writer.write_line('values.emplace_back(%s);' % (array_value))
+
+                    # HACK - SERVER-32431
+                    # GCC 5.4.0 on s390x has a code gen bug, work around it by not using std::move
+                    if self._target_arch == "s390x":
+                        self._writer.write_line('auto localValue = %s;' % (array_value))
+                        self._writer.write_line('values.push_back(localValue);')
+                    else:
+                        self._writer.write_line('values.emplace_back(%s);' % (array_value))
 
             with self._block('else {', '}'):
                 self._writer.write_line('arrayCtxt.throwBadArrayFieldNumberValue(arrayFieldName);')
@@ -1536,13 +1544,13 @@ def _generate_header(spec, file_name):
         file_handle.write(stream.getvalue().encode())
 
 
-def _generate_source(spec, file_name, header_file_name):
-    # type: (ast.IDLAST, unicode, unicode) -> None
+def _generate_source(spec, target_arch, file_name, header_file_name):
+    # type: (ast.IDLAST, unicode, unicode, unicode) -> None
     """Generate a C++ source file."""
     stream = io.StringIO()
     text_writer = writer.IndentedTextWriter(stream)
 
-    source = _CppSourceFileWriter(text_writer)
+    source = _CppSourceFileWriter(text_writer, target_arch)
 
     source.generate(spec, header_file_name)
 
@@ -1551,8 +1559,8 @@ def _generate_source(spec, file_name, header_file_name):
         file_handle.write(stream.getvalue().encode())
 
 
-def generate_code(spec, output_base_dir, header_file_name, source_file_name):
-    # type: (ast.IDLAST, unicode, unicode, unicode) -> None
+def generate_code(spec, target_arch, output_base_dir, header_file_name, source_file_name):
+    # type: (ast.IDLAST, unicode, unicode, unicode, unicode) -> None
     """Generate a C++ header and source file from an idl.ast tree."""
 
     _generate_header(spec, header_file_name)
@@ -1566,4 +1574,4 @@ def generate_code(spec, output_base_dir, header_file_name, source_file_name):
     # Normalize to POSIX style for consistency across Windows and POSIX.
     include_h_file_name = include_h_file_name.replace("\\", "/")
 
-    _generate_source(spec, source_file_name, include_h_file_name)
+    _generate_source(spec, target_arch, source_file_name, include_h_file_name)
