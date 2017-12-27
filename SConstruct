@@ -463,6 +463,11 @@ add_option('git-decider',
     type="choice",
 )
 
+add_option('android-toolchain-path',
+    default=None,
+    help="Android NDK standalone toolchain path. Required when using --variables-files=etc/scons/android_ndk.vars",
+)
+
 try:
     with open("version.json", "r") as version_fp:
         version_data = json.load(version_fp)
