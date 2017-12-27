@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"

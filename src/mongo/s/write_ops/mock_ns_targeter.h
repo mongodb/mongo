@@ -28,10 +28,8 @@
 
 #pragma once
 
-#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/range_arithmetic.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/stdx/memory.h"
@@ -40,68 +38,15 @@
 namespace mongo {
 
 /**
- * A KeyRange represents a range over keys of documents in a namespace, qualified by a
- * key pattern which defines the documents that are in the key range.
- *
- * There may be many different expressions to generate the same key fields from a document - the
- * keyPattern tells us these expressions.
- *
- * Ex:
- * DocA : { field : "aaaa" }
- * DocB : { field : "bbb" }
- * DocC : { field : "ccccc" }
- *
- * keyPattern : { field : 1 }
- * minKey : { field : "aaaa" } : Id(DocA)
- * maxKey : { field : "ccccc" } : Id(DocB)
- *
- * contains Id(DocB)
- *
- * keyPattern : { field : "numberofletters" }
- * minKey : { field : 4 } : numberofletters(DocA)
- * maxKey : { field : 5 } : numberofletters(DocC)
- *
- * does not contain numberofletters(DocB)
- */
-struct KeyRange {
-    KeyRange(const std::string& ns,
-             const BSONObj& minKey,
-             const BSONObj& maxKey,
-             const BSONObj& keyPattern)
-        : ns(ns), minKey(minKey), maxKey(maxKey), keyPattern(keyPattern) {}
-
-    KeyRange() {}
-
-    std::string ns;
-    BSONObj minKey;
-    BSONObj maxKey;
-    BSONObj keyPattern;
-};
-
-/**
  * A MockRange represents a range with endpoint that a MockNSTargeter uses to direct writes to
  * a particular endpoint.
  */
 struct MockRange {
-    MockRange(const ShardEndpoint& endpoint,
-              const NamespaceString nss,
-              const BSONObj& minKey,
-              const BSONObj& maxKey)
-        : endpoint(endpoint), range(nss.ns(), minKey, maxKey, getKeyPattern(minKey)) {}
-
-    MockRange(const ShardEndpoint& endpoint, const KeyRange& range)
-        : endpoint(endpoint), range(range) {}
-
-    static BSONObj getKeyPattern(const BSONObj& key) {
-        BSONObjIterator it(key);
-        BSONObjBuilder objB;
-        while (it.more())
-            objB.append(it.next().fieldName(), 1);
-        return objB.obj();
-    }
+    MockRange(const ShardEndpoint& endpoint, const BSONObj& minKey, const BSONObj& maxKey)
+        : endpoint(endpoint), range(minKey, maxKey) {}
 
     const ShardEndpoint endpoint;
-    const KeyRange range;
+    const ChunkRange range;
 };
 
 /**
@@ -112,11 +57,12 @@ struct MockRange {
  */
 class MockNSTargeter : public NSTargeter {
 public:
-    void init(const std::vector<MockRange*> mockRanges) {
+    void init(const NamespaceString& nss, std::vector<MockRange> mockRanges) {
+        ASSERT(nss.isValid());
+        _nss = nss;
+
         ASSERT(!mockRanges.empty());
-        _mockRanges.mutableVector().insert(
-            _mockRanges.mutableVector().end(), mockRanges.begin(), mockRanges.end());
-        _nss = NamespaceString(_mockRanges.vector().front()->range.ns);
+        _mockRanges = std::move(mockRanges);
     }
 
     const NamespaceString& getNS() const {
@@ -130,7 +76,7 @@ public:
                         const BSONObj& doc,
                         ShardEndpoint** endpoint) const override {
         std::vector<std::unique_ptr<ShardEndpoint>> endpoints;
-        Status status = targetQuery(doc, &endpoints);
+        Status status = _targetQuery(doc, &endpoints);
         if (!status.isOK())
             return status;
         if (!endpoints.empty())
@@ -145,7 +91,7 @@ public:
     Status targetUpdate(OperationContext* opCtx,
                         const write_ops::UpdateOpEntry& updateDoc,
                         std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override {
-        return targetQuery(updateDoc.getQ(), endpoints);
+        return _targetQuery(updateDoc.getQ(), endpoints);
     }
 
     /**
@@ -155,52 +101,44 @@ public:
     Status targetDelete(OperationContext* opCtx,
                         const write_ops::DeleteOpEntry& deleteDoc,
                         std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
-        return targetQuery(deleteDoc.getQ(), endpoints);
+        return _targetQuery(deleteDoc.getQ(), endpoints);
     }
 
     Status targetCollection(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override {
-        // TODO: XXX
         // No-op
         return Status::OK();
     }
 
     Status targetAllShards(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override {
-        const std::vector<MockRange*>& ranges = getRanges();
-        for (std::vector<MockRange*>::const_iterator it = ranges.begin(); it != ranges.end();
-             ++it) {
-            const MockRange* range = *it;
-            endpoints->push_back(stdx::make_unique<ShardEndpoint>(range->endpoint));
+        for (const auto& range : _mockRanges) {
+            endpoints->push_back(stdx::make_unique<ShardEndpoint>(range.endpoint));
         }
 
         return Status::OK();
     }
 
-    void noteCouldNotTarget() {
+    void noteCouldNotTarget() override {
         // No-op
     }
 
-    void noteStaleResponse(const ShardEndpoint& endpoint, const BSONObj& staleInfo) {
+    void noteStaleResponse(const ShardEndpoint& endpoint, const BSONObj& staleInfo) override {
         // No-op
     }
 
-    Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) {
+    Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) override {
         // No-op
         if (wasChanged)
             *wasChanged = false;
         return Status::OK();
     }
 
-    const std::vector<MockRange*>& getRanges() const {
-        return _mockRanges.vector();
-    }
-
 private:
-    ChunkRange parseRange(const BSONObj& query) const {
-        const std::string fieldName = query.firstElement().fieldName();
+    static ChunkRange _parseRange(const BSONObj& query) {
+        const StringData fieldName(query.firstElement().fieldName());
 
         if (query.firstElement().isNumber()) {
-            return ChunkRange(BSON(fieldName << query.firstElement().numberInt()),
-                              BSON(fieldName << query.firstElement().numberInt() + 1));
+            return {BSON(fieldName << query.firstElement().numberInt()),
+                    BSON(fieldName << query.firstElement().numberInt() + 1)};
         } else if (query.firstElement().type() == Object) {
             BSONObj queryRange = query.firstElement().Obj();
 
@@ -212,43 +150,36 @@ private:
             BSONObjBuilder maxKeyB;
             maxKeyB.appendAs(queryRange[LT.l_], fieldName);
 
-            return ChunkRange(minKeyB.obj(), maxKeyB.obj());
+            return {minKeyB.obj(), maxKeyB.obj()};
         }
 
-        ASSERT(false);
-        return ChunkRange({}, {});
+        FAIL("Invalid query");
+        MONGO_UNREACHABLE;
     }
 
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    Status targetQuery(const BSONObj& query,
-                       std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
-        ChunkRange queryRange(parseRange(query));
+    Status _targetQuery(const BSONObj& query,
+                        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
+        ChunkRange queryRange(_parseRange(query));
 
-        const std::vector<MockRange*>& ranges = getRanges();
-        for (std::vector<MockRange*>::const_iterator it = ranges.begin(); it != ranges.end();
-             ++it) {
-            const MockRange* range = *it;
-
-            if (rangeOverlaps(queryRange.getMin(),
-                              queryRange.getMax(),
-                              range->range.minKey,
-                              range->range.maxKey)) {
-                endpoints->push_back(stdx::make_unique<ShardEndpoint>(range->endpoint));
+        for (const auto& range : _mockRanges) {
+            if (queryRange.overlapWith(range.range)) {
+                endpoints->push_back(stdx::make_unique<ShardEndpoint>(range.endpoint));
             }
         }
 
         if (endpoints->empty())
-            return Status(ErrorCodes::UnknownError, "no mock ranges found for query");
+            return {ErrorCodes::UnknownError, "no mock ranges found for query"};
+
         return Status::OK();
     }
 
     NamespaceString _nss;
 
-    // Manually-stored ranges
-    OwnedPointerVector<MockRange> _mockRanges;
+    std::vector<MockRange> _mockRanges;
 };
 
 inline void assertEndpointsEqual(const ShardEndpoint& endpointA, const ShardEndpoint& endpointB) {

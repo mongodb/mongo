@@ -28,22 +28,32 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 
 class OperationContext;
-struct ShardEndpoint;
+
+/**
+ * Combines a shard and the version which that shard should be using
+ */
+struct ShardEndpoint {
+    ShardEndpoint(const ShardId& shardName, const ChunkVersion& shardVersion)
+        : shardName(shardName), shardVersion(shardVersion) {}
+
+    ShardEndpoint(const ShardEndpoint& other)
+        : shardName(other.shardName), shardVersion(other.shardVersion) {}
+
+    ShardId shardName;
+    ChunkVersion shardVersion;
+};
 
 /**
  * The NSTargeter interface is used by a WriteOp to generate and target child write operations
@@ -151,21 +161,6 @@ public:
      * Returns !OK with message if could not refresh
      */
     virtual Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) = 0;
-};
-
-/**
- * A ShardEndpoint represents a destination for a targeted query or document.  It contains both
- * the logical target (shard name/version/broadcast) and the physical target (host name).
- */
-struct ShardEndpoint {
-    ShardEndpoint(const ShardEndpoint& other)
-        : shardName(other.shardName), shardVersion(other.shardVersion) {}
-
-    ShardEndpoint(const ShardId& shardName, const ChunkVersion& shardVersion)
-        : shardName(shardName), shardVersion(shardVersion) {}
-
-    ShardId shardName;
-    ChunkVersion shardVersion;
 };
 
 }  // namespace mongo

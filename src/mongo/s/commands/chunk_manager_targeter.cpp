@@ -33,7 +33,6 @@
 #include "mongo/s/commands/chunk_manager_targeter.h"
 
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/s/client/shard_registry.h"
@@ -574,7 +573,7 @@ Status ChunkManagerTargeter::targetQuery(
 std::unique_ptr<ShardEndpoint> ChunkManagerTargeter::targetShardKey(const BSONObj& shardKey,
                                                                     const BSONObj& collation,
                                                                     long long estDataSize) const {
-    auto chunk = _routingInfo->cm()->findIntersectingChunk(shardKey, collation);
+    const auto chunk = _routingInfo->cm()->findIntersectingChunk(shardKey, collation);
 
     // Track autosplit stats for sharded collections
     // Note: this is only best effort accounting and is not accurate.
@@ -632,6 +631,11 @@ Status ChunkManagerTargeter::targetAllShards(
     return Status::OK();
 }
 
+void ChunkManagerTargeter::noteCouldNotTarget() {
+    dassert(_remoteShardVersions.empty());
+    _needsTargetingRefresh = true;
+}
+
 void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
                                              const BSONObj& staleInfo) {
     dassert(!_needsTargetingRefresh);
@@ -662,11 +666,6 @@ void ChunkManagerTargeter::noteStaleResponse(const ShardEndpoint& endpoint,
             previouslyNotedVersion = ChunkVersion::IGNORED();
         }
     }
-}
-
-void ChunkManagerTargeter::noteCouldNotTarget() {
-    dassert(_remoteShardVersions.empty());
-    _needsTargetingRefresh = true;
 }
 
 Status ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) {

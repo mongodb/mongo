@@ -44,9 +44,7 @@
 
 namespace mongo {
 
-using std::shared_ptr;
 using std::string;
-using std::stringstream;
 using std::vector;
 
 namespace {
@@ -58,7 +56,7 @@ class ClusterMergeChunksCommand : public ErrmsgCommandDeprecated {
 public:
     ClusterMergeChunksCommand() : ErrmsgCommandDeprecated("mergeChunks") {}
 
-    void help(stringstream& h) const override {
+    void help(std::stringstream& h) const override {
         h << "Merge Chunks command\n"
           << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ] }";
     }
@@ -151,7 +149,7 @@ public:
         minKey = cm->getShardKeyPattern().normalizeShardKey(minKey);
         maxKey = cm->getShardKeyPattern().normalizeShardKey(maxKey);
 
-        shared_ptr<Chunk> firstChunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
+        const auto firstChunk = cm->findIntersectingChunkWithSimpleCollation(minKey);
 
         BSONObjBuilder remoteCmdObjB;
         remoteCmdObjB.append(cmdObj[ClusterMergeChunksCommand::nsField()]);

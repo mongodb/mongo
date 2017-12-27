@@ -285,12 +285,13 @@ private:
                 targeter.targetUpdate(opCtx, targetingBatchItem.getUpdate(), &endpoints);
             if (!status.isOK())
                 return status;
-        } else {
-            invariant(targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete);
+        } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
             Status status =
                 targeter.targetDelete(opCtx, targetingBatchItem.getDelete(), &endpoints);
             if (!status.isOK())
                 return status;
+        } else {
+            MONGO_UNREACHABLE;
         }
 
         auto shardRegistry = Grid::get(opCtx)->shardRegistry();

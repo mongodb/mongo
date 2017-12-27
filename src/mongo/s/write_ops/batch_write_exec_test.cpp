@@ -28,14 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/write_ops/batch_write_exec.h"
-
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_test_fixture.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/mock_ns_targeter.h"
@@ -43,16 +42,11 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
-using std::unique_ptr;
-using std::string;
-using std::vector;
-
 namespace {
 
 const HostAndPort kTestShardHost = HostAndPort("FakeHost", 12345);
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
-const string shardName = "FakeShard";
+const std::string shardName = "FakeShard";
 const int kMaxRoundsWithoutProgress = 5;
 
 /**
@@ -87,11 +81,10 @@ public:
         setupShards(shards);
 
         // Set up the namespace targeter to target the fake shard.
-        ShardEndpoint endpoint(shardName, ChunkVersion::IGNORED());
-        vector<MockRange*> mockRanges;
-        mockRanges.push_back(
-            new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
-        nsTargeter.init(mockRanges);
+        nsTargeter.init(nss,
+                        {MockRange(ShardEndpoint(shardName, ChunkVersion::IGNORED()),
+                                   BSON("x" << MINKEY),
+                                   BSON("x" << MAXKEY))});
     }
 
     void expectInsertsReturnSuccess(const std::vector<BSONObj>& expected) {
@@ -290,7 +283,7 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
         ASSERT(response.isErrDetailsSet());
         ASSERT_EQ(errResponse.getErrCode(), response.getErrDetailsAt(0)->getErrCode());
         ASSERT(response.getErrDetailsAt(0)->getErrMessage().find(errResponse.getErrMessage()) !=
-               string::npos);
+               std::string::npos);
 
         ASSERT_EQ(1, stats.numRounds);
     });
@@ -479,7 +472,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
         ASSERT(response.isErrDetailsSet());
         ASSERT_EQUALS(response.getErrDetailsAt(0)->getErrCode(), retryableErrResponse.getErrCode());
         ASSERT(response.getErrDetailsAt(0)->getErrMessage().find(
-                   retryableErrResponse.getErrMessage()) != string::npos);
+                   retryableErrResponse.getErrMessage()) != std::string::npos);
         ASSERT_EQ(1, stats.numRounds);
     });
 
@@ -561,7 +554,7 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
         ASSERT_EQUALS(response.getErrDetailsAt(0)->getErrCode(),
                       nonRetryableErrResponse.getErrCode());
         ASSERT(response.getErrDetailsAt(0)->getErrMessage().find(
-                   nonRetryableErrResponse.getErrMessage()) != string::npos);
+                   nonRetryableErrResponse.getErrMessage()) != std::string::npos);
         ASSERT_EQ(1, stats.numRounds);
     });
 

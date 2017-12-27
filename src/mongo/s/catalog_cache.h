@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"

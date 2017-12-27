@@ -49,7 +49,6 @@
 namespace mongo {
 
 using std::string;
-using std::shared_ptr;
 using std::vector;
 using str::stream;
 
@@ -347,7 +346,8 @@ public:
     bool slaveOk() const override {
         return false;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 

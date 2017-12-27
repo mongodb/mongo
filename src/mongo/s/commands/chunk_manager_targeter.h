@@ -29,30 +29,21 @@
 #pragma once
 
 #include <map>
-#include <memory>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/ns_targeter.h"
 
 namespace mongo {
 
-class ChunkManager;
-class OperationContext;
-class Shard;
-struct ChunkVersion;
-
 struct TargeterStats {
-    TargeterStats()
-        : chunkSizeDelta(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>()) {}
-
-    // Map of chunk shard minKey -> approximate delta. This is used for deciding
-    // whether a chunk might need splitting or not.
-    BSONObjIndexedMap<int> chunkSizeDelta;
+    // Map of chunk shard minKey -> approximate delta. This is used for deciding whether a chunk
+    // might need splitting or not.
+    BSONObjIndexedMap<int> chunkSizeDelta{
+        SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<int>()};
 };
 
 /**
@@ -73,12 +64,12 @@ public:
      */
     Status init(OperationContext* opCtx);
 
-    const NamespaceString& getNS() const;
+    const NamespaceString& getNS() const override;
 
     // Returns ShardKeyNotFound if document does not have a full shard key.
     Status targetInsert(OperationContext* opCtx,
                         const BSONObj& doc,
-                        ShardEndpoint** endpoint) const;
+                        ShardEndpoint** endpoint) const override;
 
     // Returns ShardKeyNotFound if the update can't be targeted without a shard key.
     Status targetUpdate(OperationContext* opCtx,
@@ -94,9 +85,9 @@ public:
 
     Status targetAllShards(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
 
-    void noteStaleResponse(const ShardEndpoint& endpoint, const BSONObj& staleInfo);
+    void noteCouldNotTarget() override;
 
-    void noteCouldNotTarget();
+    void noteStaleResponse(const ShardEndpoint& endpoint, const BSONObj& staleInfo) override;
 
     /**
      * Replaces the targeting information with the latest information from the cache.  If this
@@ -107,7 +98,7 @@ public:
      *
      * Also see NSTargeter::refreshIfNeeded().
      */
-    Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged);
+    Status refreshIfNeeded(OperationContext* opCtx, bool* wasChanged) override;
 
 private:
     using ShardVersionMap = std::map<ShardId, ChunkVersion>;

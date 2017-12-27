@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -89,12 +88,9 @@ TEST(WriteOpTests, BasicError) {
 
 TEST(WriteOpTests, TargetSingle) {
     OperationContextNoop opCtx;
+
     NamespaceString nss("foo.bar");
-
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-
-    std::vector<MockRange*> mockRanges;
-    mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -108,7 +104,7 @@ TEST(WriteOpTests, TargetSingle) {
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
-    targeter.init(mockRanges);
+    targeter.init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
@@ -126,16 +122,11 @@ TEST(WriteOpTests, TargetSingle) {
 // Multi-write targeting test where our query goes to one shard
 TEST(WriteOpTests, TargetMultiOneShard) {
     OperationContextNoop opCtx;
-    NamespaceString nss("foo.bar");
 
+    NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion(10, 0, OID()));
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion(20, 0, OID()));
     ShardEndpoint endpointC(ShardId("shardB"), ChunkVersion(20, 0, OID()));
-
-    std::vector<MockRange*> mockRanges;
-    mockRanges.push_back(new MockRange(endpointA, nss, BSON("x" << MINKEY), BSON("x" << 0)));
-    mockRanges.push_back(new MockRange(endpointB, nss, BSON("x" << 0), BSON("x" << 10)));
-    mockRanges.push_back(new MockRange(endpointC, nss, BSON("x" << 10), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request([&] {
         write_ops::Delete deleteOp(nss);
@@ -148,7 +139,10 @@ TEST(WriteOpTests, TargetMultiOneShard) {
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
-    targeter.init(mockRanges);
+    targeter.init(nss,
+                  {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
+                   MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
+                   MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
@@ -167,16 +161,11 @@ TEST(WriteOpTests, TargetMultiOneShard) {
 // Multi-write targeting test where our write goes to more than one shard
 TEST(WriteOpTests, TargetMultiAllShards) {
     OperationContextNoop opCtx;
-    NamespaceString nss("foo.bar");
 
+    NamespaceString nss("foo.bar");
     ShardEndpoint endpointA(ShardId("shardA"), ChunkVersion(10, 0, OID()));
     ShardEndpoint endpointB(ShardId("shardB"), ChunkVersion(20, 0, OID()));
     ShardEndpoint endpointC(ShardId("shardB"), ChunkVersion(20, 0, OID()));
-
-    std::vector<MockRange*> mockRanges;
-    mockRanges.push_back(new MockRange(endpointA, nss, BSON("x" << MINKEY), BSON("x" << 0)));
-    mockRanges.push_back(new MockRange(endpointB, nss, BSON("x" << 0), BSON("x" << 10)));
-    mockRanges.push_back(new MockRange(endpointC, nss, BSON("x" << 10), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request([&] {
         write_ops::Delete deleteOp(nss);
@@ -189,7 +178,10 @@ TEST(WriteOpTests, TargetMultiAllShards) {
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
-    targeter.init(mockRanges);
+    targeter.init(nss,
+                  {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
+                   MockRange(endpointB, BSON("x" << 0), BSON("x" << 10)),
+                   MockRange(endpointC, BSON("x" << 10), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
@@ -216,12 +208,9 @@ TEST(WriteOpTests, TargetMultiAllShards) {
 // Single error after targeting test
 TEST(WriteOpTests, ErrorSingle) {
     OperationContextNoop opCtx;
+
     NamespaceString nss("foo.bar");
-
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-
-    std::vector<MockRange*> mockRanges;
-    mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -235,7 +224,7 @@ TEST(WriteOpTests, ErrorSingle) {
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
-    targeter.init(mockRanges);
+    targeter.init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
@@ -260,12 +249,9 @@ TEST(WriteOpTests, ErrorSingle) {
 // Cancel single targeting test
 TEST(WriteOpTests, CancelSingle) {
     OperationContextNoop opCtx;
+
     NamespaceString nss("foo.bar");
-
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-
-    std::vector<MockRange*> mockRanges;
-    mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -279,7 +265,7 @@ TEST(WriteOpTests, CancelSingle) {
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
-    targeter.init(mockRanges);
+    targeter.init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();
@@ -302,12 +288,9 @@ TEST(WriteOpTests, CancelSingle) {
 // Retry single targeting test
 TEST(WriteOpTests, RetrySingleOp) {
     OperationContextNoop opCtx;
+
     NamespaceString nss("foo.bar");
-
     ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED());
-
-    std::vector<MockRange*> mockRanges;
-    mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
 
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
@@ -321,7 +304,7 @@ TEST(WriteOpTests, RetrySingleOp) {
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Ready);
 
     MockNSTargeter targeter;
-    targeter.init(mockRanges);
+    targeter.init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 
     OwnedPointerVector<TargetedWrite> targetedOwned;
     std::vector<TargetedWrite*>& targeted = targetedOwned.mutableVector();

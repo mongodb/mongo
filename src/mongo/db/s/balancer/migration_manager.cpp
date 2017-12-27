@@ -190,8 +190,8 @@ Status MigrationManager::executeManualMigration(
 
     auto& routingInfo = routingInfoStatus.getValue();
 
-    auto chunk = routingInfo.cm()->findIntersectingChunkWithSimpleCollation(migrateInfo.minKey);
-    invariant(chunk);
+    const auto chunk =
+        routingInfo.cm()->findIntersectingChunkWithSimpleCollation(migrateInfo.minKey);
 
     Status commandStatus = _processRemoteCommandResponse(
         remoteCommandResponse, &statusWithScopedMigrationRequest.getValue());
@@ -336,9 +336,8 @@ void MigrationManager::finishRecovery(OperationContext* opCtx,
             auto waitForDelete = migrationType.getWaitForDelete();
             migrateInfos.pop_front();
 
-            auto chunk =
+            const auto chunk =
                 routingInfo.cm()->findIntersectingChunkWithSimpleCollation(migrationInfo.minKey);
-            invariant(chunk);
 
             if (chunk->getShardId() != migrationInfo.from) {
                 // Chunk is no longer on the source shard specified by this migration. Erase the

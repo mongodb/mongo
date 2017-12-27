@@ -285,7 +285,7 @@ void ChunkSplitter::_runAutosplit(const NamespaceString& nss,
                 routingInfo.cm());
 
         const auto cm = routingInfo.cm();
-        auto chunk = cm->findIntersectingChunkWithSimpleCollation(min);
+        const auto chunk = cm->findIntersectingChunkWithSimpleCollation(min);
 
         // Stop if chunk's range differs from the range we were expecting to split.
         if ((0 != chunk->getMin().woCompare(min)) || (0 != chunk->getMax().woCompare(max)) ||
