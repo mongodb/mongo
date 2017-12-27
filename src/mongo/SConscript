@@ -197,7 +197,7 @@ for tup in env['MONGO_BUILDINFO_ENVIRONMENT_DATA']:
     def pyToCXXBool(val):
         return "true" if val else "false"
     def wrapInQuotes(val):
-        return '"{0}"'.format(val)
+        return 'R"raw_delimiter({0})raw_delimiter"'.format(val.replace("\\", r"\\"))
     buildInfoInitializer.append(
         'std::make_tuple({0})'.format(', '.join(
             (
