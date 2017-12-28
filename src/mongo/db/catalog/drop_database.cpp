@@ -238,6 +238,10 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
             opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
         if (userInitiatedWritesAndNotPrimary) {
+            AutoGetDb autoDB(opCtx, dbName, MODE_X);
+            if (auto db = autoDB.getDb()) {
+                db->setDropPending(opCtx, false);
+            }
             return Status(ErrorCodes::PrimarySteppedDown,
                           str::stream() << "Could not drop database " << dbName
                                         << " because we transitioned from PRIMARY to "

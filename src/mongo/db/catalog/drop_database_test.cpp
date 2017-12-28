@@ -447,7 +447,11 @@ TEST_F(DropDatabaseTest,
                                 << " because we transitioned from PRIMARY to SECONDARY"
                                 << " while waiting for 1 pending collection drop(s).");
 
-    ASSERT_TRUE(AutoGetDb(_opCtx.get(), _nss.db(), MODE_X).getDb());
+    // Check drop-pending flag in Database after dropDatabase() fails.
+    AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+    auto db = autoDb.getDb();
+    ASSERT_TRUE(db);
+    ASSERT_FALSE(db->isDropPending(_opCtx.get()));
 }
 
 }  // namespace
