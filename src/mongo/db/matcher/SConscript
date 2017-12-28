@@ -164,7 +164,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/fts/base',
+        '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/scripting/scripting_server',
         'expressions',
         '$BUILD_DIR/mongo/db/catalog/collection',

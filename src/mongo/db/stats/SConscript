@@ -89,7 +89,7 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='serveronly',
+    target='serveronly_stats',
     source=[
         "latency_server_status_section.cpp",
         "lock_server_status_section.cpp",

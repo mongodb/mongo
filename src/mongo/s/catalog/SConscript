@@ -64,7 +64,7 @@ env.Library(
         'dist_lock_catalog_mock.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/common',
+        '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/unittest/unittest',
         'dist_lock_catalog_interface',
     ]

@@ -256,7 +256,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
         '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/serveronly',
+        '$BUILD_DIR/mongo/db/repl/serveronly_repl',
         '$BUILD_DIR/mongo/db/s/balancer',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/key_string',

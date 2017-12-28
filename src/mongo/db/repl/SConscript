@@ -557,7 +557,6 @@ env.Library(
         'optime',
         'replication_process',
         'replmocks',
-        #'serveronly', # CYCLE
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
@@ -1087,7 +1086,7 @@ env.Library(
         'repl_settings',
         'replica_set_messages',
         'replication_process',
-        'serveronly',
+        'serveronly_repl',
     ],
 )
 
@@ -1535,7 +1534,7 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target="serveronly",
+    target="serveronly_repl",
     source=[
         "master_slave.cpp",
         'noop_writer.cpp',

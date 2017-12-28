@@ -64,7 +64,7 @@ env.Library(
 )
 
 env.Library(
-    target='common',
+    target='common_s',
     source=[
         'catalog/mongo_version_range.cpp',
         'catalog/type_changelog.cpp',
@@ -206,7 +206,7 @@ env.CppUnitTest(
         'shard_id_test.cpp',
     ],
     LIBDEPS=[
-        'common',
+        'common_s',
     ]
 )
 
@@ -232,7 +232,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        'common',
+        'common_s',
     ]
 )
 
@@ -248,7 +248,7 @@ env.CppUnitTest('request_types_test',
         'request_types/update_zone_key_range_request_test.cpp',
     ],
     LIBDEPS=[
-        'common',
+        'common_s',
     ],
 )
 
@@ -260,7 +260,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/storage/key_string',
-        'common',
+        'common_s',
     ],
 )
 
@@ -286,7 +286,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        'common',
+        'common_s',
         'routing_table',
         #'client/sharding_client', # CYCLE
     ],

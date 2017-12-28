@@ -14,7 +14,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/range_arithmetic',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/s/common',
+        '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/routing_table',
     ],
 )
@@ -41,7 +41,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/s/common',
+        '$BUILD_DIR/mongo/s/common_s',
     ],
 )
 
@@ -54,7 +54,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/s/write_ops/batch_write_types',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/s/common',
+        '$BUILD_DIR/mongo/s/common_s',
     ],
 )
 
@@ -156,7 +156,7 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='commands',
+    target='commands_db_s',
     source=[
         'check_sharding_index_command.cpp',
         'cleanup_orphaned_cmd.cpp',
@@ -289,7 +289,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/clientcursor',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/exec/exec',
-        '$BUILD_DIR/mongo/db/pipeline/serveronly',
+        '$BUILD_DIR/mongo/db/pipeline/serveronly_pipeline',
         '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager',

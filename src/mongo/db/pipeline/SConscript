@@ -510,7 +510,7 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='serveronly',
+    target='serveronly_pipeline',
     source=[
         'document_source_cursor.cpp',
         'pipeline_d.cpp',
@@ -523,7 +523,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
-        '$BUILD_DIR/mongo/db/stats/serveronly',
+        '$BUILD_DIR/mongo/db/stats/serveronly_stats',
     ],
 )
 
