@@ -229,7 +229,7 @@ public:
         if (!(_cm || _primary)) {
             auto routingInfo =
                 uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(
-                    _opCtx, SessionsCollection::kSessionsFullNS));
+                    _opCtx, NamespaceString(SessionsCollection::kSessionsFullNS)));
             _cm = routingInfo.cm();
             _primary = routingInfo.primary();
         }

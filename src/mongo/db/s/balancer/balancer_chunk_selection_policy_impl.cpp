@@ -300,8 +300,8 @@ BalancerChunkSelectionPolicyImpl::selectSpecificChunkToMove(OperationContext* op
     const auto& shardStats = shardStatsStatus.getValue();
 
     auto routingInfoStatus =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                     chunk.getNS());
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+            opCtx, NamespaceString(chunk.getNS()));
     if (!routingInfoStatus.isOK()) {
         return routingInfoStatus.getStatus();
     }
@@ -329,8 +329,8 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCt
     auto shardStats = std::move(shardStatsStatus.getValue());
 
     auto routingInfoStatus =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                     chunk.getNS());
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+            opCtx, NamespaceString(chunk.getNS()));
     if (!routingInfoStatus.isOK()) {
         return routingInfoStatus.getStatus();
     }
