@@ -79,8 +79,6 @@ public:
      */
     StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
                                                                      const NamespaceString& nss);
-    StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
-                                                                     StringData ns);
 
     /**
      * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed.
@@ -94,8 +92,6 @@ public:
      */
     StatusWith<CachedCollectionRoutingInfo> getShardedCollectionRoutingInfoWithRefresh(
         OperationContext* opCtx, const NamespaceString& nss);
-    StatusWith<CachedCollectionRoutingInfo> getShardedCollectionRoutingInfoWithRefresh(
-        OperationContext* opCtx, StringData ns);
 
     /**
      * Non-blocking method to be called whenever using the specified routing table has encountered a
@@ -110,7 +106,6 @@ public:
      * namespace to be refreshed the next time getCollectionRoutingInfo is called.
      */
     void invalidateShardedCollection(const NamespaceString& nss);
-    void invalidateShardedCollection(StringData ns);
 
     /**
      * Non-blocking method, which removes the entire specified database (including its collections)

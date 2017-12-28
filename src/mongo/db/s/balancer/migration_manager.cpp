@@ -183,7 +183,7 @@ Status MigrationManager::executeManualMigration(
 
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-            opCtx, migrateInfo.ns);
+            opCtx, NamespaceString(migrateInfo.ns));
     if (!routingInfoStatus.isOK()) {
         return routingInfoStatus.getStatus();
     }
