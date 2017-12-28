@@ -72,49 +72,46 @@ public:
     /**
      * Returns a ShardEndpoint for the doc from the mock ranges
      */
-    Status targetInsert(OperationContext* opCtx,
-                        const BSONObj& doc,
-                        ShardEndpoint** endpoint) const override {
-        std::vector<std::unique_ptr<ShardEndpoint>> endpoints;
-        Status status = _targetQuery(doc, &endpoints);
-        if (!status.isOK())
-            return status;
-        if (!endpoints.empty())
-            *endpoint = endpoints.front().release();
-        return Status::OK();
+    StatusWith<ShardEndpoint> targetInsert(OperationContext* opCtx,
+                                           const BSONObj& doc) const override {
+        auto swEndpoints = _targetQuery(doc);
+        if (!swEndpoints.isOK())
+            return swEndpoints.getStatus();
+
+        ASSERT_EQ(1U, swEndpoints.getValue().size());
+        return swEndpoints.getValue().front();
     }
 
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    Status targetUpdate(OperationContext* opCtx,
-                        const write_ops::UpdateOpEntry& updateDoc,
-                        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override {
-        return _targetQuery(updateDoc.getQ(), endpoints);
+    StatusWith<std::vector<ShardEndpoint>> targetUpdate(
+        OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override {
+        return _targetQuery(updateDoc.getQ());
     }
 
     /**
      * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
      * queries of the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    Status targetDelete(OperationContext* opCtx,
-                        const write_ops::DeleteOpEntry& deleteDoc,
-                        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
-        return _targetQuery(deleteDoc.getQ(), endpoints);
+    StatusWith<std::vector<ShardEndpoint>> targetDelete(
+        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteDoc) const {
+        return _targetQuery(deleteDoc.getQ());
     }
 
-    Status targetCollection(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override {
+    StatusWith<std::vector<ShardEndpoint>> targetCollection() const override {
         // No-op
-        return Status::OK();
+        return std::vector<ShardEndpoint>{};
     }
 
-    Status targetAllShards(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override {
+    StatusWith<std::vector<ShardEndpoint>> targetAllShards(OperationContext* opCtx) const override {
+        std::vector<ShardEndpoint> endpoints;
         for (const auto& range : _mockRanges) {
-            endpoints->push_back(stdx::make_unique<ShardEndpoint>(range.endpoint));
+            endpoints.push_back(range.endpoint);
         }
 
-        return Status::OK();
+        return endpoints;
     }
 
     void noteCouldNotTarget() override {
@@ -158,23 +155,24 @@ private:
     }
 
     /**
-     * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
-     * queries of the form { field : { $gte : <value>, $lt : <value> } }.
+     * Returns the first ShardEndpoint for the query from the mock ranges. Only handles queries of
+     * the form { field : { $gte : <value>, $lt : <value> } }.
      */
-    Status _targetQuery(const BSONObj& query,
-                        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const {
-        ChunkRange queryRange(_parseRange(query));
+    StatusWith<std::vector<ShardEndpoint>> _targetQuery(const BSONObj& query) const {
+        const ChunkRange queryRange(_parseRange(query));
+
+        std::vector<ShardEndpoint> endpoints;
 
         for (const auto& range : _mockRanges) {
             if (queryRange.overlapWith(range.range)) {
-                endpoints->push_back(stdx::make_unique<ShardEndpoint>(range.endpoint));
+                endpoints.push_back(range.endpoint);
             }
         }
 
-        if (endpoints->empty())
+        if (endpoints.empty())
             return {ErrorCodes::UnknownError, "no mock ranges found for query"};
 
-        return Status::OK();
+        return endpoints;
     }
 
     NamespaceString _nss;

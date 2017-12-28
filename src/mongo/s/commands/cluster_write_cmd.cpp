@@ -271,41 +271,28 @@ private:
         if (!status.isOK())
             return status;
 
-        std::vector<std::unique_ptr<ShardEndpoint>> endpoints;
+        auto swEndpoints = [&]() -> StatusWith<std::vector<ShardEndpoint>> {
+            if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
+                auto swEndpoint = targeter.targetInsert(opCtx, targetingBatchItem.getDocument());
+                if (!swEndpoint.isOK())
+                    return swEndpoint.getStatus();
+                return std::vector<ShardEndpoint>{std::move(swEndpoint.getValue())};
+            } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
+                return targeter.targetUpdate(opCtx, targetingBatchItem.getUpdate());
+            } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
+                return targeter.targetDelete(opCtx, targetingBatchItem.getDelete());
+            } else {
+                MONGO_UNREACHABLE;
+            }
+        }();
 
-        if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
-            ShardEndpoint* endpoint;
-            Status status =
-                targeter.targetInsert(opCtx, targetingBatchItem.getDocument(), &endpoint);
-            if (!status.isOK())
-                return status;
-            endpoints.push_back(std::unique_ptr<ShardEndpoint>{endpoint});
-        } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-            Status status =
-                targeter.targetUpdate(opCtx, targetingBatchItem.getUpdate(), &endpoints);
-            if (!status.isOK())
-                return status;
-        } else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
-            Status status =
-                targeter.targetDelete(opCtx, targetingBatchItem.getDelete(), &endpoints);
-            if (!status.isOK())
-                return status;
-        } else {
-            MONGO_UNREACHABLE;
-        }
-
-        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        if (!swEndpoints.isOK())
+            return swEndpoints.getStatus();
 
         // Assemble requests
         std::vector<AsyncRequestsSender::Request> requests;
-        for (auto it = endpoints.begin(); it != endpoints.end(); ++it) {
-            const ShardEndpoint* endpoint = it->get();
-
-            auto shardStatus = shardRegistry->getShard(opCtx, endpoint->shardName);
-            if (!shardStatus.isOK()) {
-                return shardStatus.getStatus();
-            }
-            requests.emplace_back(shardStatus.getValue()->getId(), command);
+        for (const auto& endpoint : swEndpoints.getValue()) {
+            requests.emplace_back(endpoint.shardName, command);
         }
 
         // Send the requests.

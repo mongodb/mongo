@@ -67,23 +67,20 @@ public:
     const NamespaceString& getNS() const override;
 
     // Returns ShardKeyNotFound if document does not have a full shard key.
-    Status targetInsert(OperationContext* opCtx,
-                        const BSONObj& doc,
-                        ShardEndpoint** endpoint) const override;
+    StatusWith<ShardEndpoint> targetInsert(OperationContext* opCtx,
+                                           const BSONObj& doc) const override;
 
     // Returns ShardKeyNotFound if the update can't be targeted without a shard key.
-    Status targetUpdate(OperationContext* opCtx,
-                        const write_ops::UpdateOpEntry& updateDoc,
-                        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
+    StatusWith<std::vector<ShardEndpoint>> targetUpdate(
+        OperationContext* opCtx, const write_ops::UpdateOpEntry& updateDoc) const override;
 
     // Returns ShardKeyNotFound if the delete can't be targeted without a shard key.
-    Status targetDelete(OperationContext* opCtx,
-                        const write_ops::DeleteOpEntry& deleteDoc,
-                        std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
+    StatusWith<std::vector<ShardEndpoint>> targetDelete(
+        OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteDoc) const override;
 
-    Status targetCollection(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
+    StatusWith<std::vector<ShardEndpoint>> targetCollection() const override;
 
-    Status targetAllShards(std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const override;
+    StatusWith<std::vector<ShardEndpoint>> targetAllShards(OperationContext* opCtx) const override;
 
     void noteCouldNotTarget() override;
 
@@ -106,7 +103,7 @@ private:
     /**
      * Performs an actual refresh from the config server.
      */
-    Status refreshNow(OperationContext* opCtx);
+    Status _refreshNow(OperationContext* opCtx);
 
     /**
      * Returns a vector of ShardEndpoints where a document might need to be placed.
@@ -115,10 +112,9 @@ private:
      *
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
-    Status targetDoc(OperationContext* opCtx,
-                     const BSONObj& doc,
-                     const BSONObj& collation,
-                     std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const;
+    StatusWith<std::vector<ShardEndpoint>> _targetDoc(OperationContext* opCtx,
+                                                      const BSONObj& doc,
+                                                      const BSONObj& collation) const;
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
@@ -127,10 +123,9 @@ private:
      *
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
-    Status targetQuery(OperationContext* opCtx,
-                       const BSONObj& query,
-                       const BSONObj& collation,
-                       std::vector<std::unique_ptr<ShardEndpoint>>* endpoints) const;
+    StatusWith<std::vector<ShardEndpoint>> _targetQuery(OperationContext* opCtx,
+                                                        const BSONObj& query,
+                                                        const BSONObj& collation) const;
 
     /**
      * Returns a ShardEndpoint for an exact shard key query.
@@ -140,9 +135,9 @@ private:
      *
      * If 'collation' is empty, we use the collection default collation for targeting.
      */
-    std::unique_ptr<ShardEndpoint> targetShardKey(const BSONObj& doc,
-                                                  const BSONObj& collation,
-                                                  long long estDataSize) const;
+    ShardEndpoint _targetShardKey(const BSONObj& doc,
+                                  const BSONObj& collation,
+                                  long long estDataSize) const;
 
     // Full namespace of the collection for this targeter
     const NamespaceString _nss;
