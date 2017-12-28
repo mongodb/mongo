@@ -126,6 +126,12 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
     }
 }
 
+StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt(
+    OperationContext* opCtx, const NamespaceString& nss, Timestamp atClusterTime) {
+    // TODO (GPiTR): Implement retrieving collection routing info at time
+    return getCollectionRoutingInfo(opCtx, nss);
+}
+
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss) {
     while (true) {

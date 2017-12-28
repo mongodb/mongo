@@ -70,11 +70,27 @@ public:
     StatusWith<CachedDatabaseInfo> getDatabase(OperationContext* opCtx, StringData dbName);
 
     /**
-     * Blocking shortcut method to get a specific sharded collection from a given database using the
-     * complete namespace. If the collection is sharded returns a ScopedChunkManager initialized
-     * with ChunkManager. If the collection is not sharded, returns a ScopedChunkManager initialized
-     * with the primary shard for the specified database. If an error occurs loading the metadata
-     * returns a failed status.
+     * Blocking method to get the routing information for a specific collection at a given cluster
+     * time.
+     *
+     * If the collection is sharded, returns routing info initialized with a ChunkManager. If the
+     * collection is not sharded, returns routing info initialized with the primary shard for the
+     * specified database. If an error occurs while loading the metadata, returns a failed status.
+     *
+     * If the given atClusterTime is so far in the past that it is not possible to construct routing
+     * info, returns a StaleClusterTime error.
+     */
+    StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfoAt(OperationContext* opCtx,
+                                                                       const NamespaceString& nss,
+                                                                       Timestamp atClusterTime);
+
+    /**
+     * Same as the getCollectionRoutingInfoAt call above, but returns the latest known routing
+     * information for the specified namespace.
+     *
+     * While this method may fail under the same circumstances as getCollectionRoutingInfoAt, it is
+     * guaranteed to never return StaleClusterTime, because the latest routing information should
+     * always be available.
      */
     StatusWith<CachedCollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
                                                                      const NamespaceString& nss);
