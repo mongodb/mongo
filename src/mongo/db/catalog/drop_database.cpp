@@ -233,15 +233,24 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
 
     return writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
         Lock::GlobalWrite lk(opCtx);
+        AutoGetDb autoDB(opCtx, dbName, MODE_X);
+        auto db = autoDB.getDb();
+        if (!db) {
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Could not drop database " << dbName
+                                        << " because it does not exist after dropping "
+                                        << numCollectionsToDrop
+                                        << " collection(s).");
+        }
+
+        // If we fail to complete the database drop, we should reset the drop-pending state on
+        // Database.
+        auto dropPendingGuard = MakeGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
 
         bool userInitiatedWritesAndNotPrimary =
             opCtx->writesAreReplicated() && !replCoord->canAcceptWritesForDatabase(opCtx, dbName);
 
         if (userInitiatedWritesAndNotPrimary) {
-            AutoGetDb autoDB(opCtx, dbName, MODE_X);
-            if (auto db = autoDB.getDb()) {
-                db->setDropPending(opCtx, false);
-            }
             return Status(ErrorCodes::PrimarySteppedDown,
                           str::stream() << "Could not drop database " << dbName
                                         << " because we transitioned from PRIMARY to "
@@ -251,16 +260,8 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
                                         << " pending collection drop(s).");
         }
 
-        AutoGetDb autoDB(opCtx, dbName, MODE_X);
-        if (auto db = autoDB.getDb()) {
-            return _finishDropDatabase(opCtx, dbName, db);
-        }
-
-        return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Could not drop database " << dbName
-                                    << " because it does not exist after dropping "
-                                    << numCollectionsToDrop
-                                    << " collection(s).");
+        dropPendingGuard.Dismiss();
+        return _finishDropDatabase(opCtx, dbName, db);
     });
 }
 
