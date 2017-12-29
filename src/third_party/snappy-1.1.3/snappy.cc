@@ -297,7 +297,7 @@ uint16* WorkingMemory::GetHashTable(size_t input_size, int* table_size) {
 // is done when GetEightBytesAt() is called, whereas for 32-bit, the load is
 // done at GetUint32AtOffset() time.
 
-#ifdef ARCH_K8
+#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 
 typedef uint64 EightBytesReference;
 

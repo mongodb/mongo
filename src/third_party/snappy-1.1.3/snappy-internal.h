@@ -79,9 +79,8 @@ char* CompressFragment(const char* input,
 // Does not read *(s1 + (s2_limit - s2)) or beyond.
 // Requires that s2_limit >= s2.
 //
-// Separate implementation for x86_64, for speed.  Uses the fact that
-// x86_64 is little endian.
-#if defined(ARCH_K8)
+// Separate implementation for 64-bit, little endian cpus.
+#if defined(ARCH_K8) || defined(ARCH_PPC) || defined(ARCH_ARM)
 static inline int FindMatchLength(const char* s1,
                                   const char* s2,
                                   const char* s2_limit) {

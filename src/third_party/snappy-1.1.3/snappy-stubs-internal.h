@@ -52,6 +52,14 @@
 // Enable 64-bit optimized versions of some routines.
 #define ARCH_K8 1
 
+#elif defined(__ppc64__)
+
+#define ARCH_PPC 1
+
+#elif defined(__aarch64__)
+
+#define ARCH_ARM 1
+
 #endif
 
 // Needed by OS X, among others.
