@@ -33,6 +33,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "mongo/client/embedded/embedded.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmain.h"
 #include "mongo/db/service_context.h"
@@ -52,7 +53,6 @@ struct libmongodbcapi_db {
     libmongodbcapi_db& operator=(const libmongodbcapi_db&) = delete;
 
     mongo::ServiceContext* serviceContext = nullptr;
-    mongo::stdx::thread mongodThread;
     mongo::stdx::unordered_map<libmongodbcapi_client*, std::unique_ptr<libmongodbcapi_client>>
         open_clients;
     std::unique_ptr<mongo::transport::TransportLayerMock> transportLayer;
@@ -111,11 +111,7 @@ libmongodbcapi_db* db_new(int argc, const char** argv, const char** envp) noexce
         }
         global_db->envpPointers.push_back(nullptr);
 
-        // call mongoDbMain() in a new thread because it currently does not terminate
-        global_db->mongodThread = stdx::thread([=] {
-            mongoDbMain(argc, global_db->argvPointers.data(), global_db->envpPointers.data());
-        });
-        global_db->mongodThread.detach();
+        embedded::initialize(argc, global_db->argvPointers.data(), global_db->envpPointers.data());
 
         // wait until the global service context is not null
         global_db->serviceContext = waitAndGetGlobalServiceContext();
@@ -128,7 +124,8 @@ libmongodbcapi_db* db_new(int argc, const char** argv, const char** envp) noexce
         // wait until the global service context is not null
         global_db->serviceContext = waitAndGetGlobalServiceContext();
     }
-    // creating mock transport layer
+
+    // creating mock transport layer to be able to create sessions
     global_db->transportLayer = stdx::make_unique<transport::TransportLayerMock>();
 
     return global_db;
@@ -138,6 +135,12 @@ libmongodbcapi_db* db_new(int argc, const char** argv, const char** envp) noexce
 }
 
 void db_destroy(libmongodbcapi_db* db) noexcept {
+    // todo, we can't teardown and re-initialize yet.
+    /*if (run_setup) {
+        embedded::shutdown();
+        run_setup = false;
+    }*/
+
     delete db;
     invariant(!db || db == global_db);
     if (db) {

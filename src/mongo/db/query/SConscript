@@ -118,6 +118,7 @@ env.CppUnitTest(
         "query_test_service_context",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/serveronly",
+        "$BUILD_DIR/mongo/db/service_context_d",
         "$BUILD_DIR/mongo/dbtests/mocklib",
     ],
 )
@@ -398,6 +399,7 @@ env.CppUnitTest(
         "query_planner_test_fixture",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/serveronly",
+        "$BUILD_DIR/mongo/db/service_context_d",
         "$BUILD_DIR/mongo/dbtests/mocklib",
     ],
 )
