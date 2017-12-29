@@ -37,7 +37,7 @@ function assertSchemaMatch(coll, schema, doc, valid) {
         assert.writeOK(res, errmsg + " during insert document validation");
     } else {
         assert.writeErrorWithCode(res,
-                                  ErrorCodes.DocumentFailedValidation,
+                                  ErrorCodes.DocumentValidationFailure,
                                   errmsg + " during insert document validation");
     }
 
@@ -57,7 +57,7 @@ function assertSchemaMatch(coll, schema, doc, valid) {
         assert.writeOK(res, errmsg + " during update document validation in strict mode");
     } else {
         assert.writeErrorWithCode(res,
-                                  ErrorCodes.DocumentFailedValidation,
+                                  ErrorCodes.DocumentValidationFailure,
                                   errmsg + " during update document validation in strict mode");
     }
 }

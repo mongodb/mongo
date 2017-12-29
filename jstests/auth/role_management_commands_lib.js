@@ -6,8 +6,8 @@ function runAllRoleManagementCommandsTests(conn, writeConcern) {
     'use strict';
 
     var hasAuthzError = function(result) {
-        assert(result.hasWriteError());
-        assert.eq(ErrorCodes.Unauthorized, result.getWriteError().code);
+        assert(result instanceof WriteCommandError);
+        assert.eq(ErrorCodes.Unauthorized, result.code);
     };
 
     var userAdminConn = new Mongo(conn.host);

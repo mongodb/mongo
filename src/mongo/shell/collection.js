@@ -261,6 +261,9 @@ DBCollection.prototype.findOne = function(query, fields, options, readConcern, c
     return ret;
 };
 
+// Returns a WriteResult for a single insert or a BulkWriteResult for a multi-insert if write
+// command succeeded, but may contain write errors.
+// Returns a WriteCommandError if the write command responded with ok:0.
 DBCollection.prototype.insert = function(obj, options) {
     if (!obj)
         throw Error("no object passed to insert!");
@@ -317,7 +320,7 @@ DBCollection.prototype.insert = function(obj, options) {
             if (ex instanceof BulkWriteError) {
                 result = isMultiInsert ? ex.toResult() : ex.toSingleResult();
             } else if (ex instanceof WriteCommandError) {
-                result = isMultiInsert ? ex : ex.toSingleResult();
+                result = ex;
             } else {
                 // Other exceptions rethrown as-is.
                 throw ex;
@@ -374,6 +377,8 @@ DBCollection.prototype._parseRemove = function(t, justOne) {
     return {"query": query, "justOne": justOne, "wc": wc, "collation": collation};
 };
 
+// Returns a WriteResult if write command succeeded, but may contain write errors.
+// Returns a WriteCommandError if the write command responded with ok:0.
 DBCollection.prototype.remove = function(t, justOne) {
     var parsed = this._parseRemove(t, justOne);
     var query = parsed.query;
@@ -402,8 +407,10 @@ DBCollection.prototype.remove = function(t, justOne) {
         try {
             result = bulk.execute(wc).toSingleResult();
         } catch (ex) {
-            if (ex instanceof BulkWriteError || ex instanceof WriteCommandError) {
+            if (ex instanceof BulkWriteError) {
                 result = ex.toSingleResult();
+            } else if (ex instanceof WriteCommandError) {
+                result = ex;
             } else {
                 // Other exceptions thrown
                 throw Error(ex);
@@ -475,6 +482,8 @@ DBCollection.prototype._parseUpdate = function(query, obj, upsert, multi) {
     };
 };
 
+// Returns a WriteResult if write command succeeded, but may contain write errors.
+// Returns a WriteCommandError if the write command responded with ok:0.
 DBCollection.prototype.update = function(query, obj, upsert, multi) {
     var parsed = this._parseUpdate(query, obj, upsert, multi);
     var query = parsed.query;
@@ -514,8 +523,10 @@ DBCollection.prototype.update = function(query, obj, upsert, multi) {
         try {
             result = bulk.execute(wc).toSingleResult();
         } catch (ex) {
-            if (ex instanceof BulkWriteError || ex instanceof WriteCommandError) {
+            if (ex instanceof BulkWriteError) {
                 result = ex.toSingleResult();
+            } else if (ex instanceof WriteCommandError) {
+                result = ex;
             } else {
                 // Other exceptions thrown
                 throw Error(ex);

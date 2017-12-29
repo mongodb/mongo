@@ -6,8 +6,8 @@
 function runTest(conn) {
     var authzErrorCode = 13;
     var hasAuthzError = function(result) {
-        assert(result.hasWriteError());
-        assert.eq(authzErrorCode, result.getWriteError().code);
+        assert(result instanceof WriteCommandError);
+        assert.eq(authzErrorCode, result.code);
     };
 
     conn.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']});

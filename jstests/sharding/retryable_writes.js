@@ -313,7 +313,7 @@
             lsid: lsid,
             txnNumber: NumberLong(1),
         };
-        var res = assert.commandWorked(testDb.runCommand(cmd));
+        var res = assert.commandWorkedIgnoringWriteErrors(testDb.runCommand(cmd));
         assert.eq(1,
                   res.writeErrors.length,
                   'expected only one write error, received: ' + tojson(res.writeErrors));
@@ -334,7 +334,7 @@
             lsid: lsid,
             txnNumber: NumberLong(1),
         };
-        res = assert.commandWorked(testDb.runCommand(cmd));
+        res = assert.commandWorkedIgnoringWriteErrors(testDb.runCommand(cmd));
         assert.eq(1,
                   res.writeErrors.length,
                   'expected only one write error, received: ' + tojson(res.writeErrors));

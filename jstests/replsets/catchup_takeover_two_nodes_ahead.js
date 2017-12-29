@@ -45,8 +45,8 @@
 
     // Make sure that node 2 cannot write anything. Because it is lagged and replication
     // has been stopped, it shouldn't be able to become master.
-    assert.writeErrorWithCode(nodes[2].getDB(name).bar.insert({z: 100}, writeConcern),
-                              ErrorCodes.NotMaster);
+    assert.commandFailedWithCode(nodes[2].getDB(name).bar.insert({z: 100}, writeConcern),
+                                 ErrorCodes.NotMaster);
 
     // Confirm that the most up-to-date node becomes primary
     // after the default catchup delay.
