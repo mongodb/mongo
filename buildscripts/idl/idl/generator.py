@@ -105,6 +105,18 @@ def _get_bson_type_check(bson_element, ctxt_name, field):
         return '%s.checkAndAssertTypes(%s, %s)' % (ctxt_name, bson_element, type_list)
 
 
+def _get_all_fields(struct):
+    # type: (ast.Struct) -> List[ast.Field]
+    """Get a list of all the fields, including the command field."""
+    all_fields = []
+    if isinstance(struct, ast.Command) and struct.command_field:
+        all_fields.append(struct.command_field)
+
+    all_fields += struct.fields
+
+    return sorted([field for field in all_fields], key=lambda f: f.cpp_name)
+
+
 class _FieldUsageCheckerBase(object):
     """Check for duplicate fields, and required fields as needed."""
 
@@ -494,9 +506,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (ast.Struct) -> None
         # pylint: disable=invalid-name
         """Generate a StringData constant for field name."""
-        sorted_fields = sorted([field for field in struct.fields], key=lambda f: f.cpp_name)
 
-        for field in sorted_fields:
+        for field in _get_all_fields(struct):
             self._writer.write_line(
                 common.template_args(
                     'static constexpr auto ${constant_name} = "${field_name}"_sd;',
@@ -535,16 +546,22 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     def gen_op_msg_request_methods(self, command):
         # type: (ast.Command) -> None
         """Generate the methods for a command."""
-        struct_type_info = struct_types.get_struct_info(command)
-        struct_type_info.gen_getter_method(self._writer)
+        if command.command_field:
+            self.gen_getter(command.command_field)
+        else:
+            struct_type_info = struct_types.get_struct_info(command)
+            struct_type_info.gen_getter_method(self._writer)
 
         self._writer.write_empty_line()
 
     def gen_op_msg_request_member(self, command):
         # type: (ast.Command) -> None
         """Generate the class members for a command."""
-        struct_type_info = struct_types.get_struct_info(command)
-        struct_type_info.gen_member(self._writer)
+        if command.command_field:
+            self.gen_member(command.command_field)
+        else:
+            struct_type_info = struct_types.get_struct_info(command)
+            struct_type_info.gen_member(self._writer)
 
         self._writer.write_empty_line()
 
@@ -658,7 +675,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
             for struct in spec_and_structs:
                 self.gen_description_comment(struct.description)
-                with self.gen_class_declaration_block(struct.name):
+                with self.gen_class_declaration_block(struct.cpp_name):
                     self.write_unindented_line('public:')
 
                     # Generate a sorted list of string constants
@@ -782,8 +799,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 return '%s(%s)' % (method_name, element_name)
 
-    def _gen_array_deserializer(self, field):
-        # type: (ast.Field) -> None
+    def _gen_array_deserializer(self, field, bson_element):
+        # type: (ast.Field, unicode) -> None
         """Generate the C++ deserializer piece for an array field."""
         cpp_type_info = cpp_types.get_cpp_type(field)
         cpp_type = cpp_type_info.get_type_name()
@@ -794,7 +811,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         self._writer.write_line('std::vector<%s> values;' % (cpp_type))
         self._writer.write_empty_line()
 
-        self._writer.write_line('const BSONObj arrayObject = element.Obj();')
+        self._writer.write_line('const BSONObj arrayObject = %s.Obj();' % (bson_element))
 
         with self._block('for (const auto& arrayElement : arrayObject) {', '}'):
 
@@ -837,11 +854,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         else:
             self._writer.write_line('%s = std::move(values);' % (_get_field_member_name(field)))
 
-    def gen_field_deserializer(self, field, bson_object):
-        # type: (ast.Field, unicode) -> None
+    def gen_field_deserializer(self, field, bson_object, bson_element):
+        # type: (ast.Field, unicode, unicode) -> None
         """Generate the C++ deserializer piece for a field."""
         if field.array:
-            self._gen_array_deserializer(field)
+            self._gen_array_deserializer(field, bson_element)
             return
 
         if field.chained:
@@ -859,11 +876,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             self._writer.write_line('%s = %s;' % (_get_field_member_name(field), expression))
         else:
             # May be an empty block if the type is 'any'
-            predicate = _get_bson_type_check('element', 'ctxt', field)
+            predicate = _get_bson_type_check(bson_element, 'ctxt', field)
             if predicate:
                 predicate = "MONGO_likely(%s)" % (predicate)
             with self._predicate(predicate):
-                object_value = self._gen_field_deserializer_expression('element', field)
+                object_value = self._gen_field_deserializer_expression(bson_element, field)
                 if field.chained_struct_field:
                     self._writer.write_line('%s.%s(%s);' %
                                             (_get_field_member_name(field.chained_struct_field),
@@ -962,6 +979,19 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         with self._block('%s %s {' % (constructor.get_definition(), initializers_str), '}'):
             self._writer.write_line('// Used for initialization only')
 
+    def _gen_command_deserializer(self, struct, bson_object):
+        # type: (ast.Struct, unicode) -> None
+        """Generate the command field deserializer."""
+
+        if isinstance(struct, ast.Command) and struct.command_field:
+            with self._block('{', '}'):
+                self.gen_field_deserializer(struct.command_field, bson_object, "commandElement")
+        else:
+            struct_type_info = struct_types.get_struct_info(struct)
+
+            # Generate namespace check now that "$db" has been read or defaulted
+            struct_type_info.gen_namespace_check(self._writer, "_dbName", "commandElement")
+
     def _gen_fields_deserializer_common(self, struct, bson_object):
         # type: (ast.Struct, unicode) -> _FieldUsageCheckerBase
         """Generate the C++ code to deserialize list of fields."""
@@ -1009,7 +1039,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             self._writer.write_line('%s = true;' %
                                                     (_get_has_field_member_name(field)))
 
-                        self.gen_field_deserializer(field, bson_object)
+                        self.gen_field_deserializer(field, bson_object, "element")
 
                 if first_field:
                     first_field = False
@@ -1035,7 +1065,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 continue
 
             # Simply generate deserializers since these are all 'any' types
-            self.gen_field_deserializer(field, bson_object)
+            self.gen_field_deserializer(field, bson_object, "element")
             self._writer.write_empty_line()
 
         self._writer.write_empty_line()
@@ -1051,10 +1081,17 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         with self._block('%s {' % (func_def), '}'):
             if isinstance(struct,
                           ast.Command) and struct.namespace != common.COMMAND_NAMESPACE_IGNORED:
-                self._writer.write_line('NamespaceString localNS;')
-                self._writer.write_line('%s object(localNS);' % (common.title_case(struct.name)))
+                if struct.namespace == common.COMMAND_NAMESPACE_TYPE:
+                    cpp_type_info = cpp_types.get_cpp_type(struct.command_field)
+                    self._writer.write_line('%s localCmdType;' % (cpp_type_info.get_storage_type()))
+                    self._writer.write_line('%s object(localCmdType);' %
+                                            (common.title_case(struct.cpp_name)))
+                elif struct.namespace == common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB:
+                    self._writer.write_line('NamespaceString localNS;')
+                    self._writer.write_line('%s object(localNS);' %
+                                            (common.title_case(struct.cpp_name)))
             else:
-                self._writer.write_line('%s object;' % common.title_case(struct.name))
+                self._writer.write_line('%s object;' % common.title_case(struct.cpp_name))
 
             self._writer.write_line(method_info.get_call('object'))
             self._writer.write_line('return object;')
@@ -1078,8 +1115,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             field_usage_check.add_final_checks()
             self._writer.write_empty_line()
 
-            # Generate namespace check now that "$db" has been read or defaulted
-            struct_type_info.gen_namespace_check(self._writer, "_dbName", "commandElement")
+            self._gen_command_deserializer(struct, "bsonObject")
 
     def gen_op_msg_request_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None
@@ -1141,8 +1177,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             field_usage_check.add_final_checks()
             self._writer.write_empty_line()
 
-            # Generate namespace check now that "$db" has been read or defaulted
-            struct_type_info.gen_namespace_check(self._writer, "_dbName", "commandElement")
+            self._gen_command_deserializer(struct, "request.body")
 
     def _gen_serializer_method_custom(self, field):
         # type: (ast.Field) -> None
@@ -1237,10 +1272,41 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     'BSONObjBuilder subObjBuilder(builder->subobjStart(${field_name}));')
                 self._writer.write_template('${access_member}.serialize(&subObjBuilder);')
 
+    def _gen_serializer_method_common(self, field):
+        # type: (ast.Field) -> None
+        """Generate the serialize method definition."""
+        member_name = _get_field_member_name(field)
+
+        # Is this a scalar bson C++ type?
+        bson_cpp_type = cpp_types.get_bson_cpp_type(field)
+
+        needs_custom_serializer = field.serializer or (bson_cpp_type and
+                                                       bson_cpp_type.has_serializer())
+
+        optional_block_start = None
+        if field.optional:
+            optional_block_start = 'if (%s.is_initialized()) {' % (member_name)
+        elif field.struct_type or needs_custom_serializer or field.array:
+            # Introduce a new scope for required nested object serialization.
+            optional_block_start = '{'
+
+        with self._block(optional_block_start, '}'):
+
+            if not field.struct_type:
+                if needs_custom_serializer:
+                    self._gen_serializer_method_custom(field)
+                else:
+                    # Generate default serialization using BSONObjBuilder::append
+                    # Note: BSONObjBuilder::append has overrides for std::vector also
+                    self._writer.write_line(
+                        'builder->append(%s, %s);' %
+                        (_get_field_constant_name(field), _access_member(field)))
+            else:
+                self._gen_serializer_method_struct(field)
+
     def _gen_serializer_methods_common(self, struct, is_op_msg_request):
         # type: (ast.Struct, bool) -> None
         """Generate the serialize method definition."""
-        # pylint: disable=too-many-branches
 
         struct_type_info = struct_types.get_struct_info(struct)
 
@@ -1257,8 +1323,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         # Serialize the namespace as the first field
         if isinstance(struct, ast.Command):
-            struct_type_info = struct_types.get_struct_info(struct)
-            struct_type_info.gen_serializer(self._writer)
+            if struct.command_field:
+                self._gen_serializer_method_common(struct.command_field)
+            else:
+                struct_type_info = struct_types.get_struct_info(struct)
+                struct_type_info.gen_serializer(self._writer)
 
         for field in struct.fields:
             # If fields are meant to be ignored during deserialization, there is no need to
@@ -1279,34 +1348,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if field.supports_doc_sequence and is_op_msg_request:
                 continue
 
-            member_name = _get_field_member_name(field)
-
-            # Is this a scalar bson C++ type?
-            bson_cpp_type = cpp_types.get_bson_cpp_type(field)
-
-            needs_custom_serializer = field.serializer or (bson_cpp_type and
-                                                           bson_cpp_type.has_serializer())
-
-            optional_block_start = None
-            if field.optional:
-                optional_block_start = 'if (%s.is_initialized()) {' % (member_name)
-            elif field.struct_type or needs_custom_serializer or field.array:
-                # Introduce a new scope for required nested object serialization.
-                optional_block_start = '{'
-
-            with self._block(optional_block_start, '}'):
-
-                if not field.struct_type:
-                    if needs_custom_serializer:
-                        self._gen_serializer_method_custom(field)
-                    else:
-                        # Generate default serialization using BSONObjBuilder::append
-                        # Note: BSONObjBuilder::append has overrides for std::vector also
-                        self._writer.write_line(
-                            'builder->append(%s, %s);' %
-                            (_get_field_constant_name(field), _access_member(field)))
-                else:
-                    self._gen_serializer_method_struct(field)
+            self._gen_serializer_method_common(field)
 
             # Add a blank line after each block
             self._writer.write_empty_line()
@@ -1406,22 +1448,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # pylint: disable=invalid-name
         """Generate a StringData constant for field name in the cpp file."""
 
-        # Generate a sorted list of string constants
-
-        sorted_fields = sorted([field for field in struct.fields], key=lambda f: f.cpp_name)
-
-        for field in sorted_fields:
+        for field in _get_all_fields(struct):
             self._writer.write_line(
                 common.template_args(
                     'constexpr StringData ${class_name}::${constant_name};',
-                    class_name=common.title_case(struct.name),
+                    class_name=common.title_case(struct.cpp_name),
                     constant_name=_get_field_constant_name(field)))
 
         if isinstance(struct, ast.Command):
             self._writer.write_line(
                 common.template_args(
                     'constexpr StringData ${class_name}::kCommandName;',
-                    class_name=common.title_case(struct.name)))
+                    class_name=common.title_case(struct.cpp_name)))
 
     def gen_enum_definition(self, idl_enum):
         # type: (ast.Enum) -> None
@@ -1442,7 +1480,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         block_name = common.template_args(
             'const std::vector<StringData> ${class_name}::_knownFields {',
-            class_name=common.title_case(struct.name))
+            class_name=common.title_case(struct.cpp_name))
         with self._block(block_name, "};"):
             sorted_fields = sorted([field for field in struct.fields], key=lambda f: f.cpp_name)
 
@@ -1450,12 +1488,12 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line(
                     common.template_args(
                         '${class_name}::${constant_name},',
-                        class_name=common.title_case(struct.name),
+                        class_name=common.title_case(struct.cpp_name),
                         constant_name=_get_field_constant_name(field)))
 
             self._writer.write_line(
                 common.template_args(
-                    '${class_name}::kCommandName,', class_name=common.title_case(struct.name)))
+                    '${class_name}::kCommandName,', class_name=common.title_case(struct.cpp_name)))
 
     def generate(self, spec, header_file_name):
         # type: (ast.IDLAST, unicode) -> None

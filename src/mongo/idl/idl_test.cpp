@@ -2329,5 +2329,220 @@ TEST(IDLChainedStruct, TestInline) {
     }
 }
 
+// Positive: verify a command a string arg
+TEST(IDLTypeCommand, TestString) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(CommandTypeStringCommand::kCommandName << "foo"
+                                                               << "field1"
+                                                               << 3
+                                                               << "$db"
+                                                               << "db");
+
+    auto testStruct = CommandTypeStringCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getField1(), 3);
+    ASSERT_EQUALS(testStruct.getCommandParameter(), "foo");
+
+    assert_same_types<decltype(testStruct.getCommandParameter()), const StringData>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Positive: Test we can serialize from nothing the same document except for $db
+    {
+        auto testDocWithoutDb = BSON(CommandTypeStringCommand::kCommandName << "foo"
+                                                                            << "field1"
+                                                                            << 3);
+
+        BSONObjBuilder builder;
+        CommandTypeStringCommand one_new("foo");
+        one_new.setField1(3);
+        one_new.setDbName("db");
+        one_new.serialize(BSONObj(), &builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDocWithoutDb, serializedDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        CommandTypeStringCommand one_new("foo");
+        one_new.setField1(3);
+        one_new.setDbName("db");
+        OpMsgRequest reply = one_new.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+}
+
+// Positive: verify a command can take an array of object
+TEST(IDLTypeCommand, TestArrayObject) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(CommandTypeArrayObjectCommand::kCommandName << BSON_ARRAY(BSON("sample"
+                                                                                       << "doc"))
+                                                                    << "$db"
+                                                                    << "db");
+
+    auto testStruct = CommandTypeArrayObjectCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getCommandParameter().size(), 1UL);
+
+    assert_same_types<decltype(testStruct.getCommandParameter()),
+                      const std::vector<mongo::BSONObj>&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        std::vector<BSONObj> vec;
+        vec.emplace_back(BSON("sample"
+                              << "doc"));
+        CommandTypeArrayObjectCommand one_new(vec);
+        one_new.setDbName("db");
+        OpMsgRequest reply = one_new.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+}
+
+// Positive: verify a command can take a struct
+TEST(IDLTypeCommand, TestStruct) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(CommandTypeStructCommand::kCommandName << BSON("value"
+                                                                       << "sample")
+                                                               << "$db"
+                                                               << "db");
+
+    auto testStruct = CommandTypeStructCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getCommandParameter().getValue(), "sample");
+
+    assert_same_types<decltype(testStruct.getCommandParameter()),
+                      mongo::idl::import::One_string&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        One_string os;
+        os.setValue("sample");
+        CommandTypeStructCommand one_new(os);
+        one_new.setDbName("db");
+        OpMsgRequest reply = one_new.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+}
+
+// Positive: verify a command can take an array of structs
+TEST(IDLTypeCommand, TestStructArray) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(CommandTypeArrayStructCommand::kCommandName << BSON_ARRAY(BSON("value"
+                                                                                       << "sample"))
+                                                                    << "$db"
+                                                                    << "db");
+
+    auto testStruct = CommandTypeArrayStructCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getCommandParameter().size(), 1UL);
+
+    assert_same_types<decltype(testStruct.getCommandParameter()),
+                      const std::vector<mongo::idl::import::One_string>&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        std::vector<One_string> vec;
+        One_string os;
+        os.setValue("sample");
+        vec.push_back(os);
+        CommandTypeArrayStructCommand one_new(vec);
+        one_new.setDbName("db");
+        OpMsgRequest reply = one_new.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+}
+
+// Positive: verify a command a string arg and alternate C++ name
+TEST(IDLTypeCommand, TestUnderscoreCommand) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(WellNamedCommand::kCommandName << "foo"
+                                                       << "field1"
+                                                       << 3
+                                                       << "$db"
+                                                       << "db");
+
+    auto testStruct = WellNamedCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getField1(), 3);
+    ASSERT_EQUALS(testStruct.getCommandParameter(), "foo");
+
+    assert_same_types<decltype(testStruct.getCommandParameter()), const StringData>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Positive: Test we can serialize from nothing the same document except for $db
+    {
+        auto testDocWithoutDb = BSON(WellNamedCommand::kCommandName << "foo"
+                                                                    << "field1"
+                                                                    << 3);
+
+        BSONObjBuilder builder;
+        WellNamedCommand one_new("foo");
+        one_new.setField1(3);
+        one_new.setDbName("db");
+        one_new.serialize(BSONObj(), &builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDocWithoutDb, serializedDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        WellNamedCommand one_new("foo");
+        one_new.setField1(3);
+        one_new.setDbName("db");
+        OpMsgRequest reply = one_new.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

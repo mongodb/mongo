@@ -76,10 +76,13 @@ class Struct(common.SourceLocation):
     All fields are either required or have a non-None default.
     """
 
+    # pylint: disable=too-many-instance-attributes
+
     def __init__(self, file_name, line, column):
         # type: (unicode, int, int) -> None
         """Construct a struct."""
         self.name = None  # type: unicode
+        self.cpp_name = None  # type: unicode
         self.description = None  # type: unicode
         self.strict = True  # type: bool
         self.immutable = False  # type: bool
@@ -150,6 +153,7 @@ class Command(Struct):
         # type: (unicode, int, int) -> None
         """Construct a command."""
         self.namespace = None  # type: unicode
+        self.command_field = None  # type: Field
         super(Command, self).__init__(file_name, line, column)
 
 

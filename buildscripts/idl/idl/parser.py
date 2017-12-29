@@ -419,6 +419,8 @@ def _parse_command(ctxt, spec, name, node):
         "chained_structs": _RuleDesc('mapping', mapping_parser_func=_parse_chained_structs),
         "fields": _RuleDesc('mapping', mapping_parser_func=_parse_fields),
         "namespace": _RuleDesc('scalar', _RuleDesc.REQUIRED),
+        "cpp_name": _RuleDesc('scalar'),
+        "type": _RuleDesc('scalar'),
         "strict": _RuleDesc("bool_scalar"),
         "inline_chained_structs": _RuleDesc("bool_scalar"),
         "immutable": _RuleDesc('bool_scalar'),
@@ -427,14 +429,25 @@ def _parse_command(ctxt, spec, name, node):
 
     # TODO: support the first argument as UUID depending on outcome of Catalog Versioning changes.
     valid_commands = [
-        common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB, common.COMMAND_NAMESPACE_IGNORED
+        common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB, common.COMMAND_NAMESPACE_IGNORED,
+        common.COMMAND_NAMESPACE_TYPE
     ]
-    if command.namespace and command.namespace not in valid_commands:
-        ctxt.add_bad_command_namespace_error(command, command.name, command.namespace,
-                                             valid_commands)
 
-    if command.fields is None:
-        ctxt.add_empty_struct_error(node, command.name)
+    if command.namespace:
+        if command.namespace not in valid_commands:
+            ctxt.add_bad_command_namespace_error(command, command.name, command.namespace,
+                                                 valid_commands)
+
+        # type property must be specified for a namespace = type
+        if command.namespace == common.COMMAND_NAMESPACE_TYPE and not command.type:
+            ctxt.add_missing_required_field_error(node, "command", "type")
+
+        if command.namespace != common.COMMAND_NAMESPACE_TYPE and command.type:
+            ctxt.add_extranous_command_type(command, command.name)
+
+    # Commands may only have the first parameter, ensure the fields property is an empty array.
+    if not command.fields:
+        command.fields = []
 
     spec.symbols.add_command(ctxt, command)
 

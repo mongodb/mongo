@@ -348,6 +348,9 @@ class Struct(common.SourceLocation):
         self.chained_structs = None  # type: List[ChainedStruct]
         self.fields = None  # type: List[Field]
 
+        # Command only property
+        self.cpp_name = None  # type: unicode
+
         # Internal property that is not represented as syntax. An imported struct is read from an
         # imported file, and no code is generated for it.
         self.imported = False  # type: bool
@@ -369,6 +372,7 @@ class Command(Struct):
         # type: (unicode, int, int) -> None
         """Construct a Command."""
         self.namespace = None  # type: unicode
+        self.type = None  # type: unicode
 
         super(Command, self).__init__(file_name, line, column)
 
