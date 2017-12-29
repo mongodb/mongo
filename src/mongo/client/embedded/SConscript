@@ -45,6 +45,7 @@ embeddedTransport = env.Library(
        'embedded_transport_layer.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
         'mongo_embedded_capi',
     ],
     SYSLIBDEPS=[
