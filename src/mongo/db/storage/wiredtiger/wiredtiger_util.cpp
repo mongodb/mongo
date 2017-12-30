@@ -87,7 +87,7 @@ void WiredTigerUtil::fetchTypeAndSourceURI(OperationContext* opCtx,
     invariant(colon != string::npos);
     colgroupUri += tableUri.substr(colon);
     StatusWith<std::string> colgroupResult = getMetadata(opCtx, colgroupUri);
-    invariant(colgroupResult.isOK());
+    invariantOK(colgroupResult.getStatus());
     WiredTigerConfigParser parser(colgroupResult.getValue());
 
     WT_CONFIG_ITEM typeItem;
