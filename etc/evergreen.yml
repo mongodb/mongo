@@ -10049,7 +10049,6 @@ buildvariants:
   - name: rollback_fuzzer
   - name: serial_run
   - name: sharded_collections_jscore_passthrough
-  - name: sharding
   - name: sharding_gle_auth_basics_passthrough
   - name: sharding_gle_auth_basics_passthrough_write_cmd
   - name: sharding_jscore_passthrough
