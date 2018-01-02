@@ -80,8 +80,8 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
             return Status(ErrorCodes::IllegalOperation, "Commands cannot be applied via doTxn.");
         }
         StringData commandName = o.firstElement().fieldNameStringData();
-        Command* command = Command::findCommand(commandName);
-        if (!command) {
+        Command* commandInOplogEntry = Command::findCommand(commandName);
+        if (!commandInOplogEntry) {
             return Status(ErrorCodes::FailedToParse, "Unrecognized command in op");
         }
 
@@ -94,7 +94,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         }
 
         return Command::checkAuthorization(
-            command, opCtx, OpMsgRequest::fromDBAndBody(dbNameForAuthCheck, o));
+            commandInOplogEntry, opCtx, OpMsgRequest::fromDBAndBody(dbNameForAuthCheck, o));
     }
 
     if (opType == "i"_sd) {
