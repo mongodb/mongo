@@ -43,10 +43,14 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+
+MONGO_FP_DECLARE(dropDatabaseHangAfterLastCollectionDrop);
+
 namespace {
 
 // This is used to wait for the collection drops to replicate to a majority of the replica set.
@@ -67,6 +71,14 @@ Status _finishDropDatabase(OperationContext* opCtx, const std::string& dbName, D
     dropPendingGuard.Dismiss();
 
     log() << "dropDatabase " << dbName << " - finished";
+
+    if (MONGO_FAIL_POINT(dropDatabaseHangAfterLastCollectionDrop)) {
+        log() << "dropDatabase - fail point dropDatabaseHangAfterLastCollectionDrop enabled. "
+                 "Blocking until fail point is disabled. ";
+        while (MONGO_FAIL_POINT(dropDatabaseHangAfterLastCollectionDrop)) {
+            mongo::sleepsecs(1);
+        }
+    }
 
     WriteUnitOfWork wunit(opCtx);
     getGlobalServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
