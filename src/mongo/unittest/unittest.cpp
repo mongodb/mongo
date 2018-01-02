@@ -47,6 +47,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -296,18 +297,18 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
             }
             passes = true;
         } catch (const TestAssertionFailureException& ae) {
-            err << ae.toString();
+            err << ae.toString() << " in test " << tc->getName() << '\n' << ae.getStacktrace();
         } catch (const DBException& e) {
-            err << " DBException: " << e.toString() << " in test " << tc->getName();
+            err << "DBException: " << e.toString() << " in test " << tc->getName();
         } catch (const std::exception& e) {
-            err << " std::exception: " << e.what() << " in test " << tc->getName();
+            err << "std::exception: " << e.what() << " in test " << tc->getName();
         } catch (int x) {
-            err << " caught int " << x << " in test " << tc->getName();
+            err << "caught int " << x << " in test " << tc->getName();
         }
 
         if (!passes) {
             std::string s = err.str();
-            log() << "FAIL: " << s << std::endl;
+            log() << "FAIL: " << s;
             r->_fails.push_back(tc->getName());
             r->_messages.push_back(s);
         }
@@ -434,7 +435,11 @@ void Suite::setupTests() {}
 
 TestAssertionFailureException::TestAssertionFailureException(
     const std::string& theFile, unsigned theLine, const std::string& theFailingExpression)
-    : _file(theFile), _line(theLine), _message(theFailingExpression) {}
+    : _file(theFile), _line(theLine), _message(theFailingExpression) {
+    std::ostringstream ostream;
+    printStackTrace(ostream);
+    _stacktrace = ostream.str();
+}
 
 std::string TestAssertionFailureException::toString() const {
     std::ostringstream os;

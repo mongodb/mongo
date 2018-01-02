@@ -254,4 +254,18 @@ public:
 };
 
 DEATH_TEST_F(DeathTestSelfTestFixture, DieInTearDown, "Died in tear-down") {}
+
+TEST(UnitTestSelfTest, StackTraceForAssertion) {
+    bool threw = false;
+    std::string stacktrace;
+    try {
+        ASSERT_EQ(0, 1);
+    } catch (mongo::unittest::TestAssertionFailureException& ae) {
+        stacktrace = ae.getStacktrace();
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+    ASSERT_STRING_CONTAINS(stacktrace, "printStackTrace");
+}
+
 }  // namespace

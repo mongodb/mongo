@@ -181,7 +181,7 @@ void printStackTrace(std::ostream& os) {
     // Collect symbol information for each backtrace address.
     ////////////////////////////////////////////////////////////
 
-    os << std::hex << std::uppercase << '\n';
+    os << std::hex << std::uppercase;
     for (int i = 0; i < addressCount; ++i) {
         Dl_info& dlinfo(dlinfoForFrames[i]);
         if (!dladdr(addresses[i], &dlinfo)) {
