@@ -97,7 +97,6 @@ env.Prepend(CPPPATH=[
 sources = [
     "extract/js/src/builtin/RegExp.cpp",
     "extract/js/src/frontend/Parser.cpp",
-    "extract/js/src/jit/ProcessExecutableMemory.cpp",
     "extract/js/src/jsarray.cpp",
     "extract/js/src/jsatom.cpp",
     "extract/js/src/jsmath.cpp",
