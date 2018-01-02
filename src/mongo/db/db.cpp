@@ -44,7 +44,6 @@
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/client/global_conn_pool.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/audit.h"
@@ -1235,9 +1234,6 @@ void shutdownTask() {
         log(LogComponent::kNetwork) << "shutdown: going to close listening sockets...";
         tl->shutdown();
     }
-
-    // Shut down the global dbclient pool so callers stop waiting for connections.
-    globalConnPool.shutdown();
 
     if (serviceContext->getGlobalStorageEngine()) {
         ServiceContext::UniqueOperationContext uniqueOpCtx;
