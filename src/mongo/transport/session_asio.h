@@ -75,6 +75,10 @@ public:
         }
     }
 
+    ~ASIOSession() {
+        shutdown();
+    }
+
     TransportLayer* getTransportLayer() const override {
         return _tl;
     }
@@ -97,11 +101,13 @@ public:
     }
 
     void shutdown() {
-        std::error_code ec;
-        getSocket().cancel();
-        getSocket().shutdown(GenericSocket::shutdown_both, ec);
-        if (ec) {
-            error() << "Error closing socket: " << ec.message();
+        if (getSocket().is_open()) {
+            std::error_code ec;
+            getSocket().cancel();
+            getSocket().shutdown(GenericSocket::shutdown_both, ec);
+            if (ec) {
+                error() << "Error shutting down socket: " << ec.message();
+            }
         }
     }
 
