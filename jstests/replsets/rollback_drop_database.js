@@ -52,7 +52,8 @@
         {configureFailPoint: "dropDatabaseHangAfterLastCollectionDrop", mode: "off"}));
     waitForDropDatabaseToFinish();
     assert.eq(0, rollbackNode.getDB(oldDbName).getCollectionNames().length);
-    jsTestLog("Database " + oldDbName + " successfully dropped on primary node " + rollbackNode.host);
+    jsTestLog("Database " + oldDbName + " successfully dropped on primary node " +
+              rollbackNode.host);
 
     rollbackTest.transitionToSyncSourceOperations();
 
