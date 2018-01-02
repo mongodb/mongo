@@ -722,7 +722,7 @@ Status OptionsParser::parseCommandLine(const OptionSection& options,
         }
     } catch (po::multiple_occurrences& e) {
         StringBuilder sb;
-        sb << "Error parsing command line:  Multiple occurrences of option \"--"
+        sb << "Error parsing command line:  Multiple occurrences of option \""
            << e.get_option_name() << "\"";
         return Status(ErrorCodes::BadValue, sb.str());
     } catch (po::error& e) {
