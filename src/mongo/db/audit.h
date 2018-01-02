@@ -43,13 +43,26 @@ namespace mongo {
 class AuthorizationSession;
 class BSONObj;
 class Client;
-class CommandInterface;
 class NamespaceString;
 class OperationContext;
 class StringData;
 class UserName;
 
+namespace mutablebson {
+class Document;
+}  // namespace mutablebson
+
 namespace audit {
+
+/**
+ * Narrow API for the parts of mongo::Command used by the audit library.
+ */
+class CommandInterface {
+public:
+    virtual ~CommandInterface() = default;
+    virtual void redactForLogging(mutablebson::Document* cmdObj) const = 0;
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const = 0;
+};
 
 /**
  * Logs the result of an authentication attempt.

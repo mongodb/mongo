@@ -56,17 +56,31 @@ namespace mutablebson {
 class Document;
 }  // namespace mutablebson
 
-class CommandInterface {
-protected:
-    CommandInterface() = default;
-
+/**
+ * Serves as a base for server commands. See the constructor for more details.
+ */
+class Command {
 public:
-    virtual ~CommandInterface() = default;
+    using CommandMap = StringMap<Command*>;
+
+    /**
+     * Constructs a new command and causes it to be registered with the global commands list. It is
+     * not safe to construct commands other than when the server is starting up.
+     *
+     * @param oldName an optional old, deprecated name for the command
+     */
+    Command(StringData name, StringData oldName = StringData());
+
+    // Do not remove or relocate the definition of this "key function".
+    // See https://gcc.gnu.org/wiki/VerboseDiagnostics#missing_vtable
+    virtual ~Command();
 
     /**
      * Returns the command's name. This value never changes for the lifetime of the command.
      */
-    virtual const std::string& getName() const = 0;
+    const std::string& getName() const {
+        return _name;
+    }
 
     /**
      * Return the namespace for the command. If the first field in 'cmdObj' is of type
@@ -74,7 +88,7 @@ public:
      * appended to 'dbname' after a '.' character. If the first field is not of type
      * mongo::String, then 'dbname' is returned unmodified.
      */
-    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const = 0;
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const;
 
     /**
      * Utility that returns a ResourcePattern for the namespace returned from
@@ -83,13 +97,15 @@ public:
      * collection name or just a database name.
      */
     virtual ResourcePattern parseResourcePattern(const std::string& dbname,
-                                                 const BSONObj& cmdObj) const = 0;
+                                                 const BSONObj& cmdObj) const;
 
     /**
      * Used by command implementations to hint to the rpc system how much space they will need in
      * their replies.
      */
-    virtual std::size_t reserveBytesForReply() const = 0;
+    virtual std::size_t reserveBytesForReply() const {
+        return 0u;
+    }
 
     /**
      * supportsWriteConcern returns true if this command should be parsed for a writeConcern
@@ -101,10 +117,13 @@ public:
      */
     virtual bool supportsWriteConcern(const BSONObj& cmd) const = 0;
 
+
     /**
      * Return true if only the admin ns has privileges to run this command.
      */
-    virtual bool adminOnly() const = 0;
+    virtual bool adminOnly() const {
+        return false;
+    }
 
     /**
      * Like adminOnly, but even stricter: we must either be authenticated for admin db,
@@ -113,7 +132,9 @@ public:
      *
      * When localHostOnlyIfNoAuth() is true, adminOnly() must also be true.
      */
-    virtual bool localHostOnlyIfNoAuth() = 0;
+    virtual bool localHostOnlyIfNoAuth() {
+        return false;
+    }
 
     /* Return true if slaves are allowed to execute the command
     */
@@ -123,23 +144,29 @@ public:
      * Return true if the client force a command to be run on a slave by
      * turning on the 'slaveOk' option in the command query.
      */
-    virtual bool slaveOverrideOk() const = 0;
+    virtual bool slaveOverrideOk() const {
+        return false;
+    }
 
     /**
      * Override and return fales if the command opcounters should not be incremented on
      * behalf of this command.
      */
-    virtual bool shouldAffectCommandCounter() const = 0;
+    virtual bool shouldAffectCommandCounter() const {
+        return true;
+    }
 
     /**
      * Return true if the command requires auth.
     */
-    virtual bool requiresAuth() const = 0;
+    virtual bool requiresAuth() const {
+        return true;
+    }
 
     /**
      * Generates help text for this command.
      */
-    virtual void help(std::stringstream& help) const = 0;
+    virtual void help(std::stringstream& help) const;
 
     /**
      * Commands which can be explained override this method. Any operation which has a query
@@ -157,8 +184,7 @@ public:
                            const std::string& dbname,
                            const BSONObj& cmdObj,
                            ExplainOptions::Verbosity verbosity,
-                           BSONObjBuilder* out) const = 0;
-
+                           BSONObjBuilder* out) const;
     /**
      * Checks if the client associated with the given OperationContext is authorized to run this
      * command.
@@ -170,25 +196,29 @@ public:
      *
      * The default implementation does nothing.
      */
-    virtual void redactForLogging(mutablebson::Document* cmdObj) = 0;
+    virtual void redactForLogging(mutablebson::Document* cmdObj);
 
     /**
      * Returns a copy of "cmdObj" in a form suitable for writing to logs.
      * Uses redactForLogging() to transform "cmdObj".
      */
-    virtual BSONObj getRedactedCopyForLogging(const BSONObj& cmdObj) = 0;
+    virtual BSONObj getRedactedCopyForLogging(const BSONObj& cmdObj);
 
     /**
      * Return true if a replica set secondary should go into "recovering"
      * (unreadable) state while running this command.
      */
-    virtual bool maintenanceMode() const = 0;
+    virtual bool maintenanceMode() const {
+        return false;
+    }
 
     /**
      * Return true if command should be permitted when a replica set secondary is in "recovering"
      * (unreadable) state.
      */
-    virtual bool maintenanceOk() const = 0;
+    virtual bool maintenanceOk() const {
+        return true; /* assumed true prior to commit */
+    }
 
     /**
      * Returns true if this Command supports the non-local readConcern:level field value. Takes the
@@ -205,19 +235,25 @@ public:
      * cases where it isn't supported.
      */
     virtual bool supportsNonLocalReadConcern(const std::string& dbName,
-                                             const BSONObj& cmdObj) const = 0;
+                                             const BSONObj& cmdObj) const {
+        return false;
+    }
 
     /**
      * Returns true if command allows afterClusterTime in its readConcern. The command may not allow
      * it if it is specifically intended not to take any LockManager locks. Waiting for
      * afterClusterTime takes the MODE_IS lock.
      */
-    virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const = 0;
+    virtual bool allowsAfterClusterTime(const BSONObj& cmdObj) const {
+        return true;
+    }
 
     /**
      * Returns LogicalOp for this command.
      */
-    virtual LogicalOp getLogicalOp() const = 0;
+    virtual LogicalOp getLogicalOp() const {
+        return LogicalOp::opCommand;
+    }
 
     /**
      * Returns whether this operation is a read, write, or command.
@@ -226,24 +262,24 @@ public:
      * or kWrite as appropriate.
      */
     enum class ReadWriteType { kCommand, kRead, kWrite };
-    virtual ReadWriteType getReadWriteType() const = 0;
+    virtual ReadWriteType getReadWriteType() const {
+        return ReadWriteType::kCommand;
+    }
 
     /**
      * Increment counter for how many times this command has executed.
      */
-    virtual void incrementCommandsExecuted() = 0;
+    void incrementCommandsExecuted() {
+        _commandsExecuted.increment();
+    }
 
     /**
      * Increment counter for how many times this command has failed.
      */
-    virtual void incrementCommandsFailed() = 0;
-};
+    void incrementCommandsFailed() {
+        _commandsFailed.increment();
+    }
 
-/**
- * Serves as a base for server commands. See the constructor for more details.
- */
-class Command : public CommandInterface {
-public:
     // The type of the first field in 'cmdObj' must be mongo::String. The first field is
     // interpreted as a collection name.
     static std::string parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj);
@@ -256,97 +292,6 @@ public:
                                          const std::string& dbname,
                                          const BSONObj& cmdObj);
 
-    using CommandMap = StringMap<Command*>;
-
-    /**
-     * Constructs a new command and causes it to be registered with the global commands list. It is
-     * not safe to construct commands other than when the server is starting up.
-     *
-     * @param oldName an optional old, deprecated name for the command
-     */
-    Command(StringData name, StringData oldName = StringData());
-
-    // NOTE: Do not remove this declaration, or relocate it in this class. We
-    // are using this method to control where the vtable is emitted.
-    virtual ~Command();
-
-    const std::string& getName() const final {
-        return _name;
-    }
-
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override;
-
-    ResourcePattern parseResourcePattern(const std::string& dbname,
-                                         const BSONObj& cmdObj) const override;
-
-    std::size_t reserveBytesForReply() const override {
-        return 0u;
-    }
-
-    bool adminOnly() const override {
-        return false;
-    }
-
-    bool localHostOnlyIfNoAuth() override {
-        return false;
-    }
-
-    bool slaveOverrideOk() const override {
-        return false;
-    }
-
-    bool shouldAffectCommandCounter() const override {
-        return true;
-    }
-
-    bool requiresAuth() const override {
-        return true;
-    }
-
-    void help(std::stringstream& help) const override;
-
-    Status explain(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& cmdObj,
-                   ExplainOptions::Verbosity verbosity,
-                   BSONObjBuilder* out) const override;
-
-    void redactForLogging(mutablebson::Document* cmdObj) override;
-
-    BSONObj getRedactedCopyForLogging(const BSONObj& cmdObj) override;
-
-    bool maintenanceMode() const override {
-        return false;
-    }
-
-    bool maintenanceOk() const override {
-        return true; /* assumed true prior to commit */
-    }
-
-    bool supportsNonLocalReadConcern(const std::string& dbName,
-                                     const BSONObj& cmdObj) const override {
-        return false;
-    }
-
-    bool allowsAfterClusterTime(const BSONObj& cmdObj) const override {
-        return true;
-    }
-
-    LogicalOp getLogicalOp() const override {
-        return LogicalOp::opCommand;
-    }
-
-    ReadWriteType getReadWriteType() const override {
-        return ReadWriteType::kCommand;
-    }
-
-    void incrementCommandsExecuted() final {
-        _commandsExecuted.increment();
-    }
-
-    void incrementCommandsFailed() final {
-        _commandsFailed.increment();
-    }
 
     /**
      * Runs the command.

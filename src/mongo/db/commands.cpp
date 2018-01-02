@@ -337,6 +337,25 @@ static Status _checkAuthorizationImpl(Command* c,
     return Status::OK();
 }
 
+namespace {
+// A facade presenting CommandDefinition as an audit::CommandInterface.
+class CommandAuditHook : public audit::CommandInterface {
+public:
+    explicit CommandAuditHook(Command* command) : _command(command) {}
+
+    void redactForLogging(mutablebson::Document* cmdObj) const final {
+        _command->redactForLogging(cmdObj);
+    }
+
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const final {
+        return _command->parseNs(dbname, cmdObj);
+    }
+
+private:
+    Command* _command;
+};
+}  // namespace
+
 Status Command::checkAuthorization(Command* c,
                                    OperationContext* opCtx,
                                    const OpMsgRequest& request) {
@@ -344,7 +363,8 @@ Status Command::checkAuthorization(Command* c,
     if (!status.isOK()) {
         log(LogComponent::kAccessControl) << status;
     }
-    audit::logCommandAuthzCheck(opCtx->getClient(), request, c, status.code());
+    CommandAuditHook hook(c);
+    audit::logCommandAuthzCheck(opCtx->getClient(), request, &hook, status.code());
     return status;
 }
 
@@ -355,8 +375,9 @@ bool Command::publicRun(OperationContext* opCtx,
         return enhancedRun(opCtx, request, result);
     } catch (const DBException& e) {
         if (e.code() == ErrorCodes::Unauthorized) {
+            CommandAuditHook hook(this);
             audit::logCommandAuthzCheck(
-                opCtx->getClient(), request, this, ErrorCodes::Unauthorized);
+                opCtx->getClient(), request, &hook, ErrorCodes::Unauthorized);
         }
         throw;
     }
