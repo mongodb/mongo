@@ -102,12 +102,16 @@
                     }
 
                     // We filter out operations that didn't produce a write error to avoid causing a
-                    // duplicate key error when retrying the operations.
+                    // duplicate key error when retrying the operations. We cache the error message
+                    // for the assertion below to avoid the expense of serializing the server's
+                    // response as a JSON string repeatedly. (There may be up to 1000 write errors
+                    // in the server's response.)
+                    const errorMsg =
+                        "A write error was returned for an operation outside the list of" +
+                        " operations executed: " + tojson(res);
+
                     for (let writeError of res.writeErrors) {
-                        assert.lt(writeError.index,
-                                  opsExecuted.length,
-                                  "A write error was returned for an operation outside the list" +
-                                      " of operations executed: " + tojson(res));
+                        assert.lt(writeError.index, opsExecuted.length, errorMsg);
                         opsToRetry.push(opsExecuted[writeError.index]);
                     }
                 } else if (res.ok === 1 || res.code !== ErrorCodes.DatabaseDropPending) {
