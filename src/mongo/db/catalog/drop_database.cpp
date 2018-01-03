@@ -135,6 +135,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         // on Database.
         auto dropPendingGuard = MakeGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
 
+        std::vector<NamespaceString> collectionsToDrop;
         for (auto collection : *db) {
             const auto& nss = collection->ns();
             if (nss.isDropPendingNamespace() && replCoord->isReplEnabled() &&
@@ -147,11 +148,17 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
             if (replCoord->isOplogDisabledFor(opCtx, nss) || nss.isSystemDotIndexes()) {
                 continue;
             }
+            collectionsToDrop.push_back(nss);
+        }
+        numCollectionsToDrop = collectionsToDrop.size();
+
+        log() << "dropDatabase " << dbName << " - dropping " << numCollectionsToDrop
+              << " collections";
+        for (auto nss : collectionsToDrop) {
             log() << "dropDatabase " << dbName << " - dropping collection: " << nss;
             WriteUnitOfWork wunit(opCtx);
             fassertStatusOK(40476, db->dropCollectionEvenIfSystem(opCtx, nss));
             wunit.commit();
-            numCollectionsToDrop++;
         }
         dropPendingGuard.Dismiss();
 
