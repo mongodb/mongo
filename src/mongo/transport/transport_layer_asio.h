@@ -76,6 +76,7 @@ class TransportLayerASIO final : public TransportLayer {
 public:
     struct Options {
         explicit Options(const ServerGlobalParams* params);
+        Options() = default;
 
         int port = ServerGlobalParams::DefaultDBPort;  // port to bind to
         std::string ipList;                            // addresses to bind to

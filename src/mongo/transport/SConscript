@@ -60,7 +60,6 @@ tlEnv.Library(
     source=[
         'ticket_asio.cpp',
         'transport_layer_asio.cpp',
-        'transport_layer_legacy.cpp',
     ],
     LIBDEPS=[
         'transport_layer_common',
@@ -217,18 +216,6 @@ env.CppUnitTest(
     LIBDEPS=[
         'message_compressor',
     ]
-)
-
-env.CppUnitTest(
-    target='transport_layer_legacy_test',
-    source=[
-        'transport_layer_legacy_test.cpp',
-    ],
-    LIBDEPS=[
-        'transport_layer',
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-    ],
 )
 
 env.CppUnitTest(
