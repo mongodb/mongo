@@ -114,6 +114,8 @@ selector:
   - jstests/sharding/pending_chunk.js
   # New waitForClusterTime
   - jstests/sharding/auth_slaveok_routing.js
+  # This test should not be run with a mixed cluster environment.
+  - jstests/sharding/nonreplicated_uuids_on_shardservers.js
 
 executor:
   config:

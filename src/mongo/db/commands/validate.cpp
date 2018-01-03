@@ -205,19 +205,6 @@ public:
         // SERVER-29926 are resolved.
         bool skipUUIDCheck = nss.coll() == "system.indexes" || nss.coll() == "system.namespaces";
 
-        // Skip checking UUID on local database for shard secondaries until SERVER-32255 is
-        // resolved.
-        bool isShardServer = serverGlobalParams.clusterRole == ClusterRole::ShardServer;
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        bool isReplSet =
-            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-        bool isPrimary =
-            isReplSet ? replCoord->getMemberState() == repl::MemberState::RS_PRIMARY : false;
-
-        if (isShardServer && isReplSet && !isPrimary && nss.db() == "local") {
-            skipUUIDCheck = true;
-        }
-
         if (!skipUUIDCheck) {
             ServerGlobalParams::FeatureCompatibility::Version version =
                 serverGlobalParams.featureCompatibility.getVersion();
