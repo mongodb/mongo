@@ -107,6 +107,8 @@ selector:
   - jstests/sharding/pending_chunk.js
   # Calls a shard command that does not exist in v3.4
   - jstests/sharding/dump_coll_metadata.js
+  # This test should not be run with a mixed cluster environment.
+  - jstests/sharding/nonreplicated_uuids_on_shardservers.js
 
 executor:
   config:

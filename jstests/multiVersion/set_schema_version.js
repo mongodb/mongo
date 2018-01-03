@@ -5,31 +5,10 @@
     load("jstests/replsets/rslib.js");
     load("jstests/libs/feature_compatibility_version.js");
     load("jstests/libs/get_index_helpers.js");
+    load("jstests/libs/check_uuids.js");
 
     const latest = "latest";
     const downgrade = "3.4";
-
-    let checkCollectionUUIDs = function(adminDB, isDowngrade) {
-        let databaseList = adminDB.runCommand({"listDatabases": 1}).databases;
-
-        databaseList.forEach(function(database) {
-            let currentDatabase = adminDB.getSiblingDB(database.name);
-            let collectionInfos = currentDatabase.getCollectionInfos();
-            for (let i = 0; i < collectionInfos.length; i++) {
-                // Always skip system.indexes due to SERVER-30500.
-                if (collectionInfos[i].name == "system.indexes") {
-                    continue;
-                }
-                if (isDowngrade) {
-                    assert(!collectionInfos[i].info.uuid,
-                           "Unexpected uuid for collection: " + tojson(collectionInfos[i]));
-                } else {
-                    assert(collectionInfos[i].info.uuid,
-                           "Expect uuid for collection: " + tojson(collectionInfos[i]));
-                }
-            }
-        });
-    };
 
     let setFCV = function(adminDB, version) {
         assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: version}));
