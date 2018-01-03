@@ -91,6 +91,8 @@ TEST(ConnectionPoolTest, ConnectionPoolMaxInUseConnectionsTest) {
     }
 
     t.join();
+
+    pool.release(host, conn1);
 }
 
 TEST(ConnectionPoolTest, ConnectionPoolMaxInUseTimeoutTest) {
@@ -110,6 +112,9 @@ TEST(ConnectionPoolTest, ConnectionPoolMaxInUseTimeoutTest) {
     // Try creating a new connection with a 1-second timeout, should block,
     // then should time out.
     ASSERT_THROWS(pool.get(host, 1), AssertionException);
+
+    pool.release(host, conn1);
+    pool.release(host, conn2);
 }
 
 TEST(ConnectionPoolTest, ConnectionPoolShutdownLogicTest) {
@@ -166,6 +171,9 @@ TEST(ConnectionPoolTest, ConnectionPoolShutdownLogicTest) {
     ASSERT_THROWS(pool.get(host), AssertionException);
 
     t.join();
+
+    pool.release(host, conn1);
+    pool.release(host, conn2);
 }
 
 }  // namespace

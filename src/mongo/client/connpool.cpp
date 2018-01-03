@@ -1,5 +1,5 @@
 /* connpool.cpp
-*/
+ */
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -47,6 +47,14 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/socket_exception.h"
+
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
+#if __has_feature(address_sanitizer)
+#include <sanitizer/lsan_interface.h>
+#endif
 
 namespace mongo {
 
@@ -431,6 +439,10 @@ DBConnectionPool::~DBConnectionPool() {
         PoolForHost& p = i->second;
         p._parentDestroyed = true;
     }
+
+#if __has_feature(address_sanitizer)
+    __lsan_ignore_object(_hooks);
+#endif
 }
 
 void DBConnectionPool::flush() {
