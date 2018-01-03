@@ -186,7 +186,7 @@ variables:
   ec2_artifacts: ${log_path} ${backup_path_after} ${backup_path_before}
   program_options: --logLevel=info --backupPathBefore=${backup_path_before} --backupPathAfter=${backup_path_after}
   connection_options: --sshUserHost=${ip_address} --sshConnection=\"${ssh_identity} ${ssh_connection_options}\"
-  test_options: --testLoops=15 --seedDocNum=10000 --rsync --validate=local --canary=local
+  test_options: --testLoops=15 --seedDocNum=10000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local
   crash_options: --crashMethod=internal --crashOption=${windows_crash_cmd} --crashWaitTime=45 --jitterForCrashWaitTime=5 --instanceId=${instance_id}
   client_options: --numCrudClients=20 --numFsmClients=20
   mongodb_options: --rootDir=${remote_dir}-${task_id} --mongodbBinDir=${remote_dir}
@@ -4368,7 +4368,7 @@ tasks:
     vars:
       <<: *powercycle_test
       client_options: --numCrudClients=20 --numFsmClients=0
-      test_options: --testLoops=15 --seedDocNum=10000 --rsync --validate=local --canary=local --removeLockFile
+      test_options: --testLoops=15 --seedDocNum=10000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local --removeLockFile
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine mmapv1\"
 
 - name: powercycle_WT

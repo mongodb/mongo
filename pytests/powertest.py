@@ -1200,7 +1200,7 @@ def remote_handler(options, operations):
             ret = wait_for_mongod_shutdown(options.db_path)
 
         elif operation == "rsync_data":
-            ret, output = rsync(options.db_path, options.rsync_dest)
+            ret, output = rsync(options.db_path, options.rsync_dest, options.rsync_exclude_files)
             LOGGER.info(output)
 
         elif operation == "seed_docs":
@@ -1253,13 +1253,22 @@ def remote_handler(options, operations):
     return 0
 
 
-def rsync(src_dir, dest_dir):
+def rsync(src_dir, dest_dir, exclude_files=None):
     """ Rsync 'src_dir' to 'dest_dir'. """
     # Note rsync on Windows requires a Unix-style directory.
-    LOGGER.info("Rsync'ing %s to %s", src_dir, dest_dir)
+    exclude_options = ""
+    exclude_str = ""
+    if exclude_files:
+        exclude_str = " (excluding {})".format(exclude_files)
+        if isinstance(exclude_files, str):
+            exclude_files = [exclude_files]
+        for exclude_file in exclude_files:
+            exclude_options = "{} --exclude '{}'".format(exclude_options, exclude_file)
+
+    LOGGER.info("Rsync'ing %s to %s%s", src_dir, dest_dir, exclude_str)
     if not distutils.spawn.find_executable("rsync"):
         return 1, "No rsync exists on the host, not rsync'ing"
-    cmds = "rsync -va --delete --quiet {} {}".format(src_dir, dest_dir)
+    cmds = "rsync -va --delete --quiet {} {} {}".format(exclude_options, src_dir, dest_dir)
     ret, output = execute_cmd(cmds)
     return ret, output
 
@@ -1664,6 +1673,12 @@ Examples:
                             action="store_true",
                             default=False)
 
+    test_options.add_option("--rsyncExcludeFiles",
+                            dest="rsync_exclude_files",
+                            help="Files excluded from rsync of the data directory",
+                            action="append",
+                            default=None)
+
     test_options.add_option("--backupPathBefore",
                             dest="backup_path_before",
                             help="Path where the db_path is backed up before crash recovery,"
@@ -1742,8 +1757,8 @@ Examples:
     crash_options.add_option("--crashOption",
                              dest="crash_option",
                              help="Secondary argument for the following --crashMethod:"
-                                  " 'aws_ec2': specify EC2 'address_type', which is one of {} and defaults"
-                                  " to 'public_ip_address'."
+                                  " 'aws_ec2': specify EC2 'address_type', which is one of {} and"
+                                  " defaults to 'public_ip_address'."
                                   " 'mpower': specify output<num> to turn"
                                   " off/on, i.e., 'output1' (REQUIRED)."
                                   " 'internal': for Windows, optionally specify a crash method,"
