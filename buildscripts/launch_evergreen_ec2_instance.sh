@@ -174,6 +174,7 @@ aws_ec2=$(python buildscripts/aws_ec2.py \
           $subnet_id                     \
           --tagName "$tag_name"          \
           --tagOwner "$USER"             \
+          $expire_tag                    \
           $block_device_option | tr -cd "[:print:]\n")
 echo "Spawned new AMI EC2 instance: $aws_ec2"
 
