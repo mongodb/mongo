@@ -1,8 +1,0 @@
-{
-    "sharding" : {
-        "clusterRole" : "shardsvr"
-    },
-    "replication" : {
-        "replSetName" : "dummy"
-    }
-}
