@@ -153,6 +153,7 @@ variables:
 # TODO: Remove psutil from virtualenv_requirements when BUILD-3083 is done
 - &powercycle_ec2_instance
   aws_ec2_yml: aws_ec2.yml
+  expire_hours: "3"
   ec2_monitor_files: proc.json system.json
   monitor_proc_file: proc.json
   monitor_system_file: system.json
@@ -1183,8 +1184,13 @@ functions:
             security_groups="$security_groups -s $security_group"
           done
 
+          if [ ! -z "${expire_hours}" ]; then
+            expire_hours="-e ${expire_hours}"
+          fi
+
           # Clone another instance of this host in EC2.
           buildscripts/launch_evergreen_ec2_instance.sh \
+            $expire_hours                               \
             -k ${ssh_key_id}                            \
             $security_groups                            \
             -t "AMI Evergreen ${task_id}"               \
@@ -4341,6 +4347,7 @@ tasks:
       run_multiple_jobs: false
 
 - name: powercycle
+  exec_timeout_secs: 10800 # 3 hour timeout for the task overall
   depends_on:
   - name: compile
   commands:
@@ -4352,6 +4359,7 @@ tasks:
   - func: "set up EC2 instance"
     vars:
       <<: *powercycle_ec2_instance
+      expire_hours: "4"
   - command: expansions.update
     <<: *powercycle_expansions
   - func: "run powercycle test"
@@ -4364,6 +4372,7 @@ tasks:
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine mmapv1\"
 
 - name: powercycle_WT
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: compile
   commands:
@@ -4383,6 +4392,7 @@ tasks:
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 
 - name: powercycle_fcv3.4_WT
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: compile
   commands:
@@ -4404,6 +4414,7 @@ tasks:
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 
 - name: powercycle_replication_WT
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: compile
   commands:
@@ -4423,6 +4434,7 @@ tasks:
       mongod_extra_options: --replSet=powercyle --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 
 - name: powercycle_replication_smalloplog_WT
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: compile
   commands:
@@ -4442,6 +4454,7 @@ tasks:
       mongod_extra_options: --replSet=powercyle --mongodOptions=\"--setParameter enableTestCommands=1 --oplogSize 20 --storageEngine wiredTiger\"
 
 - name: powercycle_syncdelay_WT
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: compile
   commands:
@@ -4461,6 +4474,7 @@ tasks:
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --syncdelay 10 --storageEngine wiredTiger\"
 
 - name: powercycle_write_concern_majority_WT
+  exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: compile
   commands:
