@@ -279,6 +279,7 @@ env.Library(
         "db/mongod_options_init.cpp",
     ],
     LIBDEPS_PRIVATE=[
+        'db/catalog/health_log',
         'db/clientcursor',
         'db/commands/core',
         'db/conn_pool_options',
@@ -287,6 +288,7 @@ env.Library(
         'db/index_d',
         'db/initialize_snmp',
         'db/kill_sessions_local',
+        'db/keys_collection_client_direct',
         'db/logical_session_cache_factory_mongod',
         'db/mongod_options',
         'db/mongodandmongos',
@@ -355,7 +357,10 @@ env.Install(
                         "client/examples/mongoperf.cpp",
                     ] + env.WindowsResourceFile("client/examples/mongoperf.rc"),
                     LIBDEPS=[
+                        "base",
                         "db/serveronly",
+                        "db/storage/mmap_v1/logfile",
+                        "db/storage/mmap_v1/mmap",
                     ]),
     ])
 

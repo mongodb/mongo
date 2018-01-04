@@ -65,6 +65,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'oplog',
         'oplog_entry',
+        'oplog_interface_local',
         'replmocks',
     ],
 )
@@ -238,9 +239,12 @@ env.Library(
         'collection_bulk_loader_impl.cpp',
     ],
     LIBDEPS=[
+        'oplog',
         'rollback_idl',
         'storage_interface',
+        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/exec/exec',
         '$BUILD_DIR/mongo/db/query/internal_plans',
         '$BUILD_DIR/mongo/db/query/query',
@@ -317,8 +321,7 @@ env.CppUnitTest(
         'replication_recovery_test.cpp',
     ],
     LIBDEPS=[
-    ],
-    LIBDEPS_PRIVATE=[
+        'oplog_interface_local',
         'replmocks',
         'replication_recovery',
         'storage_interface_impl',
@@ -553,10 +556,13 @@ env.Library(
         'rollback_test_fixture.cpp',
     ],
     LIBDEPS=[
+        'drop_pending_collection_reaper',
         'oplog_interface_mock',
         'optime',
         'replication_process',
         'replmocks',
+        'rs_rollback',
+        'rs_rollback_no_uuid',
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
@@ -677,6 +683,7 @@ env.Library(
         'replmocks',
         'sync_tail',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/op_observer_d',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ],
 )
@@ -1064,6 +1071,7 @@ env.CppUnitTest('isself_test',
                 ],
                 LIBDEPS=[
                     '$BUILD_DIR/mongo/db/serveronly',
+                    'isself',
                 ],
                 )
 
@@ -1590,6 +1598,7 @@ env.Library(
         'mock_repl_coord_server_fixture.cpp',
     ],
     LIBDEPS=[
+        'oplog',
         'replmocks',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ]
