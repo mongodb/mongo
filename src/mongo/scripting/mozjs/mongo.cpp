@@ -720,6 +720,15 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto defaultDB = cs.getDatabase() == "" ? "test" : cs.getDatabase();
     o.setString(InternedString::defaultDB, defaultDB);
 
+    // Adds a property to the Mongo connection object.
+    boost::optional<bool> retryWrites = cs.getRetryWrites();
+    // If retryWrites is not explicitly set in uri, sessions created on this connection default to
+    // the global retryWrites value. This is checked in sessions.js by using the injected
+    // _shouldRetryWrites() function, which returns true if the --retryWrites flag was passed.
+    if (retryWrites) {
+        o.setBoolean(InternedString::_retryWrites, retryWrites.get());
+    }
+
     args.rval().setObjectOrNull(thisv);
 }
 

@@ -82,7 +82,7 @@ StatusWith<std::string> uriDecode(StringData str);
  *   2. The 'fragment' field, as defined by section 3.5 is not permitted.
  *
  * For a complete list of URI string options, see
- * https://wiki.mongodb.com/display/DH/Connection+String+Format
+ * https://docs.mongodb.com/manual/reference/connection-string/#connection-string-options
  *
  * Examples:
  *
@@ -145,15 +145,24 @@ public:
         return _connectString.getServers();
     }
 
+
     const boost::optional<std::string> getAppName() const;
+
+    boost::optional<bool> getRetryWrites() const {
+        return _retryWrites;
+    }
 
     // If you are trying to clone a URI (including its options/auth information) for a single
     // server (say a member of a replica-set), you can pass in its HostAndPort information to
     // get a new URI with the same info, except type() will be MASTER and getServers() will
     // be the single host you pass in.
     MongoURI cloneURIForServer(HostAndPort hostAndPort) const {
-        return MongoURI(
-            ConnectionString(std::move(hostAndPort)), _user, _password, _database, _options);
+        return MongoURI(ConnectionString(std::move(hostAndPort)),
+                        _user,
+                        _password,
+                        _database,
+                        _retryWrites,
+                        _options);
     }
 
     ConnectionString::ConnectionType type() const {
@@ -173,11 +182,13 @@ private:
              const std::string& user,
              const std::string& password,
              const std::string& database,
+             boost::optional<bool> retryWrites,
              OptionsMap options)
         : _connectString(std::move(connectString)),
           _user(user),
           _password(password),
           _database(database),
+          _retryWrites(std::move(retryWrites)),
           _options(std::move(options)) {}
 
     BSONObj _makeAuthObjFromOptions(int maxWireVersion) const;
@@ -188,6 +199,7 @@ private:
     std::string _user;
     std::string _password;
     std::string _database;
+    boost::optional<bool> _retryWrites;
     OptionsMap _options;
 };
 
