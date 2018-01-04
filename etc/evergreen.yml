@@ -3684,31 +3684,6 @@ tasks:
       resmoke_args: --suites=json_schema --storageEngine=wiredTiger
       run_multiple_jobs: false
 
-- name: powercycle_mmapv1
-  exec_timeout_secs: 10800 # 3 hour timeout for the task overall
-  depends_on:
-  - name: compile
-  commands:
-  - func: "do setup"
-  - func: "set up remote credentials"
-    vars:
-      <<: *powercycle_remote_credentials
-  - func: "set up virtualenv"
-  - func: "set up EC2 instance"
-    vars:
-      <<: *powercycle_ec2_instance
-      expire_hours: "4"
-  - command: expansions.update
-    <<: *powercycle_expansions
-  - func: "run powercycle test"
-    # Disable the FSM clients for mmapv1.
-    # mongod will not start if it crashed mongod while creating a namespace (SERVER-26499).
-    vars:
-      <<: *powercycle_test
-      client_options: --numCrudClients=20 --numFsmClients=0
-      test_options: --testLoops=15 --seedDocNum=10000 --rsync --rsyncExcludeFiles=diagnostic.data/metrics.interim* --validate=local --canary=local --removeLockFile
-      mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine mmapv1\"
-
 - name: powercycle
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
@@ -9084,7 +9059,6 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
-  - name: powercycle_mmapv1
   - name: read_concern_linearizable_passthrough
     distros:
     - rhel62-large
@@ -9207,9 +9181,6 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
-  - name: powercycle_mmapv1
-    distros:
-    - windows-64-vs2015-large
   - name: read_concern_linearizable_passthrough
     distros:
     - windows-64-vs2015-large
