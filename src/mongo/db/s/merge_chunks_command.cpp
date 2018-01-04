@@ -161,15 +161,12 @@ Status mergeChunks(OperationContext* opCtx,
     ChunkType itChunk;
     itChunk.setMin(minKey);
     itChunk.setMax(minKey);
-    itChunk.setNS(nss.ns());
-    itChunk.setShard(shardingState->getShardName());
 
     while (itChunk.getMax().woCompare(maxKey) < 0 &&
            metadata->getNextChunk(itChunk.getMax(), &itChunk)) {
         chunkBoundaries.push_back(itChunk.getMax());
         chunksToMerge.push_back(itChunk);
     }
-
 
     if (chunksToMerge.empty()) {
         std::string errmsg = stream()
@@ -409,6 +406,7 @@ public:
         auto mergeStatus = mergeChunks(opCtx, NamespaceString(ns), minKey, maxKey, epoch);
         return appendCommandStatus(result, mergeStatus);
     }
+
 } mergeChunksCmd;
 
 BSONField<string> MergeChunksCommand::nsField("mergeChunks");

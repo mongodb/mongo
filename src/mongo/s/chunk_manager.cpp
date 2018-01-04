@@ -177,7 +177,7 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
     invariant(it != _chunkMapViews.chunkRangeMap.end());
 
     // We need to include the last chunk
-    if (end != _chunkMapViews.chunkRangeMap.cend()) {
+    if (end != _chunkMapViews.chunkRangeMap.end()) {
         ++end;
     }
 
@@ -335,10 +335,22 @@ ChunkVersion ChunkManager::getVersion(const ShardId& shardName) const {
 
 std::string ChunkManager::toString() const {
     StringBuilder sb;
-    sb << "ChunkManager: " << _nss.ns() << " key:" << _shardKeyPattern.toString() << '\n';
+    sb << "ChunkManager: " << _nss.ns() << " key: " << _shardKeyPattern.toString() << '\n';
 
+    sb << "Chunks:\n";
     for (const auto& entry : _chunkMap) {
-        sb << "\t" << entry.second->toString() << '\n';
+        sb << "\t" << entry.first << ": " << entry.second->toString() << '\n';
+    }
+
+    sb << "Ranges:\n";
+    for (const auto& entry : _chunkMapViews.chunkRangeMap) {
+        sb << "\t" << entry.first << ": " << entry.second.range.toString() << " @ "
+           << entry.second.shardId << '\n';
+    }
+
+    sb << "Shard versions:\n";
+    for (const auto& entry : _chunkMapViews.shardVersions) {
+        sb << "\t" << entry.first << ": " << entry.second.toString() << '\n';
     }
 
     return sb.str();

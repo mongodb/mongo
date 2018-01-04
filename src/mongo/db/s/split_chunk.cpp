@@ -122,7 +122,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     return true;
 }
 
-}  // anonymous namespace
+}  // namespace
 
 StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
                                                    const NamespaceString& nss,

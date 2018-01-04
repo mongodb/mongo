@@ -64,9 +64,8 @@ public:
     }
 
     /**
-     * Returns true if the document key 'key' belongs to this chunkset. Recall that documents of
-     * an in-flight chunk migration may be present and should not be considered part of the
-     * collection / chunkset yet. Key must be the full shard key.
+     * Returns true if the document with the given key belongs to this chunkset. If the key is empty
+     * returns false. If key is not a valid shard key, the behaviour is undefined.
      */
     bool keyBelongsToMe(const BSONObj& key) const;
 
