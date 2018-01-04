@@ -55,9 +55,6 @@
 
 namespace mongo {
 
-using std::string;
-using std::stringstream;
-
 using logger::LogComponent;
 
 Command::CommandMap* Command::_commandsByBestName = nullptr;
@@ -108,7 +105,7 @@ BSONObj Command::appendMajorityWriteConcern(const BSONObj& cmdObj) {
     return cmdObjWithWriteConcern.obj();
 }
 
-string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) {
+std::string Command::parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     uassert(ErrorCodes::BadValue,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
@@ -120,7 +117,8 @@ string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdOb
     return nss.ns();
 }
 
-NamespaceString Command::parseNsCollectionRequired(const string& dbname, const BSONObj& cmdObj) {
+NamespaceString Command::parseNsCollectionRequired(const std::string& dbname,
+                                                   const BSONObj& cmdObj) {
     // Accepts both BSON String and Symbol for collection name per SERVER-16260
     // TODO(kangas) remove Symbol support in MongoDB 3.0 after Ruby driver audit
     BSONElement first = cmdObj.firstElement();
@@ -135,7 +133,7 @@ NamespaceString Command::parseNsCollectionRequired(const string& dbname, const B
 }
 
 NamespaceString Command::parseNsOrUUID(OperationContext* opCtx,
-                                       const string& dbname,
+                                       const std::string& dbname,
                                        const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
@@ -161,7 +159,7 @@ NamespaceString Command::parseNsOrUUID(OperationContext* opCtx,
     }
 }
 
-string Command::parseNs(const string& dbname, const BSONObj& cmdObj) const {
+std::string Command::parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
     BSONElement first = cmdObj.firstElement();
     if (first.type() != mongo::String)
         return dbname;
@@ -197,12 +195,12 @@ Command::Command(StringData name, StringData oldName)
         (*_commands)[oldName.toString()] = this;
 }
 
-void Command::help(stringstream& help) const {
+void Command::help(std::stringstream& help) const {
     help << "no help defined";
 }
 
 Status Command::explain(OperationContext* opCtx,
-                        const string& dbname,
+                        const std::string& dbname,
                         const BSONObj& cmdObj,
                         ExplainOptions::Verbosity verbosity,
                         BSONObjBuilder* out) const {
