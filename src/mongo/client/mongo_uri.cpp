@@ -422,16 +422,30 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
         addTXTOptions(parseOptions(connectionOptions, url), canonicalHost, url, isSeedlist);
 
     // If a replica set option was specified, store it in the 'setName' field.
-    const auto optIter = options.find("replicaSet");
+    auto optIter = options.find("replicaSet");
     std::string setName;
     if (optIter != end(options)) {
         setName = optIter->second;
         invariant(!setName.empty());
     }
 
+    boost::optional<bool> retryWrites = boost::none;
+    optIter = options.find("retryWrites");
+    if (optIter != end(options)) {
+        if (optIter->second == "true") {
+            retryWrites.reset(true);
+        } else if (optIter->second == "false") {
+            retryWrites.reset(false);
+        } else {
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << "retryWrites must be either \"true\" or \"false\"");
+        }
+    }
+
     ConnectionString cs(
         setName.empty() ? ConnectionString::MASTER : ConnectionString::SET, servers, setName);
-    return MongoURI(std::move(cs), username, password, database, std::move(options));
+    return MongoURI(
+        std::move(cs), username, password, database, std::move(retryWrites), std::move(options));
 }
 
 StatusWith<MongoURI> MongoURI::parse(const std::string& url) try {

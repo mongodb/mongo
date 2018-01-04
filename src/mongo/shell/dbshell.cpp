@@ -784,10 +784,11 @@ int _main(int argc, char* argv[], char** envp) {
            << getURIFromArgs(processedURI, shellGlobalParams.dbhost, shellGlobalParams.port)
            << "\");";
 
-        if (shellGlobalParams.shouldRetryWrites) {
-            // If the user specified --retryWrites to the mongo shell, then we replace the global
-            // `db` object with a DB object that has retryable writes enabled.
-            ss << "db = db.getMongo().startSession({retryWrites: true}).getDatabase(db.getName());";
+        if (shellGlobalParams.shouldRetryWrites || parsedURI.getRetryWrites()) {
+            // If the --retryWrites cmdline argument or retryWrites URI param was specified, then
+            // replace the global `db` object with a DB object started in a session. The resulting
+            // Mongo connection checks its _retryWrites property.
+            ss << "db = db.getMongo().startSession().getDatabase(db.getName());";
         }
 
         mongo::shell_utils::_dbConnect = ss.str();
