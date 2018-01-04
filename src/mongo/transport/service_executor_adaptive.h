@@ -184,6 +184,7 @@ private:
         TickSource::Tick executingCurRun;
         CumulativeTickTimer executing;
         MetricsArray threadMetrics;
+        std::int64_t markIdleCounter = 0;
         int recursionDepth = 0;
     };
 

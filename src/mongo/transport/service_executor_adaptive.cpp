@@ -41,6 +41,7 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/thread_idle_callback.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stringutils.h"
@@ -206,7 +207,8 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
         return {ErrorCodes::ShutdownInProgress, "Executor is not running"};
     }
 
-    auto wrappedTask = [ this, task = std::move(task), scheduleTime, pendingCounterPtr, taskName ] {
+    auto wrappedTask =
+        [ this, task = std::move(task), scheduleTime, pendingCounterPtr, taskName, flags ] {
         pendingCounterPtr->subtractAndFetch(1);
         auto start = _tickSource->getTicks();
         _totalSpentQueued.addAndFetch(start - scheduleTime);
@@ -232,6 +234,11 @@ Status ServiceExecutorAdaptive::schedule(ServiceExecutorAdaptive::Task task,
         task();
         _localThreadState->threadMetrics[static_cast<size_t>(taskName)]
             ._totalSpentExecuting.addAndFetch(_localTimer.sinceStartTicks());
+
+        if ((flags & ServiceExecutor::kMayYieldBeforeSchedule) &&
+            (_localThreadState->markIdleCounter++ & 0xf)) {
+            markThreadIdle();
+        }
     };
 
     // Dispatching a task on the io_context will run the task immediately, and may run it
