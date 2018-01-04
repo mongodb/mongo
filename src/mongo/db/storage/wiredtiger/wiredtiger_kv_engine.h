@@ -175,6 +175,8 @@ public:
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
+    bool supportsReadConcernSnapshot() const final;
+
     // wiredtiger specific
     // Calls WT_CONNECTION::reconfigure on the underlying WT_CONNECTION
     // held by this class

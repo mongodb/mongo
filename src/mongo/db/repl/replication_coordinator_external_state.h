@@ -284,6 +284,11 @@ public:
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const = 0;
 
     /**
+     * Returns true if the current storage engine supports snapshot read concern.
+     */
+    virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const = 0;
+
+    /**
      * Applies the operations described in the oplog entries contained in "ops" using the
      * "applyOperation" function.
      */

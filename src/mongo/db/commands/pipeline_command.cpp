@@ -65,9 +65,11 @@ public:
         return true;
     }
 
-    bool supportsNonLocalReadConcern(const std::string& dbName,
-                                     const BSONObj& cmdObj) const override {
-        return !AggregationRequest::parseNs(dbName, cmdObj).isCollectionlessAggregateNS();
+    bool supportsReadConcern(const std::string& dbName,
+                             const BSONObj& cmdObj,
+                             repl::ReadConcernLevel level) const override {
+        return level == repl::ReadConcernLevel::kLocalReadConcern ||
+            !AggregationRequest::parseNs(dbName, cmdObj).isCollectionlessAggregateNS();
     }
 
     ReadWriteType getReadWriteType() const {

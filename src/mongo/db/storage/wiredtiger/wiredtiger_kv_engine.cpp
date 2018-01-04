@@ -1112,6 +1112,10 @@ bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
     return _checkpointThread->supportsRecoverToStableTimestamp();
 }
 
+bool WiredTigerKVEngine::supportsReadConcernSnapshot() const {
+    return true;
+}
+
 void WiredTigerKVEngine::startOplogManager(OperationContext* opCtx,
                                            const std::string& uri,
                                            WiredTigerRecordStore* oplogRecordStore) {

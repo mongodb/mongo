@@ -121,6 +121,8 @@ public:
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
+    bool supportsReadConcernSnapshot() const final;
+
     virtual void replicationBatchIsComplete() const override;
 
     SnapshotManager* getSnapshotManager() const final;

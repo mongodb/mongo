@@ -57,6 +57,8 @@ public:
         auto engine = opCtx->getClient()->getServiceContext()->getGlobalStorageEngine();
         return BSON("name" << storageGlobalParams.engine << "supportsCommittedReads"
                            << bool(engine->getSnapshotManager())
+                           << "supportsSnapshotReadConcern"
+                           << engine->supportsReadConcernSnapshot()
                            << "readOnly"
                            << storageGlobalParams.readOnly
                            << "persistent"

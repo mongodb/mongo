@@ -45,10 +45,11 @@ namespace repl {
 
 namespace {
 
-const char kLocalReadConcernStr[] = "local";
-const char kMajorityReadConcernStr[] = "majority";
-const char kLinearizableReadConcernStr[] = "linearizable";
-const char kAvailableReadConcernStr[] = "available";
+constexpr StringData kLocalReadConcernStr = "local"_sd;
+constexpr StringData kMajorityReadConcernStr = "majority"_sd;
+constexpr StringData kLinearizableReadConcernStr = "linearizable"_sd;
+constexpr StringData kAvailableReadConcernStr = "available"_sd;
+constexpr StringData kSnapshotReadConcernStr = "snapshot"_sd;
 
 }  // unnamed namespace
 
@@ -73,7 +74,7 @@ ReadConcernArgs::ReadConcernArgs(boost::optional<OpTime> opTime,
 
 ReadConcernArgs::ReadConcernArgs(boost::optional<LogicalTime> clusterTime,
                                  boost::optional<ReadConcernLevel> level)
-    : _clusterTime(std::move(clusterTime)), _level(std::move(level)) {}
+    : _afterClusterTime(std::move(clusterTime)), _level(std::move(level)) {}
 
 std::string ReadConcernArgs::toString() const {
     return toBSON().toString();
@@ -86,7 +87,7 @@ BSONObj ReadConcernArgs::toBSON() const {
 }
 
 bool ReadConcernArgs::isEmpty() const {
-    return !_clusterTime && !_opTime && !_level;
+    return !_afterClusterTime && !_opTime && !_level;
 }
 
 ReadConcernLevel ReadConcernArgs::getLevel() const {
@@ -101,15 +102,15 @@ boost::optional<OpTime> ReadConcernArgs::getArgsOpTime() const {
     return _opTime;
 }
 
-boost::optional<LogicalTime> ReadConcernArgs::getArgsClusterTime() const {
-    return _clusterTime;
+boost::optional<LogicalTime> ReadConcernArgs::getArgsAfterClusterTime() const {
+    return _afterClusterTime;
 }
 
-boost::optional<LogicalTime> ReadConcernArgs::getArgsPointInTime() const {
-    return _pointInTime;
+boost::optional<LogicalTime> ReadConcernArgs::getArgsAtClusterTime() const {
+    return _atClusterTime;
 }
 
-Status ReadConcernArgs::initialize(const BSONElement& readConcernElem, bool testMode) {
+Status ReadConcernArgs::initialize(const BSONElement& readConcernElem) {
     invariant(isEmpty());  // only legal to call on uninitialized object.
 
     if (readConcernElem.eoo()) {
@@ -136,21 +137,21 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem, bool test
             }
             _opTime = opTime;
         } else if (fieldName == kAfterClusterTimeFieldName) {
-            Timestamp clusterTime;
-            auto clusterTimeStatus =
-                bsonExtractTimestampField(readConcernObj, kAfterClusterTimeFieldName, &clusterTime);
-            if (!clusterTimeStatus.isOK()) {
-                return clusterTimeStatus;
+            Timestamp afterClusterTime;
+            auto afterClusterTimeStatus = bsonExtractTimestampField(
+                readConcernObj, kAfterClusterTimeFieldName, &afterClusterTime);
+            if (!afterClusterTimeStatus.isOK()) {
+                return afterClusterTimeStatus;
             }
-            _clusterTime = LogicalTime(clusterTime);
-        } else if (fieldName == kAtClusterTimeFieldName && testMode) {
-            Timestamp pointInTime;
-            auto pointInTimeStatus =
-                bsonExtractTimestampField(readConcernObj, kAtClusterTimeFieldName, &pointInTime);
-            if (!pointInTimeStatus.isOK()) {
-                return pointInTimeStatus;
+            _afterClusterTime = LogicalTime(afterClusterTime);
+        } else if (fieldName == kAtClusterTimeFieldName) {
+            Timestamp atClusterTime;
+            auto atClusterTimeStatus =
+                bsonExtractTimestampField(readConcernObj, kAtClusterTimeFieldName, &atClusterTime);
+            if (!atClusterTimeStatus.isOK()) {
+                return atClusterTimeStatus;
             }
-            _pointInTime = LogicalTime(pointInTime);
+            _atClusterTime = LogicalTime(atClusterTime);
         } else if (fieldName == kLevelFieldName) {
             std::string levelString;
             // TODO pass field in rather than scanning again.
@@ -169,14 +170,13 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem, bool test
                 _level = ReadConcernLevel::kLinearizableReadConcern;
             } else if (levelString == kAvailableReadConcernStr) {
                 _level = ReadConcernLevel::kAvailableReadConcern;
+            } else if (levelString == kSnapshotReadConcernStr) {
+                _level = ReadConcernLevel::kSnapshotReadConcern;
             } else {
-                return Status(
-                    ErrorCodes::FailedToParse,
-                    str::stream()
-                        << kReadConcernFieldName
-                        << '.'
-                        << kLevelFieldName
-                        << " must be either 'local', 'majority', 'linearizable', or 'available'");
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << kReadConcernFieldName << '.' << kLevelFieldName
+                                            << " must be either 'local', 'majority', "
+                                               "'linearizable', 'available', or 'snapshot'");
             }
         } else {
             return Status(ErrorCodes::InvalidOptions,
@@ -186,29 +186,61 @@ Status ReadConcernArgs::initialize(const BSONElement& readConcernElem, bool test
         }
     }
 
-    if (_clusterTime && _opTime) {
+    if (_afterClusterTime && _opTime) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << "Can not specify both " << kAfterClusterTimeFieldName
                                     << " and "
                                     << kAfterOpTimeFieldName);
     }
 
+    if (_afterClusterTime && _atClusterTime) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "Can not specify both " << kAfterClusterTimeFieldName
+                                    << " and "
+                                    << kAtClusterTimeFieldName);
+    }
+
     // Note: 'available' should not be used with after cluster time, as cluster time can wait for
-    // replication whereas the premise of 'available' is to avoid waiting.
-    if (_clusterTime && getLevel() != ReadConcernLevel::kMajorityReadConcern &&
-        getLevel() != ReadConcernLevel::kLocalReadConcern) {
+    // replication whereas the premise of 'available' is to avoid waiting. 'linearizable' should not
+    // be used with after cluster time, since linearizable reads are inherently causally consistent.
+    if (_afterClusterTime && getLevel() != ReadConcernLevel::kMajorityReadConcern &&
+        getLevel() != ReadConcernLevel::kLocalReadConcern &&
+        getLevel() != ReadConcernLevel::kSnapshotReadConcern) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << kAfterClusterTimeFieldName << " field can be set only if "
                                     << kLevelFieldName
                                     << " is equal to "
                                     << kMajorityReadConcernStr
-                                    << " or "
-                                    << kLocalReadConcernStr);
+                                    << ", "
+                                    << kLocalReadConcernStr
+                                    << ", or "
+                                    << kSnapshotReadConcernStr);
     }
 
-    if (_clusterTime && _clusterTime == LogicalTime::kUninitialized) {
+    if (_opTime && getLevel() == ReadConcernLevel::kSnapshotReadConcern) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << kAfterOpTimeFieldName << " field cannot be set if "
+                                    << kLevelFieldName
+                                    << " is equal to "
+                                    << kSnapshotReadConcernStr);
+    }
+
+    if (_atClusterTime && getLevel() != ReadConcernLevel::kSnapshotReadConcern) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << kAtClusterTimeFieldName << " field can be set only if "
+                                    << kLevelFieldName
+                                    << " is equal to "
+                                    << kSnapshotReadConcernStr);
+    }
+
+    if (_afterClusterTime && _afterClusterTime == LogicalTime::kUninitialized) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream() << kAfterClusterTimeFieldName << " cannot be a null timestamp");
+    }
+
+    if (_atClusterTime && _atClusterTime == LogicalTime::kUninitialized) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << kAtClusterTimeFieldName << " cannot be a null timestamp");
     }
 
     return Status::OK();
@@ -218,7 +250,7 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
     BSONObjBuilder rcBuilder(builder->subobjStart(kReadConcernFieldName));
 
     if (_level) {
-        string levelName;
+        StringData levelName;
         switch (_level.get()) {
             case ReadConcernLevel::kLocalReadConcern:
                 levelName = kLocalReadConcernStr;
@@ -236,8 +268,12 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
                 levelName = kAvailableReadConcernStr;
                 break;
 
+            case ReadConcernLevel::kSnapshotReadConcern:
+                levelName = kSnapshotReadConcernStr;
+                break;
+
             default:
-                fassert(28754, false);
+                MONGO_UNREACHABLE;
         }
 
         rcBuilder.append(kLevelFieldName, levelName);
@@ -247,8 +283,12 @@ void ReadConcernArgs::appendInfo(BSONObjBuilder* builder) const {
         _opTime->append(&rcBuilder, kAfterOpTimeFieldName);
     }
 
-    if (_clusterTime) {
-        rcBuilder.append(kAfterClusterTimeFieldName, _clusterTime->asTimestamp());
+    if (_afterClusterTime) {
+        rcBuilder.append(kAfterClusterTimeFieldName, _afterClusterTime->asTimestamp());
+    }
+
+    if (_atClusterTime) {
+        rcBuilder.append(kAtClusterTimeFieldName, _atClusterTime->asTimestamp());
     }
 
     rcBuilder.done();

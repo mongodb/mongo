@@ -93,6 +93,7 @@ public:
     virtual void notifyOplogMetadataWaiters(const OpTime& committedOpTime);
     virtual double getElectionTimeoutOffsetLimitFraction() const;
     virtual bool isReadCommittedSupportedByStorageEngine(OperationContext* opCtx) const;
+    virtual bool isReadConcernSnapshotSupportedByStorageEngine(OperationContext* opCtx) const;
     virtual StatusWith<OpTime> multiApply(OperationContext* opCtx,
                                           MultiApplier::Operations ops,
                                           MultiApplier::ApplyOperationFn applyOperation) override;

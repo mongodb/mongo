@@ -203,6 +203,19 @@ void execCommandClient(OperationContext* opCtx,
         return;
     }
 
+    repl::ReadConcernArgs readConcernArgs;
+    auto readConcernParseStatus = readConcernArgs.initialize(request.body);
+    if (!readConcernParseStatus.isOK()) {
+        CommandHelpers::appendCommandStatus(result, readConcernParseStatus);
+        return;
+    }
+    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+        CommandHelpers::appendCommandStatus(
+            result,
+            Status(ErrorCodes::InvalidOptions, "read concern snapshot is not supported on mongos"));
+        return;
+    }
+
     // attach tracking
     rpc::TrackingMetadata trackingMetadata;
     trackingMetadata.initWithOperName(c->getName());

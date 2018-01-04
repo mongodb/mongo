@@ -302,6 +302,13 @@ public:
     }
 
     /**
+     * Returns true if the storage engine supports the readConcern level "snapshot".
+     */
+    virtual bool supportsReadConcernSnapshot() const {
+        return false;
+    }
+
+    /**
      * Recovers the storage engine state to the last stable timestamp. "Stable" in this case
      * refers to a timestamp that is guaranteed to never be rolled back. The stable timestamp
      * used should be one provided by StorageEngine::setStableTimestamp().

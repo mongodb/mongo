@@ -269,6 +269,13 @@ public:
     }
 
     /**
+     * See `StorageEngine::supportsReadConcernSnapshot`
+     */
+    virtual bool supportsReadConcernSnapshot() const {
+        return false;
+    }
+
+    /**
      * See `StorageEngine::replicationBatchIsComplete()`
      */
     virtual void replicationBatchIsComplete() const {};

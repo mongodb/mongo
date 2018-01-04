@@ -864,6 +864,14 @@ bool ReplicationCoordinatorExternalStateImpl::isReadCommittedSupportedByStorageE
     return storageEngine->getSnapshotManager();
 }
 
+bool ReplicationCoordinatorExternalStateImpl::isReadConcernSnapshotSupportedByStorageEngine(
+    OperationContext* opCtx) const {
+    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    // This should never be called if the storage engine has not been initialized.
+    invariant(storageEngine);
+    return storageEngine->supportsReadConcernSnapshot();
+}
+
 StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
     OperationContext* opCtx,
     MultiApplier::Operations ops,

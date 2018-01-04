@@ -347,22 +347,21 @@ public:
     }
 
     /**
-     * Returns true if this Command supports the non-local readConcern:level field value. Takes the
-     * command object and the name of the database on which it was invoked as arguments, so that
-     * readConcern can be conditionally rejected based on the command's parameters and/or namespace.
+     * Returns true if this Command supports the given readConcern level. Takes the command object
+     * and the name of the database on which it was invoked as arguments, so that readConcern can be
+     * conditionally rejected based on the command's parameters and/or namespace.
      *
-     * If the readConcern non-local level argument is sent to a command that returns false the
-     * command processor will reject the command, returning an appropriate error message. For
-     * commands that support the argument, the command processor will instruct the RecoveryUnit to
-     * only return "committed" data, failing if this isn't supported by the storage engine.
+     * If a readConcern level argument is sent to a command that returns false the command processor
+     * will reject the command, returning an appropriate error message.
      *
      * Note that this is never called on mongos. Sharded commands are responsible for forwarding
      * the option to the shards as needed. We rely on the shards to fail the commands in the
      * cases where it isn't supported.
      */
-    virtual bool supportsNonLocalReadConcern(const std::string& dbName,
-                                             const BSONObj& cmdObj) const {
-        return false;
+    virtual bool supportsReadConcern(const std::string& dbName,
+                                     const BSONObj& cmdObj,
+                                     repl::ReadConcernLevel level) const {
+        return level == repl::ReadConcernLevel::kLocalReadConcern;
     }
 
     /**

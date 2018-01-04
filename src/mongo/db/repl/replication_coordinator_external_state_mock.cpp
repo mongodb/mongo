@@ -240,6 +240,11 @@ bool ReplicationCoordinatorExternalStateMock::isReadCommittedSupportedByStorageE
     return _isReadCommittedSupported;
 }
 
+bool ReplicationCoordinatorExternalStateMock::isReadConcernSnapshotSupportedByStorageEngine(
+    OperationContext* opCtx) const {
+    return true;
+}
+
 StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::multiApply(
     OperationContext*, MultiApplier::Operations, MultiApplier::ApplyOperationFn) {
     return {ErrorCodes::InternalError, "Method not implemented"};

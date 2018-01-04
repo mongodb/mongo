@@ -380,6 +380,10 @@ bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
     return _engine->supportsRecoverToStableTimestamp();
 }
 
+bool KVStorageEngine::supportsReadConcernSnapshot() const {
+    return _engine->supportsReadConcernSnapshot();
+}
+
 void KVStorageEngine::replicationBatchIsComplete() const {
     return _engine->replicationBatchIsComplete();
 }

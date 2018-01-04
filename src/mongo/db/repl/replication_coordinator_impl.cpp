@@ -1167,18 +1167,34 @@ Status ReplicationCoordinatorImpl::_validateReadConcern(OperationContext* opCtx,
                 "Waiting for replication not allowed while holding a lock"};
     }
 
-    if (readConcern.getArgsClusterTime() &&
+    if (readConcern.getArgsAfterClusterTime() &&
         readConcern.getLevel() != ReadConcernLevel::kMajorityReadConcern &&
-        readConcern.getLevel() != ReadConcernLevel::kLocalReadConcern) {
+        readConcern.getLevel() != ReadConcernLevel::kLocalReadConcern &&
+        readConcern.getLevel() != ReadConcernLevel::kSnapshotReadConcern) {
+        return {
+            ErrorCodes::BadValue,
+            "Only readConcern level 'majority', 'local', or 'snapshot' is allowed when specifying "
+            "afterClusterTime"};
+    }
+
+    if (readConcern.getArgsAtClusterTime() &&
+        readConcern.getLevel() != ReadConcernLevel::kSnapshotReadConcern) {
         return {ErrorCodes::BadValue,
-                "Only readConcern level 'majority' or 'local' is allowed when specifying "
-                "afterClusterTime"};
+                "readConcern level 'snapshot' is required when specifying atClusterTime"};
     }
 
     if (readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern &&
         !_externalState->isReadCommittedSupportedByStorageEngine(opCtx)) {
         return {ErrorCodes::ReadConcernMajorityNotEnabled,
-                "Majority read concern requested, but it is not supported by the storage engine."};
+                str::stream() << "Storage engine does not support read concern: "
+                              << readConcern.toString()};
+    }
+
+    if (readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern &&
+        !_externalState->isReadConcernSnapshotSupportedByStorageEngine(opCtx)) {
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << "Storage engine does not support read concern: "
+                              << readConcern.toString()};
     }
 
     return Status::OK();
@@ -1192,7 +1208,7 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* opCt
     }
 
     // nothing to wait for
-    if (!readConcern.getArgsClusterTime() && !readConcern.getArgsOpTime()) {
+    if (!readConcern.getArgsAfterClusterTime() && !readConcern.getArgsOpTime()) {
         return Status::OK();
     }
 
@@ -1210,7 +1226,7 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForReadUntil(OperationContext*
                 "node needs to be a replica set member to use read concern"};
     }
 
-    if (readConcern.getArgsClusterTime()) {
+    if (readConcern.getArgsAfterClusterTime()) {
         return _waitUntilClusterTimeForRead(opCtx, readConcern, deadline);
     } else {
         return _waitUntilOpTimeForReadDeprecated(opCtx, readConcern);
@@ -1296,7 +1312,7 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
 Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext* opCtx,
                                                                 const ReadConcernArgs& readConcern,
                                                                 boost::optional<Date_t> deadline) {
-    auto clusterTime = *readConcern.getArgsClusterTime();
+    auto clusterTime = *readConcern.getArgsAfterClusterTime();
     invariant(clusterTime != LogicalTime::kUninitialized);
 
     // convert clusterTime to opTime so it can be used by the _opTimeWaiterList for wait on
