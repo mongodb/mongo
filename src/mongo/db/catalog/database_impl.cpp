@@ -600,10 +600,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
 
     // Register this drop-pending namespace with DropPendingCollectionReaper to remove when the
     // committed optime reaches the drop optime.
-    auto &&pReaper = repl::DropPendingCollectionReaper::get(opCtx);
-    if (pReaper != nullptr) {
-        pReaper->addDropPendingNamespace(dropOpTime, dpns);
-    }
+    repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(dropOpTime, dpns);
     return Status::OK();
 }
 

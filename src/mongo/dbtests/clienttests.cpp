@@ -28,6 +28,8 @@
  *    then also delete it in the license file.
  */
 
+#include <mongo/db/repl/drop_pending_collection_reaper.h>
+#include <mongo/db/repl/storage_interface_mock.h>
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclientcursor.h"
@@ -51,7 +53,11 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
-
+        auto storagePtr = std::make_unique<repl::StorageInterfaceMock>();
+        repl::DropPendingCollectionReaper::set(
+                opCtxPtr.get()->getServiceContext(),
+                std::make_unique<repl::DropPendingCollectionReaper>(storagePtr.get())
+        );
         db.dropDatabase("test");
     }
 
