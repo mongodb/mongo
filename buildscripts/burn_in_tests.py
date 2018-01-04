@@ -381,7 +381,8 @@ def main():
         # If there are no changed tests, exit cleanly.
         if not changed_tests:
             print "No new or modified tests found."
-            _write_report_file({}, values.test_list_outfile)
+            if values.test_list_outfile is not None:
+                _write_report_file({}, values.test_list_outfile)
             sys.exit(0)
         suites = resmokelib.parser.get_suites(values, changed_tests)
         tests_by_executor = create_executor_list(suites, exclude_suites)
