@@ -45,6 +45,8 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include <mongo/db/repl/drop_pending_collection_reaper.h>
+#include <mongo/db/repl/storage_interface_mock.h>
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d.h"
 #include "mongo/db/wire_version.h"
@@ -155,6 +157,11 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     repl::getGlobalReplicationCoordinator()
         ->setFollowerMode(repl::MemberState::RS_PRIMARY)
         .ignore();
+
+    repl::DropPendingCollectionReaper::set(
+                service,
+                std::make_unique<repl::DropPendingCollectionReaper>(new repl::StorageInterfaceMock())
+    );
 
     getGlobalAuthorizationManager()->setAuthEnabled(false);
     ScriptEngine::setup();
