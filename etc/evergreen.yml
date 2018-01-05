@@ -1455,6 +1455,7 @@ functions:
             --sshConnectionOptions "$ssh_connection_options" \
             --retries ${ssh_retries|0}                       \
             --commands "$cmds"
+
     - *copy_ec2_monitor_files
 
 
@@ -1600,6 +1601,52 @@ post:
 
   - func: "set EC2 address"
   - func: "copy EC2 artifacts"
+  # Gather remote mongo coredumps.
+  - command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        if [ ! -f ${aws_ec2_yml|""} ]; then
+          exit 0
+        fi
+        ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+        remote_dir=${remote_dir|.}
+        # Find all core files and move to $remote_dir
+        cmds="core_files=\$(/usr/bin/find -H . \( -name '*.core' -o -name '*.mdmp' \) 2> /dev/null)"
+        cmds="$cmds; if [ -z \"\$core_files\" ]; then exit 0; fi"
+        cmds="$cmds; echo Found remote core files \$core_files, moving to \$(pwd)"
+        cmds="$cmds; for core_file in \$core_files"
+        cmds="$cmds; do base_name=\$(echo \$core_file | sed 's/.*\///')"
+        cmds="$cmds;   if [ ! -f \$base_name ]; then mv \$core_file .; fi"
+        cmds="$cmds; done"
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          --verbose                                        \
+          --userHost $USER@${ip_address}                   \
+          --sshConnectionOptions "$ssh_connection_options" \
+          --retries ${ssh_retries}                         \
+          --commands "$cmds"                               \
+          --commandDir $remote_dir
+  - command: shell.exec
+    params:
+      working_dir: "src"
+      script: |
+        if [ ! -f ${aws_ec2_yml|""} ]; then
+          exit 0
+        fi
+        ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
+        remote_dir=${remote_dir|.}
+        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
+          --verbose                                        \
+          --userHost $USER@${ip_address}                   \
+          --operation "copy_from"                          \
+          --sshConnectionOptions "$ssh_connection_options" \
+          --retries ${ssh_retries}                         \
+          --file "$remote_dir/*.core"                      \
+          --file "$remote_dir/*.mdmp"
+        # Since both type of core files do not exist on the same host, this command
+        # will always return non-zero. As the core file retrieval is optional, we
+        # always exit successfully.
+        exit 0
   - func: "cleanup EC2 instance"
 
   - func: "kill processes"
