@@ -327,7 +327,7 @@ void ServiceExecutorAdaptive::_controllerThreadRoutine() {
 
     // Get the initial values for our utilization percentage calculations
     auto getTimerTotals = [this]() {
-        std::unique_lock<stdx::mutex> lk(_threadsMutex);
+        stdx::unique_lock<stdx::mutex> lk(_threadsMutex);
         auto first = _getThreadTimerTotal(ThreadTimer::kExecuting, lk);
         auto second = _getThreadTimerTotal(ThreadTimer::kRunning, lk);
         return std::make_pair(first, second);
