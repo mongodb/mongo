@@ -157,7 +157,6 @@ void CountScan::doRestoreState() {
         _cursor->restore();
 
     // This can change during yielding.
-    // TODO this isn't sufficient. See SERVER-17678.
     _shouldDedup = _descriptor->isMultikey(getOpCtx());
 }
 

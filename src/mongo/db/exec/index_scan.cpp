@@ -94,7 +94,6 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
     if (_params.doNotDedup) {
         _shouldDedup = false;
     } else {
-        // TODO it is incorrect to rely on this not changing. SERVER-17678
         _shouldDedup = _params.descriptor->isMultikey(getOpCtx());
     }
 

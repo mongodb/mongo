@@ -93,8 +93,6 @@ public:
 
     /**
      * Returns true if the pipeline has a $changeStream stage.
-     *
-     * TODO SERVER-29506 Require $changeStream to be the first stage.
      */
     bool hasChangeStream() const {
         return std::any_of(_stageSpecs.begin(), _stageSpecs.end(), [](auto&& spec) {

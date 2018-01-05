@@ -333,9 +333,6 @@ private:
     //     CursorManager, at which point it has sole ownership of the ClientCursor.
     //
 
-    // TODO SERVER-28309 Remove this field and instead use _exec->markedAsKilled().
-    bool _killed = false;
-
     // While a cursor is being used by a client, it is marked as "pinned". See ClientCursorPin
     // below.
     //
