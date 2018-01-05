@@ -42,7 +42,8 @@
     // Ensure that we've hit the failpoint before moving on.
     checkLog.contains(rollbackNode,
                       "dropDatabase - fail point dropDatabaseHangAfterLastCollectionDrop enabled");
-    assert.eq(0, syncSourceNode.getDB(oldDbName).getCollectionNames().length);
+    assert.eq(false,
+              syncSourceNode.getDB(oldDbName).getCollectionNames().includes("beforeRollback"));
 
     rollbackTest.transitionToRollbackOperations();
 
@@ -51,7 +52,7 @@
     assert.commandWorked(rollbackNode.adminCommand(
         {configureFailPoint: "dropDatabaseHangAfterLastCollectionDrop", mode: "off"}));
     waitForDropDatabaseToFinish();
-    assert.eq(0, rollbackNode.getDB(oldDbName).getCollectionNames().length);
+    assert.eq(false, rollbackNode.getDB(oldDbName).getCollectionNames().includes("beforeRollback"));
     jsTestLog("Database " + oldDbName + " successfully dropped on primary node " +
               rollbackNode.host);
 
