@@ -28,7 +28,7 @@
     assert.eq(t.count({x: 1}), 1);
 
     // Operations on non-existent databases cannot be atomic.
-    var newDBName = "apply_ops_atomicity";
+    var newDBName = "do_txn_atomicity";
     var newDB = db.getSiblingDB(newDBName);
     assert.commandWorked(newDB.dropDatabase());
     // Updates on a non-existent database no longer implicitly create collections and will fail with
