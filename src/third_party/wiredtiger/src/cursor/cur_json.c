@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -204,14 +204,13 @@ __json_struct_size(WT_SESSION_IMPL *session, const void *buffer,
 		WT_RET(
 		    __json_unpack_put(session, &pv, NULL, 0, &name, &result));
 	}
-	if (ret == WT_NOTFOUND)
-		ret = 0;
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Be paranoid - __pack_write should never overflow. */
 	WT_ASSERT(session, p <= end);
 
 	*presult = result;
-	return (ret);
+	return (0);
 }
 
 /*
@@ -258,15 +257,14 @@ __json_struct_unpackv(WT_SESSION_IMPL *session,
 		jbuf += jsize;
 		jbufsize -= jsize;
 	}
-	if (ret == WT_NOTFOUND)
-		ret = 0;
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Be paranoid - __unpack_read should never overflow. */
 	WT_ASSERT(session, p <= end);
 
 	WT_ASSERT(session, jbufsize == 1);
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -754,12 +752,10 @@ __json_pack_struct(WT_SESSION_IMPL *session, void *buffer, size_t size,
 		WT_RET(__pack_write(session, &pv, &p, (size_t)(end - p)));
 		multi = true;
 	}
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Be paranoid - __pack_write should never overflow. */
 	WT_ASSERT(session, p <= end);
-
-	if (ret != WT_NOTFOUND)
-		return (ret);
 
 	return (0);
 }
@@ -778,16 +774,17 @@ __json_pack_size(
 {
 	WT_CONFIG_ITEM name;
 	WT_DECL_PACK_VALUE(pv);
+	WT_DECL_RET;
 	WT_PACK pack;
 	WT_PACK_NAME packname;
-	size_t toksize, total;
+	size_t toksize, v;
 	const char *tokstart;
 	bool multi;
 
 	__pack_name_init(session, names, iskey, &packname);
 	multi = false;
 	WT_RET(__pack_init(session, &pack, fmt));
-	for (total = 0; __pack_next(&pack, &pv) == 0;) {
+	for (*sizep = 0; (ret = __pack_next(&pack, &pv)) == 0;) {
 		if (multi)
 			JSON_EXPECT_TOKEN(session, jstr, ',');
 		JSON_EXPECT_TOKEN_GET(session, jstr, 's', tokstart, toksize);
@@ -799,13 +796,15 @@ __json_pack_size(
 			    iskey ? "key" : "value", (int)name.len, name.str);
 		JSON_EXPECT_TOKEN(session, jstr, ':');
 		WT_PACK_JSON_GET(session, pv, jstr);
-		total += __pack_size(session, &pv);
+		WT_RET(__pack_size(session, &pv, &v));
+		*sizep += v;
 		multi = true;
 	}
+	WT_RET_NOTFOUND_OK(ret);
+
 	/* check end of string */
 	JSON_EXPECT_TOKEN(session, jstr, 0);
 
-	*sizep = total;
 	return (0);
 }
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -28,7 +28,6 @@ util_downgrade(WT_SESSION *session, WT_CONNECTION *conn, int argc, char *argv[])
 			return (usage());
 		}
 	argc -= __wt_optind;
-	argv += __wt_optind;
 
 	/*
 	 * The release argument is required.

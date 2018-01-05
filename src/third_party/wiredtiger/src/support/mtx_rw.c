@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -255,12 +255,10 @@ stall:			__wt_cond_wait(session,
 		time_stop = __wt_rdtsc(session);
 		if (F_ISSET(session, WT_SESSION_INTERNAL))
 			stats[session->stat_bucket][l->stat_int_usecs_off] +=
-			    (int64_t)WT_TSCDIFF_US(
-			    session, time_stop, time_start);
+			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
 		else
 			stats[session->stat_bucket][l->stat_app_usecs_off] +=
-			    (int64_t)WT_TSCDIFF_US(
-			    session, time_stop, time_start);
+			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
 	}
 
 	/*
@@ -428,12 +426,10 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 		time_stop = __wt_rdtsc(session);
 		if (F_ISSET(session, WT_SESSION_INTERNAL))
 			stats[session->stat_bucket][l->stat_int_usecs_off] +=
-			    (int64_t)WT_TSCDIFF_US(
-			    session, time_stop, time_start);
+			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
 		else
 			stats[session->stat_bucket][l->stat_app_usecs_off] +=
-			    (int64_t)WT_TSCDIFF_US(
-			    session, time_stop, time_start);
+			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
 	}
 
 	/*

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -516,6 +516,7 @@ restart:	/*
 			 */
 			if (ret == WT_NOTFOUND) {
 				ret = 0;
+				WT_NOT_READ(ret);
 				break;
 			}
 

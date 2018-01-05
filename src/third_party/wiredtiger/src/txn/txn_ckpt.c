@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -380,15 +380,13 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	cache = conn->cache;
-	time_last = time_start = time_stop = 0;
 
 	/* Give up if scrubbing is disabled. */
 	if (cache->eviction_checkpoint_target == 0 ||
 	    cache->eviction_checkpoint_target >= cache->eviction_dirty_trigger)
 		return;
 
-	time_start = __wt_rdtsc(session);
-	time_last = time_start;
+	time_last = time_start = __wt_rdtsc(session);
 	bytes_written_last = 0;
 	bytes_written_start = cache->bytes_written;
 	cache_size = conn->cache_size;
@@ -450,7 +448,7 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 
 		__wt_sleep(0, stepdown_us / 10);
 		time_stop = __wt_rdtsc(session);
-		current_us = WT_TSCDIFF_US(session, time_stop, time_last);
+		current_us = WT_TSCDIFF_US(time_stop, time_last);
 		bytes_written_total =
 		    cache->bytes_written - bytes_written_start;
 
@@ -508,7 +506,7 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	}
 
 	time_stop = __wt_rdtsc(session);
-	total_ms = WT_TSCDIFF_MS(session, time_stop, time_start);
+	total_ms = WT_TSCDIFF_MS(time_stop, time_start);
 	WT_STAT_CONN_SET(session, txn_checkpoint_scrub_time, total_ms);
 }
 
@@ -758,7 +756,6 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn_global = &conn->txn_global;
 	saved_isolation = session->isolation;
 	full = idle = logging = tracking = false;
-	time_start = time_stop = 0;
 
 	/*
 	 * Do a pass over the configuration arguments and figure out what kind
@@ -886,7 +883,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	time_start = __wt_rdtsc(session);
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 	time_stop = __wt_rdtsc(session);
-	fsync_duration_usecs = WT_TSCDIFF_US(session, time_stop, time_start);
+	fsync_duration_usecs = WT_TSCDIFF_US(time_stop, time_start);
 	WT_STAT_CONN_INCR(session, txn_checkpoint_fsync_post);
 	WT_STAT_CONN_SET(session,
 	    txn_checkpoint_fsync_post_duration, fsync_duration_usecs);

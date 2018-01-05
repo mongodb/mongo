@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -77,7 +77,31 @@ __wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
  *	Convert from rdtsc ticks to nanoseconds.
  */
 uint64_t
-__wt_tsc_to_nsec(WT_SESSION_IMPL *session, uint64_t tsc_diff)
+__wt_tsc_to_nsec(uint64_t end, uint64_t begin)
 {
-	return ((uint64_t)((double)tsc_diff / S2C(session)->tsc_nsec_ratio));
+	double tsc_diff;
+
+	/*
+	 * If the ticks were reset, consider it an invalid check and just
+	 * return zero as the time difference because we cannot compute
+	 * anything meaningful.
+	 */
+	if (end < begin)
+		return (0);
+	tsc_diff = (double)(end - begin);
+	return ((uint64_t)(tsc_diff / __wt_process.tsc_nsec_ratio));
+}
+
+/*
+ * __wt_tsc_get_expensive_timestamp --
+ *       Obtain a timestamp via a system call on platforms where obtaining it
+ *       directly from the hardware register is not supported.
+ */
+uint64_t
+__wt_tsc_get_expensive_timestamp(WT_SESSION_IMPL *session)
+{
+	struct timespec tsp;
+
+	__wt_epoch(session, &tsp);
+	return ((uint64_t)(tsp.tv_sec * WT_BILLION + tsp.tv_nsec));
 }

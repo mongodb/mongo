@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -490,18 +490,16 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 				continue;
 
 			switch (upd->type) {
-			case WT_UPDATE_DELETED:
-				las_value.size = 0;
-				break;
-			case WT_UPDATE_MODIFIED:
+			case WT_UPDATE_MODIFY:
 			case WT_UPDATE_STANDARD:
 				las_value.data = upd->data;
 				las_value.size = upd->size;
 				break;
-			case WT_UPDATE_RESERVED:
-				WT_ASSERT(session,
-				    upd->type != WT_UPDATE_RESERVED);
-				continue;
+			case WT_UPDATE_BIRTHMARK:
+			case WT_UPDATE_TOMBSTONE:
+				las_value.size = 0;
+				break;
+			WT_ILLEGAL_VALUE_ERR(session);
 			}
 
 			cursor->set_key(cursor,
@@ -511,8 +509,25 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 			las_timestamp.data = &upd->timestamp;
 			las_timestamp.size = WT_TIMESTAMP_SIZE;
 #endif
-			cursor->set_value(cursor,
-			    upd->txnid, &las_timestamp, upd->type, &las_value);
+			/*
+			 * If saving a non-zero length value on the page, save a
+			 * birthmark instead of duplicating it in the lookaside
+			 * table. (We check the length because row-store doesn't
+			 * write zero-length data items.)
+			 */
+			if (multi->page_las.las_skew_newest &&
+			    upd == list->onpage_upd &&
+			    upd->size > 0 &&
+			    (upd->type == WT_UPDATE_STANDARD ||
+			    upd->type == WT_UPDATE_MODIFY)) {
+				las_value.size = 0;
+				cursor->set_value(cursor,
+				    upd->txnid, &las_timestamp,
+				    WT_UPDATE_BIRTHMARK, &las_value);
+			} else
+				cursor->set_value(cursor,
+				    upd->txnid, &las_timestamp,
+				    upd->type, &las_value);
 
 			/*
 			 * Using update looks a little strange because the keys

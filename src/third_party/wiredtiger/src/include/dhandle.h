@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -48,11 +48,11 @@
 	if ((dhandle) == NULL)						\
 		(dhandle) = TAILQ_FIRST(head);				\
 	else {								\
-		    WT_DHANDLE_RELEASE(dhandle);			\
-		    (dhandle) = TAILQ_NEXT(dhandle, field);		\
+		WT_DHANDLE_RELEASE(dhandle);				\
+		(dhandle) = TAILQ_NEXT(dhandle, field);			\
 	}								\
 	if ((dhandle) != NULL)						\
-		    WT_DHANDLE_ACQUIRE(dhandle);			\
+		WT_DHANDLE_ACQUIRE(dhandle);				\
 } while (0)
 
 /*

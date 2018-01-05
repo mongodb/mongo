@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -118,6 +118,14 @@ testutil_parse_opts(int argc, char * const *argv, TEST_OPTS *opts)
 		testutil_check(__wt_snprintf(
 		    opts->home, len, "WT_TEST.%s", opts->progname));
 	}
+
+	/*
+	 * Setup the progress file name.
+	 */
+	len = strlen(opts->home) + 20;
+	opts->progress_file_name = dmalloc(len);
+	testutil_check(__wt_snprintf(opts->progress_file_name, len,
+	    "%s/progress.txt", opts->home));
 
 	/* Setup the default URI string */
 	len = strlen("table:") + strlen(opts->progname) + 10;

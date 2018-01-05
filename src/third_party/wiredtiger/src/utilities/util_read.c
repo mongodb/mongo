@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -74,7 +74,7 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 	 */
 	for (rval = false; *++argv != NULL;) {
 		if (rkey) {
-			if (util_str2recno(session, *argv, &recno))
+			if (util_str2num(session, *argv, true, &recno))
 				return (1);
 			cursor->set_key(cursor, recno);
 		} else

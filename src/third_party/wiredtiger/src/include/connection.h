@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -25,6 +25,9 @@ struct __wt_process {
 					/* Locked: connection queue */
 	TAILQ_HEAD(__wt_connection_impl_qh, __wt_connection_impl) connqh;
 	WT_CACHE_POOL *cache_pool;
+#define	WT_TSC_DEFAULT_RATIO	1.0
+	double	 tsc_nsec_ratio;	/* rdtsc ticks to nanoseconds */
+	bool use_epochtime;		/* use expensive time */
 
 					/* Checksum function */
 #define	__wt_checksum(chunk, len)	__wt_process.checksum(chunk, len)
@@ -403,7 +406,6 @@ struct __wt_connection_impl {
 
 	bool	 mmap;			/* mmap configuration */
 	int page_size;			/* OS page size for mmap alignment */
-	double	 tsc_nsec_ratio;	/* rdtsc ticks to nanoseconds */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define	WT_VERB_API			0x000000001u

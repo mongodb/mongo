@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -35,22 +35,24 @@ __wt_hex(int c)
  */
 static inline uint64_t
 __wt_rdtsc(WT_SESSION_IMPL *session) {
-#if (defined __i386)
+	if (__wt_process.use_epochtime)
+		return (__wt_tsc_get_expensive_timestamp(session));
+#if defined (__i386)
+	{
 	uint64_t x;
-
-	WT_UNUSED(session);
 
 	__asm__ volatile ("rdtsc" : "=A" (x));
 	return (x);
-#elif (defined __amd64)
+	}
+#elif defined (__amd64)
+	{
 	uint64_t a, d;
-
-	WT_UNUSED(session);
 
 	__asm__ volatile ("rdtsc" : "=a" (a), "=d" (d));
 	return ((d << 32) | a);
+	}
 #else
-	return (__wt_optrack_get_expensive_timestamp(session));
+	return (__wt_tsc_get_expensive_timestamp(session));
 #endif
 }
 

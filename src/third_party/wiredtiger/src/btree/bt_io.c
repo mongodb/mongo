@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -354,6 +354,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	 * configured.
 	 */
 	data_checksum = true;		/* -Werror=maybe-uninitialized */
+	WT_NOT_READ(data_checksum);
 	switch (btree->checksum) {
 	case CKSUM_ON:
 		data_checksum = true;
@@ -380,7 +381,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		time_stop = __wt_rdtsc(session);
 		WT_STAT_CONN_INCR(session, cache_write_app_count);
 		WT_STAT_CONN_INCRV(session, cache_write_app_time,
-		    WT_TSCDIFF_US(session, time_stop, time_start));
+		    WT_TSCDIFF_US(time_stop, time_start));
 	}
 
 	WT_STAT_CONN_INCR(session, cache_write);

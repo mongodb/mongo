@@ -550,7 +550,7 @@ connection_runtime_config = [
         Maintain database statistics, which may impact performance.
         Choosing "all" maintains all statistics regardless of cost,
         "fast" maintains a subset of statistics that are relatively
-        inexpensive, "none" turns off all statistics.  The "clear"
+        inexpensive, "none" turns off all statistics. The "clear"
         configuration resets statistics after they are gathered,
         where appropriate (for example, a cache size statistic is
         not cleared, while the count of cursor insert operations will

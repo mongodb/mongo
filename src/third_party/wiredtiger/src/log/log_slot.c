@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -172,7 +172,7 @@ retry:
 			if (count > WT_MILLION) {
 				time_stop = __wt_rdtsc(session);
 				if (WT_TSCDIFF_SEC(
-				    session, time_stop, time_start) > 10) {
+				    time_stop, time_start) > 10) {
 					__wt_errx(session, "SLOT_CLOSE: Slot %"
 					PRIu32 " Timeout unbuffered, state 0x%"
 					PRIx64 " unbuffered %" PRId64,
@@ -272,8 +272,7 @@ __log_slot_new(WT_SESSION_IMPL *session)
 		++count;
 		if (count > WT_MILLION) {
 			time_stop = __wt_rdtsc(session);
-			if (WT_TSCDIFF_SEC(
-			    session, time_stop, time_start) > 10) {
+			if (WT_TSCDIFF_SEC(time_stop, time_start) > 10) {
 				__wt_errx(session,
 				    "SLOT_NEW: Timeout free slot");
 				__log_slot_dump(session);
@@ -600,7 +599,7 @@ __wt_log_slot_join(WT_SESSION_IMPL *session, uint64_t mysize,
 	else {
 		WT_STAT_CONN_INCR(session, log_slot_yield);
 		time_stop = __wt_rdtsc(session);
-		usecs = WT_TSCDIFF_US(session, time_stop, time_start);
+		usecs = WT_TSCDIFF_US(time_stop, time_start);
 		WT_STAT_CONN_INCRV(session, log_slot_yield_duration, usecs);
 		if (closed)
 			WT_STAT_CONN_INCR(session, log_slot_yield_close);

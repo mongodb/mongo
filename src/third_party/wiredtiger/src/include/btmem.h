@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -224,7 +224,8 @@ struct __wt_ovfl_reuse {
     "key_format=" WT_UNCHECKED_STRING(QIQu)				\
     ",value_format=" WT_UNCHECKED_STRING(QuBu)				\
     ",block_compressor=" WT_LOOKASIDE_COMPRESSOR			\
-    ",leaf_value_max=64MB"
+    ",leaf_value_max=64MB"						\
+    ",prefix_compression=true"
 
 /*
  * WT_PAGE_LOOKASIDE --
@@ -974,15 +975,17 @@ struct __wt_update {
 	uint32_t size;			/* data length */
 
 #define	WT_UPDATE_INVALID	0	/* diagnostic check */
-#define	WT_UPDATE_DELETED	1	/* deleted */
-#define	WT_UPDATE_MODIFIED	2	/* partial-update modify value */
-#define	WT_UPDATE_RESERVED	3	/* reserved */
+#define	WT_UPDATE_BIRTHMARK	1	/* transaction for on-page value */
+#define	WT_UPDATE_MODIFY	2	/* partial-update modify value */
+#define	WT_UPDATE_RESERVE	3	/* reserved */
 #define	WT_UPDATE_STANDARD	4	/* complete value */
+#define	WT_UPDATE_TOMBSTONE	5	/* deleted */
 	uint8_t type;			/* type (one byte to conserve memory) */
 
 	/* If the update includes a complete value. */
 #define	WT_UPDATE_DATA_VALUE(upd)					\
-	((upd)->type == WT_UPDATE_STANDARD || (upd)->type == WT_UPDATE_DELETED)
+	((upd)->type == WT_UPDATE_STANDARD ||				\
+	(upd)->type == WT_UPDATE_TOMBSTONE)
 
 #if WT_TIMESTAMP_SIZE != 8
 	WT_DECL_TIMESTAMP(timestamp)	/* unaligned uint8_t array timestamp */

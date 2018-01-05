@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -547,7 +547,7 @@ __curtable_insert(WT_CURSOR *cursor)
 	 */
 	F_CLR(primary, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	if (F_ISSET(primary, WT_CURSTD_APPEND))
-		F_SET(primary, WT_CURSTD_KEY_INT);
+		F_SET(primary, WT_CURSTD_KEY_EXT);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);

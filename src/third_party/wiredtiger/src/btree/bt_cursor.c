@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -55,15 +55,38 @@ __cursor_state_restore(WT_CURSOR *cursor, WT_CURFILE_STATE *state)
  *	Return if we have a page pinned.
  */
 static inline bool
-__cursor_page_pinned(WT_CURSOR_BTREE *cbt, bool eviction_ok)
+__cursor_page_pinned(WT_CURSOR_BTREE *cbt)
 {
+	WT_CURSOR *cursor;
+
+	cursor = &cbt->iface;
+
 	/*
-	 * Optionally fail the page-pinned test when the page is flagged for
-	 * forced eviction (so we periodically release pages grown too large).
-	 * The test is optional as not all callers can release pinned pages.
+	 * Check the page active flag, asserting the page reference with any
+	 * external key.
 	 */
-	return (F_ISSET(cbt, WT_CBT_ACTIVE) &&
-	    (!eviction_ok || cbt->ref->page->read_gen != WT_READGEN_OLDEST));
+	if (!F_ISSET(cbt, WT_CBT_ACTIVE)) {
+		WT_ASSERT((WT_SESSION_IMPL *)cursor->session,
+		    cbt->ref == NULL && !F_ISSET(cursor, WT_CURSTD_KEY_INT));
+		return (false);
+	}
+
+	/*
+	 * Check if the key references the page. When returning from search,
+	 * the page is active and the key is internal. After the application
+	 * sets a key, the key is external, and the page is useless.
+	 */
+	if (!F_ISSET(cursor, WT_CURSTD_KEY_INT))
+		return (false);
+
+	/*
+	 * Fail if the page is flagged for forced eviction (so we periodically
+	 * release pages grown too large).
+	 */
+	if (cbt->ref->page->read_gen == WT_READGEN_OLDEST)
+		return (false);
+
+	return (true);
 }
 
 /*
@@ -146,7 +169,7 @@ __cursor_disable_bulk(WT_SESSION_IMPL *session, WT_BTREE *btree)
  * __cursor_fix_implicit --
  *	Return if search went past the end of the tree.
  */
-static inline int
+static inline bool
 __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 {
 	/*
@@ -229,7 +252,7 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 	 */
 	if (cbt->ins != NULL &&
 	    (upd = __wt_txn_read(session, cbt->ins->upd)) != NULL) {
-		if (upd->type == WT_UPDATE_DELETED)
+		if (upd->type == WT_UPDATE_TOMBSTONE)
 			return (false);
 		if (updp != NULL)
 			*updp = upd;
@@ -302,7 +325,7 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_UPDATE **updp)
 		    page->modify->mod_row_update != NULL &&
 		    (upd = __wt_txn_read(session,
 		    page->modify->mod_row_update[cbt->slot])) != NULL) {
-			if (upd->type == WT_UPDATE_DELETED)
+			if (upd->type == WT_UPDATE_TOMBSTONE)
 				return (false);
 			if (updp != NULL)
 				*updp = upd;
@@ -468,7 +491,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	 * from the root.
 	 */
 	valid = false;
-	if (__cursor_page_pinned(cbt, true)) {
+	if (__cursor_page_pinned(cbt)) {
 		__wt_txn_cursor_op(session);
 
 		WT_ERR(btree->type == BTREE_ROW ?
@@ -565,7 +588,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	 * existing record.
 	 */
 	valid = false;
-	if (btree->type == BTREE_ROW && __cursor_page_pinned(cbt, true)) {
+	if (btree->type == BTREE_ROW && __cursor_page_pinned(cbt)) {
 		__wt_txn_cursor_op(session);
 
 		WT_ERR(__cursor_row_search(session, cbt, cbt->ref, true));
@@ -691,14 +714,12 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 
 	/*
 	 * If inserting with overwrite configured, and positioned to an on-page
-	 * key, the update doesn't require another search. The cursor won't be
-	 * positioned on a page with an external key set, but be sure. Cursors
-	 * configured for append aren't included, regardless of whether or not
-	 * they meet all other criteria.
+	 * key, the update doesn't require another search. Cursors configured
+	 * for append aren't included, regardless of whether or not they meet
+	 * all other criteria.
 	 */
-	if (__cursor_page_pinned(cbt, true) &&
-	    F_ISSET_ALL(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_OVERWRITE) &&
-	    !append_key) {
+	if (__cursor_page_pinned(cbt) &&
+	    F_ISSET(cursor, WT_CURSTD_OVERWRITE) && !append_key) {
 		WT_ERR(__wt_txn_autocommit_check(session));
 		/*
 		 * The cursor position may not be exact (the cursor's comparison
@@ -771,7 +792,7 @@ retry:	WT_ERR(__cursor_func_init(cbt, true));
 		WT_ERR(__cursor_col_modify(session, cbt, WT_UPDATE_STANDARD));
 
 		if (append_key)
-			cbt->iface.recno = cbt->recno;
+			cursor->recno = cbt->recno;
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -784,7 +805,7 @@ done:	/* Insert doesn't maintain a position across calls, clear resources. */
 	if (ret == 0) {
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		if (append_key)
-			F_SET(cursor, WT_CURSTD_KEY_INT);
+			F_SET(cursor, WT_CURSTD_KEY_EXT);
 	}
 	WT_TRET(__cursor_reset(cbt));
 	if (ret != 0)
@@ -884,12 +905,12 @@ err:	if (ret == WT_RESTART) {
 int
 __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 {
+	enum { NO_POSITION, POSITIONED, SEARCH_POSITION } positioned;
 	WT_BTREE *btree;
 	WT_CURFILE_STATE state;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	bool positioned;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
@@ -902,8 +923,27 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	/*
 	 * WT_CURSOR.remove has a unique semantic, the cursor stays positioned
 	 * if it starts positioned, otherwise clear the cursor on completion.
+	 *
+	 * However, if we unpin the page (because the page is in WT_REF_LIMBO or
+	 * it was selected for forcible eviction), and every item on the page is
+	 * deleted, eviction can delete the page and our subsequent search will
+	 * re-instantiate an empty page for us, with no key/value pairs. Cursor
+	 * remove will search that page and return not-found, which is OK unless
+	 * cursor-overwrite is configured (which causes cursor remove to return
+	 * success even if there's no item to delete). In that case, we're
+	 * supposed to return a positioned cursor, but there's nothing to which
+	 * we can position, and we'll fail attempting to point the cursor at the
+	 * key on the page to satisfy the positioned requirement.
+	 *
+	 * Do the best we can: If we start with a positioned cursor, and we let
+	 * go of our pinned page, reset our state to use the search position,
+	 * that is, use a successful search to return to a "positioned" state.
+	 * If we start with a positioned cursor, let go of our pinned page, and
+	 * the search fails, leave the cursor's key set so the cursor appears
+	 * positioned to the application.
 	 */
-	positioned = F_ISSET(cursor, WT_CURSTD_KEY_INT);
+	positioned =
+	    F_ISSET(cursor, WT_CURSTD_KEY_INT) ? POSITIONED : NO_POSITION;
 
 	/* Save the cursor state. */
 	__cursor_state_save(cursor, &state);
@@ -912,9 +952,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	 * If remove positioned to an on-page key, the remove doesn't require
 	 * another search. We don't care about the "overwrite" configuration
 	 * because regardless of the overwrite setting, any existing record is
-	 * removed, and the record must exist with a positioned cursor. The
-	 * cursor won't be positioned on a page with an external key set, but
-	 * be sure.
+	 * removed, and the record must exist with a positioned cursor.
 	 *
 	 * There's trickiness in the page-pinned check. By definition a remove
 	 * operation leaves a cursor positioned if it's initially positioned.
@@ -929,8 +967,7 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	 * that's all a positioned cursor implies), but it's probably safer to
 	 * avoid page eviction entirely in the positioned case.
 	 */
-	if (__cursor_page_pinned(cbt, !positioned) &&
-	    F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
+	if (__cursor_page_pinned(cbt)) {
 		WT_ERR(__wt_txn_autocommit_check(session));
 
 		/*
@@ -940,8 +977,8 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 		 */
 		cbt->compare = 0;
 		ret = btree->type == BTREE_ROW ?
-		    __cursor_row_modify(session, cbt, WT_UPDATE_DELETED) :
-		    __cursor_col_modify(session, cbt, WT_UPDATE_DELETED);
+		    __cursor_row_modify(session, cbt, WT_UPDATE_TOMBSTONE) :
+		    __cursor_col_modify(session, cbt, WT_UPDATE_TOMBSTONE);
 		if (ret == 0)
 			goto done;
 
@@ -958,6 +995,9 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 		__cursor_state_save(cursor, &state);
 		goto err;
 	}
+
+	if (positioned == POSITIONED)
+		positioned = SEARCH_POSITION;
 
 	/*
 	 * The pinned page goes away if we do a search, get a local copy of any
@@ -980,7 +1020,7 @@ retry:	WT_ERR(__cursor_func_init(cbt, true));
 		if (cbt->compare != 0 || !__wt_cursor_valid(cbt, NULL))
 			WT_ERR(WT_NOTFOUND);
 
-		ret = __cursor_row_modify(session, cbt, WT_UPDATE_DELETED);
+		ret = __cursor_row_modify(session, cbt, WT_UPDATE_TOMBSTONE);
 	} else {
 		WT_ERR(__cursor_col_search(session, cbt, NULL));
 
@@ -1008,7 +1048,7 @@ retry:	WT_ERR(__cursor_func_init(cbt, true));
 			cbt->recno = cursor->recno;
 		} else
 			ret = __cursor_col_modify(
-			    session, cbt, WT_UPDATE_DELETED);
+			    session, cbt, WT_UPDATE_TOMBSTONE);
 	}
 
 err:	if (ret == WT_RESTART) {
@@ -1024,19 +1064,37 @@ err:	if (ret == WT_RESTART) {
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) && ret == WT_NOTFOUND)
 		ret = 0;
 
-done:	/*
-	 * If the cursor was positioned, it stays positioned, point the cursor
-	 * at an internal copy of the key. Otherwise, there's no position or
-	 * key/value.
-	 */
-	if (ret == 0)
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	if (ret == 0 && positioned)
-		WT_TRET(__wt_key_return(session, cbt));
-	else
+done:	if (ret == 0) {
+		F_CLR(cursor, WT_CURSTD_VALUE_SET);
+		switch (positioned) {
+		case NO_POSITION:
+			/*
+			 * Never positioned and we leave it that way, clear any
+			 * key and reset the cursor.
+			 */
+			F_CLR(cursor, WT_CURSTD_KEY_SET);
+			WT_TRET(__cursor_reset(cbt));
+			break;
+		case POSITIONED:
+			/*
+			 * Positioned and we used the pinned page, leave the key
+			 * alone, whatever it is.
+			 */
+			break;
+		case SEARCH_POSITION:
+			/*
+			 * Positioned and we did a search anyway, get a key to
+			 * return.
+			 */
+			WT_TRET(__wt_key_return(session, cbt));
+			break;
+		}
+	}
+
+	if (ret != 0) {
 		WT_TRET(__cursor_reset(cbt));
-	if (ret != 0)
 		__cursor_state_restore(cursor, &state);
+	}
 
 	return (ret);
 }
@@ -1068,12 +1126,9 @@ __btcur_update(WT_CURSOR_BTREE *cbt, WT_ITEM *value, u_int modify_type)
 	 * If update positioned to an on-page key, the update doesn't require
 	 * another search. We don't care about the "overwrite" configuration
 	 * because regardless of the overwrite setting, any existing record is
-	 * updated, and the record must exist with a positioned cursor. The
-	 * cursor won't be positioned on a page with an external key set, but
-	 * be sure.
+	 * updated, and the record must exist with a positioned cursor.
 	 */
-	if (__cursor_page_pinned(cbt, true) &&
-	    F_ISSET(cursor, WT_CURSTD_KEY_INT)) {
+	if (__cursor_page_pinned(cbt)) {
 		WT_ERR(__wt_txn_autocommit_check(session));
 
 		/*
@@ -1168,20 +1223,21 @@ done:	if (ret == 0)
 			WT_TRET(__cursor_kv_return(
 			    session, cbt, cbt->modify_update));
 			break;
-		case WT_UPDATE_RESERVED:
+		case WT_UPDATE_RESERVE:
 			/*
 			 * WT_CURSOR.reserve doesn't return any value.
 			 */
 			F_CLR(cursor, WT_CURSTD_VALUE_SET);
 			/* FALLTHROUGH */
-		case WT_UPDATE_MODIFIED:
+		case WT_UPDATE_MODIFY:
 			/*
 			 * WT_CURSOR.modify has already created the return value
 			 * and our job is to leave it untouched.
 			 */
 			WT_TRET(__wt_key_return(session, cbt));
 			break;
-		case WT_UPDATE_DELETED:
+		case WT_UPDATE_BIRTHMARK:
+		case WT_UPDATE_TOMBSTONE:
 		default:
 			WT_TRET(__wt_illegal_value(session, NULL));
 			break;
@@ -1268,8 +1324,7 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
 
 	WT_ERR(__wt_btcur_search(cbt));
 	orig = cursor->value.size;
-	WT_ERR(__wt_modify_apply_api(
-	    session, &cursor->value, entries, nentries));
+	WT_ERR(__wt_modify_apply_api(session, cursor, entries, nentries));
 	new = cursor->value.size;
 	WT_ERR(__cursor_size_chk(session, &cursor->value));
 	if (new > orig)
@@ -1290,7 +1345,7 @@ __wt_btcur_modify(WT_CURSOR_BTREE *cbt, WT_MODIFY *entries, int nentries)
 		ret = __btcur_update(cbt, &cursor->value, WT_UPDATE_STANDARD);
 	else if ((ret =
 	    __wt_modify_pack(session, &modify, entries, nentries)) == 0)
-		ret = __btcur_update(cbt, modify, WT_UPDATE_MODIFIED);
+		ret = __btcur_update(cbt, modify, WT_UPDATE_MODIFY);
 	if (overwrite)
 	       F_SET(cursor, WT_CURSTD_OVERWRITE);
 
@@ -1330,7 +1385,7 @@ __wt_btcur_reserve(WT_CURSOR_BTREE *cbt)
 	/* WT_CURSOR.reserve is update-without-overwrite and a special value. */
 	overwrite = F_ISSET(cursor, WT_CURSTD_OVERWRITE);
 	F_CLR(cursor, WT_CURSTD_OVERWRITE);
-	ret = __btcur_update(cbt, &cursor->value, WT_UPDATE_RESERVED);
+	ret = __btcur_update(cbt, &cursor->value, WT_UPDATE_RESERVE);
 	if (overwrite)
 	       F_SET(cursor, WT_CURSTD_OVERWRITE);
 	return (ret);
@@ -1510,7 +1565,7 @@ retry:	WT_RET(__wt_btcur_search(start));
 	    F_MASK((WT_CURSOR *)start, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
 
 	for (;;) {
-		if ((ret = rmfunc(session, start, WT_UPDATE_DELETED)) != 0)
+		if ((ret = rmfunc(session, start, WT_UPDATE_TOMBSTONE)) != 0)
 			break;
 
 		if (stop != NULL && __cursor_equals(start, stop))
@@ -1568,7 +1623,7 @@ retry:	WT_RET(__wt_btcur_search(start));
 	for (;;) {
 		value = (const uint8_t *)start->iface.value.data;
 		if (*value != 0 &&
-		    (ret = rmfunc(session, start, WT_UPDATE_DELETED)) != 0)
+		    (ret = rmfunc(session, start, WT_UPDATE_TOMBSTONE)) != 0)
 			break;
 
 		if (stop != NULL && __cursor_equals(start, stop))
