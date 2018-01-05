@@ -49,14 +49,13 @@ using std::vector;
 
 class Base {
 public:
-    Base(string coll) : _ns("test." + coll) {
+    Base(string coll) : _ns("test." + coll), _storageInterface(std::make_unique<repl::StorageInterfaceMock>()) {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
-        auto storagePtr = std::make_unique<repl::StorageInterfaceMock>();
         repl::DropPendingCollectionReaper::set(
                 opCtxPtr.get()->getServiceContext(),
-                std::make_unique<repl::DropPendingCollectionReaper>(storagePtr.get())
+                std::make_unique<repl::DropPendingCollectionReaper>(_storageInterface.get())
         );
         db.dropDatabase("test");
     }
@@ -74,6 +73,8 @@ public:
     }
 
     const string _ns;
+
+    std::unique_ptr<repl::StorageInterface> _storageInterface;
 };
 
 
