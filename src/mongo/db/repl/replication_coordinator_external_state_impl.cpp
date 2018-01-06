@@ -242,8 +242,12 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     _applierThread->startup();
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
-    _syncSourceFeedbackThread = stdx::make_unique<stdx::thread>([this, replCoord] {
-        _syncSourceFeedback.run(_taskExecutor.get(), _bgSync.get(), replCoord);
+    // Get the pointer while holding the lock so that _stopDataReplication_inlock() won't
+    // leave the unique pointer empty if the _syncSourceFeedbackThread's function starts
+    // after _stopDataReplication_inlock's move.
+    auto bgSyncPtr = _bgSync.get();
+    _syncSourceFeedbackThread = stdx::make_unique<stdx::thread>([this, bgSyncPtr, replCoord] {
+        _syncSourceFeedback.run(_taskExecutor.get(), bgSyncPtr, replCoord);
     });
 }
 
@@ -263,6 +267,8 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     auto oldApplier = std::move(_applierThread);
     lock->unlock();
 
+    // _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it has
+    // a pointer of _bgSync.
     if (oldSSF) {
         log() << "Stopping replication reporter thread";
         _syncSourceFeedback.shutdown();
