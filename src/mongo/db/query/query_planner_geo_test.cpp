@@ -1766,4 +1766,22 @@ TEST_F(QueryPlannerTest, 2dsphereNonNearWithInternalExprEqOverTrailingFieldMulti
         "{a: [], b: [['MinKey','MaxKey',true,true]]}}}}}");
 }
 
+TEST_F(QueryPlannerTest, 2dWithinPredicateOverTrailingFieldElemMatchMultikey) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+
+    const bool multikey = true;
+    addIndex(BSON("a"
+                  << "2d"
+                  << "b"
+                  << 1),
+             multikey);
+
+    runQuery(fromjson("{a: {$geoWithin: {$center: [[0, 0], 1]}}, b: {$elemMatch: {c: 1}}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {$and: [{b: {$elemMatch: {c: 1}}}, {a: {$geoWithin: {$center: [ [ 0, 0 "
+        "], 1 ]}}}]}, node: {ixscan: {filter: null, pattern: {a: '2d', b: 1}}}}}");
+}
+
+
 }  // namespace

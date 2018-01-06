@@ -37,4 +37,13 @@
     assert.eq(0, coll.find({a: {$geoWithin: {$center: [[0, 0], 1]}}, "b.c": [2, 3]}).itcount());
     assert.eq(
         0, coll.find({a: {$geoWithin: {$center: [[0, 0], 1]}}, "b.c": {$type: "array"}}).itcount());
+
+    coll.drop();
+    assert.commandWorked(coll.createIndex({a: "2d", "b.c": 1}));
+    assert.writeOK(coll.insert({a: [0, 0], b: [{c: 1}, {c: 2}]}));
+
+    // Verify that non-near 2d queries correctly handle predicates which cannot be covered due to
+    // array semantics.
+    assert.eq(
+        1, coll.find({a: {$geoWithin: {$center: [[0, 0], 1]}}, b: {$elemMatch: {c: 1}}}).itcount());
 }());
