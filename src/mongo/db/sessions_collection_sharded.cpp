@@ -144,12 +144,12 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
         // Do the work to generate the first batch of results. This blocks waiting to get responses
         // from the shard(s).
         std::vector<BSONObj> batch;
-        BSONObj viewDefinition;
-        auto cursorId = ClusterFind::runQuery(
-            opCtx, *cq.getValue(), ReadPreferenceSetting::get(opCtx), &batch, &viewDefinition);
-
-        if (!cursorId.isOK()) {
-            return cursorId.getStatus();
+        CursorId cursorId;
+        try {
+            cursorId = ClusterFind::runQuery(
+                opCtx, *cq.getValue(), ReadPreferenceSetting::get(opCtx), &batch);
+        } catch (const DBException& ex) {
+            return ex.toStatus();
         }
 
         BSONObjBuilder result;
@@ -157,7 +157,7 @@ StatusWith<LogicalSessionIdSet> SessionsCollectionSharded::findRemovedSessions(
         for (const auto& obj : batch) {
             firstBatch.append(obj);
         }
-        firstBatch.done(cursorId.getValue(), nss.ns());
+        firstBatch.done(cursorId, nss.ns());
 
         return result.obj();
     };

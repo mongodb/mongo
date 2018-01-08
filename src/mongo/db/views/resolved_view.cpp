@@ -30,18 +30,16 @@
 
 #include "mongo/db/views/resolved_view.h"
 
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
 
-bool ResolvedView::isResolvedViewErrorResponse(BSONObj commandResponseObj) {
-    auto status = getStatusFromCommandResult(commandResponseObj);
-    return ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == status;
-}
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(ResolvedView);
 
-ResolvedView ResolvedView::fromBSON(BSONObj commandResponseObj) {
+ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
     uassert(40248,
             "command response expected to have a 'resolvedView' field",
             commandResponseObj.hasField("resolvedView"));
@@ -75,14 +73,17 @@ ResolvedView ResolvedView::fromBSON(BSONObj commandResponseObj) {
             std::move(collationSpec)};
 }
 
-BSONObj ResolvedView::toBSON() const {
-    BSONObjBuilder builder;
-    builder.append("ns", _namespace.ns());
-    builder.append("pipeline", _pipeline);
+void ResolvedView::serialize(BSONObjBuilder* builder) const {
+    BSONObjBuilder subObj(builder->subobjStart("resolvedView"));
+    subObj.append("ns", _namespace.ns());
+    subObj.append("pipeline", _pipeline);
     if (!_defaultCollation.isEmpty()) {
-        builder.append("collation", _defaultCollation);
+        subObj.append("collation", _defaultCollation);
     }
-    return builder.obj();
+}
+
+std::shared_ptr<const ErrorExtraInfo> ResolvedView::parse(const BSONObj& cmdReply) {
+    return std::make_shared<ResolvedView>(fromBSON(cmdReply));
 }
 
 AggregationRequest ResolvedView::asExpandedViewAggregation(

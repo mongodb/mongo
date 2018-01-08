@@ -43,43 +43,29 @@
 
 namespace mongo {
 
-StatusWith<BSONObj> ViewShardingCheck::getResolvedViewIfSharded(OperationContext* opCtx,
-                                                                Database* db,
-                                                                const ViewDefinition* view) {
+void ViewShardingCheck::throwResolvedViewIfSharded(OperationContext* opCtx,
+                                                   Database* db,
+                                                   const ViewDefinition* view) {
     invariant(opCtx);
     invariant(db);
     invariant(view);
 
     if (ClusterRole::ShardServer != serverGlobalParams.clusterRole) {
         // This node is not part of a sharded cluster, so the collection cannot be sharded.
-        return BSONObj();
+        return;
     }
 
-    auto resolvedView = db->getViewCatalog()->resolveView(opCtx, view->name());
-    if (!resolvedView.isOK()) {
-        return resolvedView.getStatus();
-    }
-
-    const auto& sourceNss = resolvedView.getValue().getNamespace();
+    auto resolvedView = uassertStatusOK(db->getViewCatalog()->resolveView(opCtx, view->name()));
+    const auto& sourceNss = resolvedView.getNamespace();
     const auto isPrimary =
         repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext())
             ->canAcceptWritesForDatabase(opCtx, db->name());
 
     if (isPrimary && !collectionIsSharded(opCtx, sourceNss)) {
-        return BSONObj();
+        return;
     }
 
-    return resolvedView.getValue().toBSON();
-}
-
-Status ViewShardingCheck::appendShardedViewResponse(const BSONObj& resolvedView,
-                                                    BSONObjBuilder* out) {
-    invariant(out);
-    invariant(!resolvedView.isEmpty());
-
-    out->append("resolvedView", resolvedView);
-    return {ErrorCodes::CommandOnShardedViewNotSupportedOnMongod,
-            str::stream() << "Command on view must be executed by mongos"};
+    uasserted(std::move(resolvedView), "Command on view must be executed by mongos");
 }
 
 bool ViewShardingCheck::collectionIsSharded(OperationContext* opCtx, const NamespaceString& nss) {

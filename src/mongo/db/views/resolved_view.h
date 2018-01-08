@@ -41,7 +41,7 @@ namespace mongo {
  * Represents a resolved definition, composed of a base collection namespace and a pipeline
  * built from one or more views.
  */
-class ResolvedView {
+class ResolvedView final : public ErrorExtraInfo {
 public:
     ResolvedView(const NamespaceString& collectionNs,
                  std::vector<BSONObj> pipeline,
@@ -50,15 +50,7 @@ public:
           _pipeline(std::move(pipeline)),
           _defaultCollation(std::move(defaultCollation)) {}
 
-    /**
-     * Returns whether 'commandResponseObj' contains a CommandOnShardedViewNotSupportedOnMongod
-     * error and resolved view definition.
-     */
-    static bool isResolvedViewErrorResponse(BSONObj commandResponseObj);
-
-    static ResolvedView fromBSON(BSONObj commandResponseObj);
-
-    BSONObj toBSON() const;
+    static ResolvedView fromBSON(const BSONObj& commandResponseObj);
 
     /**
      * Convert an aggregation command on a view to the equivalent command against the view's
@@ -77,6 +69,11 @@ public:
     const BSONObj& getDefaultCollation() const {
         return _defaultCollation;
     }
+
+    // ErrorExtraInfo API
+    static constexpr auto code = ErrorCodes::CommandOnShardedViewNotSupportedOnMongod;
+    void serialize(BSONObjBuilder* bob) const final;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
 private:
     NamespaceString _namespace;

@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/views/resolved_view.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -271,36 +272,47 @@ TEST(ResolvedViewTest, FromBSONSuccessfullyParsesPopulatedBSONArrayIntoVector) {
 TEST(ResolvedViewTest, IsResolvedViewErrorResponseDetectsKickbackErrorCodeSuccessfully) {
     BSONObj errorResponse =
         BSON("ok" << 0 << "code" << ErrorCodes::CommandOnShardedViewNotSupportedOnMongod << "errmsg"
-                  << "This view is sharded and cannot be run on mongod");
-    ASSERT(ResolvedView::isResolvedViewErrorResponse(errorResponse));
+                  << "This view is sharded and cannot be run on mongod"
+                  << "resolvedView"
+                  << BSON("ns" << backingNss.ns() << "pipeline" << BSONArray()));
+    auto status = getStatusFromCommandResult(errorResponse);
+    ASSERT_EQ(status, ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
+    ASSERT(status.extraInfo<ResolvedView>());
 }
 
 TEST(ResolvedViewTest, IsResolvedViewErrorResponseReportsFalseOnNonKickbackErrorCode) {
     BSONObj errorResponse =
         BSON("ok" << 0 << "code" << ErrorCodes::ViewDepthLimitExceeded << "errmsg"
                   << "View nesting too deep or view cycle detected");
-    ASSERT_FALSE(ResolvedView::isResolvedViewErrorResponse(errorResponse));
+    auto status = getStatusFromCommandResult(errorResponse);
+    ASSERT_NE(status, ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
+    ASSERT(!status.extraInfo<ResolvedView>());
 }
 
-TEST(ResolvedViewTest, ToBSONSerializesCorrectly) {
+TEST(ResolvedViewTest, SerializesCorrectly) {
     const ResolvedView resolvedView{backingNss,
                                     std::vector<BSONObj>{BSON("$match" << BSON("x" << 1))},
                                     BSON("locale"
                                          << "fr_CA")};
-    auto serialized = resolvedView.toBSON();
-    ASSERT_BSONOBJ_EQ(
-        serialized,
-        fromjson(
-            "{ns: 'testdb.testcoll', pipeline: [{$match: {x: 1}}], collation: {locale: 'fr_CA'}}"));
+    BSONObjBuilder bob;
+    resolvedView.serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson(R"({
+        resolvedView: {
+            ns: 'testdb.testcoll',
+            pipeline: [{$match: {x: 1}}],
+            collation: {locale: 'fr_CA'}
+        }
+    })"));
 }
 
-TEST(ResolvedViewTest, ToBSONOutputCanBeReparsed) {
+TEST(ResolvedViewTest, SerializeOutputCanBeReparsed) {
     const ResolvedView resolvedView{backingNss,
                                     emptyPipeline,
                                     BSON("locale"
                                          << "fr_CA")};
-    auto serialized = resolvedView.toBSON();
-    auto reparsedResolvedView = ResolvedView::fromBSON(BSON("resolvedView" << serialized));
+    BSONObjBuilder bob;
+    resolvedView.serialize(&bob);
+    auto reparsedResolvedView = ResolvedView::fromBSON(bob.obj());
     ASSERT_EQ(reparsedResolvedView.getNamespace(), backingNss);
     ASSERT(std::equal(emptyPipeline.begin(),
                       emptyPipeline.end(),

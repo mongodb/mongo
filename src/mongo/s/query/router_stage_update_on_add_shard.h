@@ -53,14 +53,13 @@ private:
      * Establish the new cursors and tell the RouterStageMerge about them.
      * obj: The BSONObj which triggered the establishment of the new cursors
      */
-    Status addNewShardCursors(BSONObj obj);
+    void addNewShardCursors(BSONObj obj);
 
     /**
      * Open the cursors on the new shards.
      */
-    StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>>
-    establishShardCursorsOnNewShards(std::vector<ShardId> existingShardIds,
-                                     const BSONObj& newShardDetectedObj);
+    std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursorsOnNewShards(
+        std::vector<ShardId> existingShardIds, const BSONObj& newShardDetectedObj);
 
     ClusterClientCursorParams* _params;
     BSONObj _cmdToRunOnNewShards;

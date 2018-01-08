@@ -54,22 +54,13 @@ class ViewDefinition;
 class ViewShardingCheck {
 public:
     /**
-     * If it is determined that a view's underlying collection may be sharded this method returns
-     * a BSONObj containing the resolved view definition. If the underlying collection is not
-     * sharded an empty BSONObj is returned.
-     *
-     * Will return an error if the ViewCatalog is unable to generate a resolved view.
+     * If it is determined that a view's underlying collection may be sharded this method throws an
+     * exception with code CommandOnShardedViewNotSupportedOnMongod with an attached ResolvedView
+     * with the required information to run the view on mongos.
      */
-    static StatusWith<BSONObj> getResolvedViewIfSharded(OperationContext* opCtx,
-                                                        Database* db,
-                                                        const ViewDefinition* view);
-
-    /**
-     * Appends the resolved view definition to 'result' and returns a
-     * CommandOnShardedViewNotSupportedOnMongod error status. The caller is responsible for
-     * appending the non-ok status and error code.
-     */
-    static Status appendShardedViewResponse(const BSONObj& resolvedView, BSONObjBuilder* result);
+    static void throwResolvedViewIfSharded(OperationContext* opCtx,
+                                           Database* db,
+                                           const ViewDefinition* view);
 
 private:
     /**

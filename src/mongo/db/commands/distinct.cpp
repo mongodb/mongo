@@ -180,17 +180,7 @@ public:
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregation.getValue())));
-
-            if (ResolvedView::isResolvedViewErrorResponse(aggResult)) {
-                result.appendElements(aggResult);
-                return false;
-            }
-
-            ViewResponseFormatter formatter(aggResult);
-            Status formatStatus = formatter.appendAsDistinctResponse(&result);
-            if (!formatStatus.isOK()) {
-                return CommandHelpers::appendCommandStatus(result, formatStatus);
-            }
+            uassertStatusOK(ViewResponseFormatter(aggResult).appendAsDistinctResponse(&result));
             return true;
         }
 

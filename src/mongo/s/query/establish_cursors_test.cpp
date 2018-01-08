@@ -89,36 +89,29 @@ protected:
 
 TEST_F(EstablishCursorsTest, NoRemotes) {
     std::vector<std::pair<ShardId, BSONObj>> remotes;
-    BSONObj viewDefinition;
-    auto swCursors = establishCursors(operationContext(),
-                                      executor(),
-                                      _nss,
-                                      ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                      remotes,
-                                      false,  // allowPartialResults
-                                      &viewDefinition);
+    auto cursors = establishCursors(operationContext(),
+                                    executor(),
+                                    _nss,
+                                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                    remotes,
+                                    false);  // allowPartialResults
 
-    ASSERT_OK(swCursors.getStatus());
-    ASSERT_EQUALS(remotes.size(), swCursors.getValue().size());
-    ASSERT_BSONOBJ_EQ({}, viewDefinition);
+
+    ASSERT_EQUALS(remotes.size(), cursors.size());
 }
 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccess) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          false,  // allowPartialResults
-                                          &viewDefinition);
-        ASSERT_OK(swCursors.getStatus());
-        ASSERT_EQUALS(remotes.size(), swCursors.getValue().size());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        false);  // allowPartialResults
+        ASSERT_EQUALS(remotes.size(), cursors.size());
     });
 
     // Remote responds.
@@ -136,18 +129,15 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithSuccess) {
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableError) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          false,  // allowPartialResults
-                                          &viewDefinition);
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, swCursors.getStatus().code());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       false),  // allowPartialResults
+                      ExceptionFor<ErrorCodes::FailedToParse>);
     });
 
     // Remote responds with non-retriable error.
@@ -161,19 +151,16 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableError) {
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableErrorAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          true,  // allowPartialResults
-                                          &viewDefinition);
         // A non-retriable error is not ignored even though allowPartialResults is true.
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, swCursors.getStatus().code());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       true),  // allowPartialResults
+                      ExceptionFor<ErrorCodes::FailedToParse>);
     });
 
     // Remote responds with non-retriable error.
@@ -187,19 +174,15 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithNonretriableErrorAllowParti
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithRetriableErrorThenSuccess) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          false,  // allowPartialResults
-                                          &viewDefinition);
-        ASSERT_OK(swCursors.getStatus());
-        ASSERT_EQUALS(remotes.size(), swCursors.getValue().size());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        false);  // allowPartialResults
+        ASSERT_EQUALS(remotes.size(), cursors.size());
     });
 
     // Remote responds with retriable error.
@@ -223,19 +206,15 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithRetriableErrorThenSuccess) 
 TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithRetriableErrorThenSuccessAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          true,  // allowPartialResults
-                                          &viewDefinition);
-        ASSERT_OK(swCursors.getStatus());
-        ASSERT_EQUALS(remotes.size(), swCursors.getValue().size());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        true);  // allowPartialResults
+        ASSERT_EQUALS(remotes.size(), cursors.size());
     });
 
     // Remote responds with retriable error.
@@ -260,18 +239,15 @@ TEST_F(EstablishCursorsTest, SingleRemoteRespondsWithRetriableErrorThenSuccessAl
 TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrors) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          false,  // allowPartialResults
-                                          &viewDefinition);
-        ASSERT_EQUALS(ErrorCodes::HostUnreachable, swCursors.getStatus().code());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       false),  // allowPartialResults
+                      ExceptionFor<ErrorCodes::HostUnreachable>);
     });
 
     // Remote repeatedly responds with retriable errors.
@@ -287,23 +263,19 @@ TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrors) {
 TEST_F(EstablishCursorsTest, SingleRemoteMaxesOutRetriableErrorsAllowPartialResults) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{{kTestShardIds[0], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          true,  // allowPartialResults
-                                          &viewDefinition);
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        true);  // allowPartialResults
 
         // Failure to establish a cursor due to maxing out retriable errors on one remote (in this
         // case, the only remote) was ignored, since allowPartialResults is true, and one less
         // cursor was established.
-        ASSERT_OK(swCursors.getStatus());
-        ASSERT_EQUALS(remotes.size() - 1, swCursors.getValue().size());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        ASSERT_EQUALS(remotes.size() - 1, cursors.size());
     });
 
     // Remote repeatedly responds with retriable errors.
@@ -320,19 +292,15 @@ TEST_F(EstablishCursorsTest, MultipleRemotesRespondWithSuccess) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          false,  // allowPartialResults
-                                          &viewDefinition);
-        ASSERT_OK(swCursors.getStatus());
-        ASSERT_EQUALS(remotes.size(), swCursors.getValue().size());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        false);  // allowPartialResults
+        ASSERT_EQUALS(remotes.size(), cursors.size());
     });
 
     // All remotes respond with success.
@@ -353,18 +321,15 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteRespondsWithNonretriableErr
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          false,  // allowPartialResults
-                                          &viewDefinition);
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, swCursors.getStatus());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       false),  // allowPartialResults
+                      ExceptionFor<ErrorCodes::FailedToParse>);
     });
 
     // First remote responds with success.
@@ -399,19 +364,16 @@ TEST_F(EstablishCursorsTest,
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          true,  // allowPartialResults
-                                          &viewDefinition);
         // Failure is reported even though allowPartialResults was true.
-        ASSERT_EQUALS(ErrorCodes::FailedToParse, swCursors.getStatus());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       true),  // allowPartialResults
+                      ExceptionFor<ErrorCodes::FailedToParse>);
     });
 
     // First remote responds with success.
@@ -445,19 +407,15 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteRespondsWithRetriableErrorT
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          false,  // allowPartialResults
-                                          &viewDefinition);
-        ASSERT_OK(swCursors.getStatus());
-        ASSERT_EQUALS(remotes.size(), swCursors.getValue().size());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        false);  // allowPartialResults
+        ASSERT_EQUALS(remotes.size(), cursors.size());
     });
 
     // First remote responds with success.
@@ -501,20 +459,16 @@ TEST_F(EstablishCursorsTest,
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          true,  // allowPartialResults
-                                          &viewDefinition);
-        ASSERT_OK(swCursors.getStatus());
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        true);  // allowPartialResults
         // We still retry up to the max retries, even if allowPartialResults is true.
-        ASSERT_EQUALS(remotes.size(), swCursors.getValue().size());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        ASSERT_EQUALS(remotes.size(), cursors.size());
     });
     // First remote responds with success.
     onCommand([&](const RemoteCommandRequest& request) {
@@ -556,18 +510,15 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteMaxesOutRetriableErrors) {
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          false,  // allowPartialResults
-                                          &viewDefinition);
-        ASSERT_EQUALS(ErrorCodes::HostUnreachable, swCursors.getStatus().code());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       false),  // allowPartialResults
+                      ExceptionFor<ErrorCodes::HostUnreachable>);
     });
 
     // First remote responds with success.
@@ -609,21 +560,17 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteMaxesOutRetriableErrorsAllo
     BSONObj cmdObj = fromjson("{find: 'testcoll'}");
     std::vector<std::pair<ShardId, BSONObj>> remotes{
         {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
-    BSONObj viewDefinition;
 
     auto future = launchAsync([&] {
-        auto swCursors = establishCursors(operationContext(),
-                                          executor(),
-                                          _nss,
-                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                          remotes,
-                                          true,  // allowPartialResults
-                                          &viewDefinition);
+        auto cursors = establishCursors(operationContext(),
+                                        executor(),
+                                        _nss,
+                                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                        remotes,
+                                        true);  // allowPartialResults
         // Failure to establish a cursor due to maxing out retriable errors on one remote was
         // ignored, since allowPartialResults is true, and one less cursor was established.
-        ASSERT_OK(swCursors.getStatus());
-        ASSERT_EQUALS(remotes.size() - 1, swCursors.getValue().size());
-        ASSERT_BSONOBJ_EQ({}, viewDefinition);
+        ASSERT_EQUALS(remotes.size() - 1, cursors.size());
     });
 
     // First remote responds with success.

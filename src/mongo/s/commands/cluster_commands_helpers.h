@@ -71,7 +71,7 @@ BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);
  * 2) a shard has been *removed* through a different mongos, this function will return a
  *    ShardNotFound error status.
  */
-StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherUnversionedTargetAllShards(
+std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShards(
     OperationContext* opCtx,
     const std::string& dbName,
     boost::optional<NamespaceString> nss,
@@ -83,14 +83,11 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherUnversionedT
  * Utility for dispatching versioned commands on a namespace, deciding which shards to
  * target by applying the passed-in query and collation to the local routing table cache.
  *
- * Throws on seeing a StaleConfigException from any shard.
- *
- * Optionally populates a 'viewDefinition' out parameter if a shard's result contains a view
- * definition. The viewDefinition can be used to re-run the command as an aggregation.
+ * Does not retry on StaleConfigException.
  *
  * Return value is the same as scatterGatherUnversionedTargetAllShards().
  */
-StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherVersionedTargetByRoutingTable(
+std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
     const std::string& dbName,
     const NamespaceString& nss,
@@ -98,8 +95,7 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherVersionedTar
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
-    const BSONObj& collation,
-    BSONObj* viewDefinition);
+    const BSONObj& collation);
 
 /**
  * Utility for dispatching commands on a namespace, but with special hybrid versioning:
@@ -108,11 +104,11 @@ StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherVersionedTar
  * - If the namespace is sharded, no version is attached, and the request is broadcast to all
  * shards.
  *
- * Throws on seeing a StaleConfigException.
+ * Does not retry on StaleConfigException.
  *
  * Return value is the same as scatterGatherUnversionedTargetAllShards().
  */
-StatusWith<std::vector<AsyncRequestsSender::Response>> scatterGatherOnlyVersionIfUnsharded(
+std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
     OperationContext* opCtx,
     const std::string& dbName,
     const NamespaceString& nss,

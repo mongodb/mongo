@@ -422,16 +422,7 @@ Status runAggregate(OperationContext* opCtx,
                 }
             }
 
-            auto viewDefinition =
-                ViewShardingCheck::getResolvedViewIfSharded(opCtx, ctx->getDb(), ctx->getView());
-            if (!viewDefinition.isOK()) {
-                return viewDefinition.getStatus();
-            }
-
-            if (!viewDefinition.getValue().isEmpty()) {
-                return ViewShardingCheck::appendShardedViewResponse(viewDefinition.getValue(),
-                                                                    &result);
-            }
+            ViewShardingCheck::throwResolvedViewIfSharded(opCtx, ctx->getDb(), ctx->getView());
 
             auto resolvedView = ctx->getDb()->getViewCatalog()->resolveView(opCtx, nss);
             if (!resolvedView.isOK()) {

@@ -85,18 +85,17 @@ public:
 
     /**
      * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of
-     * the of the explain command on success. On failure, returns a non-OK status and does not
-     * modify 'out'.
+     * the of the explain command on success. On failure, throws and does not modify 'out'.
      *
      * Used both if mongos receives an explain command and if it receives an OP_QUERY find with the
      * $explain modifier.
      */
-    static Status explainFind(OperationContext* opCtx,
-                              const BSONObj& findCommand,
-                              const QueryRequest& qr,
-                              ExplainOptions::Verbosity verbosity,
-                              const ReadPreferenceSetting& readPref,
-                              BSONObjBuilder* out);
+    static void explainFind(OperationContext* opCtx,
+                            const BSONObj& findCommand,
+                            const QueryRequest& qr,
+                            ExplainOptions::Verbosity verbosity,
+                            const ReadPreferenceSetting& readPref,
+                            BSONObjBuilder* out);
 
     struct CommandResult {
         CommandResult() = default;

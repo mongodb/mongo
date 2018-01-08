@@ -255,7 +255,7 @@ BSONObj createCommandForMergingShard(
     return mergeCmd.freeze().toBson();
 }
 
-StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishShardCursors(
+std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const LiteParsedPipeline& litePipe,
@@ -304,24 +304,25 @@ StatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>> establishShardC
     // If we reach this point, we're either trying to establish cursors on a sharded execution
     // namespace, or handling the case where a sharded collection was dropped and recreated as
     // unsharded. Since views cannot be sharded, and because we will return an error rather than
-    // attempting to continue in the event that a recreated namespace is a view, we set
-    // viewDefinitionOut to nullptr.
-    BSONObj* viewDefinitionOut = nullptr;
-    auto swCursors = establishCursors(opCtx,
-                                      Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-                                      nss,
-                                      readPref,
-                                      requests,
-                                      false /* do not allow partial results */,
-                                      viewDefinitionOut /* can't receive view definition */);
+    // attempting to continue in the event that a recreated namespace is a view, we do not handle
+    // ErrorCodes::CommandOnShardedViewNotSupportedOnMongod here.
+    try {
+        return establishCursors(opCtx,
+                                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                                nss,
+                                readPref,
+                                requests,
+                                false /* do not allow partial results */);
 
-    // If any shard returned a stale shardVersion error, invalidate the routing table cache.
-    // This will cause the cache to be refreshed the next time it is accessed.
-    if (ErrorCodes::isStaleShardingError(swCursors.getStatus().code())) {
-        Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(*routingInfo));
+    } catch (const DBException& ex) {
+        // TODO SERVER-32587 only catch this category.
+        if (ex.isA<ErrorCategory::StaleShardingError>()) {
+            // If any shard returned a stale shardVersion error, invalidate the routing table cache.
+            // This will cause the cache to be refreshed the next time it is accessed.
+            Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(*routingInfo));
+        }
+        throw;
     }
-
-    return swCursors;
 }
 
 struct DispatchShardPipelineResults {
@@ -352,7 +353,7 @@ struct DispatchShardPipelineResults {
  * the pipeline that will need to be executed to merge the results from the remotes. If a stale
  * shard version is encountered, refreshes the routing table and tries again.
  */
-StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
+DispatchShardPipelineResults dispatchShardPipeline(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& executionNss,
     BSONObj originalCmdObj,
@@ -369,8 +370,8 @@ StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
     // pipeline is already split and we now only need to target a single shard, reassemble the
     // original pipeline.
     // - After exhausting 10 attempts to establish the cursors, we give up and throw.
-    auto swCursors = makeStatusWith<std::vector<ClusterClientCursorParams::RemoteCursor>>();
-    auto swShardResults = makeStatusWith<std::vector<AsyncRequestsSender::Response>>();
+    auto cursors = std::vector<ClusterClientCursorParams::RemoteCursor>();
+    auto shardResults = std::vector<AsyncRequestsSender::Response>();
     auto opCtx = expCtx->opCtx;
 
     const bool needsPrimaryShardMerge =
@@ -386,7 +387,7 @@ StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
 
     int numAttempts = 0;
 
-    do {
+    while (++numAttempts <= kMaxNumStaleVersionRetries) {
         // We need to grab a new routing table at the start of each iteration, since a stale config
         // exception will invalidate the previous one.
         auto executionNsRoutingInfo = uassertStatusOK(
@@ -439,65 +440,62 @@ StatusWith<DispatchShardPipelineResults> dispatchShardPipeline(
         }
 
         // Explain does not produce a cursor, so instead we scatter-gather commands to the shards.
-        if (expCtx->explain) {
-            if (mustRunOnAllShards(executionNss, executionNsRoutingInfo, liteParsedPipeline)) {
-                // Some stages (such as $currentOp) need to be broadcast to all shards, and should
-                // not participate in the shard version protocol.
-                swShardResults =
-                    scatterGatherUnversionedTargetAllShards(opCtx,
-                                                            executionNss.db().toString(),
-                                                            executionNss,
-                                                            targetedCommand,
-                                                            ReadPreferenceSetting::get(opCtx),
-                                                            Shard::RetryPolicy::kIdempotent);
+        try {
+            if (expCtx->explain) {
+                if (mustRunOnAllShards(executionNss, executionNsRoutingInfo, liteParsedPipeline)) {
+                    // Some stages (such as $currentOp) need to be broadcast to all shards, and
+                    // should not participate in the shard version protocol.
+                    shardResults =
+                        scatterGatherUnversionedTargetAllShards(opCtx,
+                                                                executionNss.db().toString(),
+                                                                executionNss,
+                                                                targetedCommand,
+                                                                ReadPreferenceSetting::get(opCtx),
+                                                                Shard::RetryPolicy::kIdempotent);
+                } else {
+                    // Aggregations on a real namespace should use the routing table to target
+                    // shards, and should participate in the shard version protocol.
+                    shardResults = scatterGatherVersionedTargetByRoutingTable(
+                        opCtx,
+                        executionNss.db().toString(),
+                        executionNss,
+                        targetedCommand,
+                        ReadPreferenceSetting::get(opCtx),
+                        Shard::RetryPolicy::kIdempotent,
+                        shardQuery,
+                        aggRequest.getCollation());
+                }
             } else {
-                // Aggregations on a real namespace should use the routing table to target shards,
-                // and should participate in the shard version protocol.
-                swShardResults =
-                    scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                               executionNss.db().toString(),
-                                                               executionNss,
-                                                               targetedCommand,
-                                                               ReadPreferenceSetting::get(opCtx),
-                                                               Shard::RetryPolicy::kIdempotent,
-                                                               shardQuery,
-                                                               aggRequest.getCollation(),
-                                                               nullptr /* viewDefinition */);
+                cursors = establishShardCursors(opCtx,
+                                                executionNss,
+                                                liteParsedPipeline,
+                                                &executionNsRoutingInfo,
+                                                targetedCommand,
+                                                ReadPreferenceSetting::get(opCtx),
+                                                shardQuery,
+                                                aggRequest.getCollation());
             }
-        } else {
-            swCursors = establishShardCursors(opCtx,
-                                              executionNss,
-                                              liteParsedPipeline,
-                                              &executionNsRoutingInfo,
-                                              targetedCommand,
-                                              ReadPreferenceSetting::get(opCtx),
-                                              shardQuery,
-                                              aggRequest.getCollation());
-
-            if (ErrorCodes::isStaleShardingError(swCursors.getStatus().code())) {
-                LOG(1) << "got stale shardVersion error " << swCursors.getStatus()
-                       << " while dispatching " << redact(targetedCommand) << " after "
-                       << (numAttempts + 1) << " dispatch attempts";
-            }
+        } catch (const DBException& ex) {
+            // TODO SERVER-32587 only catch this category.
+            if (!ex.isA<ErrorCategory::StaleShardingError>())
+                throw;
+            LOG(1) << "got stale shardVersion error " << redact(ex) << " while dispatching "
+                   << redact(targetedCommand) << " after " << (numAttempts + 1)
+                   << " dispatch attempts";
+            continue;  // Try again if allowed.
         }
-    } while (++numAttempts < kMaxNumStaleVersionRetries &&
-             (expCtx->explain ? !swShardResults.isOK() : !swCursors.isOK()));
+        break;  // Success!
+    }
 
-    if (!swShardResults.isOK()) {
-        return swShardResults.getStatus();
-    }
-    if (!swCursors.isOK()) {
-        return swCursors.getStatus();
-    }
     return DispatchShardPipelineResults{needsPrimaryShardMerge,
-                                        std::move(swCursors.getValue()),
-                                        std::move(swShardResults.getValue()),
+                                        std::move(cursors),
+                                        std::move(shardResults),
                                         std::move(pipelineForTargetedShards),
                                         std::move(pipelineForMerging),
                                         targetedCommand};
 }
 
-StatusWith<std::pair<ShardId, Shard::CommandResponse>> establishMergingShardCursor(
+std::pair<ShardId, Shard::CommandResponse> establishMergingShardCursor(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const std::vector<ClusterClientCursorParams::RemoteCursor>& cursors,
@@ -517,7 +515,7 @@ StatusWith<std::pair<ShardId, Shard::CommandResponse>> establishMergingShardCurs
                                                        mergeCmdObj,
                                                        Shard::RetryPolicy::kIdempotent));
 
-    return {{std::move(mergingShardId), std::move(shardCmdResponse)}};
+    return {std::move(mergingShardId), std::move(shardCmdResponse)};
 }
 
 BSONObj establishMergingMongosCursor(OperationContext* opCtx,
@@ -758,12 +756,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         return getStatusFromCommandResult(result->asTempObj());
     }
 
-    auto dispatchResults = uassertStatusOK(dispatchShardPipeline(mergeCtx,
-                                                                 namespaces.executionNss,
-                                                                 cmdObj,
-                                                                 request,
-                                                                 liteParsedPipeline,
-                                                                 std::move(pipeline)));
+    auto dispatchResults = dispatchShardPipeline(mergeCtx,
+                                                 namespaces.executionNss,
+                                                 cmdObj,
+                                                 request,
+                                                 liteParsedPipeline,
+                                                 std::move(pipeline));
 
     if (mergeCtx->explain) {
         // If we reach here, we've either succeeded in running the explain or exhausted all
@@ -827,13 +825,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         DocumentSourceMergeCursors::create(parseCursors(dispatchResults.remoteCursors), mergeCtx));
     auto mergeCmdObj = createCommandForMergingShard(request, mergeCtx, cmdObj, mergingPipeline);
 
-    auto mergeResponse = uassertStatusOK(
+    auto mergeResponse =
         establishMergingShardCursor(opCtx,
                                     namespaces.executionNss,
                                     dispatchResults.remoteCursors,
                                     mergeCmdObj,
                                     boost::optional<ShardId>{dispatchResults.needsPrimaryShardMerge,
-                                                             executionNsRoutingInfo.primaryId()}));
+                                                             executionNsRoutingInfo.primaryId()});
 
     auto mergingShardId = mergeResponse.first;
     auto response = mergeResponse.second;
@@ -943,11 +941,9 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
 
     out->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(result));
 
-    BSONObj responseObj = out->asTempObj();
-    if (ResolvedView::isResolvedViewErrorResponse(responseObj)) {
-        auto resolvedView = ResolvedView::fromBSON(responseObj);
-
-        auto resolvedAggRequest = resolvedView.asExpandedViewAggregation(aggRequest);
+    auto status = getStatusFromCommandResult(out->asTempObj());
+    if (auto resolvedView = status.extraInfo<ResolvedView>()) {
+        auto resolvedAggRequest = resolvedView->asExpandedViewAggregation(aggRequest);
         auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
         out->resetToEmpty();
 
@@ -957,13 +953,13 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         // killCursors calls against the view have access.
         Namespaces nsStruct;
         nsStruct.requestedNss = namespaces.requestedNss;
-        nsStruct.executionNss = resolvedView.getNamespace();
+        nsStruct.executionNss = resolvedView->getNamespace();
 
         return ClusterAggregate::runAggregate(
             opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
     }
 
-    return getStatusFromCommandResult(result);
+    return status;
 }
 
 }  // namespace mongo

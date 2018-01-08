@@ -358,6 +358,8 @@ void LogicalSessionCacheImpl::_refresh(Client* client) {
         for (const auto& lsid : removedSessions) {
             patterns.emplace(makeKillAllSessionsByPattern(opCtx, lsid));
         }
+    } else {
+        // Ignore errors.
     }
 
     // Add all of the explicitly ended sessions to the list of sessions to kill cursors for.

@@ -268,19 +268,9 @@ TEST(Transformers, ExceptionToStatus) {
     ASSERT_TRUE(fromBoostExcept.reason().find("boost::exception") != std::string::npos);
 }
 
-// TODO enable this once the next ErrorExtraInfo subclass is registered
-#if false
-DEATH_TEST(ErrorExtraInfo, InvariantAllRegistered, "Invariant failure parser_for::") {
+DEATH_TEST(ErrorExtraInfo, InvariantAllRegistered, "Invariant failure parsers::") {
     ErrorExtraInfo::invariantHaveAllParsers();
 }
-#else
-TEST(ErrorExtraInfo, MakeSureInvariantAllRegisteredGetsEnabled) {
-    // This will be the first "real" use of ErrorExtraInfo, and it won't be linked into this test.
-    // This just exists to ensure that once that work is done, the above test gets enabled.
-    invariant(
-        !ErrorCodes::shouldHaveExtraInfo(ErrorCodes::CommandOnShardedViewNotSupportedOnMongod));
-}
-#endif
 
 #ifdef MONGO_CONFIG_DEBUG_BUILD
 DEATH_TEST(ErrorExtraInfo, DassertShouldHaveExtraInfo, "Fatal Assertion 40680") {

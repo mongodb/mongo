@@ -68,13 +68,13 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& output) override {
-        auto shardResponses = uassertStatusOK(scatterGatherUnversionedTargetAllShards(
+        auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
             dbName,
             boost::none,
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             ReadPreferenceSetting::get(opCtx),
-            Shard::RetryPolicy::kIdempotent));
+            Shard::RetryPolicy::kIdempotent);
         if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses)) {
             return false;
         }

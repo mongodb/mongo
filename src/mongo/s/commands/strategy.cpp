@@ -350,12 +350,12 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
         const auto verbosity = ExplainOptions::Verbosity::kExecAllPlans;
 
         BSONObjBuilder explainBuilder;
-        uassertStatusOK(Strategy::explainFind(opCtx,
-                                              findCommand,
-                                              queryRequest,
-                                              verbosity,
-                                              ReadPreferenceSetting::get(opCtx),
-                                              &explainBuilder));
+        Strategy::explainFind(opCtx,
+                              findCommand,
+                              queryRequest,
+                              verbosity,
+                              ReadPreferenceSetting::get(opCtx),
+                              &explainBuilder);
 
         BSONObj explainObj = explainBuilder.done();
         return replyToQuery(explainObj);
@@ -367,19 +367,13 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
 
     // 0 means the cursor is exhausted. Otherwise we assume that a cursor with the returned id can
     // be retrieved via the ClusterCursorManager.
-    auto cursorId =
-        ClusterFind::runQuery(opCtx,
-                              *canonicalQuery,
-                              ReadPreferenceSetting::get(opCtx),
-                              &batch,
-                              nullptr /*Argument is for views which OP_QUERY doesn't support*/);
-
-    if (!cursorId.isOK() &&
-        cursorId.getStatus() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
+    CursorId cursorId;
+    try {
+        cursorId = ClusterFind::runQuery(
+            opCtx, *canonicalQuery, ReadPreferenceSetting::get(opCtx), &batch);
+    } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>&) {
         uasserted(40247, "OP_QUERY not supported on views");
     }
-
-    uassertStatusOK(cursorId.getStatus());
 
     // Fill out the response buffer.
     int numResults = 0;
@@ -392,7 +386,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
     return DbResponse{reply.toQueryReply(0,  // query result flags
                                          numResults,
                                          0,  // startingFrom
-                                         cursorId.getValue())};
+                                         cursorId)};
 }
 
 DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
@@ -604,19 +598,18 @@ void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
                BSONObjBuilder());
 }
 
-Status Strategy::explainFind(OperationContext* opCtx,
-                             const BSONObj& findCommand,
-                             const QueryRequest& qr,
-                             ExplainOptions::Verbosity verbosity,
-                             const ReadPreferenceSetting& readPref,
-                             BSONObjBuilder* out) {
+void Strategy::explainFind(OperationContext* opCtx,
+                           const BSONObj& findCommand,
+                           const QueryRequest& qr,
+                           ExplainOptions::Verbosity verbosity,
+                           const ReadPreferenceSetting& readPref,
+                           BSONObjBuilder* out) {
     const auto explainCmd = ClusterExplain::wrapAsExplain(findCommand, verbosity);
 
     // We will time how long it takes to run the commands on the shards.
     Timer timer;
 
-    BSONObj viewDefinition;
-    auto swShardResponses =
+    auto shardResponses =
         scatterGatherVersionedTargetByRoutingTable(opCtx,
                                                    qr.nss().db().toString(),
                                                    qr.nss(),
@@ -624,31 +617,18 @@ Status Strategy::explainFind(OperationContext* opCtx,
                                                    readPref,
                                                    Shard::RetryPolicy::kIdempotent,
                                                    qr.getFilter(),
-                                                   qr.getCollation(),
-                                                   &viewDefinition);
+                                                   qr.getCollation());
 
     long long millisElapsed = timer.millis();
-
-    if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
-        uassert(ErrorCodes::InternalError,
-                str::stream() << "Missing resolved view definition, but remote returned "
-                              << ErrorCodes::errorString(swShardResponses.getStatus().code()),
-                !viewDefinition.isEmpty());
-
-        out->appendElements(viewDefinition);
-        return swShardResponses.getStatus();
-    }
-
-    uassertStatusOK(swShardResponses.getStatus());
-    auto shardResponses = std::move(swShardResponses.getValue());
 
     const char* mongosStageName =
         ClusterExplain::getStageNameForReadOp(shardResponses.size(), findCommand);
 
-    return ClusterExplain::buildExplainResult(opCtx,
-                                              ClusterExplain::downconvert(opCtx, shardResponses),
-                                              mongosStageName,
-                                              millisElapsed,
-                                              out);
+    uassertStatusOK(
+        ClusterExplain::buildExplainResult(opCtx,
+                                           ClusterExplain::downconvert(opCtx, shardResponses),
+                                           mongosStageName,
+                                           millisElapsed,
+                                           out));
 }
 }  // namespace mongo
