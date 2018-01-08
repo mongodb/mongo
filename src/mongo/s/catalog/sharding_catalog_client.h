@@ -156,9 +156,11 @@ public:
      *
      * Returns the set of collections, or a !OK status if an error occurs.
      */
-    virtual StatusWith<std::vector<CollectionType>> getCollections(OperationContext* opCtx,
-                                                                   const std::string* dbName,
-                                                                   repl::OpTime* optime) = 0;
+    virtual StatusWith<std::vector<CollectionType>> getCollections(
+        OperationContext* opCtx,
+        const std::string* dbName,
+        repl::OpTime* optime,
+        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Drops the specified collection from the collection metadata store.
@@ -167,10 +169,7 @@ public:
      * some of the known failures:
      *  - NamespaceNotFound - collection does not exist
      */
-    virtual Status dropCollection(
-        OperationContext* opCtx,
-        const NamespaceString& ns,
-        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
+    virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
     /**
      * Retrieves all databases for a shard.

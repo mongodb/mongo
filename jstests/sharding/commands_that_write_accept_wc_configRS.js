@@ -57,54 +57,8 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         coll = db[collName];
     }
 
-    // Commands in 'commands' will accept any valid writeConcern, while 'metadataCommands' will
-    // upconvert any valid writeConcern to "majority."
-    var commands = [], metadataCommands = [];
-
-    // Drop an unsharded database.
-    commands.push({
-        req: {dropDatabase: 1},
-        setupFunc: function() {
-            coll.insert({type: 'oak'});
-            db.pine_needles.insert({type: 'pine'});
-            // As of SERVER-29277, dropping a database with any replicated collections requires a
-            // majority of nodes to be able to complete the drop. Since this test case may run with
-            // less than a majority of nodes available, we empty out the database in the "setup"
-            // phase to allow the dropDatabase command to always run to completion.
-            db.pine_needles.drop();
-            coll.drop();
-        },
-        confirmFunc: function() {
-            assert.isnull(db.getMongo().getDBNames().find(dbName => dbName == db.getName()));
-        },
-        requiresMajority: false,
-        runsOnShards: true,
-        failsOnShards: true,
-        admin: false
-    });
-
-    // Drop a sharded database.
-    commands.push({
-        req: {dropDatabase: 1},
-        setupFunc: function() {
-            shardCollectionWithChunks(st, coll);
-            coll.insert({type: 'oak', x: 11});
-            db.pine_needles.insert({type: 'pine'});
-            // As of SERVER-29277, dropping a database with any replicated collections requires a
-            // majority of nodes to be able to complete the drop. Since this test case may run with
-            // less than a majority of nodes available, we empty out the database in the "setup"
-            // phase to allow the dropDatabase command to always run to completion.
-            db.pine_needles.drop();
-            coll.drop();
-        },
-        confirmFunc: function() {
-            assert.isnull(db.getMongo().getDBNames().find(dbName => dbName == db.getName()));
-        },
-        requiresMajority: false,
-        runsOnShards: true,
-        failsOnShards: true,
-        admin: false
-    });
+    // Commands in 'commands' will accept any valid writeConcern.
+    var commands = [];
 
     commands.push({
         req: {createUser: 'username', pwd: 'password', roles: jsTest.basicUserRoles},
@@ -144,21 +98,6 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         requiresMajority: true,
         runsOnShards: false,
         failsOnShards: false,
-        admin: false
-    });
-
-    // Sharded dropCollection should return a normal error.
-    metadataCommands.push({
-        req: {drop: collName},
-        setupFunc: function() {
-            shardCollectionWithChunks(st, coll);
-        },
-        confirmFunc: function() {
-            assert.eq(coll.count(), 0);
-        },
-        requiresMajority: false,
-        runsOnShards: true,
-        failsOnShards: true,
         admin: false
     });
 
@@ -269,21 +208,11 @@ load('jstests/multiVersion/libs/auth_helpers.js');
     var majorityWC = {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS};
 
     // Config server commands require w: majority writeConcerns.
-    // TODO: SERVER-32584 mongos accepts invalid writeConcern 'w' mode
     var nonMajorityWCs = [{w: 'invalid'}, {w: 2}];
 
     commands.forEach(function(cmd) {
         nonMajorityWCs.forEach(function(wc) {
             testInvalidWriteConcern(wc, cmd);
-        });
-        testValidWriteConcern(majorityWC, cmd);
-    });
-
-    // Mongos will upconvert the WC for config server metadata commands to majority, so
-    // we check that invalid WCs still work for these commands.
-    metadataCommands.forEach(function(cmd) {
-        nonMajorityWCs.forEach(function(wc) {
-            testValidWriteConcern(wc, cmd);
         });
         testValidWriteConcern(majorityWC, cmd);
     });

@@ -151,8 +151,7 @@ public:
                 opCtx, dbStatus.getValue().value.getPrimary(), nss, &result);
         } else {
             uassertStatusOK(collStatus);
-            uassertStatusOK(catalogClient->dropCollection(
-                opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern));
+            uassertStatusOK(catalogClient->dropCollection(opCtx, nss));
         }
 
         return true;

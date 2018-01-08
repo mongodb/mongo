@@ -74,15 +74,21 @@
         },
     };
 
-    function checkCommand(conn, command, unacceptableWCs, acceptableWCs, setupFunc, cleanupFunc) {
+    function checkCommand(
+        conn, command, unacceptableWCs, acceptableWCs, adminCommand, setupFunc, cleanupFunc) {
         unacceptableWCs.forEach(function(writeConcern) {
             jsTest.log("testing " + tojson(command) + " with writeConcern " + tojson(writeConcern) +
                        " against " + conn + ", expecting the command to fail");
             setupFunc();
             let commandWithWriteConcern = {};
             Object.assign(commandWithWriteConcern, command, writeConcern);
-            assert.commandFailedWithCode(conn.adminCommand(commandWithWriteConcern),
-                                         ErrorCodes.InvalidOptions);
+            if (adminCommand) {
+                assert.commandFailedWithCode(conn.adminCommand(commandWithWriteConcern),
+                                             ErrorCodes.InvalidOptions);
+            } else {
+                assert.commandFailedWithCode(conn.runCommand(commandWithWriteConcern),
+                                             ErrorCodes.InvalidOptions);
+            }
             cleanupFunc();
         });
 
@@ -92,7 +98,11 @@
             setupFunc();
             let commandWithWriteConcern = {};
             Object.assign(commandWithWriteConcern, command, writeConcern);
-            assert.commandWorked(conn.adminCommand(commandWithWriteConcern));
+            if (adminCommand) {
+                assert.commandWorked(conn.adminCommand(commandWithWriteConcern));
+            } else {
+                assert.commandWorked(conn.runCommand(commandWithWriteConcern));
+            }
             cleanupFunc();
         });
     }
@@ -102,6 +112,7 @@
                      command,
                      unacceptableWCsForMongos,
                      acceptableWCsForMongos,
+                     true,
                      setupFunc,
                      cleanupFunc);
     }
@@ -111,6 +122,7 @@
                      command,
                      unacceptableWCsForConfig,
                      acceptableWCsForConfig,
+                     true,
                      setupFunc,
                      cleanupFunc);
     }
@@ -162,6 +174,20 @@
     checkCommandMongos({drop: ns}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
     checkCommandConfigSvr(
         {_configsvrDropCollection: ns}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
+
+    // dropDatabase
+
+    // We can't use the checkCommandMongos wrapper because we need a connection to the test
+    // database.
+    checkCommand(st.s.getDB(dbName),
+                 {dropDatabase: 1},
+                 unacceptableWCsForMongos,
+                 acceptableWCsForMongos,
+                 false,
+                 setupFuncs.createDatabase,
+                 cleanupFuncs.dropDatabase);
+    checkCommandConfigSvr(
+        {_configsvrDropDatabase: dbName}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
 
     st.stop();
 })();

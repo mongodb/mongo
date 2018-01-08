@@ -96,13 +96,13 @@ public:
         const std::string& collNs,
         repl::ReadConcernLevel readConcernLevel) override;
 
-    StatusWith<std::vector<CollectionType>> getCollections(OperationContext* opCtx,
-                                                           const std::string* dbName,
-                                                           repl::OpTime* optime) override;
+    StatusWith<std::vector<CollectionType>> getCollections(
+        OperationContext* opCtx,
+        const std::string* dbName,
+        repl::OpTime* optime,
+        repl::ReadConcernLevel readConcernLevel) override;
 
-    Status dropCollection(OperationContext* opCtx,
-                          const NamespaceString& ns,
-                          repl::ReadConcernLevel readConcernLevel) override;
+    Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) override;
 
     StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
                                                               const ShardId& shardName) override;

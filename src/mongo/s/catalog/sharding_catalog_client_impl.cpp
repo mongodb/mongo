@@ -378,7 +378,10 @@ StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientImpl::getColle
 }
 
 StatusWith<std::vector<CollectionType>> ShardingCatalogClientImpl::getCollections(
-    OperationContext* opCtx, const std::string* dbName, OpTime* opTime) {
+    OperationContext* opCtx,
+    const std::string* dbName,
+    OpTime* opTime,
+    repl::ReadConcernLevel readConcernLevel) {
     BSONObjBuilder b;
     if (dbName) {
         invariant(!dbName->empty());
@@ -388,7 +391,7 @@ StatusWith<std::vector<CollectionType>> ShardingCatalogClientImpl::getCollection
 
     auto findStatus = _exhaustiveFindOnConfig(opCtx,
                                               kConfigReadSelector,
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
+                                              readConcernLevel,
                                               NamespaceString(CollectionType::ConfigNS),
                                               b.obj(),
                                               BSONObj(),
@@ -422,8 +425,7 @@ StatusWith<std::vector<CollectionType>> ShardingCatalogClientImpl::getCollection
 }
 
 Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
-                                                 const NamespaceString& ns,
-                                                 repl::ReadConcernLevel readConcernLevel) {
+                                                 const NamespaceString& ns) {
     logChange(opCtx,
               "dropCollection.start",
               ns.ns(),
@@ -431,7 +433,7 @@ Status ShardingCatalogClientImpl::dropCollection(OperationContext* opCtx,
               ShardingCatalogClientImpl::kMajorityWriteConcern)
         .ignore();
 
-    auto shardsStatus = getAllShards(opCtx, readConcernLevel);
+    auto shardsStatus = getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
     if (!shardsStatus.isOK()) {
         return shardsStatus.getStatus();
     }

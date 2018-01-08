@@ -412,24 +412,6 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
     return Command::appendCommandStatus(result, status);
 }
 
-std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
-                                                           StringData dbName) {
-    const auto dbNameStr = dbName.toString();
-
-    const std::vector<CollectionType> collectionsOnConfig = uassertStatusOK(
-        Grid::get(opCtx)->catalogClient()->getCollections(opCtx, &dbNameStr, nullptr));
-
-    std::vector<NamespaceString> collectionsToReturn;
-    for (const auto& coll : collectionsOnConfig) {
-        if (coll.getDropped())
-            continue;
-
-        collectionsToReturn.push_back(coll.getNs());
-    }
-
-    return collectionsToReturn;
-}
-
 CachedCollectionRoutingInfo getShardedCollection(OperationContext* opCtx,
                                                  const NamespaceString& nss) {
     auto routingInfo =
