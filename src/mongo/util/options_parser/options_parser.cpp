@@ -48,6 +48,7 @@
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 namespace optionenvironment {
@@ -901,9 +902,25 @@ Status OptionsParser::readConfigFile(const std::string& filename, std::string* c
         configVector.resize(nread);
     }
 
-    // config file cannot have null bytes
+    // Config files cannot have null bytes
     if (end(configVector) != std::find(begin(configVector), end(configVector), '\0')) {
-        return Status(ErrorCodes::FailedToParse, "Config file has null bytes");
+
+#if defined(_WIN32)
+        // On Windows, it is common for files to be saved by Notepad as UTF-16 with a BOM so convert
+        // it for the user. If the file lacks a BOM, but is UTF-16 encoded we will fail rather then
+        // try to guess the file encoding.
+        const std::array<unsigned char, 2> UTF16LEBOM = {0xff, 0xfe};
+        if (configVector.size() >= UTF16LEBOM.size() &&
+            memcmp(configVector.data(), UTF16LEBOM.data(), UTF16LEBOM.size()) == 0) {
+            auto wstr = std::wstring(configVector.begin() + 2, configVector.end());
+            *contents = toUtf8String(wstr);
+            return Status::OK();
+        }
+#endif
+
+        return Status(
+            ErrorCodes::FailedToParse,
+            "Config file has null bytes, ensure the file is saved as UTF-8 and not UTF-16.");
     }
 
     // Copy the vector contents into our result string

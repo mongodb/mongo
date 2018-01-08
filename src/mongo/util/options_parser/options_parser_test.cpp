@@ -25,11 +25,15 @@
  *    then also delete it in the license file.
  */
 
+#include <array>
+#include <boost/filesystem.hpp>
+#include <fstream>
 #include <map>
 #include <ostream>
 #include <sstream>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/environment.h"
@@ -4630,5 +4634,75 @@ TEST(NumericalBaseParsing, YAMLConfigFile) {
     ASSERT_OK(value.get(&unsignedVal));
     ASSERT_EQUALS(unsignedVal, 0x10U);
 }
+
+void TestFile(std::vector<unsigned char> contents, bool valid) {
+    mongo::unittest::TempDir tempdir("options_testpath");
+    boost::filesystem::path p(tempdir.path());
+    p /= "config.yaml";
+
+    {
+        std::ofstream ofs(p.generic_string(), std::ios::binary);
+        ofs.write(reinterpret_cast<char*>(contents.data()), contents.size());
+    }
+
+    moe::OptionsParser parser;
+    moe::Environment environment;
+
+    moe::OptionSection testOpts;
+    testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+    testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back(p.generic_string());
+    std::map<std::string, std::string> env_map;
+
+    if (valid) {
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 1234);
+    } else {
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+}
+
+#if defined(_WIN32)
+// Positive: Validate a UTF-16 file with a BOM can be parsed
+TEST(YAMLConfigFile, UTF16WithBOMFile) {
+    // This array represents a file with a UTF-16 LE BOM and the contents:
+    // port: 1234
+    // <blank line>
+    std::vector<unsigned char> data{0xff, 0xfe, 0x70, 0x00, 0x6f, 0x00, 0x72, 0x00, 0x74,
+                                    0x00, 0x3a, 0x00, 0x20, 0x00, 0x31, 0x00, 0x32, 0x00,
+                                    0x33, 0x00, 0x34, 0x00, 0x0d, 0x00, 0x0a, 0x00};
+    TestFile(data, true);
+}
+
+// Negative: Validate a UTF-16 file without a BOM cannot be parsed
+TEST(YAMLConfigFile, UTF16WithoutBOMFile) {
+    // This array represents a file with a UTF-16 with a BOM and the contents:
+    // port: 1234
+    // <blank line>
+    std::vector<unsigned char> data{0x70, 0x00, 0x6f, 0x00, 0x72, 0x00, 0x74, 0x00,
+                                    0x3a, 0x00, 0x20, 0x00, 0x31, 0x00, 0x32, 0x00,
+                                    0x33, 0x00, 0x34, 0x00, 0x0d, 0x00, 0x0a, 0x00};
+    TestFile(data, false);
+}
+
+// Positive: Validate a UTF-8 file with a BOM can be parsed
+TEST(YAMLConfigFile, UTF8WithBOMFile) {
+    // This array represents a file with a UTF-8 BOM and the contents:
+    // port: 1234
+    // <blank line>
+    std::vector<unsigned char> data{
+        0xef, 0xbb, 0xbf, 0x70, 0x6f, 0x72, 0x74, 0x3a, 0x20, 0x31, 0x32, 0x33, 0x34, 0x0d, 0x0a};
+    TestFile(data, true);
+}
+#endif
 
 }  // unnamed namespace
