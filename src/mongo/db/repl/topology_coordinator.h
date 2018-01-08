@@ -52,6 +52,9 @@ class ReplSetConfig;
 class TagSubgroup;
 struct MemberState;
 
+// Maximum number of retries for a failed heartbeat.
+const int kMaxHeartbeatRetries = 2;
+
 /**
  * Replication Topology Coordinator
  *
@@ -1046,7 +1049,7 @@ public:
      * last call to start(). Otherwise, returns false.
      */
     bool hasFailed() const {
-        return (_numFailuresSinceLastStart > _kMaxHeartbeatRetries) ||
+        return (_numFailuresSinceLastStart > kMaxHeartbeatRetries) ||
             (_goodHeartbeatReceived == true);
     }
 
@@ -1054,14 +1057,12 @@ public:
      * Gets the number of retries left for a failed heartbeat.
      */
     int retriesLeft() const {
-        return _kMaxHeartbeatRetries - _numFailuresSinceLastStart;
+        return kMaxHeartbeatRetries - _numFailuresSinceLastStart;
     }
 
 private:
     static constexpr Milliseconds UninitializedPing{-1};
 
-    // Maximum number of retries for a failed heartbeat.
-    int _kMaxHeartbeatRetries = 2;
     unsigned int count = 0;
     Milliseconds value = UninitializedPing;
     Date_t _lastHeartbeatStartDate;
