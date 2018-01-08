@@ -38,7 +38,7 @@ def assignErrorCodes():
             print( x )
             didAnything = False
             fixed = ""
-            for line in open( x ):
+            for line in open( x, encoding="UTF-8" ):
                 s = line.partition( root + "(" )
                 if s[1] == "" or line.startswith( "#define " + root):
                     fixed += line
@@ -47,7 +47,7 @@ def assignErrorCodes():
                 cur = cur + 1
                 didAnything = True
             if didAnything:
-                out = open( x , 'w' )
+                out = open( x , 'w', encoding="UTF-8" )
                 out.write( fixed )
                 out.close()
 
@@ -69,7 +69,7 @@ def parseSourceFiles( callback ):
         if list_files:
             print('scanning file: ' + sourceFile)
 
-        with open(sourceFile) as f:
+        with open(sourceFile, encoding="UTF-8") as f:
             text = f.read()
 
             if not any([zz in text for zz in quick]):
@@ -94,7 +94,7 @@ def parseSourceFiles( callback ):
 # Converts an absolute position in a file into a line number.
 def getLineAndColumnForPosition(loc, _file_cache={}):
     if loc.sourceFile not in _file_cache:
-        with open(loc.sourceFile) as f:
+        with open(loc.sourceFile, encoding="UTF-8") as f:
             text = f.read()
             line_offsets = [0]
             for line in text.splitlines(True):
@@ -201,7 +201,7 @@ def replaceBadCodes( errors, nextCode ):
 
         ln = lineNum - 1
 
-        with open(sourceFile, 'r+') as f:
+        with open(sourceFile, 'r+', encoding="UTF-8") as f:
             print("LINE_%d_BEFORE:%s" % (lineNum, f.readlines()[ln].rstrip()))
 
             f.seek(0)
