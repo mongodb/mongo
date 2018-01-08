@@ -86,7 +86,7 @@ BSONObj selectMedianKey(OperationContext* opCtx,
 
 class SplitCollectionCmd : public ErrmsgCommandDeprecated {
 public:
-    SplitCollectionCmd() : ErrmsgCommandDeprecated("split", "split") {}
+    SplitCollectionCmd() : ErrmsgCommandDeprecated("split") {}
 
     bool slaveOk() const override {
         return true;

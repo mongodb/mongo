@@ -51,18 +51,12 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/invariant.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 using logger::LogComponent;
-
-Command::CommandMap* Command::_commandsByBestName = nullptr;
-Command::CommandMap* Command::_commands = nullptr;
-
-Counter64 Command::unknownCommands;
-static ServerStatusMetricField<Counter64> displayUnknownCommands("commands.<UNKNOWN>",
-                                                                 &Command::unknownCommands);
 
 namespace {
 
@@ -205,19 +199,7 @@ Command::Command(StringData name, StringData oldName)
     : _name(name.toString()),
       _commandsExecutedMetric("commands." + _name + ".total", &_commandsExecuted),
       _commandsFailedMetric("commands." + _name + ".failed", &_commandsFailed) {
-    // register ourself.
-    if (_commands == 0)
-        _commands = new CommandMap();
-    if (_commandsByBestName == 0)
-        _commandsByBestName = new CommandMap();
-    Command*& c = (*_commands)[name];
-    if (c)
-        log() << "warning: 2 commands with name: " << _name;
-    c = this;
-    (*_commandsByBestName)[name] = this;
-
-    if (!oldName.empty())
-        (*_commands)[oldName.toString()] = this;
+    globalCommandRegistry()->registerCommand(this, name, oldName);
 }
 
 void Command::help(std::stringstream& help) const {
@@ -233,29 +215,11 @@ Status Command::explain(OperationContext* opCtx,
 }
 
 BSONObj Command::runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request) {
-    auto command = Command::findCommand(request.getCommandName());
-    invariant(command);
-
-    BSONObjBuilder out;
-    try {
-        bool ok = command->publicRun(opCtx, request, out);
-        appendCommandStatus(out, ok);
-    } catch (const StaleConfigException&) {
-        // These exceptions are intended to be handled at a higher level and cannot losslessly
-        // round-trip through Status.
-        throw;
-    } catch (const DBException& ex) {
-        out.resetToEmpty();
-        appendCommandStatus(out, ex.toStatus());
-    }
-    return out.obj();
+    return CommandHelpers::runCommandDirectly(opCtx, request);
 }
 
 Command* Command::findCommand(StringData name) {
-    CommandMap::const_iterator i = _commands->find(name);
-    if (i == _commands->end())
-        return 0;
-    return i->second;
+    return globalCommandRegistry()->findCommand(name);
 }
 
 bool Command::appendCommandStatus(BSONObjBuilder& result, const Status& status) {
@@ -514,6 +478,49 @@ BSONObj Command::filterCommandReplyForPassthrough(const BSONObj& cmdObj) {
     BSONObjBuilder bob;
     filterCommandReplyForPassthrough(cmdObj, &bob);
     return bob.obj();
+}
+
+void CommandRegistry::registerCommand(Command* command, StringData name, StringData oldName) {
+    for (StringData key : {name, oldName}) {
+        if (key.empty()) {
+            continue;
+        }
+        auto hashedKey = CommandMap::HashedKey(key);
+        auto iter = _commands.find(hashedKey);
+        invariant(iter == _commands.end(), str::stream() << "command name collision: " << key);
+        _commands[hashedKey] = command;
+    }
+}
+
+Command* CommandRegistry::findCommand(StringData name) const {
+    auto it = _commands.find(name);
+    if (it == _commands.end())
+        return nullptr;
+    return it->second;
+}
+
+BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request) {
+    auto command = globalCommandRegistry()->findCommand(request.getCommandName());
+    invariant(command);
+
+    BSONObjBuilder out;
+    try {
+        bool ok = command->publicRun(opCtx, request, out);
+        Command::appendCommandStatus(out, ok);
+    } catch (const StaleConfigException&) {
+        // These exceptions are intended to be handled at a higher level and cannot losslessly
+        // round-trip through Status.
+        throw;
+    } catch (const DBException& ex) {
+        out.resetToEmpty();
+        Command::appendCommandStatus(out, ex.toStatus());
+    }
+    return out.obj();
+}
+
+CommandRegistry* globalCommandRegistry() {
+    static auto reg = new CommandRegistry();
+    return reg;
 }
 
 }  // namespace mongo

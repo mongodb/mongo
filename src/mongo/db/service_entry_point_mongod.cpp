@@ -857,7 +857,7 @@ DbResponse runCommands(OperationContext* opCtx, const Message& message) {
             // we restrict the log message to the name of the unrecognized command.
             // However, the complete command object will still be echoed to the client.
             if (!(c = Command::findCommand(request.getCommandName()))) {
-                Command::unknownCommands.increment();
+                globalCommandRegistry()->incrementUnknownCommands();
                 std::string msg = str::stream() << "no such command: '" << request.getCommandName()
                                                 << "'";
                 LOG(2) << msg;

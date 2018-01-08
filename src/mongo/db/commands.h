@@ -300,17 +300,6 @@ public:
      */
     bool publicRun(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder& result);
 
-    static const CommandMap& allCommands() {
-        return *_commands;
-    }
-
-    static const CommandMap& allCommandsByBestName() {
-        return *_commandsByBestName;
-    }
-
-    // Counter for unknown commands
-    static Counter64 unknownCommands;
-
     /**
      * Runs a command directly and returns the result. Does not do any other work normally handled
      * by command dispatch, such as checking auth, dealing with CurOp or waiting for write concern.
@@ -468,9 +457,6 @@ public:
     static BSONObj filterCommandReplyForPassthrough(const BSONObj& reply);
 
 private:
-    static CommandMap* _commands;
-    static CommandMap* _commandsByBestName;
-
     /**
      * Runs the command.
      *
@@ -588,5 +574,42 @@ class ErrmsgCommandDeprecated : public BasicCommand {
                            std::string& errmsg,
                            BSONObjBuilder& result) = 0;
 };
+
+// Struct as closed namespace. Nothing but statics.
+struct CommandHelpers {
+    static BSONObj runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request);
+};
+
+// See the 'globalCommandRegistry()' singleton accessor.
+class CommandRegistry {
+public:
+    using CommandMap = Command::CommandMap;
+
+    CommandRegistry() : _unknownsMetricField("commands.<UNKNOWN>", &_unknowns) {}
+
+    CommandRegistry(const CommandRegistry&) = delete;
+    CommandRegistry& operator=(const CommandRegistry&) = delete;
+
+    const CommandMap& allCommands() const {
+        return _commands;
+    }
+
+    void registerCommand(Command* command, StringData name, StringData oldName);
+
+    Command* findCommand(StringData name) const;
+
+    void incrementUnknownCommands() {
+        _unknowns.increment();
+    }
+
+private:
+    Counter64 _unknowns;
+    ServerStatusMetricField<Counter64> _unknownsMetricField;
+
+    CommandMap _commands;
+};
+
+// Accessor to the command registry, an always-valid singleton.
+CommandRegistry* globalCommandRegistry();
 
 }  // namespace mongo
