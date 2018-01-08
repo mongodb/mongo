@@ -15,6 +15,11 @@
     if (storageEngine !== "wiredTiger") {
         print('Skipping test because storageEngine is not "wiredTiger"');
         return;
+    } else if (jsTest.options().wiredTigerCollectionConfigString === "type=lsm") {
+        // Readers of old data, such as a lagged secondary, can lead to stalls when using
+        // WiredTiger's LSM tree.
+        print("WT-3742: Skipping test because we're running with WiredTiger's LSM tree");
+        return;
     } else {
         var rst = new ReplSetTest({
             nodes: 2,
