@@ -2956,30 +2956,14 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "doTxn_empty",
-          command: {doTxn: []},
-          skipSharded: true,
-          testcases: [
-              {
-                roles: {__system: 1},
-                runOnDb: adminDbName,
-              },
-              {
-                roles: {__system: 1},
-                runOnDb: firstDbName,
-              }
-          ]
-        },
-        {
           testname: "doTxn_precondition",
           command: {
               doTxn: [{
-                  "ts": Timestamp(1473353037, 1),
                   "h": NumberLong(0),
                   "v": 2,
-                  "op": "n",
-                  "ns": "",
-                  "o": {}
+                  "op": "i",
+                  "ns": firstDbName + ".x",
+                  "o": {"_id": ObjectId("57dc3d7da4fce4358afa85b8"), "data": 5}
               }],
               preCondition: [{ns: firstDbName + ".x", q: {x: 5}, res: []}]
           },
@@ -2995,49 +2979,15 @@ var authCommandsLib = {
                 runOnDb: adminDbName,
                 privileges: [
                     {resource: {db: firstDbName, collection: "x"}, actions: ["find"]},
-                    {
-                      resource: {cluster: true},
-                      actions: ["appendOplogNote"],
-                      removeWhenTestingAuthzFailure: false
-                    },
+                    {resource: {db: firstDbName, collection: "x"}, actions: ["insert"]},
                 ],
               },
-          ]
-        },
-        {
-          testname: "doTxn_noop",
-          command: {
-              doTxn: [{
-                  "ts": Timestamp(1473353037, 1),
-                  "h": NumberLong(0),
-                  "v": 2,
-                  "op": "n",
-                  "ns": "",
-                  "o": {}
-              }]
-          },
-          skipSharded: true,
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                privileges: [
-                    {resource: {cluster: true}, actions: ["appendOplogNote"]},
-                ],
-              },
-              {
-                runOnDb: firstDbName,
-                privileges: [
-                    {resource: {cluster: true}, actions: ["appendOplogNote"]},
-                ],
-                expectFailure: true
-              }
           ]
         },
         {
           testname: "doTxn_insert",
           command: {
               doTxn: [{
-                  "ts": Timestamp(1474051453, 1),
                   "h": NumberLong(0),
                   "v": 2,
                   "op": "i",
@@ -3067,7 +3017,6 @@ var authCommandsLib = {
           command: function(state) {
               return {
                   doTxn: [{
-                      "ts": Timestamp(1474051453, 1),
                       "h": NumberLong(0),
                       "v": 2,
                       "op": "i",
@@ -3106,7 +3055,6 @@ var authCommandsLib = {
           command: function(state) {
               return {
                   doTxn: [{
-                      "ts": Timestamp(1474051453, 1),
                       "h": NumberLong(0),
                       "v": 2,
                       "op": "i",
@@ -3149,7 +3097,6 @@ var authCommandsLib = {
           command: function(state) {
               return {
                   doTxn: [{
-                      "ts": Timestamp(1474051453, 1),
                       "h": NumberLong(0),
                       "v": 2,
                       "op": "i",
@@ -3188,7 +3135,6 @@ var authCommandsLib = {
           command: function(state) {
               return {
                   doTxn: [{
-                      "ts": Timestamp(1474051453, 1),
                       "h": NumberLong(0),
                       "v": 2,
                       "op": "i",
@@ -3230,7 +3176,6 @@ var authCommandsLib = {
           command: function(state) {
               return {
                   doTxn: [{
-                      "ts": Timestamp(1474051453, 1),
                       "h": NumberLong(0),
                       "v": 2,
                       "op": "i",
@@ -3272,7 +3217,6 @@ var authCommandsLib = {
           testname: "doTxn_upsert",
           command: {
               doTxn: [{
-                  "ts": Timestamp(1474053682, 1),
                   "h": NumberLong(0),
                   "v": 2,
                   "op": "u",
@@ -3302,7 +3246,6 @@ var authCommandsLib = {
           testname: "doTxn_update",
           command: {
               doTxn: [{
-                  "ts": Timestamp(1474053682, 1),
                   "h": NumberLong(0),
                   "v": 2,
                   "op": "u",
@@ -3334,7 +3277,6 @@ var authCommandsLib = {
           command: function(state) {
               return {
                   doTxn: [{
-                      "ts": Timestamp(1474053682, 1),
                       "h": NumberLong(0),
                       "v": 2,
                       "op": "u",
@@ -3375,7 +3317,6 @@ var authCommandsLib = {
           command: function(state) {
               return {
                   doTxn: [{
-                      "ts": Timestamp(1474053682, 1),
                       "h": NumberLong(0),
                       "v": 2,
                       "op": "u",
@@ -3414,7 +3355,6 @@ var authCommandsLib = {
           testname: "doTxn_delete",
           command: {
               doTxn: [{
-                  "ts": Timestamp(1474056194, 1),
                   "h": NumberLong(0),
                   "v": 2,
                   "op": "d",

@@ -49,6 +49,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/do_txn.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
@@ -59,35 +60,12 @@
 namespace mongo {
 namespace {
 
-bool checkCOperationType(const BSONObj& opObj, const StringData opName) {
-    BSONElement opTypeElem = opObj["op"];
-    checkBSONType(BSONType::String, opTypeElem);
-    const StringData opType = opTypeElem.checkAndGetStringData();
-
-    if (opType == "c"_sd) {
-        BSONElement oElem = opObj["o"];
-        checkBSONType(BSONType::Object, oElem);
-        BSONObj o = oElem.Obj();
-
-        if (o.firstElement().fieldNameStringData() == opName) {
-            return true;
-        }
-    }
-    return false;
-};
-
 /**
- * Returns kNeedsSuperuser, if the provided doTxn command contains
- * an empty doTxn command or createCollection/renameCollection commands are mixed in doTxn
- * batch. Returns kNeedForceAndUseUUID if an operation contains a UUID, and will create a collection
- * with the user-specified UUID. Returns
- * kNeedsUseUUID if the operation contains a UUID. Returns kOk if no conditions
- * which must be specially handled are detected. May throw exceptions if the input is malformed.
+ * Returns kNeedsUseUUID if the operation contains a UUID. Returns kOk if no conditions
+ * which must be specially handled are detected. Throws an exception if the input is malformed or
+ * if a command is in the list of ops.
  */
-OplogApplicationValidity validateDoTxnCommand(const BSONObj& cmdObj) {
-    const size_t maxDoTxnDepth = 10;
-    std::stack<std::pair<size_t, BSONObj>> toCheck;
-
+OplogApplicationValidity validateDoTxnCommand(const BSONObj& doTxnObj) {
     auto operationContainsUUID = [](const BSONObj& opObj) {
         auto anyTopLevelElementIsUUID = [](const BSONObj& opObj) {
             for (const BSONElement opElement : opObj) {
@@ -121,73 +99,31 @@ OplogApplicationValidity validateDoTxnCommand(const BSONObj& cmdObj) {
 
     OplogApplicationValidity ret = OplogApplicationValidity::kOk;
 
-    // Insert the top level doTxn command into the stack.
-    toCheck.emplace(std::make_pair(0, cmdObj));
+    checkBSONType(BSONType::Array, doTxnObj.firstElement());
+    // Check if the doTxn command is empty.  There's no good reason for an empty transaction,
+    // so reject it.
+    uassert(ErrorCodes::InvalidOptions,
+            "An empty doTxn command is not allowed.",
+            !doTxnObj.firstElement().Array().empty());
 
-    while (!toCheck.empty()) {
-        size_t depth;
-        BSONObj doTxnObj;
-        std::tie(depth, doTxnObj) = toCheck.top();
-        toCheck.pop();
+    // Iterate the ops.
+    for (BSONElement element : doTxnObj.firstElement().Array()) {
+        checkBSONType(BSONType::Object, element);
+        BSONObj opObj = element.Obj();
 
-        checkBSONType(BSONType::Array, doTxnObj.firstElement());
-        // Check if the doTxn command is empty. This is probably not something that should
-        // happen, so require a superuser to do this.
-        if (doTxnObj.firstElement().Array().empty()) {
-            return OplogApplicationValidity::kNeedsSuperuser;
-        }
+        // If the op is a command, it's illegal.
+        BSONElement opTypeElem = opObj["op"];
+        const StringData opTypeStr = opTypeElem.checkAndGetStringData();
+        auto opType = repl::OpType_parse(IDLParserErrorContext("validateDoTxnCommand"), opTypeStr);
+        uassert(ErrorCodes::InvalidOptions,
+                "Commands cannot be applied via doTxn.",
+                opType != repl::OpTypeEnum::kCommand);
 
-        // createCollection and renameCollection are only allowed to be applied
-        // individually. Ensure there is no create/renameCollection in a batch
-        // of size greater than 1.
-        if (doTxnObj.firstElement().Array().size() > 1) {
-            for (const BSONElement& e : doTxnObj.firstElement().Array()) {
-                checkBSONType(BSONType::Object, e);
-                auto oplogEntry = e.Obj();
-                if (checkCOperationType(oplogEntry, "create"_sd) ||
-                    checkCOperationType(oplogEntry, "renameCollection"_sd)) {
-                    return OplogApplicationValidity::kNeedsSuperuser;
-                }
-            }
-        }
-
-        // For each doTxn command, iterate the ops.
-        for (BSONElement element : doTxnObj.firstElement().Array()) {
-            checkBSONType(BSONType::Object, element);
-            BSONObj opObj = element.Obj();
-
-            bool opHasUUIDs = operationContainsUUID(opObj);
-
-            if (serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
-                uassert(ErrorCodes::OplogOperationUnsupported,
-                        "doTxn with UUID requires upgrading to FeatureCompatibilityVersion 3.6",
-                        !opHasUUIDs);
-            }
-
-            // If the op uses any UUIDs at all then the user must possess extra privileges.
-            if (opHasUUIDs && ret == OplogApplicationValidity::kOk)
-                ret = OplogApplicationValidity::kNeedsUseUUID;
-            if (opHasUUIDs && checkCOperationType(opObj, "create"_sd)) {
-                // If the op is 'c' and forces the server to ingest a collection
-                // with a specific, user defined UUID.
-                ret = OplogApplicationValidity::kNeedsForceAndUseUUID;
-            }
-
-            // If the op contains a nested doTxn...
-            if (checkCOperationType(opObj, "doTxn"_sd)) {
-                // And we've recursed too far, then bail out.
-                uassert(ErrorCodes::FailedToParse, "Too many nested doTxn", depth < maxDoTxnDepth);
-
-                // Otherwise, if the op contains an doTxn, but we haven't recursed too far:
-                // extract the doTxn command, and insert it into the stack.
-                checkBSONType(BSONType::Object, opObj["o"]);
-                BSONObj oObj = opObj["o"].Obj();
-                toCheck.emplace(std::make_pair(depth + 1, std::move(oObj)));
-            }
+        // If the op uses any UUIDs at all then the user must possess extra privileges.
+        if (operationContainsUUID(opObj)) {
+            ret = OplogApplicationValidity::kNeedsUseUUID;
         }
     }
-
     return ret;
 }
 
@@ -212,8 +148,7 @@ public:
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) override {
         OplogApplicationValidity validity = validateDoTxnCommand(cmdObj);
-        return OplogApplicationChecks::checkAuthForCommand(
-            opCtx, dbname, cmdObj, validity, OplogApplicationCommand::kDoTxnCmd);
+        return OplogApplicationChecks::checkAuthForCommand(opCtx, dbname, cmdObj, validity);
     }
 
     bool run(OperationContext* opCtx,
@@ -241,36 +176,7 @@ public:
         // was acknowledged. To fix this, we should wait for replication of the node’s last applied
         // OpTime if the last write operation was a no-op write.
 
-        // We set the OplogApplication::Mode argument based on the mode argument given in the
-        // command object. If no mode is given, default to the 'kApplyOpsCmd' mode.
-        repl::OplogApplication::Mode oplogApplicationMode =
-            repl::OplogApplication::Mode::kApplyOpsCmd;  // the default mode.
-        std::string oplogApplicationModeString;
-        status = bsonExtractStringField(
-            cmdObj, DoTxn::kOplogApplicationModeFieldName, &oplogApplicationModeString);
-
-        if (status.isOK()) {
-            auto modeSW = repl::OplogApplication::parseMode(oplogApplicationModeString);
-            if (!modeSW.isOK()) {
-                // Unable to parse the mode argument.
-                return appendCommandStatus(
-                    result,
-                    modeSW.getStatus().withContext(str::stream() << "Could not parse " +
-                                                       DoTxn::kOplogApplicationModeFieldName));
-            }
-            oplogApplicationMode = modeSW.getValue();
-        } else if (status != ErrorCodes::NoSuchKey) {
-            // NoSuchKey means the user did not supply a mode.
-            return appendCommandStatus(result,
-                                       Status(status.code(),
-                                              str::stream() << "Could not parse out "
-                                                            << DoTxn::kOplogApplicationModeFieldName
-                                                            << ": "
-                                                            << status.reason()));
-        }
-
-        auto doTxnStatus = appendCommandStatus(
-            result, doTxn(opCtx, dbname, cmdObj, oplogApplicationMode, &result));
+        auto doTxnStatus = appendCommandStatus(result, doTxn(opCtx, dbname, cmdObj, &result));
 
         return doTxnStatus;
     }

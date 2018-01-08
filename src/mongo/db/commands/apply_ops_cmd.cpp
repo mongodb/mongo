@@ -219,8 +219,7 @@ public:
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) override {
         OplogApplicationValidity validity = validateApplyOpsCommand(cmdObj);
-        return OplogApplicationChecks::checkAuthForCommand(
-            opCtx, dbname, cmdObj, validity, OplogApplicationCommand::kApplyOpsCmd);
+        return OplogApplicationChecks::checkAuthForCommand(opCtx, dbname, cmdObj, validity);
     }
 
     bool run(OperationContext* opCtx,
