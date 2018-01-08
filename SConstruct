@@ -2533,8 +2533,20 @@ def doConfigure(myenv):
             context.Result(ret)
             return ret
 
+        def CheckForGlibcDefinesFortify(context):
+            test_body="""
+            #ifndef _FORTIFY_SOURCE
+            #error
+            #endif
+            """
+            context.Message('Checking for predefined _FORTIFY_SOURCE...')
+            ret = context.TryCompile(textwrap.dedent(test_body), ".c")
+            context.Result(ret)
+            return ret
+
         conf = Configure(myenv, help=False, custom_tests = {
             'CheckForFortify': CheckForGlibcKnownToSupportFortify,
+            'CheckForFortifyDefined': CheckForGlibcDefinesFortify,
         })
 
         # Fortify only possibly makes sense on POSIX systems, and we know that clang is not a valid
@@ -2543,6 +2555,10 @@ def doConfigure(myenv):
         # http://lists.llvm.org/pipermail/cfe-dev/2015-November/045852.html
         #
         if env.TargetOSIs('posix') and not env.ToolchainIs('clang') and conf.CheckForFortify():
+            if conf.CheckForFortifyDefined():
+                conf.env.Prepend(
+                    CPPFLAGS='-U_FORTIFY_SOURCE'
+                )
             conf.env.Append(
                 CPPDEFINES=[
                     ('_FORTIFY_SOURCE', 2),
