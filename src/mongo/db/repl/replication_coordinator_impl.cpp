@@ -1614,7 +1614,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
                 _topCoord->fillMemberData(&progress);
                 log() << "Replication for failed WC: " << writeConcern.toBSON()
                       << ", waitInfo: " << waiter << ", opID: " << opCtx->getOpID()
-                      << ", progress: " << progress.done();
+                      << ", minSnapshot: " << minSnapshot << ", progress: " << progress.done();
             }
             return {ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
         }
