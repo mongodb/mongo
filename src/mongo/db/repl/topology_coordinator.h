@@ -1041,38 +1041,27 @@ public:
     }
 
     /**
-     * Gets the number of failures since start() was last called.
-     *
-     * This value is incremented by calls to miss() and cleared by calls to start().
-     * 
+     * Returns true if the number of failed heartbeats has exceeded the max number
+     * of heartbeat retries or if a good heartbeat has been received since the
+     * last call to start(). Otherwise, returns false.
      */
-    int getNumFailuresSinceLastStart() const {
-        return _numFailuresSinceLastStart;
+    bool hasFailed() const {
+        return (_numFailuresSinceLastStart > _kMaxHeartbeatRetries) ||
+            (_goodHeartbeatReceived == true);
     }
 
     /**
-     * Gets a flag that indicates whether the number of failed heartbeats has
-     * exceeded the max number of heartbeat retries or whether a good
-     * heartbeat has been received since the last call to start(). 
+     * Gets the number of retries left for a failed heartbeat.
      */
-    bool noMoreRetries() const {
-        return _numFailuresSinceLastStart > 2 || _goodHeartbeatReceived == true;
-    }
-	
-    /**
-     * Gets a flag that indicates whether a good heartbeat was received
-     * since the last call to start().
-     *
-     * This value is set to false on calls to start() and set to true on
-     * call to hit().
-     */
-    bool getGoodHeartbeatReceived() const {
-        return _goodHeartbeatReceived;
+    int retriesLeft() const {
+        return _kMaxHeartbeatRetries - _numFailuresSinceLastStart;
     }
 
 private:
     static constexpr Milliseconds UninitializedPing{-1};
 
+    // Maximum number of retries for a failed heartbeat.
+    int _kMaxHeartbeatRetries = 2;
     unsigned int count = 0;
     Milliseconds value = UninitializedPing;
     Date_t _lastHeartbeatStartDate;
