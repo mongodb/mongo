@@ -146,7 +146,7 @@ private:
                                            ResumeToken token);
 
     ResumeToken _token;
-    bool _seenDoc;
+    bool _haveSeenResumeToken;
 };
 
 }  // namespace mongo

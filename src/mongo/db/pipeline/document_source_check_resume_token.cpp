@@ -51,24 +51,66 @@ DocumentSourceEnsureResumeTokenPresent::create(const intrusive_ptr<ExpressionCon
 
 DocumentSourceEnsureResumeTokenPresent::DocumentSourceEnsureResumeTokenPresent(
     const intrusive_ptr<ExpressionContext>& expCtx, ResumeToken token)
-    : DocumentSource(expCtx), _token(std::move(token)), _seenDoc(false) {}
+    : DocumentSource(expCtx), _token(std::move(token)), _haveSeenResumeToken(false) {}
 
 DocumentSource::GetNextResult DocumentSourceEnsureResumeTokenPresent::getNext() {
     pExpCtx->checkForInterrupt();
 
-    auto nextInput = pSource->getNext();
-    if (_seenDoc || !nextInput.isAdvanced())
-        return nextInput;
+    if (_haveSeenResumeToken) {
+        // We've already verified the resume token is present.
+        return pSource->getNext();
+    }
 
-    _seenDoc = true;
-    auto doc = nextInput.getDocument();
+    bool cannotResume = false;
+    const auto tokenDataWeAreSearchingFor = _token.getData();
+    ResumeToken tokenFromSource;
 
-    auto receivedToken = ResumeToken::parse(doc["_id"].getDocument());
-    uassert(40585,
-            str::stream()
-                << "resume of change stream was not possible, as the resume token was not found. "
-                << receivedToken.toDocument().toString(),
-            receivedToken == _token);
+    // Keep iterating the stream until we see either the resume token we're looking for,
+    // or a change with a higher timestamp than our resume token.
+    while (!cannotResume && !_haveSeenResumeToken) {
+        auto nextInput = pSource->getNext();
+
+        if (!nextInput.isAdvanced())
+            return nextInput;
+
+        auto doc = nextInput.getDocument();
+
+        tokenFromSource = ResumeToken::parse(doc["_id"].getDocument());
+        auto tokenDataFromSource = tokenFromSource.getData();
+
+        // We start the resume with a $gte query on the timestamp, so we never expect it to be
+        // lower than our resume token's timestamp.
+        invariant(tokenDataFromSource.clusterTime >= tokenDataWeAreSearchingFor.clusterTime);
+
+        // The incoming documents are sorted on clusterTime, uuid, documentKey. We examine a range
+        // of documents that have the same prefix (i.e. clusterTime and uuid). If the user provided
+        // token would sort before this received document we cannot resume the change stream.
+        // Use the simple collation to compare the resume tokens.
+        // Note this is purposefully avoiding the user's requested collation.
+        if (tokenDataWeAreSearchingFor.clusterTime == tokenDataFromSource.clusterTime) {
+            if (tokenDataWeAreSearchingFor.uuid != tokenDataFromSource.uuid) {
+                cannotResume = true;
+            } else if (ValueComparator::kInstance.evaluate(tokenDataWeAreSearchingFor.documentKey ==
+                                                           tokenDataFromSource.documentKey)) {
+                _haveSeenResumeToken = true;
+            } else if (ValueComparator::kInstance.evaluate(tokenDataWeAreSearchingFor.documentKey <
+                                                           tokenDataFromSource.documentKey)) {
+                // This means we will never see the resume token because it would have come before
+                // this one.
+                cannotResume = true;
+            }
+        } else {
+            cannotResume = true;
+        }
+    }
+
+    if (cannotResume) {
+        uasserted(40585,
+                  str::stream() << "resume of change stream was not possible, as the resume "
+                                   "token was not found. "
+                                << tokenFromSource.toDocument().toString());
+    }
+
     // Don't return the document which has the token; the user has already seen it.
     return pSource->getNext();
 }
