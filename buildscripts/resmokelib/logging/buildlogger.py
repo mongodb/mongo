@@ -5,7 +5,9 @@ Defines handlers for communicating with a buildlogger server.
 from __future__ import absolute_import
 
 import functools
+import httplib
 import urllib2
+import json
 
 from . import handlers
 from . import loggers
@@ -131,6 +133,47 @@ def new_test_id(build_id, build_config, test_filename, test_command):
     return response["id"]
 
 
+class _LogsSplitter(object):
+    """Class with static methods used to split list of log lines into smaller batches."""
+
+    @staticmethod
+    def split_logs(log_lines, max_size):
+        """
+        Splits the log lines into batches of size less than or equal to max_size.
+
+        Args:
+            log_lines: A list of log lines.
+            max_size: The maximum size in bytes a batch of log lines can have in JSON.
+        Returns:
+            A list of list of log lines. Each item is a list is a list of log lines
+            satisfying the size requirement.
+        """
+        if not max_size:
+            return [log_lines]
+
+        def line_size(line):
+            """
+            Computes the encoded JSON size of a log line as part of an array.
+            2 is added to each string size to account for the array representation of the logs,
+            as each line is preceded by a '[' or a space and followed by a ',' or a ']'.
+            """
+            return len(json.dumps(line, encoding="utf-8")) + 2
+
+        curr_logs = []
+        curr_logs_size = 0
+        split_logs = []
+        for line in log_lines:
+            size = line_size(line)
+            if curr_logs_size + size > max_size:
+                split_logs.append(curr_logs)
+                curr_logs = []
+                curr_logs_size = 0
+            curr_logs.append(line)
+            curr_logs_size += size
+        split_logs.append(curr_logs)
+        return split_logs
+
+
 class _BaseBuildloggerHandler(handlers.BufferedHandler):
     """
     Base class of the buildlogger handler for the global logs and the
@@ -138,8 +181,8 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
     """
 
     def __init__(self,
-                 build_id,
                  build_config,
+                 endpoint,
                  capacity=_SEND_AFTER_LINES,
                  interval_secs=_SEND_AFTER_SECS):
         """
@@ -157,8 +200,9 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
                                                  username,
                                                  password)
 
-        self.build_id = build_id
+        self.endpoint = endpoint
         self.retry_buffer = []
+        self.max_size = None
 
     def process_record(self, record):
         """
@@ -177,12 +221,55 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
         """
         Convenience method for subclasses to use when making POST requests.
         """
-
         return self.http_handler.post(*args, **kwargs)
 
     def _append_logs(self, log_lines):
-        raise NotImplementedError("_append_logs must be implemented by _BaseBuildloggerHandler"
-                                  " subclasses")
+        """
+        Sends a POST request to the handlers endpoint with the logs that have been captured.
+
+        Returns:
+            The number of log lines that have been successfully sent.
+        """
+        lines_sent = 0
+        for chunk in _LogsSplitter.split_logs(log_lines, self.max_size):
+            chunk_lines_sent = self.__append_logs_chunk(chunk)
+            lines_sent += chunk_lines_sent
+            if chunk_lines_sent < len(chunk):
+                # Not all lines have been sent. We stop here.
+                break
+        return lines_sent
+
+    def __append_logs_chunk(self, log_lines_chunk):
+        """
+        Sends a log lines chunk, handles 413 Request Entity Too Large errors and retries
+        if necessary.
+
+        Returns:
+            The number of log lines that have been successfully sent.
+        """
+        try:
+            self.post(self.endpoint, data=log_lines_chunk)
+            return len(log_lines_chunk)
+        except urllib2.HTTPError as err:
+            # Handle the "Request Entity Too Large" error, set the max size and retry.
+            if err.code == httplib.REQUEST_ENTITY_TOO_LARGE:
+                response_data = json.load(err, "utf-8")
+                if isinstance(response_data, dict) and "max_size" in response_data:
+                    new_max_size = response_data["max_size"]
+                    if self.max_size and new_max_size >= self.max_size:
+                        loggers._BUILDLOGGER_FALLBACK.exception(
+                            "Received an HTTP 413 code, but already had max_size set")
+                        return 0
+                    loggers._BUILDLOGGER_FALLBACK.warning(
+                        "Received an HTTP 413 code, updating the request max_size to %s",
+                        new_max_size)
+                    self.max_size = new_max_size
+                    return self._append_logs(log_lines_chunk)
+            loggers._BUILDLOGGER_FALLBACK.exception("Encountered an error.")
+            return 0
+        except:
+            loggers._BUILDLOGGER_FALLBACK.exception("Encountered an error.")
+            return 0
 
     def _flush_buffer_with_lock(self, buf, close_called):
         """
@@ -196,9 +283,10 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
 
         self.retry_buffer.extend(buf)
 
-        if self._append_logs(self.retry_buffer):
-            self.retry_buffer = []
-        elif close_called:
+        nb_sent = self._append_logs(self.retry_buffer)
+        if nb_sent:
+            self.retry_buffer = self.retry_buffer[nb_sent:]
+        if close_called and self.retry_buffer:
             # Request to the buildlogger server returned an error, so use the fallback logger to
             # avoid losing the log messages entirely.
             for (_, message) in self.retry_buffer:
@@ -215,29 +303,14 @@ class BuildloggerTestHandler(_BaseBuildloggerHandler):
     Buildlogger handler for the test logs.
     """
 
-    def __init__(self, build_id, build_config, test_id, **kwargs):
-        """
-        Initializes the buildlogger handler with the build id, test id,
-        and credentials.
-        """
-
-        _BaseBuildloggerHandler.__init__(self, build_id, build_config, **kwargs)
-
-        self.test_id = test_id
-
-    @_log_on_error
-    def _append_logs(self, log_lines):
-        """
-        Sends a POST request to the APPEND_TEST_LOGS_ENDPOINT with the
-        logs that have been captured.
-        """
+    def __init__(self, build_config, build_id, test_id,
+                 capacity=_SEND_AFTER_LINES, interval_secs=_SEND_AFTER_SECS):
+        """Initializes the buildlogger handler with the credentials, build id, and test id."""
         endpoint = APPEND_TEST_LOGS_ENDPOINT % {
-            "build_id": self.build_id,
-            "test_id": self.test_id,
+            "build_id": build_id,
+            "test_id": test_id,
         }
-
-        response = self.post(endpoint, data=log_lines)
-        return response is not None
+        _BaseBuildloggerHandler.__init__(self, build_config, endpoint, capacity, interval_secs)
 
     @_log_on_error
     def _finish_test(self, failed=False):
@@ -245,12 +318,7 @@ class BuildloggerTestHandler(_BaseBuildloggerHandler):
         Sends a POST request to the APPEND_TEST_LOGS_ENDPOINT with the
         test status.
         """
-        endpoint = APPEND_TEST_LOGS_ENDPOINT % {
-            "build_id": self.build_id,
-            "test_id": self.test_id,
-        }
-
-        self.post(endpoint, headers={
+        self.post(self.endpoint, headers={
             "X-Sendlogs-Test-Done": "true",
             "X-Sendlogs-Test-Failed": "true" if failed else "false",
         })
@@ -271,12 +339,8 @@ class BuildloggerGlobalHandler(_BaseBuildloggerHandler):
     Buildlogger handler for the global logs.
     """
 
-    @_log_on_error
-    def _append_logs(self, log_lines):
-        """
-        Sends a POST request to the APPEND_GLOBAL_LOGS_ENDPOINT with
-        the logs that have been captured.
-        """
-        endpoint = APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": self.build_id}
-        response = self.post(endpoint, data=log_lines)
-        return response is not None
+    def __init__(self, build_config, build_id,
+                 capacity=_SEND_AFTER_LINES, interval_secs=_SEND_AFTER_SECS):
+        """Initializes the buildlogger handler with the credentials and build id."""
+        endpoint = APPEND_GLOBAL_LOGS_ENDPOINT % {"build_id": build_id}
+        _BaseBuildloggerHandler.__init__(self, build_config, endpoint, capacity, interval_secs)
