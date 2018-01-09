@@ -73,11 +73,9 @@ protected:
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
     mutable DBDirectClient _client;
-    ReplSettings _defaultReplSettings;
 
 public:
-    Base()
-        : _client(&_opCtx), _defaultReplSettings(getGlobalReplicationCoordinator()->getSettings()) {
+    Base() : _client(&_opCtx) {
         ReplSettings replSettings;
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);
         replSettings.setMaster(true);
@@ -109,13 +107,10 @@ public:
         try {
             deleteAll(ns());
             deleteAll(cllNS());
-            setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(
-                _opCtx.getServiceContext(), _defaultReplSettings));
-            repl::getGlobalReplicationCoordinator()
-                ->setFollowerMode(repl::MemberState::RS_PRIMARY)
-                .ignore();
-
-
+            ReplSettings replSettings;
+            replSettings.setOplogSizeBytes(10 * 1024 * 1024);
+            setGlobalReplicationCoordinator(
+                new repl::ReplicationCoordinatorMock(_opCtx.getServiceContext(), replSettings));
         } catch (...) {
             FAIL("Exception while cleaning up test");
         }
