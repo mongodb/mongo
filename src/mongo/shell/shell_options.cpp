@@ -142,10 +142,19 @@ Status addMongoShellOptions(moe::OptionSection* options) {
     options->addOptionChaining(
         "ipv6", "ipv6", moe::Switch, "enable IPv6 support (disabled by default)");
 
-    options->addOptionChaining("disableJavaScriptJIT",
-                               "disableJavaScriptJIT",
-                               moe::Switch,
-                               "disable the Javascript Just In Time compiler");
+    options
+        ->addOptionChaining("disableJavaScriptJIT",
+                            "disableJavaScriptJIT",
+                            moe::Switch,
+                            "disable the Javascript Just In Time compiler")
+        .incompatibleWith("enableJavaScriptJIT");
+
+    options
+        ->addOptionChaining("enableJavaScriptJIT",
+                            "enableJavaScriptJIT",
+                            moe::Switch,
+                            "enable the Javascript Just In Time compiler")
+        .incompatibleWith("disableJavaScriptJIT");
 
     options
         ->addOptionChaining("disableJavaScriptProtection",
@@ -338,6 +347,9 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
     if (params.count("disableJavaScriptJIT")) {
         shellGlobalParams.nojit = true;
+    }
+    if (params.count("enableJavaScriptJIT")) {
+        shellGlobalParams.nojit = false;
     }
     if (params.count("files")) {
         shellGlobalParams.files = params["files"].as<vector<string>>();
