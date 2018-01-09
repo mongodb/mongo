@@ -32,7 +32,6 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
-#include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -117,8 +116,7 @@ protected:
     }
 
     void setMyOpTime(const OpTime& opTime) {
-        auto* myMemberData = getTopoCoord().getMyMemberData();
-        myMemberData->setLastAppliedOpTime(opTime, now());
+        getTopoCoord().setMyLastAppliedOpTime(opTime, now(), false);
     }
 
     void setSelfMemberState(const MemberState& newState) {
@@ -979,7 +977,7 @@ TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp) {
     ASSERT_EQUALS(MemberState::RS_RECOVERING, getTopoCoord().getMemberState().s);
 
     // Having an auth error but with another node up should bring us out of RECOVERING
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(OpTime(Timestamp(2, 0), 0), Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(OpTime(Timestamp(2, 0), 0), Date_t(), false);
     HeartbeatResponseAction action = receiveUpHeartbeat(
         HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(), OpTime(Timestamp(2, 0), 0));
     ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
@@ -1317,7 +1315,7 @@ TEST_F(TopoCoordTest, ChooseRequestedNodeWhenSyncFromRequestsAStaleNode) {
     heartbeatFromMember(
         HostAndPort("h5"), "rs0", MemberState::RS_SECONDARY, staleOpTime, Milliseconds(100));
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(ourOpTime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(ourOpTime, Date_t(), false);
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h5"), &response, &result);
     ASSERT_OK(result);
     ASSERT_EQUALS("requested member \"h5:27017\" is more than 10 seconds behind us",
@@ -1366,7 +1364,7 @@ TEST_F(TopoCoordTest, ChooseRequestedNodeWhenSyncFromRequestsAValidNode) {
     heartbeatFromMember(
         HostAndPort("h6"), "rs0", MemberState::RS_SECONDARY, ourOpTime, Milliseconds(100));
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(ourOpTime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(ourOpTime, Date_t(), false);
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h6"), &response, &result);
     ASSERT_OK(result);
     BSONObj responseObj = response.obj();
@@ -1416,7 +1414,7 @@ TEST_F(TopoCoordTest,
         HostAndPort("h6"), "rs0", MemberState::RS_SECONDARY, ourOpTime, Milliseconds(100));
 
     // node goes down between forceSync and chooseNewSyncSource
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(ourOpTime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(ourOpTime, Date_t(), false);
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h6"), &response, &result);
     BSONObj responseObj = response.obj();
     ASSERT_FALSE(responseObj.hasField("warning"));
@@ -1464,7 +1462,7 @@ TEST_F(TopoCoordTest, NodeReturnsUnauthorizedWhenSyncFromRequestsANodeWeAreNotAu
     // Try to sync from a member that is unauth'd
     receiveDownHeartbeat(HostAndPort("h5"), "rs0", ErrorCodes::Unauthorized);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(ourOpTime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(ourOpTime, Date_t(), false);
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h5"), &response, &result);
     ASSERT_NOT_OK(result);
     ASSERT_EQUALS(ErrorCodes::Unauthorized, result.code());
@@ -1478,7 +1476,7 @@ TEST_F(TopoCoordTest, NodeReturnsInvalidOptionsWhenAskedToSyncFromANonVoterAsAVo
     Status result = Status::OK();
     BSONObjBuilder response;
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(ourOpTime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(ourOpTime, Date_t(), false);
     // Test trying to sync from another node
     updateConfig(fromjson("{_id:'rs0', version:1, members:["
                           "{_id:0, host:'self'},"
@@ -1533,7 +1531,7 @@ TEST_F(TopoCoordTest,
     heartbeatFromMember(
         HostAndPort("h5"), "rs0", MemberState::RS_SECONDARY, ourOpTime, Milliseconds(100));
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(ourOpTime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(ourOpTime, Date_t(), false);
     getTopoCoord().prepareSyncFromResponse(HostAndPort("h5"), &response, &result);
     ASSERT_OK(result);
     BSONObj responseObj = response.obj();
@@ -1617,8 +1615,8 @@ TEST_F(TopoCoordTest, ReplSetGetStatus) {
     getTopoCoord().processHeartbeatResponse(
         heartbeatTime, Milliseconds(4000), member, hbResponseGood);
     makeSelfPrimary();
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(oplogProgress, startupTime);
-    getTopoCoord().getMyMemberData()->setLastDurableOpTime(oplogDurable, startupTime);
+    getTopoCoord().setMyLastAppliedOpTime(oplogProgress, startupTime, false);
+    getTopoCoord().setMyLastDurableOpTime(oplogDurable, startupTime, false);
     getTopoCoord().advanceLastCommittedOpTime(lastCommittedOpTime);
 
     // Now node 0 is down, node 1 is up, and for node 2 we have no heartbeat data yet.
@@ -1972,8 +1970,8 @@ TEST_F(PrepareHeartbeatResponseV1Test, SetStatePrimaryInHeartbeatResponseWhenPri
 
     // prepare response and check the results
     OpTime lastOpTime(Timestamp(11, 0), 0);
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTime, Date_t());
-    getTopoCoord().getMyMemberData()->setLastDurableOpTime(lastOpTime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTime, Date_t(), false);
+    getTopoCoord().setMyLastDurableOpTime(lastOpTime, Date_t(), false);
     prepareHeartbeatResponseV1(args, &response, &result);
     ASSERT_OK(result);
     ASSERT_FALSE(response.hasConfig());
@@ -2008,8 +2006,8 @@ TEST_F(PrepareHeartbeatResponseV1Test,
 
     // prepare response and check the results
     OpTime lastOpTime(Timestamp(100, 0), 0);
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTime, Date_t());
-    getTopoCoord().getMyMemberData()->setLastDurableOpTime(lastOpTime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTime, Date_t(), false);
+    getTopoCoord().setMyLastDurableOpTime(lastOpTime, Date_t(), false);
     prepareHeartbeatResponseV1(args, &response, &result);
     ASSERT_OK(result);
     ASSERT_FALSE(response.hasConfig());
@@ -2447,7 +2445,7 @@ TEST_F(TopoCoordTest, ShouldStandForElectionDespiteNotCloseEnoughToLastOptime) {
                  0);
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(OpTime(Timestamp(100, 0), 0), Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(OpTime(Timestamp(100, 0), 0), Date_t(), false);
     heartbeatFromMember(
         HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(Timestamp(10000, 0), 0));
     ASSERT_OK(getTopoCoord().checkShouldStandForElection(now()++));
@@ -2854,7 +2852,7 @@ TEST_F(TopoCoordTest, NodeDoesNotGrantVoteWhenOpTimeIsStale) {
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime({Timestamp(20, 0), 0}, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime({Timestamp(20, 0), 0}, Date_t(), false);
     getTopoCoord().processReplSetRequestVotes(args, &response);
     ASSERT_EQUALS(
         str::stream() << "candidate's data is staler than mine. candidate's last applied OpTime: "
@@ -3163,7 +3161,7 @@ TEST_F(TopoCoordTest, DoNotGrantDryRunVoteWhenOpTimeIsStale) {
         .transitional_ignore();
     ReplSetRequestVotesResponse response;
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime({Timestamp(20, 0), 0}, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime({Timestamp(20, 0), 0}, Date_t(), false);
     getTopoCoord().processReplSetRequestVotes(args, &response);
     ASSERT_EQUALS(
         str::stream() << "candidate's data is staler than mine. candidate's last applied OpTime: "
@@ -3285,7 +3283,7 @@ TEST_F(HeartbeatResponseTestV1,
                                                   << "priority"
                                                   << 0))),
                  0);
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, lastOpTimeApplied);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -3337,7 +3335,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime election = OpTime();
     OpTime lastOpTimeApplied = OpTime(Timestamp(400, 0), 0);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, lastOpTimeApplied);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -3415,7 +3413,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsDown
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime fresherLastOpTimeApplied = OpTime(Timestamp(3005, 0), 0);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -3455,7 +3453,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhileFresherMemberIsBla
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime fresherLastOpTimeApplied = OpTime(Timestamp(3005, 0), 0);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -3508,7 +3506,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsFreshByHeartbea
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime fresherLastOpTimeApplied = OpTime(Timestamp(3005, 0), 0);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, fresherLastOpTimeApplied);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -3542,7 +3540,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceIfNodeIsStaleByHeartbea
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime fresherLastOpTimeApplied = OpTime(Timestamp(3005, 0), 0);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, lastOpTimeApplied);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -3576,7 +3574,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenFresherMemberExists) {
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime fresherLastOpTimeApplied = OpTime(Timestamp(3005, 0), 0);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, lastOpTimeApplied);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -3625,7 +3623,7 @@ TEST_F(HeartbeatResponseTestV1, ReconfigNodeRemovedBetweenHeartbeatRequestAndRep
     // all three members up and secondaries
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, election, lastOpTimeApplied);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -3672,7 +3670,7 @@ TEST_F(HeartbeatResponseTestV1, ReconfigBetweenHeartbeatRequestAndRepsonse) {
     // all three members up and secondaries
     setSelfMemberState(MemberState::RS_SECONDARY);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_PRIMARY, election, lastOpTimeApplied);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -3703,7 +3701,7 @@ TEST_F(HeartbeatResponseTestV1, ReconfigBetweenHeartbeatRequestAndRepsonse) {
     hb.setDurableOpTime(lastOpTimeApplied);
     hb.setElectionTime(election.getTimestamp());
     StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
         now()++, Milliseconds(0), HostAndPort("host3"), hbResponse);
 
@@ -3717,7 +3715,7 @@ TEST_F(HeartbeatResponseTestV1, NodeDoesNotUpdateHeartbeatDataIfNodeIsAbsentFrom
     OpTime lastOpTimeApplied = OpTime(Timestamp(3, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host9"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
@@ -3777,7 +3775,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeApplied = OpTime(Timestamp(300, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_EQUALS(HeartbeatResponseAction::PriorityTakeover, nextAction.getAction());
@@ -3814,7 +3812,7 @@ TEST_F(HeartbeatResponseTestV1, UpdateHeartbeatDataTermPreventsPriorityTakeover)
     // Host 2 is the current primary in term 1.
     getTopoCoord().updateTerm(1, now());
     ASSERT_EQUALS(getTopoCoord().getTerm(), 1);
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_EQUALS(HeartbeatResponseAction::PriorityTakeover, nextAction.getAction());
@@ -3877,7 +3875,7 @@ TEST_F(TopoCoordTest, FreshestNodeDoesCatchupTakeover) {
     getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host3:27017"));
 
     // Set optimes so that I am the freshest node and strictly ahead of the primary.
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(currentOptime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(currentOptime, Date_t(), false);
     getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
                                             Milliseconds(999),
                                             HostAndPort("host3:27017"),
@@ -3930,7 +3928,7 @@ TEST_F(TopoCoordTest, StaleNodeDoesntDoCatchupTakeover) {
     getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host3:27017"));
 
     // Set optimes so that the other (non-primary) node is ahead of me.
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(behindOptime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(behindOptime, Date_t(), false);
     getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
                                             Milliseconds(999),
                                             HostAndPort("host3:27017"),
@@ -3986,7 +3984,7 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverHeartbeatSaysPrimaryCaughtUp) {
     getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host3:27017"));
 
     // Set optimes so that the primary node is caught up with me.
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(currentOptime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(currentOptime, Date_t(), false);
     getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
                                             Milliseconds(999),
                                             HostAndPort("host3:27017"),
@@ -4044,7 +4042,7 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverIfTermNumbersSayPrimaryCaughtUp
     // Simulates a scenario where the node hasn't received a heartbeat from the primary in a while
     // but the primary is caught up and has written something. The node is aware of this change
     // and as a result realizes the primary is caught up.
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(currentOptime, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(currentOptime, Date_t(), false);
     getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
                                             Milliseconds(999),
                                             HostAndPort("host3:27017"),
@@ -4415,7 +4413,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeAppliedPrimary = OpTime(Timestamp(200, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeAppliedSecondary, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeAppliedSecondary, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, lastOpTimeAppliedPrimary);
     ASSERT_EQUALS(HeartbeatResponseAction::CatchupTakeover, nextAction.getAction());
@@ -4453,7 +4451,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeAppliedPrimary = OpTime(Timestamp(200, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeAppliedSecondary, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeAppliedSecondary, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, lastOpTimeAppliedPrimary);
     ASSERT_EQUALS(HeartbeatResponseAction::CatchupTakeover, nextAction.getAction());
@@ -4509,7 +4507,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeApplied = OpTime(Timestamp(300, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -4546,7 +4544,7 @@ TEST_F(HeartbeatResponseTestV1, ScheduleElectionWhenPrimaryIsMarkedDownAndWeAreE
     OpTime lastOpTimeApplied = OpTime(Timestamp(399, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -4587,7 +4585,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime election = OpTime(Timestamp(400, 0), 0);
     OpTime lastOpTimeApplied = OpTime(Timestamp(300, 0), 0);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, election);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -4612,7 +4610,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeApplied = OpTime(Timestamp(300, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -4640,7 +4638,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeApplied = OpTime(Timestamp(300, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -4660,7 +4658,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeApplied = OpTime(Timestamp(300, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -4701,7 +4699,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeApplied = OpTime(Timestamp(300, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -4726,7 +4724,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeApplied = OpTime(Timestamp(300, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -4747,7 +4745,7 @@ TEST_F(HeartbeatResponseTestV1, NodeDoesNotStepDownSelfWhenRemoteNodeWasElectedM
     OpTime lastOpTimeApplied = OpTime(Timestamp(3, 0), 0);
 
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     receiveUpHeartbeat(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, election);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
@@ -4791,7 +4789,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime stale = OpTime();
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(election, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(election, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
@@ -4831,7 +4829,7 @@ TEST_F(HeartbeatResponseTestV1,
     makeSelfPrimary(election.getTimestamp());
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(election, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(election, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, staleTime);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -4867,7 +4865,7 @@ TEST_F(HeartbeatResponseTestV1,
     makeSelfPrimary(election.getTimestamp());
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(election, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(election, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, election);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -4904,7 +4902,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime slightlyLessFreshLastOpTimeApplied = OpTime(Timestamp(3, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, lastOpTimeApplied);
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
@@ -4925,7 +4923,7 @@ TEST_F(HeartbeatResponseTestV1, NodeDoesNotStepDownSelfWhenRemoteNodeWasElectedL
     OpTime lastOpTimeApplied = OpTime(Timestamp(3, 0), 0);
 
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_EQUALS(0, getCurrentPrimaryIndex());
@@ -4961,7 +4959,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeApplied = OpTime(Timestamp(3, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
@@ -4982,7 +4980,7 @@ TEST_F(HeartbeatResponseTestV1,
     OpTime lastOpTimeApplied = OpTime(Timestamp(3, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
@@ -5001,7 +4999,7 @@ TEST_F(HeartbeatResponseTestV1, UpdatePrimaryIndexWhenAHeartbeatMakesNodeAwareOf
     OpTime lastOpTimeApplied = OpTime(Timestamp(3, 0), 0);
 
     ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_PRIMARY, election, election);
     ASSERT_EQUALS(1, getCurrentPrimaryIndex());
@@ -5068,7 +5066,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberDoesNo
                       << "protocolVersion"
                       << 1),
                  0);
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -5098,7 +5096,7 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsNotR
     // ahead by more than maxSyncSourceLagSecs (30)
     OpTime fresherLastOpTimeApplied = OpTime(Timestamp(3005, 0), 0);
 
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction nextAction = receiveUpHeartbeat(
         HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
     ASSERT_NO_ACTION(nextAction.getAction());
@@ -5383,7 +5381,7 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1, UpdateHeartbeatDataOldConfig) {
     believesWeAreDownResponse.setElectable(true);
     believesWeAreDownResponse.noteStateDisagreement();
     startCapturingLogMessages();
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
         now()++,            // Time is left.
         Milliseconds(400),  // Spent 0.4 of the 0.5 second in the network.
@@ -5432,7 +5430,7 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1, UpdateHeartbeatDataSameConfig) {
     sameConfigResponse.setConfigVersion(2);
     sameConfigResponse.setConfig(originalConfig);
     startCapturingLogMessages();
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
         now()++,            // Time is left.
         Milliseconds(400),  // Spent 0.4 of the 0.5 second in the network.
@@ -5460,7 +5458,7 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1,
     memberMissingResponse.setElectable(true);
     memberMissingResponse.noteStateDisagreement();
     startCapturingLogMessages();
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
         now()++,            // Time is left.
         Milliseconds(400),  // Spent 0.4 of the 0.5 second in the network.
@@ -5486,7 +5484,7 @@ TEST_F(HeartbeatResponseHighVerbosityTestV1,
     believesWeAreDownResponse.setElectable(true);
     believesWeAreDownResponse.noteStateDisagreement();
     startCapturingLogMessages();
-    getTopoCoord().getMyMemberData()->setLastAppliedOpTime(lastOpTimeApplied, Date_t());
+    getTopoCoord().setMyLastAppliedOpTime(lastOpTimeApplied, Date_t(), false);
     HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
         now()++,            // Time is left.
         Milliseconds(400),  // Spent 0.4 of the 0.5 second in the network.

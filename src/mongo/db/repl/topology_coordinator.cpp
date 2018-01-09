@@ -38,16 +38,17 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/isself.h"
+#include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_set_html_summary.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/rslog.h"
-#include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
@@ -800,13 +801,14 @@ Status TopologyCoordinator::prepareHeartbeatResponse(Date_t now,
     }
     invariant(from != _selfIndex);
 
+    auto& fromNodeData = _memberData.at(from);
     // if we thought that this node is down, let it know
-    if (!_memberData.at(from).up()) {
+    if (!fromNodeData.up()) {
         response->noteStateDisagreement();
     }
 
     // note that we got a heartbeat from this node
-    _memberData.at(from).setLastHeartbeatRecv(now);
+    fromNodeData.setLastHeartbeatRecv(now);
     return Status::OK();
 }
 
@@ -885,8 +887,11 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
     }
     invariant(from != _selfIndex);
 
+    auto& fromNodeData = _memberData.at(from);
     // note that we got a heartbeat from this node
-    _memberData.at(from).setLastHeartbeatRecv(now);
+    fromNodeData.setLastHeartbeatRecv(now);
+    // Update liveness for sending node.
+    fromNodeData.updateLiveness(now);
     return Status::OK();
 }
 
@@ -1257,22 +1262,119 @@ OpTime TopologyCoordinator::getMyLastAppliedOpTime() const {
     return _selfMemberData().getLastAppliedOpTime();
 }
 
+void TopologyCoordinator::setMyLastAppliedOpTime(OpTime opTime,
+                                                 Date_t now,
+                                                 bool isRollbackAllowed) {
+    auto& myMemberData = _selfMemberData();
+    invariant(isRollbackAllowed || opTime >= myMemberData.getLastAppliedOpTime());
+    myMemberData.setLastAppliedOpTime(opTime, now);
+}
+
 OpTime TopologyCoordinator::getMyLastDurableOpTime() const {
     return _selfMemberData().getLastDurableOpTime();
 }
 
-MemberData* TopologyCoordinator::getMyMemberData() {
-    return &_memberData[_selfMemberDataIndex()];
+void TopologyCoordinator::setMyLastDurableOpTime(OpTime opTime,
+                                                 Date_t now,
+                                                 bool isRollbackAllowed) {
+    auto& myMemberData = _selfMemberData();
+    invariant(isRollbackAllowed || opTime >= myMemberData.getLastDurableOpTime());
+    myMemberData.setLastDurableOpTime(opTime, now);
 }
 
-MemberData* TopologyCoordinator::findMemberDataByMemberId(const int memberId) {
+StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::UpdateInfo& args,
+                                                    Date_t now,
+                                                    long long* configVersion) {
+    if (_selfIndex == -1) {
+        // Ignore updates when we're in state REMOVED.
+        return Status(ErrorCodes::NotMasterOrSecondary,
+                      "Received replSetUpdatePosition command but we are in state REMOVED");
+    }
+    invariant(_rsConfig.isInitialized());  // Can only use setLastOptime in replSet mode.
+
+    if (args.memberId < 0) {
+        std::string errmsg = str::stream()
+            << "Received replSetUpdatePosition for node with memberId " << args.memberId
+            << " which is negative and therefore invalid";
+        LOG(1) << errmsg;
+        return Status(ErrorCodes::NodeNotFound, errmsg);
+    }
+
+    if (args.memberId == _rsConfig.getMemberAt(_selfIndex).getId()) {
+        // Do not let remote nodes tell us what our optime is.
+        return false;
+    }
+
+    LOG(2) << "received notification that node with memberID " << args.memberId
+           << " in config with version " << args.cfgver
+           << " has reached optime: " << args.appliedOpTime
+           << " and is durable through: " << args.durableOpTime;
+
+    if (args.cfgver != _rsConfig.getConfigVersion()) {
+        std::string errmsg = str::stream()
+            << "Received replSetUpdatePosition for node with memberId " << args.memberId
+            << " whose config version of " << args.cfgver << " doesn't match our config version of "
+            << _rsConfig.getConfigVersion();
+        LOG(1) << errmsg;
+        *configVersion = _rsConfig.getConfigVersion();
+        return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
+    }
+
+    auto* memberData = _findMemberDataByMemberId(args.memberId);
+    if (!memberData) {
+        invariant(!_rsConfig.findMemberByID(args.memberId));
+
+        std::string errmsg = str::stream()
+            << "Received replSetUpdatePosition for node with memberId " << args.memberId
+            << " which doesn't exist in our config";
+        LOG(1) << errmsg;
+        return Status(ErrorCodes::NodeNotFound, errmsg);
+    }
+
+    invariant(args.memberId == memberData->getMemberId());
+
+    LOG(3) << "Node with memberID " << args.memberId << " currently has optime "
+           << memberData->getLastAppliedOpTime() << " durable through "
+           << memberData->getLastDurableOpTime() << "; updating to optime " << args.appliedOpTime
+           << " and durable through " << args.durableOpTime;
+
+
+    bool advancedOpTime = memberData->advanceLastAppliedOpTime(args.appliedOpTime, now);
+    advancedOpTime =
+        memberData->advanceLastDurableOpTime(args.durableOpTime, now) || advancedOpTime;
+    return advancedOpTime;
+}
+
+void TopologyCoordinator::setLastOptimeForSlave(const OID& rid, const OpTime& opTime, Date_t now) {
+    massert(28576,
+            "Received an old style replication progress update, which is only used for Master/"
+            "Slave replication now, but this node is not using Master/Slave replication. "
+            "This is likely caused by an old (pre-2.6) member syncing from this node.",
+            !_rsConfig.isInitialized());
+    auto* memberData = _findMemberDataByRid(rid);
+    if (memberData) {
+        memberData->advanceLastAppliedOpTime(opTime, now);
+    } else {
+        invariant(!_memberData.empty());  // Must always have our own entry first.
+        _memberData.emplace_back();
+        memberData = &_memberData.back();
+        memberData->setRid(rid);
+        memberData->setLastAppliedOpTime(opTime, now);
+    }
+}
+
+void TopologyCoordinator::setMyRid(const OID& rid) {
+    _selfMemberData().setRid(rid);
+}
+
+MemberData* TopologyCoordinator::_findMemberDataByMemberId(const int memberId) {
     const int memberIndex = _getMemberIndex(memberId);
     if (memberIndex >= 0)
         return &_memberData[memberIndex];
     return nullptr;
 }
 
-MemberData* TopologyCoordinator::findMemberDataByRid(const OID rid) {
+MemberData* TopologyCoordinator::_findMemberDataByRid(const OID rid) {
     for (auto& memberData : _memberData) {
         if (memberData.getRid() == rid)
             return &memberData;
@@ -1280,13 +1382,20 @@ MemberData* TopologyCoordinator::findMemberDataByRid(const OID rid) {
     return nullptr;
 }
 
-MemberData* TopologyCoordinator::addSlaveMemberData(const OID rid) {
-    invariant(!_memberData.empty());        // Must always have our own entry first.
-    invariant(!_rsConfig.isInitialized());  // Used only for master-slave.
-    _memberData.emplace_back();
-    auto* result = &_memberData.back();
-    result->setRid(rid);
-    return result;
+Status TopologyCoordinator::processHandshake(const OID& rid, const HostAndPort& hostAndPort) {
+    if (_rsConfig.isInitialized()) {
+        return Status(ErrorCodes::IllegalOperation,
+                      "The handshake command is only used for master/slave replication");
+    }
+    auto* memberData = _findMemberDataByRid(rid);
+    if (!memberData) {
+        invariant(!_memberData.empty());  // Must always have our own entry first.
+        _memberData.emplace_back();
+        auto& newMember = _memberData.back();
+        newMember.setRid(rid);
+        newMember.setHostAndPort(hostAndPort);
+    }
+    return Status::OK();
 }
 
 HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBDataV1(
@@ -2362,6 +2471,10 @@ const MemberData& TopologyCoordinator::_selfMemberData() const {
     return _memberData[_selfMemberDataIndex()];
 }
 
+MemberData& TopologyCoordinator::_selfMemberData() {
+    return _memberData[_selfMemberDataIndex()];
+}
+
 const int TopologyCoordinator::_selfMemberDataIndex() const {
     invariant(!_memberData.empty());
     if (_selfIndex >= 0)
@@ -3124,6 +3237,8 @@ rpc::OplogQueryMetadata TopologyCoordinator::prepareOplogQueryMetadata(int rbid)
 }
 
 void TopologyCoordinator::summarizeAsHtml(ReplSetHtmlSummary* output) {
+    // TODO(dannenberg) consider putting both optimes into the htmlsummary.
+    output->setSelfOptime(getMyLastAppliedOpTime());
     output->setConfig(_rsConfig);
     output->setHBData(_memberData);
     output->setSelfIndex(_selfIndex);

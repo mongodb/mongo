@@ -35,6 +35,7 @@
 #include "mongo/db/repl/last_vote.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/hostandport.h"
@@ -512,33 +513,56 @@ public:
     OpTime getMyLastAppliedOpTime() const;
 
     /*
+     * Sets the last optime that this node has applied, whether or not it has been journaled. Fails
+     * with an invariant if 'isRollbackAllowed' is false and we're attempting to set the optime
+     * backwards. The Date_t 'now' is used to track liveness; setting a node's applied optime
+     * updates its liveness information.
+     */
+    void setMyLastAppliedOpTime(OpTime opTime, Date_t now, bool isRollbackAllowed);
+
+    /*
      * Returns the last optime that this node has applied and journaled.
      */
     OpTime getMyLastDurableOpTime() const;
 
     /*
-     * Returns information we have on the state of this node.
+     * Sets the last optime that this node has applied and journaled. Fails with an invariant if
+     * 'isRollbackAllowed' is false and we're attempting to set the optime backwards. The Date_t
+     * 'now' is used to track liveness; setting a node's durable optime updates its liveness
+     * information.
      */
-    MemberData* getMyMemberData();
+    void setMyLastDurableOpTime(OpTime opTime, Date_t now, bool isRollbackAllowed);
 
     /*
-     * Returns information we have on the state of the node identified by memberId.  Returns
-     * nullptr if memberId is not found in the configuration.
+     * Sets the last optimes for a node, other than this node, based on the data from a
+     * replSetUpdatePosition command.
+     *
+     * Returns a Status if the position could not be set, false if the last optimes for the node
+     * did not change, or true if either the last applied or last durable optime did change.
      */
-    MemberData* findMemberDataByMemberId(const int memberId);
+    StatusWith<bool> setLastOptime(const UpdatePositionArgs::UpdateInfo& args,
+                                   Date_t now,
+                                   long long* configVersion);
+    /*
+     * Sets the last optimes for a slave node.
+     *
+     * Used only in master/slave replication.
+     */
+
+    void setLastOptimeForSlave(const OID& rid, const OpTime& opTime, Date_t now);
 
     /*
-     * Returns information we have on the state of the node identified by rid.  Returns
-     * nullptr if rid is not found in the heartbeat data.  This method is used only for
-     * master/slave replication.
+     * Set the RID for this node.
+     *
+     * Used only in master/slave replication.
      */
-    MemberData* findMemberDataByRid(const OID rid);
+    void setMyRid(const OID& rid);
 
-    /*
-     * Adds and returns a memberData entry for the given RID.
-     * Used only in master/slave mode.
+    /**
+     * Process a handshake command, adding the slave to the member list if it isn't already there.
+     * Used only in master/slave mode
      */
-    MemberData* addSlaveMemberData(const OID rid);
+    Status processHandshake(const OID& rid, const HostAndPort& hostAndPort);
 
     /**
      * If getRole() == Role::candidate and this node has not voted too recently, updates the
@@ -836,11 +860,27 @@ private:
     // Helper shortcut to self config
     const MemberConfig& _selfConfig() const;
 
-    // Helper shortcut to self member data
+    // Helper shortcut to self member data for const members.
     const MemberData& _selfMemberData() const;
+
+    // Helper shortcut to self member data for non-const members.
+    MemberData& _selfMemberData();
 
     // Index of self member in member data.
     const int _selfMemberDataIndex() const;
+
+    /*
+     * Returns information we have on the state of the node identified by memberId.  Returns
+     * nullptr if memberId is not found in the configuration.
+     */
+    MemberData* _findMemberDataByMemberId(const int memberId);
+
+    /*
+     * Returns information we have on the state of the node identified by rid.  Returns
+     * nullptr if rid is not found in the heartbeat data.  This method is used only for
+     * master/slave replication.
+     */
+    MemberData* _findMemberDataByRid(const OID rid);
 
     // Returns NULL if there is no primary, or the MemberConfig* for the current primary
     const MemberConfig* _currentPrimaryMember() const;

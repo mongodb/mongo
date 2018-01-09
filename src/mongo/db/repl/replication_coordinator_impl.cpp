@@ -51,7 +51,6 @@
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/last_vote.h"
-#include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
@@ -740,7 +739,7 @@ void ReplicationCoordinatorImpl::startup(OperationContext* opCtx) {
         fassert(18822, !_inShutdown);
         _setConfigState_inlock(kConfigStartingUp);
         _myRID = rid;
-        _topCoord->getMyMemberData()->setRid(rid);
+        _topCoord->setMyRid(rid);
     }
 
     if (!_settings.usingReplSets()) {
@@ -1022,21 +1021,10 @@ void ReplicationCoordinatorImpl::signalUpstreamUpdater() {
 
 Status ReplicationCoordinatorImpl::setLastOptimeForSlave(const OID& rid, const Timestamp& ts) {
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    massert(28576,
-            "Received an old style replication progress update, which is only used for Master/"
-            "Slave replication now, but this node is not using Master/Slave replication. "
-            "This is likely caused by an old (pre-2.6) member syncing from this node.",
-            getReplicationMode() == modeMasterSlave);
 
     // term == -1 for master-slave
     OpTime opTime(ts, OpTime::kUninitializedTerm);
-    MemberData* memberData = _topCoord->findMemberDataByRid(rid);
-    if (memberData) {
-        memberData->advanceLastAppliedOpTime(opTime, _replExecutor->now());
-    } else {
-        auto* memberData = _topCoord->addSlaveMemberData(rid);
-        memberData->setLastAppliedOpTime(opTime, _replExecutor->now());
-    }
+    _topCoord->setLastOptimeForSlave(rid, opTime, _replExecutor->now());
     _updateLastCommittedOpTime_inlock();
     return Status::OK();
 }
@@ -1110,9 +1098,7 @@ void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<stdx::
 void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& opTime,
                                                                 bool isRollbackAllowed,
                                                                 DataConsistency consistency) {
-    auto* myMemberData = _topCoord->getMyMemberData();
-    invariant(isRollbackAllowed || opTime >= myMemberData->getLastAppliedOpTime());
-    myMemberData->setLastAppliedOpTime(opTime, _replExecutor->now());
+    _topCoord->setMyLastAppliedOpTime(opTime, _replExecutor->now(), isRollbackAllowed);
     // If we are using applied times to calculate the commit level, update it now.
     if (!_rsConfig.getWriteConcernMajorityShouldJournal()) {
         _updateLastCommittedOpTime_inlock();
@@ -1155,9 +1141,7 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
 
 void ReplicationCoordinatorImpl::_setMyLastDurableOpTime_inlock(const OpTime& opTime,
                                                                 bool isRollbackAllowed) {
-    auto* myMemberData = _topCoord->getMyMemberData();
-    invariant(isRollbackAllowed || myMemberData->getLastDurableOpTime() <= opTime);
-    myMemberData->setLastDurableOpTime(opTime, _replExecutor->now());
+    _topCoord->setMyLastDurableOpTime(opTime, _replExecutor->now(), isRollbackAllowed);
     // If we are using durable times to calculate the commit level, update it now.
     if (_rsConfig.getWriteConcernMajorityShouldJournal()) {
         _updateLastCommittedOpTime_inlock();
@@ -1372,65 +1356,10 @@ Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer
 
 Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArgs::UpdateInfo& args,
                                                          long long* configVersion) {
-    if (_selfIndex == -1) {
-        // Ignore updates when we're in state REMOVED.
-        return Status(ErrorCodes::NotMasterOrSecondary,
-                      "Received replSetUpdatePosition command but we are in state REMOVED");
-    }
-    invariant(getReplicationMode() == modeReplSet);
-
-    if (args.memberId < 0) {
-        std::string errmsg = str::stream()
-            << "Received replSetUpdatePosition for node with memberId " << args.memberId
-            << " which is negative and therefore invalid";
-        LOG(1) << errmsg;
-        return Status(ErrorCodes::NodeNotFound, errmsg);
-    }
-
-    if (args.memberId == _rsConfig.getMemberAt(_selfIndex).getId()) {
-        // Do not let remote nodes tell us what our optime is.
-        return Status::OK();
-    }
-
-    LOG(2) << "received notification that node with memberID " << args.memberId
-           << " in config with version " << args.cfgver
-           << " has reached optime: " << args.appliedOpTime
-           << " and is durable through: " << args.durableOpTime;
-
-    if (args.cfgver != _rsConfig.getConfigVersion()) {
-        std::string errmsg = str::stream()
-            << "Received replSetUpdatePosition for node with memberId " << args.memberId
-            << " whose config version of " << args.cfgver << " doesn't match our config version of "
-            << _rsConfig.getConfigVersion();
-        LOG(1) << errmsg;
-        *configVersion = _rsConfig.getConfigVersion();
-        return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
-    }
-
-    auto* memberData = _topCoord->findMemberDataByMemberId(args.memberId);
-    if (!memberData) {
-        invariant(!_rsConfig.findMemberByID(args.memberId));
-
-        std::string errmsg = str::stream()
-            << "Received replSetUpdatePosition for node with memberId " << args.memberId
-            << " which doesn't exist in our config";
-        LOG(1) << errmsg;
-        return Status(ErrorCodes::NodeNotFound, errmsg);
-    }
-
-    invariant(args.memberId == memberData->getMemberId());
-
-    LOG(3) << "Node with memberID " << args.memberId << " currently has optime "
-           << memberData->getLastAppliedOpTime() << " durable through "
-           << memberData->getLastDurableOpTime() << "; updating to optime " << args.appliedOpTime
-           << " and durable through " << args.durableOpTime;
-
-
-    auto now(_replExecutor->now());
-    bool advancedOpTime = memberData->advanceLastAppliedOpTime(args.appliedOpTime, now);
-    advancedOpTime =
-        memberData->advanceLastDurableOpTime(args.durableOpTime, now) || advancedOpTime;
-
+    auto result = _topCoord->setLastOptime(args, _replExecutor->now(), configVersion);
+    if (!result.isOK())
+        return result.getStatus();
+    const bool advancedOpTime = result.getValue();
     // Only update committed optime if the remote optimes increased.
     if (advancedOpTime) {
         _updateLastCommittedOpTime_inlock();
@@ -2923,23 +2852,9 @@ Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePosi
 Status ReplicationCoordinatorImpl::processHandshake(OperationContext* opCtx,
                                                     const HandshakeArgs& handshake) {
     LOG(2) << "Received handshake " << handshake.toBSON();
-
     stdx::lock_guard<stdx::mutex> lock(_mutex);
-
-    if (getReplicationMode() != modeMasterSlave) {
-        return Status(ErrorCodes::IllegalOperation,
-                      "The handshake command is only used for master/slave replication");
-    }
-
-    auto* memberData = _topCoord->findMemberDataByRid(handshake.getRid());
-    if (memberData) {
-        return Status::OK();  // nothing to do
-    }
-
-    memberData = _topCoord->addSlaveMemberData(handshake.getRid());
-    memberData->setHostAndPort(_externalState->getClientHostAndPort(opCtx));
-
-    return Status::OK();
+    return _topCoord->processHandshake(handshake.getRid(),
+                                       _externalState->getClientHostAndPort(opCtx));
 }
 
 bool ReplicationCoordinatorImpl::buildsIndexes() {
@@ -3346,13 +3261,6 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
             int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
             _scheduleHeartbeatToTarget_inlock(senderHost, senderIndex, now);
         }
-    } else if (result.isOK()) {
-        // Update liveness for sending node.
-        auto* memberData = _topCoord->findMemberDataByMemberId(args.getSenderId());
-        if (!memberData) {
-            return result;
-        }
-        memberData->updateLiveness(_replExecutor->now());
     }
     return result;
 }
@@ -3360,8 +3268,6 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
 void ReplicationCoordinatorImpl::summarizeAsHtml(ReplSetHtmlSummary* output) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    // TODO(dannenberg) consider putting both optimes into the htmlsummary.
-    output->setSelfOptime(_getMyLastAppliedOpTime_inlock());
     output->setSelfUptime(time(0) - serverGlobalParams.started);
     output->setNow(_replExecutor->now());
 
