@@ -59,8 +59,6 @@
     // We awaited the replication of the first writes, so the change stream shouldn't return them.
     assert.writeOK(mongosColl.update({_id: -1}, {$set: {updated: true}}));
     assert.writeOK(mongosColl.update({_id: 1}, {$set: {updated: true}}));
-    st.rs0.awaitReplication();
-    st.rs1.awaitReplication();
 
     // Test that we see the two writes, and remember their resume tokens.
     assert.soon(() => changeStream.hasNext());
@@ -133,6 +131,59 @@
         pipeline: [{$changeStream: {resumeAfter: resumeTokenFromFirstUpdateOnShard0}}],
         expectedCode: 40576
     });
+
+    // Drop the collection.
+    assert(mongosColl.drop());
+
+    // Shard the test collection on shardKey.
+    assert.commandWorked(
+        mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {shardKey: 1}}));
+
+    // Split the collection into 2 chunks: [MinKey, 50), [50, MaxKey].
+    assert.commandWorked(
+        mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: 50}}));
+
+    // Move the [50, MaxKey] chunk to shard0001.
+    assert.commandWorked(mongosDB.adminCommand(
+        {moveChunk: mongosColl.getFullName(), find: {shardKey: 51}, to: st.rs1.getURL()}));
+
+    const numberOfDocs = 100;
+
+    // Insert test documents.
+    for (let counter = 0; counter < numberOfDocs / 5; ++counter) {
+        assert.writeOK(mongosColl.insert({_id: "abcd" + counter, shardKey: counter * 5 + 0},
+                                         {writeConcern: {w: "majority"}}));
+        assert.writeOK(mongosColl.insert({_id: "Abcd" + counter, shardKey: counter * 5 + 1},
+                                         {writeConcern: {w: "majority"}}));
+        assert.writeOK(mongosColl.insert({_id: "aBcd" + counter, shardKey: counter * 5 + 2},
+                                         {writeConcern: {w: "majority"}}));
+        assert.writeOK(mongosColl.insert({_id: "abCd" + counter, shardKey: counter * 5 + 3},
+                                         {writeConcern: {w: "majority"}}));
+        assert.writeOK(mongosColl.insert({_id: "abcD" + counter, shardKey: counter * 5 + 4},
+                                         {writeConcern: {w: "majority"}}));
+    }
+
+    let allChangesCursor = mongosColl.aggregate([{$changeStream: {}}]);
+
+    // Perform the multi-update that will induce timestamp collisions
+    assert.writeOK(mongosColl.update({}, {$set: {updated: true}}, {multi: true}));
+
+    // Loop over documents and open inner change streams resuming from a specified position.
+    // Note we skip the last document as it does not have the next document so we would
+    // hang indefinitely.
+    for (let counter = 0; counter < numberOfDocs - 1; ++counter) {
+        assert.soon(() => allChangesCursor.hasNext());
+        let next = allChangesCursor.next();
+
+        const resumeToken = next._id;
+        const caseInsensitive = {locale: "en_US", strength: 2};
+        let resumedCaseInsensitiveCursor = mongosColl.aggregate(
+            [{$changeStream: {resumeAfter: resumeToken}}], {collation: caseInsensitive});
+        assert.soon(() => resumedCaseInsensitiveCursor.hasNext());
+        resumedCaseInsensitiveCursor.close();
+    }
+
+    allChangesCursor.close();
 
     st.stop();
 })();
