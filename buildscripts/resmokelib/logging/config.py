@@ -67,8 +67,8 @@ def apply_buildlogger_global_handler(logger, logging_config, build_id=None, buil
         log_format = logger_info.get("format", _DEFAULT_FORMAT)
         formatter = formatters.ISO8601Formatter(fmt=log_format)
 
-        handler = buildlogger.BuildloggerGlobalHandler(build_id,
-                                                       build_config,
+        handler = buildlogger.BuildloggerGlobalHandler(build_config,
+                                                       build_id,
                                                        **handler_info)
         handler.setFormatter(formatter)
     else:
@@ -98,8 +98,8 @@ def apply_buildlogger_test_handler(logger,
         log_format = logger_info.get("format", _DEFAULT_FORMAT)
         formatter = formatters.ISO8601Formatter(fmt=log_format)
 
-        handler = buildlogger.BuildloggerTestHandler(build_id,
-                                                     build_config,
+        handler = buildlogger.BuildloggerTestHandler(build_config,
+                                                     build_id,
                                                      test_id,
                                                      **handler_info)
         handler.setFormatter(formatter)
