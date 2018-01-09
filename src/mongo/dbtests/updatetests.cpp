@@ -43,9 +43,6 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include <mongo/db/repl/repl_settings.h>
 
 namespace UpdateTests {
 
@@ -61,11 +58,6 @@ class ClientBase {
 public:
     ClientBase() : _client(&_opCtx) {
         mongo::LastError::get(_opCtx.getClient()).reset();
-        repl::ReplSettings replSettings;
-        replSettings.setOplogSizeBytes(10 * 1024 * 1024);
-        replSettings.setMaster(true);
-        setGlobalReplicationCoordinator(
-                new repl::ReplicationCoordinatorMock(_opCtx.getServiceContext(), replSettings));
     }
     virtual ~ClientBase() {
         mongo::LastError::get(_opCtx.getClient()).reset();
