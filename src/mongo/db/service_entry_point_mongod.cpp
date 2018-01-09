@@ -63,7 +63,6 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
@@ -232,20 +231,17 @@ void appendReplyMetadataOnError(OperationContext* opCtx, BSONObjBuilder* metadat
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
 
     if (isReplSet) {
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-                // No need to sign cluster times for internal clients.
-                SignedLogicalTime currentTime(
-                    LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
-                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                logicalTimeMetadata.writeToMetadata(metadataBob);
-            } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
-                auto currentTime =
-                    validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                logicalTimeMetadata.writeToMetadata(metadataBob);
-            }
+        if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+            // No need to sign cluster times for internal clients.
+            SignedLogicalTime currentTime(
+                LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
+            rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+            logicalTimeMetadata.writeToMetadata(metadataBob);
+        } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
+            auto currentTime =
+                validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
+            rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+            logicalTimeMetadata.writeToMetadata(metadataBob);
         }
     }
 }
@@ -271,20 +267,17 @@ void appendReplyMetadata(OperationContext* opCtx,
                 .writeToMetadata(metadataBob)
                 .transitional_ignore();
         }
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
-                // No need to sign cluster times for internal clients.
-                SignedLogicalTime currentTime(
-                    LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
-                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                logicalTimeMetadata.writeToMetadata(metadataBob);
-            } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
-                auto currentTime =
-                    validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
-                rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
-                logicalTimeMetadata.writeToMetadata(metadataBob);
-            }
+        if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+            // No need to sign cluster times for internal clients.
+            SignedLogicalTime currentTime(
+                LogicalClock::get(opCtx)->getClusterTime(), TimeProofService::TimeProof(), 0);
+            rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+            logicalTimeMetadata.writeToMetadata(metadataBob);
+        } else if (auto validator = LogicalTimeValidator::get(opCtx)) {
+            auto currentTime =
+                validator->trySignLogicalTime(LogicalClock::get(opCtx)->getClusterTime());
+            rpc::LogicalTimeMetadata logicalTimeMetadata(currentTime);
+            logicalTimeMetadata.writeToMetadata(metadataBob);
         }
     }
 
@@ -509,9 +502,7 @@ bool runCommandImpl(OperationContext* opCtx,
 
     // An uninitialized operation time means the cluster time is not propagated, so the operation
     // time should not be attached to the response.
-    if (operationTime != LogicalTime::kUninitialized &&
-        (serverGlobalParams.featureCompatibility.getVersion() ==
-         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
+    if (operationTime != LogicalTime::kUninitialized) {
         operationTime.appendAsOperationTime(&inPlaceReplyBob);
     }
 
@@ -759,9 +750,7 @@ void execCommandDatabase(OperationContext* opCtx,
 
         // An uninitialized operation time means the cluster time is not propagated, so the
         // operation time should not be attached to the error response.
-        if (operationTime != LogicalTime::kUninitialized &&
-            (serverGlobalParams.featureCompatibility.getVersion() ==
-             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
+        if (operationTime != LogicalTime::kUninitialized) {
             LOG(1) << "assertion while executing command '" << request.getCommandName() << "' "
                    << "on database '" << request.getDatabase() << "' "
                    << "with arguments '" << command->getRedactedCopyForLogging(request.body)

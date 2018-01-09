@@ -102,11 +102,6 @@ public:
     bool shouldGossipLogicalTime();
 
     /**
-     * Makes the KeysCollectionManager refresh synchronously.
-     */
-    void forceKeyRefreshNow(OperationContext* opCtx);
-
-    /**
      * Reset the key manager to prevent the former members of standalone replica set to use old
      * keys with sharded cluster.
      */

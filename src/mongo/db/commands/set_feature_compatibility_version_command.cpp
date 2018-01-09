@@ -37,13 +37,9 @@
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/keys_collection_document.h"
-#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
@@ -175,12 +171,6 @@ public:
                                      << requestedVersion)))));
             }
 
-            if (ShardingState::get(opCtx)->enabled()) {
-                // Ensure we try reading the keys for signing clusterTime immediately on upgrade.
-                // Remove after 3.4 -> 3.6 upgrade.
-                LogicalTimeValidator::get(opCtx)->forceKeyRefreshNow(opCtx);
-            }
-
             // Fail after adding UUIDs but before updating the FCV document.
             if (MONGO_FAIL_POINT(featureCompatibilityUpgrade)) {
                 exitCleanly(EXIT_CLEAN);
@@ -212,8 +202,7 @@ public:
                 exitCleanly(EXIT_CLEAN);
             }
 
-            // If config server, downgrade shards *before* downgrading self; and clear the keys
-            // collection to ensure all shards will have the same key information on re-upgrade.
+            // If config server, downgrade shards *before* downgrading self.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
@@ -223,25 +212,6 @@ public:
                                 cmdObj,
                                 BSON(FeatureCompatibilityVersion::kCommandName
                                      << requestedVersion)))));
-
-                // Stop the background key generator thread from running before trying to drop the
-                // collection so we know the key won't just be recreated.
-                //
-                // Note: no need to restart the key generator if downgrade doesn't succeed at once
-                // because downgrade must be completed before upgrade is allowed; and clusterTime
-                // auth is inactive unless fully upgraded.
-                LogicalTimeValidator::get(opCtx)->enableKeyGenerator(opCtx, false);
-
-                DBDirectClient client(opCtx);
-                BSONObj result;
-                if (!client.dropCollection(NamespaceString::kSystemKeysCollectionName.toString(),
-                                           ShardingCatalogClient::kMajorityWriteConcern,
-                                           &result)) {
-                    Status status = getStatusFromCommandResult(result);
-                    if (status != ErrorCodes::NamespaceNotFound) {
-                        uassertStatusOK(status);
-                    }
-                }
             }
 
             // Remove after 3.6 -> 3.4 downgrade.

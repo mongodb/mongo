@@ -60,10 +60,6 @@ protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
 
-        serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-        serverGlobalParams.validateFeaturesAsMaster.store(true);
-
         auto clockSource = stdx::make_unique<ClockSourceMock>();
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
         auto catalogClient = stdx::make_unique<KeysCollectionClientSharded>(

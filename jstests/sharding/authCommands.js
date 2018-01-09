@@ -6,6 +6,15 @@
 
     load("jstests/replsets/rslib.js");
 
+    // Replica set nodes started with --shardsvr do not enable key generation until they are added
+    // to a sharded cluster and reject commands with gossiped clusterTime from users without the
+    // advanceClusterTime privilege. This causes ShardingTest setup to fail because the shell
+    // briefly authenticates as __system and recieves clusterTime metadata then will fail trying to
+    // gossip that time later in setup.
+    //
+    // TODO SERVER-32672: remove this flag.
+    TestData.skipGossipingClusterTime = true;
+
     var st = new ShardingTest({
         shards: 2,
         rs: {oplogSize: 10, useHostname: false},

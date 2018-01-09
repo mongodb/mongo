@@ -239,14 +239,6 @@ Status waitForReadConcern(OperationContext* opCtx,
             return {ErrorCodes::InvalidOptions, "afterClusterTime is not allowed for this command"};
         }
 
-        if ((serverGlobalParams.featureCompatibility.getVersion() !=
-             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) &&
-            ShardingState::get(opCtx)->enabled()) {
-            return {ErrorCodes::InvalidOptions,
-                    "readConcern afterClusterTime is not available in featureCompatibilityVersion "
-                    "3.4 in a sharded cluster"};
-        }
-
         auto currentTime = LogicalClock::get(opCtx)->getClusterTime();
         if (currentTime < *afterClusterTime) {
             return {ErrorCodes::InvalidOptions,

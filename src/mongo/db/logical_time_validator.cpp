@@ -190,10 +190,6 @@ bool LogicalTimeValidator::shouldGossipLogicalTime() {
     return _getKeyManagerCopy()->hasSeenKeys();
 }
 
-void LogicalTimeValidator::forceKeyRefreshNow(OperationContext* opCtx) {
-    _getKeyManagerCopy()->refreshNow(opCtx);
-}
-
 void LogicalTimeValidator::resetKeyManagerCache(ServiceContext* service) {
     log() << "Resetting key manager cache";
     if (auto keyManager = _getKeyManagerCopy()) {

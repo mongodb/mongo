@@ -37,7 +37,6 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/memory.h"
@@ -242,9 +241,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 
         Milliseconds nextWakeup = kRefreshIntervalIfErrored;
 
-        // No need to refresh keys in FCV 3.4, since key generation will be disabled.
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+        {
             auto opCtx = cc().makeOperationContext();
 
             auto latestKeyStatusWith = (*doRefresh)(opCtx.get());
@@ -267,8 +264,6 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
                     nextWakeup = kMaxRefreshWaitTime;
                 }
             }
-        } else {
-            nextWakeup = kDefaultRefreshWaitTime;
         }
 
         MONGO_FAIL_POINT_BLOCK(maxKeyRefreshWaitTimeOverrideMS, data) {

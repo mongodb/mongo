@@ -12,6 +12,14 @@
 
 (function() {
     "use strict";
+
+    // Arbiters don't replicate the admin.system.keys collection, so they can never validate or sign
+    // clusterTime. Gossiping a clusterTime to an arbiter as a user other than __system will fail,
+    // so we skip gossiping for this test.
+    //
+    // TODO SERVER-32639: remove this flag.
+    TestData.skipGossipingClusterTime = true;
+
     // helper function for verifying contents at the end of the test
     var checkFinalResults = function(db) {
         assert.commandWorked(db.runCommand({dbStats: 1}));

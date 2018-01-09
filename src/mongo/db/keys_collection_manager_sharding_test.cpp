@@ -38,7 +38,6 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/s/grid.h"
@@ -58,10 +57,6 @@ public:
 protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
-
-        serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-        serverGlobalParams.validateFeaturesAsMaster.store(true);
 
         auto clockSource = stdx::make_unique<ClockSourceMock>();
         // Timestamps of "0 seconds" are not allowed, so we must advance our clock mock to the first
@@ -372,25 +367,6 @@ TEST_F(KeysManagerShardedTest, HasSeenKeysIsFalseUntilKeysAreFound) {
     ASSERT_OK(keyStatus.getStatus());
 
     ASSERT_EQ(true, keyManager()->hasSeenKeys());
-}
-
-TEST_F(KeysManagerShardedTest, ShouldNotReturnKeysInFeatureCompatibilityVersion34) {
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
-
-    keyManager()->startMonitoring(getServiceContext());
-    keyManager()->enableKeyGenerator(operationContext(), true);
-
-    KeysCollectionDocument origKey(
-        1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey.toBSON()));
-
-    keyManager()->refreshNow(operationContext());
-
-    auto keyStatus =
-        keyManager()->getKeyForValidation(operationContext(), 1, LogicalTime(Timestamp(100, 0)));
-    ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
 }
 
 }  // namespace mongo

@@ -34,7 +34,6 @@
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/util/fail_point_service.h"
 
@@ -81,11 +80,6 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReaderAndUpdater::refresh(
 
     if (MONGO_FAIL_POINT(disableKeyGeneration)) {
         return {ErrorCodes::FailPointEnabled, "key generation disabled"};
-    }
-
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-        return KeysCollectionCacheReader::refresh(opCtx);
     }
 
     auto currentTime = LogicalClock::get(opCtx)->getClusterTime();
