@@ -938,9 +938,9 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
               (readConcern == repl::ReadConcernLevel::kMajorityReadConcern &&
                writeConcern.wMode == WriteConcernOptions::kMajority));
-    BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition
-                                  << WriteConcernOptions::kWriteConcernField
-                                  << writeConcern.toBSON());
+    BSONObj cmd = BSON("doTxn" << updateOps << "preCondition" << preCondition
+                               << WriteConcernOptions::kWriteConcernField
+                               << writeConcern.toBSON());
 
     auto response =
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
@@ -978,7 +978,7 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
                   << causedBy(redact(status));
 
         // Look for the chunk in this shard whose version got bumped. We assume that if that
-        // mod made it to the config server, then applyOps was successful.
+        // mod made it to the config server, then transaction was successful.
         BSONObjBuilder query;
         lastChunkVersion.addToBSON(query, ChunkType::lastmod());
         query.append(ChunkType::ns(), nss);

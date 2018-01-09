@@ -69,8 +69,8 @@ void appendShortVersion(BufBuilder* b, const ChunkType& chunk) {
     bb.done();
 }
 
-BSONArray buildMergeChunksApplyOpsUpdates(const std::vector<ChunkType>& chunksToMerge,
-                                          const ChunkVersion& mergeVersion) {
+BSONArray buildMergeChunksTransactionUpdates(const std::vector<ChunkType>& chunksToMerge,
+                                             const ChunkVersion& mergeVersion) {
     BSONArrayBuilder updates;
 
     // Build an update operation to expand the first chunk into the newly merged chunk
@@ -84,7 +84,7 @@ BSONArray buildMergeChunksApplyOpsUpdates(const std::vector<ChunkType>& chunksTo
         ChunkType mergedChunk(chunksToMerge.front());
         mergedChunk.setMax(chunksToMerge.back().getMax());
 
-        // fill in additional details for sending through applyOps
+        // fill in additional details for sending through transaction
         mergedChunk.setVersion(mergeVersion);
 
         // add the new chunk information as the update object
@@ -111,8 +111,8 @@ BSONArray buildMergeChunksApplyOpsUpdates(const std::vector<ChunkType>& chunksTo
     return updates.arr();
 }
 
-BSONArray buildMergeChunksApplyOpsPrecond(const std::vector<ChunkType>& chunksToMerge,
-                                          const ChunkVersion& collVersion) {
+BSONArray buildMergeChunksTransactionPrecond(const std::vector<ChunkType>& chunksToMerge,
+                                             const ChunkVersion& collVersion) {
     BSONArrayBuilder preCond;
 
     for (auto chunk : chunksToMerge) {
@@ -167,11 +167,11 @@ Status checkChunkIsOnShard(OperationContext* opCtx,
     return Status::OK();
 }
 
-BSONObj makeCommitChunkApplyOpsCommand(const NamespaceString& nss,
-                                       const ChunkType& migratedChunk,
-                                       const boost::optional<ChunkType>& controlChunk,
-                                       StringData fromShard,
-                                       StringData toShard) {
+BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
+                                          const ChunkType& migratedChunk,
+                                          const boost::optional<ChunkType>& controlChunk,
+                                          StringData fromShard,
+                                          StringData toShard) {
 
     // Update migratedChunk's version and shard.
     BSONArrayBuilder updates;
@@ -220,10 +220,10 @@ BSONObj makeCommitChunkApplyOpsCommand(const NamespaceString& nss,
         updates.append(op.obj());
     }
 
-    // Do not give applyOps a write concern. If applyOps tries to wait for replication, it will fail
+    // Do not give doTxn a write concern. If doTxn tries to wait for replication, it will fail
     // because of the GlobalWrite lock CommitChunkMigration already holds. Replication will not be
     // able to take the lock it requires.
-    return BSON("applyOps" << updates.arr());
+    return BSON("doTxn" << updates.arr());
 }
 
 }  // namespace
@@ -375,7 +375,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     }
 
     // apply the batch of updates to local metadata.
-    Status applyOpsStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
+    Status doTxnStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
         opCtx,
         updates.arr(),
         preCond.arr(),
@@ -383,8 +383,8 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         currentMaxVersion,
         WriteConcernOptions(),
         repl::ReadConcernLevel::kLocalReadConcern);
-    if (!applyOpsStatus.isOK()) {
-        return applyOpsStatus;
+    if (!doTxnStatus.isOK()) {
+        return doTxnStatus;
     }
 
     // log changes
@@ -424,7 +424,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         }
     }
 
-    return applyOpsStatus;
+    return doTxnStatus;
 }
 
 Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
@@ -500,11 +500,11 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
     ChunkVersion mergeVersion = collVersion;
     mergeVersion.incMinor();
 
-    auto updates = buildMergeChunksApplyOpsUpdates(chunksToMerge, mergeVersion);
-    auto preCond = buildMergeChunksApplyOpsPrecond(chunksToMerge, collVersion);
+    auto updates = buildMergeChunksTransactionUpdates(chunksToMerge, mergeVersion);
+    auto preCond = buildMergeChunksTransactionPrecond(chunksToMerge, collVersion);
 
     // apply the batch of updates to local metadata
-    Status applyOpsStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
+    Status doTxnStatus = Grid::get(opCtx)->catalogClient()->applyChunkOpsDeprecated(
         opCtx,
         updates,
         preCond,
@@ -512,8 +512,8 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
         mergeVersion,
         WriteConcernOptions(),
         repl::ReadConcernLevel::kLocalReadConcern);
-    if (!applyOpsStatus.isOK()) {
-        return applyOpsStatus;
+    if (!doTxnStatus.isOK()) {
+        return doTxnStatus;
     }
 
     // log changes
@@ -532,7 +532,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
         ->logChange(opCtx, "merge", ns.ns(), logDetail.obj(), WriteConcernOptions())
         .transitional_ignore();
 
-    return applyOpsStatus;
+    return doTxnStatus;
 }
 
 StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
@@ -638,10 +638,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
             currentCollectionVersion.majorVersion() + 1, 1, currentCollectionVersion.epoch()));
     }
 
-    auto command = makeCommitChunkApplyOpsCommand(
+    auto command = makeCommitChunkTransactionCommand(
         nss, newMigratedChunk, newControlChunk, fromShard.toString(), toShard.toString());
 
-    StatusWith<Shard::CommandResponse> applyOpsCommandResponse =
+    StatusWith<Shard::CommandResponse> doTxnCommandResponse =
         configShard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -649,12 +649,12 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
             command,
             Shard::RetryPolicy::kIdempotent);
 
-    if (!applyOpsCommandResponse.isOK()) {
-        return applyOpsCommandResponse.getStatus();
+    if (!doTxnCommandResponse.isOK()) {
+        return doTxnCommandResponse.getStatus();
     }
 
-    if (!applyOpsCommandResponse.getValue().commandStatus.isOK()) {
-        return applyOpsCommandResponse.getValue().commandStatus;
+    if (!doTxnCommandResponse.getValue().commandStatus.isOK()) {
+        return doTxnCommandResponse.getValue().commandStatus;
     }
 
     BSONObjBuilder result;
