@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -145,7 +145,8 @@ __wt_cache_config(WT_SESSION_IMPL *session, bool reconfigure, const char *cfg[])
 		    session, &conn->evict_threads,
 		    conn->evict_threads_min,
 		    conn->evict_threads_max,
-		    WT_THREAD_CAN_WAIT | WT_THREAD_PANIC_FAIL));
+		    WT_THREAD_CAN_WAIT | WT_THREAD_LOOKASIDE |
+		    WT_THREAD_PANIC_FAIL));
 
 	return (0);
 }
@@ -198,6 +199,10 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET_MSG(NULL, ret,
 		    "Failed to create session for eviction walks");
 
+	WT_RET(__wt_spin_init(session, &cache->las_lock, "lookaside table"));
+	WT_RET(__wt_spin_init(
+	    session, &cache->las_sweep_lock, "lookaside sweep"));
+
 	/* Allocate the LRU eviction queue. */
 	cache->evict_slots = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
 	for (i = 0; i < WT_EVICT_QUEUE_MAX; ++i) {
@@ -249,34 +254,40 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	WT_STAT_SET(session, stats, cache_bytes_inuse, inuse);
 	WT_STAT_SET(session, stats, cache_overhead, cache->overhead_pct);
 
-	WT_STAT_SET(
-	    session, stats, cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
-	WT_STAT_SET(
-	    session, stats, cache_bytes_image, __wt_cache_bytes_image(cache));
-	WT_STAT_SET(
-	    session, stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
-	WT_STAT_SET(
-	    session, stats, cache_bytes_internal, cache->bytes_internal);
+	WT_STAT_SET(session, stats,
+	    cache_bytes_dirty, __wt_cache_dirty_inuse(cache));
+	WT_STAT_SET(session, stats,
+	    cache_bytes_image, __wt_cache_bytes_image(cache));
+	WT_STAT_SET(session, stats,
+	    cache_pages_inuse, __wt_cache_pages_inuse(cache));
+	WT_STAT_SET(session, stats,
+	    cache_bytes_internal, cache->bytes_internal);
 	WT_STAT_SET(session, stats, cache_bytes_leaf, leaf);
-	WT_STAT_SET(
-	    session, stats, cache_bytes_other, __wt_cache_bytes_other(cache));
+	if (F_ISSET(conn, WT_CONN_LOOKASIDE_OPEN)) {
+		WT_STAT_SET(session, stats, cache_bytes_lookaside,
+		    __wt_cache_bytes_plus_overhead(
+		    cache, cache->bytes_lookaside));
+	}
+	WT_STAT_SET(session, stats,
+	    cache_bytes_other, __wt_cache_bytes_other(cache));
 
 	WT_STAT_SET(session, stats,
 	    cache_eviction_maximum_page_size, cache->evict_max_page_size);
 	WT_STAT_SET(session, stats, cache_pages_dirty,
 	    cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
-	WT_STAT_CONN_SET(session, cache_eviction_state, cache->flags);
-	WT_STAT_CONN_SET(session,
+	WT_STAT_SET(session, stats, cache_eviction_state, cache->flags);
+	WT_STAT_SET(session, stats,
 	    cache_eviction_aggressive_set, cache->evict_aggressive_score);
-	WT_STAT_CONN_SET(session,
+	WT_STAT_SET(session, stats,
 	    cache_eviction_empty_score, cache->evict_empty_score);
-	WT_STAT_CONN_SET(session,
+	WT_STAT_SET(session, stats,
 	    cache_lookaside_score, __wt_cache_lookaside_score(cache));
 
-	WT_STAT_CONN_SET(session,
+	WT_STAT_SET(session, stats,
 	    cache_eviction_active_workers, conn->evict_threads.current_threads);
-	WT_STAT_CONN_SET(session, cache_eviction_stable_state_workers,
+	WT_STAT_SET(session, stats,
+	    cache_eviction_stable_state_workers,
 	    cache->evict_tune_workers_best);
 
 	/*
@@ -334,6 +345,8 @@ __wt_cache_destroy(WT_SESSION_IMPL *session)
 	__wt_spin_destroy(session, &cache->evict_pass_lock);
 	__wt_spin_destroy(session, &cache->evict_queue_lock);
 	__wt_spin_destroy(session, &cache->evict_walk_lock);
+	__wt_spin_destroy(session, &cache->las_lock);
+	__wt_spin_destroy(session, &cache->las_sweep_lock);
 	wt_session = &cache->walk_session->iface;
 	if (wt_session != NULL)
 		WT_TRET(wt_session->close(wt_session, NULL));

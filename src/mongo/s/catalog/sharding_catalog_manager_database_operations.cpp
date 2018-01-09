@@ -138,9 +138,8 @@ void ShardingCatalogManager::enableSharding(OperationContext* opCtx, const std::
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateDatabase(opCtx, dbName, dbType));
 }
 
-Status ShardingCatalogManager::getDatabasesForShard(OperationContext* opCtx,
-                                                    const ShardId& shardId,
-                                                    std::vector<std::string>* dbs) {
+StatusWith<std::vector<std::string>> ShardingCatalogManager::getDatabasesForShard(
+    OperationContext* opCtx, const ShardId& shardId) {
     auto findStatus = Grid::get(opCtx)->catalogClient()->_exhaustiveFindOnConfig(
         opCtx,
         kConfigReadSelector,
@@ -150,18 +149,21 @@ Status ShardingCatalogManager::getDatabasesForShard(OperationContext* opCtx,
         BSONObj(),
         boost::none);  // no limit
 
+    if (!findStatus.isOK())
+        return findStatus.getStatus();
+
+    std::vector<std::string> dbs;
     for (const BSONObj& obj : findStatus.getValue().value) {
         std::string dbName;
         Status status = bsonExtractStringField(obj, DatabaseType::name(), &dbName);
         if (!status.isOK()) {
-            dbs->clear();
             return status;
         }
 
-        dbs->push_back(dbName);
+        dbs.push_back(dbName);
     }
 
-    return Status::OK();
+    return dbs;
 }
 
 }  // namespace mongo

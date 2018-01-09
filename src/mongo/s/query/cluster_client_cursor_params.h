@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -44,8 +45,12 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+namespace executor {
+class TaskExecutor;
+}
 
 class OperationContext;
+class RouterExecStage;
 
 /**
  * The resulting ClusterClientCursor will take ownership of the existing remote cursor, generating
@@ -59,6 +64,9 @@ struct ClusterClientCursorParams {
     // When mongos has to do a merge in order to return results to the client in the correct sort
     // order, it requests a sortKey meta-projection using this field name.
     static const char kSortKeyField[];
+
+    // The expected sort key pattern when 'compareWholeSortKey' is true.
+    static const BSONObj kWholeSortKeySortPattern;
 
     struct RemoteCursor {
         RemoteCursor(ShardId shardId, HostAndPort hostAndPort, CursorResponse cursorResponse)
@@ -100,6 +108,11 @@ struct ClusterClientCursorParams {
     // The sort specification. Leave empty if there is no sort.
     BSONObj sort;
 
+    // When 'compareWholeSortKey' is true, $sortKey is a scalar value, rather than an object. We
+    // extract the sort key {$sortKey: <value>}. The sort key pattern is verified to be {$sortKey:
+    // 1}.
+    bool compareWholeSortKey = false;
+
     // The number of results to skip. Optional. Should not be forwarded to the remote hosts in
     // 'cmdObj'.
     boost::optional<long long> skip;
@@ -113,7 +126,7 @@ struct ClusterClientCursorParams {
     boost::optional<long long> limit;
 
     // If set, we use this pipeline to merge the output of aggregations on each remote.
-    std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline;
+    std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline;
 
     // Whether this cursor is tailing a capped collection, and whether it has the awaitData option
     // set.
@@ -121,6 +134,12 @@ struct ClusterClientCursorParams {
 
     // Set if a readPreference must be respected throughout the lifetime of the cursor.
     boost::optional<ReadPreferenceSetting> readPreference;
+
+    // If valid, is called to return the RouterExecStage which becomes the initial source in this
+    // cursor's execution plan. Otherwise, a RouterStageMerge is used.
+    stdx::function<std::unique_ptr<RouterExecStage>(
+        OperationContext*, executor::TaskExecutor*, ClusterClientCursorParams*)>
+        createCustomCursorSource;
 
     // Whether the client indicated that it is willing to receive partial results in the case of an
     // unreachable host.

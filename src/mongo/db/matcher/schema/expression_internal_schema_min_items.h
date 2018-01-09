@@ -39,9 +39,9 @@ namespace mongo {
 class InternalSchemaMinItemsMatchExpression final
     : public InternalSchemaNumArrayItemsMatchExpression {
 public:
-    InternalSchemaMinItemsMatchExpression()
-        : InternalSchemaNumArrayItemsMatchExpression(INTERNAL_SCHEMA_MIN_ITEMS,
-                                                     "$_internalSchemaMinItems"_sd) {}
+    InternalSchemaMinItemsMatchExpression(StringData path, long long numItems)
+        : InternalSchemaNumArrayItemsMatchExpression(
+              INTERNAL_SCHEMA_MIN_ITEMS, path, numItems, "$_internalSchemaMinItems"_sd) {}
 
     bool matchesArray(const BSONObj& anArray, MatchDetails* details) const final {
         return (anArray.nFields() >= numItems());
@@ -49,8 +49,7 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<InternalSchemaMinItemsMatchExpression> minItems =
-            stdx::make_unique<InternalSchemaMinItemsMatchExpression>();
-        invariantOK(minItems->init(path(), numItems()));
+            stdx::make_unique<InternalSchemaMinItemsMatchExpression>(path(), numItems());
         if (getTag()) {
             minItems->setTag(getTag()->clone());
         }

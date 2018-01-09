@@ -80,13 +80,15 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                 adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
                 "3.6",
                 "expected 3.6 mongod with no data files to start up with featureCompatibilityVersion 3.6");
+            removeFCVDocument(adminDB);
         } else {
             assert.eq(
                 adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
                 "3.4",
                 "expected 3.4 mongod with no data files to start up with featureCompatibilityVersion 3.4");
+            assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
         }
-        assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
+
         MongoRunner.stopMongod(conn);
         return conn;
     };
@@ -376,26 +378,28 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
               0);
     rst.stopSet();
 
-    // A mixed 3.4/3.6 replica set without a featureCompatibilityVersion document unfortunately
-    // reports mixed 3.2/3.4 featureCompatibilityVersion.
-    rst = new ReplSetTest({nodes: [{binVersion: downgrade}, {binVersion: latest}]});
-    rstConns = rst.startSet();
-    replSetConfig = rst.getReplSetConfig();
-    replSetConfig.members[1].priority = 0;
-    replSetConfig.members[1].votes = 0;
-    rst.initiate(replSetConfig);
+    // Test idempotency for setFeatureCompatibilityVersion.
+    rst = new ReplSetTest({nodes: 2, nodeOpts: {binVersion: latest}});
+    rst.startSet();
+    rst.initiate();
 
-    primaryAdminDB = rst.getPrimary().getDB("admin");
-    secondaryAdminDB = rst.getSecondary().getDB("admin");
-    assert.writeOK(primaryAdminDB.system.version.remove({_id: "featureCompatibilityVersion"},
-                                                        {writeConcern: {w: 2}}));
-    res = primaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion, "3.2");
-    res = secondaryAdminDB.runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-    assert.commandWorked(res);
-    assert.eq(res.featureCompatibilityVersion.version, "3.4", tojson(res));
-    assert.eq(res.featureCompatibilityVersion.targetVersion, null, tojson(res));
+    // Set FCV to 3.4 so that a 3.4 node can join the set.
+    primary = rst.getPrimary();
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgrade}));
+    rst.awaitReplication();
+
+    // Add a 3.4 node to the set.
+    secondary = rst.add({binVersion: downgrade});
+    rst.reInitiate();
+
+    // Ensure the 3.4 node succeeded its initial sync.
+    assert.writeOK(primary.getDB("test").coll.insert({awaitRepl: true}, {writeConcern: {w: 3}}));
+
+    // Run {setFCV: "3.4"}. This should be idempotent.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgrade}));
+    rst.awaitReplication();
+
+    // Ensure the secondary is still running.
     rst.stopSet();
 
     //
@@ -477,63 +481,10 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     assert.commandWorked(mongosAdminDB.runCommand({addShard: latestShard.getURL()}));
     checkFCV(latestShardPrimaryAdminDB, "3.4");
 
-    // Shard some collections before upgrade, to ensure UUIDs are generated for them on upgrade.
-    // This specifically tests 3.4 -> 3.6 upgrade behavior.
-    let dbName = "test";
-    assert.commandWorked(mongosAdminDB.runCommand({enableSharding: dbName}));
-    let existingShardedCollNames = [];
-    for (let i = 0; i < 5; i++) {
-        let collName = "coll" + i;
-        assert.commandWorked(
-            mongosAdminDB.runCommand({shardCollection: dbName + "." + collName, key: {_id: 1}}));
-        existingShardedCollNames.push(collName);
-    }
-
-    // Additionally simulate that some sharded collections already have UUIDs from a previous failed
-    // upgrade attempt (for example, due to repeated config server failover).
-    let existingShardedCollEntriesWithUUIDs = [];
-    for (let i = 0; i < 3; i++) {
-        let collName = "collWithUUID" + i;
-        let collEntry = {
-            _id: dbName + "." + collName,
-            lastmod: ISODate(),
-            dropped: false,
-            key: {_id: 1},
-            unique: false,
-            lastmodEpoch: ObjectId(),
-            uuid: UUID()
-        };
-        assert.writeOK(st.s.getDB("config").collections.insert(collEntry));
-        existingShardedCollEntriesWithUUIDs.push(collEntry);
-    }
-
     // featureCompatibilityVersion can be set to 3.6 on mongos.
     assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.6"}));
     checkFCV(st.configRS.getPrimary().getDB("admin"), "3.6");
     checkFCV(shardPrimaryAdminDB, "3.6");
-
-    // Ensure the storage engine's schema was upgraded on the config server to include UUIDs.
-    // This specifically tests 3.4 -> 3.6 upgrade behavior.
-    res = st.s.getDB("config").runCommand({listCollections: 1});
-    assert.commandWorked(res);
-    for (let coll of res.cursor.firstBatch) {
-        assert(coll.info.hasOwnProperty("uuid"), tojson(res));
-    }
-
-    // Check that the existing sharded collections that did not have UUIDs were assigned new UUIDs,
-    // and existing sharded collections that already had a UUID (from the simulated earlier failed
-    // upgrade attempt) were *not* assigned new UUIDs.
-    // This specifically tests 3.4 -> 3.6 upgrade behavior.
-    existingShardedCollNames.forEach(function(collName) {
-        let collEntry = st.s.getDB("config").collections.findOne({_id: dbName + "." + collName});
-        assert.neq(null, collEntry);
-        assert.hasFields(collEntry, ["uuid"]);
-    });
-    existingShardedCollEntriesWithUUIDs.forEach(function(expectedEntry) {
-        let actualEntry = st.s.getDB("config").collections.findOne({_id: expectedEntry._id});
-        assert.neq(null, actualEntry);
-        assert.docEq(expectedEntry, actualEntry);
-    });
 
     // Call ShardingTest.stop before shutting down latestShard, so that the UUID check in
     // ShardingTest.stop can talk to latestShard.

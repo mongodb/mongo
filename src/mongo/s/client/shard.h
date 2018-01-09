@@ -91,7 +91,9 @@ public:
 
     virtual ~Shard() = default;
 
-    const ShardId getId() const;
+    const ShardId& getId() const {
+        return _id;
+    }
 
     /**
      * Returns true if this shard object represents the config server.

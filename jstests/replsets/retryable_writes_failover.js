@@ -5,6 +5,13 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/retryable_writes_util.js");
+
+    if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     function stepDownPrimary(replTest) {
         let exception = assert.throws(function() {
             let res = assert.commandWorked(

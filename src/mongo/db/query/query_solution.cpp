@@ -603,13 +603,13 @@ bool IndexScanNode::sortedByDiskLoc() const {
 // static
 std::set<StringData> IndexScanNode::getFieldsWithStringBounds(const IndexBounds& bounds,
                                                               const BSONObj& indexKeyPattern) {
-    BSONObjIterator keyPatternIterator = indexKeyPattern.begin();
+    BSONObjIterator keyPatternIterator(indexKeyPattern);
 
     if (bounds.isSimpleRange) {
         // With a simple range, the only cases we can say for sure do not contain strings
         // are those with point bounds.
-        BSONObjIterator startKeyIterator = bounds.startKey.begin();
-        BSONObjIterator endKeyIterator = bounds.endKey.begin();
+        BSONObjIterator startKeyIterator(bounds.startKey);
+        BSONObjIterator endKeyIterator(bounds.endKey);
         while (keyPatternIterator.more() && startKeyIterator.more() && endKeyIterator.more()) {
             BSONElement startKey = startKeyIterator.next();
             BSONElement endKey = endKeyIterator.next();
@@ -758,7 +758,7 @@ void IndexScanNode::computeProperties() {
     // We cannot provide a sort which involves a multikey field. Prune such sort orders, if the
     // index is multikey.
     if (index.multikey) {
-        auto multikeyFields = getMultikeyFields(index.keyPattern, index.multikeyPaths);
+        multikeyFields = getMultikeyFields(index.keyPattern, index.multikeyPaths);
         for (auto sortsIt = _sorts.begin(); sortsIt != _sorts.end();) {
             bool foundMultikeyField = false;
             for (auto&& elt : *sortsIt) {

@@ -112,7 +112,10 @@ Status LocksType::validate() const {
     }
 
     State lockState = getState();
-    if (lockState < 0 || lockState >= State::numStates) {
+    // The State enum may be unsigned depending on compiler,
+    // force it into a signed value for the purpose of bounds checking.
+    const auto sLockState = static_cast<std::make_signed<State>::type>(lockState);
+    if (sLockState < 0 || lockState >= State::numStates) {
         return {ErrorCodes::BadValue, str::stream() << "Invalid lock state: " << getState()};
     }
 

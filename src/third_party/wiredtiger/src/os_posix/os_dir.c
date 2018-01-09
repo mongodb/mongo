@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -11,13 +11,13 @@
 #include <dirent.h>
 
 /*
- * __wt_posix_directory_list --
+ * __directory_list_worker --
  *	Get a list of files from a directory, POSIX version.
  */
-int
-__wt_posix_directory_list(WT_FILE_SYSTEM *file_system,
+static int
+__directory_list_worker(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *directory,
-    const char *prefix, char ***dirlistp, uint32_t *countp)
+    const char *prefix, char ***dirlistp, uint32_t *countp, bool single)
 {
 	struct dirent *dp;
 	DIR *dirp;
@@ -63,6 +63,9 @@ __wt_posix_directory_list(WT_FILE_SYSTEM *file_system,
 		    session, &dirallocsz, count + 1, &entries));
 		WT_ERR(__wt_strdup(session, dp->d_name, &entries[count]));
 		++count;
+
+		if (single)
+			break;
 	}
 
 	*dirlistp = entries;
@@ -87,6 +90,32 @@ err:	if (dirp != NULL) {
 	WT_RET_MSG(session, ret,
 	    "%s: directory-list, prefix \"%s\"",
 	    directory, prefix == NULL ? "" : prefix);
+}
+
+/*
+ * __wt_posix_directory_list --
+ *	Get a list of files from a directory, POSIX version.
+ */
+int
+__wt_posix_directory_list(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *directory,
+    const char *prefix, char ***dirlistp, uint32_t *countp)
+{
+	return (__directory_list_worker(file_system,
+	    wt_session, directory, prefix, dirlistp, countp, false));
+}
+
+/*
+ * __wt_posix_directory_list_single --
+ *	Get one file from a directory, POSIX version.
+ */
+int
+__wt_posix_directory_list_single(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *directory,
+    const char *prefix, char ***dirlistp, uint32_t *countp)
+{
+	return (__directory_list_worker(file_system,
+	    wt_session, directory, prefix, dirlistp, countp, true));
 }
 
 /*

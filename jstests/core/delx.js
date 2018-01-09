@@ -1,3 +1,4 @@
+// @tags: [requires_getmore, requires_non_retryable_writes]
 
 a = db.getSisterDB("delxa");
 b = db.getSisterDB("delxb");

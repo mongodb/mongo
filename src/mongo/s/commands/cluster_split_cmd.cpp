@@ -196,7 +196,7 @@ public:
             BSONObj shardKey =
                 uassertStatusOK(cm->getShardKeyPattern().extractShardKeyFromQuery(opCtx, find));
             if (shardKey.isEmpty()) {
-                errmsg = stream() << "no shard key found in chunk query " << find;
+                errmsg = str::stream() << "no shard key found in chunk query " << find;
                 return false;
             }
 
@@ -272,6 +272,8 @@ public:
                                                   ChunkRange(chunk->getMin(), chunk->getMax()),
                                                   {splitPoint}));
 
+        // This invalidation is only necessary so that auto-split can begin to track statistics for
+        // the chunks produced after the split instead of the single original chunk.
         Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
 
         return true;

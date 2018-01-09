@@ -77,7 +77,7 @@ private:
         if (!remaining)
             return;
 
-        stdx::thread athread(stdx::bind(&ThreadedTest::subthread, this, remaining));
+        stdx::thread athread([=] { subthread(remaining); });
         launch_subthreads(remaining - 1);
         athread.join();
     }
@@ -129,7 +129,7 @@ public:
         OldThreadPool tp(nThreads);
 
         for (unsigned i = 0; i < iterations; i++) {
-            tp.schedule(&ThreadPoolTest::increment, this, 2);
+            tp.schedule([=] { increment(2); });
         }
 
         tp.join();

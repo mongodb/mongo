@@ -153,6 +153,44 @@ void FixUpInfo::addIndexToDrop(const NamespaceString& nss, const DocID& doc) {
     }
 }
 
+namespace {
+
+bool canRollBackCollMod(BSONObj obj) {
+
+    // If there is only one field, then the collMod is a UUID upgrade/downgrade collMod.
+    if (obj.nFields() == 1) {
+        return true;
+    }
+    for (auto field : obj) {
+        // Example collMod obj
+        // o:{
+        //       collMod : "x",
+        //       validationLevel : "off",
+        //       index: {
+        //                  name: "indexName_1",
+        //                  expireAfterSeconds: 600
+        //              }
+        //    }
+
+        const auto modification = field.fieldNameStringData();
+        if (modification == "collMod") {
+            continue;  // Skips the command name. The first field in the obj will be the
+                       // command name.
+        }
+
+        if (modification == "validator" || modification == "validationAction" ||
+            modification == "validationLevel" || modification == "usePowerOf2Sizes" ||
+            modification == "noPadding") {
+            continue;
+        }
+
+        // Some collMod fields cannot be rolled back, such as the index field.
+        return false;
+    }
+    return true;
+}
+
+}  // namespace
 
 Status rollback_internal_no_uuid::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& fixUpInfo,
                                                                      const BSONObj& ourObj) {
@@ -274,36 +312,14 @@ Status rollback_internal_no_uuid::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& 
             severe() << message << redact(obj);
             throw RSFatalException(message);
         } else if (cmdname == "collMod") {
-            const auto ns = NamespaceString(cmd->parseNs(nss.db().toString(), obj));
-            for (auto field : obj) {
-                // Example collMod obj
-                // o:{
-                //       collMod : "x",
-                //       validationLevel : "off",
-                //       index: {
-                //                  name: "indexName_1",
-                //                  expireAfterSeconds: 600
-                //              }
-                //    }
-
-                const auto modification = field.fieldNameStringData();
-                if (modification == cmdname) {
-                    continue;  // Skips the command name. The first field in the obj will be the
-                               // command name.
-                }
-
-                if (modification == "validator" || modification == "validationAction" ||
-                    modification == "validationLevel" || modification == "usePowerOf2Sizes" ||
-                    modification == "noPadding") {
-                    fixUpInfo.collectionsToResyncMetadata.insert(ns.ns());
-                    continue;
-                }
-                // Some collMod fields cannot be rolled back, such as the index field.
-                string message = "Cannot roll back a collMod command: ";
-                severe() << message << redact(obj);
-                throw RSFatalException(message);
+            if (canRollBackCollMod(obj)) {
+                const auto ns = NamespaceString(cmd->parseNs(nss.db().toString(), obj));
+                fixUpInfo.collectionsToResyncMetadata.insert(ns.ns());
+                return Status::OK();
             }
-            return Status::OK();
+            string message = "Cannot roll back a collMod command: ";
+            severe() << message << redact(obj);
+            throw RSFatalException(message);
         } else if (cmdname == "applyOps") {
 
             if (first.type() != Array) {
@@ -401,7 +417,7 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
 
     OpTime minValid = fassertStatusOK(28774, OpTime::parseFromOplogEntry(newMinValidDoc));
     log() << "Setting minvalid to " << minValid;
-    replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});  // Use top of oplog.
+    replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, {});
     replicationProcess->getConsistencyMarkers()->setMinValid(opCtx, minValid);
 
     if (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
@@ -533,7 +549,8 @@ void syncFixUp(OperationContext* opCtx,
             // Updates the collection flags.
             if (auto optionsField = info["options"]) {
                 if (optionsField.type() != Object) {
-                    throw RSFatalException(str::stream() << "Failed to parse options " << info
+                    throw RSFatalException(str::stream() << "Failed to parse options "
+                                                         << redact(info)
                                                          << ": expected 'options' to be an "
                                                          << "Object, got "
                                                          << typeName(optionsField.type()));
@@ -545,12 +562,14 @@ void syncFixUp(OperationContext* opCtx,
                                                          << ": "
                                                          << status.toString());
                 }
-                // TODO(SERVER-27992): Set options.uuid.
             } else {
                 // Use default options.
             }
 
             WriteUnitOfWork wuow(opCtx);
+
+            // Set collection to whatever temp status is on the sync source.
+            cce->setIsTemp(opCtx, options.temp);
 
             // Resets collection user flags such as noPadding and usePowerOf2Sizes.
             if (options.flagsSet || cce->getCollectionOptions(opCtx).flagsSet) {
@@ -560,10 +579,72 @@ void syncFixUp(OperationContext* opCtx,
             // Set any document validation options. We update the validator fields without
             // parsing/validation, since we fetched the options object directly from the sync
             // source, and we should set our validation options to match it exactly.
-            cce->updateValidator(
+            auto validatorStatus = collection->updateValidator(
                 opCtx, options.validator, options.validationLevel, options.validationAction);
+            if (!validatorStatus.isOK()) {
+                throw RSFatalException(
+                    str::stream() << "Failed to update validator for " << nss.toString() << " with "
+                                  << redact(info)
+                                  << ". Got: "
+                                  << validatorStatus.toString());
+            }
+
+            OptionalCollectionUUID originalLocalUUID = collection->uuid();
+            OptionalCollectionUUID remoteUUID = boost::none;
+            if (auto infoField = info["info"]) {
+                if (infoField.type() != Object) {
+                    throw RSFatalException(str::stream() << "Failed to parse collection info "
+                                                         << redact(info)
+                                                         << ": expected 'info' to be an "
+                                                         << "Object, got "
+                                                         << typeName(infoField.type()));
+                }
+                auto infoFieldObj = infoField.Obj();
+                if (infoFieldObj.hasField("uuid")) {
+                    remoteUUID = boost::make_optional(UUID::parse(infoFieldObj));
+                }
+            }
+
+            // If the local collection has a UUID, it must match the remote UUID. If the sync source
+            // has no UUID or they do not match, we remove the local UUID and allow the 'collMod'
+            // operation on the sync source to add the UUID back.
+            if (originalLocalUUID) {
+                if (!remoteUUID) {
+                    log() << "Removing UUID " << originalLocalUUID.get() << " from " << nss.ns()
+                          << " because sync source had no UUID for namespace.";
+                    cce->removeUUID(opCtx);
+                    collection->refreshUUID(opCtx);
+                } else if (originalLocalUUID.get() != remoteUUID.get()) {
+                    log() << "Removing UUID " << originalLocalUUID.get() << " from " << nss.ns()
+                          << " because sync source had different UUID (" << remoteUUID.get()
+                          << ") for collection.";
+                    cce->removeUUID(opCtx);
+                    collection->refreshUUID(opCtx);
+                }
+            } else if (remoteUUID &&
+                       (serverGlobalParams.featureCompatibility.getVersion() ==
+                        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34)) {
+                // If we are in the process of downgrading, and we have no UUID but the sync source
+                // does, then it is possible we will not see a 'collMod' during RECOVERING to add
+                // back in the UUID from the sync source. In that case, we add the sync source's
+                // UUID here.
+                invariant(!originalLocalUUID);
+                log() << "Assigning UUID " << remoteUUID.get() << " to " << nss.ns()
+                      << " because we had no UUID, the sync source had a UUID, and we were in the "
+                         "middle of downgrade.";
+                cce->addUUID(opCtx, remoteUUID.get(), collection);
+                collection->refreshUUID(opCtx);
+            }
 
             wuow.commit();
+
+            auto originalLocalUUIDString =
+                (originalLocalUUID) ? originalLocalUUID.get().toString() : "no UUID";
+            auto remoteUuidString = (remoteUUID) ? remoteUUID.get().toString() : "no UUID";
+            LOG(1) << "Resynced collection metadata for collection: " << nss
+                   << ", original local UUID: " << originalLocalUUIDString
+                   << ", remote UUID: " << remoteUuidString << ", with: " << redact(info)
+                   << ", to: " << redact(cce->getCollectionOptions(opCtx).toBSON());
         }
 
         // Since we read from the sync source to retrieve the metadata of the
@@ -854,8 +935,13 @@ void syncFixUp(OperationContext* opCtx,
     }
 
     // Reload the lastAppliedOpTime and lastDurableOpTime value in the replcoord and the
-    // lastAppliedHash value in bgsync to reflect our new last op.
-    replCoord->resetLastOpTimesFromOplog(opCtx);
+    // lastAppliedHash value in bgsync to reflect our new last op. The rollback common point does
+    // not necessarily represent a consistent database state. For example, on a secondary, we may
+    // have rolled back to an optime that fell in the middle of an oplog application batch. We make
+    // the database consistent again after rollback by applying ops forward until we reach
+    // 'minValid'.
+    replCoord->resetLastOpTimesFromOplog(opCtx,
+                                         ReplicationCoordinator::DataConsistency::Inconsistent);
 }
 
 Status _syncRollback(OperationContext* opCtx,
@@ -905,7 +991,21 @@ Status _syncRollback(OperationContext* opCtx,
                           << e.what());
     }
 
+    OpTime commonPoint = how.commonPoint;
+    OpTime lastCommittedOpTime = replCoord->getLastCommittedOpTime();
+    OpTime committedSnapshot = replCoord->getCurrentCommittedSnapshotOpTime();
+
     log() << "Rollback common point is " << how.commonPoint;
+
+    // Rollback common point should be >= the replication commit point.
+    invariant(!replCoord->isV1ElectionProtocol() ||
+              commonPoint.getTimestamp() >= lastCommittedOpTime.getTimestamp());
+    invariant(!replCoord->isV1ElectionProtocol() || commonPoint >= lastCommittedOpTime);
+
+    // Rollback common point should be >= the committed snapshot optime.
+    invariant(commonPoint.getTimestamp() >= committedSnapshot.getTimestamp());
+    invariant(commonPoint >= committedSnapshot);
+
     try {
         ON_BLOCK_EXIT([&] {
             auto status = replicationProcess->incrementRollbackID(opCtx);

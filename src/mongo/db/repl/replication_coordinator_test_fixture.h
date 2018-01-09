@@ -33,6 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/unittest/unittest.h"
 
@@ -41,17 +42,15 @@ namespace mongo {
 class BSONObj;
 struct HostAndPort;
 
-namespace executor {
-class NetworkInterfaceMock;
-}  // namespace executor
-
 namespace repl {
 
 class ReplSetConfig;
 class ReplicationCoordinatorExternalStateMock;
 class ReplicationCoordinatorImpl;
 class StorageInterfaceMock;
-class TopologyCoordinatorImpl;
+class TopologyCoordinator;
+
+using executor::NetworkInterfaceMock;
 
 /**
  * Fixture for testing ReplicationCoordinatorImpl behaviors.
@@ -121,7 +120,7 @@ protected:
     /**
      * Gets the topology coordinator used by the replication coordinator under test.
      */
-    TopologyCoordinatorImpl& getTopoCoord() {
+    TopologyCoordinator& getTopoCoord() {
         return *_topo;
     }
 
@@ -263,6 +262,11 @@ protected:
      */
     void replyToReceivedHeartbeat();
     void replyToReceivedHeartbeatV1();
+    /**
+     * Consumes the network operation and responds if it's a heartbeat request.
+     * Returns whether the operation is a heartbeat request.
+     */
+    bool consumeHeartbeatV1(const NetworkInterfaceMock::NetworkOperationIterator& noi);
 
     void simulateEnoughHeartbeatsForAllNodesUp();
 
@@ -284,7 +288,7 @@ protected:
 private:
     std::unique_ptr<ReplicationCoordinatorImpl> _repl;
     // Owned by ReplicationCoordinatorImpl
-    TopologyCoordinatorImpl* _topo = nullptr;
+    TopologyCoordinator* _topo = nullptr;
     // Owned by executor
     executor::NetworkInterfaceMock* _net = nullptr;
     // Owned by ReplicationCoordinatorImpl

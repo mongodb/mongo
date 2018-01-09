@@ -149,9 +149,9 @@ class ExecutorRootLogger(RootLogger):
         """Create a new TestQueueLogger that will be a child of the "tests" root logger."""
         return TestQueueLogger(test_kind, self.tests_root_logger)
 
-    def new_hook_logger(self, behavior_class, job_num):
+    def new_hook_logger(self, behavior_class, job_num, fixture_logger):
         """Create a new child hook logger."""
-        return BaseLogger("%s:job%d" % (behavior_class, job_num), parent=self.tests_root_logger)
+        return BaseLogger("%s:job%d" % (behavior_class, job_num), parent=fixture_logger)
 
 
 class JobLogger(BaseLogger):

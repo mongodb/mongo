@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -35,7 +35,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	 * If the page is a replacement, test the replacement addresses.
 	 * Ignore empty pages, they get merged into the parent.
 	 */
-	if (mod == NULL || mod->rec_result == 0) {
+	if (__wt_page_evict_clean(page)) {
 		__wt_ref_info(ref, &addr, &addr_size, NULL);
 		if (addr == NULL)
 			return (0);
@@ -58,7 +58,7 @@ __compact_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
 	if (mod->rec_result == WT_PM_REC_MULTIBLOCK)
 		for (multi = mod->mod_multi,
 		    i = 0; i < mod->mod_multi_entries; ++multi, ++i) {
-			if (multi->disk_image != NULL)
+			if (multi->addr.addr == NULL)
 				continue;
 			if ((ret = bm->compact_page_skip(bm, session,
 			    multi->addr.addr, multi->addr.size, skipp)) != 0)
@@ -160,7 +160,7 @@ __wt_compact(WT_SESSION_IMPL *session)
 		 * checking whether the cache is full.  Check now to throttle
 		 * compact to match eviction speed.
 		 */
-		WT_ERR(__wt_cache_eviction_check(session, false, NULL));
+		WT_ERR(__wt_cache_eviction_check(session, false, false, NULL));
 
 		/*
 		 * Pages read for compaction aren't "useful"; don't update the

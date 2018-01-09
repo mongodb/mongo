@@ -1,17 +1,52 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
 
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * Capture cases where a single session handle is used by multiple threads
+ * in parallel. The check isn't trivial because some API calls re-enter
+ * via public API entry points and the session with ID 0 is the default
+ * session in the connection handle which can be used across multiple threads.
+ * It is safe to use the reference count without atomic operations because the
+ * reference count is only tracking a thread re-entering the API.
+ */
+#define	WT_SINGLE_THREAD_CHECK_START(s)					\
+	{								\
+	uintmax_t __tmp_api_tid;					\
+	__wt_thread_id(&__tmp_api_tid);					\
+	WT_ASSERT(session, (s)->id == 0 || (s)->api_tid == 0 ||		\
+	    (s)->api_tid == __tmp_api_tid);				\
+	if ((s)->api_tid == 0)						\
+		WT_PUBLISH((s)->api_tid, __tmp_api_tid);		\
+	++(s)->api_enter_refcnt;					\
+	}
+
+#define	WT_SINGLE_THREAD_CHECK_STOP(s)					\
+	if (--(s)->api_enter_refcnt == 0)				\
+		WT_PUBLISH((s)->api_tid, 0);
+#else
+#define	WT_SINGLE_THREAD_CHECK_START(s)
+#define	WT_SINGLE_THREAD_CHECK_STOP(s)
+#endif
+
 /* Standard entry points to the API: declares/initializes local variables. */
 #define	API_SESSION_INIT(s, h, n, dh)					\
+	WT_TRACK_OP_DECL;						\
 	WT_DATA_HANDLE *__olddh = (s)->dhandle;				\
 	const char *__oldname = (s)->name;				\
 	(s)->dhandle = (dh);						\
 	(s)->name = (s)->lastop = #h "." #n;				\
+	/*								\
+	 * No code before this line, otherwise error handling  won't be	\
+	 * correct.							\
+	 */								\
+	WT_TRACK_OP_INIT(s);						\
+	WT_SINGLE_THREAD_CHECK_START(s);				\
 	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
 	__wt_verbose((s), WT_VERB_API, "%s", "CALL: " #h ":" #n)
 
@@ -28,13 +63,19 @@
 
 #define	API_END(s, ret)							\
 	if ((s) != NULL) {						\
-		(s)->dhandle = __olddh;					\
-		(s)->name = __oldname;					\
+		WT_TRACK_OP_END(s);					\
+		WT_SINGLE_THREAD_CHECK_STOP(s);				\
 		if (F_ISSET(&(s)->txn, WT_TXN_RUNNING) &&		\
 		    (ret) != 0 &&					\
 		    (ret) != WT_NOTFOUND &&				\
 		    (ret) != WT_DUPLICATE_KEY)				\
 			F_SET(&(s)->txn, WT_TXN_ERROR);			\
+		/*							\
+		 * No code after this line, otherwise error handling	\
+		 * won't be correct.					\
+		 */							\
+		(s)->dhandle = __olddh;					\
+		(s)->name = __oldname;					\
 	}								\
 } while (0)
 

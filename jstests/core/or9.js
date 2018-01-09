@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // index skipping and previous index range negation
 
 t = db.jstests_or9;

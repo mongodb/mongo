@@ -42,7 +42,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/mongo_authentication_session.h"
 #include "mongo/db/auth/sasl_authentication_session.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/client.h"
@@ -351,18 +350,8 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
 // The CyrusSaslCommands Enterprise initializer is dependent on PreSaslCommands
 MONGO_INITIALIZER_WITH_PREREQUISITES(PreSaslCommands, ("NativeSaslServerCore"))
 (InitializerContext*) {
-    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-CR"))
-        CmdAuthenticate::disableAuthMechanism("MONGODB-CR");
-
     if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))
         CmdAuthenticate::disableAuthMechanism("MONGODB-X509");
-
-    // For backwards compatibility, in 3.0 we are letting MONGODB-CR imply general
-    // challenge-response auth and hence SCRAM-SHA-1 is enabled by either specifying
-    // SCRAM-SHA-1 or MONGODB-CR in the authenticationMechanism server parameter.
-    if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
-        sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-CR"))
-        saslGlobalParams.authenticationMechanisms.push_back("SCRAM-SHA-1");
 
     return Status::OK();
 }

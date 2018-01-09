@@ -97,7 +97,12 @@ DEATH_TEST(FatalTerminateTest,
             uasserted(28721, "Fatal second exception");
         }
     } tid;
-    uasserted(28719, "Non-fatal first exception");
+
+    // This is a workaround for https://gcc.gnu.org/bugzilla/show_bug.cgi?id=83400. We should delete
+    // this variable once we are on a compiler that doesn't require it.
+    volatile bool workaroundGCCBug = true;  // NOLINT
+    if (workaroundGCCBug)
+        uasserted(28719, "Non-fatal first exception");
 }
 
 }  // namespace

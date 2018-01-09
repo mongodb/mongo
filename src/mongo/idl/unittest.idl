@@ -110,14 +110,6 @@ types:
 ##################################################################################################
 enums:
 
-    IntEnum:
-        description: "An example int enum"
-        type: int
-        values:
-            a0: 0
-            b1: 1
-            c2: 2
-
     StringEnum:
         description: "An example string enum"
         type: string
@@ -173,6 +165,31 @@ structs:
                 type: int
                 cpp_name: cppField3
 
+##################################################################################################
+#
+# Structs to test comparison options
+#
+##################################################################################################
+    CompareAllField3:
+        description: UnitTest for a struct with 3 int fields to test comparison
+        generate_comparison_operators: true
+        fields:
+            field1: int
+            field2: int
+            field3: int
+
+    CompareSomeField3:
+        description: |
+            UnitTest for a struct with 3 int fields to test comparison, but only 2 are compared.
+        generate_comparison_operators: true
+        fields:
+            field3:
+                type: int
+                comparison_order: 3
+            field2: int
+            field1:
+                type: int
+                comparison_order: 1
 
 ##################################################################################################
 #
@@ -428,6 +445,7 @@ structs:
     chained_struct_mixed:
         description: Chained struct with chained structs and fields
         strict: true
+        inline_chained_structs: false
         chained_structs:
             chained_any_basic_type : chained_any_basic_type
             chained_object_basic_type : ChainedObjectBasicType
@@ -447,6 +465,21 @@ structs:
         fields:
             field3:
                 type: int
+
+    chained_string_inline_basic_type:
+        description: Base struct type for a chained string
+        strict: true
+        fields:
+            stringField: string
+
+    chained_struct_inline:
+        description: Chained struct with chained structs and fields
+        strict: true
+        inline_chained_structs: true
+        chained_structs:
+            chained_string_inline_basic_type : chained_string_inline_basic_type
+        fields:
+            field3: string
 
 
 ##################################################################################################
@@ -553,3 +586,33 @@ commands:
         fields:
             field3:
                 type: int
+
+    CommandTypeStringCommand:
+        description: Command with custom type string
+        namespace: type
+        type: string
+        fields:
+            field1: int
+
+    CommandTypeArrayObjectCommand:
+        description: Command with just an array of object parameter
+        namespace: type
+        type: array<object>
+
+    CommandTypeStructCommand:
+        description: Command with just a struct parameter
+        namespace: type
+        type: one_string
+
+    CommandTypeArrayStructCommand:
+        description: Command with just an array of struct parameter
+        namespace: type
+        type: array<one_string>
+
+    _underscore_command:
+        description: Command with custom type string
+        namespace: type
+        type: string
+        cpp_name: WellNamedCommand
+        fields:
+            field1: int

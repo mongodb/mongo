@@ -39,7 +39,7 @@
 #include "mongo/db/repl/replication_coordinator_external_state_mock.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_coordinator_test_fixture.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point_service.h"
@@ -354,15 +354,17 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
         log() << request.target.toString() << " processing " << request.cmdObj;
-        if (request.cmdObj.firstElement().fieldNameStringData() != "replSetRequestVotes") {
-            net->blackHole(noi);
-        } else {
+        if (consumeHeartbeatV1(noi)) {
+            // The heartbeat has been consumed.
+        } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
             net->scheduleResponse(noi,
                                   net->now(),
                                   makeResponseStatus(BSON(
                                       "ok" << 1 << "term" << 0 << "voteGranted" << false << "reason"
                                            << "don't like him much")));
             voteRequests++;
+        } else {
+            net->blackHole(noi);
         }
         net->runReadyNetworkOperations();
     }
@@ -413,9 +415,9 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
         const RemoteCommandRequest& request = noi->getRequest();
         log() << request.target.toString() << " processing " << request.cmdObj;
-        if (request.cmdObj.firstElement().fieldNameStringData() != "replSetRequestVotes") {
-            net->blackHole(noi);
-        } else {
+        if (consumeHeartbeatV1(noi)) {
+            // The heartbeat has been consumed.
+        } else if (request.cmdObj.firstElement().fieldNameStringData() == "replSetRequestVotes") {
             net->scheduleResponse(
                 noi,
                 net->now(),
@@ -425,6 +427,8 @@ TEST_F(ReplCoordTest, ElectionFailsWhenDryRunResponseContainsANewerTerm) {
                                              << "reason"
                                              << "quit living in the past")));
             voteRequests++;
+        } else {
+            net->blackHole(noi);
         }
         net->runReadyNetworkOperations();
     }
@@ -540,7 +544,11 @@ TEST_F(ReplCoordTest, NodeWillNotStandForElectionDuringHeartbeatReconfig) {
         if (!net->hasReadyRequests()) {
             continue;
         }
-        net->blackHole(net->getNextReadyRequest());
+        auto noi = net->getNextReadyRequest();
+        if (!consumeHeartbeatV1(noi)) {
+            // Black hole all requests other than heartbeats including vote requests.
+            net->blackHole(noi);
+        }
     }
     net->exitNetwork();
 
@@ -915,7 +923,7 @@ private:
             noi = net->getNextReadyRequest();
             auto&& request = noi->getRequest();
 
-            log() << request.target << " processing " << request.cmdObj;
+            log() << request.target << " processing " << request.cmdObj << " at " << net->now();
 
             // Make sure the heartbeat request is valid.
             ReplSetHeartbeatArgsV1 hbArgs;
@@ -1003,6 +1011,10 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfNodeIsFresherThanCurrentPrimary) 
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1037,7 +1049,9 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
+                                                         << "node3:12345"
+                                                         << "priority"
+                                                         << 3))
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
@@ -1048,6 +1062,10 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1068,6 +1086,62 @@ TEST_F(TakeoverTest, SchedulesCatchupTakeoverIfBothTakeoversAnOption) {
     auto catchupTakeoverTime = replCoord->getCatchupTakeover_forTest().get();
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
+}
+
+TEST_F(TakeoverTest, PrefersPriorityToCatchupTakeoverIfNodeHasHighestPriority) {
+    BSONObj configObj = BSON("_id"
+                             << "mySet"
+                             << "version"
+                             << 1
+                             << "members"
+                             << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                      << "node1:12345"
+                                                      << "priority"
+                                                      << 2)
+                                           << BSON("_id" << 2 << "host"
+                                                         << "node2:12345")
+                                           << BSON("_id" << 3 << "host"
+                                                         << "node3:12345"))
+                             << "protocolVersion"
+                             << 1);
+
+    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(2));
+    startCapturingLogMessages();
+
+    assertStartSuccess(configObj, HostAndPort("node1", 12345));
+    ReplSetConfig config = assertMakeRSConfig(configObj);
+
+    auto replCoord = getReplCoord();
+    auto now = getNet()->now();
+
+    OperationContextNoop opCtx;
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
+    replCoord->setMyLastAppliedOpTime(currentOptime);
+    replCoord->setMyLastDurableOpTime(currentOptime);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+
+    // Make sure we're secondary and that no catchup takeover has been scheduled.
+    ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    // Mock a first round of heartbeat responses, which should give us enough information to know
+    // that we are fresher than the current primary, prompting the scheduling of a takeover.
+    now = respondToHeartbeatsUntil(config, now, HostAndPort("node2", 12345), behindOptime);
+
+    // Assert that a priority takeover has been scheduled and that a catchup takeover has not
+    // been scheduled.
+    ASSERT(replCoord->getPriorityTakeover_forTest());
+    ASSERT_FALSE(replCoord->getCatchupTakeover_forTest());
+
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(
+        1,
+        countLogLinesContaining("I can take over the primary because I have a higher priority, "
+                                "the highest priority in the replica set, and fresher data."));
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
@@ -1092,6 +1166,10 @@ TEST_F(TakeoverTest, CatchupTakeoverNotScheduledTwice) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1136,9 +1214,15 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
+                                                         << "node3:12345"
+                                                         << "priority"
+                                                         << 3))
                              << "protocolVersion"
                              << 1);
+    // In order for node 1 to first schedule a catchup takeover, then a priority takeover
+    // once the first gets canceled, it must have a higher priority than the current primary
+    // (node 2). But, it must not have the highest priority in the replica set. Otherwise,
+    // it will schedule a priority takeover from the start.
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
     ReplSetConfig config = assertMakeRSConfig(configObj);
 
@@ -1147,6 +1231,10 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1167,18 +1255,16 @@ TEST_F(TakeoverTest, CatchupAndPriorityTakeoverNotScheduledAtSameTime) {
     Milliseconds catchupTakeoverDelay = catchupTakeoverTime - now;
     ASSERT_EQUALS(config.getCatchUpTakeoverDelay(), catchupTakeoverDelay);
 
-    // Mock another heartbeat where the primary is now up to date
+    // Create a new OpTime so that the primary's last applied OpTime will be in the current term.
+    OpTime caughtupOptime(Timestamp(300, 1), 1);
+    // Mock another heartbeat where the primary is now up to date.
     now = respondToHeartbeatsUntil(
-        config, now + catchupTakeoverDelay / 2, HostAndPort("node2", 12345), currentOptime);
+        config, now + catchupTakeoverDelay / 2, HostAndPort("node2", 12345), caughtupOptime);
 
-    // Since we are no longer ahead of the primary, we can't schedule a catchup
-    // takeover anymore. But we are still higher priority than the primary, so
-    // after the heartbeat we will try to schedule a priority takeover.
-    // Because we can't schedule two takeovers at the same time and the
-    // catchup takeover hasn't fired yet, make sure that we don't schedule a
-    // priority takeover.
-    ASSERT(replCoord->getCatchupTakeover_forTest());
-    ASSERT_FALSE(replCoord->getPriorityTakeover_forTest());
+    // Since the primary has caught up, we cancel the scheduled catchup takeover.
+    // But we are still higher priority than the primary, so after the heartbeat
+    // we will schedule a priority takeover.
+    ASSERT(replCoord->getPriorityTakeover_forTest());
 }
 
 TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
@@ -1203,6 +1289,10 @@ TEST_F(TakeoverTest, CatchupTakeoverCallbackCanceledIfElectionTimeoutRuns) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1273,6 +1363,10 @@ TEST_F(TakeoverTest, CatchupTakeoverCanceledIfTransitionToRollback) {
 
     OperationContextNoop opCtx;
     OpTime currentOptime(Timestamp(200, 1), 0);
+    // Update the current term to simulate a scenario where an election has occured
+    // and some other node became the new primary. Once you hear about a primary election
+    // in term 1, your term will be increased.
+    replCoord->updateTerm_forTest(1, nullptr);
     replCoord->setMyLastAppliedOpTime(currentOptime);
     replCoord->setMyLastDurableOpTime(currentOptime);
     OpTime behindOptime(Timestamp(100, 1), 0);
@@ -1557,7 +1651,9 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
                                            << BSON("_id" << 2 << "host"
                                                          << "node2:12345")
                                            << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
+                                                         << "node3:12345"
+                                                         << "priority"
+                                                         << 3))
                              << "protocolVersion"
                              << 1);
     assertStartSuccess(configObj, HostAndPort("node1", 12345));
@@ -1612,12 +1708,13 @@ TEST_F(TakeoverTest, PrimaryCatchesUpBeforeHighPriorityNodeCatchupTakeover) {
     auto priorityTakeoverTime = replCoord->getPriorityTakeover_forTest().get();
     assertValidPriorityTakeoverDelay(config, now, priorityTakeoverTime, 0);
 
-    // The priority takeover might be scheduled at a time later than one election
-    // timeout after our initial heartbeat responses, so mock another round of
-    // heartbeat responses to prevent a normal election timeout.
-    Milliseconds halfElectionTimeout = config.getElectionTimeoutPeriod() / 2;
+    // Node 1 schedules the priority takeover, and since it has the second highest
+    // priority in the replica set, it will schedule in 20 seconds. We must increase
+    // the election timeout so that the priority takeover will actually be executed.
+    // Mock another round of heartbeat responses to prevent a normal election timeout.
+    Milliseconds longElectionTimeout = config.getElectionTimeoutPeriod() * 2;
     now = respondToHeartbeatsUntil(
-        config, now + halfElectionTimeout, HostAndPort("node2", 12345), currentOptime);
+        config, now + longElectionTimeout, HostAndPort("node2", 12345), currentOptime);
 
     LastVote lastVoteExpected = LastVote(replCoord->getTerm() + 1, 0);
     performSuccessfulTakeover(priorityTakeoverTime,
@@ -1748,7 +1845,6 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
     HostAndPort primaryHostAndPort("node2", 12345);
 
     auto replCoord = getReplCoord();
-    auto timeZero = getNet()->now();
     auto now = getNet()->now();
 
     OperationContextNoop opCtx;
@@ -1786,10 +1882,9 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedSameSecond) {
 
     // Mock another round of heartbeat responses that occur after the previous
     // 'priorityTakeoverTime', which should schedule a new priority takeover
-    Milliseconds halfElectionTimeout = config.getElectionTimeoutPeriod() / 2;
+    Milliseconds heartbeatInterval = config.getHeartbeatInterval() / 4;
     now = respondToHeartbeatsUntil(
-        config, timeZero + halfElectionTimeout * 3, primaryHostAndPort, currentOpTime);
-
+        config, now + heartbeatInterval, primaryHostAndPort, currentOpTime);
     // Make sure that a new priority takeover has been scheduled and at the
     // correct time.
     ASSERT(replCoord->getPriorityTakeover_forTest());
@@ -1827,7 +1922,6 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
     HostAndPort primaryHostAndPort("node2", 12345);
 
     auto replCoord = getReplCoord();
-    auto timeZero = getNet()->now();
     auto now = getNet()->now();
 
     OperationContextNoop opCtx;
@@ -1864,9 +1958,9 @@ TEST_F(TakeoverTest, DontCallForPriorityTakeoverWhenLaggedDifferentSecond) {
 
     // Mock another round of heartbeat responses that occur after the previous
     // 'priorityTakeoverTime', which should schedule a new priority takeover
-    Milliseconds halfElectionTimeout = config.getElectionTimeoutPeriod() / 2;
+    Milliseconds heartbeatInterval = config.getHeartbeatInterval() / 4;
     now = respondToHeartbeatsUntil(
-        config, timeZero + halfElectionTimeout * 3, primaryHostAndPort, currentOpTime);
+        config, now + heartbeatInterval, primaryHostAndPort, currentOpTime);
 
     // Make sure that a new priority takeover has been scheduled and at the
     // correct time.
@@ -1908,15 +2002,19 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
     // Advance to dry run vote request phase.
     NetworkInterfaceMock* net = getNet();
     net->enterNetwork();
-    while (TopologyCoordinator::Role::candidate != getTopoCoord().getRole()) {
+    while (TopologyCoordinator::Role::kCandidate != getTopoCoord().getRole()) {
         net->runUntil(net->now() + Seconds(1));
         if (!net->hasReadyRequests()) {
             continue;
         }
-        net->blackHole(net->getNextReadyRequest());
+        auto noi = net->getNextReadyRequest();
+        // Consume the heartbeat or black hole it.
+        if (!consumeHeartbeatV1(noi)) {
+            net->blackHole(noi);
+        }
     }
     net->exitNetwork();
-    ASSERT(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+    ASSERT(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
 
     // Submit a reconfig and confirm it cancels the election.
     ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
@@ -1938,7 +2036,7 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringDryRun) {
     net->enterNetwork();
     net->runReadyNetworkOperations();
     net->exitNetwork();
-    ASSERT(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+    ASSERT(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
 }
 
 TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase) {
@@ -1962,7 +2060,7 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
     getReplCoord()->setMyLastDurableOpTime(OpTime(Timestamp(100, 0), 0));
     simulateEnoughHeartbeatsForAllNodesUp();
     simulateSuccessfulDryRun();
-    ASSERT(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+    ASSERT(TopologyCoordinator::Role::kCandidate == getTopoCoord().getRole());
 
     // Submit a reconfig and confirm it cancels the election.
     ReplicationCoordinatorImpl::ReplSetReconfigArgs config = {
@@ -1984,7 +2082,7 @@ TEST_F(ReplCoordTest, NodeCancelsElectionUponReceivingANewConfigDuringVotePhase)
     getNet()->enterNetwork();
     getNet()->runReadyNetworkOperations();
     getNet()->exitNetwork();
-    ASSERT(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+    ASSERT(TopologyCoordinator::Role::kFollower == getTopoCoord().getRole());
 }
 
 class PrimaryCatchUpTest : public ReplCoordTest {
@@ -2094,7 +2192,8 @@ protected:
         while (net->hasReadyRequests()) {
             const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
             const RemoteCommandRequest& request = noi->getRequest();
-            log() << request.target.toString() << " processing " << request.cmdObj;
+            log() << request.target.toString() << " processing heartbeat " << request.cmdObj
+                  << " at " << net->now();
             if (ReplSetHeartbeatArgsV1().initialize(request.cmdObj).isOK()) {
                 onHeartbeatRequest(noi);
             } else {

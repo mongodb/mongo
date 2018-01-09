@@ -203,9 +203,8 @@ Status handleOplogUpdate(OperationContext* opCtx,
         return status;
 
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, nullptr));
-    UpdateDriver::Options updateOptions(std::move(expCtx));
-    updateOptions.modOptions.fromOplogApplication = true;
-    UpdateDriver driver(updateOptions);
+    UpdateDriver driver(std::move(expCtx));
+    driver.setFromOplogApplication(true);
 
     // Oplog updates do not have array filters.
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
@@ -226,13 +225,9 @@ Status handleOplogUpdate(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    // The original document can be empty because it is only needed for validation of immutable
-    // paths.
-    const BSONObj emptyOriginal;
     const bool validateForStorage = false;
     const FieldRefSet emptyImmutablePaths;
-    status = driver.update(
-        StringData(), emptyOriginal, &roleDocument, validateForStorage, emptyImmutablePaths);
+    status = driver.update(StringData(), &roleDocument, validateForStorage, emptyImmutablePaths);
     if (!status.isOK())
         return status;
 

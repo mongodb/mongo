@@ -12,6 +12,7 @@ executor:
         TestData:
           ignoreCommandsIncompatibleWithInitialSync: true
   hooks:
+  - class: CheckPrimary
   - class: BackgroundInitialSync
     use_resync: true
     n: 1

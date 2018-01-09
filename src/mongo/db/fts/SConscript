@@ -38,7 +38,7 @@ env.Alias('generated-sources', generateStopWordsList)
 
 baseEnv=env.Clone()
 baseEnv.InjectThirdPartyIncludePaths(libraries=['stemmer'])
-baseEnv.Library('base', [
+baseEnv.Library('base_fts', [
         'fts_index_format.cpp',
         'fts_matcher.cpp',
         'fts_query_impl.cpp',
@@ -77,7 +77,7 @@ env.Library(
 
 env.Library('ftsmongod', [
     'ftsmongod.cpp',
-        ], LIBDEPS=["base","$BUILD_DIR/mongo/base"])
+        ], LIBDEPS=["base_fts","$BUILD_DIR/mongo/base"])
 
 env.CppUnitTest(target='fts_test',
                 source=[
@@ -99,6 +99,6 @@ env.CppUnitTest(target='fts_test',
                 LIBDEPS=[
                     "$BUILD_DIR/mongo/db/fts/fts_query_noop",
                     "$BUILD_DIR/mongo/db/matcher/expressions",
-                    "base",
+                    "base_fts",
                 ],
 )

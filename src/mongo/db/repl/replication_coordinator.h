@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/sync_source_selector.h"
@@ -47,7 +48,6 @@ class IndexDescriptor;
 class NamespaceString;
 class OperationContext;
 class ServiceContext;
-class SnapshotName;
 class Timestamp;
 struct WriteConcernOptions;
 
@@ -67,7 +67,6 @@ namespace repl {
 class BackgroundSync;
 class HandshakeArgs;
 class IsMasterResponse;
-class OldUpdatePositionArgs;
 class OplogReader;
 class OpTime;
 class ReadConcernArgs;
@@ -312,7 +311,7 @@ public:
      * it is the caller's job to properly synchronize this behavior.  The exception to this rule
      * is that after calls to resetLastOpTimesFromOplog(), the minimum acceptable value for
      * "opTime" is reset based on the contents of the oplog, and may go backwards due to
-     * rollback.
+     * rollback. Additionally, the optime given MUST represent a consistent database state.
      */
     virtual void setMyLastAppliedOpTime(const OpTime& opTime) = 0;
 
@@ -328,14 +327,27 @@ public:
     virtual void setMyLastDurableOpTime(const OpTime& opTime) = 0;
 
     /**
+     * This type is used to represent the "consistency" of a current database state. In
+     * replication, there may be times when our database data is not represented by a single optime,
+     * because we have fetched remote data from different points in time. For example, when we are
+     * in RECOVERING following a refetch based rollback. We never allow external clients to read
+     * from the database if it is not consistent.
+     */
+    enum class DataConsistency { Consistent, Inconsistent };
+
+    /**
      * Updates our internal tracking of the last OpTime applied to this node, but only
      * if the supplied optime is later than the current last OpTime known to the replication
-     * coordinator.
+     * coordinator. The 'consistency' argument must tell whether or not the optime argument
+     * represents a consistent database state.
      *
      * This function is used by logOp() on a primary, since the ops in the oplog do not
-     * necessarily commit in sequential order.
+     * necessarily commit in sequential order. It is also used when we finish oplog batch
+     * application on secondaries, to avoid any potential race conditions around setting the
+     * applied optime from more than one thread.
      */
-    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime) = 0;
+    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime,
+                                               DataConsistency consistency) = 0;
 
     /**
      * Updates our internal tracking of the last OpTime durable to this node, but only
@@ -374,6 +386,16 @@ public:
      */
     virtual Status waitUntilOpTimeForRead(OperationContext* opCtx,
                                           const ReadConcernArgs& settings) = 0;
+
+    /**
+     * Waits until the deadline or until the optime of the current node is at least the opTime
+     * specified in 'settings'.
+     *
+     * Returns whether the wait was successful.
+     */
+    virtual Status waitUntilOpTimeForReadUntil(OperationContext* opCtx,
+                                               const ReadConcernArgs& settings,
+                                               boost::optional<Date_t> deadline) = 0;
 
     /**
      * Retrieves and returns the current election id, which is a unique id that is local to
@@ -498,17 +520,11 @@ public:
      */
     virtual void signalUpstreamUpdater() = 0;
 
-    enum class ReplSetUpdatePositionCommandStyle {
-        kNewStyle,
-        kOldStyle  // Pre-3.2.4 servers.
-    };
-
     /**
      * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
      * be sent to this node's sync source to update it about our progress in replication.
      */
-    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
-        ReplSetUpdatePositionCommandStyle commandStyle) const = 0;
+    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const = 0;
 
     enum class ReplSetGetStatusResponseStyle { kBasic, kInitialSync };
 
@@ -677,12 +693,7 @@ public:
      * were applied.
      * "configVersion" will be populated with our config version if and only if we return
      * InvalidReplicaSetConfig.
-     *
-     * The OldUpdatePositionArgs version provides support for the pre-3.2.4 format of
-     * UpdatePositionArgs.
      */
-    virtual Status processReplSetUpdatePosition(const OldUpdatePositionArgs& updates,
-                                                long long* configVersion) = 0;
     virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                 long long* configVersion) = 0;
 
@@ -731,9 +742,11 @@ public:
 
     /**
      * Loads the optime from the last op in the oplog into the coordinator's lastAppliedOpTime and
-     * lastDurableOpTime values.
+     * lastDurableOpTime values. The 'consistency' argument must tell whether or not the optime of
+     * the op in the oplog represents a consistent database state.
      */
-    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx) = 0;
+    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx,
+                                           DataConsistency consistency) = 0;
 
     /**
      * Returns the OpTime of the latest replica set-committed op known to this server.
@@ -804,15 +817,7 @@ public:
      * A null OperationContext can be used in cases where the snapshot to wait for should not be
      * adjusted.
      */
-    virtual SnapshotName reserveSnapshotName(OperationContext* opCtx) = 0;
-
-    /**
-     * Creates a new snapshot in the storage engine and registers it for use in the replication
-     * coordinator.
-     */
-    virtual void createSnapshot(OperationContext* opCtx,
-                                OpTime timeOfSnapshot,
-                                SnapshotName name) = 0;
+    virtual Timestamp reserveSnapshotName(OperationContext* opCtx) = 0;
 
     /**
      * Blocks until either the current committed snapshot is at least as high as 'untilSnapshot',
@@ -820,7 +825,7 @@ public:
      * 'opCtx' is used to checkForInterrupt and enforce maxTimeMS.
      */
     virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
-                                            const SnapshotName& untilSnapshot) = 0;
+                                            const Timestamp& untilSnapshot) = 0;
 
     /**
      * Resets all information related to snapshotting.

@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongoreplay
 
 import "fmt"
@@ -40,7 +46,6 @@ func (c OpCode) String() string {
 // http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#request-opcodes
 const (
 	OpCodeReply        = OpCode(1)
-	OpCodeMessage      = OpCode(1000)
 	OpCodeUpdate       = OpCode(2001)
 	OpCodeInsert       = OpCode(2002)
 	OpCodeReserved     = OpCode(2003)
@@ -51,4 +56,5 @@ const (
 	OpCodeCommand      = OpCode(2010)
 	OpCodeCommandReply = OpCode(2011)
 	OpCodeCompressed   = OpCode(2012)
+	OpCodeMessage      = OpCode(2013)
 )

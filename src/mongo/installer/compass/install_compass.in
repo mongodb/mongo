@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!@python_interpreter@
 
 # This script downloads the latest version of Compass and installs it on
 # non-windows platforms.
@@ -64,21 +64,30 @@ def download_pkg(link, pkg_format=''):
 def install_mac(dmg):
     """Use CLI tools to mount the dmg and extract all .apps into Applications."""
     tmp = tempfile.mkdtemp()
-    subprocess.check_call(['hdiutil', 'attach', '-mountpoint', tmp, dmg])
-    try:
-        apps = [f for f in os.listdir(tmp) if f.endswith('.app')]
-        for app in apps:
-            if path.isdir('/Applications/' + app):
-                print 'Old version found removing...'
-                shutil.rmtree('/Applications/' + app)
-            print 'Copying %s to /Applications' % app
-            shutil.copytree(path.join(tmp, app), '/Applications/' + app)
-    # We don't really care about what errors come up here. Just log the failure
-    # and use the finally to make sure we always unmount the dmg.
-    except Exception as exception:
-        print exception
-    finally:
-        subprocess.check_call(['hdiutil', 'detach', tmp])
+    with open(os.devnull, 'w') as fnull:
+        subprocess.check_call(['hdiutil', 'attach', '-nobrowse', '-noautoopen',
+                               '-mountpoint', tmp, dmg], stdout=fnull, stderr=fnull)
+        try:
+            apps = [f for f in os.listdir(tmp) if f.endswith('.app')]
+            for app in apps:
+                if path.isdir('/Applications/' + app):
+                    print 'Old version found removing...'
+                    shutil.rmtree('/Applications/' + app)
+                print 'Copying %s to /Applications' % app
+                shutil.copytree(path.join(tmp, app), '/Applications/' + app)
+        # We don't really care about what errors come up here. Just log the failure
+        # and use the finally to make sure we always unmount the dmg.
+        except Exception as exception:
+            print exception
+        finally:
+            subprocess.check_call(['hdiutil', 'detach', tmp], stdout=fnull, stderr=fnull)
+
+        if path.isdir('/Applications/MongoDB Compass.app'):
+            subprocess.check_call(['open', '/Applications/MongoDB Compass.app'])
+            return
+        if path.isdir('/Applications/MongoDB Compass Community.app'):
+            subprocess.check_call(['open', '/Applications/MongoDB Compass Community.app'])
+            return
 
 
 def install_linux(pkg_format, pkg_file):

@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-class DocumentSourceCurrentOp final : public DocumentSourceNeedsMongoProcessInterface {
+class DocumentSourceCurrentOp final : public DocumentSource {
 public:
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -100,7 +100,7 @@ private:
                             ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
                             UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
                             TruncationMode truncateOps = TruncationMode::kNoTruncation)
-        : DocumentSourceNeedsMongoProcessInterface(pExpCtx),
+        : DocumentSource(pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeOpsFromAllUsers(includeOpsFromAllUsers),
           _truncateOps(truncateOps) {}

@@ -32,17 +32,14 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/query.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
@@ -70,8 +67,7 @@ protected:
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         ShardingMongodTestFixture::setUp();
         replicationCoordinator()->alwaysAllowWrites(true);
-        initializeGlobalShardingStateForMongodForTest(ConnectionString(dummyHost))
-            .transitional_ignore();
+        ASSERT_OK(initializeGlobalShardingStateForMongodForTest(ConnectionString(dummyHost)));
 
         // RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter())
         //     ->setConnectionStringReturnValue(kConfigConnStr);

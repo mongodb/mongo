@@ -131,8 +131,7 @@ Status ReplSetConfig::_initialize(const BSONObj& cfg,
     if (!status.isOK())
         return status;
 
-    for (BSONObj::iterator membersIterator(membersElement.Obj()); membersIterator.more();) {
-        BSONElement memberElement = membersIterator.next();
+    for (auto&& memberElement : membersElement.Obj()) {
         if (memberElement.type() != Object) {
             return Status(ErrorCodes::TypeMismatch,
                           str::stream() << "Expected type of " << kMembersFieldName << "."
@@ -242,8 +241,8 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
     //
     // Parse electionTimeoutMillis
     //
-    auto greaterThanZero = stdx::bind(std::greater<long long>(), stdx::placeholders::_1, 0);
     long long electionTimeoutMillis;
+    auto greaterThanZero = [](const auto& x) { return x > 0; };
     auto electionTimeoutStatus = bsonExtractIntegerFieldWithDefaultIf(
         settings,
         kElectionTimeoutFieldName,
@@ -345,8 +344,7 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
         return status;
     }
 
-    for (BSONObj::iterator gleModeIter(gleModes); gleModeIter.more();) {
-        const BSONElement modeElement = gleModeIter.next();
+    for (auto&& modeElement : gleModes) {
         if (_customWriteConcernModes.find(modeElement.fieldNameStringData()) !=
             _customWriteConcernModes.end()) {
             return Status(ErrorCodes::DuplicateKey,
@@ -364,8 +362,7 @@ Status ReplSetConfig::_parseSettingsSubdocument(const BSONObj& settings) {
                                         << typeName(modeElement.type()));
         }
         ReplSetTagPattern pattern = _tagConfig.makePattern();
-        for (BSONObj::iterator constraintIter(modeElement.Obj()); constraintIter.more();) {
-            const BSONElement constraintElement = constraintIter.next();
+        for (auto&& constraintElement : modeElement.Obj()) {
             if (!constraintElement.isNumber()) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Expected " << kSettingsFieldName << '.'
@@ -706,13 +703,10 @@ StatusWith<ReplSetTagPattern> ReplSetConfig::findCustomWriteMode(StringData patt
 }
 
 void ReplSetConfig::_calculateMajorities() {
-    const int voters = std::count_if(_members.begin(),
-                                     _members.end(),
-                                     stdx::bind(&MemberConfig::isVoter, stdx::placeholders::_1));
+    const int voters =
+        std::count_if(begin(_members), end(_members), [](const auto& x) { return x.isVoter(); });
     const int arbiters =
-        std::count_if(_members.begin(),
-                      _members.end(),
-                      stdx::bind(&MemberConfig::isArbiter, stdx::placeholders::_1));
+        std::count_if(begin(_members), end(_members), [](const auto& x) { return x.isArbiter(); });
     _totalVotingMembers = voters;
     _majorityVoteCount = voters / 2 + 1;
     _writeMajority = std::min(_majorityVoteCount, voters - arbiters);
@@ -850,11 +844,11 @@ std::vector<std::string> ReplSetConfig::getWriteConcernNames() const {
 
 Milliseconds ReplSetConfig::getPriorityTakeoverDelay(int memberIdx) const {
     auto member = getMemberAt(memberIdx);
-    int priorityRank = _calculatePriorityRank(member.getPriority());
+    int priorityRank = calculatePriorityRank(member.getPriority());
     return (priorityRank + 1) * getElectionTimeoutPeriod();
 }
 
-int ReplSetConfig::_calculatePriorityRank(double priority) const {
+int ReplSetConfig::calculatePriorityRank(double priority) const {
     int count = 0;
     for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
         if (mem->getPriority() > priority) {

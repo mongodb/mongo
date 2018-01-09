@@ -22,9 +22,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                "Expected \"" + v1 + "\" not to equal \"" + v2 + "\"");
     }
 
-    // The current version is in the 3.6 series. This has to be changed very time we bump
+    // The current version is in the 3.7 series. This has to be changed very time we bump
     // the major version pair, but it provides a useful test of assumptions.
-    assertBinVersionsEqual("3.6", version());
+    assertBinVersionsEqual("3.7", version());
 
     // "latest" is the same version as the shell, "last-stable" is not.
     assertBinVersionsEqual("latest", version());

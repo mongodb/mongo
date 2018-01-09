@@ -67,7 +67,15 @@
     for (var i = 0; i < numRecords - 1; i++) {
         cursors[i].close();
     }
-    lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, numRecords - 1);
+    try {
+        // Each close may result in two commands in latencyStats due to separate
+        // pinning during auth check and execution.
+        lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, 2 * (numRecords - 1));
+    } catch (e) {
+        // Increment last reads to account for extra getstats call
+        ++lastHistogram.reads.ops;
+        lastHistogram = assertHistogramDiffEq(testColl, lastHistogram, 0, 0, numRecords - 1);
+    }
 
     // Remove
     for (var i = 0; i < numRecords; i++) {

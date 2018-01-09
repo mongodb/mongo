@@ -14,6 +14,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 """Test cases for IDL parser."""
+# pylint: disable=too-many-lines
 
 from __future__ import absolute_import, print_function, unicode_literals
 
@@ -277,6 +278,8 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 strict: true
                 immutable: true
+                inline_chained_structs: true
+                generate_comparison_operators: true
                 fields:
                     foo: bar
             """))
@@ -289,6 +292,8 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 immutable: false
+                inline_chained_structs: false
+                generate_comparison_operators: false
                 fields:
                     foo: bar
             """))
@@ -346,6 +351,39 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
             """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
 
+        # inline_chained_structs is a bool
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                inline_chained_structs: bar
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
+        # generate_comparison_operators is a bool
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                generate_comparison_operators: bar
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
+        # cpp_name is not allowed
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                cpp_name: bar
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_UNKNOWN_NODE)
+
     def test_field_positive(self):
         # type: () -> None
         """Positive field test cases."""
@@ -373,6 +411,7 @@ class TestParser(testcase.IDLTestcase):
                         optional: true
                         ignore: true
                         cpp_name: bar
+                        comparison_order: 3
             """))
 
         # Test false bools
@@ -430,6 +469,47 @@ class TestParser(testcase.IDLTestcase):
                         type: string
                         ignore: bar
             """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
+        # Test bad int scalar
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                strict: false
+                fields:
+                    foo:
+                        type: string
+                        comparison_order:
+                            - a
+                            - b
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        # Test bad int
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                strict: false
+                fields:
+                    foo:
+                        type: string
+                        comparison_order: 3.14159
+            """), idl.errors.ERROR_ID_IS_NODE_VALID_INT)
+
+        # Test bad negative int
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                strict: false
+                fields:
+                    foo:
+                        type: string
+                        comparison_order: -1
+            """), idl.errors.ERROR_ID_IS_NODE_VALID_NON_NEGATIVE_INT)
 
     def test_name_collisions_negative(self):
         # type: () -> None
@@ -756,6 +836,10 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 strict: true
                 namespace: ignored
+                immutable: true
+                inline_chained_structs: true
+                generate_comparison_operators: true
+                cpp_name: foo
                 fields:
                     foo: bar
             """))
@@ -768,6 +852,9 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 namespace: ignored
+                immutable: false
+                inline_chained_structs: false
+                generate_comparison_operators: false
                 fields:
                     foo: bar
             """))
@@ -794,6 +881,16 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
             """))
 
+        # No fields
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                strict: true
+            """))
+
     def test_command_negative(self):
         # type: () -> None
         """Negative command test cases."""
@@ -804,16 +901,6 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo: foo
             """), idl.errors.ERROR_ID_IS_NODE_TYPE)
-
-        # Missing fields
-        self.assert_parse_fail(
-            textwrap.dedent("""
-        commands:
-            foo:
-                description: foo
-                namespace: ignored
-                strict: true
-            """), idl.errors.ERROR_ID_EMPTY_FIELDS)
 
         # unknown field
         self.assert_parse_fail(
@@ -899,6 +986,18 @@ class TestParser(testcase.IDLTestcase):
                         foo: string
             """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
 
+        # Namespace concatenate_with_db
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: concatenate_with_db
+                type: foobar
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_IS_COMMAND_TYPE_EXTRANEOUS)
+
     def test_command_doc_sequence_positive(self):
         # type: () -> None
         """Positive supports_doc_sequence test cases."""
@@ -947,6 +1046,61 @@ class TestParser(testcase.IDLTestcase):
                         type: bar
                         supports_doc_sequence: foo
             """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
+    def test_command_type_positive(self):
+        # type: () -> None
+        """Positive command custom type test cases."""
+        # string
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                strict: true
+                namespace: type
+                type: string
+                fields:
+                    foo: bar
+            """))
+
+        # array of string
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                strict: true
+                namespace: type
+                type: array<string>
+                fields:
+                    foo: bar
+            """))
+
+        # no fields
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                strict: true
+                namespace: type
+                type: string
+            """))
+
+    def test_command_type_negative(self):
+        # type: () -> None
+        """Negative command type test cases."""
+
+        # supports_doc_sequence must be a bool
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: type
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
 
 
 if __name__ == '__main__':

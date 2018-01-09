@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 var mydb = db.getSiblingDB('auth1_db');
 mydb.dropAllUsers();
 

@@ -64,8 +64,7 @@ void InternalSchemaUniqueItemsMatchExpression::serialize(BSONObjBuilder* builder
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaUniqueItemsMatchExpression::shallowClone() const {
-    auto clone = stdx::make_unique<InternalSchemaUniqueItemsMatchExpression>();
-    invariantOK(clone->init(path()));
+    auto clone = stdx::make_unique<InternalSchemaUniqueItemsMatchExpression>(path());
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }

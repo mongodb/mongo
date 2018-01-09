@@ -49,10 +49,6 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
-
-using std::shared_ptr;
-using std::string;
-
 namespace {
 
 class MoveChunkCmd : public ErrmsgCommandDeprecated {
@@ -121,9 +117,10 @@ public:
 
         const auto toStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, toString);
         if (!toStatus.isOK()) {
-            string msg(str::stream() << "Could not move chunk in '" << nss.ns() << "' to shard '"
-                                     << toString
-                                     << "' because that shard does not exist");
+            std::string msg(str::stream() << "Could not move chunk in '" << nss.ns()
+                                          << "' to shard '"
+                                          << toString
+                                          << "' because that shard does not exist");
             log() << msg;
             return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
         }
@@ -146,7 +143,7 @@ public:
             return false;
         }
 
-        shared_ptr<Chunk> chunk;
+        std::shared_ptr<Chunk> chunk;
 
         if (!find.isEmpty()) {
             // find

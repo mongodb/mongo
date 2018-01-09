@@ -6,6 +6,13 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/retryable_writes_util.js");
+
+    if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     var checkOplog = function(oplog, lsid, uid, txnNum, stmtId, prevTs, prevTerm) {
         assert(oplog != null);
         assert(oplog.lsid != null);

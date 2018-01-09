@@ -273,7 +273,7 @@ TEST_F(OplogBufferCollectionTest, StartupWithExistingCollectionInitializesCorrec
         _opCtx.get(),
         nss,
         TimestampedBSONObj{std::get<0>(OplogBufferCollection::addIdToDocument(oplog[0], {}, 0)),
-                           SnapshotName(0)},
+                           Timestamp(0)},
         OpTime::kUninitializedTerm));
     _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 
@@ -366,11 +366,10 @@ DEATH_TEST_F(OplogBufferCollectionTest,
     CollectionOptions collOpts;
     collOpts.setNoIdIndex();
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, collOpts));
-    ASSERT_OK(
-        _storageInterface->insertDocument(_opCtx.get(),
-                                          nss,
-                                          TimestampedBSONObj{makeOplogEntry(1), SnapshotName(0)},
-                                          OpTime::kUninitializedTerm));
+    ASSERT_OK(_storageInterface->insertDocument(_opCtx.get(),
+                                                nss,
+                                                TimestampedBSONObj{makeOplogEntry(1), Timestamp(0)},
+                                                OpTime::kUninitializedTerm));
 
     OplogBufferCollection::Options opts;
     opts.dropCollectionAtStartup = false;
@@ -383,11 +382,10 @@ DEATH_TEST_F(OplogBufferCollectionTest,
              "Fatal assertion 40405 NoSuchKey: Missing expected field \"ts\"") {
     auto nss = makeNamespace(_agent);
     ASSERT_OK(_storageInterface->createCollection(_opCtx.get(), nss, CollectionOptions()));
-    ASSERT_OK(
-        _storageInterface->insertDocument(_opCtx.get(),
-                                          nss,
-                                          TimestampedBSONObj{BSON("_id" << 1), SnapshotName(0)},
-                                          OpTime::kUninitializedTerm));
+    ASSERT_OK(_storageInterface->insertDocument(_opCtx.get(),
+                                                nss,
+                                                TimestampedBSONObj{BSON("_id" << 1), Timestamp(0)},
+                                                OpTime::kUninitializedTerm));
 
     OplogBufferCollection::Options opts;
     opts.dropCollectionAtStartup = false;
@@ -403,7 +401,7 @@ DEATH_TEST_F(OplogBufferCollectionTest,
     ASSERT_OK(_storageInterface->insertDocument(
         _opCtx.get(),
         nss,
-        TimestampedBSONObj{BSON("_id" << BSON("ts" << Timestamp(1, 1))), SnapshotName(1)},
+        TimestampedBSONObj{BSON("_id" << BSON("ts" << Timestamp(1, 1))), Timestamp(1)},
         OpTime::kUninitializedTerm));
 
     OplogBufferCollection::Options opts;
@@ -418,8 +416,7 @@ TEST_F(OplogBufferCollectionTest, PeekWithExistingCollectionReturnsEmptyObjectWh
     ASSERT_OK(_storageInterface->insertDocument(
         _opCtx.get(),
         nss,
-        TimestampedBSONObj{BSON("_id" << BSON("ts" << Timestamp(1, 1) << "s" << 0)),
-                           SnapshotName(1)},
+        TimestampedBSONObj{BSON("_id" << BSON("ts" << Timestamp(1, 1) << "s" << 0)), Timestamp(1)},
         OpTime::kUninitializedTerm));
 
     OplogBufferCollection::Options opts;
@@ -441,7 +438,7 @@ TEST_F(OplogBufferCollectionTest,
         _opCtx.get(),
         nss,
         TimestampedBSONObj{std::get<0>(OplogBufferCollection::addIdToDocument(oplog[0], {}, 0)),
-                           SnapshotName(0)},
+                           Timestamp(0)},
         OpTime::kUninitializedTerm));
 
     OplogBufferCollection::Options opts;
@@ -545,7 +542,7 @@ TEST_F(OplogBufferCollectionTest, PeekingFromExistingCollectionReturnsDocument) 
         _opCtx.get(),
         nss,
         TimestampedBSONObj{std::get<0>(OplogBufferCollection::addIdToDocument(oplog[0], {}, 0)),
-                           SnapshotName(0)},
+                           Timestamp(0)},
         OpTime::kUninitializedTerm));
 
     OplogBufferCollection::Options opts;
@@ -689,14 +686,14 @@ TEST_F(OplogBufferCollectionTest,
         _opCtx.get(),
         nss,
         TimestampedBSONObj{std::get<0>(OplogBufferCollection::addIdToDocument(firstDoc, {}, 0)),
-                           SnapshotName(0)},
+                           Timestamp(0)},
         OpTime::kUninitializedTerm));
     auto secondDoc = makeOplogEntry(2);
     ASSERT_OK(_storageInterface->insertDocument(
         _opCtx.get(),
         nss,
         TimestampedBSONObj{std::get<0>(OplogBufferCollection::addIdToDocument(secondDoc, {}, 0)),
-                           SnapshotName(0)},
+                           Timestamp(0)},
         OpTime::kUninitializedTerm));
 
     OplogBufferCollection::Options opts;
@@ -816,7 +813,7 @@ TEST_F(OplogBufferCollectionTest, WaitForDataReturnsImmediatelyWhenStartedWithEx
         nss,
         TimestampedBSONObj{
             std::get<0>(OplogBufferCollection::addIdToDocument(makeOplogEntry(1), {}, 0)),
-            SnapshotName(0)},
+            Timestamp(0)},
         OpTime::kUninitializedTerm));
 
     OplogBufferCollection::Options opts;

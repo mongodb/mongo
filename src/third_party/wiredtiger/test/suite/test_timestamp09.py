@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2017 MongoDB, Inc.
+# Public Domain 2014-2018 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -184,6 +184,16 @@ class test_timestamp09(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(c[6], 6)
         self.assertEqual(c[7], 7)
         self.assertEqual(c[8], 8)
+        self.session.commit_transaction()
+
+        # We can move the oldest timestamp backwards with "force"
+        self.conn.set_timestamp(
+            'oldest_timestamp=' + timestamp_str(5) + ',force')
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.begin_transaction('read_timestamp=' +
+                timestamp_str(4)),
+                '/older than oldest timestamp/')
+        self.session.begin_transaction('read_timestamp=' + timestamp_str(6))
         self.session.commit_transaction()
 
 if __name__ == '__main__':

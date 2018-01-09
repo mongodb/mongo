@@ -119,6 +119,21 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='catalog_raii',
+    source=[
+        'catalog_raii.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/views/views',
+        'collection',
+        'database',
+        'uuid_catalog',
+    ],
+)
+
 env.CppUnitTest(
     target='database_test',
     source=[
@@ -174,6 +189,7 @@ env.Library(
     LIBDEPS=[
         'collection',
         'database',
+        'database_holder',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/storage_options',
@@ -205,7 +221,7 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='catalog',
+    target='catalog_impl',
     source=[
         "collection_compact.cpp",
         "collection_impl.cpp",
@@ -216,7 +232,6 @@ env.Library(
         "index_catalog_entry_impl.cpp",
         "index_consistency.cpp",
         "index_create_impl.cpp",
-        "index_observer.cpp",
         "private/record_store_validate_adaptor.cpp",
     ],
     LIBDEPS=[
@@ -241,7 +256,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
         '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/serveronly',
+        '$BUILD_DIR/mongo/db/repl/serveronly_repl',
         '$BUILD_DIR/mongo/db/s/balancer',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/key_string',
@@ -276,6 +291,40 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='capped_utils_test',
+    source=[
+        'capped_utils_test.cpp',
+    ],
+    LIBDEPS=[
+        'catalog_helpers',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+    ],
+)
+
+env.CppUnitTest(
+    target='create_collection_test',
+    source=[
+        'create_collection_test.cpp',
+    ],
+    LIBDEPS=[
+        'catalog_helpers',
+        'uuid_catalog',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
+        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/util/uuid',
+    ],
+)
+
+env.CppUnitTest(
     target='rename_collection_test',
     source=[
         'rename_collection_test.cpp',
@@ -285,6 +334,8 @@ env.CppUnitTest(
         'index_create',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
+        '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replmocks',
@@ -301,6 +352,8 @@ env.CppUnitTest(
         'catalog_helpers',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
+        '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replmocks',

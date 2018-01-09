@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 (function() {
     "use strict";
 

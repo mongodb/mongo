@@ -45,6 +45,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
@@ -327,19 +328,33 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
     // Retrieve all collections in config.collections that do not have a UUID. Some collections
     // may already have a UUID if an earlier upgrade attempt failed after making some progress.
     auto shardedColls =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                            opCtx,
-                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                            repl::ReadConcernLevel::kLocalReadConcern,
-                            NamespaceString(CollectionType::ConfigNS),
-                            BSON(CollectionType::uuid.name() << BSON("$exists" << false)),  // query
-                            BSONObj(),                                                      // sort
-                            boost::none                                                     // limit
-                            ))
+        uassertStatusOK(
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kLocalReadConcern,
+                NamespaceString(CollectionType::ConfigNS),
+                BSON(CollectionType::uuid.name() << BSON("$exists" << false) << "dropped" << false),
+                BSONObj(),   // sort
+                boost::none  // limit
+                ))
             .docs;
 
+    if (shardedColls.empty()) {
+        LOG(0) << "all sharded collections already have UUIDs";
+
+        // We did a local read of the collections collection above and found that all sharded
+        // collections already have UUIDs. However, the data may not be majority committed (a
+        // previous setFCV attempt may have failed with a write concern error). Since the current
+        // Client doesn't know the opTime of the last write to the collections collection, make it
+        // wait for the last opTime in the system when we wait for writeConcern.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        return;
+    }
+
     // Generate and persist a new UUID for each collection that did not have a UUID.
-    LOG(0) << "generating UUIDs for all sharded collections that do not yet have one";
+    LOG(0) << "generating UUIDs for " << shardedColls.size()
+           << " sharded collections that do not yet have a UUID";
     for (auto& coll : shardedColls) {
         auto collType = uassertStatusOK(CollectionType::fromBSON(coll));
         invariant(!collType.getUUID());

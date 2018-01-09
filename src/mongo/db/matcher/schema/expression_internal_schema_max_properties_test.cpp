@@ -38,16 +38,14 @@ namespace mongo {
 namespace {
 
 TEST(InternalSchemaMaxPropertiesMatchExpression, RejectsObjectsWithTooManyElements) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties;
-    ASSERT_OK(maxProperties.init(0));
+    InternalSchemaMaxPropertiesMatchExpression maxProperties(0);
 
     ASSERT_FALSE(maxProperties.matchesBSON(BSON("b" << 21)));
     ASSERT_FALSE(maxProperties.matchesBSON(BSON("b" << 21 << "c" << 3)));
 }
 
 TEST(InternalSchemaMaxPropertiesMatchExpression, AcceptsObjectWithLessThanOrEqualToMaxElements) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties;
-    ASSERT_OK(maxProperties.init(2));
+    InternalSchemaMaxPropertiesMatchExpression maxProperties(2);
 
     ASSERT_TRUE(maxProperties.matchesBSON(BSONObj()));
     ASSERT_TRUE(maxProperties.matchesBSON(BSON("b" << BSONNULL)));
@@ -56,26 +54,21 @@ TEST(InternalSchemaMaxPropertiesMatchExpression, AcceptsObjectWithLessThanOrEqua
 }
 
 TEST(InternalSchemaMaxPropertiesMatchExpression, MaxPropertiesZeroAllowsEmptyObjects) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties;
-    ASSERT_OK(maxProperties.init(0));
+    InternalSchemaMaxPropertiesMatchExpression maxProperties(0);
 
     ASSERT_TRUE(maxProperties.matchesBSON(BSONObj()));
 }
 
 TEST(InternalSchemaMaxPropertiesMatchExpression, NestedObjectsAreNotUnwound) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties;
-    ASSERT_OK(maxProperties.init(1));
+    InternalSchemaMaxPropertiesMatchExpression maxProperties(1);
 
     ASSERT_TRUE(maxProperties.matchesBSON(BSON("b" << BSON("c" << 2 << "d" << 3))));
 }
 
 TEST(InternalSchemaMaxPropertiesMatchExpression, EquivalentFunctionIsAccurate) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties1;
-    InternalSchemaMaxPropertiesMatchExpression maxProperties2;
-    InternalSchemaMaxPropertiesMatchExpression maxProperties3;
-    ASSERT_OK(maxProperties1.init(1));
-    ASSERT_OK(maxProperties2.init(1));
-    ASSERT_OK(maxProperties3.init(2));
+    InternalSchemaMaxPropertiesMatchExpression maxProperties1(1);
+    InternalSchemaMaxPropertiesMatchExpression maxProperties2(1);
+    InternalSchemaMaxPropertiesMatchExpression maxProperties3(2);
 
     ASSERT_TRUE(maxProperties1.equivalent(&maxProperties1));
     ASSERT_TRUE(maxProperties1.equivalent(&maxProperties2));
@@ -83,17 +76,14 @@ TEST(InternalSchemaMaxPropertiesMatchExpression, EquivalentFunctionIsAccurate) {
 }
 
 TEST(InternalSchemaMaxPropertiesMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties;
-    ASSERT_OK(maxProperties.init(2));
+    InternalSchemaMaxPropertiesMatchExpression maxProperties(2);
 
     ASSERT_TRUE(maxProperties.matchesBSON(BSON("a" << (BSON("b" << 2 << "c" << 3 << "d" << 4)))));
 }
 
 TEST(InternalSchemaMaxPropertiesMatchExpression, MinPropertiesNotEquivalentToMaxProperties) {
-    InternalSchemaMaxPropertiesMatchExpression maxProperties;
-    InternalSchemaMinPropertiesMatchExpression minProperties;
-    ASSERT_OK(maxProperties.init(5));
-    ASSERT_OK(minProperties.init(5));
+    InternalSchemaMaxPropertiesMatchExpression maxProperties(5);
+    InternalSchemaMinPropertiesMatchExpression minProperties(5);
 
     ASSERT_FALSE(maxProperties.equivalent(&minProperties));
 }

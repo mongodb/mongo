@@ -427,7 +427,8 @@ TEST(PlanCacheTest, AddEmptySolutions) {
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}"));
     std::vector<QuerySolution*> solns;
     unique_ptr<PlanRankingDecision> decision(createDecision(1U));
-    ASSERT_NOT_OK(planCache.add(*cq, solns, decision.get()));
+    QueryTestServiceContext serviceContext;
+    ASSERT_NOT_OK(planCache.add(*cq, solns, decision.get(), Date_t{}));
 }
 
 TEST(PlanCacheTest, AddValidSolution) {
@@ -441,7 +442,8 @@ TEST(PlanCacheTest, AddValidSolution) {
 
     // Check if key is in cache before and after add().
     ASSERT_FALSE(planCache.contains(*cq));
-    ASSERT_OK(planCache.add(*cq, solns, createDecision(1U)));
+    QueryTestServiceContext serviceContext;
+    ASSERT_OK(planCache.add(*cq, solns, createDecision(1U), Date_t{}));
 
     ASSERT_TRUE(planCache.contains(*cq));
     ASSERT_EQUALS(planCache.size(), 1U);

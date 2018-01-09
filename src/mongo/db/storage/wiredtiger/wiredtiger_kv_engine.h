@@ -38,6 +38,7 @@
 #include <wiredtiger.h>
 
 #include "mongo/bson/ordering.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
@@ -162,9 +163,15 @@ public:
 
     void setJournalListener(JournalListener* jl) final;
 
-    virtual void setStableTimestamp(SnapshotName stableTimestamp) override;
+    virtual void setStableTimestamp(Timestamp stableTimestamp) override;
 
-    virtual void setInitialDataTimestamp(SnapshotName initialDataTimestamp) override;
+    virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
+
+    /**
+     * This method will force the oldest timestamp to the input value. Callers must be serialized
+     * along with `_advanceOldestTimestamp`
+     */
+    void setOldestTimestamp(Timestamp oldestTimestamp);
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
@@ -245,9 +252,9 @@ private:
 
     std::string _uri(StringData ident) const;
 
-    // Not threadsafe; callers must be serialized.
-    void _setOldestTimestamp(SnapshotName oldestTimestamp);
-    SnapshotName _previousSetOldestTimestamp;
+    // Not threadsafe; callers must be serialized along with `setOldestTimestamp`.
+    void _advanceOldestTimestamp(Timestamp oldestTimestamp);
+    Timestamp _previousSetOldestTimestamp;
 
     WT_CONNECTION* _conn;
     WT_EVENT_HANDLER _eventHandler;

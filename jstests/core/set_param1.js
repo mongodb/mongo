@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Tests for accessing logLevel server parameter using getParameter/setParameter commands
 // and shell helpers.
 

@@ -39,6 +39,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -119,8 +120,6 @@ void WiredTigerRecoveryUnit::beginUnitOfWork(OperationContext* opCtx) {
     invariant(!_areWriteUnitOfWorksBanned);
     invariant(!_inUnitOfWork);
     _inUnitOfWork = true;
-    // Begin a new transaction, if one is not already started.
-    getSession();
 }
 
 void WiredTigerRecoveryUnit::commitUnitOfWork() {
@@ -180,6 +179,11 @@ void WiredTigerRecoveryUnit::abandonSnapshot() {
     _areWriteUnitOfWorksBanned = false;
 }
 
+void WiredTigerRecoveryUnit::prepareSnapshot() {
+    // Begin a new transaction, if one is not already started.
+    getSession();
+}
+
 void* WiredTigerRecoveryUnit::writingPtr(void* data, size_t len) {
     // This API should not be used for anything other than the MMAP V1 storage engine
     MONGO_UNREACHABLE;
@@ -198,6 +202,12 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
 
     int wtRet;
     if (commit) {
+        if (!_commitTimestamp.isNull()) {
+            const std::string conf = "commit_timestamp=" + integerToHex(_commitTimestamp.asULL());
+            invariantWTOK(s->timestamp_transaction(s, conf.c_str()));
+            _isTimestamped = true;
+        }
+
         wtRet = s->commit_transaction(s, NULL);
         LOG(3) << "WT commit_transaction for snapshot id " << _mySnapshotId;
     } else {
@@ -234,7 +244,7 @@ Status WiredTigerRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
     return Status::OK();
 }
 
-boost::optional<SnapshotName> WiredTigerRecoveryUnit::getMajorityCommittedSnapshot() const {
+boost::optional<Timestamp> WiredTigerRecoveryUnit::getMajorityCommittedSnapshot() const {
     if (!_readFromMajorityCommittedSnapshot)
         return {};
     return _majorityCommittedSnapshot;
@@ -250,7 +260,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
     }
     WT_SESSION* session = _session->getSession();
 
-    if (_readAtTimestamp != SnapshotName::min()) {
+    if (_readAtTimestamp != Timestamp::min()) {
         uassertStatusOK(_sessionCache->snapshotManager().beginTransactionAtTimestamp(
             _readAtTimestamp, session));
     } else if (_readFromMajorityCommittedSnapshot) {
@@ -268,16 +278,20 @@ void WiredTigerRecoveryUnit::_txnOpen() {
 }
 
 
-Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
+Status WiredTigerRecoveryUnit::setTimestamp(Timestamp timestamp) {
     _ensureSession();
     LOG(3) << "WT set timestamp of future write operations to " << timestamp;
     WT_SESSION* session = _session->getSession();
     invariant(_inUnitOfWork);
+    invariant(_commitTimestamp.isNull(),
+              str::stream() << "Commit timestamp set to " << _commitTimestamp.toString()
+                            << " and trying to set WUOW timestamp to "
+                            << timestamp.toString());
 
     // Starts the WT transaction associated with this session.
     getSession();
 
-    const std::string conf = "commit_timestamp=" + timestamp.toString();
+    const std::string conf = "commit_timestamp=" + integerToHex(timestamp.asULL());
     auto rc = session->timestamp_transaction(session, conf.c_str());
     if (rc == 0) {
         _isTimestamped = true;
@@ -285,7 +299,26 @@ Status WiredTigerRecoveryUnit::setTimestamp(SnapshotName timestamp) {
     return wtRCToStatus(rc, "timestamp_transaction");
 }
 
-Status WiredTigerRecoveryUnit::selectSnapshot(SnapshotName timestamp) {
+void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {
+    invariant(!_inUnitOfWork);
+    invariant(_commitTimestamp.isNull(),
+              str::stream() << "Commit timestamp set to " << _commitTimestamp.toString()
+                            << " and trying to set it to "
+                            << timestamp.toString());
+    _commitTimestamp = timestamp;
+}
+
+Timestamp WiredTigerRecoveryUnit::getCommitTimestamp() {
+    return _commitTimestamp;
+}
+
+void WiredTigerRecoveryUnit::clearCommitTimestamp() {
+    invariant(!_inUnitOfWork);
+    invariant(!_commitTimestamp.isNull());
+    _commitTimestamp = Timestamp();
+}
+
+Status WiredTigerRecoveryUnit::selectSnapshot(Timestamp timestamp) {
     _readAtTimestamp = timestamp;
     return Status::OK();
 }

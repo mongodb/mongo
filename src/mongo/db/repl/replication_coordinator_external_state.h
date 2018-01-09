@@ -47,7 +47,6 @@ class OID;
 class OldThreadPool;
 class OperationContext;
 class ServiceContext;
-class SnapshotName;
 class Status;
 struct HostAndPort;
 template <typename T>
@@ -59,31 +58,6 @@ class LastVote;
 class ReplSettings;
 class ReplicationCoordinator;
 
-struct SnapshotInfo {
-    OpTime opTime;
-    SnapshotName name;
-
-    bool operator==(const SnapshotInfo& other) const {
-        return std::tie(opTime, name) == std::tie(other.opTime, other.name);
-    }
-    bool operator!=(const SnapshotInfo& other) const {
-        return std::tie(opTime, name) != std::tie(other.opTime, other.name);
-    }
-    bool operator<(const SnapshotInfo& other) const {
-        return std::tie(opTime, name) < std::tie(other.opTime, other.name);
-    }
-    bool operator<=(const SnapshotInfo& other) const {
-        return std::tie(opTime, name) <= std::tie(other.opTime, other.name);
-    }
-    bool operator>(const SnapshotInfo& other) const {
-        return std::tie(opTime, name) > std::tie(other.opTime, other.name);
-    }
-    bool operator>=(const SnapshotInfo& other) const {
-        return std::tie(opTime, name) >= std::tie(other.opTime, other.name);
-    }
-    std::string toString() const;
-};
-
 /**
  * This class represents the interface the ReplicationCoordinator uses to interact with the
  * rest of the system.  All functionality of the ReplicationCoordinatorImpl that would introduce
@@ -94,8 +68,8 @@ class ReplicationCoordinatorExternalState {
     MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalState);
 
 public:
-    ReplicationCoordinatorExternalState();
-    virtual ~ReplicationCoordinatorExternalState();
+    ReplicationCoordinatorExternalState() {}
+    virtual ~ReplicationCoordinatorExternalState() {}
 
     /**
      * Starts the journal listener, and snapshot threads
@@ -286,7 +260,7 @@ public:
      *
      * It is illegal to call with a newCommitPoint that does not name an existing snapshot.
      */
-    virtual void updateCommittedSnapshot(SnapshotInfo newCommitPoint) = 0;
+    virtual void updateCommittedSnapshot(const OpTime& newCommitPoint) = 0;
 
     /**
      * Returns whether or not the SnapshotThread is active.

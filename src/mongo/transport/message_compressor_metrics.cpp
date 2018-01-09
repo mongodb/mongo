@@ -49,15 +49,15 @@ void appendMessageCompressionStats(BSONObjBuilder* b) {
         auto&& compressor = registry.getCompressor(name);
         BSONObjBuilder base(compressionSection.subobjStart(name));
 
-        BSONObjBuilder compressed(base.subobjStart("compressed"));
-        compressed << kBytesIn << compressor->getCompressedBytesIn() << kBytesOut
-                   << compressor->getCompressedBytesOut();
-        compressed.doneFast();
+        BSONObjBuilder compressorSection(base.subobjStart("compressor"));
+        compressorSection << kBytesIn << compressor->getCompressorBytesIn() << kBytesOut
+                          << compressor->getCompressorBytesOut();
+        compressorSection.doneFast();
 
-        BSONObjBuilder decompressed(base.subobjStart("decompressed"));
-        decompressed << kBytesIn << compressor->getDecompressedBytesIn() << kBytesOut
-                     << compressor->getDecompressedBytesOut();
-        decompressed.doneFast();
+        BSONObjBuilder decompressorSection(base.subobjStart("decompressor"));
+        decompressorSection << kBytesIn << compressor->getDecompressorBytesIn() << kBytesOut
+                            << compressor->getDecompressorBytesOut();
+        decompressorSection.doneFast();
         base.doneFast();
     }
     compressionSection.doneFast();

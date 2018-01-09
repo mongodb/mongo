@@ -40,6 +40,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/sharding_state.h"
@@ -81,7 +82,7 @@ public:
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+        return true;
     }
 
     virtual void help(std::stringstream& help) const {
@@ -98,9 +99,8 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(
-                    NamespaceString("$setFeatureCompatibilityVersion.version")),
-                ActionType::update)) {
+                ResourcePattern::forClusterResource(),
+                ActionType::setFeatureCompatibilityVersion)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
@@ -110,6 +110,26 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
+        // Always wait for at least majority writeConcern to ensure all writes involved in the
+        // upgrade process cannot be rolled back. There is currently no mechanism to specify a
+        // default writeConcern, so we manually call waitForWriteConcern upon exiting this command.
+        //
+        // TODO SERVER-25778: replace this with the general mechanism for specifying a default
+        // writeConcern.
+        ON_BLOCK_EXIT([&] {
+            // Propagate the user's wTimeout if one was given.
+            auto timeout =
+                opCtx->getWriteConcern().usedDefault ? INT_MAX : opCtx->getWriteConcern().wTimeout;
+            WriteConcernResult res;
+            auto waitForWCStatus = waitForWriteConcern(
+                opCtx,
+                repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                WriteConcernOptions(
+                    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, timeout),
+                &res);
+            Command::appendCommandWCStatus(result, waitForWCStatus, res);
+        });
+
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
         Lock::ExclusiveLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
 
@@ -122,6 +142,15 @@ public:
                     "featureCompatibilityVersion downgrade has not completed",
                     serverGlobalParams.featureCompatibility.getVersion() !=
                         ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34);
+
+            if (serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+                // Set the client's last opTime to the system last opTime so no-ops wait for
+                // writeConcern.
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+                return true;
+            }
 
             FeatureCompatibilityVersion::setTargetUpgrade(opCtx);
 
@@ -138,7 +167,10 @@ public:
 
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-                        opCtx, requestedVersion));
+                        opCtx,
+                        Command::appendMajorityWriteConcern(Command::appendPassthroughFields(
+                            cmdObj,
+                            BSON(FeatureCompatibilityVersion::kCommandName << requestedVersion)))));
             }
 
             if (ShardingState::get(opCtx)->enabled()) {
@@ -162,6 +194,15 @@ public:
                     serverGlobalParams.featureCompatibility.getVersion() !=
                         ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
 
+            if (serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
+                // Set the client's last opTime to the system last opTime so no-ops wait for
+                // writeConcern.
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+                return true;
+            }
+
             FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
 
             // Fail after updating the FCV document but before removing UUIDs.
@@ -174,7 +215,10 @@ public:
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-                        opCtx, requestedVersion));
+                        opCtx,
+                        Command::appendMajorityWriteConcern(Command::appendPassthroughFields(
+                            cmdObj,
+                            BSON(FeatureCompatibilityVersion::kCommandName << requestedVersion)))));
 
                 // Stop the background key generator thread from running before trying to drop the
                 // collection so we know the key won't just be recreated.

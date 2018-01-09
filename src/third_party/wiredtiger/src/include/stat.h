@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -83,6 +83,17 @@
  */
 #define	WT_STATS_FIELD_TO_OFFSET(stats, fld)				\
 	(int)(&(stats)[0]->fld - (int64_t *)(stats)[0])
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_STAT_CLEAR		0x01u
+#define	WT_STAT_JSON		0x02u
+#define	WT_STAT_ON_CLOSE	0x04u
+#define	WT_STAT_TYPE_ALL	0x08u
+#define	WT_STAT_TYPE_CACHE_WALK	0x10u
+#define	WT_STAT_TYPE_FAST	0x20u
+#define	WT_STAT_TYPE_SIZE	0x40u
+#define	WT_STAT_TYPE_TREE_WALK	0x80u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 
 /*
  * Sum the values from all structures in the array.
@@ -248,6 +259,51 @@ __wt_stats_clear(void *stats_arg, int slot)
 } while (0)
 
 /*
+ * Construct histogram increment functions to put the passed value into the
+ * right bucket. Bucket ranges, represented by various statistics, depend upon
+ * whether the passed value is in milliseconds or microseconds.  Also values
+ * less than a given minimum are ignored and not put in any bucket.  This floor
+ * value keeps us from having an excessively large smallest values.
+ */
+#define	WT_STAT_MSECS_HIST_INCR_FUNC(name, stat, min_val)		\
+static inline void							\
+__wt_stat_msecs_hist_incr_##name(WT_SESSION_IMPL *session, uint64_t msecs) \
+{									\
+	if (msecs < (min_val))						\
+		return;							\
+	if (msecs < 50)							\
+		WT_STAT_CONN_INCR(session, stat##_lt50);		\
+	else if (msecs < 100)						\
+		WT_STAT_CONN_INCR(session, stat##_lt100);		\
+	else if (msecs < 250)						\
+		WT_STAT_CONN_INCR(session, stat##_lt250);		\
+	else if (msecs < 500)						\
+		WT_STAT_CONN_INCR(session, stat##_lt500);		\
+	else if (msecs < 1000)						\
+		WT_STAT_CONN_INCR(session, stat##_lt1000);		\
+	else								\
+		WT_STAT_CONN_INCR(session, stat##_gt1000);		\
+}
+
+#define	WT_STAT_USECS_HIST_INCR_FUNC(name, stat, min_val)		\
+static inline void							\
+__wt_stat_usecs_hist_incr_##name(WT_SESSION_IMPL *session, uint64_t usecs) \
+{									\
+	if (usecs < (min_val))						\
+		return;							\
+	if (usecs < 250)						\
+		WT_STAT_CONN_INCR(session, stat##_lt250);		\
+	else if (usecs < 500)						\
+		WT_STAT_CONN_INCR(session, stat##_lt500);		\
+	else if (usecs < 1000)						\
+		WT_STAT_CONN_INCR(session, stat##_lt1000);		\
+	else if (usecs < 10000)						\
+		WT_STAT_CONN_INCR(session, stat##_lt10000);		\
+	else								\
+		WT_STAT_CONN_INCR(session, stat##_gt10000);		\
+}
+
+/*
  * DO NOT EDIT: automatically built by dist/stat.py.
  */
 /* Statistics section: BEGIN */
@@ -293,6 +349,7 @@ struct __wt_connection_stats {
 	int64_t cache_write_app_count;
 	int64_t cache_write_app_time;
 	int64_t cache_bytes_image;
+	int64_t cache_bytes_lookaside;
 	int64_t cache_bytes_inuse;
 	int64_t cache_bytes_other;
 	int64_t cache_bytes_read;
@@ -412,6 +469,10 @@ struct __wt_connection_stats {
 	int64_t lock_checkpoint_count;
 	int64_t lock_checkpoint_wait_application;
 	int64_t lock_checkpoint_wait_internal;
+	int64_t lock_commit_timestamp_wait_application;
+	int64_t lock_commit_timestamp_wait_internal;
+	int64_t lock_commit_timestamp_read_count;
+	int64_t lock_commit_timestamp_write_count;
 	int64_t lock_dhandle_wait_application;
 	int64_t lock_dhandle_wait_internal;
 	int64_t lock_dhandle_read_count;
@@ -419,6 +480,10 @@ struct __wt_connection_stats {
 	int64_t lock_metadata_count;
 	int64_t lock_metadata_wait_application;
 	int64_t lock_metadata_wait_internal;
+	int64_t lock_read_timestamp_wait_application;
+	int64_t lock_read_timestamp_wait_internal;
+	int64_t lock_read_timestamp_read_count;
+	int64_t lock_read_timestamp_write_count;
 	int64_t lock_schema_count;
 	int64_t lock_schema_wait_application;
 	int64_t lock_schema_wait_internal;
@@ -426,6 +491,10 @@ struct __wt_connection_stats {
 	int64_t lock_table_wait_internal;
 	int64_t lock_table_read_count;
 	int64_t lock_table_write_count;
+	int64_t lock_txn_global_wait_application;
+	int64_t lock_txn_global_wait_internal;
+	int64_t lock_txn_global_read_count;
+	int64_t lock_txn_global_write_count;
 	int64_t log_slot_switch_busy;
 	int64_t log_force_ckpt_sleep;
 	int64_t log_bytes_payload;
@@ -472,6 +541,28 @@ struct __wt_connection_stats {
 	int64_t log_compress_len;
 	int64_t log_slot_coalesced;
 	int64_t log_close_yields;
+	int64_t perf_hist_fsread_latency_lt50;
+	int64_t perf_hist_fsread_latency_lt100;
+	int64_t perf_hist_fsread_latency_lt250;
+	int64_t perf_hist_fsread_latency_lt500;
+	int64_t perf_hist_fsread_latency_lt1000;
+	int64_t perf_hist_fsread_latency_gt1000;
+	int64_t perf_hist_fswrite_latency_lt50;
+	int64_t perf_hist_fswrite_latency_lt100;
+	int64_t perf_hist_fswrite_latency_lt250;
+	int64_t perf_hist_fswrite_latency_lt500;
+	int64_t perf_hist_fswrite_latency_lt1000;
+	int64_t perf_hist_fswrite_latency_gt1000;
+	int64_t perf_hist_opread_latency_lt250;
+	int64_t perf_hist_opread_latency_lt500;
+	int64_t perf_hist_opread_latency_lt1000;
+	int64_t perf_hist_opread_latency_lt10000;
+	int64_t perf_hist_opread_latency_gt10000;
+	int64_t perf_hist_opwrite_latency_lt250;
+	int64_t perf_hist_opwrite_latency_lt500;
+	int64_t perf_hist_opwrite_latency_lt1000;
+	int64_t perf_hist_opwrite_latency_lt10000;
+	int64_t perf_hist_opwrite_latency_gt10000;
 	int64_t rec_page_delete_fast;
 	int64_t rec_pages;
 	int64_t rec_pages_eviction;
@@ -517,8 +608,24 @@ struct __wt_connection_stats {
 	int64_t page_del_rollback_blocked;
 	int64_t child_modify_blocked_page;
 	int64_t tree_descend_blocked;
+	int64_t txn_commit_queue_empty;
+	int64_t txn_commit_queue_head;
+	int64_t txn_commit_queue_inserts;
+	int64_t txn_commit_queue_len;
 	int64_t txn_snapshots_created;
 	int64_t txn_snapshots_dropped;
+	int64_t txn_query_ts;
+	int64_t txn_read_queue_empty;
+	int64_t txn_read_queue_head;
+	int64_t txn_read_queue_inserts;
+	int64_t txn_read_queue_len;
+	int64_t txn_set_ts;
+	int64_t txn_set_ts_commit;
+	int64_t txn_set_ts_commit_upd;
+	int64_t txn_set_ts_oldest;
+	int64_t txn_set_ts_oldest_upd;
+	int64_t txn_set_ts_stable;
+	int64_t txn_set_ts_stable_upd;
 	int64_t txn_begin;
 	int64_t txn_checkpoint_running;
 	int64_t txn_checkpoint_generation;
@@ -536,14 +643,10 @@ struct __wt_connection_stats {
 	int64_t txn_pinned_range;
 	int64_t txn_pinned_checkpoint_range;
 	int64_t txn_pinned_snapshot_range;
+	int64_t txn_pinned_timestamp;
+	int64_t txn_pinned_timestamp_oldest;
 	int64_t txn_sync;
-	int64_t txn_commit_queue_head;
-	int64_t txn_commit_queue_inserts;
-	int64_t txn_commit_queue_len;
 	int64_t txn_commit;
-	int64_t txn_read_queue_head;
-	int64_t txn_read_queue_inserts;
-	int64_t txn_read_queue_len;
 	int64_t txn_rollback;
 	int64_t txn_update_conflict;
 };

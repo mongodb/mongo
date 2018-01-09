@@ -280,8 +280,16 @@ UpdateNode::ApplyResult ModifierNode::applyToNonexistentElement(ApplyParams appl
 
         ApplyResult applyResult;
 
-        // Determine if indexes are affected.
-        if (!applyParams.indexData || !applyParams.indexData->mightBeIndexed(fullPath)) {
+        // Determine if indexes are affected. If we did not create a new element in an array, check
+        // whether the full path affects indexes. If we did create a new element in an array, check
+        // whether the array itself might affect any indexes. This is necessary because if there is
+        // an index {"a.b": 1}, and we set "a.1.c" and implicitly create an array element in "a",
+        // then we may need to add a null key to the index, even though "a.1.c" does not appear to
+        // affect the index.
+        if (!applyParams.indexData ||
+            !applyParams.indexData->mightBeIndexed(applyParams.element.getType() != BSONType::Array
+                                                       ? fullPath
+                                                       : applyParams.pathTaken->dottedField())) {
             applyResult.indexesAffected = false;
         }
 

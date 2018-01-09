@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns, requires_getmore]
+
 // Test various cursor behaviors
 
 var testDB = db.getSiblingDB("geo_s2cursorlimitskip");

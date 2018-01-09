@@ -35,6 +35,7 @@
 #include "mongo/util/net/op_msg.h"
 
 using namespace mongo::idl::test;
+using namespace mongo::idl::import;
 
 namespace mongo {
 
@@ -173,6 +174,10 @@ void TestLoopback(TestT test_value) {
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+
+        // Validate the operator == works
+        // Use ASSERT instead of ASSERT_EQ to avoid operator<<
+        ASSERT(one_new == testStruct);
     }
 }
 
@@ -478,6 +483,102 @@ TEST(IDLStructTests, TestNonStrictStruct) {
         auto testDoc =
             BSON("field4" << 1234 << "1" << 12 << "2" << 123 << "3" << 1234 << "field4" << 1234);
         ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
+    }
+}
+
+/// Struct default comparison tests
+TEST(IDLCompareTests, TestAllFields) {
+    IDLParserErrorContext ctxt("root");
+
+    // Positive: equality works
+    {
+        CompareAllField3 origStruct;
+        origStruct.setField1(12);
+        origStruct.setField2(123);
+        origStruct.setField3(1234);
+
+        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
+        auto parsedStruct = CompareAllField3::parse(ctxt, testDoc);
+
+        // Avoid ASSET_<RelOp> to avoid operator <<
+        ASSERT_TRUE(origStruct == parsedStruct);
+        ASSERT_FALSE(origStruct != parsedStruct);
+        ASSERT_FALSE(origStruct < parsedStruct);
+        ASSERT_FALSE(parsedStruct < origStruct);
+    }
+
+    // Positive: not equality works in field 3
+    {
+        CompareAllField3 origStruct;
+        origStruct.setField1(12);
+        origStruct.setField2(123);
+        origStruct.setField3(12345);
+
+        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
+        auto parsedStruct = CompareAllField3::parse(ctxt, testDoc);
+
+        // Avoid ASSET_<RelOp> to avoid operator <<
+        ASSERT_FALSE(origStruct == parsedStruct);
+        ASSERT_TRUE(origStruct != parsedStruct);
+        ASSERT_FALSE(origStruct < parsedStruct);
+        ASSERT_TRUE(parsedStruct < origStruct);
+    }
+}
+
+
+/// Struct partial comparison tests
+TEST(IDLCompareTests, TestSomeFields) {
+    IDLParserErrorContext ctxt("root");
+
+    // Positive: partial equality works when field 2 is different
+    {
+        CompareSomeField3 origStruct;
+        origStruct.setField1(12);
+        origStruct.setField2(12345);
+        origStruct.setField3(1234);
+
+        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
+        auto parsedStruct = CompareSomeField3::parse(ctxt, testDoc);
+
+        // Avoid ASSET_<RelOp> to avoid operator <<
+        ASSERT_TRUE(origStruct == parsedStruct);
+        ASSERT_FALSE(origStruct != parsedStruct);
+        ASSERT_FALSE(origStruct < parsedStruct);
+        ASSERT_FALSE(parsedStruct < origStruct);
+    }
+
+    // Positive: partial equality works when field 3 is different
+    {
+        CompareSomeField3 origStruct;
+        origStruct.setField1(12);
+        origStruct.setField2(1);
+        origStruct.setField3(12345);
+
+        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
+        auto parsedStruct = CompareSomeField3::parse(ctxt, testDoc);
+
+        // Avoid ASSET_<RelOp> to avoid operator <<
+        ASSERT_FALSE(origStruct == parsedStruct);
+        ASSERT_TRUE(origStruct != parsedStruct);
+        ASSERT_FALSE(origStruct < parsedStruct);
+        ASSERT_TRUE(parsedStruct < origStruct);
+    }
+
+    // Positive: partial equality works when field 1 is different
+    {
+        CompareSomeField3 origStruct;
+        origStruct.setField1(123);
+        origStruct.setField2(1);
+        origStruct.setField3(1234);
+
+        auto testDoc = BSON("field1" << 12 << "field2" << 123 << "field3" << 1234);
+        auto parsedStruct = CompareSomeField3::parse(ctxt, testDoc);
+
+        // Avoid ASSET_<RelOp> to avoid operator <<
+        ASSERT_FALSE(origStruct == parsedStruct);
+        ASSERT_TRUE(origStruct != parsedStruct);
+        ASSERT_FALSE(origStruct < parsedStruct);
+        ASSERT_TRUE(parsedStruct < origStruct);
     }
 }
 
@@ -896,7 +997,8 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     assert_same_types<decltype(testStruct.getField4()),
                       const std::vector<mongo::ObjectBasicType>&>();
     assert_same_types<decltype(testStruct.getField5()), const std::vector<mongo::BSONObj>&>();
-    assert_same_types<decltype(testStruct.getField6()), const std::vector<mongo::One_string>&>();
+    assert_same_types<decltype(testStruct.getField6()),
+                      const std::vector<mongo::idl::import::One_string>&>();
 
     assert_same_types<decltype(testStruct.getField1o()),
                       const boost::optional<std::vector<std::int64_t>>&>();
@@ -909,7 +1011,7 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     assert_same_types<decltype(testStruct.getField5o()),
                       const boost::optional<std::vector<mongo::BSONObj>>&>();
     assert_same_types<decltype(testStruct.getField6o()),
-                      const boost::optional<std::vector<mongo::One_string>>&>();
+                      const boost::optional<std::vector<mongo::idl::import::One_string>>&>();
 
     std::vector<std::int64_t> field1{1, 2, 3};
     ASSERT_TRUE(field1 == testStruct.getField1());
@@ -957,6 +1059,10 @@ void TestBinDataVector() {
 
         auto serializedDoc = builder.obj();
         ASSERT_BSONOBJ_EQ(testDoc, serializedDoc);
+
+        // Validate the operator == works
+        // Use ASSERT instead of ASSERT_EQ to avoid operator<<
+        ASSERT(one_new == testStruct);
     }
 }
 
@@ -2027,9 +2133,20 @@ TEST(IDLDocSequence, TestWellKnownFieldsAreIgnored) {
                                 << "objects"
                                 << BSON_ARRAY(BSON("foo" << 1)));
 
+
         OpMsgRequest request = OpMsgRequest::fromDBAndBody("db", testTempDoc);
-        auto testStruct = DocSequenceCommand::parse(ctxt, request);
-        ASSERT_EQUALS(2UL, testStruct.getStructs().size());
+
+        // Validate it can be parsed as a OpMsgRequest.
+        {
+            auto testStruct = DocSequenceCommand::parse(ctxt, request);
+            ASSERT_EQUALS(2UL, testStruct.getStructs().size());
+        }
+
+        // Validate it can be parsed as just a BSON document.
+        {
+            auto testStruct = DocSequenceCommand::parse(ctxt, request.body);
+            ASSERT_EQUALS(2UL, testStruct.getStructs().size());
+        }
     }
 }
 
@@ -2171,6 +2288,261 @@ TEST(IDLCommand, TestKnownFieldDuplicate) {
     ASSERT_BSONOBJ_EQ(expectedDoc, testStruct.serialize(testPassthrough).body);
 }
 
+
+// Positive: Test an inline nested chain struct works
+TEST(IDLChainedStruct, TestInline) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON("stringField"
+                        << "bar"
+                        << "field3"
+                        << "foo");
+
+    auto testStruct = Chained_struct_inline::parse(ctxt, testDoc);
+    ASSERT_EQUALS(testStruct.getChained_string_inline_basic_type().getStringField(), "bar");
+    ASSERT_EQUALS(testStruct.getField3(), "foo");
+
+    assert_same_types<decltype(testStruct.getChained_string_inline_basic_type().getStringField()),
+                      const StringData>();
+    assert_same_types<decltype(testStruct.getField3()), const StringData>();
+
+    // Positive: Test we can round trip to a document from the just parsed document
+    {
+        BSONObj loopbackDoc = testStruct.toBSON();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        Chained_struct_inline one_new;
+        one_new.setField3("foo");
+
+        Chained_string_inline_basic_type f1;
+        f1.setStringField("bar");
+        one_new.setChained_string_inline_basic_type(f1);
+
+        BSONObj loopbackDoc = one_new.toBSON();
+
+        ASSERT_BSONOBJ_EQ(testDoc, loopbackDoc);
+    }
+}
+
+// Positive: verify a command a string arg
+TEST(IDLTypeCommand, TestString) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(CommandTypeStringCommand::kCommandName << "foo"
+                                                               << "field1"
+                                                               << 3
+                                                               << "$db"
+                                                               << "db");
+
+    auto testStruct = CommandTypeStringCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getField1(), 3);
+    ASSERT_EQUALS(testStruct.getCommandParameter(), "foo");
+
+    assert_same_types<decltype(testStruct.getCommandParameter()), const StringData>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Positive: Test we can serialize from nothing the same document except for $db
+    {
+        auto testDocWithoutDb = BSON(CommandTypeStringCommand::kCommandName << "foo"
+                                                                            << "field1"
+                                                                            << 3);
+
+        BSONObjBuilder builder;
+        CommandTypeStringCommand one_new("foo");
+        one_new.setField1(3);
+        one_new.setDbName("db");
+        one_new.serialize(BSONObj(), &builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDocWithoutDb, serializedDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        CommandTypeStringCommand one_new("foo");
+        one_new.setField1(3);
+        one_new.setDbName("db");
+        OpMsgRequest reply = one_new.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+}
+
+// Positive: verify a command can take an array of object
+TEST(IDLTypeCommand, TestArrayObject) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(CommandTypeArrayObjectCommand::kCommandName << BSON_ARRAY(BSON("sample"
+                                                                                       << "doc"))
+                                                                    << "$db"
+                                                                    << "db");
+
+    auto testStruct = CommandTypeArrayObjectCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getCommandParameter().size(), 1UL);
+
+    assert_same_types<decltype(testStruct.getCommandParameter()),
+                      const std::vector<mongo::BSONObj>&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        std::vector<BSONObj> vec;
+        vec.emplace_back(BSON("sample"
+                              << "doc"));
+        CommandTypeArrayObjectCommand one_new(vec);
+        one_new.setDbName("db");
+        OpMsgRequest reply = one_new.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+}
+
+// Positive: verify a command can take a struct
+TEST(IDLTypeCommand, TestStruct) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(CommandTypeStructCommand::kCommandName << BSON("value"
+                                                                       << "sample")
+                                                               << "$db"
+                                                               << "db");
+
+    auto testStruct = CommandTypeStructCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getCommandParameter().getValue(), "sample");
+
+    assert_same_types<decltype(testStruct.getCommandParameter()),
+                      mongo::idl::import::One_string&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        One_string os;
+        os.setValue("sample");
+        CommandTypeStructCommand one_new(os);
+        one_new.setDbName("db");
+        OpMsgRequest reply = one_new.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+}
+
+// Positive: verify a command can take an array of structs
+TEST(IDLTypeCommand, TestStructArray) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(CommandTypeArrayStructCommand::kCommandName << BSON_ARRAY(BSON("value"
+                                                                                       << "sample"))
+                                                                    << "$db"
+                                                                    << "db");
+
+    auto testStruct = CommandTypeArrayStructCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getCommandParameter().size(), 1UL);
+
+    assert_same_types<decltype(testStruct.getCommandParameter()),
+                      const std::vector<mongo::idl::import::One_string>&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        std::vector<One_string> vec;
+        One_string os;
+        os.setValue("sample");
+        vec.push_back(os);
+        CommandTypeArrayStructCommand one_new(vec);
+        one_new.setDbName("db");
+        OpMsgRequest reply = one_new.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+}
+
+// Positive: verify a command a string arg and alternate C++ name
+TEST(IDLTypeCommand, TestUnderscoreCommand) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(WellNamedCommand::kCommandName << "foo"
+                                                       << "field1"
+                                                       << 3
+                                                       << "$db"
+                                                       << "db");
+
+    auto testStruct = WellNamedCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getField1(), 3);
+    ASSERT_EQUALS(testStruct.getCommandParameter(), "foo");
+
+    assert_same_types<decltype(testStruct.getCommandParameter()), const StringData>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Positive: Test we can serialize from nothing the same document except for $db
+    {
+        auto testDocWithoutDb = BSON(WellNamedCommand::kCommandName << "foo"
+                                                                    << "field1"
+                                                                    << 3);
+
+        BSONObjBuilder builder;
+        WellNamedCommand one_new("foo");
+        one_new.setField1(3);
+        one_new.setDbName("db");
+        one_new.serialize(BSONObj(), &builder);
+
+        auto serializedDoc = builder.obj();
+        ASSERT_BSONOBJ_EQ(testDocWithoutDb, serializedDoc);
+    }
+
+    // Positive: Test we can serialize from nothing the same document
+    {
+        BSONObjBuilder builder;
+        WellNamedCommand one_new("foo");
+        one_new.setField1(3);
+        one_new.setDbName("db");
+        OpMsgRequest reply = one_new.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+}
 
 }  // namespace
 }  // namespace mongo

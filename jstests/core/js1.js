@@ -1,4 +1,4 @@
-
+// @tags: [requires_non_retryable_writes]
 
 t = db.jstests_js1;
 t.remove({});

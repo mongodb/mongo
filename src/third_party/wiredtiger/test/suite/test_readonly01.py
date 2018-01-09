@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2017 MongoDB, Inc.
+# Public Domain 2014-2018 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -44,8 +44,8 @@ class test_readonly01(wttest.WiredTigerTestCase, suite_subprocess):
     # We want a list of directory writable or readonly.
     #
     basecfg_list = [
-        ('basecfg', dict(basecfg='config_base=true,')),
-        ('no_basecfg', dict(basecfg='config_base=false,')),
+        ('basecfg', dict(basecfg='config_base=true,operation_tracking=(enabled=false),')),
+        ('no_basecfg', dict(basecfg='config_base=false,operation_tracking=(enabled=false),')),
     ]
     dir_list = [
         ('write', dict(dirchmod=False)),

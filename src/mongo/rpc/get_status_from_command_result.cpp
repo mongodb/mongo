@@ -77,7 +77,7 @@ Status getStatusFromCommandResult(const BSONObj& result) {
         code = ErrorCodes::CommandNotFound;
     }
 
-    return Status(ErrorCodes::Error(code), errmsg);
+    return Status(ErrorCodes::Error(code), errmsg, result);
 }
 
 Status getWriteConcernStatusFromCommandResult(const BSONObj& obj) {

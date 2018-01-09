@@ -55,12 +55,15 @@
         _configsvrCommitChunkMerge: {skip: "primary only"},
         _configsvrCommitChunkMigration: {skip: "primary only"},
         _configsvrCommitChunkSplit: {skip: "primary only"},
+        _configsvrDropCollection: {skip: "primary only"},
+        _configsvrDropDatabase: {skip: "primary only"},
         _configsvrMoveChunk: {skip: "primary only"},
         _configsvrMovePrimary: {skip: "primary only"},
         _configsvrRemoveShardFromZone: {skip: "primary only"},
         _configsvrShardCollection: {skip: "primary only"},
         _configsvrSetFeatureCompatibilityVersion: {skip: "primary only"},
         _configsvrUpdateZoneKeyRange: {skip: "primary only"},
+        _flushRoutingTableCacheUpdates: {skip: "does not return user data"},
         _getUserCacheGeneration: {skip: "does not return user data"},
         _hashBSONElement: {skip: "does not return user data"},
         _isSelf: {skip: "does not return user data"},
@@ -87,7 +90,6 @@
         },
         appendOplogNote: {skip: "primary only"},
         applyOps: {skip: "primary only"},
-        authSchemaUpgrade: {skip: "primary only"},
         authenticate: {skip: "does not return user data"},
         availableQueryOptions: {skip: "does not return user data"},
         balancerStart: {skip: "primary only"},
@@ -110,7 +112,6 @@
         connectionStatus: {skip: "does not return user data"},
         convertToCapped: {skip: "primary only"},
         copydb: {skip: "primary only"},
-        copydbgetnonce: {skip: "primary only"},
         copydbsaslstart: {skip: "primary only"},
         count: {
             setUp: function(mongosConn) {
@@ -176,7 +177,6 @@
         findAndModify: {skip: "primary only"},
         flushRouterConfig: {skip: "does not return user data"},
         forceerror: {skip: "does not return user data"},
-        forceRoutingTableRefresh: {skip: "does not return user data"},
         fsync: {skip: "does not return user data"},
         fsyncUnlock: {skip: "does not return user data"},
         geoNear: {
@@ -405,7 +405,7 @@
                     "command.shardVersion": {"$exists": false},
                     "command.$readPreference": {"mode": "secondary"},
                     "command.readConcern": {"level": "local"},
-                    "exceptionCode": {"$exists": false}
+                    "exceptionCode": {"$ne": ErrorCodes.StaleConfig},
                 },
                                       commandProfile)
             });
@@ -448,7 +448,7 @@
                     "command.shardVersion": {"$exists": true},
                     "command.$readPreference": {"mode": "secondary"},
                     "command.readConcern": {"level": "local"},
-                    "exceptionCode": {"$exists": false}
+                    "exceptionCode": {"$ne": ErrorCodes.StaleConfig},
                 },
                                       commandProfile)
             });

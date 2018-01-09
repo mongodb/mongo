@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2017 MongoDB, Inc.
+# Public Domain 2014-2018 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -42,11 +42,16 @@ class test_readonly02(wttest.WiredTigerTestCase, suite_subprocess):
     entries = 10
 
     conn_params = \
-        'create,statistics=(fast),log=(enabled,file_max=100K,zero_fill=true),'
+        'create,statistics=(fast),' + \
+        'log=(enabled,file_max=100K,zero_fill=true),' + \
+        'operation_tracking=(enabled=false),'
     conn_params_rd = \
-        'create,readonly=true,statistics=(fast),log=(enabled,zero_fill=false),'
+        'create,readonly=true,statistics=(fast),' + \
+        'log=(enabled,zero_fill=false),' + \
+        'operation_tracking=(enabled=false),'
     conn_params_rdcfg = \
-        'create,readonly=true,statistics=(fast),log=(enabled),'
+        'create,readonly=true,statistics=(fast),log=(enabled),' + \
+        'operation_tracking=(enabled=false),'
 
     #
     # Run to make sure incompatible configuration options return an error.

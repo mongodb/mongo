@@ -616,23 +616,29 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
     //
     // Don't do this if the query is a geonear or text as as text search queries must be answered
     // using full text indices and geoNear queries must be answered using geospatial indices.
-    if (query.getQueryRequest().isSnapshot() &&
-        !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
-        !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
-        const bool useIXScan = params.options & QueryPlannerParams::SNAPSHOT_USE_ID;
+    if (query.getQueryRequest().isSnapshot()) {
+        RARELY {
+            warning() << "The snapshot option is deprecated. See "
+                         "http://dochub.mongodb.org/core/snapshot-deprecation";
+        }
 
-        if (!useIXScan) {
-            QuerySolution* soln = buildCollscanSoln(query, isTailable, params);
-            if (soln) {
-                out->push_back(soln);
-            }
-            return Status::OK();
-        } else {
-            // Find the ID index in indexKeyPatterns. It's our hint.
-            for (size_t i = 0; i < params.indices.size(); ++i) {
-                if (isIdIndex(params.indices[i].keyPattern)) {
-                    hintIndex = params.indices[i].keyPattern;
-                    break;
+        if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
+            !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)) {
+            const bool useIXScan = params.options & QueryPlannerParams::SNAPSHOT_USE_ID;
+
+            if (!useIXScan) {
+                QuerySolution* soln = buildCollscanSoln(query, isTailable, params);
+                if (soln) {
+                    out->push_back(soln);
+                }
+                return Status::OK();
+            } else {
+                // Find the ID index in indexKeyPatterns. It's our hint.
+                for (size_t i = 0; i < params.indices.size(); ++i) {
+                    if (isIdIndex(params.indices[i].keyPattern)) {
+                        hintIndex = params.indices[i].keyPattern;
+                        break;
+                    }
                 }
             }
         }

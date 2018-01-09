@@ -154,7 +154,23 @@ TEST_F(RenameNodeTest, ToAndFromHaveSameValue) {
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{b: 2}"), doc);
-    ASSERT_EQUALS(fromjson("{$unset: {a: true}}"), getLogDoc());
+    ASSERT_EQUALS(fromjson("{$set: {b: 2}, $unset: {a: true}}"), getLogDoc());
+}
+
+TEST_F(RenameNodeTest, RenameToFieldWithSameValueButDifferentType) {
+    auto update = fromjson("{$rename: {a: 'b'}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    RenameNode node;
+    ASSERT_OK(node.init(update["$rename"]["a"], expCtx));
+
+    mutablebson::Document doc(fromjson("{a: 1, b: NumberLong(1)}"));
+    setPathTaken("b");
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["b"]));
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{b: 1}"), doc);
+    ASSERT_EQUALS(fromjson("{$set: {b: 1}, $unset: {a: true}}"), getLogDoc());
 }
 
 TEST_F(RenameNodeTest, FromDottedElement) {
@@ -281,7 +297,7 @@ TEST_F(RenameNodeTest, MoveToArrayElement) {
     mutablebson::Document doc(fromjson("{_id: 'test_object', a: [1, 2], b: 2}"));
     setPathTaken("a.1");
     addIndexedPath("a");
-    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"]["1"])),
+    ASSERT_THROWS_CODE_AND_WHAT(node.apply(getApplyParams(doc.root()["a"][1])),
                                 AssertionException,
                                 ErrorCodes::BadValue,
                                 "The destination field cannot be an array element, 'a.1' in doc "

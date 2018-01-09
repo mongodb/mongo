@@ -91,31 +91,31 @@ public:
         const std::string& dbName,
         repl::ReadConcernLevel readConcernLevel) override;
 
-    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(OperationContext* opCtx,
-                                                               const std::string& collNs) override;
+    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
+        OperationContext* opCtx,
+        const std::string& collNs,
+        repl::ReadConcernLevel readConcernLevel) override;
 
-    Status getCollections(OperationContext* opCtx,
-                          const std::string* dbName,
-                          std::vector<CollectionType>* collections,
-                          repl::OpTime* optime) override;
+    StatusWith<std::vector<CollectionType>> getCollections(OperationContext* opCtx,
+                                                           const std::string* dbName,
+                                                           repl::OpTime* optime) override;
 
-    Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) override;
+    Status dropCollection(OperationContext* opCtx,
+                          const NamespaceString& ns,
+                          repl::ReadConcernLevel readConcernLevel) override;
 
-    Status getDatabasesForShard(OperationContext* opCtx,
-                                const ShardId& shardName,
-                                std::vector<std::string>* dbs) override;
+    StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
+                                                              const ShardId& shardName) override;
 
-    Status getChunks(OperationContext* opCtx,
-                     const BSONObj& query,
-                     const BSONObj& sort,
-                     boost::optional<int> limit,
-                     std::vector<ChunkType>* chunks,
-                     repl::OpTime* opTime,
-                     repl::ReadConcernLevel readConcern) override;
+    StatusWith<std::vector<ChunkType>> getChunks(OperationContext* opCtx,
+                                                 const BSONObj& query,
+                                                 const BSONObj& sort,
+                                                 boost::optional<int> limit,
+                                                 repl::OpTime* opTime,
+                                                 repl::ReadConcernLevel readConcern) override;
 
-    Status getTagsForCollection(OperationContext* opCtx,
-                                const std::string& collectionNs,
-                                std::vector<TagsType>* tags) override;
+    StatusWith<std::vector<TagsType>> getTagsForCollection(
+        OperationContext* opCtx, const std::string& collectionNs) override;
 
     StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
         OperationContext* opCtx, repl::ReadConcernLevel readConcern) override;

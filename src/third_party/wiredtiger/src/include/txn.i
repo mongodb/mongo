@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -287,7 +287,8 @@ __wt_txn_oldest_id(WT_SESSION_IMPL *session)
 	 */
 	oldest_id = txn_global->oldest_id;
 	include_checkpoint_txn = btree == NULL ||
-	    btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT);
+	    (!F_ISSET(btree, WT_BTREE_LOOKASIDE) &&
+	    btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT));
 	if (!include_checkpoint_txn)
 		return (oldest_id);
 
@@ -455,6 +456,10 @@ __wt_txn_visible(
 	if (!__txn_visible_id(session, id))
 		return (false);
 
+	/* Transactions read their writes, regardless of timestamps. */
+	if (F_ISSET(&session->txn, WT_TXN_HAS_ID) && id == session->txn.id)
+		return (true);
+
 #ifdef HAVE_TIMESTAMPS
 	{
 	WT_TXN *txn = &session->txn;
@@ -489,13 +494,25 @@ __wt_txn_upd_visible(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 static inline WT_UPDATE *
 __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	/* Skip reserved place-holders, they're never visible. */
-	for (; upd != NULL; upd = upd->next)
-		if (upd->type != WT_UPDATE_RESERVED &&
+	static WT_UPDATE tombstone = {
+		.txnid = WT_TXN_NONE, .type = WT_UPDATE_TOMBSTONE
+	};
+	bool skipped_birthmark;
+
+	for (skipped_birthmark = false; upd != NULL; upd = upd->next) {
+		/* Skip reserved place-holders, they're never visible. */
+		if (upd->type != WT_UPDATE_RESERVE &&
 		    __wt_txn_upd_visible(session, upd))
 			break;
+		/* An invisible birthmark is equivalent to a tombstone. */
+		if (upd->type == WT_UPDATE_BIRTHMARK)
+			skipped_birthmark = true;
+	}
 
-	return (upd);
+	if (upd == NULL && skipped_birthmark)
+		upd = &tombstone;
+
+	return (upd == NULL || upd->type == WT_UPDATE_BIRTHMARK ? NULL : upd);
 }
 
 /*
@@ -523,11 +540,9 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		if (session->ncursors > 0)
 			WT_RET(__wt_session_copy_values(session));
 
-		/*
-		 * We're about to allocate a snapshot: if we need to block for
-		 * eviction, it's better to do it beforehand.
-		 */
-		WT_RET(__wt_cache_eviction_check(session, false, NULL));
+		/* Stall here if the cache is completely full. */
+		WT_RET(__wt_cache_eviction_check(session, false, true, NULL));
+
 		__wt_txn_get_snapshot(session);
 	}
 
@@ -572,11 +587,14 @@ __wt_txn_idle_cache_check(WT_SESSION_IMPL *session)
 
 	/*
 	 * Check the published snap_min because read-uncommitted never sets
-	 * WT_TXN_HAS_SNAPSHOT.
+	 * WT_TXN_HAS_SNAPSHOT.  We don't have any transaction information at
+	 * this point, so assume the transaction will be read-only.  The dirty
+	 * cache check will be performed when the transaction completes, if
+	 * necessary.
 	 */
 	if (F_ISSET(txn, WT_TXN_RUNNING) &&
 	    !F_ISSET(txn, WT_TXN_HAS_ID) && txn_state->pinned_id == WT_TXN_NONE)
-		WT_RET(__wt_cache_eviction_check(session, false, NULL));
+		WT_RET(__wt_cache_eviction_check(session, false, true, NULL));
 
 	return (0);
 }

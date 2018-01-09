@@ -33,10 +33,11 @@
 
 namespace mongo {
 
-class DocumentSourceGeoNear : public DocumentSourceNeedsMongoProcessInterface,
-                              public SplittableDocumentSource {
+class DocumentSourceGeoNear : public DocumentSource, public SplittableDocumentSource {
 public:
     static const long long kDefaultLimit;
+
+    static constexpr StringData kKeyFieldName = "key"_sd;
 
     // virtuals from DocumentSource
     GetNextResult getNext() final;
@@ -105,6 +106,10 @@ private:
     bool spherical;
     double distanceMultiplier;
     std::unique_ptr<FieldPath> includeLocs;
+
+    // The field path over which the command should run, extracted from the 'key' parameter passed
+    // by the user. Or the empty string the user did not provide a 'key'.
+    std::string keyFieldPath;
 
     // these fields are used while processing the results
     BSONObj cmdOutput;

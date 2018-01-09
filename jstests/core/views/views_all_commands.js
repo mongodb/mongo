@@ -1,3 +1,6 @@
+// @tags: [does_not_support_stepdowns, requires_getmore, requires_non_retryable_commands,
+// requires_non_retryable_writes]
+
 /*
  * Declaratively-defined tests for views for all database commands. This file contains a map of test
  * definitions as well as code to run them.
@@ -67,6 +70,8 @@
         _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
         _configsvrCommitChunkSplit: {skip: isAnInternalCommand},
         _configsvrCreateDatabase: {skip: isAnInternalCommand},
+        _configsvrDropCollection: {skip: isAnInternalCommand},
+        _configsvrDropDatabase: {skip: isAnInternalCommand},
         _configsvrEnableSharding: {skip: isAnInternalCommand},
         _configsvrMoveChunk: {skip: isAnInternalCommand},
         _configsvrMovePrimary: {skip: isAnInternalCommand},
@@ -75,6 +80,7 @@
         _configsvrShardCollection: {skip: isAnInternalCommand},
         _configsvrSetFeatureCompatibilityVersion: {skip: isAnInternalCommand},
         _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
+        _flushRoutingTableCacheUpdates: {skip: isUnrelated},
         _getNextSessionMods: {skip: isAnInternalCommand},
         _getUserCacheGeneration: {skip: isAnInternalCommand},
         _hashBSONElement: {skip: isAnInternalCommand},
@@ -95,7 +101,6 @@
             expectFailure: true,
             skipSharded: true,
         },
-        authSchemaUpgrade: {skip: isUnrelated},
         authenticate: {skip: isUnrelated},
         availableQueryOptions: {skip: isAnInternalCommand},
         balancerStart: {skip: isUnrelated},
@@ -126,7 +131,6 @@
         connectionStatus: {skip: isUnrelated},
         convertToCapped: {command: {convertToCapped: "view", size: 12345}, expectFailure: true},
         copydb: {skip: "Tested in replsets/copydb.js"},
-        copydbgetnonce: {skip: isUnrelated},
         copydbsaslstart: {skip: isUnrelated},
         count: {command: {count: "view"}},
         cpuload: {skip: isAnInternalCommand},
@@ -181,6 +185,11 @@
         dbStats: {skip: "TODO(SERVER-25948)"},
         delete: {command: {delete: "view", deletes: [{q: {x: 1}, limit: 1}]}, expectFailure: true},
         distinct: {command: {distinct: "view", key: "_id"}},
+        doTxn: {
+            command: {doTxn: [{op: "i", o: {_id: 1}, ns: "test.view"}]},
+            expectFailure: true,
+            skipSharded: true,
+        },
         driverOIDTest: {skip: isUnrelated},
         drop: {command: {drop: "view"}},
         dropAllRolesFromDatabase: {skip: isUnrelated},
@@ -215,7 +224,6 @@
         },
         flushRouterConfig: {skip: isUnrelated},
         forceerror: {skip: isUnrelated},
-        forceRoutingTableRefresh: {skip: isUnrelated},
         fsync: {skip: isUnrelated},
         fsyncUnlock: {skip: isUnrelated},
         geoNear: {

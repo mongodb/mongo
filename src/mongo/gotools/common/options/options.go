@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 // Package options implements command-line options that are used by all of
 // the mongo tools.
 package options
@@ -494,6 +500,10 @@ func (opts *ToolOptions) setOptionsFromURI(cs connstring.ConnString) error {
 	opts.ReplicaSetName = cs.ReplicaSet
 
 	if cs.UseSSL && !BuiltWithSSL {
+		if cs.UsingSRV {
+			return fmt.Errorf("SSL enabled by default when using SRV but tool not built with SSL: " +
+				"SSL must be explicitly disabled with ssl=false in the connection string")
+		}
 		return fmt.Errorf("cannot use ssl: tool not built with SSL support")
 	}
 	opts.SSL.UseSSL = cs.UseSSL

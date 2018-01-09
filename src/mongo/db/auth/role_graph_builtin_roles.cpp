@@ -221,6 +221,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::flushRouterConfig  // clusterManager gets this also
         << ActionType::fsync
         << ActionType::invalidateUserCache // userAdminAnyDatabase gets this also
+        << ActionType::killAnyCursor
         << ActionType::killAnySession
         << ActionType::killop
         << ActionType::replSetResizeOplog
@@ -247,7 +248,8 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::listSessions  // clusterMonitor gets this also
         << ActionType::listShards  // clusterMonitor gets this also
         << ActionType::flushRouterConfig  // hostManager gets this also
-        << ActionType::cleanupOrphaned;
+        << ActionType::cleanupOrphaned
+        << ActionType::setFeatureCompatibilityVersion;
 
     clusterManagerRoleDatabaseActions
         << ActionType::splitChunk
@@ -474,13 +476,6 @@ void addClusterManagerPrivileges(PrivilegeVector* privileges) {
         privileges, Privilege(ResourcePattern::forDatabaseName("config"), writeActions));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forDatabaseName("local"), writeActions));
-
-    // Fake collection used for setFeatureCompatibilityVersion permissions.
-    Privilege::addPrivilegeToPrivilegeVector(
-        privileges,
-        Privilege(ResourcePattern::forExactNamespace(
-                      NamespaceString("$setFeatureCompatibilityVersion", "version")),
-                  writeActions));
 }
 
 void addClusterAdminPrivileges(PrivilegeVector* privileges) {
@@ -654,6 +649,12 @@ void addRestorePrivileges(PrivilegeVector* privileges) {
         Privilege(
             ResourcePattern::forExactNamespace(AuthorizationManager::rolesCollectionNamespace),
             ActionType::createIndex));
+
+    // Need to be able to force UUID consistency in sharded restores
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
+        Privilege(ResourcePattern::forClusterResource(),
+                  {ActionType::forceUUID, ActionType::useUUID}));
 }
 
 void addRootRolePrivileges(PrivilegeVector* privileges) {

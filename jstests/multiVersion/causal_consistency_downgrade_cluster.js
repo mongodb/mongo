@@ -37,9 +37,11 @@
 
     // Both logical and operation times are returned, and cluster times are signed by mongos. Mongos
     // doesn't wait for keys at startup, so retry.
+    // TODO: SERVER-31986 this check can be done only for authenticated connections that do not have
+    // advance_cluster_time privilege.
     assert.soonNoExcept(function() {
         assertContainsLogicalAndOperationTime(st.s.getDB("test").runCommand({isMaster: 1}),
-                                              {initialized: true, signed: true});
+                                              {initialized: true, signed: false});
         return true;
     });
 
@@ -52,8 +54,10 @@
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
 
     // Mongos still signs cluster times, because they are held in memory.
+    // TODO: SERVER-31986 this check can be done only for authenticated connections that do not have
+    // advance_cluster_time privilege.
     assertContainsLogicalAndOperationTime(st.s.getDB("test").runCommand({isMaster: 1}),
-                                          {initialized: true, signed: true});
+                                          {initialized: true, signed: false});
 
     // afterClusterTime reads are no longer accepted.
     assertAfterClusterTimeReadFails(st.s.getDB("test"), "foo");

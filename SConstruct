@@ -570,6 +570,9 @@ if sconsflags:
 env_vars.Add('ABIDW',
     help="Configures the path to the 'abidw' (a libabigail) utility")
 
+env_vars.Add('AR',
+    help='Sets path for the archiver')
+
 env_vars.Add('ARFLAGS',
     help='Sets flags for the archiver',
     converter=variable_shlex_converter)
@@ -1348,9 +1351,13 @@ if not 'mslink' in env['TOOLS']:
     if env.Verbose():
         env["LINKCOM"] = "${{TEMPFILE('{0}', '')}}".format(env['LINKCOM'])
         env["SHLINKCOM"] = "${{TEMPFILE('{0}', '')}}".format(env['SHLINKCOM'])
+        if not 'libtool' in env['TOOLS']:
+            env["ARCOM"] = "${{TEMPFILE('{0}', '')}}".format(env['ARCOM'])
     else:
         env["LINKCOM"] = "${{TEMPFILE('{0}', 'LINKCOMSTR')}}".format(env['LINKCOM'])
         env["SHLINKCOM"] = "${{TEMPFILE('{0}', 'SHLINKCOMSTR')}}".format(env['SHLINKCOM'])
+        if not 'libtool' in env['TOOLS']:
+            env["ARCOM"] = "${{TEMPFILE('{0}', 'ARCOMSTR')}}".format(env['ARCOM'])
 
 if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     # The libraries we build in LIBDEPS_OBJS mode are just placeholders for tracking dependencies.
@@ -2027,9 +2034,6 @@ def doConfigure(myenv):
 
         # This warning was added in clang-5 and flags many of our lambdas. Since it isn't actively
         # harmful to capture unused variables we are suppressing for now with a plan to fix later.
-        # Additionally, this has some false-positives where removing the capture makes the code
-        # incorrect and fail to compile on other compilers.
-        # See https://bugs.llvm.org/show_bug.cgi?id=34865.
         AddToCCFLAGSIfSupported(myenv, "-Wno-unused-lambda-capture")
 
         # This warning was added in clang-5 and incorrectly flags our implementation of
@@ -2483,6 +2487,10 @@ def doConfigure(myenv):
 
         # If possible with the current linker, mark relocations as read-only.
         AddToLINKFLAGSIfSupported(myenv, "-Wl,-z,relro")
+
+    # Avoid deduping symbols on OS X debug builds, as it takes a long time.
+    if not optBuild and myenv.ToolchainIs('clang') and env.TargetOSIs('darwin'):
+        AddToLINKFLAGSIfSupported(myenv, "-Wl,-no_deduplicate")
 
     # Apply any link time optimization settings as selected by the 'lto' option.
     if has_option('lto'):

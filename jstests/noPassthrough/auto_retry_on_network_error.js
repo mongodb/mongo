@@ -5,6 +5,13 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/retryable_writes_util.js");
+
+    if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     load("jstests/libs/override_methods/auto_retry_on_network_error.js");
     load("jstests/replsets/rslib.js");
 

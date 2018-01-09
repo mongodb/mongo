@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -149,7 +149,7 @@ __cursor_enter(WT_SESSION_IMPL *session)
 	 * whether the cache is full.
 	 */
 	if (session->ncursors == 0)
-		WT_RET(__wt_cache_eviction_check(session, false, NULL));
+		WT_RET(__wt_cache_eviction_check(session, false, false, NULL));
 	++session->ncursors;
 	return (0);
 }

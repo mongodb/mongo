@@ -115,41 +115,50 @@ StatusWith<int> StorageInterfaceImpl::getRollbackID(OperationContext* opCtx) {
     MONGO_UNREACHABLE;
 }
 
-Status StorageInterfaceImpl::initializeRollbackID(OperationContext* opCtx) {
+StatusWith<int> StorageInterfaceImpl::initializeRollbackID(OperationContext* opCtx) {
     auto status = createCollection(opCtx, _rollbackIdNss, CollectionOptions());
     if (!status.isOK()) {
         return status;
     }
 
     RollbackID rbid;
+    int initRBID = 1;
     rbid.set_id(kRollbackIdDocumentId);
-    rbid.setRollbackId(0);
+    rbid.setRollbackId(initRBID);
 
     BSONObjBuilder bob;
     rbid.serialize(&bob);
-    SnapshotName noTimestamp;  // This write is not replicated.
-    return insertDocument(opCtx,
-                          _rollbackIdNss,
-                          TimestampedBSONObj{bob.done(), noTimestamp},
-                          OpTime::kUninitializedTerm);
+    Timestamp noTimestamp;  // This write is not replicated.
+    status = insertDocument(opCtx,
+                            _rollbackIdNss,
+                            TimestampedBSONObj{bob.done(), noTimestamp},
+                            OpTime::kUninitializedTerm);
+    if (status.isOK()) {
+        return initRBID;
+    } else {
+        return status;
+    }
 }
 
-Status StorageInterfaceImpl::incrementRollbackID(OperationContext* opCtx) {
+StatusWith<int> StorageInterfaceImpl::incrementRollbackID(OperationContext* opCtx) {
     // This is safe because this is only called during rollback, and you can not have two
     // rollbacks at once.
-    auto rbid = getRollbackID(opCtx);
-    if (!rbid.isOK()) {
-        return rbid.getStatus();
+    auto rbidSW = getRollbackID(opCtx);
+    if (!rbidSW.isOK()) {
+        return rbidSW;
     }
 
-    // If we would go over the integer limit, reset the Rollback ID to 0.
+    // If we would go over the integer limit, reset the Rollback ID to 1.
     BSONObjBuilder updateBob;
-    if (rbid.getValue() == std::numeric_limits<int>::max()) {
+    int newRBID = -1;
+    if (rbidSW.getValue() == std::numeric_limits<int>::max()) {
+        newRBID = 1;
         BSONObjBuilder setBob(updateBob.subobjStart("$set"));
-        setBob.append(kRollbackIdFieldName, 0);
+        setBob.append(kRollbackIdFieldName, newRBID);
     } else {
         BSONObjBuilder incBob(updateBob.subobjStart("$inc"));
         incBob.append(kRollbackIdFieldName, 1);
+        newRBID = rbidSW.getValue() + 1;
     }
 
     // Since the Rollback ID is in a singleton collection, we can fix the _id field.
@@ -161,6 +170,7 @@ Status StorageInterfaceImpl::incrementRollbackID(OperationContext* opCtx) {
     // We wait until durable so that we are sure the Rollback ID is updated before rollback ends.
     if (status.isOK()) {
         opCtx->recoveryUnit()->waitUntilDurable();
+        return newRBID;
     }
     return status;
 }
@@ -742,7 +752,9 @@ StatusWith<BSONObj> makeUpsertQuery(const BSONElement& idKey) {
     return query;
 }
 
-Status _updateWithQuery(OperationContext* opCtx, const UpdateRequest& request) {
+Status _updateWithQuery(OperationContext* opCtx,
+                        const UpdateRequest& request,
+                        const Timestamp& ts) {
     invariant(!request.isMulti());  // We only want to update one document for performance.
     invariant(!request.shouldReturnAnyDocs());
     invariant(PlanExecutor::NO_YIELD == request.getYieldPolicy());
@@ -768,6 +780,10 @@ Status _updateWithQuery(OperationContext* opCtx, const UpdateRequest& request) {
             return collectionResult.getStatus();
         }
         auto collection = collectionResult.getValue();
+        WriteUnitOfWork wuow(opCtx);
+        if (!ts.isNull()) {
+            uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(ts));
+        }
 
         auto planExecutorResult =
             mongo::getExecutorUpdate(opCtx, nullptr, collection, &parsedUpdate);
@@ -776,7 +792,9 @@ Status _updateWithQuery(OperationContext* opCtx, const UpdateRequest& request) {
         }
         auto planExecutor = std::move(planExecutorResult.getValue());
 
-        return planExecutor->executePlan();
+        auto ret = planExecutor->executePlan();
+        wuow.commit();
+        return ret;
     });
 }
 
@@ -841,23 +859,23 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
 
 Status StorageInterfaceImpl::putSingleton(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          const BSONObj& update) {
+                                          const TimestampedBSONObj& update) {
     UpdateRequest request(nss);
     request.setQuery({});
-    request.setUpdates(update);
+    request.setUpdates(update.obj);
     request.setUpsert(true);
-    return _updateWithQuery(opCtx, request);
+    return _updateWithQuery(opCtx, request, update.timestamp);
 }
 
 Status StorageInterfaceImpl::updateSingleton(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const BSONObj& query,
-                                             const BSONObj& update) {
+                                             const TimestampedBSONObj& update) {
     UpdateRequest request(nss);
     request.setQuery(query);
-    request.setUpdates(update);
+    request.setUpdates(update.obj);
     invariant(!request.isUpsert());
-    return _updateWithQuery(opCtx, request);
+    return _updateWithQuery(opCtx, request, update.timestamp);
 }
 
 Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
@@ -949,13 +967,12 @@ Status StorageInterfaceImpl::upgradeUUIDSchemaVersionNonReplicated(OperationCont
     return updateUUIDSchemaVersionNonReplicated(opCtx, true);
 }
 
-void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx,
-                                              SnapshotName snapshotName) {
+void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) {
     serviceCtx->getGlobalStorageEngine()->setStableTimestamp(snapshotName);
 }
 
 void StorageInterfaceImpl::setInitialDataTimestamp(ServiceContext* serviceCtx,
-                                                   SnapshotName snapshotName) {
+                                                   Timestamp snapshotName) {
     serviceCtx->getGlobalStorageEngine()->setInitialDataTimestamp(snapshotName);
 }
 

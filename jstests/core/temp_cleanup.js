@@ -1,3 +1,4 @@
+// @tags: [does_not_support_stepdowns]
 
 mydb = db.getSisterDB("temp_cleanup_test");
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -49,7 +49,7 @@ __key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			 * itself because our caller might do another search in
 			 * this table using the key we return, and we'd corrupt
 			 * the search key during any subsequent search that used
-			 * the temporary buffer.
+			 * the temporary buffer).
 			 */
 			tmp = cbt->row_key;
 			cbt->row_key = cbt->tmp;
@@ -137,19 +137,20 @@ __value_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 #define	WT_MODIFY_ARRAY_SIZE	(WT_MAX_MODIFY_UPDATE + 10)
 
 /*
- * __value_return_upd --
+ * __wt_value_return_upd --
  *	Change the cursor to reference an internal update structure return
  *	value.
  */
-static inline int
-__value_return_upd(
-    WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
+int
+__wt_value_return_upd(WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *cbt, WT_UPDATE *upd, bool ignore_visibility)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_UPDATE **listp, *list[WT_MODIFY_ARRAY_SIZE];
 	size_t allocated_bytes;
 	u_int i;
+	bool skipped_birthmark;
 
 	cursor = &cbt->iface;
 	allocated_bytes = 0;
@@ -166,20 +167,33 @@ __value_return_upd(
 		cursor->value.size = upd->size;
 		return (0);
 	}
-	WT_ASSERT(session, upd->type == WT_UPDATE_MODIFIED);
+	WT_ASSERT(session, upd->type == WT_UPDATE_MODIFY);
 
 	/*
 	 * Find a complete update that's visible to us, tracking modifications
 	 * that are visible to us.
 	 */
-	for (i = 0, listp = list; upd != NULL; upd = upd->next) {
-		if (!__wt_txn_upd_visible(session, upd))
+	for (i = 0, listp = list, skipped_birthmark = false;
+	    upd != NULL;
+	    upd = upd->next) {
+		if (upd->txnid == WT_TXN_ABORTED)
 			continue;
+
+		if (!ignore_visibility && !__wt_txn_upd_visible(session, upd)) {
+			if (upd->type == WT_UPDATE_BIRTHMARK)
+				skipped_birthmark = true;
+			continue;
+		}
+
+		if (upd->type == WT_UPDATE_BIRTHMARK) {
+			upd = NULL;
+			break;
+		}
 
 		if (WT_UPDATE_DATA_VALUE(upd))
 			break;
 
-		if (upd->type == WT_UPDATE_MODIFIED) {
+		if (upd->type == WT_UPDATE_MODIFY) {
 			/*
 			 * Update lists are expected to be short, but it's not
 			 * guaranteed. There's sufficient room on the stack to
@@ -202,7 +216,7 @@ __value_return_upd(
 	 * If we hit the end of the chain, roll forward from the update item we
 	 * found, otherwise, from the original page's value.
 	 */
-	if (upd == NULL) {
+	if (upd == NULL && !skipped_birthmark) {
 		/*
 		 * Callers of this function set the cursor slot to an impossible
 		 * value to check we're not trying to return on-page values when
@@ -214,15 +228,14 @@ __value_return_upd(
 		WT_ASSERT(session, cbt->slot != UINT32_MAX);
 
 		WT_ERR(__value_return(session, cbt));
-	} else if (upd->type == WT_UPDATE_DELETED)
+	} else if (upd->type == WT_UPDATE_TOMBSTONE || skipped_birthmark)
 		WT_ERR(__wt_buf_set(session, &cursor->value, "", 0));
 	else
 		WT_ERR(__wt_buf_set(session,
 		    &cursor->value, upd->data, upd->size));
 
 	while (i > 0)
-		WT_ERR(__wt_modify_apply(
-		    session, &cursor->value, listp[--i]->data));
+		WT_ERR(__wt_modify_apply(session, cursor, listp[--i]->data));
 
 err:	if (allocated_bytes != 0)
 		__wt_free(session, listp);
@@ -273,7 +286,7 @@ __wt_value_return(
 	if (upd == NULL)
 		WT_RET(__value_return(session, cbt));
 	else
-		WT_RET(__value_return_upd(session, cbt, upd));
+		WT_RET(__wt_value_return_upd(session, cbt, upd, false));
 	F_SET(cursor, WT_CURSTD_VALUE_INT);
 	return (0);
 }

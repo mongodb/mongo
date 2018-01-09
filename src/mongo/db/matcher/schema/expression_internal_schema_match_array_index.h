@@ -41,12 +41,8 @@ class InternalSchemaMatchArrayIndexMatchExpression final : public ArrayMatchingM
 public:
     static constexpr StringData kName = "$_internalSchemaMatchArrayIndex"_sd;
 
-    InternalSchemaMatchArrayIndexMatchExpression()
-        : ArrayMatchingMatchExpression(MatchExpression::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX) {}
-
-    Status init(StringData path,
-                long long index,
-                std::unique_ptr<ExpressionWithPlaceholder> expression);
+    InternalSchemaMatchArrayIndexMatchExpression(
+        StringData path, long long index, std::unique_ptr<ExpressionWithPlaceholder> expression);
 
     void debugString(StringBuilder& debug, int level) const final;
 
@@ -58,7 +54,7 @@ public:
      */
     bool matchesArray(const BSONObj& array, MatchDetails* details) const final {
         BSONElement element;
-        auto iterator = array.begin();
+        auto iterator = BSONObjIterator(array);
 
         // Skip ahead to the element we want, bailing early if there aren't enough elements.
         for (auto i = 0LL; i <= _index; ++i) {

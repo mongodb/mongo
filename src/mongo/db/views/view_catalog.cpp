@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/stub_mongo_process_interface.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/recovery_unit.h"
@@ -68,62 +69,6 @@ StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* o
     }
     return CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationSpec);
 }
-
-// TODO SERVER-31588: Remove FCV 3.4 validation during the 3.7 development cycle.
-Status validInViewUnder34FeatureCompatibility(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                              const Pipeline& pipeline) {
-    const auto& sourceList = pipeline.getSources();
-    // Confirm that the view pipeline does not contain elements that require 3.6 feature
-    // compatibility.
-    for (auto&& source : sourceList) {
-        if (auto matchStage = dynamic_cast<DocumentSourceMatch*>(source.get())) {
-            auto query = matchStage->getQuery();
-            MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-                Pipeline::kAllowedMatcherFeatures &
-                ~MatchExpressionParser::AllowedFeatures::kJSONSchema &
-                ~MatchExpressionParser::AllowedFeatures::kExpr;
-
-            auto statusWithMatcher = MatchExpressionParser::parse(
-                query, expCtx, ExtensionsCallbackNoop(), allowedFeatures);
-
-            if (!statusWithMatcher.isOK()) {
-                if (statusWithMatcher.getStatus().code() == ErrorCodes::QueryFeatureNotAllowed) {
-                    return {statusWithMatcher.getStatus().code(),
-                            str::stream()
-                                << "featureCompatibility version '3.6' is required to create "
-                                   "a view containing new features. See "
-                                << feature_compatibility_version::kDochubLink
-                                << "; "
-                                << statusWithMatcher.getStatus().reason()};
-                }
-
-                uasserted(ErrorCodes::InternalError,
-                          str::stream()
-                              << "Unexpected error on validation for 3.4 feature compatibility: "
-                              << statusWithMatcher.getStatus().toString());
-            }
-        } else if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(source.get())) {
-            if (lookupStage->wasConstructedWithPipelineSyntax()) {
-                return {ErrorCodes::QueryFeatureNotAllowed,
-                        str::stream() << "featureCompatibility version '3.6' is required to create "
-                                         "a view containing "
-                                         "a $lookup stage with 'pipeline' syntax. See "
-                                      << feature_compatibility_version::kDochubLink};
-            }
-        } else if (auto facetStage = dynamic_cast<DocumentSourceFacet*>(source.get())) {
-            for (auto&& facetSubPipe : facetStage->getFacetPipelines()) {
-                auto status =
-                    validInViewUnder34FeatureCompatibility(expCtx, *facetSubPipe.pipeline);
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
-        }
-    }
-
-    return Status::OK();
-}
-
 }  // namespace
 
 Status ViewCatalog::reloadIfNeeded(OperationContext* opCtx) {
@@ -300,6 +245,10 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
         new ExpressionContext(opCtx,
                               request,
                               CollatorInterface::cloneCollator(viewDef.defaultCollator()),
+                              // We can use a stub MongoProcessInterface because we are only parsing
+                              // the Pipeline for validation here. We won't do anything with the
+                              // pipeline that will require a real implementation.
+                              std::make_shared<StubMongoProcessInterface>(),
                               std::move(resolvedNamespaces));
     auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), std::move(expCtx));
     if (!pipelineStatus.isOK()) {
@@ -311,15 +260,6 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
     if (!sources.empty() && sources.front()->constraints().isChangeStreamStage()) {
         return {ErrorCodes::OptionNotSupportedOnView,
                 "$changeStream cannot be used in a view definition"};
-    }
-
-    if (serverGlobalParams.validateFeaturesAsMaster.load() &&
-        serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-        auto status = validInViewUnder34FeatureCompatibility(expCtx, *pipelineStatus.getValue());
-        if (!status.isOK()) {
-            return status;
-        }
     }
 
     return std::move(involvedNamespaces);
@@ -393,7 +333,7 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
                       str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
 
     ViewDefinition savedDefinition = *viewPtr;
-    opCtx->recoveryUnit()->onRollback([this, opCtx, viewName, savedDefinition]() {
+    opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition]() {
         this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
     });
 
@@ -422,7 +362,7 @@ Status ViewCatalog::dropView(OperationContext* opCtx, const NamespaceString& vie
     _durable->remove(opCtx, viewName);
     _viewGraph.remove(savedDefinition.name());
     _viewMap.erase(viewName.ns());
-    opCtx->recoveryUnit()->onRollback([this, opCtx, viewName, savedDefinition]() {
+    opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition]() {
         this->_viewGraphNeedsRefresh = true;
         this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
     });

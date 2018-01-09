@@ -33,7 +33,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -45,6 +45,8 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -77,7 +79,7 @@ constexpr StringData DocumentSourceChangeStream::kDeleteOpType;
 constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
 constexpr StringData DocumentSourceChangeStream::kInsertOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
-constexpr StringData DocumentSourceChangeStream::kRetryNeededOpType;
+constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
 
 const BSONObj DocumentSourceChangeStream::kSortSpec =
     BSON("_id.clusterTime.ts" << 1 << "_id.uuid" << 1 << "_id.documentKey" << 1);
@@ -217,8 +219,7 @@ DocumentSource::GetNextResult DocumentSourceCloseCursor::getNext() {
     const auto& kOperationTypeField = DocumentSourceChangeStream::kOperationTypeField;
     checkValueType(doc[kOperationTypeField], kOperationTypeField, BSONType::String);
     auto operationType = doc[kOperationTypeField].getString();
-    if (operationType == DocumentSourceChangeStream::kInvalidateOpType ||
-        operationType == DocumentSourceChangeStream::kRetryNeededOpType) {
+    if (operationType == DocumentSourceChangeStream::kInvalidateOpType) {
         // Pass the invalidation forward, so that it can be included in the results, or
         // filtered/transformed by further stages in the pipeline, then throw an exception
         // to close the cursor on the next call to getNext().
@@ -280,15 +281,6 @@ BSONObj DocumentSourceChangeStream::buildMatchFilter(
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
-    uassert(
-        ErrorCodes::InvalidOptions,
-        str::stream()
-            << "The featureCompatibilityVersion must be 3.6 to use the $changeStream stage. See "
-            << feature_compatibility_version::kDochubLink
-            << ".",
-        serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-
     // A change stream is a tailable + awaitData cursor.
     expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
 
@@ -325,6 +317,16 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
         } else {
             resumeStage = DocumentSourceEnsureResumeTokenPresent::create(expCtx, std::move(token));
         }
+    }
+    if (auto resumeAfterClusterTime = spec.getResumeAfterClusterTime()) {
+        uassert(40674,
+                str::stream() << "Do not specify both "
+                              << DocumentSourceChangeStreamSpec::kResumeAfterFieldName
+                              << " and "
+                              << DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName
+                              << " in a $changeStream stage.",
+                !resumeStage);
+        startFrom = resumeAfterClusterTime->getTimestamp();
     }
     const bool changeStreamIsResuming = (resumeStage != nullptr);
 
@@ -366,6 +368,28 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     return stages;
 }
 
+BSONObj DocumentSourceChangeStream::replaceResumeTokenInCommand(const BSONObj originalCmdObj,
+                                                                const BSONObj resumeToken) {
+    Document originalCmd(originalCmdObj);
+    auto pipeline = originalCmd[AggregationRequest::kPipelineName].getArray();
+    // A $changeStream must be the first element of the pipeline in order to be able
+    // to replace (or add) a resume token.
+    invariant(!pipeline[0][DocumentSourceChangeStream::kStageName].missing());
+
+    MutableDocument changeStreamStage(
+        pipeline[0][DocumentSourceChangeStream::kStageName].getDocument());
+    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterFieldName] = Value(resumeToken);
+
+    // If the command was initially specified with a resumeAfterClusterTime, we need to remove it
+    // to use the new resume token.
+    changeStreamStage[DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName] = Value();
+    pipeline[0] =
+        Value(Document{{DocumentSourceChangeStream::kStageName, changeStreamStage.freeze()}});
+    MutableDocument newCmd(originalCmd);
+    newCmd[AggregationRequest::kPipelineName] = Value(pipeline);
+    return newCmd.freeze().toBson();
+}
+
 intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationStage(
     BSONObj changeStreamSpec, const intrusive_ptr<ExpressionContext>& expCtx) {
     return intrusive_ptr<DocumentSource>(new DocumentSourceSingleDocumentTransformation(
@@ -375,6 +399,22 @@ intrusive_ptr<DocumentSource> DocumentSourceChangeStream::createTransformationSt
 }
 
 Document DocumentSourceChangeStream::Transformation::applyTransformation(const Document& input) {
+    // If we're executing a change stream pipeline that was forwarded from mongos, then we expect it
+    // to "need merge"---we expect to be executing the shards part of a split pipeline. It is never
+    // correct for mongos to pass through the change stream without splitting into into a merging
+    // part executed on mongos and a shards part.
+    //
+    // This is necessary so that mongos can correctly handle "invalidate" and "retryNeeded" change
+    // notifications. See SERVER-31978 for an example of why the pipeline must be split.
+    //
+    // We have to check this invariant at run-time of the change stream rather than parse time,
+    // since a mongos may forward a change stream in an invalid position (e.g. in a nested $lookup
+    // or $facet pipeline). In this case, mongod is responsible for parsing the pipeline and
+    // throwing an error without ever executing the change stream.
+    if (_expCtx->fromMongos) {
+        invariant(_expCtx->needsMerge);
+    }
+
     MutableDocument doc;
 
     // Extract the fields we need.
@@ -388,8 +428,25 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
     Value uuid = input[repl::OplogEntry::kUuidFieldName];
     if (!uuid.missing()) {
         checkValueType(uuid, repl::OplogEntry::kUuidFieldName, BSONType::BinData);
-        if (_mongoProcess && _documentKeyFields.empty()) {
-            _documentKeyFields = _mongoProcess->collectDocumentKeyFields(uuid.getUuid());
+        // We need to retrieve the document key fields if our cached copy has not been populated. If
+        // the collection was unsharded but has now transitioned to a sharded state, we must update
+        // the documentKey fields to include the shard key. We only need to re-check the documentKey
+        // while the collection is unsharded; if the collection is or becomes sharded, then the
+        // documentKey is final and will not change.
+        if (!_documentKeyFieldsSharded) {
+            // If this is not a shard server, 'catalogCache' will be nullptr and we will skip the
+            // routing table check.
+            auto catalogCache = Grid::get(_expCtx->opCtx)->catalogCache();
+            const bool collectionIsSharded = catalogCache && [catalogCache, this]() {
+                auto routingInfo =
+                    catalogCache->getCollectionRoutingInfo(_expCtx->opCtx, _expCtx->ns);
+                return routingInfo.isOK() && routingInfo.getValue().cm();
+            }();
+            if (_documentKeyFields.empty() || collectionIsSharded) {
+                _documentKeyFields = _expCtx->mongoProcessInterface->collectDocumentKeyFields(
+                    _expCtx->opCtx, _expCtx->ns, uuid.getUuid());
+                _documentKeyFieldsSharded = collectionIsSharded;
+            }
         }
     }
     NamespaceString nss(ns.getString());
@@ -452,9 +509,9 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
             break;
         }
         case repl::OpTypeEnum::kNoop: {
-            operationType = kRetryNeededOpType;
-            // Generate a fake document Id for RetryNeeded operation so that we can resume after
-            // this operation.
+            operationType = kNewShardDetectedOpType;
+            // Generate a fake document Id for NewShardDetected operation so that we can resume
+            // after this operation.
             documentKey = Value(Document{{kIdField, input[repl::OplogEntry::kObject2FieldName]}});
             break;
         }
@@ -488,8 +545,8 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
         doc.setSortKeyMetaField(BSON("" << ts << "" << uuid << "" << documentKey));
     }
 
-    // "invalidate" and "retryNeeded" entries have fewer fields.
-    if (operationType == kInvalidateOpType || operationType == kRetryNeededOpType) {
+    // "invalidate" and "newShardDetected" entries have fewer fields.
+    if (operationType == kInvalidateOpType || operationType == kNewShardDetectedOpType) {
         return doc.freeze();
     }
 
@@ -505,7 +562,22 @@ Document DocumentSourceChangeStream::Transformation::applyTransformation(const D
 
 Document DocumentSourceChangeStream::Transformation::serializeStageOptions(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Document(_changeStreamSpec);
+    Document changeStreamOptions(_changeStreamSpec);
+    // If we're on a mongos and no other start time is specified, we want to start at the current
+    // cluster time on the mongos.  This ensures all shards use the same start time.
+    if (_expCtx->inMongos &&
+        changeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterFieldName].missing() &&
+        changeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName]
+            .missing()) {
+        MutableDocument newChangeStreamOptions(changeStreamOptions);
+        newChangeStreamOptions[DocumentSourceChangeStreamSpec::kResumeAfterClusterTimeFieldName]
+                              [ResumeTokenClusterTime::kTimestampFieldName] =
+                                  Value(LogicalClock::get(_expCtx->opCtx)
+                                            ->getClusterTime()
+                                            .asTimestamp());
+        changeStreamOptions = newChangeStreamOptions.freeze();
+    }
+    return changeStreamOptions;
 }
 
 DocumentSource::GetDepsReturn DocumentSourceChangeStream::Transformation::addDependencies(

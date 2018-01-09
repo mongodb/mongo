@@ -50,7 +50,7 @@ namespace {
 AtomicUInt32 nextCMSequenceNumber(0);
 
 void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
-    for (const auto&& element : o) {
+    for (auto&& element : o) {
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Not all elements of " << o << " are of type " << typeName(type),
                 element.type() == type);
@@ -122,11 +122,6 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
                                      expCtx,
                                      ExtensionsCallbackNoop(),
                                      MatchExpressionParser::kAllowAllSpecialFeatures));
-
-    // Query validation
-    if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR)) {
-        uasserted(13501, "use geoNear command rather than $near query");
-    }
 
     // Fast path for targeting equalities on the shard key.
     auto shardKeyToFind = _shardKeyPattern.extractShardKeyFromQuery(*cq);
@@ -212,6 +207,13 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
     if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::TEXT)) {
         IndexBounds bounds;
         IndexBoundsBuilder::allValuesBounds(key, &bounds);  // [minKey, maxKey]
+        return bounds;
+    }
+
+    // Similarly, ignore GEO_NEAR queries in planning, since we do not have geo indexes on mongos.
+    if (QueryPlannerCommon::hasNode(canonicalQuery.root(), MatchExpression::GEO_NEAR)) {
+        IndexBounds bounds;
+        IndexBoundsBuilder::allValuesBounds(key, &bounds);
         return bounds;
     }
 

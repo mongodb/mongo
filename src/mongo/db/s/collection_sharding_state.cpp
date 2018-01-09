@@ -33,12 +33,10 @@
 #include "mongo/db/s/collection_sharding_state.h"
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -63,12 +61,10 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
-
 namespace {
 
-using std::string;
+// How long to wait before starting cleanup of an emigrated chunk range
+MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
 
 /**
  * Used to perform shard identity initialization once it is certain that the document is committed.
@@ -100,9 +96,10 @@ public:
         : _opCtx(opCtx), _nss(nss) {}
 
     void commit() override {
+        invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
+
         CatalogCacheLoader::get(_opCtx).notifyOfCollectionVersionUpdate(_nss);
 
-        invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss.ns(), MODE_IX));
         // This is a hack to get around CollectionShardingState::refreshMetadata() requiring the X
         // lock: markNotShardedAtStepdown() doesn't have a lock check. Temporary measure until
         // SERVER-31595 removes the X lock requirement.
@@ -182,8 +179,8 @@ auto CollectionShardingState::cleanUpRange(ChunkRange const& range, CleanWhen wh
     return _metadataManager->cleanUpRange(range, time);
 }
 
-auto CollectionShardingState::overlappingMetadata(ChunkRange const& range) const
-    -> std::vector<ScopedCollectionMetadata> {
+std::vector<ScopedCollectionMetadata> CollectionShardingState::overlappingMetadata(
+    ChunkRange const& range) const {
     return _metadataManager->overlappingMetadata(_metadataManager, range);
 }
 
@@ -209,15 +206,12 @@ void CollectionShardingState::clearMigrationSourceManager(OperationContext* opCt
 }
 
 void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) {
-    string errmsg;
+    std::string errmsg;
     ChunkVersion received;
     ChunkVersion wanted;
     if (!_checkShardVersionOk(opCtx, &errmsg, &received, &wanted)) {
         throw StaleConfigException(
-            _nss.ns(),
-            str::stream() << "[" << _nss.ns() << "] shard version not ok: " << errmsg,
-            received,
-            wanted);
+            _nss.ns(), str::stream() << "shard version not ok: " << errmsg, received, wanted);
     }
 }
 
@@ -276,6 +270,7 @@ Status CollectionShardingState::waitForClean(OperationContext* opCtx,
                                   << result.reason()};
         }
     }
+
     MONGO_UNREACHABLE;
 }
 
@@ -284,7 +279,7 @@ auto CollectionShardingState::trackOrphanedDataCleanup(ChunkRange const& range)
     return _metadataManager->trackOrphanedDataCleanup(range);
 }
 
-boost::optional<KeyRange> CollectionShardingState::getNextOrphanRange(BSONObj const& from) {
+boost::optional<ChunkRange> CollectionShardingState::getNextOrphanRange(BSONObj const& from) {
     return _metadataManager->getNextOrphanRange(from);
 }
 
@@ -491,10 +486,10 @@ void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadataAndNotify(
 }
 
 bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
-                                                   string* errmsg,
+                                                   std::string* errmsg,
                                                    ChunkVersion* expectedShardVersion,
                                                    ChunkVersion* actualShardVersion) {
-    Client* client = opCtx->getClient();
+    auto* const client = opCtx->getClient();
 
     auto& oss = OperationShardingState::get(opCtx);
 
@@ -607,8 +602,7 @@ uint64_t CollectionShardingState::_incrementChunkOnInsertOrUpdate(OperationConte
     // Use the shard key to locate the chunk into which the document was updated, and increment the
     // number of bytes tracked for the chunk. Note that we can assume the simple collation, because
     // shard keys do not support non-simple collations.
-    std::shared_ptr<Chunk> chunk = cm->findIntersectingChunkWithSimpleCollation(shardKey);
-    invariant(chunk);
+    auto chunk = cm->findIntersectingChunkWithSimpleCollation(shardKey);
     chunk->addBytesWritten(dataWritten);
 
     // If the chunk becomes too large, then we call the ChunkSplitter to schedule a split. Then, we
@@ -617,6 +611,7 @@ uint64_t CollectionShardingState::_incrementChunkOnInsertOrUpdate(OperationConte
         // TODO: call ChunkSplitter here
         chunk->clearBytesWritten();
     }
+
     return chunk->getBytesWritten();
 }
 

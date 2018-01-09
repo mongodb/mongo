@@ -35,9 +35,8 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
@@ -55,7 +54,7 @@ public:
         help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -87,13 +86,10 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << nss.ns() << " is not a valid namespace",
-                nss.isValid());
 
-        ShardingState* const gss = ShardingState::get(opCtx);
-        if (gss->enabled()) {
-            result.append("configServer", gss->getConfigServer(opCtx).toString());
+        ShardingState* const shardingState = ShardingState::get(opCtx);
+        if (shardingState->enabled()) {
+            result.append("configServer", shardingState->getConfigServer(opCtx).toString());
         } else {
             result.append("configServer", "");
         }
@@ -109,11 +105,7 @@ public:
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         CollectionShardingState* const css = CollectionShardingState::get(opCtx, nss);
 
-        ScopedCollectionMetadata metadata;
-        if (css) {
-            metadata = css->getMetadata();
-        }
-
+        const auto metadata = css->getMetadata();
         if (metadata) {
             result.appendTimestamp("global", metadata->getShardVersion().toLong());
         } else {

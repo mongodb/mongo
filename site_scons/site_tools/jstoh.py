@@ -39,7 +39,6 @@ def jsToHeader(target, source):
 
     text = '\n'.join(h)
 
-    print "writing: %s" % outFile
     with open(outFile, 'wb') as out:
         try:
             out.write(text)

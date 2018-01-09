@@ -64,13 +64,13 @@ assert.eq(gle.wtimeout, true);
 
 // Wait with { j: false }. { w: "majority" } waits for journaling by default,
 // so we override the behavior to make it the same as the previous getLastError command.
-gle = mdb.getLastErrorObj("majority", 50, false);
-print('Trying w=majority, 50ms timeout.');
+gle = mdb.getLastErrorObj("majority", 2000, false);
+print('Trying w=majority, 2000ms timeout.');
 printjson(gle);
 assert.eq(gle.ok, 1);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo.length, 2);
-assert.lte(gle.wtime, 50);
+assert.lte(gle.wtime, 2000);
 assert.eq(gle.waited, null);
 assert.eq(gle.wtimeout, null);
 
@@ -96,8 +96,8 @@ assert.eq(gle.wtime, null);
 assert.eq(gle.waited, null);
 assert.eq(gle.wtimeout, null);
 
-gle = sdb.runCommand({getLastError: 1, w: 2, wtimeout: 10});
-print('Trying standalone server with w=2 and 10ms timeout.');
+gle = sdb.runCommand({getLastError: 1, w: 2, wtimeout: 2000});
+print('Trying standalone server with w=2 and 2000ms timeout.');
 // This is an error in 2.6
 printjson(gle);
 assert.eq(gle.ok, 0);

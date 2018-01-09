@@ -32,6 +32,7 @@
 
 #include "mongo/db/logical_session_id.h"
 
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/auth/authorization_session_for_test.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/jsobj.h"
@@ -106,11 +108,11 @@ public:
     }
 
     User* addSimpleUser(UserName un) {
+        const auto creds = BSON("SCRAM-SHA-1" << scram::generateCredentials(
+                                    "a", saslGlobalParams.scramIterationCount.load()));
         ASSERT_OK(managerState->insertPrivilegeDocument(
             _opCtx.get(),
-            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << BSON("MONGODB-CR"
-                                                                                       << "a")
-                        << "roles"
+            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << creds << "roles"
                         << BSON_ARRAY(BSON("role"
                                            << "readWrite"
                                            << "db"
@@ -121,11 +123,11 @@ public:
     }
 
     User* addClusterUser(UserName un) {
+        const auto creds = BSON("SCRAM-SHA-1" << scram::generateCredentials(
+                                    "a", saslGlobalParams.scramIterationCount.load()));
         ASSERT_OK(managerState->insertPrivilegeDocument(
             _opCtx.get(),
-            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << BSON("MONGODB-CR"
-                                                                                       << "a")
-                        << "roles"
+            BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << creds << "roles"
                         << BSON_ARRAY(BSON("role"
                                            << "__system"
                                            << "db"
@@ -244,7 +246,7 @@ TEST_F(LogicalSessionIdTest, GenWithoutAuthedUser) {
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_NoSessionIdNoTransactionNumber) {
     addSimpleUser(UserName("simple", "test"));
-    initializeOperationSessionInfo(_opCtx.get(), BSON("TestCmd" << 1), true, true);
+    initializeOperationSessionInfo(_opCtx.get(), BSON("TestCmd" << 1), true, true, true);
 
     ASSERT(!_opCtx->getLogicalSessionId());
     ASSERT(!_opCtx->getTxnNumber());
@@ -258,6 +260,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdNoTransacti
     initializeOperationSessionInfo(_opCtx.get(),
                                    BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "OtherField"
                                                   << "TestField"),
+                                   true,
                                    true,
                                    true);
 
@@ -274,6 +277,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_MissingSessionIdWith
                                        BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
                                                       << "TestField"),
                                        true,
+                                       true,
                                        true),
         AssertionException,
         ErrorCodes::IllegalOperation);
@@ -289,6 +293,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransact
         BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                        << "TestField"),
         true,
+        true,
         true);
 
     ASSERT(_opCtx->getLogicalSessionId());
@@ -298,7 +303,7 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransact
     ASSERT_EQ(100, *_opCtx->getTxnNumber());
 }
 
-TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_CanAcceptTxnNumberFalse) {
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IsReplSetMemberOrMongosFalse) {
     addSimpleUser(UserName("simple", "test"));
     LogicalSessionFromClient lsid;
     lsid.setId(UUID::gen());
@@ -308,6 +313,24 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_CanAcceptTxnNumberFa
             _opCtx.get(),
             BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                            << "TestField"),
+            true,
+            false,
+            true),
+        AssertionException,
+        ErrorCodes::IllegalOperation);
+}
+
+TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SupportsDocLockingFalse) {
+    addSimpleUser(UserName("simple", "test"));
+    LogicalSessionFromClient lsid;
+    lsid.setId(UUID::gen());
+
+    ASSERT_THROWS_CODE(
+        initializeOperationSessionInfo(
+            _opCtx.get(),
+            BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
+                           << "TestField"),
+            true,
             true,
             false),
         AssertionException,

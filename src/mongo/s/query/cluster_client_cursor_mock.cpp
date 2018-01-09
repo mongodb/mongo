@@ -115,4 +115,8 @@ boost::optional<LogicalSessionId> ClusterClientCursorMock::getLsid() const {
     return _lsid;
 }
 
+boost::optional<ReadPreferenceSetting> ClusterClientCursorMock::getReadPreference() const {
+    return boost::none;
+}
+
 }  // namespace mongo

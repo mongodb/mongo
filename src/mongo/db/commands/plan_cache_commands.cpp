@@ -406,10 +406,8 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
     for (size_t i = 0; i < numPlans; ++i) {
         BSONObjBuilder planBob(plansBuilder.subobjStart());
 
-        // Create plan details field.
-        // Currently, simple string representationg of
-        // SolutionCacheData. Need to revisit format when we
-        // need to parse user-provided plan details for planCacheAddPlan.
+        // Create the plan details field. Currently, this is a simple string representation of
+        // SolutionCacheData.
         SolutionCacheData* scd = entry->plannerData[i];
         BSONObjBuilder detailsBob(planBob.subobjStart("details"));
         detailsBob.append("solution", scd->toString());
@@ -442,7 +440,11 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
 
         planBob.append("filterSet", scd->indexFilterApplied);
     }
+
     plansBuilder.doneFast();
+
+    // Append the time the entry was inserted into the plan cache.
+    bob->append("timeOfCreation", entry->timeOfCreation);
 
     return Status::OK();
 }

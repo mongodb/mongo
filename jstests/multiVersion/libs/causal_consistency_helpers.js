@@ -72,7 +72,9 @@ function assertContainsOperationTime(res, opts) {
 function supportsMajorityReadConcern() {
     const rst = new ReplSetTest({nodes: 1, nodeOptions: {enableMajorityReadConcern: ""}});
     if (!startSetIfSupportsReadMajority(rst)) {
+        rst.stopSet();
         return false;
     }
+    rst.stopSet();
     return true;
 }

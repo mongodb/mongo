@@ -26,8 +26,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
-
 #include "mongo/db/commands.h"
 #include "mongo/db/cursor_id.h"
 
@@ -78,6 +76,13 @@ public:
 
 private:
     /**
+     * Verify the cursor exists, is unpinned, and can be killed by the current user(s).
+     */
+    virtual Status _checkAuth(Client* client,
+                              const NamespaceString& nss,
+                              CursorId cursorId) const = 0;
+
+    /**
      * Kill the cursor with id 'cursorId' in namespace 'nss'. Use 'opCtx' if necessary.
      *
      * Returns Status::OK() if the cursor was killed, or ErrorCodes::CursorNotFound if there is no
@@ -85,7 +90,7 @@ private:
      */
     virtual Status _killCursor(OperationContext* opCtx,
                                const NamespaceString& nss,
-                               CursorId cursorId) = 0;
+                               CursorId cursorId) const = 0;
 };
 
 }  // namespace mongo

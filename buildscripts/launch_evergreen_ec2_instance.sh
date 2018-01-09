@@ -17,6 +17,7 @@ This script supports the following parameters for Windows & Linux platforms:
   -y <aws_ec2_yml>,    [REQUIRED] YAML file name where to store the new AWS EC2 instance
                        information. This file will be used in etc/evergreen.yml for
                        macro expansion of variables used in other functions.
+  -e <expire_hours>,   [OPTIONAL] Number of hours to expire the AWS EC2 instance.
   -s <security_group>, [OPTIONAL] The security group to be used for the new AWS EC2 instance.
                        To specify more than one group, invoke this option each time.
   -t <tag_name>,       [OPTIONAL] The tag name of the new AWS EC2 instance.
@@ -24,9 +25,12 @@ EOF
 }
 
 # Parse command line options
-while getopts "k:s:t:y:?" option
+while getopts "e:k:s:t:y:?" option
 do
    case $option in
+     e)
+        expire_hours=$OPTARG
+        ;;
      k)
         ssh_key_id=$OPTARG
         ;;
@@ -60,6 +64,10 @@ for sec_group in $sec_groups
 do
   security_groups="$security_groups --securityGroup $sec_group"
 done
+
+if [ ! -z $expire_hours ]; then
+  expire_tag="--tagExpireHours $expire_hours"
+fi
 
 # Get the AMI information on the current host so we can launch a similar EC2 instance.
 # See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html#instancedata-data-retrieval
@@ -146,6 +154,7 @@ aws_ec2=$(python buildscripts/aws_ec2.py \
           $security_groups               \
           --tagName "$tag_name"          \
           --tagOwner "$USER"             \
+          $expire_tag                    \
           $block_device_option | tr -cd "[:print:]\n")
 echo "Spawned new AMI EC2 instance: $aws_ec2"
 

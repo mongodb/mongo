@@ -4,8 +4,6 @@ Import("env")
 
 env = env.Clone()
 
-env.Library('serverauth', ['mongo_authentication_session.cpp'])
-
 generateActionTypes = env.Command(
     target=['action_type.h', 'action_type.cpp'],
     source=['generate_action_types.py', 'action_types.txt'],
@@ -294,10 +292,15 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest('sasl_scramsha1_test',
-                'sasl_scramsha1_test.cpp',
-                LIBDEPS=[
-                    'saslauth',
-                    '$BUILD_DIR/mongo/client/sasl_client',
-                ])
+env.CppUnitTest(
+    target='sasl_scramsha1_test',
+    source=[
+        'sasl_authentication_session_test.cpp',
+        'sasl_scramsha1_test.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'saslauth',
+        '$BUILD_DIR/mongo/client/sasl_client',
+    ],
+)
 

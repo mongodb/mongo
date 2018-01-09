@@ -33,6 +33,7 @@
 #include "mongo/db/json.h"
 #include "mongo/rpc/command_reply.h"
 #include "mongo/rpc/command_reply_builder.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/legacy_reply.h"
 #include "mongo/rpc/legacy_reply_builder.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -45,6 +46,9 @@ using namespace mongo;
 
 template <typename T>
 void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder, bool unifiedBodyAndMetadata);
+
+template <typename T>
+void testErrors(rpc::ReplyBuilderInterface& replyBuilder);
 
 TEST(LegacyReplyBuilder, RoundTrip) {
     rpc::LegacyReplyBuilder r;
@@ -59,6 +63,24 @@ TEST(CommandReplyBuilder, RoundTrip) {
 TEST(OpMsgReplyBuilder, RoundTrip) {
     rpc::OpMsgReplyBuilder r;
     testRoundTrip<rpc::OpMsgReply>(r, true);
+}
+
+template <typename T>
+void testErrors(rpc::ReplyBuilderInterface& replyBuilder);
+
+TEST(LegacyReplyBuilder, Errors) {
+    rpc::LegacyReplyBuilder r;
+    testErrors<rpc::LegacyReply>(r);
+}
+
+TEST(CommandReplyBuilder, Errors) {
+    rpc::CommandReplyBuilder r;
+    testErrors<rpc::CommandReply>(r);
+}
+
+TEST(OpMsgReplyBuilder, Errors) {
+    rpc::OpMsgReplyBuilder r;
+    testErrors<rpc::OpMsgReply>(r);
 }
 
 BSONObj buildMetadata() {
@@ -193,6 +215,26 @@ void testRoundTrip(rpc::ReplyBuilderInterface& replyBuilder, bool unifiedBodyAnd
         ASSERT_BSONOBJ_EQ(parsed.getCommandReply(), commandReply);
         ASSERT_BSONOBJ_EQ(parsed.getMetadata(), metadata);
     }
+}
+
+template <typename T>
+void testErrors(rpc::ReplyBuilderInterface& replyBuilder) {
+    ErrorExtraInfoExample::EnableParserForTest whenInScope;
+
+    const auto status = Status(ErrorExtraInfoExample(123), "Why does this keep failing!");
+
+    replyBuilder.setCommandReply(status);
+    replyBuilder.setMetadata(buildMetadata());
+
+    const auto msg = replyBuilder.done();
+
+    T parsed(&msg);
+    const Status result = getStatusFromCommandResult(parsed.getCommandReply());
+    ASSERT_EQ(result, status.code());
+    ASSERT_EQ(result.reason(), status.reason());
+    ASSERT(result.extraInfo());
+    ASSERT(result.extraInfo<ErrorExtraInfoExample>());
+    ASSERT_EQ(result.extraInfo<ErrorExtraInfoExample>()->data, 123);
 }
 
 }  // namespace

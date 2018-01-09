@@ -4,6 +4,13 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/retryable_writes_util.js");
+
+    if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     /**
      * Asserts the connection has a document in its transaction collection that has the given
      * sessionId, txnNumber, and lastWriteOptimeTs.

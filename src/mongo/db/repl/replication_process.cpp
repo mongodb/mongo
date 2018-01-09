@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/string_data.h"
@@ -39,6 +41,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -51,14 +54,7 @@ const auto getReplicationProcess =
     ServiceContext::declareDecoration<std::unique_ptr<ReplicationProcess>>();
 
 const auto kRollbackNamespacePrefix = "local.system.rollback."_sd;
-
-const auto kRollbackProgressIdDoc = BSON("_id"
-                                         << "rollbackProgress");
-const auto kRollbackProgressIdKey = kRollbackProgressIdDoc["_id"];
 }  // namespace
-
-const NamespaceString ReplicationProcess::kRollbackProgressNamespace(kRollbackNamespacePrefix +
-                                                                     "progress");
 
 ReplicationProcess* ReplicationProcess::get(ServiceContext* service) {
     return getReplicationProcess(service).get();
@@ -119,7 +115,13 @@ Status ReplicationProcess::initializeRollbackID(OperationContext* opCtx) {
     // Leave _rbid uninitialized until the next getRollbackID() to retrieve the actual value
     // from storage.
 
-    return _storageInterface->initializeRollbackID(opCtx);
+    auto initRbidSW = _storageInterface->initializeRollbackID(opCtx);
+    if (initRbidSW.isOK()) {
+        log() << "Initialized the rollback ID to " << initRbidSW.getValue();
+    } else {
+        warning() << "Failed to initialize the rollback ID: " << initRbidSW.getStatus().reason();
+    }
+    return initRbidSW.getStatus();
 }
 
 Status ReplicationProcess::incrementRollbackID(OperationContext* opCtx) {
@@ -131,51 +133,12 @@ Status ReplicationProcess::incrementRollbackID(OperationContext* opCtx) {
     // storage next time getRollbackID() is called.
     if (status.isOK()) {
         _rbid = kUninitializedRollbackId;
+        log() << "Incremented the rollback ID to " << status.getValue();
+    } else {
+        warning() << "Failed to increment the rollback ID: " << status.getStatus().reason();
     }
 
-    return status;
-}
-
-StatusWith<OpTime> ReplicationProcess::getRollbackProgress(OperationContext* opCtx) {
-    auto documentResult =
-        _storageInterface->findById(opCtx, kRollbackProgressNamespace, kRollbackProgressIdKey);
-    if (!documentResult.isOK()) {
-        return documentResult.getStatus();
-    }
-    const auto& doc = documentResult.getValue();
-    RollbackProgress rollbackProgress;
-    try {
-        rollbackProgress = RollbackProgress::parse(IDLParserErrorContext("RollbackProgress"), doc);
-    } catch (...) {
-        return exceptionToStatus();
-    }
-    return rollbackProgress.getApplyUntil();
-}
-
-Status ReplicationProcess::setRollbackProgress(OperationContext* opCtx, const OpTime& applyUntil) {
-    auto status = _storageInterface->createCollection(opCtx, kRollbackProgressNamespace, {});
-    if (ErrorCodes::NamespaceExists == status.code()) {
-        // Collection exists. Proceed to upsert progress document.
-    } else if (!status.isOK()) {
-        return status;
-    }
-    RollbackProgress rollbackProgress;
-    rollbackProgress.set_id(kRollbackProgressIdKey.String());
-    rollbackProgress.setApplyUntil(applyUntil);
-    BSONObjBuilder bob;
-    rollbackProgress.serialize(&bob);
-    return _storageInterface->upsertById(
-        opCtx, kRollbackProgressNamespace, kRollbackProgressIdKey, bob.obj());
-}
-
-Status ReplicationProcess::clearRollbackProgress(OperationContext* opCtx) {
-    auto status = _storageInterface->deleteByFilter(opCtx, kRollbackProgressNamespace, {});
-    if (ErrorCodes::NamespaceNotFound == status) {
-        return Status::OK();
-    } else if (!status.isOK()) {
-        return status;
-    }
-    return Status::OK();
+    return status.getStatus();
 }
 
 ReplicationConsistencyMarkers* ReplicationProcess::getConsistencyMarkers() {

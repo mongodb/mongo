@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
@@ -79,7 +80,7 @@ public:
         auto status = snapshotManager->prepareForCreateSnapshot(opCtx);
         if (status.isOK()) {
             const auto name = repl::ReplicationCoordinator::get(opCtx)->reserveSnapshotName(opCtx);
-            result.append("name", static_cast<long long>(name.asU64()));
+            result.append("name", static_cast<long long>(name.asULL()));
         }
         return appendCommandStatus(result, status);
     }
@@ -121,8 +122,8 @@ public:
         }
 
         Lock::GlobalLock lk(opCtx, MODE_IX, UINT_MAX);
-        auto name = SnapshotName(cmdObj.firstElement().Long());
-        snapshotManager->setCommittedSnapshot(name, Timestamp(name.asU64()));
+        auto timestamp = Timestamp(cmdObj.firstElement().Long());
+        snapshotManager->setCommittedSnapshot(timestamp);
         return true;
     }
 };

@@ -71,29 +71,8 @@ SubplanStage::SubplanStage(OperationContext* opCtx,
       _plannerParams(params),
       _query(cq) {
     invariant(_collection);
+    invariant(_query->root()->matchType() == MatchExpression::OR);
 }
-
-namespace {
-
-/**
- * Returns true if 'expr' is an AND that contains a single OR child.
- */
-bool isContainedOr(const MatchExpression* expr) {
-    if (MatchExpression::AND != expr->matchType()) {
-        return false;
-    }
-
-    size_t numOrs = 0;
-    for (size_t i = 0; i < expr->numChildren(); ++i) {
-        if (MatchExpression::OR == expr->getChild(i)->matchType()) {
-            ++numOrs;
-        }
-    }
-
-    return (numOrs == 1U);
-}
-
-}  // namespace
 
 bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
     const QueryRequest& qr = query.getQueryRequest();
@@ -126,54 +105,12 @@ bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
         return false;
     }
 
-    // TODO: For now we only allow rooted OR. We should consider also allowing contained OR that
-    // does not have a TEXT or GEO_NEAR node.
+    // We can only subplan rooted $or queries.
     return MatchExpression::OR == expr->matchType();
-}
-
-std::unique_ptr<MatchExpression> SubplanStage::rewriteToRootedOr(
-    std::unique_ptr<MatchExpression> root) {
-    dassert(isContainedOr(root.get()));
-
-    // Detach the OR from the root.
-    std::vector<MatchExpression*>& rootChildren = *root->getChildVector();
-    std::unique_ptr<MatchExpression> orChild;
-    for (size_t i = 0; i < rootChildren.size(); ++i) {
-        if (MatchExpression::OR == rootChildren[i]->matchType()) {
-            orChild.reset(rootChildren[i]);
-            rootChildren.erase(rootChildren.begin() + i);
-            break;
-        }
-    }
-
-    // We should have found an OR, and the OR should have at least 2 children.
-    invariant(orChild);
-    invariant(orChild->getChildVector());
-    invariant(orChild->getChildVector()->size() > 1U);
-
-    // AND the existing root with each OR child.
-    std::vector<MatchExpression*>& orChildren = *orChild->getChildVector();
-    for (size_t i = 0; i < orChildren.size(); ++i) {
-        std::unique_ptr<AndMatchExpression> ama = stdx::make_unique<AndMatchExpression>();
-        ama->add(orChildren[i]);
-        ama->add(root->shallowClone().release());
-        orChildren[i] = ama.release();
-    }
-
-    // Normalize and sort the resulting match expression.
-    orChild = MatchExpression::optimize(std::move(orChild));
-    CanonicalQuery::sortTree(orChild.get());
-
-    return orChild;
 }
 
 Status SubplanStage::planSubqueries() {
     _orExpression = _query->root()->shallowClone();
-    if (isContainedOr(_orExpression.get())) {
-        _orExpression = rewriteToRootedOr(std::move(_orExpression));
-        invariant(CanonicalQuery::isValid(_orExpression.get(), _query->getQueryRequest()).isOK());
-    }
-
     for (size_t i = 0; i < _plannerParams.indices.size(); ++i) {
         const IndexEntry& ie = _plannerParams.indices[i];
         _indexMap[ie.name] = i;

@@ -9,7 +9,7 @@ post:
         working_dir: work
         script: |
           source ./dsienv.sh
-          $DSI_PATH/bin/make_artifact.sh
+          make_artifact.sh
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -24,16 +24,6 @@ post:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        local_file: work/reports/graphs/timeseries-mongod.0.html
-        remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/timeseries-mongod.0-${task_name}-${build_id}-${execution}.html
-        bucket: mciuploads
-        permissions: public-read
-        content_type: text/html
-        display_name: timeseries-p1.html - Execution ${execution}
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
         local_file: src/workloads/workloads/jsdoc/jsdocs-redirect.html
         remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/workloads-${task_name}-${build_id}.html
         bucket: mciuploads
@@ -43,13 +33,17 @@ post:
     - command: attach.results
       params:
         file_location: work/report.json
+    - command: "json.send"
+      params:
+         name: "perf"
+         file: "work/perf.json"
     - command: shell.exec
       params:
         working_dir: work
         script: |
           source ./dsienv.sh
           if [ -e /data/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
-            $DSI_PATH/bin/mark_idle.sh
+            mark_idle.sh
           fi
 
     - command: shell.exec
@@ -90,6 +84,7 @@ functions:
           storageEngine: ${storageEngine}
           test: ${test}
           production: true
+          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
           EOF
 
           cat > runtime.yml <<EOF
@@ -112,9 +107,6 @@ functions:
           script_flags : ${script_flags}
           dsi_rev: ${dsi_rev}
           workloads_rev: ${workloads_rev}
-
-          # compositions of expansions
-          mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
           EOF
     - command: shell.exec
       params:
@@ -144,21 +136,18 @@ functions:
           virtualenv ./venv
           source ./venv/bin/activate
           pip install -r ../src/dsi/dsi/requirements.txt
-          python ../src/dsi/dsi/bin/bootstrap.py --production
-          ls
-          pwd
+          python ../src/dsi/dsi/bin/bootstrap.py
     - command: shell.exec
       params:
         script: |
           set -v
           set -e
           source work/dsienv.sh
-          $DSI_PATH/bin/setup-dsi-env.sh
+          setup-dsi-env.sh
           ls -a work
 
-  "infrastructure provisioning":
+  "deploy cluster":
     - command: shell.exec
-      # call infrastructure-provisioning.py. This will either create a cluster, or update tags on existing instances.
       params:
         working_dir: work
         script: |
@@ -166,22 +155,12 @@ functions:
           set -v
           source ./dsienv.sh
           source ./venv/bin/activate
-          $DSI_PATH/bin/infrastructure_provisioning.py
-
-  "configure mongodb cluster":
-    - command: shell.exec
-      # bring up the mongod
-      params:
-        working_dir: work
-        script: |
-          set -e
-          set -o verbose
-          source ./dsienv.sh
-          source ./venv/bin/activate
-          $DSI_PATH/bin/mongodb_setup.py && echo "${setup} MongoDB Cluster STARTED."
+          infrastructure_provisioning.py
+          mongodb_setup.py
 
   "run test":
     - command: shell.exec
+      type: test
       params:
         working_dir: work
         script: |
@@ -189,8 +168,7 @@ functions:
           set -v
           source ./dsienv.sh
           source ./venv/bin/activate
-          echo "Run test for ${test}-${storageEngine} with setup ${setup}"
-          $DSI_PATH/bin/run_test.py ${storageEngine} ${test} ${cluster}
+          test_control.py
     - command: "json.send"
       params:
          name: "perf"
@@ -202,7 +180,7 @@ functions:
         working_dir: work
         script: |
           source ./dsienv.sh
-          $DSI_PATH/bin/make_artifact.sh
+          make_artifact.sh
 
   "analyze":
     - command: json.get_history
@@ -225,7 +203,7 @@ functions:
         script: |
           set -o errexit
           TAGS="3.4.9-Baseline 3.2.17-Baseline"
-          OVERRIDEFILE="../src/dsi/dsi/analysis/master/system_perf_override.json"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/${branch_name}/system_perf_override.json"
           python -u ../src/dsi/dsi/analysis/dashboard_gen.py --rev ${revision} -f history.json -t tags.json --refTag $TAGS --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name} --jira-user ${perf_jira_user} --jira-password ${perf_jira_pw} || true
     - command: "json.send"
       params:
@@ -240,7 +218,7 @@ functions:
           set -o errexit
           set -o verbose
           TAG="3.4.9-Baseline"
-          OVERRIDEFILE="../src/dsi/dsi/analysis/master/system_perf_override.json"
+          OVERRIDEFILE="../src/dsi/dsi/analysis/${branch_name}/system_perf_override.json"
           python -u ../src/dsi/dsi/analysis/post_run_check.py ${script_flags} --reports-analysis reports --perf-file reports/perf.json --rev ${revision} -f history.json -t tags.json --refTag $TAG --overrideFile $OVERRIDEFILE --project_id sys-perf --variant ${build_variant} --task ${task_name}
 
 #######################################
@@ -337,18 +315,13 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "ycsb"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "ycsb"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
-        script_flags: --ycsb-throughput-analysis reports
+        # Disabling --ycsb-throughput-analysis until BF-7153 fixed
+        # script_flags: --ycsb-throughput-analysis reports
 
 - name: industry_benchmarks_MMAPv1
   depends_on:
@@ -359,14 +332,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "ycsb"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "ycsb"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -381,14 +348,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "ycsb-wmajority"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "ycsb-wmajority"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -403,14 +364,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "ycsb-wmajority"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "ycsb-wmajority"
     - func: "make test log artifact"
     - func: "analyze"
       vars:
@@ -426,14 +381,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "core"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "core"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -447,14 +396,22 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "core"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
+    - func: "make test log artifact"
+    - func: "analyze"
+
+- name: retryable_writes_workloads_WT
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
       vars:
-        storageEngine: "mmapv1"
-        test: "core"
+        storageEngine: "wiredTiger"
+        test: "retryable_writes"
+    - func: "deploy cluster"
+    - func: "run test"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -467,14 +424,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "agg_query_comparison_bestbuy"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "agg_query_comparison_bestbuy"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -487,14 +438,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "agg_query_comparison_bestbuy"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "agg_query_comparison_bestbuy"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -507,14 +452,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "non_sharded"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "non_sharded"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -527,14 +466,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "non_sharded"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "non_sharded"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -547,14 +480,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "mongos"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "mongos"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -568,14 +495,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "mongos"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "mongos"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -588,14 +509,8 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "move_chunk"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "move_chunk"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -608,14 +523,8 @@ tasks:
       vars:
         storageEngine: "mmapv1"
         test: "move_chunk"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "move_chunk"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -629,15 +538,8 @@ tasks:
         storageEngine: "wiredTiger"
         test: "secondary_performance"
         setup: "replica-2node"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
-        setup: "replica-2node"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "secondary_performance"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -651,15 +553,8 @@ tasks:
         storageEngine: "mmapv1"
         test: "secondary_performance"
         setup: "replica-2node"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
-        setup: "replica-2node"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "secondary_performance"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -671,15 +566,9 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "wiredTiger"
-        test: "initialSync"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+        test: "initialsync"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "initialSync"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -691,15 +580,9 @@ tasks:
     - func: "prepare environment"
       vars:
         storageEngine: "mmapv1"
-        test: "initialSync"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "mmapv1"
+        test: "initialsync"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "mmapv1"
-        test: "initialSync"
     - func: "make test log artifact"
     - func: "analyze"
 
@@ -713,16 +596,36 @@ tasks:
       vars:
         storageEngine: "wiredTiger"
         test: "initialsync-logkeeper"
-    - func: "infrastructure provisioning"
-    - func: "configure mongodb cluster"
-      vars:
-        storageEngine: "wiredTiger"
+    - func: "deploy cluster"
     - func: "run test"
-      vars:
-        storageEngine: "wiredTiger"
-        test: "initialsync-logkeeper"
     - func: "make test log artifact"
     - func: "analyze"
+
+- name: change_streams
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "change_streams"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "make test log artifact"
+
+- name: change_streams_multi_mongos
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "change_streams_multi_mongos"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "make test log artifact"
 
 
 #######################################
@@ -763,12 +666,14 @@ buildvariants:
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
+    - name: retryable_writes_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
     - name: non_sharded_workloads_WT
     - name: non_sharded_workloads_MMAPv1
     - name: agg_query_comparison_bestbuy_WT
     - name: agg_query_comparison_bestbuy_MMAPv1
+    - name: change_streams
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -812,6 +717,7 @@ buildvariants:
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
+    - name: retryable_writes_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: industry_benchmarks_wmajority_WT
     - name: industry_benchmarks_wmajority_MMAPv1
@@ -822,6 +728,8 @@ buildvariants:
     - name: move_chunk_workloads_MMAPv1
     - name: agg_query_comparison_bestbuy_WT
     - name: agg_query_comparison_bestbuy_MMAPv1
+    - name: change_streams
+    - name: change_streams_multi_mongos
 
 - name: linux-3-node-replSet
   display_name: Linux 3-Node ReplSet
@@ -837,6 +745,7 @@ buildvariants:
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
+    - name: retryable_writes_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: industry_benchmarks_wmajority_WT
     - name: industry_benchmarks_wmajority_MMAPv1
@@ -847,6 +756,7 @@ buildvariants:
     - name: non_sharded_workloads_MMAPv1
     - name: agg_query_comparison_bestbuy_WT
     - name: agg_query_comparison_bestbuy_MMAPv1
+    - name: change_streams
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync

@@ -63,23 +63,6 @@ BSONObj generateSCRAMUserDocument(StringData username, StringData password) {
                       << BSONArray());
 }
 
-BSONObj generateMONGODBCRUserDocument(StringData username, StringData password) {
-    auto database = "test"_sd;
-
-    std::string digested = createPasswordDigest(username, password);
-    return BSON("_id" << (str::stream() << database << "." << username).operator StringData()
-                      << AuthorizationManager::USER_NAME_FIELD_NAME
-                      << username
-                      << AuthorizationManager::USER_DB_FIELD_NAME
-                      << database
-                      << "credentials"
-                      << BSON("MONGODB-CR" << digested)
-                      << "roles"
-                      << BSONArray()
-                      << "privileges"
-                      << BSONArray());
-}
-
 std::string corruptEncodedPayload(const std::string& message,
                                   std::string::const_iterator begin,
                                   std::string::const_iterator end) {
@@ -507,21 +490,6 @@ TEST_F(SCRAMSHA1Fixture, testIncorrectPassword) {
                                Status(ErrorCodes::AuthenticationFailed,
                                       "SCRAM-SHA-1 authentication failed, storedKey mismatch")),
               runSteps(saslServerSession.get(), saslClientSession.get()));
-}
-
-TEST_F(SCRAMSHA1Fixture, testMONGODBCR) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateMONGODBCRUserDocument("sajack", "sajack"), BSONObj())
-        .transitional_ignore();
-
-    saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
-    saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
-                                    createPasswordDigest("sajack", "sajack"));
-
-    ASSERT_OK(saslClientSession->initialize());
-
-    ASSERT_EQ(goalState, runSteps(saslServerSession.get(), saslClientSession.get()));
 }
 
 TEST(SCRAMSHA1Cache, testGetFromEmptyCache) {

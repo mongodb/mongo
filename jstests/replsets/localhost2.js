@@ -12,6 +12,6 @@
            tojson(resp.me) + " should not start with 127.0.0.1:");
     assert(!resp.me.startsWith('0.0.0.0:'), tojson(resp.me) + " should not start with 0.0.0.0:");
     assert(!resp.me.startsWith('localhost:'),
-           tojson(resp.me) + " should not start with 127.0.0.1:");
+           tojson(resp.me) + " should not start with localhost:");
     rt.stopSet();
 })();

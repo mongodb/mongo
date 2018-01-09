@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 var res;
 
 t = db.update_multi6;

@@ -206,6 +206,11 @@ public:
         CursorId getCursorId() const;
 
         /**
+         * Returns the read preference setting for this cursor.
+         */
+        boost::optional<ReadPreferenceSetting> getReadPreference() const;
+
+        /**
          * Returns the number of result documents returned so far by this cursor via the next()
          * method.
          */
@@ -309,9 +314,11 @@ public:
      *
      * Does not block.
      */
+    enum AuthCheck { kCheckSession = true, kNoCheckSession = false };
     StatusWith<PinnedCursor> checkOutCursor(const NamespaceString& nss,
                                             CursorId cursorId,
-                                            OperationContext* opCtx);
+                                            OperationContext* opCtx,
+                                            AuthCheck checkSessionAuth = kCheckSession);
 
     /**
      * Informs the manager that the given cursor should be killed.  The cursor need not necessarily

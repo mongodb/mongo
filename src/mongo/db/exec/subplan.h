@@ -107,19 +107,6 @@ public:
      */
     Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
 
-    /**
-     * Takes a match expression, 'root', which has a single "contained OR". This means that
-     * 'root' is an AND with exactly one OR child.
-     *
-     * Returns a logically equivalent query after rewriting so that the contained OR is at the
-     * root of the expression tree.
-     *
-     * Used internally so that the subplanner can be used for contained OR type queries, but
-     * exposed for testing.
-     */
-    static std::unique_ptr<MatchExpression> rewriteToRootedOr(
-        std::unique_ptr<MatchExpression> root);
-
     //
     // For testing.
     //

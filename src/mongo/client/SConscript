@@ -34,6 +34,15 @@ env.CppUnitTest(
     target='connection_string_test',
     source=[
         'connection_string_test.cpp',
+    ],
+    LIBDEPS=[
+        'clientdriver',
+    ]
+)
+
+env.CppUnitTest(
+    target='mongo_uri_test',
+    source=[
         'mongo_uri_test.cpp',
     ],
     LIBDEPS=[

@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 orig = 'rename_stayTemp_orig';
 dest = 'rename_stayTemp_dest';
 

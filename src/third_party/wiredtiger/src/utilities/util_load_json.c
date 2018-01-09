@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -354,8 +354,9 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 	WT_DECL_RET;
 	static const char *json_markers[] = {
 	    "\"config\"", "\"colgroups\"", "\"indices\"", "\"data\"", NULL };
+	uint64_t curversion;
+	int toktype;
 	char *config, *tableuri;
-	int curversion, toktype;
 	bool hasversion;
 
 	memset(&cl, 0, sizeof(cl));
@@ -380,8 +381,10 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 			}
 			hasversion = true;
 			JSON_EXPECT(session, ins, 's');
-			if ((curversion = atoi(ins->tokstart + 1)) <= 0 ||
-			    curversion > DUMP_JSON_SUPPORTED_VERSION) {
+			if ((ret = util_str2num(session,
+			    ins->tokstart + 1, false, &curversion)) != 0)
+				goto err;
+			if (curversion > DUMP_JSON_SUPPORTED_VERSION) {
 				ret = util_err(session, ENOTSUP,
 				    "unsupported JSON dump version \"%.*s\"",
 				    (int)(ins->toklen - 1), ins->tokstart + 1);

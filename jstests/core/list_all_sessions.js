@@ -1,3 +1,7 @@
+// Sessions are asynchronously flushed to disk, so a stepdown immediately after calling
+// startSession may cause this test to fail to find the returned sessionId.
+// @tags: [does_not_support_stepdowns]
+
 // Basic tests for the $listSessions {allUsers:true} aggregation stage.
 
 (function() {

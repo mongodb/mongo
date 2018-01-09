@@ -55,8 +55,12 @@ const int kMaxNumFailedHostRetryAttempts = 3;
  * Returns the sort key out of the $sortKey metadata field in 'obj'. This object is of the form
  * {'': 'firstSortKey', '': 'secondSortKey', ...}.
  */
-BSONObj extractSortKey(BSONObj obj) {
+BSONObj extractSortKey(BSONObj obj, bool compareWholeSortKey) {
     auto key = obj[ClusterClientCursorParams::kSortKeyField];
+    invariant(key);
+    if (compareWholeSortKey) {
+        return key.wrap();
+    }
     invariant(key.type() == BSONType::Object);
     return key.Obj();
 }
@@ -80,7 +84,7 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
     : _opCtx(opCtx),
       _executor(executor),
       _params(params),
-      _mergeQueue(MergingComparator(_remotes, _params->sort)) {
+      _mergeQueue(MergingComparator(_remotes, _params->sort, _params->compareWholeSortKey)) {
     size_t remoteIndex = 0;
     for (const auto& remote : _params->remotes) {
         _remotes.emplace_back(remote.hostAndPort,
@@ -129,7 +133,15 @@ Status AsyncResultsMerger::setAwaitDataTimeout(Milliseconds awaitDataTimeout) {
                       "maxTimeMS can only be used with getMore for tailable, awaitData cursors");
     }
 
-    _awaitDataTimeout = awaitDataTimeout;
+    // For sorted tailable awaitData cursors on multiple shards, cap the getMore timeout at 1000ms.
+    // This is to ensure that we get a continuous stream of updates from each shard with their most
+    // recent optimes, which allows us to return sorted $changeStream results even if some shards
+    // are yet to provide a batch of data. If the timeout specified by the client is greater than
+    // 1000ms, then it will be enforced elsewhere.
+    _awaitDataTimeout = (!_params->sort.isEmpty() && _remotes.size() > 1u
+                             ? std::min(awaitDataTimeout, Milliseconds{1000})
+                             : awaitDataTimeout);
+
     return Status::OK();
 }
 
@@ -152,6 +164,16 @@ void AsyncResultsMerger::reattachToOperationContext(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_opCtx);
     _opCtx = opCtx;
+}
+
+void AsyncResultsMerger::addNewShardCursors(
+    const std::vector<ClusterClientCursorParams::RemoteCursor>& newCursors) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    for (auto&& remote : newCursors) {
+        _remotes.emplace_back(remote.hostAndPort,
+                              remote.cursorResponse.getNSS(),
+                              remote.cursorResponse.getCursorId());
+    }
 }
 
 bool AsyncResultsMerger::_ready(WithLock lk) {
@@ -200,7 +222,8 @@ bool AsyncResultsMerger::_readySortedTailable(WithLock) {
 
     auto smallestRemote = _mergeQueue.top();
     auto smallestResult = _remotes[smallestRemote].docBuffer.front();
-    auto keyWeWantToReturn = extractSortKey(*smallestResult.getResult());
+    auto keyWeWantToReturn =
+        extractSortKey(*smallestResult.getResult(), _params->compareWholeSortKey);
     for (const auto& remote : _remotes) {
         if (!remote.promisedMinSortKey) {
             // In order to merge sorted tailable cursors, we need this value to be populated.
@@ -455,7 +478,9 @@ void AsyncResultsMerger::updateRemoteMetadata(RemoteCursorData* remote,
         // of {lastOplogTimestamp, uuid, docID} will be greater than the artificial promised min
         // sort key of {lastOplogTimestamp, MINKEY, MINKEY}.
         auto maxSortKeyFromResponse =
-            (response.getBatch().empty() ? BSONObj() : extractSortKey(response.getBatch().back()));
+            (response.getBatch().empty()
+                 ? BSONObj()
+                 : extractSortKey(response.getBatch().back(), _params->compareWholeSortKey));
 
         remote->promisedMinSortKey =
             (compareSortKeys(
@@ -566,14 +591,23 @@ bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,
     updateRemoteMetadata(&remote, response);
     for (const auto& obj : response.getBatch()) {
         // If there's a sort, we're expecting the remote node to have given us back a sort key.
-        if (!_params->sort.isEmpty() &&
-            obj[ClusterClientCursorParams::kSortKeyField].type() != BSONType::Object) {
-            remote.status = Status(ErrorCodes::InternalError,
-                                   str::stream() << "Missing field '"
-                                                 << ClusterClientCursorParams::kSortKeyField
-                                                 << "' in document: "
-                                                 << obj);
-            return false;
+        if (!_params->sort.isEmpty()) {
+            auto key = obj[ClusterClientCursorParams::kSortKeyField];
+            if (!key) {
+                remote.status = Status(ErrorCodes::InternalError,
+                                       str::stream() << "Missing field '"
+                                                     << ClusterClientCursorParams::kSortKeyField
+                                                     << "' in document: "
+                                                     << obj);
+                return false;
+            } else if (!_params->compareWholeSortKey && key.type() != BSONType::Object) {
+                remote.status =
+                    Status(ErrorCodes::InternalError,
+                           str::stream() << "Field '" << ClusterClientCursorParams::kSortKeyField
+                                         << "' was not of type Object in document: "
+                                         << obj);
+                return false;
+            }
         }
 
         ClusterQueryResult result(obj);
@@ -622,8 +656,7 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx)
                 remote.getTargetHost(), _params->nsString.db().toString(), cmdObj, opCtx);
 
             // Send kill request; discard callback handle, if any, or failure report, if not.
-            Status s = _executor->scheduleRemoteCommand(request, [](auto const&) {}).getStatus();
-            std::move(s).ignore();
+            _executor->scheduleRemoteCommand(request, [](auto const&) {}).getStatus().ignore();
         }
     }
 }
@@ -697,8 +730,8 @@ bool AsyncResultsMerger::MergingComparator::operator()(const size_t& lhs, const 
     const ClusterQueryResult& leftDoc = _remotes[lhs].docBuffer.front();
     const ClusterQueryResult& rightDoc = _remotes[rhs].docBuffer.front();
 
-    return compareSortKeys(extractSortKey(*leftDoc.getResult()),
-                           extractSortKey(*rightDoc.getResult()),
+    return compareSortKeys(extractSortKey(*leftDoc.getResult(), _compareWholeSortKey),
+                           extractSortKey(*rightDoc.getResult(), _compareWholeSortKey),
                            _sort) > 0;
 }
 

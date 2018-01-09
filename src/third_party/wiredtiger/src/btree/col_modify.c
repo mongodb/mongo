@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -39,13 +39,13 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	append = logged = false;
 
 	if (upd_arg == NULL) {
-		if (modify_type == WT_UPDATE_DELETED ||
-		    modify_type == WT_UPDATE_RESERVED) {
+		if (modify_type == WT_UPDATE_RESERVE ||
+		    modify_type == WT_UPDATE_TOMBSTONE) {
 			/*
 			 * Fixed-size column-store doesn't have on-page deleted
 			 * values, it's a nul byte.
 			 */
-			if (modify_type == WT_UPDATE_DELETED &&
+			if (modify_type == WT_UPDATE_TOMBSTONE &&
 			    btree->type == BTREE_COL_FIX) {
 				modify_type = WT_UPDATE_STANDARD;
 				value = &col_fix_remove;
@@ -200,7 +200,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	}
 
 	/* If the update was successful, add it to the in-memory log. */
-	if (logged && modify_type != WT_UPDATE_RESERVED)
+	if (logged && modify_type != WT_UPDATE_RESERVE)
 		WT_ERR(__wt_txn_log_op(session, cbt));
 
 	if (0) {

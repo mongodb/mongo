@@ -179,8 +179,7 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
     namespace mmb = mutablebson;
     const CollatorInterface* collator = nullptr;
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, collator));
-    UpdateDriver::Options updateOptions(std::move(expCtx));
-    UpdateDriver driver(updateOptions);
+    UpdateDriver driver(std::move(expCtx));
     std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>> arrayFilters;
     Status status = driver.parse(updatePattern, arrayFilters);
     if (!status.isOK())
@@ -191,16 +190,11 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
     mmb::Document document;
     if (status.isOK()) {
         document.reset(*iter, mmb::Document::kInPlaceDisabled);
-        const BSONObj emptyOriginal;
         const bool validateForStorage = false;
         const FieldRefSet emptyImmutablePaths;
         BSONObj logObj;
-        status = driver.update(StringData(),
-                               emptyOriginal,
-                               &document,
-                               validateForStorage,
-                               emptyImmutablePaths,
-                               &logObj);
+        status = driver.update(
+            StringData(), &document, validateForStorage, emptyImmutablePaths, &logObj);
         if (!status.isOK())
             return status;
         BSONObj newObj = document.getObject().copy();
@@ -224,13 +218,9 @@ Status AuthzManagerExternalStateMock::updateOne(OperationContext* opCtx,
             return status;
         }
 
-        // The original document can be empty because it is only needed for validation of immutable
-        // paths.
-        const BSONObj emptyOriginal;
         const bool validateForStorage = false;
         const FieldRefSet emptyImmutablePaths;
-        status = driver.update(
-            StringData(), emptyOriginal, &document, validateForStorage, emptyImmutablePaths);
+        status = driver.update(StringData(), &document, validateForStorage, emptyImmutablePaths);
         if (!status.isOK()) {
             return status;
         }

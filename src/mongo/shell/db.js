@@ -215,6 +215,9 @@ var DB;
             delete optcpy['useCursor'];
         }
 
+        const maxAwaitTimeMS = optcpy.maxAwaitTimeMS;
+        delete optcpy.maxAwaitTimeMS;
+
         // Reassign the cleaned-up options.
         aggregateOptions = optcpy;
 
@@ -263,7 +266,7 @@ var DB;
                 batchSizeValue = cmdObj["cursor"]["batchSize"];
             }
 
-            return new DBCommandCursor(this, res, batchSizeValue);
+            return new DBCommandCursor(this, res, batchSizeValue, maxAwaitTimeMS);
         }
 
         return res;
@@ -322,10 +325,8 @@ var DB;
         var options = opt || {};
 
         // We have special handling for the 'flags' field, and provide sugar for specific flags. If
-        // the
-        // user specifies any flags we send the field in the command. Otherwise, we leave it blank
-        // and
-        // use the server's defaults.
+        // the user specifies any flags we send the field in the command. Otherwise, we leave it
+        // blank and use the server's defaults.
         var sendFlags = false;
         var flags = 0;
         if (options.usePowerOf2Sizes != undefined) {
@@ -561,7 +562,7 @@ var DB;
         }
 
         // Fall back to MONGODB-CR
-        var n = this._adminCommand({copydbgetnonce: 1, fromhost: fromhost});
+        var n = assert.commandWorked(this._adminCommand({copydbgetnonce: 1, fromhost: fromhost}));
         return this._adminCommand({
             copydb: 1,
             fromhost: fromhost,
@@ -1567,11 +1568,6 @@ var DB;
         if (this._defaultAuthenticationMechanism != null)
             return this._defaultAuthenticationMechanism;
 
-        // Use MONGODB-CR for v2.6 and earlier.
-        maxWireVersion = this.isMaster().maxWireVersion;
-        if (maxWireVersion == undefined || maxWireVersion < 3) {
-            return "MONGODB-CR";
-        }
         return "SCRAM-SHA-1";
     };
 

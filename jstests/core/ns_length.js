@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // SERVER-7282 Faulty logic when testing maximum collection name length.
 
 // constants from server

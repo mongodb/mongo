@@ -545,4 +545,30 @@ TEST_F(QueryPlannerTest, InexactFetchPredicateOverTrailingFieldHandledCorrectlyM
         "{fetch: {filter: {b: {$exists: true}}, node: {text: {search: 'foo', prefix: {a: 3}}}}}");
 }
 
+TEST_F(QueryPlannerTest, ExprEqCannotUsePrefixOfTextIndex) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("a" << 1 << "_fts"
+                      << "text"
+                      << "_ftsx"
+                      << 1));
+
+    runInvalidQuery(fromjson("{a: {$_internalExprEq: 3}, $text: {$search: 'blah'}}"));
+}
+
+TEST_F(QueryPlannerTest, ExprEqCanUseSuffixOfTextIndex) {
+    params.options = QueryPlannerParams::NO_TABLE_SCAN;
+    addIndex(BSON("_fts"
+                  << "text"
+                  << "_ftsx"
+                  << 1
+                  << "a"
+                  << 1));
+
+    runQuery(fromjson("{a: {$_internalExprEq: 3}, $text: {$search: 'blah'}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{text: {search: 'blah', prefix: {}, filter: {a: {$_internalExprEq: 3}}}}");
+}
+
 }  // namespace

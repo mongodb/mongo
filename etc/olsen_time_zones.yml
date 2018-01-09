@@ -8,7 +8,7 @@ functions:
         working_dir: src
         script: |
           cd src/third_party/timelib-*/zones
-          make timezonedb.zip
+          make timezonedb.zip CFLAGS=-DHAVE_SNPRINTF=1
           cp timezonedb.zip timezonedb-latest.zip
 
   "publish" :

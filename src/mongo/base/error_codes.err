@@ -231,6 +231,9 @@ error_code("DNSHostNotFound", 230)
 error_code("DNSProtocolError", 231)
 error_code("MaxSubPipelineDepthExceeded", 232)
 error_code("TooManyDocumentSequences", 233)
+error_code("RetryChangeStream", 234)
+error_code("InternalErrorNotSupported", 235) # this function or module is not available on this platform or configuration
+error_code("ForTestingErrorExtraInfo", 236, extra="ErrorExtraInfoExample")
 
 # Error codes 4000-8999 are reserved.
 
@@ -282,3 +285,5 @@ error_class("ShutdownError", ["ShutdownInProgress", "InterruptedAtShutdown"])
 #TODO SERVER-28679 add checksum failure.
 error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
                                                  "TooManyDocumentSequences"])
+
+error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "NetworkInterfaceExceededTimeLimit"])

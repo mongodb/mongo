@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test basic query stage index scan functionality.
 t = db.stages_ixscan;
 t.drop();

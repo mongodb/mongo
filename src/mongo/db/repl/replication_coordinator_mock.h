@@ -119,7 +119,7 @@ public:
     virtual void setMyLastAppliedOpTime(const OpTime& opTime);
     virtual void setMyLastDurableOpTime(const OpTime& opTime);
 
-    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime);
+    virtual void setMyLastAppliedOpTimeForward(const OpTime& opTime, DataConsistency consistency);
     virtual void setMyLastDurableOpTimeForward(const OpTime& opTime);
 
     virtual void resetMyLastOpTimes();
@@ -132,6 +132,9 @@ public:
     virtual Status waitUntilOpTimeForRead(OperationContext* opCtx,
                                           const ReadConcernArgs& settings) override;
 
+    virtual Status waitUntilOpTimeForReadUntil(OperationContext* opCtx,
+                                               const ReadConcernArgs& settings,
+                                               boost::optional<Date_t> deadline) override;
     virtual OID getElectionId();
 
     virtual OID getMyRID() const;
@@ -150,8 +153,7 @@ public:
 
     virtual Status resyncData(OperationContext* opCtx, bool waitUntilCompleted) override;
 
-    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
-        ReplSetUpdatePositionCommandStyle commandStyle) const override;
+    virtual StatusWith<BSONObj> prepareReplSetUpdatePositionCommand() const override;
 
     virtual Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle);
 
@@ -196,8 +198,6 @@ public:
 
     virtual Status processReplSetElect(const ReplSetElectArgs& args, BSONObjBuilder* resultObj);
 
-    virtual Status processReplSetUpdatePosition(const OldUpdatePositionArgs& updates,
-                                                long long* configVersion);
     virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                 long long* configVersion);
 
@@ -217,7 +217,7 @@ public:
 
     virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
 
-    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx);
+    virtual void resetLastOpTimesFromOplog(OperationContext* opCtx, DataConsistency consistency);
 
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const rpc::ReplSetMetadata& replMetadata,
@@ -247,18 +247,14 @@ public:
 
     virtual Status updateTerm(OperationContext* opCtx, long long term);
 
-    virtual SnapshotName reserveSnapshotName(OperationContext* opCtx);
-
-    virtual void createSnapshot(OperationContext* opCtx,
-                                OpTime timeOfSnapshot,
-                                SnapshotName name) override;
+    virtual Timestamp reserveSnapshotName(OperationContext* opCtx);
 
     virtual void dropAllSnapshots() override;
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 
     virtual void waitUntilSnapshotCommitted(OperationContext* opCtx,
-                                            const SnapshotName& untilSnapshot) override;
+                                            const Timestamp& untilSnapshot) override;
 
     virtual size_t getNumUncommittedSnapshots() override;
 

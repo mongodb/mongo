@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 (function() {
     // SERVER-30406 Test that renaming system.views correctly invalidates the view catalog
     'use strict';

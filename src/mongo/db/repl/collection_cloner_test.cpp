@@ -63,8 +63,13 @@ public:
     BaseCloner* getCloner() const override;
 
 protected:
+    auto setStatusCallback() {
+        return [this](const Status& s) { setStatus(s); };
+    }
+
     void setUp() override;
     void tearDown() override;
+
     std::vector<BSONObj> makeSecondaryIndexSpecs(const NamespaceString& nss);
 
     // A simple arbitrary value to use as the default batch size.
@@ -84,16 +89,15 @@ void CollectionClonerTest::setUp() {
     BaseClonerTest::setUp();
     options = {};
     collectionCloner.reset(nullptr);
-    collectionCloner = stdx::make_unique<CollectionCloner>(
-        &getExecutor(),
-        dbWorkThreadPool.get(),
-        target,
-        nss,
-        options,
-        stdx::bind(&CollectionClonerTest::setStatus, this, stdx::placeholders::_1),
-        storageInterface.get(),
-        defaultBatchSize,
-        defaultNumCloningCursors);
+    collectionCloner = stdx::make_unique<CollectionCloner>(&getExecutor(),
+                                                           dbWorkThreadPool.get(),
+                                                           target,
+                                                           nss,
+                                                           options,
+                                                           setStatusCallback(),
+                                                           storageInterface.get(),
+                                                           defaultBatchSize,
+                                                           defaultNumCloningCursors);
     collectionStats = CollectionMockStats();
     storageInterface->createCollectionForBulkFn =
         [this](const NamespaceString& nss,
@@ -362,16 +366,15 @@ TEST_F(CollectionClonerTest,
             return str::equals("listIndexes", request.cmdObj.firstElementFieldName());
         });
 
-    collectionCloner = stdx::make_unique<CollectionCloner>(
-        &_executorProxy,
-        dbWorkThreadPool.get(),
-        target,
-        nss,
-        options,
-        stdx::bind(&CollectionClonerTest::setStatus, this, stdx::placeholders::_1),
-        storageInterface.get(),
-        defaultBatchSize,
-        defaultNumCloningCursors);
+    collectionCloner = stdx::make_unique<CollectionCloner>(&_executorProxy,
+                                                           dbWorkThreadPool.get(),
+                                                           target,
+                                                           nss,
+                                                           options,
+                                                           setStatusCallback(),
+                                                           storageInterface.get(),
+                                                           defaultBatchSize,
+                                                           defaultNumCloningCursors);
 
     ASSERT_OK(collectionCloner->startup());
 
@@ -386,16 +389,15 @@ TEST_F(CollectionClonerTest,
 TEST_F(CollectionClonerTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
     options = {};
     options.autoIndexId = CollectionOptions::NO;
-    collectionCloner.reset(new CollectionCloner(
-        &getExecutor(),
-        dbWorkThreadPool.get(),
-        target,
-        nss,
-        options,
-        stdx::bind(&CollectionClonerTest::setStatus, this, stdx::placeholders::_1),
-        storageInterface.get(),
-        defaultBatchSize,
-        defaultNumCloningCursors));
+    collectionCloner.reset(new CollectionCloner(&getExecutor(),
+                                                dbWorkThreadPool.get(),
+                                                target,
+                                                nss,
+                                                options,
+                                                setStatusCallback(),
+                                                storageInterface.get(),
+                                                defaultBatchSize,
+                                                defaultNumCloningCursors));
 
     NamespaceString collNss;
     CollectionOptions collOptions;
@@ -1409,16 +1411,15 @@ protected:
     void startupWithUUID(int maxNumCloningCursors = 1) {
         collectionCloner.reset();
         options.uuid = UUID::gen();
-        collectionCloner = stdx::make_unique<CollectionCloner>(
-            &getExecutor(),
-            dbWorkThreadPool.get(),
-            target,
-            alternateNss,
-            options,
-            stdx::bind(&CollectionClonerTest::setStatus, this, stdx::placeholders::_1),
-            storageInterface.get(),
-            defaultBatchSize,
-            maxNumCloningCursors);
+        collectionCloner = stdx::make_unique<CollectionCloner>(&getExecutor(),
+                                                               dbWorkThreadPool.get(),
+                                                               target,
+                                                               alternateNss,
+                                                               options,
+                                                               setStatusCallback(),
+                                                               storageInterface.get(),
+                                                               defaultBatchSize,
+                                                               maxNumCloningCursors);
 
         ASSERT_OK(collectionCloner->startup());
     }
@@ -1575,6 +1576,10 @@ protected:
     void tearDown() override;
     std::vector<BSONObj> generateDocs(std::size_t numDocs);
 
+    auto setStatusCallback() {
+        return [this](const Status& s) { setStatus(s); };
+    }
+
     // A simple arbitrary value to use as the default batch size.
     const int defaultBatchSize = 1024;
 
@@ -1592,16 +1597,15 @@ void ParallelCollectionClonerTest::setUp() {
     BaseClonerTest::setUp();
     options = {};
     collectionCloner.reset(nullptr);
-    collectionCloner = stdx::make_unique<CollectionCloner>(
-        &getExecutor(),
-        dbWorkThreadPool.get(),
-        target,
-        nss,
-        options,
-        stdx::bind(&CollectionClonerTest::setStatus, this, stdx::placeholders::_1),
-        storageInterface.get(),
-        defaultBatchSize,
-        defaultNumCloningCursors);
+    collectionCloner = stdx::make_unique<CollectionCloner>(&getExecutor(),
+                                                           dbWorkThreadPool.get(),
+                                                           target,
+                                                           nss,
+                                                           options,
+                                                           setStatusCallback(),
+                                                           storageInterface.get(),
+                                                           defaultBatchSize,
+                                                           defaultNumCloningCursors);
     collectionStats = CollectionMockStats();
     storageInterface->createCollectionForBulkFn =
         [this](const NamespaceString& nss,

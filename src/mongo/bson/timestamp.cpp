@@ -55,25 +55,17 @@ void Timestamp::append(BufBuilder& builder, const StringData& fieldName) const {
     builder.appendNum(asULL());
 }
 
-std::string Timestamp::toStringLong() const {
-    std::stringstream ss;
-    ss << time_t_to_String_short(secs) << ' ';
-    ss << std::hex << secs << ':' << i;
-    return ss.str();
-}
-
 std::string Timestamp::toStringPretty() const {
     std::stringstream ss;
-    ss << time_t_to_String_short(secs) << ':' << std::hex << i;
+    ss << time_t_to_String_short(secs) << ':' << i;
     return ss.str();
 }
 
 std::string Timestamp::toString() const {
     std::stringstream ss;
-    ss << std::hex << secs << ':' << i;
+    ss << "Timestamp(" << secs << ", " << i << ")";
     return ss.str();
 }
-
 
 BSONObj Timestamp::toBSON() const {
     BSONObjBuilder bldr;

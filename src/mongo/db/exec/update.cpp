@@ -176,6 +176,14 @@ UpdateStage::UpdateStage(OperationContext* opCtx,
       _doc(params.driver->getDocument()) {
     _children.emplace_back(child);
 
+    // Should the modifiers validate their embedded docs via storage_validation::storageValid()?
+    // Only user updates should be checked. Any system or replication stuff should pass through.
+    // Config db docs also do not get checked.
+    const auto request = _params.request;
+    _enforceOkForStorage =
+        !(request->isFromOplogApplication() || request->getNamespaceString().isConfigDB() ||
+          request->isFromMigration());
+
     // Before we even start executing, we know whether or not this is a replacement
     // style or $mod style update.
     _specificStats.isDocReplacement = params.driver->isDocReplacement();
@@ -206,8 +214,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     bool docWasModified = false;
 
     Status status = Status::OK();
-    const bool validateForStorage = getOpCtx()->writesAreReplicated() &&
-        !request->isFromMigration() && driver->modOptions().enforceOkForStorage;
+    const bool validateForStorage = getOpCtx()->writesAreReplicated() && _enforceOkForStorage;
     FieldRefSet immutablePaths;
     if (getOpCtx()->writesAreReplicated() && !request->isFromMigration()) {
         if (lifecycle) {
@@ -222,13 +229,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
     }
     if (!driver->needMatchDetails()) {
         // If we don't need match details, avoid doing the rematch
-        status = driver->update(StringData(),
-                                oldObj.value(),
-                                &_doc,
-                                validateForStorage,
-                                immutablePaths,
-                                &logObj,
-                                &docWasModified);
+        status = driver->update(
+            StringData(), &_doc, validateForStorage, immutablePaths, &logObj, &docWasModified);
     } else {
         // If there was a matched field, obtain it.
         MatchDetails matchDetails;
@@ -241,13 +243,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
         if (matchDetails.hasElemMatchKey())
             matchedField = matchDetails.elemMatchKey();
 
-        status = driver->update(matchedField,
-                                oldObj.value(),
-                                &_doc,
-                                validateForStorage,
-                                immutablePaths,
-                                &logObj,
-                                &docWasModified);
+        status = driver->update(
+            matchedField, &_doc, validateForStorage, immutablePaths, &logObj, &docWasModified);
     }
 
     if (!status.isOK()) {
@@ -375,6 +372,7 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
                                              mutablebson::Document* doc,
                                              bool isInternalRequest,
                                              const NamespaceString& ns,
+                                             bool enforceOkForStorage,
                                              UpdateStats* stats) {
     // Since this is an insert (no docs found and upsert:true), we will be logging it
     // as an insert in the oplog. We don't need the driver's help to build the
@@ -393,18 +391,13 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     }
     immutablePaths.keepShortest(&idFieldRef);
 
-    // The original document we compare changes to - immutable paths must not change
-    BSONObj original;
-
     if (cq) {
         uassertStatusOK(driver->populateDocumentWithQueryFields(*cq, immutablePaths, *doc));
         if (driver->isDocReplacement())
             stats->fastmodinsert = true;
-        original = doc->getObject();
     } else {
         fassert(17354, CanonicalQuery::isSimpleIdQuery(query));
         BSONElement idElt = query[idFieldName];
-        original = idElt.wrap();
         fassert(17352, doc->root().appendElement(idElt));
     }
 
@@ -414,8 +407,7 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     if (isInternalRequest) {
         immutablePaths.clear();
     }
-    Status updateStatus =
-        driver->update(StringData(), original, doc, validateForStorage, immutablePaths);
+    Status updateStatus = driver->update(StringData(), doc, validateForStorage, immutablePaths);
     if (!updateStatus.isOK()) {
         uasserted(16836, updateStatus.reason());
     }
@@ -432,7 +424,7 @@ BSONObj UpdateStage::applyUpdateOpsForInsert(OperationContext* opCtx,
     // that contains all the immutable keys and can be stored if it isn't coming
     // from a migration or via replication.
     if (!isInternalRequest) {
-        if (driver->modOptions().enforceOkForStorage) {
+        if (enforceOkForStorage) {
             storage_validation::storageValid(*doc);
         }
         checkImmutablePathsPresent(*doc, immutablePaths);
@@ -463,6 +455,7 @@ void UpdateStage::doInsert() {
                                              &_doc,
                                              isInternalRequest,
                                              request->getNamespaceString(),
+                                             _enforceOkForStorage,
                                              &_specificStats);
 
     _specificStats.objInserted = newObj;

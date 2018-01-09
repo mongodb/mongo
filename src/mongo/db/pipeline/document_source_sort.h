@@ -230,6 +230,13 @@ private:
      */
     BSONObj extractKeyWithArray(const Document& doc) const;
 
+    /**
+     * Returns the comparison key used to sort 'val' with the collation of the ExpressionContext.
+     * Note that these comparison keys should always be sorted with the simple (i.e. binary)
+     * collation.
+     */
+    Value getCollationComparisonKey(const Value& val) const;
+
     int compare(const Value& lhs, const Value& rhs) const;
 
     /**

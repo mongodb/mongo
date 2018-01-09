@@ -28,7 +28,8 @@ load('jstests/aggregation/extras/utils.js');
         {_id: 5, b: null},
         {_id: 6, b: null},
     ];
-    var results = coll.aggregate([{$project: {b: {$filter: filterDoc}}}]).toArray();
+    var results =
+        coll.aggregate([{$project: {b: {$filter: filterDoc}}}, {$sort: {_id: 1}}]).toArray();
     assert.eq(results, expectedResults);
 
     // create filter that uses the default variable name in 'cond'
@@ -42,13 +43,10 @@ load('jstests/aggregation/extras/utils.js');
         {_id: 5, b: null},
         {_id: 6, b: null},
     ];
-    results = coll.aggregate([{$project: {b: {$filter: filterDoc}}}]).toArray();
+    results = coll.aggregate([{$project: {b: {$filter: filterDoc}}}, {$sort: {_id: 1}}]).toArray();
     assert.eq(results, expectedResults);
 
     // Invalid filter expressions.
-
-    // Insert a document so that the initial cursor doesn't immediately return EOF.
-    coll.insert({_id: 0, a: [1, 2]});
 
     // '$filter' is not a document.
     var filterDoc = 'string';
@@ -78,7 +76,7 @@ load('jstests/aggregation/extras/utils.js');
     filterDoc = {input: '$a', cond: {$eq: [1, '$$var']}};
     assertErrorCode(coll, [{$project: {b: {$filter: filterDoc}}}], 17276);
 
-    coll.drop();
+    assert(coll.drop());
     assert.writeOK(coll.insert({a: 'string'}));
     filterDoc = {input: '$a', as: 'x', cond: true};
     assertErrorCode(coll, [{$project: {b: {$filter: filterDoc}}}], 28651);

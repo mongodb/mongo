@@ -313,15 +313,20 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
 }
 
 Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationContext* opCtx,
-                                                                      const std::string& version) {
+                                                                      const BSONObj& cmdObj) {
 
     // No shards should be added until we have forwarded featureCompatibilityVersion to all shards.
     Lock::SharedLock lk(opCtx->lockState(), _kShardMembershipLock);
 
-    std::vector<ShardId> shardIds;
-    Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
-    for (const ShardId& shardId : shardIds) {
-        const auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
+    // We do a direct read of the shards collection with local readConcern so no shards are missed,
+    // but don't go through the ShardRegistry to prevent it from caching data that may be rolled
+    // back.
+    const auto opTimeWithShards = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllShards(
+        opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+
+    for (const auto& shardType : opTimeWithShards.value) {
+        const auto shardStatus =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardType.getName());
         if (!shardStatus.isOK()) {
             continue;
         }
@@ -331,7 +336,7 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             "admin",
-            BSON(FeatureCompatibilityVersion::kCommandName << version),
+            cmdObj,
             Shard::RetryPolicy::kIdempotent);
         if (!response.isOK()) {
             return response.getStatus();

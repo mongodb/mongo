@@ -43,7 +43,7 @@ namespace mongo {
 class RouterStagePipeline final : public RouterExecStage {
 public:
     RouterStagePipeline(std::unique_ptr<RouterExecStage> child,
-                        std::unique_ptr<Pipeline, Pipeline::Deleter> mergePipeline);
+                        std::unique_ptr<Pipeline, PipelineDeleter> mergePipeline);
 
     StatusWith<ClusterQueryResult> next(RouterExecStage::ExecContext execContext) final;
 
@@ -60,7 +60,7 @@ protected:
 
 private:
     boost::intrusive_ptr<DocumentSourceRouterAdapter> _routerAdapter;
-    std::unique_ptr<Pipeline, Pipeline::Deleter> _mergePipeline;
+    std::unique_ptr<Pipeline, PipelineDeleter> _mergePipeline;
     bool _mongosOnlyPipeline;
 };
 }  // namespace mongo

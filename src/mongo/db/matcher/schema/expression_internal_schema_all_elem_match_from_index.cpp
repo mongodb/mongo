@@ -36,10 +36,18 @@ namespace mongo {
 
 constexpr StringData InternalSchemaAllElemMatchFromIndexMatchExpression::kName;
 
+InternalSchemaAllElemMatchFromIndexMatchExpression::
+    InternalSchemaAllElemMatchFromIndexMatchExpression(
+        StringData path, long long index, std::unique_ptr<ExpressionWithPlaceholder> expression)
+    : ArrayMatchingMatchExpression(MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX,
+                                   path),
+      _index(index),
+      _expression(std::move(expression)) {}
+
 std::unique_ptr<MatchExpression> InternalSchemaAllElemMatchFromIndexMatchExpression::shallowClone()
     const {
-    auto clone = stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>();
-    invariantOK(clone->init(path(), _index, _expression->shallowClone()));
+    auto clone = stdx::make_unique<InternalSchemaAllElemMatchFromIndexMatchExpression>(
+        path(), _index, _expression->shallowClone());
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }

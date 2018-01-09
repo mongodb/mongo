@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo {
@@ -80,6 +81,38 @@ TEST_F(DocumentSourceGeoNearTest, ShouldReportOutputsAreSortedByDistanceField) {
 
     ASSERT_EQUALS(outputSort.count(BSON("dist" << -1)), 1U);
     ASSERT_EQUALS(outputSort.size(), 1U);
+}
+
+TEST_F(DocumentSourceGeoNearTest, FailToParseIfKeyFieldNotAString) {
+    auto stageObj = fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], key: 1}}");
+    ASSERT_THROWS_CODE(DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+}
+
+TEST_F(DocumentSourceGeoNearTest, FailToParseIfKeyIsTheEmptyString) {
+    auto stageObj = fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], key: ''}}");
+    ASSERT_THROWS_CODE(DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+TEST_F(DocumentSourceGeoNearTest, CanParseAndSerializeKeyField) {
+    auto stageObj = fromjson("{$geoNear: {distanceField: 'dist', near: [0, 0], key: 'a.b'}}");
+    auto geoNear = DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx());
+    std::vector<Value> serialized;
+    geoNear->serializeToArray(serialized);
+    ASSERT_EQ(serialized.size(), 1u);
+    auto expectedSerialization =
+        Value{Document{{"$geoNear",
+                        Value{Document{{"key", "a.b"_sd},
+                                       {"near", std::vector<Value>{Value{0}, Value{0}}},
+                                       {"distanceField", "dist"_sd},
+                                       {"limit", 100},
+                                       {"query", BSONObj()},
+                                       {"spherical", false},
+                                       {"distanceMultiplier", 1}}}}}};
+    ASSERT_VALUE_EQ(expectedSerialization, serialized[0]);
 }
 
 }  // namespace

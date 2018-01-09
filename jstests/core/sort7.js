@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Check sorting of array sub field SERVER-480.
 
 t = db.jstests_sort7;

@@ -28,14 +28,13 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/write_ops/batch_write_exec.h"
-
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_test_fixture.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/mock_ns_targeter.h"
@@ -43,16 +42,11 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
-using std::unique_ptr;
-using std::string;
-using std::vector;
-
 namespace {
 
 const HostAndPort kTestShardHost = HostAndPort("FakeHost", 12345);
 const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
-const string shardName = "FakeShard";
+const std::string shardName = "FakeShard";
 const int kMaxRoundsWithoutProgress = 5;
 
 /**
@@ -87,14 +81,18 @@ public:
         setupShards(shards);
 
         // Set up the namespace targeter to target the fake shard.
-        ShardEndpoint endpoint(shardName, ChunkVersion::IGNORED());
-        vector<MockRange*> mockRanges;
-        mockRanges.push_back(
-            new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
-        nsTargeter.init(mockRanges);
+        nsTargeter.init(nss,
+                        {MockRange(ShardEndpoint(shardName, ChunkVersion::IGNORED()),
+                                   BSON("x" << MINKEY),
+                                   BSON("x" << MAXKEY))});
     }
 
     void expectInsertsReturnSuccess(const std::vector<BSONObj>& expected) {
+        expectInsertsReturnSuccess(expected.begin(), expected.end());
+    }
+
+    void expectInsertsReturnSuccess(std::vector<BSONObj>::const_iterator expectedFrom,
+                                    std::vector<BSONObj>::const_iterator expectedTo) {
         onCommandForPoolExecutor([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQUALS(nss.db(), request.dbname);
 
@@ -103,10 +101,11 @@ public:
             ASSERT_EQUALS(nss.toString(), actualBatchedInsert.getNS().ns());
 
             const auto& inserted = actualBatchedInsert.getInsertRequest().getDocuments();
-            ASSERT_EQUALS(expected.size(), inserted.size());
+            const size_t expectedSize = std::distance(expectedFrom, expectedTo);
+            ASSERT_EQUALS(expectedSize, inserted.size());
 
             auto itInserted = inserted.begin();
-            auto itExpected = expected.begin();
+            auto itExpected = expectedFrom;
 
             for (; itInserted != inserted.end(); itInserted++, itExpected++) {
                 ASSERT_BSONOBJ_EQ(*itExpected, *itInserted);
@@ -114,6 +113,7 @@ public:
 
             BatchedCommandResponse response;
             response.setOk(true);
+            response.setN(inserted.size());
 
             return response.toBSON();
         });
@@ -209,10 +209,49 @@ TEST_F(BatchWriteExecTest, SingleOp) {
         BatchWriteExecStats stats;
         BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
         ASSERT(response.getOk());
-        ASSERT_EQUALS(stats.numRounds, 1);
+        ASSERT_EQ(1LL, response.getN());
+        ASSERT_EQ(1, stats.numRounds);
     });
 
     expectInsertsReturnSuccess(std::vector<BSONObj>{BSON("x" << 1)});
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(BatchWriteExecTest, MultiOpLarge) {
+    const int kNumDocsToInsert = 100'000;
+    const std::string kDocValue(200, 'x');
+
+    std::vector<BSONObj> docsToInsert;
+    docsToInsert.reserve(kNumDocsToInsert);
+    for (int i = 0; i < kNumDocsToInsert; i++) {
+        docsToInsert.push_back(BSON("_id" << i << "someLargeKeyToWasteSpace" << kDocValue));
+    }
+
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(docsToInsert);
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+
+        ASSERT(response.getOk());
+        ASSERT_EQUALS(response.getN(), kNumDocsToInsert);
+        ASSERT_EQUALS(stats.numRounds, 2);
+    });
+
+    expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.begin() + 66576);
+    expectInsertsReturnSuccess(docsToInsert.begin() + 66576, docsToInsert.end());
 
     future.timed_get(kFutureTimeout);
 }
@@ -240,13 +279,13 @@ TEST_F(BatchWriteExecTest, SingleOpError) {
         BatchWriteExecStats stats;
         BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
         ASSERT(response.getOk());
-        ASSERT_EQUALS(response.getN(), 0);
+        ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
-        ASSERT_EQUALS(response.getErrDetailsAt(0)->getErrCode(), errResponse.getErrCode());
+        ASSERT_EQ(errResponse.getErrCode(), response.getErrDetailsAt(0)->getErrCode());
         ASSERT(response.getErrDetailsAt(0)->getErrMessage().find(errResponse.getErrMessage()) !=
-               string::npos);
+               std::string::npos);
 
-        ASSERT_EQUALS(stats.numRounds, 1);
+        ASSERT_EQ(1, stats.numRounds);
     });
 
     expectInsertsReturnError({BSON("x" << 1)}, errResponse);
@@ -278,7 +317,7 @@ TEST_F(BatchWriteExecTest, StaleOp) {
         BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
         ASSERT(response.getOk());
 
-        ASSERT_EQUALS(stats.numStaleBatches, 1);
+        ASSERT_EQUALS(1, stats.numStaleBatches);
     });
 
     const std::vector<BSONObj> expected{BSON("x" << 1)};
@@ -308,7 +347,7 @@ TEST_F(BatchWriteExecTest, MultiStaleOp) {
         BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
         ASSERT(response.getOk());
 
-        ASSERT_EQUALS(stats.numStaleBatches, 3);
+        ASSERT_EQUALS(3, stats.numStaleBatches);
     });
 
     const std::vector<BSONObj> expected{BSON("x" << 1)};
@@ -344,7 +383,7 @@ TEST_F(BatchWriteExecTest, TooManyStaleOp) {
         BatchWriteExecStats stats;
         BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
         ASSERT(response.getOk());
-        ASSERT_EQUALS(response.getN(), 0);
+        ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
         ASSERT_EQUALS(response.getErrDetailsAt(0)->getErrCode(), ErrorCodes::NoProgressMade);
         ASSERT_EQUALS(response.getErrDetailsAt(1)->getErrCode(), ErrorCodes::NoProgressMade);
@@ -356,6 +395,49 @@ TEST_F(BatchWriteExecTest, TooManyStaleOp) {
     for (int i = 0; i < (1 + kMaxRoundsWithoutProgress); i++) {
         expectInsertsReturnStaleVersionErrors({BSON("x" << 1), BSON("x" << 2)});
     }
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(BatchWriteExecTest, RetryableWritesLargeBatch) {
+    // A retryable error without a txnNumber is not retried.
+
+    const int kNumDocsToInsert = 100'000;
+    const std::string kDocValue(200, 'x');
+
+    std::vector<BSONObj> docsToInsert;
+    docsToInsert.reserve(kNumDocsToInsert);
+    for (int i = 0; i < kNumDocsToInsert; i++) {
+        docsToInsert.push_back(BSON("_id" << i << "someLargeKeyToWasteSpace" << kDocValue));
+    }
+
+    BatchedCommandRequest request([&] {
+        write_ops::Insert insertOp(nss);
+        insertOp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase writeCommandBase;
+            writeCommandBase.setOrdered(true);
+            return writeCommandBase;
+        }());
+        insertOp.setDocuments(docsToInsert);
+        return insertOp;
+    }());
+    request.setWriteConcern(BSONObj());
+
+    operationContext()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    operationContext()->setTxnNumber(5);
+
+    auto future = launchAsync([&] {
+        BatchedCommandResponse response;
+        BatchWriteExecStats stats;
+        BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
+
+        ASSERT(response.getOk());
+        ASSERT_EQUALS(response.getN(), kNumDocsToInsert);
+        ASSERT_EQUALS(stats.numRounds, 2);
+    });
+
+    expectInsertsReturnSuccess(docsToInsert.begin(), docsToInsert.begin() + 63791);
+    expectInsertsReturnSuccess(docsToInsert.begin() + 63791, docsToInsert.end());
 
     future.timed_get(kFutureTimeout);
 }
@@ -386,12 +468,12 @@ TEST_F(BatchWriteExecTest, RetryableErrorNoTxnNumber) {
         BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
 
         ASSERT(response.getOk());
-        ASSERT_EQUALS(response.getN(), 0);
+        ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
         ASSERT_EQUALS(response.getErrDetailsAt(0)->getErrCode(), retryableErrResponse.getErrCode());
         ASSERT(response.getErrDetailsAt(0)->getErrMessage().find(
-                   retryableErrResponse.getErrMessage()) != string::npos);
-        ASSERT_EQUALS(stats.numRounds, 1);
+                   retryableErrResponse.getErrMessage()) != std::string::npos);
+        ASSERT_EQ(1, stats.numRounds);
     });
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, retryableErrResponse);
@@ -429,7 +511,7 @@ TEST_F(BatchWriteExecTest, RetryableErrorTxnNumber) {
 
         ASSERT(response.getOk());
         ASSERT(!response.isErrDetailsSet());
-        ASSERT_EQUALS(stats.numRounds, 1);
+        ASSERT_EQ(1, stats.numRounds);
     });
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, retryableErrResponse);
@@ -467,13 +549,13 @@ TEST_F(BatchWriteExecTest, NonRetryableErrorTxnNumber) {
         BatchWriteExec::executeBatch(operationContext(), nsTargeter, request, &response, &stats);
 
         ASSERT(response.getOk());
-        ASSERT_EQUALS(response.getN(), 0);
+        ASSERT_EQ(0, response.getN());
         ASSERT(response.isErrDetailsSet());
         ASSERT_EQUALS(response.getErrDetailsAt(0)->getErrCode(),
                       nonRetryableErrResponse.getErrCode());
         ASSERT(response.getErrDetailsAt(0)->getErrMessage().find(
-                   nonRetryableErrResponse.getErrMessage()) != string::npos);
-        ASSERT_EQUALS(stats.numRounds, 1);
+                   nonRetryableErrResponse.getErrMessage()) != std::string::npos);
+        ASSERT_EQ(1, stats.numRounds);
     });
 
     expectInsertsReturnError({BSON("x" << 1), BSON("x" << 2)}, nonRetryableErrResponse);

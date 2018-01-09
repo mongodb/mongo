@@ -17,7 +17,7 @@
 from __future__ import absolute_import, print_function, unicode_literals
 
 import unittest
-from typing import Any
+from typing import Any, Tuple
 
 if __name__ == 'testcase':
     import sys
@@ -146,3 +146,13 @@ class IDLTestcase(unittest.TestCase):
             bound_doc.errors.contains(error_id),
             "For document:\n%s\nExpected error message '%s' but received only errors:\n %s" %
             (doc_str, error_id, errors_to_str(bound_doc.errors)))
+
+    def assert_generate(self, doc_str, resolver=NothingImportResolver()):
+        # type: (unicode, idl.parser.ImportResolverBase) -> Tuple[unicode,unicode]
+        """Assert a document parsed, bound, and generated correctly by the IDL compiler."""
+        spec = self.assert_bind(doc_str, resolver)
+
+        header = idl.generator.generate_header_str(spec)
+        source = idl.generator.generate_source_str(spec, "fake", "fake_header")
+
+        return (header, source)

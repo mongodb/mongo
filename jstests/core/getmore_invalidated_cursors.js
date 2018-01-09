@@ -1,3 +1,5 @@
+// @tags: [requires_getmore, requires_non_retryable_commands]
+
 // Tests that running a getMore on a cursor that has been invalidated by something like a collection
 // drop will return an appropriate error message.
 (function() {

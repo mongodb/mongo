@@ -141,8 +141,8 @@ DEATH_TEST_F(UpdateArrayNodeTest,
                                               foundIdentifiers));
 
     mutablebson::Document doc(fromjson("{a: [{c: 0}, {c: 0}, {c: 1}]}"));
-    doc.root()["a"]["1"]["c"].setValueInt(1).transitional_ignore();
-    doc.root()["a"]["2"]["c"].setValueInt(0).transitional_ignore();
+    ASSERT_OK(doc.root()["a"][1]["c"].setValueInt(1));
+    ASSERT_OK(doc.root()["a"][2]["c"].setValueInt(0));
     addIndexedPath("a");
     root.apply(getApplyParams(doc.root()));
 }

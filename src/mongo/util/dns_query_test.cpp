@@ -61,7 +61,7 @@ TEST(MongoDnsQuery, basic) {
             // these servers.  The `.net` domain is the domain with the canonical addresses for
             // these servers.
             {"a.root-servers.net.", "198.41.0.4"},
-            {"b.root-servers.net.", "192.228.79.201"},
+            {"b.root-servers.net.", "199.9.14.201"},
             {"c.root-servers.net.", "192.33.4.12"},
             {"d.root-servers.net.", "199.7.91.13"},
             {"e.root-servers.net.", "192.203.230.10"},
@@ -109,15 +109,15 @@ TEST(MongoDnsQuery, srvRecords) {
     } tests[] = {
         {"test1.test.build.10gen.cc.",
          {
-             {"localhost.build.10gen.cc.", 27017}, {"localhost.build.10gen.cc.", 27018},
+             {"localhost.test.build.10gen.cc.", 27017}, {"localhost.test.build.10gen.cc.", 27018},
          }},
         {"test2.test.build.10gen.cc.",
          {
-             {"localhost.build.10gen.cc.", 27018}, {"localhost.build.10gen.cc.", 27019},
+             {"localhost.test.build.10gen.cc.", 27018}, {"localhost.test.build.10gen.cc.", 27019},
          }},
         {"test3.test.build.10gen.cc.",
          {
-             {"localhost.build.10gen.cc.", 27017},
+             {"localhost.test.build.10gen.cc.", 27017},
          }},
 
         // Test case 4 does not exist in the expected DNS records.
@@ -125,11 +125,11 @@ TEST(MongoDnsQuery, srvRecords) {
 
         {"test5.test.build.10gen.cc.",
          {
-             {"localhost.build.10gen.cc.", 27017},
+             {"localhost.test.build.10gen.cc.", 27017},
          }},
         {"test6.test.build.10gen.cc.",
          {
-             {"localhost.build.10gen.cc.", 27017},
+             {"localhost.test.build.10gen.cc.", 27017},
          }},
     };
     for (const auto& test : tests) {
@@ -169,11 +169,11 @@ TEST(MongoDnsQuery, txtRecords) {
 
         {"test5.test.build.10gen.cc",
          {
-             "connectTimeoutMS=300000&socketTimeoutMS=300000",
+             "replicaSet=repl0&authSource=thisDB",
          }},
         {"test6.test.build.10gen.cc",
          {
-             "connectTimeoutMS=200000", "socketTimeoutMS=200000",
+             "authSource=otherDB", "replicaSet=repl0",
          }},
     };
 

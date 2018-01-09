@@ -34,7 +34,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document.h"
-#include "mongo/db/keys_collection_manager_sharding.h"
+#include "mongo/db/keys_collection_manager.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -51,7 +51,7 @@ namespace mongo {
 
 class KeysManagerShardedTest : public ConfigServerTestFixture {
 public:
-    KeysCollectionManagerSharding* keyManager() {
+    KeysCollectionManager* keyManager() {
         return _keyManager.get();
     }
 
@@ -71,8 +71,8 @@ protected:
         operationContext()->getServiceContext()->setFastClockSource(std::move(clockSource));
         auto catalogClient = stdx::make_unique<KeysCollectionClientSharded>(
             Grid::get(operationContext())->catalogClient());
-        _keyManager = stdx::make_unique<KeysCollectionManagerSharding>(
-            "dummy", std::move(catalogClient), Seconds(1));
+        _keyManager =
+            stdx::make_unique<KeysCollectionManager>("dummy", std::move(catalogClient), Seconds(1));
     }
 
     void tearDown() override {
@@ -88,7 +88,7 @@ protected:
     }
 
 private:
-    std::unique_ptr<KeysCollectionManagerSharding> _keyManager;
+    std::unique_ptr<KeysCollectionManager> _keyManager;
 };
 
 TEST_F(KeysManagerShardedTest, GetKeyForValidationTimesOutIfRefresherIsNotRunning) {

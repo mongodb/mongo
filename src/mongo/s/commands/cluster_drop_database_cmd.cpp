@@ -172,7 +172,7 @@ private:
     static void _dropDatabaseFromShard(OperationContext* opCtx,
                                        const ShardId& shardId,
                                        const std::string& dbName) {
-        const auto dropDatabaseCommandBSON = [opCtx, &dbName] {
+        const auto dropDatabaseCommandBSON = [opCtx] {
             BSONObjBuilder builder;
             builder.append("dropDatabase", 1);
 

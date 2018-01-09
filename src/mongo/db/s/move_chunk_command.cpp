@@ -36,15 +36,11 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
@@ -54,9 +50,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-using std::string;
-
 namespace {
 
 /**
@@ -100,7 +93,7 @@ public:
     }
 
     Status checkAuthForCommand(Client* client,
-                               const string& dbname,
+                               const std::string& dbname,
                                const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(), ActionType::internal)) {
@@ -109,12 +102,12 @@ public:
         return Status::OK();
     }
 
-    string parseNs(const string& dbname, const BSONObj& cmdObj) const override {
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
         return parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto shardingState = ShardingState::get(opCtx);
@@ -196,7 +189,7 @@ private:
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly});
         }());
 
-        string unusedErrMsg;
+        std::string unusedErrMsg;
         MoveTimingHelper moveTimingHelper(opCtx,
                                           "from",
                                           moveChunkRequest.getNss().ns(),

@@ -30,35 +30,27 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
 #include <string>
-#include <vector>
 
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/range_arithmetic.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
-#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
 
-#include <boost/optional.hpp>
-
 namespace mongo {
-
-using std::string;
-using str::stream;
-
 namespace {
 
 enum CleanupResult { CleanupResult_Done, CleanupResult_Continue, CleanupResult_Error };
@@ -78,29 +70,27 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                                   const BSONObj& startingFromKeyConst,
                                   const WriteConcernOptions& secondaryThrottle,
                                   BSONObj* stoppedAtKey,
-                                  string* errMsg) {
-
+                                  std::string* errMsg) {
     BSONObj startingFromKey = startingFromKeyConst;
     boost::optional<ChunkRange> targetRange;
     CollectionShardingState::CleanupNotification notifn;
-    OID epoch;
+
     {
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        auto css = CollectionShardingState::get(opCtx, ns.toString());
+        const auto css = CollectionShardingState::get(opCtx, ns.toString());
         auto metadata = css->getMetadata();
         if (!metadata) {
             log() << "skipping orphaned data cleanup for " << ns.toString()
                   << ", collection is not sharded";
             return CleanupResult_Done;
         }
-        epoch = metadata->getCollVersion().epoch();
 
         BSONObj keyPattern = metadata->getKeyPattern();
         if (!startingFromKey.isEmpty()) {
             if (!metadata->isValidKey(startingFromKey)) {
-                *errMsg = stream() << "could not cleanup orphaned data, start key "
-                                   << startingFromKey << " does not match shard key pattern "
-                                   << keyPattern;
+                *errMsg = str::stream() << "could not cleanup orphaned data, start key "
+                                        << startingFromKey << " does not match shard key pattern "
+                                        << keyPattern;
 
                 log() << *errMsg;
                 return CleanupResult_Error;
@@ -109,18 +99,16 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
             startingFromKey = metadata->getMinKey();
         }
 
-        boost::optional<KeyRange> orphanRange = css->getNextOrphanRange(startingFromKey);
-        if (!orphanRange) {
+        targetRange = css->getNextOrphanRange(startingFromKey);
+        if (!targetRange) {
             LOG(1) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
                    << redact(startingFromKey) << ", no orphan ranges remain";
 
             return CleanupResult_Done;
         }
-        orphanRange->ns = ns.ns();
-        *stoppedAtKey = orphanRange->maxKey;
 
-        targetRange.emplace(
-            ChunkRange(orphanRange->minKey.getOwned(), orphanRange->maxKey.getOwned()));
+        *stoppedAtKey = targetRange->getMax();
+
         notifn = css->cleanUpRange(*targetRange, CollectionShardingState::kNow);
     }
 
@@ -130,13 +118,17 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
     LOG(1) << "cleanupOrphaned requested for " << ns.toString() << " starting from "
            << redact(startingFromKey) << ", removing next orphan range "
            << redact(targetRange->toString()) << "; waiting...";
+
     Status result = notifn.waitStatus(opCtx);
+
     LOG(1) << "Finished waiting for last " << ns.toString() << " orphan range cleanup";
+
     if (!result.isOK()) {
         log() << redact(result.reason());
         *errMsg = result.reason();
         return CleanupResult_Error;
     }
+
     return CleanupResult_Continue;
 }
 
@@ -172,16 +164,17 @@ class CleanupOrphanedCommand : public ErrmsgCommandDeprecated {
 public:
     CleanupOrphanedCommand() : ErrmsgCommandDeprecated("cleanupOrphaned") {}
 
-    virtual bool slaveOk() const {
+    bool slaveOk() const override {
         return false;
     }
-    virtual bool adminOnly() const {
+
+    bool adminOnly() const override {
         return true;
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(), ActionType::cleanupOrphaned)) {
             return Status(ErrorCodes::Unauthorized, "Not authorized for cleanupOrphaned command.");
@@ -189,23 +182,23 @@ public:
         return Status::OK();
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
 
     // Input
-    static BSONField<string> nsField;
+    static BSONField<std::string> nsField;
     static BSONField<BSONObj> startingFromKeyField;
 
     // Output
     static BSONField<BSONObj> stoppedAtKeyField;
 
     bool errmsgRun(OperationContext* opCtx,
-                   string const& db,
+                   std::string const& db,
                    const BSONObj& cmdObj,
-                   string& errmsg,
-                   BSONObjBuilder& result) {
-        string ns;
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
+        std::string ns;
         if (!FieldParser::extract(cmdObj, nsField, &ns, &errmsg)) {
             return false;
         }
@@ -255,7 +248,7 @@ public:
 
 } cleanupOrphanedCmd;
 
-BSONField<string> CleanupOrphanedCommand::nsField("cleanupOrphaned");
+BSONField<std::string> CleanupOrphanedCommand::nsField("cleanupOrphaned");
 BSONField<BSONObj> CleanupOrphanedCommand::startingFromKeyField("startingFromKey");
 BSONField<BSONObj> CleanupOrphanedCommand::stoppedAtKeyField("stoppedAtKey");
 

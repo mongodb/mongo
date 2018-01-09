@@ -39,7 +39,7 @@ namespace mongo {
 class OperationContext;
 class ServiceContext;
 class KeysCollectionDocument;
-class KeysCollectionManagerSharding;
+class KeysCollectionManager;
 
 /**
  * This is responsible for signing cluster times that can be used to sent to other servers and
@@ -56,7 +56,7 @@ public:
      * Constructs a new LogicalTimeValidator that uses the given key manager. The passed-in
      * key manager must outlive this object.
      */
-    explicit LogicalTimeValidator(std::shared_ptr<KeysCollectionManagerSharding> keyManager);
+    explicit LogicalTimeValidator(std::shared_ptr<KeysCollectionManager> keyManager);
 
     /**
      * Tries to sign the newTime with a valid signature. Can return an empty signature and keyId
@@ -121,7 +121,7 @@ private:
     /**
      *  Returns the copy of the _keyManager to work when its reset by resetKeyManager call.
      */
-    std::shared_ptr<KeysCollectionManagerSharding> _getKeyManagerCopy();
+    std::shared_ptr<KeysCollectionManager> _getKeyManagerCopy();
 
 
     SignedLogicalTime _getProof(const KeysCollectionDocument& keyDoc, LogicalTime newTime);
@@ -130,7 +130,7 @@ private:
     stdx::mutex _mutexKeyManager;  // protects _keyManager
     SignedLogicalTime _lastSeenValidTime;
     TimeProofService _timeProofService;
-    std::shared_ptr<KeysCollectionManagerSharding> _keyManager;
+    std::shared_ptr<KeysCollectionManager> _keyManager;
 };
 
 }  // namespace mongo

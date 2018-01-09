@@ -132,15 +132,6 @@ public:
     }
 
     /**
-     * Returns true if 'me' is of type EQ, GT, GTE, LT, or LTE.
-     */
-    static bool isEqualityOrInequality(const MatchExpression* me) {
-        return (me->matchType() == MatchExpression::EQ || me->matchType() == MatchExpression::GT ||
-                me->matchType() == MatchExpression::GTE || me->matchType() == MatchExpression::LT ||
-                me->matchType() == MatchExpression::LTE);
-    }
-
-    /**
      * Returns true if 'elt' is a BSONType for which exact index bounds can be generated.
      */
     static bool isExactBoundsGenerating(BSONElement elt) {
@@ -177,7 +168,9 @@ private:
             me->matchType() == MatchExpression::TYPE_OPERATOR ||
             me->matchType() == MatchExpression::GEO ||
             me->matchType() == MatchExpression::GEO_NEAR ||
-            me->matchType() == MatchExpression::EXISTS || me->matchType() == MatchExpression::TEXT;
+            me->matchType() == MatchExpression::EXISTS ||
+            me->matchType() == MatchExpression::TEXT ||
+            me->matchType() == MatchExpression::INTERNAL_EXPR_EQ;
     }
 };
 

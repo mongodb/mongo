@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -1026,11 +1026,13 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		kvs_session_open_cursor,	/* session.open_cursor */
 		kvs_session_rename,		/* session.rename */
 		NULL,				/* No session.salvage */
+		NULL,				/* No session.size */
 		kvs_session_truncate,		/* session.truncate */
 		NULL,				/* No range_truncate */
 		kvs_session_verify,		/* session.verify */
 		NULL,				/* session.checkpoint */
-		kvs_terminate			/* termination */
+		kvs_terminate,			/* termination */
+		NULL				/* lsm_pre_merge */
 	};
 	DATA_SOURCE *ds;
 	DB_ENV *dbenv;

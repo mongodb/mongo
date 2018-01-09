@@ -53,7 +53,7 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
     invariant(!_isRunning);
     // Prime the oplog read timestamp.
     auto sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
-    _setOplogReadTimestamp(_fetchAllCommittedValue(sessionCache->conn()));
+    setOplogReadTimestamp(Timestamp(_fetchAllCommittedValue(sessionCache->conn())));
 
     std::unique_ptr<SeekableRecordCursor> reverseOplogCursor =
         oplogRecordStore->getCursor(opCtx, false /* false = reverse cursor */);
@@ -187,10 +187,8 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         sessionCache->waitUntilDurable(/*forceCheckpoint=*/false, false);
 
         lk.lock();
-
         // Publish the new timestamp value.
-        _setOplogReadTimestamp(newTimestamp);
-        _opsBecameVisibleCV.notify_all();
+        _setOplogReadTimestamp(lk, newTimestamp);
         lk.unlock();
 
         // Wake up any await_data cursors and tell them more data might be visible now.
@@ -199,7 +197,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
         // For master/slave masters, set oldest timestamp here so that we clean up old timestamp
         // data.  SERVER-31802
         if (isMasterSlave) {
-            sessionCache->getKVEngine()->setStableTimestamp(SnapshotName(newTimestamp));
+            sessionCache->getKVEngine()->setStableTimestamp(Timestamp(newTimestamp));
         }
     }
 }
@@ -209,11 +207,13 @@ std::uint64_t WiredTigerOplogManager::getOplogReadTimestamp() const {
 }
 
 void WiredTigerOplogManager::setOplogReadTimestamp(Timestamp ts) {
-    _oplogReadTimestamp.store(ts.asULL());
+    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
+    _setOplogReadTimestamp(lk, ts.asULL());
 }
 
-void WiredTigerOplogManager::_setOplogReadTimestamp(uint64_t newTimestamp) {
+void WiredTigerOplogManager::_setOplogReadTimestamp(WithLock, uint64_t newTimestamp) {
     _oplogReadTimestamp.store(newTimestamp);
+    _opsBecameVisibleCV.notify_all();
     LOG(2) << "setting new oplogReadTimestamp: " << newTimestamp;
 }
 

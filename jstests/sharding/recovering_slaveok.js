@@ -6,6 +6,11 @@
  * of 135MB across all sharding tests in mmapv1.
  * @tags: [resource_intensive]
  */
+
+// Shard secondaries are restarted, which may cause that shard's primary to stepdown while it does
+// not see the secondaries. Either the primary connection gets reset, or the primary could change.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     'use strict';
     load("jstests/replsets/rslib.js");
@@ -20,7 +25,8 @@
     var admin = mongos.getDB("admin");
     var config = mongos.getDB("config");
 
-    var dbase = mongos.getDB("test");
+    const dbName = "test";
+    var dbase = mongos.getDB(dbName);
     var coll = dbase.getCollection("foo");
     var dbaseSOk = mongosSOK.getDB("" + dbase);
     var collSOk = mongosSOK.getCollection("" + coll);
@@ -41,7 +47,12 @@
 
     print("2: shard collection");
 
-    shardTest.shardColl(coll, /* shardBy */ {_id: 1}, /* splitAt */ {_id: 0});
+    shardTest.shardColl(coll,
+                        /* shardBy */ {_id: 1},
+                        /* splitAt */ {_id: 0},
+                        /* move chunk */ {_id: 0},
+                        /* dbname */ null,
+                        /* waitForDelete */ true);
 
     print("3: test normal and slaveOk queries");
 

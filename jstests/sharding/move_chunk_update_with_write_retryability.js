@@ -1,8 +1,14 @@
 load("jstests/sharding/move_chunk_with_session_helper.js");
 
 (function() {
-
     "use strict";
+
+    load("jstests/libs/retryable_writes_util.js");
+
+    if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
 
     var st = new ShardingTest({shards: {rs0: {nodes: 2}, rs1: {nodes: 2}}});
     assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));

@@ -75,6 +75,10 @@ public:
         }
     }
 
+    ~ASIOSession() {
+        shutdown();
+    }
+
     TransportLayer* getTransportLayer() const override {
         return _tl;
     }
@@ -97,11 +101,13 @@ public:
     }
 
     void shutdown() {
-        std::error_code ec;
-        getSocket().cancel();
-        getSocket().shutdown(GenericSocket::shutdown_both, ec);
-        if (ec) {
-            error() << "Error closing socket: " << ec.message();
+        if (getSocket().is_open()) {
+            std::error_code ec;
+            getSocket().cancel();
+            getSocket().shutdown(GenericSocket::shutdown_both, ec);
+            if (ec) {
+                error() << "Error shutting down socket: " << ec.message();
+            }
         }
     }
 
@@ -277,12 +283,12 @@ private:
                 return _sslSocket->async_handshake(
                     asio::ssl::stream_base::server, buffer, handshakeCompleteCb);
             }
-        } else if (_tl->_sslMode == SSLParams::SSLMode_requireSSL) {
+        } else if (_tl->_sslMode() == SSLParams::SSLMode_requireSSL) {
             onComplete({ErrorCodes::SSLHandshakeFailed,
                         "The server is configured to only allow SSL connections"},
                        false);
         } else {
-            if (_tl->_sslMode == SSLParams::SSLMode_preferSSL) {
+            if (_tl->_sslMode() == SSLParams::SSLMode_preferSSL) {
                 LOG(0) << "SSL mode is set to 'preferred' and connection " << id() << " to "
                        << remote() << " is not using SSL.";
             }

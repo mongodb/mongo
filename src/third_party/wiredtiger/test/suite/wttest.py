@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2017 MongoDB, Inc.
+# Public Domain 2014-2018 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -489,6 +489,39 @@ class WiredTigerTestCase(unittest.TestCase):
         else:
             with self.expectedStderr(message):
                 self.assertRaises(exceptionType, expr)
+
+    def assertRaisesException(self, exceptionType, expr,
+        exceptionString=None, optional=False):
+        """
+        Like TestCase.assertRaises(), with some additional options.
+        If the exceptionString argument is used, the exception's string
+        must match it. If optional is set, then no assertion occurs
+        if the exception doesn't occur.
+        Returns true if the assertion is raised.
+        """
+        raised = False
+        try:
+            expr()
+        except BaseException, err:
+            if not isinstance(err, exceptionType):
+                self.fail('Exception of incorrect type raised, got type: ' + \
+                    str(type(err)))
+            if exceptionString != None and exceptionString != str(err):
+                self.fail('Exception with incorrect string raised, got: "' + \
+                    str(err) + '"')
+            raised = True
+        if not raised and not optional:
+            self.fail('no assertion raised')
+        return raised
+
+    def raisesBusy(self, expr):
+        """
+        Execute the expression, returning true if a 'Resource busy'
+        exception is raised, returning false if no exception is raised.
+        Any other exception raises a test suite failure.
+        """
+        return self.assertRaisesException(wiredtiger.WiredTigerError, \
+            expr, exceptionString='Resource busy', optional=True)
 
     def assertTimestampsEqual(self, ts1, ts2):
         """

@@ -39,8 +39,9 @@ namespace mongo {
 class InternalSchemaMaxPropertiesMatchExpression final
     : public InternalSchemaNumPropertiesMatchExpression {
 public:
-    InternalSchemaMaxPropertiesMatchExpression()
+    explicit InternalSchemaMaxPropertiesMatchExpression(long long numProperties)
         : InternalSchemaNumPropertiesMatchExpression(MatchType::INTERNAL_SCHEMA_MAX_PROPERTIES,
+                                                     numProperties,
                                                      "$_internalSchemaMaxProperties") {}
 
     bool matches(const MatchableDocument* doc, MatchDetails* details) const final {
@@ -57,8 +58,8 @@ public:
     }
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto maxProperties = stdx::make_unique<InternalSchemaMaxPropertiesMatchExpression>();
-        invariantOK(maxProperties->init(numProperties()));
+        auto maxProperties =
+            stdx::make_unique<InternalSchemaMaxPropertiesMatchExpression>(numProperties());
         if (getTag()) {
             maxProperties->setTag(getTag()->clone());
         }

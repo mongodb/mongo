@@ -268,6 +268,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             case PathAcceptingKeyword::EXISTS:
             case PathAcceptingKeyword::GEO_INTERSECTS:
             case PathAcceptingKeyword::GEO_NEAR:
+            case PathAcceptingKeyword::INTERNAL_EXPR_EQ:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_EQ:
             case PathAcceptingKeyword::INTERNAL_SCHEMA_FMOD:
@@ -447,10 +448,10 @@ boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPat
         if (node->getCategory() == MatchExpression::MatchCategory::kLeaf &&
             node->matchType() != MatchExpression::TYPE_OPERATOR) {
             auto leafNode = static_cast<LeafMatchExpression*>(node);
-            leafNode->setPath(newPath).transitional_ignore();
+            leafNode->setPath(newPath);
         } else if (node->getCategory() == MatchExpression::MatchCategory::kArrayMatching) {
             auto arrayNode = static_cast<ArrayMatchingMatchExpression*>(node);
-            arrayNode->setPath(newPath).transitional_ignore();
+            arrayNode->setPath(newPath);
         }
     });
 

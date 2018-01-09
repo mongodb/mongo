@@ -38,15 +38,12 @@ namespace mongo {
  */
 class InternalSchemaNumArrayItemsMatchExpression : public ArrayMatchingMatchExpression {
 public:
-    InternalSchemaNumArrayItemsMatchExpression(MatchType type, StringData name)
-        : ArrayMatchingMatchExpression(type), _name(name) {}
+    InternalSchemaNumArrayItemsMatchExpression(MatchType type,
+                                               StringData path,
+                                               long long numItems,
+                                               StringData name);
 
     virtual ~InternalSchemaNumArrayItemsMatchExpression() {}
-
-    Status init(StringData path, long long numItems) {
-        _numItems = numItems;
-        return setPath(path);
-    }
 
     void debugString(StringBuilder& debug, int level) const final;
 

@@ -14,11 +14,6 @@
 //         delete op is done during chunk migration within the chunk range.
 //
 
-// This test inserts documents into a sharded collection by directly writing to the shards, so the
-// collection is created on the non-primary shard with a shard-generated UUID rather than with a
-// UUID propagated from the primary shard.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-
 load('./jstests/libs/chunk_manipulation_util.js');
 
 (function() {
@@ -33,34 +28,53 @@ load('./jstests/libs/chunk_manipulation_util.js');
     var st = new ShardingTest({shards: 2, mongos: 1, rs: {nodes: 3}});
     st.stopBalancer();
 
-    var mongos = st.s0, admin = mongos.getDB('admin'), dbName = "testDB", ns = dbName + ".foo",
-        coll = mongos.getCollection(ns), donor = st.shard0, recipient = st.shard1,
-        donorColl = donor.getCollection(ns), recipientColl = recipient.getCollection(ns),
-        donorLocal = donor.getDB('local'), recipientLocal = recipient.getDB('local');
+    const dbName = "testDB";
+    const ns = dbName + ".foo";
+
+    let mongos = st.s0;
+    let admin = mongos.getDB('admin');
+    let coll = mongos.getCollection(ns);
+
+    let donor = st.shard0;
+    let recipient = st.shard1;
+    let donorColl = donor.getCollection(ns);
+    let recipientColl = recipient.getCollection(ns);
+    let donorLocal = donor.getDB('local');
+    let recipientLocal = recipient.getDB('local');
 
     // Two chunks
     // Donor:     [0, 2) [2, 5)
     // Recipient:
-    jsTest.log('Enable sharding of the collection and pre-split into two chunks....');
+    jsTest.log('Enable sharding of the collection and split into two chunks....');
 
     assert.commandWorked(admin.runCommand({enableSharding: dbName}));
     st.ensurePrimaryShard(dbName, st.shard0.shardName);
-    assert.commandWorked(donorColl.createIndex({_id: 1}));
     assert.commandWorked(admin.runCommand({shardCollection: ns, key: {_id: 1}}));
     assert.commandWorked(admin.runCommand({split: ns, middle: {_id: 2}}));
 
     // 6 documents,
     //        donor: 2 in the first chunk, 3 in the second.
     //    recipient: 1 document (shardkey overlaps with a doc in second chunk of donor shard)
-    jsTest.log('Inserting 5 docs into donor shard, 1 doc into the recipient shard....');
+    jsTest.log('Inserting 5 docs into donor shard, ensuring one orphan on the recipient shard....');
 
-    for (var i = 0; i < 5; ++i)
-        assert.writeOK(coll.insert({_id: i}));
-    assert.eq(5, donorColl.count());
-
-    for (var i = 2; i < 3; ++i)
-        assert.writeOK(recipientColl.insert({_id: i}));
+    // Insert just one document into the collection and fail a migration after the cloning step in
+    // order to get an orphan onto the recipient shard with the correct UUID for the collection.
+    assert.writeOK(coll.insert({_id: 2}));
+    assert.eq(1, donorColl.count());
+    assert.commandWorked(recipient.adminCommand(
+        {configureFailPoint: "failMigrationLeaveOrphans", mode: "alwaysOn"}));
+    assert.commandFailed(
+        admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 2}, to: st.shard1.shardName}));
     assert.eq(1, recipientColl.count());
+    assert.commandWorked(
+        recipient.adminCommand({configureFailPoint: "failMigrationLeaveOrphans", mode: "off"}));
+
+    // Insert the remaining documents into the collection.
+    assert.writeOK(coll.insert({_id: 0}));
+    assert.writeOK(coll.insert({_id: 1}));
+    assert.writeOK(coll.insert({_id: 3}));
+    assert.writeOK(coll.insert({_id: 4}));
+    assert.eq(5, donorColl.count());
 
     /**
      * Set failpoint: recipient will pause migration after cloning chunk data from donor,
@@ -134,9 +148,11 @@ load('./jstests/libs/chunk_manipulation_util.js');
               "Real delete of {_id: 4} on donor shard incorrectly set the " +
                   "fromMigrate flag in the oplog! Test #5 failed.");
 
+    // Expect to see two oplog entries for {_id: 2} with 'fromMigrate: true', because this doc was
+    // cloned as part of the first failed migration as well as the second successful migration.
     var recipientOplogRes =
         recipientLocal.oplog.rs.find({op: 'i', fromMigrate: true, 'o._id': 2}).count();
-    assert.eq(1,
+    assert.eq(2,
               recipientOplogRes,
               "fromMigrate flag wasn't set on the recipient shard's " +
                   "oplog for migrating insert op on {_id: 2}! Test #3 failed.");

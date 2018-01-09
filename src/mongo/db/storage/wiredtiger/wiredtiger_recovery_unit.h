@@ -36,10 +36,10 @@
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/timer.h"
 
@@ -70,19 +70,24 @@ public:
     void registerChange(Change* change) override;
 
     void abandonSnapshot() override;
+    void prepareSnapshot() override;
 
     Status setReadFromMajorityCommittedSnapshot() override;
     bool isReadingFromMajorityCommittedSnapshot() const override {
         return _readFromMajorityCommittedSnapshot;
     }
 
-    boost::optional<SnapshotName> getMajorityCommittedSnapshot() const override;
+    boost::optional<Timestamp> getMajorityCommittedSnapshot() const override;
 
     SnapshotId getSnapshotId() const override;
 
-    Status setTimestamp(SnapshotName timestamp) override;
+    Status setTimestamp(Timestamp timestamp) override;
 
-    Status selectSnapshot(SnapshotName timestamp) override;
+    void setCommitTimestamp(Timestamp timestamp) override;
+    void clearCommitTimestamp() override;
+    Timestamp getCommitTimestamp() override;
+
+    Status selectSnapshot(Timestamp timestamp) override;
 
     void* writingPtr(void* data, size_t len) override;
 
@@ -145,10 +150,11 @@ private:
     bool _inUnitOfWork;
     bool _active;
     bool _isTimestamped = false;
+    Timestamp _commitTimestamp;
     uint64_t _mySnapshotId;
     bool _readFromMajorityCommittedSnapshot = false;
-    SnapshotName _majorityCommittedSnapshot = SnapshotName::min();
-    SnapshotName _readAtTimestamp = SnapshotName::min();
+    Timestamp _majorityCommittedSnapshot;
+    Timestamp _readAtTimestamp;
     std::unique_ptr<Timer> _timer;
     bool _isOplogReader = false;
     typedef std::vector<std::unique_ptr<Change>> Changes;

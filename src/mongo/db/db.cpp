@@ -57,6 +57,7 @@
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -69,8 +70,6 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/ftdc/ftdc_mongod.h"
-#include "mongo/db/generic_cursor_manager.h"
-#include "mongo/db/generic_cursor_manager_mongod.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/initialize_server_global_state.h"
@@ -80,7 +79,6 @@
 #include "mongo/db/keys_collection_client_direct.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
-#include "mongo/db/keys_collection_manager_sharding.h"
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/log_process_details.h"
@@ -91,6 +89,7 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repair_database.h"
@@ -104,7 +103,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -180,6 +179,10 @@ using std::endl;
 
 namespace {
 
+constexpr StringData upgradeLink = "http://dochub.mongodb.org/core/3.6-upgrade-fcv"_sd;
+constexpr StringData mustDowngradeErrorMsg =
+    "UPGRADE PROBLEM: The data files need to be fully upgraded to version 3.4 before attempting an upgrade to 3.6; see http://dochub.mongodb.org/core/3.6-upgrade-fcv for more details."_sd;
+
 Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
                                                          const std::vector<std::string>& dbNames) {
     bool isMmapV1 = opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1();
@@ -204,8 +207,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
     }
 
     if (!collsHaveUuids) {
-        return {ErrorCodes::MustDowngrade,
-                "Cannot restore featureCompatibilityVersion document. A 3.4 binary must be used."};
+        return {ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
     }
 
     // Restore the featureCompatibilityVersion document if it is missing.
@@ -540,8 +542,13 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                         // but with any value other than "3.4" or "3.6". This includes unexpected
                         // cases with no path forward such as the FCV value not being a string.
                         return {ErrorCodes::MustDowngrade,
-                                "Cannot parse the feature compatibility document. If you are "
-                                "trying to upgrade from 3.2, please use a 3.4 binary."};
+                                str::stream()
+                                    << "UPGRADE PROBLEM: Unable to parse the "
+                                       "featureCompatibilityVersion document. The data files need "
+                                       "to be fully upgraded to version 3.4 before attempting an "
+                                       "upgrade to 3.6. If you are upgrading to 3.6, see "
+                                    << upgradeLink
+                                    << "."};
                     }
                     fcvDocumentExists = true;
                     auto version = swVersion.getValue();
@@ -651,8 +658,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             }
             fassertFailedNoTrace(40652);
         } else {
-            return {ErrorCodes::MustDowngrade,
-                    "There is no feature compatibility document. A 3.4 binary must be used."};
+            return {ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
         }
     }
 
@@ -684,7 +690,10 @@ ExitCode _initAndListen(int listenPort) {
     auto serviceContext = checked_cast<ServiceContextMongoD*>(getGlobalServiceContext());
 
     serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
-    serviceContext->setOpObserver(stdx::make_unique<OpObserverImpl>());
+    auto opObserverRegistry = stdx::make_unique<OpObserverRegistry>();
+    opObserverRegistry->addObserver(stdx::make_unique<OpObserverImpl>());
+    opObserverRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
+    serviceContext->setOpObserver(std::move(opObserverRegistry));
 
     DBDirectClientFactory::get(serviceContext).registerImplementation([](OperationContext* opCtx) {
         return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
@@ -744,10 +753,7 @@ ExitCode _initAndListen(int listenPort) {
     if (serverGlobalParams.parsedOpts.hasField("storage")) {
         BSONElement storageElement = serverGlobalParams.parsedOpts.getField("storage");
         invariant(storageElement.isABSONObj());
-        BSONObj storageParamsObj = storageElement.Obj();
-        BSONObjIterator i = storageParamsObj.begin();
-        while (i.more()) {
-            BSONElement e = i.next();
+        for (auto&& e : storageElement.Obj()) {
             // Ignore if field name under "storage" matches current storage engine.
             if (storageGlobalParams.engine == e.fieldName()) {
                 continue;
@@ -870,24 +876,13 @@ ExitCode _initAndListen(int listenPort) {
             exitCleanly(EXIT_NEED_UPGRADE);
         }
 
-        if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
-            log() << "Auth schema version is incompatible: "
-                  << "User and role management commands require auth data to have "
-                  << "at least schema version " << AuthorizationManager::schemaVersion26Final
-                  << " but found " << foundSchemaVersion << ". In order to upgrade "
-                  << "the auth schema, first downgrade MongoDB binaries to version "
-                  << "2.6 and then run the authSchemaUpgrade command.";
-            exitCleanly(EXIT_NEED_UPGRADE);
-        }
-
         if (foundSchemaVersion <= AuthorizationManager::schemaVersion26Final) {
-            log() << startupWarningsLog;
-            log() << "** WARNING: This server is using MONGODB-CR, a deprecated authentication "
-                  << "mechanism." << startupWarningsLog;
-            log() << "**          Support will be dropped in a future release."
-                  << startupWarningsLog;
-            log() << "**          See http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1"
-                  << startupWarningsLog;
+            log() << "This server is using MONGODB-CR, an authentication mechanism which "
+                  << "has been removed from MongoDB 3.8. In order to upgrade the auth schema, "
+                  << "first downgrade MongoDB binaries to version 3.6 and then run the "
+                  << "authSchemaUpgrade command. "
+                  << "See http://dochub.mongodb.org/core/3.0-upgrade-to-scram-sha-1";
+            exitCleanly(EXIT_NEED_UPGRADE);
         }
     } else if (globalAuthzManager->isAuthEnabled()) {
         error() << "Auth must be disabled when starting without auth schema validation";
@@ -941,7 +936,7 @@ ExitCode _initAndListen(int listenPort) {
                 makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
         } else if (replSettings.usingReplSets()) {  // standalone replica set
             auto keysCollectionClient = stdx::make_unique<KeysCollectionClientDirect>();
-            auto keyManager = std::make_shared<KeysCollectionManagerSharding>(
+            auto keyManager = std::make_shared<KeysCollectionManager>(
                 KeysCollectionManager::kKeyManagerPurposeString,
                 std::move(keysCollectionClient),
                 Seconds(KeysRotationIntervalSec));
@@ -986,8 +981,6 @@ ExitCode _initAndListen(int listenPort) {
 
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsLocal));
-
-    GenericCursorManager::set(serviceContext, stdx::make_unique<GenericCursorManagerMongod>());
 
     // Set up the logical session cache
     LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
@@ -1191,7 +1184,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
         serviceContext, stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
     auto dropPendingCollectionReaper = repl::DropPendingCollectionReaper::get(serviceContext);
 
-    repl::TopologyCoordinatorImpl::Options topoCoordOptions;
+    repl::TopologyCoordinator::Options topoCoordOptions;
     topoCoordOptions.maxSyncSourceLagSecs = Seconds(repl::maxSyncSourceLagSecs);
     topoCoordOptions.clusterRole = serverGlobalParams.clusterRole;
 
@@ -1204,7 +1197,7 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
         stdx::make_unique<repl::ReplicationCoordinatorExternalStateImpl>(
             serviceContext, dropPendingCollectionReaper, storageInterface, replicationProcess),
         makeReplicationExecutor(serviceContext),
-        stdx::make_unique<repl::TopologyCoordinatorImpl>(topoCoordOptions),
+        stdx::make_unique<repl::TopologyCoordinator>(topoCoordOptions),
         replicationProcess,
         storageInterface,
         static_cast<int64_t>(curTimeMillis64()));
@@ -1370,6 +1363,8 @@ int mongoDbMain(int argc, char* argv[], char** envp) {
         severe(LogComponent::kControl) << "Failed global initialization: " << status;
         quickExit(EXIT_FAILURE);
     }
+
+    ErrorExtraInfo::invariantHaveAllParsers();
 
     startupConfigActions(std::vector<std::string>(argv, argv + argc));
     cmdline_utils::censorArgvArray(argc, argv);

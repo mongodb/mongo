@@ -31,11 +31,11 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 
 #include "mongo/base/status.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/sync_source_resolver.h"
-#include "mongo/db/storage/snapshot_name.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
 
@@ -200,7 +200,8 @@ void ReplicationCoordinatorMock::setMyLastDurableOpTime(const OpTime& opTime) {
     _myLastDurableOpTime = opTime;
 }
 
-void ReplicationCoordinatorMock::setMyLastAppliedOpTimeForward(const OpTime& opTime) {
+void ReplicationCoordinatorMock::setMyLastAppliedOpTimeForward(const OpTime& opTime,
+                                                               DataConsistency consistency) {
     if (opTime > _myLastAppliedOpTime) {
         _myLastAppliedOpTime = opTime;
     }
@@ -229,6 +230,11 @@ Status ReplicationCoordinatorMock::waitUntilOpTimeForRead(OperationContext* opCt
     return Status::OK();
 }
 
+Status ReplicationCoordinatorMock::waitUntilOpTimeForReadUntil(OperationContext* opCtx,
+                                                               const ReadConcernArgs& settings,
+                                                               boost::optional<Date_t> deadline) {
+    return Status::OK();
+}
 
 OID ReplicationCoordinatorMock::getElectionId() {
     // TODO
@@ -265,8 +271,7 @@ Status ReplicationCoordinatorMock::resyncData(OperationContext* opCtx, bool wait
     return Status::OK();
 }
 
-StatusWith<BSONObj> ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
-    ReplicationCoordinator::ReplSetUpdatePositionCommandStyle commandStyle) const {
+StatusWith<BSONObj> ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand() const {
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("replSetUpdatePosition", 1);
     return cmdBuilder.obj();
@@ -356,12 +361,6 @@ Status ReplicationCoordinatorMock::processReplSetElect(const ReplSetElectArgs& a
     return Status::OK();
 }
 
-Status ReplicationCoordinatorMock::processReplSetUpdatePosition(
-    const OldUpdatePositionArgs& updates, long long* configVersion) {
-    // TODO
-    return Status::OK();
-}
-
 Status ReplicationCoordinatorMock::processReplSetUpdatePosition(const UpdatePositionArgs& updates,
                                                                 long long* configVersion) {
     // TODO
@@ -407,7 +406,8 @@ HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource(const OpTime& lastOp
 
 void ReplicationCoordinatorMock::blacklistSyncSource(const HostAndPort& host, Date_t until) {}
 
-void ReplicationCoordinatorMock::resetLastOpTimesFromOplog(OperationContext* opCtx) {
+void ReplicationCoordinatorMock::resetLastOpTimesFromOplog(OperationContext* opCtx,
+                                                           DataConsistency consistency) {
     invariant(false);
 }
 
@@ -457,13 +457,9 @@ Status ReplicationCoordinatorMock::updateTerm(OperationContext* opCtx, long long
     return Status::OK();
 }
 
-SnapshotName ReplicationCoordinatorMock::reserveSnapshotName(OperationContext* opCtx) {
-    return SnapshotName(_snapshotNameGenerator.addAndFetch(1));
+Timestamp ReplicationCoordinatorMock::reserveSnapshotName(OperationContext* opCtx) {
+    return Timestamp(_snapshotNameGenerator.addAndFetch(1));
 }
-
-void ReplicationCoordinatorMock::createSnapshot(OperationContext* opCtx,
-                                                OpTime timeOfSnapshot,
-                                                SnapshotName name){};
 
 void ReplicationCoordinatorMock::dropAllSnapshots() {}
 
@@ -472,7 +468,7 @@ OpTime ReplicationCoordinatorMock::getCurrentCommittedSnapshotOpTime() const {
 }
 
 void ReplicationCoordinatorMock::waitUntilSnapshotCommitted(OperationContext* opCtx,
-                                                            const SnapshotName& untilSnapshot) {}
+                                                            const Timestamp& untilSnapshot) {}
 
 size_t ReplicationCoordinatorMock::getNumUncommittedSnapshots() {
     return 0;

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -64,6 +64,15 @@
 	(WT_TIMEDIFF_NS((end), (begin)) / WT_MILLION)
 #define	WT_TIMEDIFF_SEC(end, begin)					\
 	(WT_TIMEDIFF_NS((end), (begin)) / WT_BILLION)
+
+#define	WT_TSCDIFF_NS(end, begin)					\
+	(__wt_tsc_to_nsec(end, begin))
+#define	WT_TSCDIFF_US(end, begin)					\
+	(WT_TSCDIFF_NS(end, begin) / WT_THOUSAND)
+#define	WT_TSCDIFF_MS(end, begin)					\
+	(WT_TSCDIFF_NS(end, begin) / WT_MILLION)
+#define	WT_TSCDIFF_SEC(end, begin)					\
+	(WT_TSCDIFF_NS(end, begin) / WT_BILLION)
 
 #define	WT_TIMECMP(t1, t2)						\
 	((t1).tv_sec < (t2).tv_sec ? -1 :				\
@@ -155,9 +164,11 @@ struct __wt_fstream {
 	wt_off_t size;				/* File size */
 	WT_ITEM  buf;				/* Data */
 
-#define	WT_STREAM_APPEND	0x01		/* Open a stream for append */
-#define	WT_STREAM_READ		0x02		/* Open a stream for read */
-#define	WT_STREAM_WRITE		0x04		/* Open a stream for write */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_STREAM_APPEND	0x1u		/* Open a stream for append */
+#define	WT_STREAM_READ		0x2u		/* Open a stream for read */
+#define	WT_STREAM_WRITE		0x4u		/* Open a stream for write */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 
 	int (*close)(WT_SESSION_IMPL *, WT_FSTREAM *);

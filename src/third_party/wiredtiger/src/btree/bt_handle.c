@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -291,9 +291,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	uint32_t bitcnt;
 	const char **cfg, *enc_cfg[] = { NULL, NULL };
 	bool fixed;
-
-	WT_UNUSED(maj_version);				/* !HAVE_VERBOSE */
-	WT_UNUSED(min_version);				/* !HAVE_VERBOSE */
 
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;

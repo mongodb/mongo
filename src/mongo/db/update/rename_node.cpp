@@ -48,7 +48,11 @@ namespace {
  * SetElementNode object. We create a class for this purpose (rather than a stand-alone function) so
  * that it can inherit from ModifierNode.
  *
- * Unlike SetNode, SetElementNode takes a mutablebson::Element as its input.
+ * Unlike SetNode, SetElementNode takes a mutablebson::Element as its input. Additionally,
+ * SetElementNode::updateExistingElement() does not check for the possibility that we are
+ * overwriting the target value with an identical source value (a no-op). That check would require
+ * us to convert _elemToSet from a mutablebson::Element to a BSONElement, which is not worth the
+ * extra time.
  */
 class SetElementNode : public ModifierNode {
 public:
@@ -67,18 +71,8 @@ public:
 protected:
     ModifierNode::ModifyResult updateExistingElement(
         mutablebson::Element* element, std::shared_ptr<FieldRef> elementPath) const final {
-        // In the case of a $rename where the source and destination have the same value, (e.g., we
-        // are applying {$rename: {a: b}} to the document {a: "foo", b: "foo"}), there's no need to
-        // modify the destination element. However, the source and destination values must be
-        // _exactly_ the same, which is why we do not use collation for this check.
-        StringData::ComparatorInterface* comparator = nullptr;
-        auto considerFieldName = false;
-        if (_elemToSet.compareWithElement(*element, comparator, considerFieldName) != 0) {
-            invariantOK(element->setValueElement(_elemToSet));
-            return ModifyResult::kNormalUpdate;
-        } else {
-            return ModifyResult::kNoOp;
-        }
+        invariantOK(element->setValueElement(_elemToSet));
+        return ModifyResult::kNormalUpdate;
     }
 
     void setValueForNewElement(mutablebson::Element* element) const final {

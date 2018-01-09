@@ -130,6 +130,24 @@ NOINLINE_DECL void invariantFailed(const char* expr, const char* file, unsigned 
     std::abort();
 }
 
+NOINLINE_DECL void invariantFailedWithMsg(const char* expr,
+                                          const char* msg,
+                                          const char* file,
+                                          unsigned line) noexcept {
+    severe() << "Invariant failure " << expr << " " << msg << " " << file << ' ' << dec << line
+             << endl;
+    breakpoint();
+    severe() << "\n\n***aborting after invariant() failure\n\n" << endl;
+    std::abort();
+}
+
+NOINLINE_DECL void invariantFailedWithMsg(const char* expr,
+                                          const std::string& msg,
+                                          const char* file,
+                                          unsigned line) noexcept {
+    invariantFailedWithMsg(expr, msg.c_str(), file, line);
+}
+
 NOINLINE_DECL void invariantOKFailed(const char* expr,
                                      const Status& status,
                                      const char* file,
@@ -179,24 +197,16 @@ MONGO_COMPILER_NORETURN void fassertFailedWithStatusNoTraceWithLocation(int msgi
     quickExit(EXIT_ABRUPT);
 }
 
-NOINLINE_DECL void uassertedWithLocation(int msgid,
-                                         StringData msg,
-                                         const char* file,
-                                         unsigned line) {
+NOINLINE_DECL void uassertedWithLocation(const Status& status, const char* file, unsigned line) {
     assertionCount.condrollover(++assertionCount.user);
-    LOG(1) << "User Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
-           << endl;
-    error_details::throwExceptionForStatus(Status(ErrorCodes::Error(msgid), msg));
+    LOG(1) << "User Assertion: " << redact(status) << ' ' << file << ' ' << dec << line;
+    error_details::throwExceptionForStatus(status);
 }
 
-NOINLINE_DECL void msgassertedWithLocation(int msgid,
-                                           StringData msg,
-                                           const char* file,
-                                           unsigned line) {
+NOINLINE_DECL void msgassertedWithLocation(const Status& status, const char* file, unsigned line) {
     assertionCount.condrollover(++assertionCount.msg);
-    error() << "Assertion: " << msgid << ":" << redact(msg) << ' ' << file << ' ' << dec << line
-            << endl;
-    error_details::throwExceptionForStatus(Status(ErrorCodes::Error(msgid), msg));
+    error() << "Assertion: " << redact(status) << ' ' << file << ' ' << dec << line;
+    error_details::throwExceptionForStatus(status);
 }
 
 std::string causedBy(StringData e) {

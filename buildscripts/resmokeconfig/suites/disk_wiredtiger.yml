@@ -3,6 +3,8 @@ test_kind: js_test
 selector:
   roots:
   - jstests/disk/*.js
+  exclude_with_any_tags:
+  - requires_mmapv1
 
 executor:
   config:

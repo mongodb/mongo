@@ -1,12 +1,16 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongorestore
 
 import (
 	"github.com/mongodb/mongo-tools/common/archive"
-	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
-	"github.com/mongodb/mongo-tools/common/util"
 
 	. "github.com/smartystreets/goconvey/convey"
 
@@ -28,35 +32,23 @@ var (
 )
 
 func TestMongorestoreShortArchive(t *testing.T) {
-	Convey("With a test MongoRestore", t, func() {
-		ssl := testutil.GetSSLOptions()
-		auth := testutil.GetAuthOptions()
+	testutil.VerifyTestType(t, testutil.IntegrationTestType)
+	_, err := testutil.GetBareSession()
+	if err != nil {
+		t.Fatalf("No server available")
+	}
 
-		testutil.VerifyTestType(t, testutil.IntegrationTestType)
-		toolOptions := &options.ToolOptions{
-			Connection: &options.Connection{
-				Host: testServer,
-				Port: testPort,
-			},
-			URI:  &options.URI{},
-			Auth: &auth,
-			SSL:  &ssl,
-		}
+	Convey("With a test MongoRestore", t, func() {
 		inputOptions := &InputOptions{
 			Archive: testArchive,
 		}
 		outputOptions := &OutputOptions{
 			NumParallelCollections: 1,
 			NumInsertionWorkers:    1,
-			WriteConcern:           "majority",
 			Drop:                   true,
 		}
 		nsOptions := &NSOptions{}
-		provider, err := db.NewSessionProvider(*toolOptions)
-		if err != nil {
-			log.Logvf(log.Always, "error connecting to host: %v", err)
-			os.Exit(util.ExitError)
-		}
+		provider, toolOpts, err := testutil.GetBareSessionProvider()
 		file, err := os.Open(testArchive)
 		So(file, ShouldNotBeNil)
 		So(err, ShouldBeNil)
@@ -75,7 +67,7 @@ func TestMongorestoreShortArchive(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			restore := MongoRestore{
-				ToolOptions:     toolOptions,
+				ToolOptions:     toolOpts,
 				OutputOptions:   outputOptions,
 				InputOptions:    inputOptions,
 				NSOptions:       nsOptions,

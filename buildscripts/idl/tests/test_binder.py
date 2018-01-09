@@ -57,6 +57,8 @@ def indent_text(count, unindented_text):
 class TestBinder(testcase.IDLTestcase):
     """Test cases for the IDL binder."""
 
+    # pylint: disable=too-many-public-methods
+
     def test_empty(self):
         # type: () -> None
         """Test an empty document works."""
@@ -751,6 +753,22 @@ class TestBinder(testcase.IDLTestcase):
                             optional: true
             """), idl.errors.ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL)
 
+        # Test duplicate comparison order
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                strict: false
+                generate_comparison_operators: true
+                fields:
+                    foo:
+                        type: string
+                        comparison_order: 1
+                    bar:
+                        type: string
+                        comparison_order: 1
+            """), idl.errors.ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER)
+
     def test_ignored_field_negative(self):
         # type: () -> None
         """Test that if a field is marked as ignored, no other properties are set."""
@@ -978,6 +996,44 @@ class TestBinder(testcase.IDLTestcase):
                     foo1: string
         """)))
 
+        # Inline Chained struct with strict true
+        self.assert_bind(test_preamble + indent_text(1,
+                                                     textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: true
+                fields:
+                    field1: string
+
+            foobar:
+                description: foo
+                strict: false
+                inline_chained_structs: true
+                chained_structs:
+                    bar1: alias
+                fields:
+                    f1: string
+
+        """)))
+
+        # Inline Chained struct with strict true and inline_chained_structs defaulted
+        self.assert_bind(test_preamble + indent_text(1,
+                                                     textwrap.dedent("""
+            bar1:
+                description: foo
+                strict: true
+                fields:
+                    field1: string
+
+            foobar:
+                description: foo
+                strict: false
+                chained_structs:
+                    bar1: alias
+                fields:
+                    f1: string
+        """)))
+
     def test_chained_struct_negative(self):
         # type: () -> None
         """Negative parser chaining test cases."""
@@ -1080,6 +1136,7 @@ class TestBinder(testcase.IDLTestcase):
             foobar:
                 description: foo
                 strict: false
+                inline_chained_structs: false
                 chained_structs:
                     bar1: alias
                 fields:
@@ -1473,6 +1530,67 @@ class TestBinder(testcase.IDLTestcase):
                             type: array<string>
                             supports_doc_sequence: true
             """), idl.errors.ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_OBJECT)
+
+    def test_command_type_positive(self):
+        # type: () -> None
+        """Positive command custom type test cases."""
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+        """)
+
+        # string
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                strict: true
+                namespace: type
+                type: string
+                fields:
+                    field1: string
+            """))
+
+        # array of string
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                strict: true
+                namespace: type
+                type: array<string>
+                fields:
+                    field1: string
+            """))
+
+    def test_command_type_negative(self):
+        # type: () -> None
+        """Negative command type test cases."""
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+        """)
+
+        # supports_doc_sequence must be a bool
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: type
+                type: int
+                fields:
+                    field1: string
+            """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
 
 
 if __name__ == '__main__':

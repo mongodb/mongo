@@ -705,48 +705,26 @@ Value ExpressionCoerceToBool::serialize(bool explain) const {
 
 /* ----------------------- ExpressionCompare --------------------------- */
 
-REGISTER_EXPRESSION(cmp,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::CMP));
-REGISTER_EXPRESSION(eq,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::EQ));
-REGISTER_EXPRESSION(gt,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::GT));
-REGISTER_EXPRESSION(gte,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::GTE));
-REGISTER_EXPRESSION(lt,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::LT));
-REGISTER_EXPRESSION(lte,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::LTE));
-REGISTER_EXPRESSION(ne,
-                    stdx::bind(ExpressionCompare::parse,
-                               stdx::placeholders::_1,
-                               stdx::placeholders::_2,
-                               stdx::placeholders::_3,
-                               ExpressionCompare::NE));
+namespace {
+struct BoundOp {
+    ExpressionCompare::CmpOp op;
+
+    auto operator()(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                    BSONElement bsonExpr,
+                    const VariablesParseState& vps) const {
+        return ExpressionCompare::parse(expCtx, std::move(bsonExpr), vps, op);
+    }
+};
+}  // namespace
+
+REGISTER_EXPRESSION(cmp, BoundOp{ExpressionCompare::CMP});
+REGISTER_EXPRESSION(eq, BoundOp{ExpressionCompare::EQ});
+REGISTER_EXPRESSION(gt, BoundOp{ExpressionCompare::GT});
+REGISTER_EXPRESSION(gte, BoundOp{ExpressionCompare::GTE});
+REGISTER_EXPRESSION(lt, BoundOp{ExpressionCompare::LT});
+REGISTER_EXPRESSION(lte, BoundOp{ExpressionCompare::LTE});
+REGISTER_EXPRESSION(ne, BoundOp{ExpressionCompare::NE});
+
 intrusive_ptr<Expression> ExpressionCompare::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement bsonExpr,
@@ -968,14 +946,14 @@ namespace {
 
 boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,
                                        const Document& root,
-                                       intrusive_ptr<Expression> _timeZone) {
+                                       const Expression* timeZone) {
     invariant(tzdb);
 
-    if (!_timeZone) {
+    if (!timeZone) {
         return mongo::TimeZoneDatabase::utcZone();
     }
 
-    auto timeZoneId = _timeZone->evaluate(root);
+    auto timeZoneId = timeZone->evaluate(root);
 
     if (timeZoneId.nullish()) {
         return boost::none;
@@ -1088,17 +1066,17 @@ ExpressionDateFromParts::ExpressionDateFromParts(
     intrusive_ptr<Expression> isoDayOfWeek,
     intrusive_ptr<Expression> timeZone)
     : Expression(expCtx),
-      _year(year),
-      _month(month),
-      _day(day),
-      _hour(hour),
-      _minute(minute),
-      _second(second),
-      _millisecond(millisecond),
-      _isoWeekYear(isoWeekYear),
-      _isoWeek(isoWeek),
-      _isoDayOfWeek(isoDayOfWeek),
-      _timeZone(timeZone) {}
+      _year(std::move(year)),
+      _month(std::move(month)),
+      _day(std::move(day)),
+      _hour(std::move(hour)),
+      _minute(std::move(minute)),
+      _second(std::move(second)),
+      _millisecond(std::move(millisecond)),
+      _isoWeekYear(std::move(isoWeekYear)),
+      _isoWeek(std::move(isoWeek)),
+      _isoDayOfWeek(std::move(isoDayOfWeek)),
+      _timeZone(std::move(timeZone)) {}
 
 intrusive_ptr<Expression> ExpressionDateFromParts::optimize() {
     if (_year) {
@@ -1184,7 +1162,7 @@ Value ExpressionDateFromParts::serialize(bool explain) const {
  *   out parameter, and the function returns true.
  */
 bool ExpressionDateFromParts::evaluateNumberWithinRange(const Document& root,
-                                                        intrusive_ptr<Expression> field,
+                                                        const Expression* field,
                                                         StringData fieldName,
                                                         int defaultValue,
                                                         int minValue,
@@ -1225,14 +1203,15 @@ bool ExpressionDateFromParts::evaluateNumberWithinRange(const Document& root,
 Value ExpressionDateFromParts::evaluate(const Document& root) const {
     int hour, minute, second, millisecond;
 
-    if (!evaluateNumberWithinRange(root, _hour, "hour"_sd, 0, 0, 24, &hour) ||
-        !evaluateNumberWithinRange(root, _minute, "minute"_sd, 0, 0, 59, &minute) ||
-        !evaluateNumberWithinRange(root, _second, "second"_sd, 0, 0, 59, &second) ||
-        !evaluateNumberWithinRange(root, _millisecond, "millisecond"_sd, 0, 0, 999, &millisecond)) {
+    if (!evaluateNumberWithinRange(root, _hour.get(), "hour"_sd, 0, 0, 24, &hour) ||
+        !evaluateNumberWithinRange(root, _minute.get(), "minute"_sd, 0, 0, 59, &minute) ||
+        !evaluateNumberWithinRange(root, _second.get(), "second"_sd, 0, 0, 59, &second) ||
+        !evaluateNumberWithinRange(
+            root, _millisecond.get(), "millisecond"_sd, 0, 0, 999, &millisecond)) {
         return Value(BSONNULL);
     }
 
-    auto timeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone);
+    auto timeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get());
 
     if (!timeZone) {
         return Value(BSONNULL);
@@ -1241,9 +1220,9 @@ Value ExpressionDateFromParts::evaluate(const Document& root) const {
     if (_year) {
         int year, month, day;
 
-        if (!evaluateNumberWithinRange(root, _year, "year"_sd, 1970, 0, 9999, &year) ||
-            !evaluateNumberWithinRange(root, _month, "month"_sd, 1, 1, 12, &month) ||
-            !evaluateNumberWithinRange(root, _day, "day"_sd, 1, 1, 31, &day)) {
+        if (!evaluateNumberWithinRange(root, _year.get(), "year"_sd, 1970, 0, 9999, &year) ||
+            !evaluateNumberWithinRange(root, _month.get(), "month"_sd, 1, 1, 12, &month) ||
+            !evaluateNumberWithinRange(root, _day.get(), "day"_sd, 1, 1, 31, &day)) {
             return Value(BSONNULL);
         }
 
@@ -1255,10 +1234,10 @@ Value ExpressionDateFromParts::evaluate(const Document& root) const {
         int isoWeekYear, isoWeek, isoDayOfWeek;
 
         if (!evaluateNumberWithinRange(
-                root, _isoWeekYear, "isoWeekYear"_sd, 1970, 0, 9999, &isoWeekYear) ||
-            !evaluateNumberWithinRange(root, _isoWeek, "isoWeek"_sd, 1, 1, 53, &isoWeek) ||
+                root, _isoWeekYear.get(), "isoWeekYear"_sd, 1970, 0, 9999, &isoWeekYear) ||
+            !evaluateNumberWithinRange(root, _isoWeek.get(), "isoWeek"_sd, 1, 1, 53, &isoWeek) ||
             !evaluateNumberWithinRange(
-                root, _isoDayOfWeek, "isoDayOfWeek"_sd, 1, 1, 7, &isoDayOfWeek)) {
+                root, _isoDayOfWeek.get(), "isoDayOfWeek"_sd, 1, 1, 7, &isoDayOfWeek)) {
             return Value(BSONNULL);
         }
 
@@ -1348,7 +1327,7 @@ ExpressionDateFromString::ExpressionDateFromString(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     intrusive_ptr<Expression> dateString,
     intrusive_ptr<Expression> timeZone)
-    : Expression(expCtx), _dateString(dateString), _timeZone(timeZone) {}
+    : Expression(expCtx), _dateString(std::move(dateString)), _timeZone(std::move(timeZone)) {}
 
 intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
     _dateString = _dateString->optimize();
@@ -1373,7 +1352,7 @@ Value ExpressionDateFromString::serialize(bool explain) const {
 Value ExpressionDateFromString::evaluate(const Document& root) const {
     const Value dateString = _dateString->evaluate(root);
 
-    auto timeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone);
+    auto timeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get());
 
     if (!timeZone || dateString.nullish()) {
         return Value(BSONNULL);
@@ -1443,7 +1422,10 @@ ExpressionDateToParts::ExpressionDateToParts(const boost::intrusive_ptr<Expressi
                                              intrusive_ptr<Expression> date,
                                              intrusive_ptr<Expression> timeZone,
                                              intrusive_ptr<Expression> iso8601)
-    : Expression(expCtx), _date(date), _timeZone(timeZone), _iso8601(iso8601) {}
+    : Expression(expCtx),
+      _date(std::move(date)),
+      _timeZone(std::move(timeZone)),
+      _iso8601(std::move(iso8601)) {}
 
 intrusive_ptr<Expression> ExpressionDateToParts::optimize() {
     _date = _date->optimize();
@@ -1492,7 +1474,7 @@ boost::optional<int> ExpressionDateToParts::evaluateIso8601Flag(const Document& 
 Value ExpressionDateToParts::evaluate(const Document& root) const {
     const Value date = _date->evaluate(root);
 
-    auto timeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone);
+    auto timeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get());
     if (!timeZone) {
         return Value(BSONNULL);
     }
@@ -1592,7 +1574,7 @@ ExpressionDateToString::ExpressionDateToString(
     const string& format,
     intrusive_ptr<Expression> date,
     intrusive_ptr<Expression> timeZone)
-    : Expression(expCtx), _format(format), _date(date), _timeZone(timeZone) {}
+    : Expression(expCtx), _format(format), _date(std::move(date)), _timeZone(std::move(timeZone)) {}
 
 intrusive_ptr<Expression> ExpressionDateToString::optimize() {
     _date = _date->optimize();
@@ -1619,7 +1601,7 @@ Value ExpressionDateToString::serialize(bool explain) const {
 Value ExpressionDateToString::evaluate(const Document& root) const {
     const Value date = _date->evaluate(root);
 
-    auto timeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone);
+    auto timeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get());
     if (!timeZone) {
         return Value(BSONNULL);
     }
@@ -1819,12 +1801,8 @@ intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
         return ExpressionConstant::create(getExpressionContext(), Value());
     }
 
-    if (Variables::isUserDefinedVariable(_variable) &&
-        getExpressionContext()->variables.hasUserDefinedValue(_variable)) {
-        const auto val = getExpressionContext()->variables.getUserDefinedValue(_variable);
-        if (!val.missing()) {
-            return ExpressionConstant::create(getExpressionContext(), val);
-        }
+    if (getExpressionContext()->variables.hasConstantValue(_variable)) {
+        return ExpressionConstant::create(getExpressionContext(), evaluate(Document()));
     }
 
     return intrusive_ptr<Expression>(this);

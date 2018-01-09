@@ -95,7 +95,7 @@ protected:
         auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
 
         auto exec = uassertStatusOK(
-            getExecutor(opCtx(), ctx.getCollection(), std::move(cq), PlanExecutor::NO_YIELD));
+            getExecutor(opCtx(), ctx.getCollection(), std::move(cq), PlanExecutor::NO_YIELD, 0));
 
         exec->saveState();
         _source = DocumentSourceCursor::create(ctx.getCollection(), std::move(exec), _ctx);
@@ -311,7 +311,7 @@ TEST_F(DocumentSourceCursorTest, SerializationRespectsExplainModes) {
     source()->dispose();
 }
 
-TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorStillUsableAfterTimeout) {
+TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout) {
     // Make sure the collection exists, otherwise we'll default to a NO_YIELD yield policy.
     const bool capped = true;
     const long long cappedSize = 1024;
@@ -348,8 +348,8 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorStillUsableAfterTimeout)
     auto cursor =
         DocumentSourceCursor::create(readLock.getCollection(), std::move(planExecutor), ctx());
 
-    ASSERT(cursor->getNext().isEOF());
-    cursor->dispose();
+    ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
+    ASSERT_THROWS_CODE(cursor->getNext().isEOF(), AssertionException, ErrorCodes::QueryPlanKilled);
 }
 
 TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {

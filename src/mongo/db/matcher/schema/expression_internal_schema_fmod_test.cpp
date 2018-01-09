@@ -40,8 +40,7 @@ TEST(InternalSchemaFmodMatchExpression, MatchesElement) {
     BSONObj longLongMatch = BSON("a" << 68719476736LL);
     BSONObj notMatch = BSON("a" << 6);
     BSONObj negativeNotMatch = BSON("a" << -2);
-    InternalSchemaFmodMatchExpression fmod;
-    ASSERT_OK(fmod.init("", Decimal128(3), Decimal128(1)));
+    InternalSchemaFmodMatchExpression fmod("", Decimal128(3), Decimal128(1));
     ASSERT_TRUE(fmod.matchesSingleElement(match.firstElement()));
     ASSERT_TRUE(fmod.matchesSingleElement(largerMatch.firstElement()));
     ASSERT_TRUE(fmod.matchesSingleElement(longLongMatch.firstElement()));
@@ -50,49 +49,44 @@ TEST(InternalSchemaFmodMatchExpression, MatchesElement) {
 }
 
 TEST(InternalSchemaFmodMatchExpression, ZeroDivisor) {
-    InternalSchemaFmodMatchExpression fmod;
-    ASSERT_NOT_OK(fmod.init("", Decimal128(0), Decimal128(1)));
+    ASSERT_THROWS_CODE(InternalSchemaFmodMatchExpression fmod("", Decimal128(0), Decimal128(1)),
+                       AssertionException,
+                       ErrorCodes::BadValue);
 }
 
 TEST(InternalSchemaFmodMatchExpression, MatchesScalar) {
-    InternalSchemaFmodMatchExpression fmod;
-    ASSERT_OK(fmod.init("a", Decimal128(5), Decimal128(2)));
+    InternalSchemaFmodMatchExpression fmod("a", Decimal128(5), Decimal128(2));
     ASSERT_TRUE(fmod.matchesBSON(BSON("a" << 7.0)));
     ASSERT_FALSE(fmod.matchesBSON(BSON("a" << 4)));
 }
 
 TEST(InternalSchemaFmodMatchExpression, MatchesNonIntegralValue) {
-    InternalSchemaFmodMatchExpression fmod;
-    ASSERT_OK(fmod.init("a", Decimal128(10.5), Decimal128((4.5))));
+    InternalSchemaFmodMatchExpression fmod("a", Decimal128(10.5), Decimal128((4.5)));
     ASSERT_TRUE(fmod.matchesBSON(BSON("a" << 15.0)));
     ASSERT_FALSE(fmod.matchesBSON(BSON("a" << 10.0)));
 }
 
 TEST(InternalSchemaFmodMatchExpression, MatchesArrayValue) {
-    InternalSchemaFmodMatchExpression fmod;
-    ASSERT_OK(fmod.init("a", Decimal128(5), Decimal128(2)));
+    InternalSchemaFmodMatchExpression fmod("a", Decimal128(5), Decimal128(2));
     ASSERT_TRUE(fmod.matchesBSON(BSON("a" << BSON_ARRAY(5 << 12LL))));
     ASSERT_FALSE(fmod.matchesBSON(BSON("a" << BSON_ARRAY(6 << 8))));
 }
 
 TEST(InternalSchemaFmodMatchExpression, DoesNotMatchNull) {
-    InternalSchemaFmodMatchExpression fmod;
-    ASSERT_OK(fmod.init("a", Decimal128(5), Decimal128(2)));
+    InternalSchemaFmodMatchExpression fmod("a", Decimal128(5), Decimal128(2));
     ASSERT_FALSE(fmod.matchesBSON(BSONObj()));
     ASSERT_FALSE(fmod.matchesBSON(BSON("a" << BSONNULL)));
 }
 
 TEST(InternalSchemaFmodMatchExpression, NegativeRemainders) {
-    InternalSchemaFmodMatchExpression fmod;
-    ASSERT_OK(fmod.init("a", Decimal128(5), Decimal128(-2.4)));
+    InternalSchemaFmodMatchExpression fmod("a", Decimal128(5), Decimal128(-2.4));
     ASSERT_FALSE(fmod.matchesBSON(BSON("a" << 7.6)));
     ASSERT_FALSE(fmod.matchesBSON(BSON("a" << 12.4)));
     ASSERT_TRUE(fmod.matchesBSON(BSON("a" << Decimal128(-12.4))));
 }
 
 TEST(InternalSchemaFmodMatchExpression, ElemMatchKey) {
-    InternalSchemaFmodMatchExpression fmod;
-    ASSERT_OK(fmod.init("a", Decimal128(5), Decimal128(2)));
+    InternalSchemaFmodMatchExpression fmod("a", Decimal128(5), Decimal128(2));
     MatchDetails details;
     details.requestElemMatchKey();
     ASSERT_FALSE(fmod.matchesBSON(BSON("a" << 4), &details));
@@ -105,15 +99,10 @@ TEST(InternalSchemaFmodMatchExpression, ElemMatchKey) {
 }
 
 TEST(InternalSchemaFmodMatchExpression, Equality) {
-    InternalSchemaFmodMatchExpression m1;
-    InternalSchemaFmodMatchExpression m2;
-    InternalSchemaFmodMatchExpression m3;
-    InternalSchemaFmodMatchExpression m4;
-
-    ASSERT_OK(m1.init("a", Decimal128(1.7), Decimal128(2)));
-    ASSERT_OK(m2.init("a", Decimal128(2), Decimal128(2)));
-    ASSERT_OK(m3.init("a", Decimal128(1.7), Decimal128(1)));
-    ASSERT_OK(m4.init("b", Decimal128(1.7), Decimal128(2)));
+    InternalSchemaFmodMatchExpression m1("a", Decimal128(1.7), Decimal128(2));
+    InternalSchemaFmodMatchExpression m2("a", Decimal128(2), Decimal128(2));
+    InternalSchemaFmodMatchExpression m3("a", Decimal128(1.7), Decimal128(1));
+    InternalSchemaFmodMatchExpression m4("b", Decimal128(1.7), Decimal128(2));
 
     ASSERT_TRUE(m1.equivalent(&m1));
     ASSERT_FALSE(m1.equivalent(&m2));

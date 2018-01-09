@@ -364,12 +364,16 @@ void KVStorageEngine::setJournalListener(JournalListener* jl) {
     _engine->setJournalListener(jl);
 }
 
-void KVStorageEngine::setStableTimestamp(SnapshotName stableTimestamp) {
+void KVStorageEngine::setStableTimestamp(Timestamp stableTimestamp) {
     _engine->setStableTimestamp(stableTimestamp);
 }
 
-void KVStorageEngine::setInitialDataTimestamp(SnapshotName initialDataTimestamp) {
+void KVStorageEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
     _engine->setInitialDataTimestamp(initialDataTimestamp);
+}
+
+void KVStorageEngine::setOldestTimestamp(Timestamp oldestTimestamp) {
+    _engine->setOldestTimestamp(oldestTimestamp);
 }
 
 bool KVStorageEngine::supportsRecoverToStableTimestamp() const {

@@ -14,12 +14,14 @@ selector:
   - jstests/core/capped_update.js # uses godinsert and can't run under replication.
   - jstests/core/check_shard_index.js  # checkShardingIndex.
   - jstests/core/collection_truncate.js  # emptycapped.
+  - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
   - jstests/core/compact_keeps_indexes.js  # compact.
   - jstests/core/currentop.js  # uses fsync.
   - jstests/core/dbadmin.js  # "local" database.
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
   - jstests/core/diagdata.js # Command not supported in mongos
+  - jstests/core/do_txn*.js  # doTxn
   - jstests/core/dropdb_race.js  # syncdelay.
   - jstests/core/evalb.js  # db.eval() and profiling.
   - jstests/core/fsync.js  # uses fsync.
@@ -36,7 +38,6 @@ selector:
   - jstests/core/repair_server12955.js # repairDatabase
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/startup_log.js  # "local" database.
-  - jstests/core/storageDetailsCommand.js  # diskStorageStats.
   - jstests/core/top.js  # top.
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.
@@ -111,32 +112,11 @@ selector:
   - jstests/core/or4.js
   - jstests/core/recursion.js
   - jstests/core/temp_cleanup.js
-  # Tests that fail for Causal Consistency with default injected readPreference 'secondary'
-  # "TODO SERVER-30384: These tests assume that documents are returned in the same order they are
-  # written when no sort is specified; however, the order of documents within a collection can
-  # be different across a primary and secondary."
-  - jstests/core/coveredIndex1.js
-  - jstests/core/distinct1.js
-  - jstests/core/elemMatchProjection.js
-  - jstests/core/find1.js
-  - jstests/core/find4.js
-  - jstests/core/find5.js
-  - jstests/core/fts1.js
-  - jstests/core/find_dedup.js
-  - jstests/core/fts_spanish.js
-  - jstests/core/geo_distinct.js
-  - jstests/core/geo_s2ordering.js
-  - jstests/core/group1.js
-  - jstests/core/group2.js
-  - jstests/core/maxscan.js
-  - jstests/core/nan.js
-  - jstests/core/null2.js
-  - jstests/core/not2.js
+  # Tests that use $snapshot and expect documents to arrive in some implicit sort order are not
+  # causally consistent.
   - jstests/core/snapshot_queries.js
-  - jstests/core/sorta.js
-  - jstests/core/sortc.js
-  - jstests/core/sort3.js
-  - jstests/core/sort4.js
+  - jstests/core/find1.js
+  # An index drop does not necessarily cause cursors to be killed on the secondary.
   - jstests/core/ord.js
   # plan_cache tests does not work because they check the plan_cache on the primary while the 
   # cache is created on the secondary.
@@ -160,6 +140,13 @@ selector:
   - jstests/core/views/views_stats.js
   - jstests/core/orf.js #explain.executionStats is not CC
   - jstests/core/rename7.js
+  # getMore is not causally consistent if collection is dropped
+  - jstests/core/drop3.js
+  # The following tests fail because of divergent dropCollection behavior between standalones and
+  # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
+  # we expect a second drop to return status OK.
+  - jstests/core/drop.js
+  - jstests/core/explain_upsert.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
 
@@ -169,6 +156,7 @@ executor:
       eval: load("jstests/libs/override_methods/enable_causal_consistency.js")
       readMode: commands
   hooks:
+  - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20
@@ -200,5 +188,10 @@ executor:
           tracking: 0
         numInitialSyncAttempts: 1
     num_rs_nodes_per_shard: 2
+    # TODO SERVER-32572 remove voting_secondaries: true
+    shard_options:
+      voting_secondaries: true
+    configsvr_options:
+      voting_secondaries: true
     enable_sharding:
     - test

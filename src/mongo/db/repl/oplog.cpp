@@ -81,6 +81,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/sync_tail.h"
+#include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -158,6 +159,8 @@ void _getNextOpTimes(OperationContext* opCtx,
         term = replCoord->getTerm();
     }
 
+    // Allow the storage engine to start the transaction outside the critical section.
+    opCtx->recoveryUnit()->prepareSnapshot();
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
 
     auto ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();
@@ -346,11 +349,8 @@ OplogDocWriter _logOpWriter(OperationContext* opCtx,
     if (o2)
         b.append("o2", *o2);
 
-    if (wallTime != Date_t{} &&
-        (serverGlobalParams.featureCompatibility.getVersion() ==
-         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
-        b.appendDate("wall", wallTime);
-    }
+    invariant(wallTime != Date_t{});
+    b.appendDate("wall", wallTime);
 
     appendSessionInfo(opCtx, &b, statementId, sessionInfo, oplogLink);
     return OplogDocWriter(OplogDocWriter(b.obj(), obj));
@@ -389,8 +389,8 @@ void _logOpsInner(OperationContext* opCtx,
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (nss.size() && replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
         !replCoord->canAcceptWritesFor(opCtx, nss)) {
-        severe() << "logOp() but can't accept write to collection " << nss.ns();
-        fassertFailed(17405);
+        uasserted(17405,
+                  str::stream() << "logOp() but can't accept write to collection " << nss.ns());
     }
 
     // we jump through a bunch of hoops here to avoid copying the obj buffer twice --
@@ -399,7 +399,9 @@ void _logOpsInner(OperationContext* opCtx,
 
     // Set replCoord last optime only after we're sure the WUOW didn't abort and roll back.
     opCtx->recoveryUnit()->onCommit([opCtx, replCoord, finalOpTime] {
-        replCoord->setMyLastAppliedOpTimeForward(finalOpTime);
+        // Optimes on the primary should always represent consistent database states.
+        replCoord->setMyLastAppliedOpTimeForward(
+            finalOpTime, ReplicationCoordinator::DataConsistency::Consistent);
         ReplClientInfo::forClient(opCtx->getClient()).setLastOp(finalOpTime);
     });
 }
@@ -416,6 +418,8 @@ OpTime logOp(OperationContext* opCtx,
              StmtId statementId,
              const OplogLink& oplogLink) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
+    // For commands, the test below is on the command ns and therefore does not check for
+    // specific namespaces such as system.profile. This is the caller's responsibility.
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
         invariant(statementId == kUninitializedStmtId);
         return {};
@@ -712,7 +716,8 @@ using OpApplyFn = stdx::function<Status(OperationContext* opCtx,
                                         const char* ns,
                                         const BSONElement& ui,
                                         BSONObj& cmd,
-                                        const OpTime& opTime)>;
+                                        const OpTime& opTime,
+                                        OplogApplication::Mode mode)>;
 
 struct ApplyOpMetadata {
     OpApplyFn applyFunc;
@@ -734,7 +739,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           const NamespaceString nss(parseNs(ns, cmd));
           if (auto idIndexElem = cmd["idIndex"]) {
               // Remove "idIndex" field from command.
@@ -759,7 +765,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           const NamespaceString nss(parseUUID(opCtx, ui));
           BSONElement first = cmd.firstElement();
           invariant(first.fieldNameStringData() == "createIndexes");
@@ -780,7 +787,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           OptionalCollectionUUID uuid;
           NamespaceString nss;
           std::tie(uuid, nss) = parseCollModUUIDAndNss(opCtx, ui, ns, cmd);
@@ -793,7 +801,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           return dropDatabase(opCtx, NamespaceString(ns).db().toString());
       },
       {ErrorCodes::NamespaceNotFound}}},
@@ -802,7 +811,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           auto nss = parseUUIDorNs(opCtx, ns, ui, cmd);
           if (nss.isDropPendingNamespace()) {
@@ -825,7 +835,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
       },
@@ -835,7 +846,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
       },
@@ -845,7 +857,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
       },
@@ -855,7 +868,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
           return dropIndexes(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd, &resultWeDontCareAbout);
       },
@@ -865,7 +879,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           return renameCollectionForApplyOps(opCtx, nsToDatabase(ns), ui, cmd, opTime);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::NamespaceExists}}},
@@ -874,9 +889,10 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
           BSONObjBuilder resultWeDontCareAbout;
-          return applyOps(opCtx, nsToDatabase(ns), cmd, &resultWeDontCareAbout);
+          return applyOps(opCtx, nsToDatabase(ns), cmd, mode, &resultWeDontCareAbout);
       },
       {ErrorCodes::UnknownError}}},
     {"convertToCapped",
@@ -884,7 +900,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
          return convertToCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd), cmd["size"].number());
      }}},
     {"emptycapped",
@@ -892,7 +909,8 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          const char* ns,
          const BSONElement& ui,
          BSONObj& cmd,
-         const OpTime& opTime) -> Status {
+         const OpTime& opTime,
+         OplogApplication::Mode mode) -> Status {
          return emptyCapped(opCtx, parseUUIDorNs(opCtx, ns, ui, cmd));
      }}},
 };
@@ -903,7 +921,7 @@ constexpr StringData OplogApplication::kInitialSyncOplogApplicationMode;
 constexpr StringData OplogApplication::kMasterSlaveOplogApplicationMode;
 constexpr StringData OplogApplication::kRecoveringOplogApplicationMode;
 constexpr StringData OplogApplication::kSecondaryOplogApplicationMode;
-constexpr StringData OplogApplication::kApplyOpsOplogApplicationMode;
+constexpr StringData OplogApplication::kApplyOpsCmdOplogApplicationMode;
 
 StringData OplogApplication::modeToString(OplogApplication::Mode mode) {
     switch (mode) {
@@ -915,8 +933,8 @@ StringData OplogApplication::modeToString(OplogApplication::Mode mode) {
             return OplogApplication::kRecoveringOplogApplicationMode;
         case OplogApplication::Mode::kSecondary:
             return OplogApplication::kSecondaryOplogApplicationMode;
-        case OplogApplication::Mode::kApplyOps:
-            return OplogApplication::kApplyOpsOplogApplicationMode;
+        case OplogApplication::Mode::kApplyOpsCmd:
+            return OplogApplication::kApplyOpsCmdOplogApplicationMode;
     }
     MONGO_UNREACHABLE;
 }
@@ -930,8 +948,8 @@ StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string
         return OplogApplication::Mode::kRecovering;
     } else if (mode == OplogApplication::kSecondaryOplogApplicationMode) {
         return OplogApplication::Mode::kSecondary;
-    } else if (mode == OplogApplication::kApplyOpsOplogApplicationMode) {
-        return OplogApplication::Mode::kApplyOps;
+    } else if (mode == OplogApplication::kApplyOpsCmdOplogApplicationMode) {
+        return OplogApplication::Mode::kApplyOpsCmd;
     } else {
         return Status(ErrorCodes::FailedToParse,
                       str::stream() << "Invalid oplog application mode provided: " << mode);
@@ -986,7 +1004,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                              bool alwaysUpsert,
                              OplogApplication::Mode mode,
                              IncrementOpsAppliedStatsFn incrementOpsAppliedStats) {
-    LOG(3) << "applying op: " << redact(op);
+    LOG(3) << "applying op: " << redact(op)
+           << ", oplog application mode: " << OplogApplication::modeToString(mode);
 
     OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
 
@@ -1008,6 +1027,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
     // operation type -- see logOp() comments for types
     const char* opType = fieldOp.valuestrsafe();
+
+    if (*opType == 'n') {
+        // no op
+        if (incrementOpsAppliedStats) {
+            incrementOpsAppliedStats();
+        }
+
+        return Status::OK();
+    }
 
     NamespaceString requestNss;
     Collection* collection = nullptr;
@@ -1076,27 +1104,56 @@ Status applyOperation_inlock(OperationContext* opCtx,
     //      that violate oplog ordering. Disallow this regardless of whether the timestamps chosen
     //      are otherwise legal.
     //
-    // Use cases: Secondary oplog application: Use the timestamp in the operation document. These
+    // Use cases:
+    //   Secondary oplog application: Use the timestamp in the operation document. These
     //     operations are replicated to the oplog and this is not nested in a parent
     //     `WriteUnitOfWork`.
     //
     //   Non-atomic `applyOps`: The server receives an `applyOps` command with a series of
     //     operations that cannot be run under a single transaction. The common exemption from
     //     being "transactionable" is containing a command operation. These will not be under a
-    //     parent `WriteUnitOfWork`. The timestamps on the operations will only be used if the
-    //     writes are not being replicated, as that would violate the guiding requirement. This is
-    //     primarily allowed for unit testing. See `dbtest/storage_timestamp_tests.cpp`.
+    //     parent `WriteUnitOfWork`. We do not use the timestamps provided by the operations; if
+    //     replicated, these operations will be assigned timestamps when logged in the oplog.
     //
-    //  Atomic `applyOps`: The server receives an `applyOps` command with operations that can be
+    //   Atomic `applyOps`: The server receives an `applyOps` command with operations that can be
     //    run under a single transaction. In this case the caller has already opened a
     //    `WriteUnitOfWork` and expects all writes to become visible at the same time. Moreover,
     //    the individual operations will not contain a `ts` field. The caller is responsible for
     //    setting the timestamp before committing. Assigning a competing timestamp in this
     //    codepath would break that atomicity. Sharding is a consumer of this use-case.
-    const bool assignOperationTimestamp = !opCtx->writesAreReplicated() &&
-        !haveWrappingWriteUnitOfWork && fieldTs &&
-        getGlobalReplicationCoordinator()->getReplicationMode() !=
-            ReplicationCoordinator::modeMasterSlave;
+    const bool assignOperationTimestamp = [opCtx, haveWrappingWriteUnitOfWork] {
+        const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
+        if (opCtx->writesAreReplicated()) {
+            // We do not assign timestamps on replicated writes since they will get their oplog
+            // timestamp once they are logged.
+            return false;
+        } else {
+            switch (replMode) {
+                case ReplicationCoordinator::modeReplSet: {
+                    if (haveWrappingWriteUnitOfWork) {
+                        // We do not assign timestamps to non-replicated writes that have a wrapping
+                        // WUOW. These must be operations inside of atomic 'applyOps' commands being
+                        // applied on a secondary. They will get the timestamp of the outer
+                        // 'applyOps' oplog entry in their wrapper WUOW.
+                        return false;
+                    }
+                    break;
+                }
+                case ReplicationCoordinator::modeNone: {
+                    // We do not assign timestamps on standalones.
+                    return false;
+                }
+                case ReplicationCoordinator::modeMasterSlave: {
+                    // Master-slave does not support timestamps so we do not assign a timestamp.
+                    return false;
+                }
+            }
+        }
+        return true;
+    }();
+
+    invariant(!assignOperationTimestamp || !fieldTs.eoo(),
+              str::stream() << "Oplog entry did not have 'ts' field when expected: " << redact(op));
 
     if (*opType == 'i') {
         if (requestNss.isSystemDotIndexes()) {
@@ -1134,9 +1191,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     !fieldO.Obj().isEmpty() && !fieldTs.Obj().isEmpty() && !fieldT.Obj().isEmpty());
 
             std::vector<InsertStatement> insertObjs;
-            auto fieldOIt = fieldO.Obj().begin();
-            auto fieldTsIt = fieldTs.Obj().begin();
-            auto fieldTIt = fieldT.Obj().begin();
+            auto fieldOIt = BSONObjIterator(fieldO.Obj());
+            auto fieldTsIt = BSONObjIterator(fieldTs.Obj());
+            auto fieldTIt = BSONObjIterator(fieldT.Obj());
 
             while (true) {
                 auto oElem = fieldOIt.next();
@@ -1145,8 +1202,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 // Note: we don't care about statement ids here since the secondaries don't create
                 // their own oplog entries.
-                insertObjs.emplace_back(
-                    oElem.Obj(), SnapshotName(tsElem.timestamp()), tElem.Long());
+                insertObjs.emplace_back(oElem.Obj(), tsElem.timestamp(), tElem.Long());
                 if (!fieldOIt.more()) {
                     // Make sure arrays are the same length.
                     uassert(ErrorCodes::OperationFailed,
@@ -1199,11 +1255,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
             // case.
             bool needToDoUpsert = haveWrappingWriteUnitOfWork;
 
-            SnapshotName timestamp;
+            Timestamp timestamp;
             long long term = OpTime::kUninitializedTerm;
             if (assignOperationTimestamp) {
                 if (fieldTs) {
-                    timestamp = SnapshotName(fieldTs.timestamp());
+                    timestamp = fieldTs.timestamp();
                 }
                 if (fieldT) {
                     term = fieldT.Long();
@@ -1217,7 +1273,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // a user to dictate what timestamps appear in the oplog.
                 if (assignOperationTimestamp) {
                     if (fieldTs.ok()) {
-                        timestamp = SnapshotName(fieldTs.timestamp());
+                        timestamp = fieldTs.timestamp();
                     }
                     if (fieldT.ok()) {
                         term = fieldT.Long();
@@ -1259,7 +1315,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     WriteUnitOfWork wuow(opCtx);
                     // If this is an atomic applyOps (i.e: `haveWrappingWriteUnitOfWork` is true),
                     // do not timestamp the write.
-                    if (assignOperationTimestamp && timestamp != SnapshotName::min()) {
+                    if (assignOperationTimestamp && timestamp != Timestamp::min()) {
                         uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
                     }
 
@@ -1280,12 +1336,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
     } else if (*opType == 'u') {
         opCounters->gotUpdate();
 
-        BSONObj updateCriteria = o2;
-        const bool upsert = valueB || alwaysUpsert;
-
+        auto idField = o2["_id"];
         uassert(ErrorCodes::NoSuchKey,
                 str::stream() << "Failed to apply update due to missing _id: " << op.toString(),
-                updateCriteria.hasField("_id"));
+                !idField.eoo());
+
+        // The o2 field may contain additional fields besides the _id (like the shard key fields),
+        // but we want to do the update by just _id so we can take advantage of the IDHACK.
+        BSONObj updateCriteria = idField.wrap();
+        const bool upsert = valueB || alwaysUpsert;
 
         UpdateRequest request(requestNss);
         request.setQuery(updateCriteria);
@@ -1296,15 +1355,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
         UpdateLifecycleImpl updateLifecycle(requestNss);
         request.setLifecycle(&updateLifecycle);
 
-        SnapshotName timestamp;
+        Timestamp timestamp;
         if (assignOperationTimestamp) {
-            timestamp = SnapshotName(fieldTs.timestamp());
+            timestamp = fieldTs.timestamp();
         }
 
         const StringData ns = fieldNs.valueStringData();
         auto status = writeConflictRetry(opCtx, "applyOps_update", ns, [&] {
             WriteUnitOfWork wuow(opCtx);
-            if (timestamp != SnapshotName::min()) {
+            if (timestamp != Timestamp::min()) {
                 uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
             }
 
@@ -1362,34 +1421,34 @@ Status applyOperation_inlock(OperationContext* opCtx,
     } else if (*opType == 'd') {
         opCounters->gotDelete();
 
+        auto idField = o["_id"];
         uassert(ErrorCodes::NoSuchKey,
                 str::stream() << "Failed to apply delete due to missing _id: " << op.toString(),
-                o.hasField("_id"));
+                !idField.eoo());
 
-        SnapshotName timestamp;
+        // The o field may contain additional fields besides the _id (like the shard key fields),
+        // but we want to do the delete by just _id so we can take advantage of the IDHACK.
+        BSONObj deleteCriteria = idField.wrap();
+
+        Timestamp timestamp;
         if (assignOperationTimestamp) {
-            timestamp = SnapshotName(fieldTs.timestamp());
+            timestamp = fieldTs.timestamp();
         }
 
         const StringData ns = fieldNs.valueStringData();
         writeConflictRetry(opCtx, "applyOps_delete", ns, [&] {
             WriteUnitOfWork wuow(opCtx);
-            if (timestamp != SnapshotName::min()) {
+            if (timestamp != Timestamp::min()) {
                 uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(timestamp));
             }
 
             if (opType[1] == 0) {
-                deleteObjects(opCtx, collection, requestNss, o, /*justOne*/ valueB);
+                deleteObjects(opCtx, collection, requestNss, deleteCriteria, /*justOne*/ valueB);
             } else
                 verify(opType[1] == 'b');  // "db" advertisement
             wuow.commit();
         });
 
-        if (incrementOpsAppliedStats) {
-            incrementOpsAppliedStats();
-        }
-    } else if (*opType == 'n') {
-        // no op
         if (incrementOpsAppliedStats) {
             incrementOpsAppliedStats();
         }
@@ -1404,6 +1463,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
 Status applyCommand_inlock(OperationContext* opCtx,
                            const BSONObj& op,
                            OplogApplication::Mode mode) {
+    LOG(3) << "applying command op: " << redact(op)
+           << ", oplog application mode: " << OplogApplication::modeToString(mode);
+
     std::array<StringData, 4> names = {"o", "ui", "ns", "op"};
     std::array<BSONElement, 4> fields;
     op.getFields(names, &fields);
@@ -1486,8 +1548,40 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    bool done = false;
+    const bool assignCommandTimestamp = [opCtx] {
+        const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
+        if (opCtx->writesAreReplicated()) {
+            // We do not assign timestamps on replicated writes since they will get their oplog
+            // timestamp once they are logged.
+            return false;
+        } else {
+            switch (replMode) {
+                case ReplicationCoordinator::modeReplSet: {
+                    // The 'applyOps' command never logs 'applyOps' oplog entries with nested
+                    // command operations, so this code will never be run from inside the 'applyOps'
+                    // command on secondaries. Thus, the timestamps in the command oplog
+                    // entries are always real timestamps from this oplog and we should
+                    // timestamp our writes with them.
+                    return true;
+                }
+                case ReplicationCoordinator::modeNone: {
+                    // We do not assign timestamps on standalones.
+                    return false;
+                }
+                case ReplicationCoordinator::modeMasterSlave: {
+                    // Master-slave does not support timestamps so we do not assign a timestamp.
+                    return false;
+                }
+            }
+            MONGO_UNREACHABLE;
+        }
+    }();
+    invariant(!assignCommandTimestamp || !opTime.isNull(),
+              str::stream() << "Oplog entry did not have 'ts' field when expected: " << redact(op));
 
+    const Timestamp writeTime = (assignCommandTimestamp ? opTime.getTimestamp() : Timestamp());
+
+    bool done = false;
     while (!done) {
         auto op = opsMap.find(o.firstElementFieldName());
         if (op == opsMap.end()) {
@@ -1498,7 +1592,10 @@ Status applyCommand_inlock(OperationContext* opCtx,
         ApplyOpMetadata curOpToApply = op->second;
         Status status = Status::OK();
         try {
-            status = curOpToApply.applyFunc(opCtx, nss.ns().c_str(), fieldUI, o, opTime);
+            // If 'writeTime' is not null, any writes in this scope will be given 'writeTime' as
+            // their timestamp at commit.
+            TimestampBlock tsBlock(opCtx, writeTime);
+            status = curOpToApply.applyFunc(opCtx, nss.ns().c_str(), fieldUI, o, opTime, mode);
         } catch (...) {
             status = exceptionToStatus();
         }

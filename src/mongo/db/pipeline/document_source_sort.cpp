@@ -34,10 +34,12 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
+#include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 
 namespace mongo {
 
@@ -188,14 +190,27 @@ Pipeline::SourceContainer::iterator DocumentSourceSort::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
-    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
+    auto sortItr = std::next(itr);
+    long long skipSum = 0;
+    while (sortItr != container->end()) {
+        auto nextStage = (*sortItr).get();
 
-    if (nextLimit) {
-        // If the following stage is a $limit, we can combine it with ourselves.
-        setLimitSrc(nextLimit);
-        container->erase(std::next(itr));
-        return itr;
+        if (auto nextSkip = dynamic_cast<DocumentSourceSkip*>(nextStage)) {
+            skipSum += nextSkip->getSkip();
+            ++sortItr;
+        } else if (auto nextLimit = dynamic_cast<DocumentSourceLimit*>(nextStage)) {
+            nextLimit->setLimit(nextLimit->getLimit() + skipSum);
+            setLimitSrc(nextLimit);
+            container->erase(sortItr);
+            sortItr = std::next(itr);
+            skipSum = 0;
+        } else if (!nextStage->constraints().canSwapWithLimit) {
+            return std::next(itr);
+        } else {
+            ++sortItr;
+        }
     }
+
     return std::next(itr);
 }
 
@@ -397,15 +412,52 @@ void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& curs
     _populated = true;
 }
 
+Value DocumentSourceSort::getCollationComparisonKey(const Value& val) const {
+    const auto collator = pExpCtx->getCollator();
+
+    // If the collation is the simple collation, the value itself is the comparison key.
+    if (!collator) {
+        return val;
+    }
+
+    // If 'val' is not a collatable type, there's no need to do any work.
+    if (!CollationIndexKey::isCollatableType(val.getType())) {
+        return val;
+    }
+
+    // If 'val' is a string, directly use the collator to obtain a comparison key.
+    if (val.getType() == BSONType::String) {
+        auto compKey = collator->getComparisonKey(val.getString());
+        return Value(compKey.getKeyData());
+    }
+
+    // Otherwise, for non-string collatable types, take the slow path and round-trip the value
+    // through BSON.
+    BSONObjBuilder input;
+    val.addToBsonObj(&input, ""_sd);
+
+    BSONObjBuilder output;
+    CollationIndexKey::collationAwareIndexKeyAppend(input.obj().firstElement(), collator, &output);
+    return Value(output.obj().firstElement());
+}
+
 StatusWith<Value> DocumentSourceSort::extractKeyPart(const Document& doc,
                                                      const SortPatternPart& patternPart) const {
+    Value plainKey;
     if (patternPart.fieldPath) {
         invariant(!patternPart.expression);
-        return document_path_support::extractElementAlongNonArrayPath(doc, *patternPart.fieldPath);
+        auto key =
+            document_path_support::extractElementAlongNonArrayPath(doc, *patternPart.fieldPath);
+        if (!key.isOK()) {
+            return key;
+        }
+        plainKey = key.getValue();
     } else {
         invariant(patternPart.expression);
-        return patternPart.expression->evaluate(doc);
+        plainKey = patternPart.expression->evaluate(doc);
     }
+
+    return getCollationComparisonKey(plainKey);
 }
 
 StatusWith<Value> DocumentSourceSort::extractKeyFast(const Document& doc) const {
@@ -476,24 +528,24 @@ std::pair<Value, Document> DocumentSourceSort::extractSortKey(Document&& doc) co
 }
 
 int DocumentSourceSort::compare(const Value& lhs, const Value& rhs) const {
-    /*
-      populate() already checked that there is a non-empty sort key,
-      so we shouldn't have to worry about that here.
-
-      However, the tricky part is what to do is none of the sort keys are
-      present.  In this case, consider the document less.
-    */
+    // DocumentSourceSort::populate() has already guaranteed that the sort key is non-empty.
+    // However, the tricky part is deciding what to do if none of the sort keys are present. In that
+    // case, consider the document "less".
+    //
+    // Note that 'comparator' must use binary comparisons here, as both 'lhs' and 'rhs' are
+    // collation comparison keys.
+    ValueComparator comparator;
     const size_t n = _sortPattern.size();
     if (n == 1) {  // simple fast case
         if (_sortPattern[0].isAscending)
-            return pExpCtx->getValueComparator().compare(lhs, rhs);
+            return comparator.compare(lhs, rhs);
         else
-            return -pExpCtx->getValueComparator().compare(lhs, rhs);
+            return -comparator.compare(lhs, rhs);
     }
 
     // compound sort
     for (size_t i = 0; i < n; i++) {
-        int cmp = pExpCtx->getValueComparator().compare(lhs[i], rhs[i]);
+        int cmp = comparator.compare(lhs[i], rhs[i]);
         if (cmp) {
             /* if necessary, adjust the return value by the key ordering */
             if (!_sortPattern[i].isAscending)

@@ -46,7 +46,6 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/catalog/index_observer.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/clientcursor.h"
@@ -547,9 +546,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     }
 
     Snapshotted<BSONObj> doc = docFor(opCtx, loc);
-
-    auto deleteState =
-        getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
+    getGlobalServiceContext()->getOpObserver()->aboutToDelete(opCtx, ns(), doc.value());
 
     boost::optional<BSONObj> deletedDoc;
     if (storeDeletedDoc == Collection::StoreDeletedDoc::On) {
@@ -568,7 +565,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     _recordStore->deleteRecord(opCtx, loc);
 
     getGlobalServiceContext()->getOpObserver()->onDelete(
-        opCtx, ns(), uuid(), stmtId, std::move(deleteState), fromMigrate, deletedDoc);
+        opCtx, ns(), uuid(), stmtId, fromMigrate, deletedDoc);
 }
 
 Counter64 moveCounter;
@@ -997,28 +994,39 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
     return Status::OK();
 }
 
+Status CollectionImpl::updateValidator(OperationContext* opCtx,
+                                       BSONObj newValidator,
+                                       StringData newLevel,
+                                       StringData newAction) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+
+    _details->updateValidator(opCtx, newValidator, newLevel, newAction);
+    _validatorDoc = std::move(newValidator);
+
+    auto validatorSW =
+        parseValidator(opCtx, _validatorDoc, MatchExpressionParser::kAllowAllSpecialFeatures);
+    if (!validatorSW.isOK()) {
+        return validatorSW.getStatus();
+    }
+    _validator = std::move(validatorSW.getValue());
+
+    auto levelSW = parseValidationLevel(newLevel);
+    if (!levelSW.isOK()) {
+        return levelSW.getStatus();
+    }
+    _validationLevel = levelSW.getValue();
+
+    auto actionSW = parseValidationAction(newAction);
+    if (!actionSW.isOK()) {
+        return actionSW.getStatus();
+    }
+    _validationAction = actionSW.getValue();
+
+    return Status::OK();
+}
+
 const CollatorInterface* CollectionImpl::getDefaultCollator() const {
     return _collator.get();
-}
-
-void CollectionImpl::informIndexObserver(OperationContext* opCtx,
-                                         const IndexDescriptor* descriptor,
-                                         const IndexKeyEntry& indexEntry,
-                                         const ValidationOperation operation) const {
-    stdx::lock_guard<stdx::mutex> lock(_indexObserverMutex);
-    if (_indexObserver) {
-        _indexObserver->inform(opCtx, descriptor, std::move(indexEntry), operation);
-    }
-}
-
-void CollectionImpl::hookIndexObserver(IndexConsistency* consistency) {
-    stdx::lock_guard<stdx::mutex> lock(_indexObserverMutex);
-    _indexObserver = stdx::make_unique<IndexObserver>(consistency);
-}
-
-void CollectionImpl::unhookIndexObserver() {
-    stdx::lock_guard<stdx::mutex> lock(_indexObserverMutex);
-    _indexObserver.reset();
 }
 
 namespace {

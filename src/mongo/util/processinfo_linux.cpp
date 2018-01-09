@@ -42,7 +42,9 @@
 #include <sys/time.h>
 #include <sys/utsname.h>
 #include <unistd.h>
-#ifdef __UCLIBC__
+#ifdef __BIONIC__
+#include <android/api-level.h>
+#elif __UCLIBC__
 #include <features.h>
 #else
 #include <gnu/libc-version.h>
@@ -451,6 +453,10 @@ int ProcessInfo::getResidentSize() {
     return (int)((p.getResidentSizeInPages() * getPageSize()) / (1024.0 * 1024));
 }
 
+double ProcessInfo::getMaxSystemFileCachePercentage() {
+    return 0.0;
+}
+
 double ProcessInfo::getSystemMemoryPressurePercentage() {
     return 0.0;
 }
@@ -493,7 +499,11 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
 
     BSONObjBuilder bExtra;
     bExtra.append("versionString", LinuxSysHelper::readLineFromFile("/proc/version"));
-#ifdef __UCLIBC__
+#ifdef __BIONIC__
+    stringstream ss;
+    ss << "bionic (android api " << __ANDROID_API__ << ")";
+    bExtra.append("libcVersion", ss.str());
+#elif __UCLIBC__
     stringstream ss;
     ss << "uClibc-" << __UCLIBC_MAJOR__ << "." << __UCLIBC_MINOR__ << "." << __UCLIBC_SUBLEVEL__;
     bExtra.append("libcVersion", ss.str());

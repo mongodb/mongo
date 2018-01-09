@@ -394,6 +394,29 @@ Mongo.prototype.unsetWriteConcern = function() {
     delete this._writeConcern;
 };
 
+Mongo.prototype.advanceClusterTime = function(newTime) {
+    if (!newTime.hasOwnProperty("clusterTime")) {
+        throw new Error("missing clusterTime field in setClusterTime argument");
+    }
+
+    if (typeof this._clusterTime === "object" && this._clusterTime !== null) {
+        this._clusterTime =
+            (bsonWoCompare({_: this._clusterTime.clusterTime}, {_: newTime.clusterTime}) >= 0)
+            ? this._clusterTime
+            : newTime;
+    } else {
+        this._clusterTime = newTime;
+    }
+};
+
+Mongo.prototype.resetClusterTime_forTesting = function() {
+    delete this._clusterTime;
+};
+
+Mongo.prototype.getClusterTime = function() {
+    return this._clusterTime;
+};
+
 Mongo.prototype.startSession = function startSession(options) {
     return new DriverSession(this, options);
 };
@@ -417,4 +440,25 @@ Mongo.prototype.isCausalConsistency = function isCausalConsistency() {
 
 Mongo.prototype.setCausalConsistency = function setCausalConsistency(causalConsistency = true) {
     this._causalConsistency = causalConsistency;
+};
+
+Mongo.prototype.waitForClusterTime = function waitForClusterTime(maxRetries = 10) {
+    let isFirstTime = true;
+    let count = 0;
+    while (count < maxRetries) {
+        if (typeof this._clusterTime === "object" && this._clusterTime !== null) {
+            if (this._clusterTime.hasOwnProperty("signature") &&
+                this._clusterTime.signature.keyId > 0) {
+                return;
+            }
+        }
+        if (isFirstTime) {
+            isFirstTime = false;
+        } else {
+            sleep(500);
+        }
+        count++;
+        this.adminCommand({"ping": 1});
+    }
+    throw new Error("failed waiting for non default clusterTime");
 };

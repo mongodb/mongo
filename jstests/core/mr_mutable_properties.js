@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // See SERVER-9448
 // Test argument and receiver (aka 'this') objects and their children can be mutated
 // in Map, Reduce and Finalize functions

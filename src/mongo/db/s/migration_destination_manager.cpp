@@ -38,8 +38,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/db_raii.h"
@@ -49,8 +48,6 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
@@ -208,6 +205,7 @@ MONGO_FP_DECLARE(migrateThreadHangAtStep4);
 MONGO_FP_DECLARE(migrateThreadHangAtStep5);
 MONGO_FP_DECLARE(migrateThreadHangAtStep6);
 
+MONGO_FP_DECLARE(failMigrationLeaveOrphans);
 MONGO_FP_DECLARE(failMigrationReceivedOutOfRangeOperation);
 
 }  // namespace
@@ -432,7 +430,8 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
                                                  OID epoch,
                                                  WriteConcernOptions writeConcern) {
     Client::initThread("migrateThread");
-    auto opCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+    auto opCtx = Client::getCurrent()->makeOperationContext();
+
 
     if (getGlobalAuthorizationManager()->isAuthEnabled()) {
         AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
@@ -447,7 +446,7 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
         setStateFail("migrate failed with unknown exception: UNKNOWN ERROR");
     }
 
-    if (getState() != DONE) {
+    if (getState() != DONE && !MONGO_FAIL_POINT(failMigrationLeaveOrphans)) {
         _forgetPending(opCtx.get(), _nss, epoch, ChunkRange(min, max));
     }
 
@@ -469,6 +468,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
     invariant(_scopedRegisterReceiveChunk);
     invariant(!min.isEmpty());
     invariant(!max.isEmpty());
+
+    auto const serviceContext = opCtx->getServiceContext();
 
     log() << "Starting receiving end of migration of chunk " << redact(min) << " -> " << redact(max)
           << " for collection " << _nss.ns() << " from " << fromShardConnString << " at epoch "
@@ -493,9 +494,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
     DisableDocumentValidation validationDisabler(opCtx);
 
-    std::vector<BSONObj> indexSpecs;
-    BSONObj idIndexSpec;
-    BSONObj options;
+    std::vector<BSONObj> donorIndexSpecs;
+    BSONObj donorIdIndexSpec;
+    BSONObj donorOptions;
     {
         // 0. Get the collection indexes and options from the donor shard.
 
@@ -505,11 +506,11 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         // Get indexes by calling listIndexes against the donor.
         auto indexes = conn->getIndexSpecs(_nss.ns());
         for (auto&& spec : indexes) {
-            indexSpecs.push_back(spec);
+            donorIndexSpecs.push_back(spec);
             if (auto indexNameElem = spec[IndexDescriptor::kIndexNameFieldName]) {
                 if (indexNameElem.type() == BSONType::String &&
                     indexNameElem.valueStringData() == "_id_"_sd) {
-                    idIndexSpec = spec;
+                    donorIdIndexSpec = spec;
                 }
             }
         }
@@ -532,10 +533,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
         // The entire options include both the settable options under the 'options' field in the
         // listCollections response, and the UUID under the 'info' field.
-        BSONObjBuilder optionsBob;
+        BSONObjBuilder donorOptionsBob;
 
         if (entry["options"].isABSONObj()) {
-            optionsBob.appendElements(entry["options"].Obj());
+            donorOptionsBob.appendElements(entry["options"].Obj());
         }
 
         if (serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
@@ -555,9 +556,9 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                                     "compatibility version across the cluster.");
                 return;
             }
-            optionsBob.append(info["uuid"]);
+            donorOptionsBob.append(info["uuid"]);
         }
-        options = optionsBob.obj();
+        donorOptions = donorOptionsBob.obj();
     }
 
     {
@@ -581,44 +582,66 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
         }
 
         Database* const db = ctx.db();
-        if (!db->getCollection(opCtx, _nss)) {
+        Collection* collection = db->getCollection(opCtx, _nss);
+        if (collection) {
+            // We have an entry for a collection by this name. Check that our collection's UUID
+            // matches the donor's.
+            boost::optional<UUID> donorUUID;
+            if (!donorOptions["uuid"].eoo()) {
+                donorUUID.emplace(UUID::parse(donorOptions));
+            }
+
+            if (!collection->getCatalogEntry()->isEqualToMetadataUUID(opCtx, donorUUID)) {
+                setStateFailWarn(
+                    str::stream()
+                    << "Cannot receive chunk "
+                    << ChunkRange(min, max).toString()
+                    << " for collection "
+                    << _nss.ns()
+                    << " because we already have an identically named collection with UUID "
+                    << (collection->uuid() ? collection->uuid()->toString() : "(none)")
+                    << ", which differs from the donor's UUID "
+                    << (donorUUID ? donorUUID->toString() : "(none)")
+                    << ". Manually drop the collection on this shard if it contains data from a "
+                       "previous incarnation of "
+                    << _nss.ns());
+                return;
+            }
+        } else {
+            // We do not have a collection by this name. Create the collection with the donor's
+            // options.
             WriteUnitOfWork wuow(opCtx);
             const bool createDefaultIndexes = true;
             Status status = userCreateNS(opCtx,
                                          db,
                                          _nss.ns(),
-                                         options,
+                                         donorOptions,
                                          CollectionOptions::parseForStorage,
                                          createDefaultIndexes,
-                                         idIndexSpec);
+                                         donorIdIndexSpec);
             if (!status.isOK()) {
                 warning() << "failed to create collection [" << _nss << "] "
-                          << " with options " << options << ": " << redact(status);
+                          << " with options " << donorOptions << ": " << redact(status);
             }
             wuow.commit();
-        }
-
-        Collection* const collection = db->getCollection(opCtx, _nss);
-        if (!collection) {
-            setStateFailWarn(str::stream() << "collection dropped during migration: " << _nss.ns());
-            return;
+            collection = db->getCollection(opCtx, _nss);
         }
 
         MultiIndexBlock indexer(opCtx, collection);
-        indexer.removeExistingIndexes(&indexSpecs);
+        indexer.removeExistingIndexes(&donorIndexSpecs);
 
-        if (!indexSpecs.empty()) {
+        if (!donorIndexSpecs.empty()) {
             // Only copy indexes if the collection does not have any documents.
             if (collection->numRecords(opCtx) > 0) {
                 setStateFailWarn(str::stream() << "aborting migration, shard is missing "
-                                               << indexSpecs.size()
+                                               << donorIndexSpecs.size()
                                                << " indexes and "
                                                << "collection is not empty. Non-trivial "
                                                << "index creation should be scheduled manually");
                 return;
             }
 
-            auto indexInfoObjs = indexer.init(indexSpecs);
+            auto indexInfoObjs = indexer.init(donorIndexSpecs);
             if (!indexInfoObjs.isOK()) {
                 setStateFailWarn(str::stream() << "failed to create index before migrating data. "
                                                << " error: "
@@ -631,7 +654,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
             for (auto&& infoObj : indexInfoObjs.getValue()) {
                 // make sure to create index on secondaries as well
-                getGlobalServiceContext()->getOpObserver()->onCreateIndex(
+                serviceContext->getOpObserver()->onCreateIndex(
                     opCtx, collection->ns(), collection->uuid(), infoObj, true /* fromMigrate */);
             }
 
@@ -752,6 +775,12 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
 
         timing.done(3);
         MONGO_FAIL_POINT_PAUSE_WHILE_SET(migrateThreadHangAtStep3);
+
+        if (MONGO_FAIL_POINT(failMigrationLeaveOrphans)) {
+            setStateFail(str::stream() << "failing migration after cloning " << _numCloned
+                                       << " docs due to failMigrationLeaveOrphans failpoint");
+            return;
+        }
     }
 
     // If running on a replicated system, we'll need to flush the docs we cloned to the

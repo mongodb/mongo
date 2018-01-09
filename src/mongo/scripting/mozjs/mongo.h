@@ -64,20 +64,13 @@ struct MongoBase : public BaseInfo {
         MONGO_DECLARE_JS_FUNCTION(getMaxWireVersion);
         MONGO_DECLARE_JS_FUNCTION(isReplicaSetMember);
         MONGO_DECLARE_JS_FUNCTION(isMongos);
-        MONGO_DECLARE_JS_FUNCTION(getClusterTime);
-        MONGO_DECLARE_JS_FUNCTION(advanceClusterTime);
-        MONGO_DECLARE_JS_FUNCTION(resetClusterTime_forTesting);
         MONGO_DECLARE_JS_FUNCTION(_startSession);
     };
 
-    static const JSFunctionSpec methods[25];
+    static const JSFunctionSpec methods[22];
 
     static const char* const className;
     static const unsigned classFlags = JSCLASS_HAS_PRIVATE;
-
-    static BSONObj getClusterTime();
-    static void advanceClusterTime(const BSONObj& newTime);
-    static void resetClusterTime_forTesting();
 };
 
 /**

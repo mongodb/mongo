@@ -39,9 +39,9 @@ namespace mongo {
 class InternalSchemaMaxItemsMatchExpression final
     : public InternalSchemaNumArrayItemsMatchExpression {
 public:
-    InternalSchemaMaxItemsMatchExpression()
-        : InternalSchemaNumArrayItemsMatchExpression(INTERNAL_SCHEMA_MAX_ITEMS,
-                                                     "$_internalSchemaMaxItems"_sd) {}
+    InternalSchemaMaxItemsMatchExpression(StringData path, long long numItems)
+        : InternalSchemaNumArrayItemsMatchExpression(
+              INTERNAL_SCHEMA_MAX_ITEMS, path, numItems, "$_internalSchemaMaxItems"_sd) {}
 
     bool matchesArray(const BSONObj& anArray, MatchDetails* details) const final {
         return (anArray.nFields() <= numItems());
@@ -49,8 +49,7 @@ public:
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<InternalSchemaMaxItemsMatchExpression> maxItems =
-            stdx::make_unique<InternalSchemaMaxItemsMatchExpression>();
-        invariantOK(maxItems->init(path(), numItems()));
+            stdx::make_unique<InternalSchemaMaxItemsMatchExpression>(path(), numItems());
         if (getTag()) {
             maxItems->setTag(getTag()->clone());
         }

@@ -132,7 +132,10 @@ static bool forkServer() {
         } else if (child1) {
             // this is run in the original parent process
             int pstat;
-            waitpid(child1, &pstat, 0);
+            if (waitpid(child1, &pstat, 0) == pid_t{-1}) {
+                perror("waitpid");
+                quickExit(-1);
+            }
 
             if (WIFEXITED(pstat)) {
                 if (WEXITSTATUS(pstat)) {
@@ -166,7 +169,10 @@ static bool forkServer() {
             // this is run in the middle process
             int pstat;
             cout << "forked process: " << child2 << endl;
-            waitpid(child2, &pstat, 0);
+            if (waitpid(child2, &pstat, 0) == pid_t{-1}) {
+                perror("waitpid");
+                quickExit(-1);
+            }
 
             if (WIFEXITED(pstat)) {
                 quickExit(WEXITSTATUS(pstat));
@@ -361,7 +367,7 @@ bool initializeServerGlobalState() {
     Listener::globalTicketHolder.resize(serverGlobalParams.maxConns).transitional_ignore();
 
 #ifndef _WIN32
-    if (!fs::is_directory(serverGlobalParams.socket)) {
+    if (!serverGlobalParams.noUnixSocket && !fs::is_directory(serverGlobalParams.socket)) {
         cout << serverGlobalParams.socket << " must be a directory" << endl;
         return false;
     }

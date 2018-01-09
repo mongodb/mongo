@@ -141,24 +141,24 @@ public:
      *  - NamespaceNotFound - collection does not exist
      */
     virtual StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
-        OperationContext* opCtx, const std::string& collNs) = 0;
+        OperationContext* opCtx,
+        const std::string& collNs,
+        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Retrieves all collections undera specified database (or in the system).
      *
      * @param dbName an optional database name. Must be nullptr or non-empty. If nullptr is
      *      specified, all collections on the system are returned.
-     * @param collections variable to receive the set of collections.
      * @param optime an out parameter that will contain the opTime of the config server.
      *      Can be null. Note that collections can be fetched in multiple batches and each batch
      *      can have a unique opTime. This opTime will be the one from the last batch.
      *
-     * Returns a !OK status if an error occurs.
+     * Returns the set of collections, or a !OK status if an error occurs.
      */
-    virtual Status getCollections(OperationContext* opCtx,
-                                  const std::string* dbName,
-                                  std::vector<CollectionType>* collections,
-                                  repl::OpTime* optime) = 0;
+    virtual StatusWith<std::vector<CollectionType>> getCollections(OperationContext* opCtx,
+                                                                   const std::string* dbName,
+                                                                   repl::OpTime* optime) = 0;
 
     /**
      * Drops the specified collection from the collection metadata store.
@@ -167,16 +167,18 @@ public:
      * some of the known failures:
      *  - NamespaceNotFound - collection does not exist
      */
-    virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) = 0;
+    virtual Status dropCollection(
+        OperationContext* opCtx,
+        const NamespaceString& ns,
+        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Retrieves all databases for a shard.
      *
      * Returns a !OK status if an error occurs.
      */
-    virtual Status getDatabasesForShard(OperationContext* opCtx,
-                                        const ShardId& shardId,
-                                        std::vector<std::string>* dbs) = 0;
+    virtual StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
+                                                                      const ShardId& shardId) = 0;
 
     /**
      * Gets the requested number of chunks (of type ChunkType) that satisfy a query.
@@ -184,28 +186,27 @@ public:
      * @param filter The query to filter out the results.
      * @param sort Fields to use for sorting the results. Pass empty BSON object for no sort.
      * @param limit The number of chunk entries to return. Pass boost::none for no limit.
-     * @param chunks Vector entry to receive the results
      * @param optime an out parameter that will contain the opTime of the config server.
      *      Can be null. Note that chunks can be fetched in multiple batches and each batch
      *      can have a unique opTime. This opTime will be the one from the last batch.
      * @param readConcern The readConcern to use while querying for chunks.
      *
-     * Returns a !OK status if an error occurs.
+     * Returns a vector of ChunkTypes, or a !OK status if an error occurs.
      */
-    virtual Status getChunks(OperationContext* opCtx,
-                             const BSONObj& filter,
-                             const BSONObj& sort,
-                             boost::optional<int> limit,
-                             std::vector<ChunkType>* chunks,
-                             repl::OpTime* opTime,
-                             repl::ReadConcernLevel readConcern) = 0;
+    virtual StatusWith<std::vector<ChunkType>> getChunks(OperationContext* opCtx,
+                                                         const BSONObj& filter,
+                                                         const BSONObj& sort,
+                                                         boost::optional<int> limit,
+                                                         repl::OpTime* opTime,
+                                                         repl::ReadConcernLevel readConcern) = 0;
 
     /**
      * Retrieves all tags for the specified collection.
+     *
+     * Returns a !OK status if an error occurs.
      */
-    virtual Status getTagsForCollection(OperationContext* opCtx,
-                                        const std::string& collectionNs,
-                                        std::vector<TagsType>* tags) = 0;
+    virtual StatusWith<std::vector<TagsType>> getTagsForCollection(
+        OperationContext* opCtx, const std::string& collectionNs) = 0;
 
     /**
      * Retrieves all shards in this sharded cluster.
@@ -240,7 +241,7 @@ public:
 
     /**
      * Applies oplog entries to the config servers.
-     * Used by mergeChunk, splitChunk, and moveChunk commands.
+     * Used by mergeChunk and splitChunk commands.
      *
      * @param updateOps: documents to write to the chunks collection.
      * @param preCondition: preconditions for applying documents.

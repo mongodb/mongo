@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test clearing of the plan cache, either manually through the planCacheClear command,
 // or due to system events such as an index build.
 

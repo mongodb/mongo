@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // checks that operations do not create a database
 
 (function() {

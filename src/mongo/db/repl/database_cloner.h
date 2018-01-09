@@ -50,11 +50,6 @@ namespace mongo {
 class OldThreadPool;
 
 namespace repl {
-namespace {
-
-using UniqueLock = stdx::unique_lock<stdx::mutex>;
-
-}  // namespace
 
 class StorageInterface;
 
@@ -204,7 +199,7 @@ private:
     /**
      * Calls the above method after unlocking.
      */
-    void _finishCallback_inlock(UniqueLock& lk, const Status& status);
+    void _finishCallback_inlock(stdx::unique_lock<stdx::mutex>& lk, const Status& status);
 
     //
     // All member variables are labeled with one of the following codes indicating the

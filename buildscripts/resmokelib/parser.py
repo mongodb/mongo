@@ -289,6 +289,7 @@ def parse_command_line():
 
     return options, args
 
+
 def validate_options(parser, options, args):
     """
     Do preliminary validation on the options and error on any invalid options.
@@ -441,7 +442,7 @@ def get_named_suites():
     Returns the list of suites available to execute.
     """
 
-    # Skip "with_server*" and "no_server" because they do not define any test files to run.
+    # Skip "with_*server" and "no_server" because they do not define any test files to run.
     executor_only = set(["with_server", "with_external_server", "no_server"])
     suite_names = [suite for suite in resmokeconfig.NAMED_SUITES if suite not in executor_only]
     suite_names.sort()
@@ -488,12 +489,6 @@ def _get_suite_config(pathname):
 
 def _get_suite_roots(files):
     return {"selector": {"roots": files}}
-
-
-def _ensure_test_kind(suite_config, yaml_config, yaml_file):
-    if "test_kind" not in yaml_config:
-        raise ValueError("YAML config file %s missing key 'test_kind'" % (yaml_file))
-    suite_config["test_kind"] = yaml_config["test_kind"]
 
 
 def _get_yaml_config(kind, pathname):

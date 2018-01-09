@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test the shell helpers which wrap the plan cache commands.
 
 var t = db.jstests_plan_cache_shell_helpers;
@@ -82,7 +84,7 @@ assert.eq(getShapes(),
 
 // should return empty array on non-existent query shape.
 assert.eq(0,
-          planCache.getPlansByQuery({unknownfield: 1}).length,
+          planCache.getPlansByQuery({unknownfield: 1}).plans.length,
           'collection.getPlanCache().getPlansByQuery() should return empty results ' +
               'on non-existent collection');
 // should error on missing required field query.
@@ -92,16 +94,16 @@ assert.throws(function() {
 
 // Invoke with various permutations of required (query) and optional (projection, sort) arguments.
 assert.eq(getPlans(queryB, sortC, projectionB),
-          planCache.getPlansByQuery(queryB, projectionB, sortC),
+          planCache.getPlansByQuery(queryB, projectionB, sortC).plans,
           'plans from collection.getPlanCache().getPlansByQuery() different from command result');
 assert.eq(getPlans(queryB, {}, projectionB),
-          planCache.getPlansByQuery(queryB, projectionB),
+          planCache.getPlansByQuery(queryB, projectionB).plans,
           'plans from collection.getPlanCache().getPlansByQuery() different from command result');
 assert.eq(getPlans(queryB, sortC, {}),
-          planCache.getPlansByQuery(queryB, undefined, sortC),
+          planCache.getPlansByQuery(queryB, undefined, sortC).plans,
           'plans from collection.getPlanCache().getPlansByQuery() different from command result');
 assert.eq(getPlans(queryB, {}, {}),
-          planCache.getPlansByQuery(queryB),
+          planCache.getPlansByQuery(queryB).plans,
           'plans from collection.getPlanCache().getPlansByQuery() different from command result');
 
 // getPlansByQuery() will also accept a single argument with the query shape object
@@ -114,7 +116,7 @@ assert.eq(getPlans(queryB, {}, {}),
 // }
 var shapeB = {query: queryB, projection: projectionB, sort: sortC};
 assert.eq(getPlans(queryB, sortC, projectionB),
-          planCache.getPlansByQuery(shapeB),
+          planCache.getPlansByQuery(shapeB).plans,
           'collection.getPlanCache().getPlansByQuery() did not accept query shape object');
 
 // Should return empty array on missing or extra fields in query shape object.
@@ -122,14 +124,14 @@ assert.eq(getPlans(queryB, sortC, projectionB),
 // as the 'query' component which will result in the server returning an empty
 // array of plans.
 assert.eq(0,
-          planCache.getPlansByQuery({query: queryB}).length,
+          planCache.getPlansByQuery({query: queryB}).plans.length,
           'collection.getPlanCache.getPlansByQuery should return empty results on ' +
               'incomplete query shape');
 assert.eq(
     0,
     planCache
         .getPlansByQuery({query: queryB, sort: sortC, projection: projectionB, unknown_field: 1})
-        .length,
+        .plans.length,
     'collection.getPlanCache.getPlansByQuery should return empty results on ' +
         'invalid query shape');
 

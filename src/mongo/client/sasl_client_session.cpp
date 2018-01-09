@@ -56,7 +56,10 @@ void SaslClientSession::setParameter(Parameter id, StringData value) {
 }
 
 bool SaslClientSession::hasParameter(Parameter id) {
-    if (id < 0 || id >= numParameters)
+    // The Parameter enum may be unsigned depending on compiler,
+    // force it into a signed value for the purpose of bounds checking.
+    const auto sid = static_cast<std::make_signed<Parameter>::type>(id);
+    if (sid < 0 || id >= numParameters)
         return false;
     return static_cast<bool>(_parameters[id].data);
 }

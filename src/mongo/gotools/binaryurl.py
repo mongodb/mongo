@@ -34,8 +34,6 @@ if opts.version == "2.4" and opts.edition == "enterprise":
   opts.edition = "subscription"
 
 def isCorrectVersion(version):
-  if not "-rc" in opts.version and version["release_candidate"]:
-    return False
   actual = version["version"].split(".")
   desired = opts.version.split(".")
   for i in range(len(desired)):

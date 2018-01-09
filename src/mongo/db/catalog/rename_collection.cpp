@@ -33,9 +33,7 @@
 #include "mongo/db/catalog/rename_collection.h"
 
 #include "mongo/db/background.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -58,12 +56,16 @@
 namespace mongo {
 namespace {
 
-NamespaceString getNamespaceFromUUID(OperationContext* opCtx, const BSONElement& ui) {
+NamespaceString getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
+    Collection* source = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
+    return source ? source->ns() : NamespaceString();
+}
+
+NamespaceString getNamespaceFromUUIDElement(OperationContext* opCtx, const BSONElement& ui) {
     if (ui.eoo())
         return {};
     auto uuid = uassertStatusOK(UUID::parse(ui));
-    Collection* source = UUIDCatalog::get(opCtx).lookupCollectionByUUID(uuid);
-    return source ? source->ns() : NamespaceString();
+    return getNamespaceFromUUID(opCtx, uuid);
 }
 
 Status renameCollectionCommon(OperationContext* opCtx,
@@ -72,6 +74,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
                               OptionalCollectionUUID targetUUID,
                               repl::OpTime renameOpTimeFromApplyOps,
                               const RenameCollectionOptions& options) {
+    auto uuidString = targetUUID ? targetUUID->toString() : "no UUID";
+    log() << "renameCollection: renaming collection " << source << " to " << target << " ("
+          << uuidString << ")";
+
     // A valid 'renameOpTimeFromApplyOps' is not allowed when writes are replicated.
     if (!renameOpTimeFromApplyOps.isNull() && opCtx->writesAreReplicated()) {
         return Status(
@@ -402,6 +408,13 @@ Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,
                         const NamespaceString& target,
                         const RenameCollectionOptions& options) {
+    if (source.isDropPendingNamespace()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "renameCollection() cannot accept a source "
+                                       "collection that is in a drop-pending state: "
+                                    << source.toString());
+    }
+
     OptionalCollectionUUID noTargetUUID;
     return renameCollectionCommon(opCtx, source, target, noTargetUUID, {}, options);
 }
@@ -424,11 +437,21 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
 
     NamespaceString sourceNss(sourceNsElt.valueStringData());
     NamespaceString targetNss(targetNsElt.valueStringData());
-    NamespaceString uiNss(getNamespaceFromUUID(opCtx, ui));
+    NamespaceString uiNss(getNamespaceFromUUIDElement(opCtx, ui));
 
     // If the UUID we're targeting already exists, rename from there no matter what.
     if (!uiNss.isEmpty()) {
         sourceNss = uiNss;
+    }
+
+    if (sourceNss.isDropPendingNamespace()) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "renameCollectionForApplyOps() cannot accept a source "
+                                       "collection that is in a drop-pending state: "
+                                    << sourceNss.toString()
+                                    << " (UUID: "
+                                    << ui.toString(false)
+                                    << ")");
     }
 
     OptionalCollectionUUID targetUUID;
@@ -440,4 +463,23 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     options.stayTemp = cmd["stayTemp"].trueValue();
     return renameCollectionCommon(opCtx, sourceNss, targetNss, targetUUID, renameOpTime, options);
 }
+
+Status renameCollectionForRollback(OperationContext* opCtx,
+                                   const NamespaceString& target,
+                                   const UUID& uuid) {
+    // If the UUID we're targeting already exists, rename from there no matter what.
+    auto source = getNamespaceFromUUID(opCtx, uuid);
+    invariant(source.db() == target.db(),
+              str::stream() << "renameCollectionForRollback: source and target namespaces must "
+                               "have the same database. source: "
+                            << source.toString()
+                            << ". target: "
+                            << target.toString());
+
+    RenameCollectionOptions options;
+    invariant(!options.dropTarget);
+
+    return renameCollectionCommon(opCtx, source, target, uuid, {}, options);
+}
+
 }  // namespace mongo

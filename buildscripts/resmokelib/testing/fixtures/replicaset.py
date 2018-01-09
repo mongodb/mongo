@@ -37,7 +37,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                  write_concern_majority_journal_default=None,
                  auth_options=None,
                  replset_config_options=None,
-                 voting_secondaries=True,
+                 voting_secondaries=None,
                  all_nodes_electable=False):
 
         interface.ReplFixture.__init__(self, logger, job_num)
@@ -52,6 +52,11 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.replset_config_options = utils.default_if_none(replset_config_options, {})
         self.voting_secondaries = voting_secondaries
         self.all_nodes_electable = all_nodes_electable
+
+        # If voting_secondaries has not been set, set a default. By default, secondaries have zero
+        # votes unless they are also nodes capable of being elected primary.
+        if self.voting_secondaries is None:
+            self.voting_secondaries = self.all_nodes_electable
 
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
@@ -258,11 +263,19 @@ class ReplicaSetFixture(interface.ReplFixture):
         while True:
             for node in self.nodes:
                 self._check_get_primary_timeout(start, timeout_secs)
-                client = clients.get(node.port)
-                if not client:
-                    client = node.mongo_client()
-                    clients[node.port] = client
-                is_master = client.admin.command("isMaster")["ismaster"]
+
+                try:
+                    client = clients.get(node.port)
+                    if not client:
+                        client = node.mongo_client()
+                        clients[node.port] = client
+                    is_master = client.admin.command("isMaster")["ismaster"]
+                except pymongo.errors.AutoReconnect:
+                    # AutoReconnect exceptions may occur if the primary stepped down since PyMongo
+                    # last contacted it. We'll just try contacting the node again in the next round
+                    # of isMaster requests.
+                    continue
+
                 if is_master:
                     self.logger.info("The node on port %d is primary of replica set '%s'",
                                      node.port, self.replset_name)

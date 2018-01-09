@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Test removal of Records that have been reused since the remove operation began.  SERVER-5198
 
 t = db.jstests_removeb;

@@ -579,11 +579,12 @@ void execCommandDatabase(OperationContext* opCtx,
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-        initializeOperationSessionInfo(opCtx,
-                                       request.body,
-                                       command->requiresAuth(),
-                                       replCoord->getReplicationMode() ==
-                                           repl::ReplicationCoordinator::modeReplSet);
+        initializeOperationSessionInfo(
+            opCtx,
+            request.body,
+            command->requiresAuth(),
+            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet,
+            opCtx->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking());
 
         const auto dbname = request.getDatabase().toString();
         uassert(

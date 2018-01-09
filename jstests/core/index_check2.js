@@ -1,3 +1,4 @@
+// @tags: [requires_getmore]
 
 t = db.index_check2;
 t.drop();

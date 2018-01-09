@@ -4,18 +4,16 @@
 (function() {
     "use strict";
 
-    const testName = "report_latest_observed_oplog_timestamp";
-    const cursorCollection = db.getCollection(testName);
-    const otherCollection = db.getCollection("unrelated_" + testName);
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
-    // Drop collections to assure a clean run.  Collections may not exist so do not check result.
-    cursorCollection.drop();
-    otherCollection.drop();
+    // Drop and recreate collections to assure a clean run.
+    const testName = "report_latest_observed_oplog_timestamp";
+    const cursorCollection = assertDropAndRecreateCollection(db, testName);
+    const otherCollection = assertDropAndRecreateCollection(db, "unrelated_" + testName);
 
     // Get a resume point.
     jsTestLog("Getting a resume point.");
     const batchSize = 2;
-    assert.commandWorked(db.createCollection(cursorCollection.getName()));
     const firstResponse = assert.commandWorked(cursorCollection.runCommand(
         {aggregate: testName, pipeline: [{$changeStream: {}}], cursor: {batchSize: batchSize}}));
     assert.eq(0, firstResponse.cursor.firstBatch.length);

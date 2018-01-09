@@ -20,6 +20,13 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/retryable_writes_util.js");
+
+    if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
+        jsTestLog("Retryable writes are not supported, skipping test");
+        return;
+    }
+
     load("jstests/replsets/rslib.js");
 
     function assertSameRecordOnBothConnections(primary, secondary, lsid) {

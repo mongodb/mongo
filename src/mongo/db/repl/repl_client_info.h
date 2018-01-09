@@ -29,9 +29,9 @@
 #pragma once
 
 #include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/client.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/storage/snapshot_name.h"
 
 namespace mongo {
 
@@ -56,10 +56,10 @@ public:
         _lastOp = OpTime();
     }
 
-    void setLastSnapshot(SnapshotName name) {
+    void setLastSnapshot(Timestamp name) {
         _lastSnapshot = name;
     }
-    SnapshotName getLastSnapshot() const {
+    Timestamp getLastSnapshot() const {
         return _lastSnapshot;
     }
 
@@ -82,7 +82,7 @@ private:
     static const long long kUninitializedTerm = -1;
 
     OpTime _lastOp = OpTime();
-    SnapshotName _lastSnapshot = SnapshotName::min();
+    Timestamp _lastSnapshot;
     OID _remoteId = OID();
 };
 

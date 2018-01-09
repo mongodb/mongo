@@ -794,7 +794,7 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
     expectMoveChunkCommand(
         chunk2,
         kShardId3,
-        Status(ErrorCodes::ExceededTimeLimit,
+        Status(ErrorCodes::NetworkInterfaceExceededTimeLimit,
                "RemoteCallErrorConversionToOperationFailedCheck generated error."));
 
     // Run the MigrationManager code.

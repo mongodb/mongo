@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -326,6 +326,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	bool flush_set, release_dhandle;
 
 	flush_set = release_dhandle = false;
+	WT_NOT_READ(flush_set);
 
 	/*
 	 * If the chunk is already checkpointed, make sure it is also evicted.
@@ -338,9 +339,10 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		    ret = __lsm_discard_handle(session, chunk->uri, NULL));
 		if (ret == 0)
 			chunk->evicted = 1;
-		else if (ret == EBUSY)
+		else if (ret == EBUSY) {
 			ret = 0;
-		else
+			WT_NOT_READ(ret);
+		} else
 			WT_RET_MSG(session, ret, "discard handle");
 	}
 	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
@@ -409,7 +411,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		WT_ERR_MSG(session, ret, "LSM checkpoint");
 
 	/* Now the file is written, get the chunk size. */
-	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
+	WT_ERR(__wt_lsm_tree_set_chunk_size(session, lsm_tree, chunk));
 
 	++lsm_tree->chunks_flushed;
 
@@ -503,7 +505,8 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	 * ourselves to get stuck creating bloom filters, the entire tree
 	 * can stall since there may be no worker threads available to flush.
 	 */
-	F_SET(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
+	F_SET(session,
+	    WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_READ_WONT_NEED);
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		WT_ERR(src->get_key(src, &key));
 		__wt_bloom_insert(bloom, &key);
@@ -514,7 +517,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 	WT_TRET(__wt_bloom_finalize(bloom));
 	WT_ERR(ret);
 
-	F_CLR(session, WT_SESSION_NO_CACHE);
+	F_CLR(session, WT_SESSION_READ_WONT_NEED);
 
 	/* Load the new Bloom filter into cache. */
 	WT_CLEAR(key);
@@ -537,7 +540,8 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 err:	if (bloom != NULL)
 		WT_TRET(__wt_bloom_close(bloom));
-	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_EVICTION);
+	F_CLR(session,
+	    WT_SESSION_IGNORE_CACHE_SIZE | WT_SESSION_READ_WONT_NEED);
 	return (ret);
 }
 

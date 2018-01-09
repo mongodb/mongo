@@ -125,11 +125,13 @@
 
     // Once the config primary creates keys, both mongos servers discover them and start returning
     // signed cluster times.
+    // TODO: SERVER-31986 this check can be done only for authenticated connections that do not have
+    // advance_cluster_time privilege.
     assert.soonNoExcept(function() {
         assertContainsLogicalAndOperationTime(st.s0.getDB("test").runCommand({isMaster: 1}),
-                                              {initialized: true, signed: true});
+                                              {initialized: true, signed: false});
         assertContainsLogicalAndOperationTime(st.s1.getDB("test").runCommand({isMaster: 1}),
-                                              {initialized: true, signed: true});
+                                              {initialized: true, signed: false});
         return true;
     });
 

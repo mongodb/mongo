@@ -43,9 +43,9 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -660,7 +660,12 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return batchResponseStatus;
     }
 
-    // The featureCompatibilityVersion should be the same throughout the cluster.
+    // The featureCompatibilityVersion should be the same throughout the cluster. We don't
+    // explicitly send writeConcern majority to the added shard, because a 3.4 mongod will reject
+    // it (setFCV did not support writeConcern until 3.6), and a 3.6 mongod will still default to
+    // majority writeConcern.
+    //
+    // TODO SERVER-32045: propagate the user's writeConcern
     auto versionResponse = _runCommandForAddShard(
         opCtx,
         targeter.get(),

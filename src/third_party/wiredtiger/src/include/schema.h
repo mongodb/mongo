@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -40,7 +40,10 @@ struct __wt_index {
 
 	const char *idxkey_format;	/* Index key format (hides primary) */
 	const char *exkey_format;	/* Key format for custom extractors */
-#define	WT_INDEX_IMMUTABLE	0x01
+
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_INDEX_IMMUTABLE	0x1u
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t    flags;		/* Index configuration flags */
 };
 
@@ -63,7 +66,7 @@ struct __wt_table {
 	WT_INDEX **indices;
 	size_t idx_alloc;
 
-	bool cg_complete, idx_complete, is_simple, is_simple_file;
+	bool cg_complete, idx_complete, is_simple;
 	u_int ncolgroups, nindices, nkey_columns;
 };
 

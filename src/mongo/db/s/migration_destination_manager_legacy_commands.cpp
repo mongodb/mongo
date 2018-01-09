@@ -102,9 +102,8 @@ public:
         // Refresh our collection manager from the config server, we need a collection manager to
         // start registering pending chunks. We force the remote refresh here to make the behavior
         // consistent and predictable, generally we'd refresh anyway, and to be paranoid.
-        ChunkVersion currentVersion;
-
-        Status status = shardingState->refreshMetadataNow(opCtx, nss, &currentVersion);
+        ChunkVersion shardVersion;
+        Status status = shardingState->refreshMetadataNow(opCtx, nss, &shardVersion);
         if (!status.isOK()) {
             errmsg = str::stream() << "cannot start receiving chunk "
                                    << redact(chunkRange.toString()) << causedBy(redact(status));
@@ -147,7 +146,7 @@ public:
             chunkRange.getMin(),
             chunkRange.getMax(),
             shardKeyPattern,
-            currentVersion.epoch(),
+            shardVersion.epoch(),
             writeConcern));
 
         result.appendBool("started", true);

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -532,7 +532,8 @@ typedef struct {
  *	Handle a key produced by a custom extractor.
  */
 static int
-__curjoin_extract_insert(WT_CURSOR *cursor) {
+__curjoin_extract_insert(WT_CURSOR *cursor)
+{
 	WT_CURJOIN_EXTRACTOR *cextract;
 	WT_DECL_RET;
 	WT_ITEM ikey;

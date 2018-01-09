@@ -36,13 +36,13 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/repl/collection_bulk_loader.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/snapshot_name.h"
 
 namespace mongo {
 
@@ -54,7 +54,7 @@ namespace repl {
 
 struct TimestampedBSONObj {
     BSONObj obj;
-    SnapshotName timestamp;
+    Timestamp timestamp;
 };
 
 /**
@@ -84,11 +84,26 @@ public:
     virtual ~StorageInterface() = default;
 
     /**
-     * Rollback ID is an increasing counter of how many rollbacks have occurred on this server.
+     * Rollback ID is an increasing counter of how many rollbacks have occurred on this server. It
+     * is initialized with a value of 1, and should increase by exactly 1 every time a rollback
+     * occurs.
+     */
+
+    /**
+     * Return the current value of the rollback ID.
      */
     virtual StatusWith<int> getRollbackID(OperationContext* opCtx) = 0;
-    virtual Status initializeRollbackID(OperationContext* opCtx) = 0;
-    virtual Status incrementRollbackID(OperationContext* opCtx) = 0;
+
+    /**
+     * Initialize the rollback ID to 1. Returns the value of the initialized rollback ID if
+     * successful.
+     */
+    virtual StatusWith<int> initializeRollbackID(OperationContext* opCtx) = 0;
+
+    /**
+     * Increments the current rollback ID. Returns the new value of the rollback ID if successful.
+     */
+    virtual StatusWith<int> incrementRollbackID(OperationContext* opCtx) = 0;
 
 
     // Collection creation and population for initial sync.
@@ -224,20 +239,20 @@ public:
      * Updates a singleton document in a collection. Upserts the document if it does not exist. If
      * the document is upserted and no '_id' is provided, one will be generated.
      * If the collection has more than 1 document, the update will only be performed on the first
-     * one found.
+     * one found. The upsert is performed at the given timestamp.
      * Returns 'NamespaceNotFound' if the collection does not exist. This does not implicitly
      * create the collection so that the caller can create the collection with any collection
      * options they want (ex: capped, temp, collation, etc.).
      */
     virtual Status putSingleton(OperationContext* opCtx,
                                 const NamespaceString& nss,
-                                const BSONObj& update) = 0;
+                                const TimestampedBSONObj& update) = 0;
 
     /**
      * Updates a singleton document in a collection. Never upsert.
      *
      * If the collection has more than 1 document, the update will only be performed on the first
-     * one found.
+     * one found. The update is performed at the given timestamp.
      * Returns 'NamespaceNotFound' if the collection does not exist. This does not implicitly
      * create the collection so that the caller can create the collection with any collection
      * options they want (ex: capped, temp, collation, etc.).
@@ -245,7 +260,7 @@ public:
     virtual Status updateSingleton(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const BSONObj& query,
-                                   const BSONObj& update) = 0;
+                                   const TimestampedBSONObj& update) = 0;
 
     /**
      * Finds a single document in the collection referenced by the specified _id.
@@ -318,13 +333,13 @@ public:
      * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
      * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
      */
-    virtual void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) = 0;
+    virtual void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) = 0;
 
     /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because
      * timestamps are not persisted in the storage layer.
      */
-    virtual void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) = 0;
+    virtual void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) = 0;
 
     /**
      * Reverts the state of all database data to the last stable timestamp.

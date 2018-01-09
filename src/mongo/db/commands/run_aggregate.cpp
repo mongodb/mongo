@@ -234,7 +234,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
  * Round trips the pipeline through serialization by calling serialize(), then Pipeline::parse().
  * fasserts if it fails to parse after being serialized.
  */
-std::unique_ptr<Pipeline, Pipeline::Deleter> reparsePipeline(
+std::unique_ptr<Pipeline, PipelineDeleter> reparsePipeline(
     const Pipeline* pipeline,
     const AggregationRequest& request,
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -362,7 +362,16 @@ Status runAggregate(OperationContext* opCtx,
             // of the collection on which $changeStream was invoked, so that we do not end up
             // resolving the collation on the oplog.
             invariant(!collatorToUse);
+            // Change streams can only be run against collections; AutoGetCollection will raise an
+            // error if the given namespace is a view. A change stream may be opened on a namespace
+            // before the associated collection is created, but only if the database already exists.
+            // If the $changeStream was sent from mongoS then the database exists at the cluster
+            // level even if not yet present on this shard, so we allow the $changeStream to run.
             AutoGetCollection origNssCtx(opCtx, origNss, MODE_IS);
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "cannot open $changeStream for non-existent database: "
+                                  << origNss.db(),
+                    origNssCtx.getDb() || request.isFromMongos());
             Collection* origColl = origNssCtx.getCollection();
             collatorToUse.emplace(resolveCollator(opCtx, request, origColl));
         }
@@ -451,6 +460,7 @@ Status runAggregate(OperationContext* opCtx,
             new ExpressionContext(opCtx,
                                   request,
                                   std::move(*collatorToUse),
+                                  std::make_shared<PipelineD::MongoDInterface>(opCtx),
                                   uassertStatusOK(resolveInvolvedNamespaces(opCtx, request))));
         expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 

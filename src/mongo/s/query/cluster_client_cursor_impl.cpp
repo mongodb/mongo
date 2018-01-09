@@ -73,12 +73,20 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
                                                  executor::TaskExecutor* executor,
                                                  ClusterClientCursorParams&& params,
                                                  boost::optional<LogicalSessionId> lsid)
-    : _params(std::move(params)), _root(buildMergerPlan(opCtx, executor, &_params)), _lsid(lsid) {}
+    : _params(std::move(params)), _root(buildMergerPlan(opCtx, executor, &_params)), _lsid(lsid) {
+    dassert(!_params.compareWholeSortKey ||
+            SimpleBSONObjComparator::kInstance.evaluate(
+                _params.sort == ClusterClientCursorParams::kWholeSortKeySortPattern));
+}
 
 ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock> root,
                                                  ClusterClientCursorParams&& params,
                                                  boost::optional<LogicalSessionId> lsid)
-    : _params(std::move(params)), _root(std::move(root)), _lsid(lsid) {}
+    : _params(std::move(params)), _root(std::move(root)), _lsid(lsid) {
+    dassert(!_params.compareWholeSortKey ||
+            SimpleBSONObjComparator::kInstance.evaluate(
+                _params.sort == ClusterClientCursorParams::kWholeSortKeySortPattern));
+}
 
 StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(
     RouterExecStage::ExecContext execContext) {
@@ -146,6 +154,10 @@ boost::optional<LogicalSessionId> ClusterClientCursorImpl::getLsid() const {
     return _lsid;
 }
 
+boost::optional<ReadPreferenceSetting> ClusterClientCursorImpl::getReadPreference() const {
+    return _params.readPreference;
+}
+
 namespace {
 
 /**
@@ -183,6 +195,20 @@ bool isAllLimitsAndSkips(Pipeline* pipeline) {
         stages.begin(), stages.end(), [&](const auto& stage) { return isSkipOrLimit(stage); });
 }
 
+/**
+ * Creates the initial stage to feed data into the execution plan.  By default, a RouterExecMerge
+ * stage, or a custom stage if specified in 'params->creatCustomMerge'.
+ */
+std::unique_ptr<RouterExecStage> createInitialStage(OperationContext* opCtx,
+                                                    executor::TaskExecutor* executor,
+                                                    ClusterClientCursorParams* params) {
+    if (params->createCustomCursorSource) {
+        return params->createCustomCursorSource(opCtx, executor, params);
+    } else {
+        return stdx::make_unique<RouterStageMerge>(opCtx, executor, params);
+    }
+}
+
 std::unique_ptr<RouterExecStage> buildPipelinePlan(executor::TaskExecutor* executor,
                                                    ClusterClientCursorParams* params) {
     invariant(params->mergePipeline);
@@ -191,8 +217,7 @@ std::unique_ptr<RouterExecStage> buildPipelinePlan(executor::TaskExecutor* execu
     auto* pipeline = params->mergePipeline.get();
     auto* opCtx = pipeline->getContext()->opCtx;
 
-    std::unique_ptr<RouterExecStage> root =
-        stdx::make_unique<RouterStageMerge>(opCtx, executor, params);
+    std::unique_ptr<RouterExecStage> root = createInitialStage(opCtx, executor, params);
     if (!isAllLimitsAndSkips(pipeline)) {
         return stdx::make_unique<RouterStagePipeline>(std::move(root),
                                                       std::move(params->mergePipeline));
@@ -212,15 +237,10 @@ std::unique_ptr<RouterExecStage> buildPipelinePlan(executor::TaskExecutor* execu
                 opCtx, std::move(root), static_cast<DocumentSourceLimit*>(limit.get())->getLimit());
         }
     }
-    if (!params->sort.isEmpty()) {
-        // We are executing the pipeline without using a Pipeline, so we need to strip out any
-        // Document metadata ourselves. Note we only need this stage if there was a sort, since
-        // otherwise there would be no way for this half of the pipeline to require any metadata
-        // fields.
-        root = stdx::make_unique<RouterStageRemoveMetadataFields>(
-            opCtx, std::move(root), Document::allMetadataFieldNames);
-    }
-    return root;
+    // We are executing the pipeline without using an actual Pipeline, so we need to strip out any
+    // Document metadata ourselves.
+    return stdx::make_unique<RouterStageRemoveMetadataFields>(
+        opCtx, std::move(root), Document::allMetadataFieldNames);
 }
 }  // namespace
 
@@ -235,8 +255,7 @@ std::unique_ptr<RouterExecStage> ClusterClientCursorImpl::buildMergerPlan(
         return buildPipelinePlan(executor, params);
     }
 
-    std::unique_ptr<RouterExecStage> root =
-        stdx::make_unique<RouterStageMerge>(opCtx, executor, params);
+    std::unique_ptr<RouterExecStage> root = createInitialStage(opCtx, executor, params);
 
     if (skip) {
         root = stdx::make_unique<RouterStageSkip>(opCtx, std::move(root), *skip);

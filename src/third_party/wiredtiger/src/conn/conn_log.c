@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -599,6 +599,7 @@ __log_file_server(void *arg)
 				WT_ERR(__wt_fsync(session, log->log_fh, true));
 				__wt_spin_lock(session, &log->log_sync_lock);
 				locked = true;
+				WT_NOT_READ(locked);
 				/*
 				 * The sync LSN could have advanced while we
 				 * were writing to disk.
@@ -865,12 +866,11 @@ err:		WT_PANIC_MSG(session, ret, "log wrlsn server error");
 static WT_THREAD_RET
 __log_server(void *arg)
 {
-	struct timespec start, now;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
-	uint64_t timediff;
+	uint64_t time_start, time_stop, timediff;
 	bool did_work, signalled;
 
 	session = arg;
@@ -949,11 +949,11 @@ __log_server(void *arg)
 		}
 
 		/* Wait until the next event. */
-		__wt_epoch(session, &start);
+		time_start = __wt_rdtsc(session);
 		__wt_cond_auto_wait_signal(
 		    session, conn->log_cond, did_work, NULL, &signalled);
-		__wt_epoch(session, &now);
-		timediff = WT_TIMEDIFF_MS(now, start);
+		time_stop = __wt_rdtsc(session);
+		timediff = WT_TSCDIFF_MS(time_stop, time_start);
 	}
 
 	if (0) {

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -94,13 +94,13 @@ util_read_line(WT_SESSION *session, ULINE *l, bool eof_expected, bool *eofp)
 }
 
 /*
- * util_str2recno --
- *	Convert a string to a record number.
+ * util_str2num --
+ *	Convert a string to a number.
  */
 int
-util_str2recno(WT_SESSION *session, const char *p, uint64_t *recnop)
+util_str2num(WT_SESSION *session, const char *p, bool endnul, uint64_t *vp)
 {
-	uint64_t recno;
+	uint64_t v;
 	char *endptr;
 
 	/*
@@ -112,16 +112,20 @@ util_str2recno(WT_SESSION *session, const char *p, uint64_t *recnop)
 		goto format;
 
 	errno = 0;
-	recno = __wt_strtouq(p, &endptr, 0);
-	if (recno == ULLONG_MAX && errno == ERANGE)
-		return (
-		    util_err(session, ERANGE, "%s: invalid record number", p));
+	v = __wt_strtouq(p, &endptr, 0);
+	if (v == ULLONG_MAX && errno == ERANGE)
+		return (util_err(session, ERANGE, "%s: invalid number", p));
 
-	if (endptr[0] != '\0')
-format:		return (
-		    util_err(session, EINVAL, "%s: invalid record number", p));
+	/*
+	 * In most cases we expect the number to be a string and end with a
+	 * nul byte (and we want to confirm that because it's a user-entered
+	 * command-line argument), but we allow the caller to configure that
+	 * test off.
+	 */
+	if (endnul && endptr[0] != '\0')
+format:		return (util_err(session, EINVAL, "%s: invalid number", p));
 
-	*recnop = recno;
+	*vp = v;
 	return (0);
 }
 

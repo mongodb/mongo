@@ -44,15 +44,23 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/stdx/utility.h"
 #include "mongo/util/dns_query.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
+
+using namespace std::literals::string_literals;
 
 namespace {
 constexpr std::array<char, 16> hexits{
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 const mongo::StringData kURIPrefix{"mongodb://"};
 const mongo::StringData kURISRVPrefix{"mongodb+srv://"};
+
+// This vector must remain sorted.  It is over pairs to facilitate a call to `std::includes` using
+// a `std::map<std::string, std::string>` as the other parameter.
+const std::vector<std::pair<std::string, std::string>> permittedTXTOptions = {{"authSource"s, ""s},
+                                                                              {"replicaSet"s, ""s}};
 }  // namespace
 
 /**
@@ -123,9 +131,13 @@ std::pair<StringData, StringData> partitionBackward(StringData str, const char c
  * Breakout method for parsing application/x-www-form-urlencoded option pairs
  *
  * foo=bar&baz=qux&...
+ *
+ * A `std::map<std::string, std::string>` is returned, to facilitate setwise operations from the STL
+ * on multiple parsed option sources.  STL setwise operations require sorted lists.  A map is used
+ * instead of a vector of pairs to permit insertion-is-not-overwrite behavior.
  */
-MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
-    MongoURI::OptionsMap ret;
+std::map<std::string, std::string> parseOptions(StringData options, StringData url) {
+    std::map<std::string, std::string> ret;
     if (options.empty()) {
         return ret;
     }
@@ -188,26 +200,55 @@ MongoURI::OptionsMap parseOptions(StringData options, StringData url) {
     return ret;
 }
 
-MongoURI::OptionsMap addTXTOptions(MongoURI::OptionsMap options,
+MongoURI::OptionsMap addTXTOptions(std::map<std::string, std::string> options,
                                    const std::string& host,
                                    const StringData url,
                                    const bool isSeedlist) {
     // If there is no seedlist mode, then don't add any TXT options.
     if (!isSeedlist)
         return options;
+    options.insert({"ssl", "true"});
 
     // Get all TXT records and parse them as options, adding them to the options set.
-    const auto txtRecords = dns::getTXTRecords(host);
-
-    for (const auto& record : txtRecords) {
-        auto txtOptions = parseOptions(record, url);
-        // Note that, `std::map` and `std::unordered_map` insert does not replace existing
-        // values -- this gives the desired behavior that user-specified values override TXT
-        // record specified values.
-        options.insert(begin(txtOptions), end(txtOptions));
+    auto txtRecords = dns::getTXTRecords(host);
+    if (txtRecords.empty()) {
+        return {std::make_move_iterator(begin(options)), std::make_move_iterator(end(options))};
     }
 
-    return options;
+    if (txtRecords.size() > 1) {
+        uasserted(ErrorCodes::FailedToParse, "Encountered multiple TXT records for: "s + url);
+    }
+
+    auto txtOptions = parseOptions(txtRecords.front(), url);
+    if (!std::includes(
+            begin(permittedTXTOptions),
+            end(permittedTXTOptions),
+            begin(stdx::as_const(txtOptions)),
+            end(stdx::as_const(txtOptions)),
+            [](const auto& lhs, const auto& rhs) { return std::get<0>(lhs) < std::get<0>(rhs); })) {
+        uasserted(ErrorCodes::FailedToParse, "Encountered invalid options in TXT record.");
+    }
+
+    options.insert(std::make_move_iterator(begin(txtOptions)),
+                   std::make_move_iterator(end(txtOptions)));
+
+    return {std::make_move_iterator(begin(options)), std::make_move_iterator(end(options))};
+}
+
+std::string stripHost(const std::string& hostname) {
+    return hostname.substr(hostname.find('.') + 1);
+}
+
+bool isWithinDomain(std::string hostname, std::string domain) {
+    auto removeFQDNRoot = [](std::string name) -> std::string {
+        if (name.back() == '.') {
+            name.pop_back();
+        }
+        return name;
+    };
+    hostname = stripHost(removeFQDNRoot(std::move(hostname)));
+    domain = removeFQDNRoot(std::move(domain));
+    return hostname == domain;
 }
 }  // namespace
 
@@ -324,11 +365,27 @@ MongoURI MongoURI::parseImpl(const std::string& url) {
             uasserted(ErrorCodes::FailedToParse,
                       "Only a single server may be specified with a mongo+srv:// url.");
         }
+        const int dots = std::count(begin(canonicalHost), end(canonicalHost), '.');
+        const int requiredDots = (canonicalHost.back() == '.') + 2;
+        if (dots < requiredDots) {
+            uasserted(ErrorCodes::FailedToParse,
+                      "A server specified with a mongo+srv:// url must have at least 3 hostname "
+                      "components separated by dots ('.')");
+        }
+        const auto domain = stripHost(canonicalHost);
         auto srvEntries = dns::lookupSRVRecords("_mongodb._tcp." + canonicalHost);
         servers.clear();
-        std::transform(begin(srvEntries), end(srvEntries), back_inserter(servers), [](auto& srv) {
-            return HostAndPort(std::move(srv.host), srv.port);
-        });
+        std::transform(std::make_move_iterator(begin(srvEntries)),
+                       std::make_move_iterator(end(srvEntries)),
+                       back_inserter(servers),
+                       [&domain](auto&& srv) {
+                           if (!isWithinDomain(srv.host, domain)) {
+                               uasserted(ErrorCodes::FailedToParse,
+                                         "Hostname "s + srv.host + " is not within the domain "s +
+                                             domain);
+                           }
+                           return HostAndPort(std::move(srv.host), srv.port);
+                       });
     }
 
     // 6. Split the auth database and connection options string by the first, unescaped ?,

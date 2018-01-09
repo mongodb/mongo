@@ -79,6 +79,21 @@ TEST(Commands, appendCommandStatusNoOverwrite) {
     ASSERT_BSONOBJ_EQ(actualResult.obj(), expectedResult.obj());
 }
 
+TEST(Commands, appendCommandStatusErrorExtraInfo) {
+    BSONObjBuilder actualResult;
+    const Status status(ErrorExtraInfoExample(123), "not again!");
+    Command::appendCommandStatus(actualResult, status);
+
+    BSONObjBuilder expectedResult;
+    expectedResult.append("ok", 0.0);
+    expectedResult.append("errmsg", status.reason());
+    expectedResult.append("code", status.code());
+    expectedResult.append("codeName", ErrorCodes::errorString(status.code()));
+    expectedResult.append("data", 123);
+
+    ASSERT_BSONOBJ_EQ(actualResult.obj(), expectedResult.obj());
+}
+
 class ParseNsOrUUID : public unittest::Test {
 public:
     ParseNsOrUUID()

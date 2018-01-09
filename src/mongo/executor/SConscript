@@ -86,7 +86,7 @@ env.Library('network_interface_mock',
             ])
 
 env.Library(
-    target='connection_pool',
+    target='connection_pool_executor',
     source=[
        'connection_pool.cpp',
     ],
@@ -105,7 +105,7 @@ env.CppUnitTest(
         'connection_pool_test_fixture.cpp',
     ],
     LIBDEPS=[
-        'connection_pool',
+        'connection_pool_executor',
     ],
 )
 
@@ -164,7 +164,7 @@ env.Library(
         '$BUILD_DIR/third_party/shim_asio',
         'async_stream',
         'async_timer_asio',
-        'connection_pool',
+        'connection_pool_executor',
         'network_interface',
         'task_executor_interface',
     ])
@@ -310,7 +310,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/concurrency/thread_pool_test_fixture',
         'async_timer_mock',
-        'connection_pool',
+        'connection_pool_executor',
         'network_interface_asio',
         'network_interface_thread_pool',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',

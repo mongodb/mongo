@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Yield and delete test case for query optimizer cursor.  SERVER-4401
 
 t = db.jstests_distinct3;

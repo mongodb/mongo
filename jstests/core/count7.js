@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Check normal count matching and deduping.
 
 t = db.jstests_count7;

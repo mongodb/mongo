@@ -51,8 +51,6 @@
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/client.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
-#include "mongo/db/generic_cursor_manager.h"
-#include "mongo/db/generic_cursor_manager_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/kill_sessions.h"
 #include "mongo/db/lasterror.h"
@@ -442,9 +440,6 @@ static ExitCode runMongosServer() {
         getGlobalServiceContext(),
         std::make_shared<SessionKiller>(getGlobalServiceContext(), killSessionsRemote));
 
-    GenericCursorManager::set(getGlobalServiceContext(),
-                              stdx::make_unique<GenericCursorManagerMongos>());
-
     // Set up the logical session cache
     LogicalSessionCache::set(getGlobalServiceContext(), makeLogicalSessionCacheS());
 
@@ -593,6 +588,8 @@ int mongoSMain(int argc, char* argv[], char** envp) {
         severe(LogComponent::kDefault) << "Failed global initialization: " << status;
         quickExit(EXIT_FAILURE);
     }
+
+    ErrorExtraInfo::invariantHaveAllParsers();
 
     startupConfigActions(std::vector<std::string>(argv, argv + argc));
     cmdline_utils::censorArgvArray(argc, argv);

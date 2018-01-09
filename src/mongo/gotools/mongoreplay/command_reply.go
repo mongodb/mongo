@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongoreplay
 
 import (
@@ -18,10 +24,9 @@ import (
 type CommandReplyOp struct {
 	Header MsgHeader
 	mgo.CommandReplyOp
-	Docs         []bson.Raw
-	Latency      time.Duration
-	cursorCached bool
-	cursorID     int64
+	Docs     []bson.Raw
+	Latency  time.Duration
+	cursorID *int64
 }
 
 // OpCode returns the OpCode for a CommandReplyOp.
@@ -69,23 +74,17 @@ func (op *CommandReplyOp) Abbreviated(chars int) string {
 // caches in the CommandReplyOp struct so that multiple calls to this function
 // do not incur the cost of unmarshalling the bson.
 func (op *CommandReplyOp) getCursorID() (int64, error) {
-	if op.cursorCached {
-		return op.cursorID, nil
+	if op.cursorID != nil {
+		return *op.cursorID, nil
 	}
-	doc := &struct {
-		Cursor struct {
-			ID int64 `bson:"id"`
-		} `bson:"cursor"`
-	}{}
 	replyArgs := op.CommandReply.(*bson.Raw)
-	err := replyArgs.Unmarshal(doc)
+
+	id, err := getCursorID(replyArgs)
 	if err != nil {
-		// can happen if there's corrupt bson in the doc.
-		return 0, fmt.Errorf("failed to unmarshal bson.Raw into struct: %v", err)
+		return 0, err
 	}
-	op.cursorCached = true
-	op.cursorID = doc.Cursor.ID
-	return op.cursorID, nil
+	op.cursorID = &id
+	return *op.cursorID, nil
 }
 
 func (op *CommandReplyOp) getOpBodyString() (string, string, string, error) {

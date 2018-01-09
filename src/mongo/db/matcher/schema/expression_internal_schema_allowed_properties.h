@@ -108,13 +108,11 @@ public:
 
     static constexpr StringData kName = "$_internalSchemaAllowedProperties"_sd;
 
-    explicit InternalSchemaAllowedPropertiesMatchExpression()
-        : MatchExpression(MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES) {}
-
-    Status init(boost::container::flat_set<StringData> properties,
-                StringData namePlaceholder,
-                std::vector<PatternSchema> patternProperties,
-                std::unique_ptr<ExpressionWithPlaceholder> otherwise);
+    explicit InternalSchemaAllowedPropertiesMatchExpression(
+        boost::container::flat_set<StringData> properties,
+        StringData namePlaceholder,
+        std::vector<PatternSchema> patternProperties,
+        std::unique_ptr<ExpressionWithPlaceholder> otherwise);
 
     void debugString(StringBuilder& debug, int level) const final;
 

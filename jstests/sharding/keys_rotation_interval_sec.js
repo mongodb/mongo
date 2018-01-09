@@ -13,7 +13,8 @@
     });
 
     let keys = st.s.getDB("admin").system.keys.find();
-    let maxExpireTime = Timestamp(Date.now() / 1000 + kRotationInterval * 2, 0);
+    // add a few seconds to the expire timestamp to account for rounding that may happen.
+    let maxExpireTime = Timestamp(Date.now() / 1000 + kRotationInterval * 2 + 5, 0);
 
     assert(keys.count() >= 2);
     keys.toArray().forEach(function(key, i) {

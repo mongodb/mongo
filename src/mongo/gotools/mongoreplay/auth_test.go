@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongoreplay
 
 import (
@@ -8,7 +14,7 @@ import (
 )
 
 // TestCommandsAgainstAuthedDBWhenAuthed tests some basic commands against a
-// database that requires authenticaiton when the driver has proper
+// database that requires authentication when the driver has proper
 // authentication credentials
 func TestCommandsAgainstAuthedDBWhenAuthed(t *testing.T) {
 	if !authTestServerMode {
@@ -53,7 +59,7 @@ func TestCommandsAgainstAuthedDBWhenAuthed(t *testing.T) {
 	ind := 0
 	result := testDoc{}
 
-	t.Log("Querying database to ensure insert occured successfully")
+	t.Log("Querying database to ensure insert occurred successfully")
 	for iter.Next(&result) {
 		t.Logf("Query result: %#v\n", result)
 		if err := iter.Err(); err != nil {
@@ -81,7 +87,7 @@ func TestCommandsAgainstAuthedDBWhenAuthed(t *testing.T) {
 
 // TestCommandsAgainstAuthedDBWhenNotAuthed tests some basic commands against a
 // database that requires authentication when the driver does not have proper
-// authenticaiton. It generates a series of inserts and ensures that the docs
+// authentication. It generates a series of inserts and ensures that the docs
 // they are attempting to insert are not later found in the database
 func TestCommandsAgainstAuthedDBWhenNotAuthed(t *testing.T) {
 	if !authTestServerMode {

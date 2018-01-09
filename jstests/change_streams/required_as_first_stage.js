@@ -1,10 +1,11 @@
 // Tests that the $changeStream stage can only be present as the first stage in the pipeline.
 (function() {
     "use strict";
-    load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
 
-    const coll = db.change_stream_required_as_first_stage;
-    coll.drop();
+    load("jstests/aggregation/extras/utils.js");       // For assertErrorCode.
+    load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
+
+    const coll = assertDropAndRecreateCollection(db, "change_stream_required_as_first_stage");
 
     assertErrorCode(coll, [{$indexStats: {}}, {$changeStream: {}}], 40602);
     assertErrorCode(

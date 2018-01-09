@@ -34,7 +34,7 @@
 #include <utility>
 
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_string_data.h"
+#include "mongo/base/data_type.h"
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"

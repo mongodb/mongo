@@ -231,6 +231,10 @@ bool SockAddr::isDefaultRoute() const {
     }
 }
 
+bool SockAddr::isAnonymousUNIXSocket() const {
+    return ((getType() == AF_UNIX) && (as<sockaddr_un>().sun_path[0] == '\0'));
+}
+
 std::string SockAddr::toString(bool includePort) const {
     if (includePort && (getType() != AF_UNIX) && (getType() != AF_UNSPEC)) {
         StringBuilder ss;
@@ -281,8 +285,8 @@ std::string SockAddr::getAddr() const {
         }
 
         case AF_UNIX:
-            return (as<sockaddr_un>().sun_path[0] != '\0' ? as<sockaddr_un>().sun_path
-                                                          : "anonymous unix socket");
+            return (!isAnonymousUNIXSocket() ? as<sockaddr_un>().sun_path
+                                             : "anonymous unix socket");
         case AF_UNSPEC:
             return "(NONE)";
         default:
@@ -317,34 +321,6 @@ bool SockAddr::operator==(const SockAddr& r) const {
 
 bool SockAddr::operator!=(const SockAddr& r) const {
     return !(*this == r);
-}
-
-bool SockAddr::operator<(const SockAddr& r) const {
-    if (getType() < r.getType())
-        return true;
-    else if (getType() > r.getType())
-        return false;
-
-    if (getPort() < r.getPort())
-        return true;
-    else if (getPort() > r.getPort())
-        return false;
-
-    switch (getType()) {
-        case AF_INET:
-            return as<sockaddr_in>().sin_addr.s_addr < r.as<sockaddr_in>().sin_addr.s_addr;
-        case AF_INET6:
-            return memcmp(as<sockaddr_in6>().sin6_addr.s6_addr,
-                          r.as<sockaddr_in6>().sin6_addr.s6_addr,
-                          sizeof(in6_addr)) < 0;
-        case AF_UNIX:
-            return strcmp(as<sockaddr_un>().sun_path, r.as<sockaddr_un>().sun_path) < 0;
-        case AF_UNSPEC:
-            return false;
-        default:
-            massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
-    }
-    return false;
 }
 
 }  // namespace mongo

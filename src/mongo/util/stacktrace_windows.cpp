@@ -327,21 +327,19 @@ void printWindowsStackTrace(CONTEXT& context, std::ostream& os) {
     ++sourceWidth;
     size_t frameCount = traceList.size();
     for (size_t i = 0; i < frameCount; ++i) {
-        std::stringstream ss;
-        ss << traceList[i].moduleName << " ";
+        os << traceList[i].moduleName << ' ';
         size_t width = traceList[i].moduleName.length();
         while (width < moduleWidth) {
-            ss << " ";
+            os << ' ';
             ++width;
         }
-        ss << traceList[i].sourceAndLine << " ";
+        os << traceList[i].sourceAndLine << ' ';
         width = traceList[i].sourceAndLine.length();
         while (width < sourceWidth) {
-            ss << " ";
+            os << ' ';
             ++width;
         }
-        ss << traceList[i].symbolAndOffset;
-        log() << ss.str();
+        os << traceList[i].symbolAndOffset << '\n';
     }
 }
 

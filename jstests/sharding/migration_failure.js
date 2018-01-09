@@ -40,9 +40,10 @@
     assert.eq(oldVersion.t,
               newVersion.t,
               "The shard version major value should not change after a failed migration");
-    assert.eq(oldVersion.i,
+    // Split does not cause a shard routing table refresh, but the moveChunk attempt will.
+    assert.eq(2,
               newVersion.i,
-              "The shard version minor value should not change after a failed migration");
+              "The shard routing table should refresh on a failed migration and show the split");
 
     assert.commandWorked(st.shard0.getDB("admin").runCommand(
         {configureFailPoint: 'failMigrationCommit', mode: 'off'}));

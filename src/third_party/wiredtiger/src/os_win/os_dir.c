@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -9,13 +9,13 @@
 #include "wt_internal.h"
 
 /*
- * __wt_win_directory_list --
+ * __directory_list_worker --
  *	Get a list of files from a directory, MSVC version.
  */
-int
-__wt_win_directory_list(WT_FILE_SYSTEM *file_system,
+static int
+__directory_list_worker(WT_FILE_SYSTEM *file_system,
     WT_SESSION *wt_session, const char *directory,
-    const char *prefix, char ***dirlistp, uint32_t *countp)
+    const char *prefix, char ***dirlistp, uint32_t *countp, bool single)
 {
 	DWORD windows_error;
 	HANDLE findhandle;
@@ -82,7 +82,7 @@ __wt_win_directory_list(WT_FILE_SYSTEM *file_system,
 		WT_ERR(__wt_strdup(session, file_utf8->data, &entries[count]));
 		++count;
 		__wt_scr_free(session, &file_utf8);
-	} while (FindNextFileW(findhandle, &finddata) != 0);
+	} while (!single && FindNextFileW(findhandle, &finddata) != 0);
 
 	*dirlistp = entries;
 	*countp = count;
@@ -113,6 +113,32 @@ err:	if (findhandle != INVALID_HANDLE_VALUE)
 	WT_RET_MSG(session, ret,
 	    "%s: directory-list, prefix \"%s\"",
 	    directory, prefix == NULL ? "" : prefix);
+}
+
+/*
+ * __wt_win_directory_list --
+ *	Get a list of files from a directory, MSVC version.
+ */
+int
+__wt_win_directory_list(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *directory,
+    const char *prefix, char ***dirlistp, uint32_t *countp)
+{
+	return (__directory_list_worker(file_system,
+	    wt_session, directory, prefix, dirlistp, countp, false));
+}
+
+/*
+ * __wt_win_directory_list_single --
+ *	Get a single file from a directory, MSVC version.
+ */
+int
+__wt_win_directory_list_single(WT_FILE_SYSTEM *file_system,
+    WT_SESSION *wt_session, const char *directory,
+    const char *prefix, char ***dirlistp, uint32_t *countp)
+{
+	return (__directory_list_worker(file_system,
+	    wt_session, directory, prefix, dirlistp, countp, true));
 }
 
 /*

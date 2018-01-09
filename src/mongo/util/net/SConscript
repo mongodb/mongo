@@ -53,6 +53,18 @@ env.CppUnitTest(
     ],
 )
 
+
+env.CppUnitTest(
+    target='ssl_manager_test',
+    source=[
+        'ssl_manager_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'network',
+    ],
+)
+
 env.CppIntegrationTest(
     target='op_msg_integration_test',
     source=[

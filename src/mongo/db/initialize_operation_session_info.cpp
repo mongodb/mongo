@@ -42,15 +42,19 @@ namespace mongo {
 void initializeOperationSessionInfo(OperationContext* opCtx,
                                     const BSONObj& requestBody,
                                     bool requiresAuth,
-                                    bool canAcceptTxnNumber) {
+                                    bool isReplSetMemberOrMongos,
+                                    bool supportsDocLocking) {
     if (!requiresAuth) {
         return;
     }
 
     {
-        // If we're using the localhost bypass, logical sessions are disabled
+        // If we're using the localhost bypass, and the client hasn't authenticated,
+        // logical sessions are disabled. A client may authenticate as the __sytem user,
+        // or as an externally authorized user.
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-        if (authSession && authSession->isUsingLocalhostBypass()) {
+        if (authSession && authSession->isUsingLocalhostBypass() &&
+            !authSession->getAuthenticatedUserNames().more()) {
             return;
         }
     }
@@ -60,7 +64,7 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
     if (osi.getSessionId()) {
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "cannot pass logical session id unless fully upgraded to "
-                                 "featureCompatibilityVersion 3.4. See "
+                                 "featureCompatibilityVersion 3.6. See "
                               << feature_compatibility_version::kDochubLink
                               << " .",
                 serverGlobalParams.featureCompatibility.getVersion() ==
@@ -82,7 +86,11 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
                 opCtx->getLogicalSessionId());
         uassert(ErrorCodes::IllegalOperation,
                 "Transaction numbers are only allowed on a replica set member or mongos",
-                canAcceptTxnNumber);
+                isReplSetMemberOrMongos);
+        uassert(ErrorCodes::IllegalOperation,
+                "Transaction numbers are only allowed on storage engines that support "
+                "document-level locking",
+                supportsDocLocking);
         uassert(ErrorCodes::BadValue,
                 "Transaction number cannot be negative",
                 *osi.getTxnNumber() >= 0);

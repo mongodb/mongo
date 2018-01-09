@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/db/ops/modifier_interface.h"
 #include "mongo/db/update/update_leaf_node.h"
 
 namespace mongo {
@@ -60,12 +59,6 @@ enum ModifierType {
  * mod, or MOD_UNKNOWN otherwise.
  */
 ModifierType getType(StringData typeStr);
-
-/**
- * Instantiate an update mod that corresponds to 'modType' or NULL if 'modType' is not
- * valid. The ownership of the new object is the caller's.
- */
-ModifierInterface* makeUpdateMod(ModifierType modType);
 
 /**
  * Instantiate an UpdateLeafNode that corresponds to 'modType' or nullptr if 'modType' is not valid.

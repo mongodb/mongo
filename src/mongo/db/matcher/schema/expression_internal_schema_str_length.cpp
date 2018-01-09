@@ -34,6 +34,12 @@
 
 namespace mongo {
 
+InternalSchemaStrLengthMatchExpression::InternalSchemaStrLengthMatchExpression(MatchType type,
+                                                                               StringData path,
+                                                                               long long strLen,
+                                                                               StringData name)
+    : LeafMatchExpression(type, path), _name(name), _strLen(strLen) {}
+
 void InternalSchemaStrLengthMatchExpression::debugString(StringBuilder& debug, int level) const {
     _debugAddSpace(debug, level);
     debug << path() << " " << _name << " " << _strLen << "\n";

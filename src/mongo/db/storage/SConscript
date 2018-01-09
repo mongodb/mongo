@@ -85,8 +85,10 @@ env.Library(
         ],
     LIBDEPS= ['$BUILD_DIR/mongo/base',
               '$BUILD_DIR/mongo/db/service_context'],
+    LIBDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/mongodmain',
+    ],
     PROGDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongod',
         '$BUILD_DIR/mongo/mongos',
         ],
     )
@@ -221,11 +223,4 @@ env.CppUnitTest(
         'key_string',
         '$BUILD_DIR/mongo/base',
         ]
-)
-
-env.CppUnitTest(
-    target='storage_snapshot_name_test',
-    source='storage_snapshot_name_test.cpp',
-    LIBDEPS=[],
-    LIBDEPS_PRIVATE=[],
 )

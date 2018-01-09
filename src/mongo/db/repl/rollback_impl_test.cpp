@@ -47,9 +47,9 @@ NamespaceString nss("local.oplog.rs");
 
 class StorageInterfaceRollback : public StorageInterfaceImpl {
 public:
-    void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override {
+    void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        _stableTimestamp = Timestamp(snapshotName.asU64());
+        _stableTimestamp = snapshotName;
     }
 
     /**
@@ -284,7 +284,7 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverToStableTimestamp) {
     auto stableTimestamp = Timestamp(10, 0);
     auto currTimestamp = Timestamp(20, 0);
 
-    _storageInterface->setStableTimestamp(nullptr, SnapshotName(stableTimestamp));
+    _storageInterface->setStableTimestamp(nullptr, stableTimestamp);
     _storageInterface->setCurrentTimestamp(currTimestamp);
 
     // Check the current timestamp.
@@ -305,7 +305,7 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails
 
     auto stableTimestamp = Timestamp(10, 0);
     auto currTimestamp = Timestamp(20, 0);
-    _storageInterface->setStableTimestamp(nullptr, SnapshotName(stableTimestamp));
+    _storageInterface->setStableTimestamp(nullptr, stableTimestamp);
     _storageInterface->setCurrentTimestamp(currTimestamp);
 
     // Make it so that the 'recoverToStableTimestamp' method will fail.

@@ -14,12 +14,14 @@ selector:
   - jstests/core/capped_update.js # uses godinsert and can't run under replication.
   - jstests/core/check_shard_index.js  # checkShardingIndex.
   - jstests/core/collection_truncate.js  # emptycapped.
+  - jstests/core/collmod_without_uuid.js # applyOps, SERVER-1439
   - jstests/core/compact_keeps_indexes.js  # compact.
   - jstests/core/currentop.js  # uses fsync.
   - jstests/core/dbadmin.js  # "local" database.
   - jstests/core/dbhash.js  # dbhash.
   - jstests/core/dbhash2.js  # dbhash.
   - jstests/core/diagdata.js # Command not supported in mongos
+  - jstests/core/do_txn*.js # doTxn
   - jstests/core/dropdb_race.js  # syncdelay.
   - jstests/core/evalb.js  # profiling.
   - jstests/core/fsync.js  # uses fsync.
@@ -36,7 +38,6 @@ selector:
   - jstests/core/repair_server12955.js # repairDatabase
   - jstests/core/stages*.js  # stageDebug.
   - jstests/core/startup_log.js  # "local" database.
-  - jstests/core/storageDetailsCommand.js  # diskStorageStats.
   - jstests/core/top.js  # top.
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.
@@ -48,6 +49,11 @@ selector:
   # TODO: SERVER-27269: mongos can't establish cursor if view has $collStats and views another view.
   - jstests/core/views/views_coll_stats.js
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
+  # The following tests fail because of divergent dropCollection behavior between standalones and 
+  # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
+  # we expect a second drop to return status OK. 
+  - jstests/core/drop.js
+  - jstests/core/explain_upsert.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
 
@@ -57,6 +63,7 @@ executor:
       rpcProtocols: opQueryOnly
       readMode: commands
   hooks:
+  - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20

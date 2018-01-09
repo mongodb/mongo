@@ -42,8 +42,7 @@ namespace mongo {
 
 TEST(LeafMatchExpressionTest, Equal1) {
     BSONObj temp = BSON("x" << 5);
-    EqualityMatchExpression e;
-    e.init("x", temp["x"]).transitional_ignore();
+    EqualityMatchExpression e("x", temp["x"]);
 
     ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
     ASSERT_TRUE(e.matchesBSON(fromjson("{ x : [5] }")));
@@ -61,8 +60,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     BSONObj temp = BSON("x" << 5);
 
     {
-        LTEMatchExpression e;
-        e.init("x", temp["x"]).transitional_ignore();
+        LTEMatchExpression e("x", temp["x"]);
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 4 }")));
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
@@ -70,8 +68,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     }
 
     {
-        LTMatchExpression e;
-        e.init("x", temp["x"]).transitional_ignore();
+        LTMatchExpression e("x", temp["x"]);
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 4 }")));
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 6 }")));
@@ -79,8 +76,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     }
 
     {
-        GTEMatchExpression e;
-        e.init("x", temp["x"]).transitional_ignore();
+        GTEMatchExpression e("x", temp["x"]);
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 5 }")));
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 4 }")));
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 6 }")));
@@ -88,8 +84,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
     }
 
     {
-        GTMatchExpression e;
-        e.init("x", temp["x"]).transitional_ignore();
+        GTMatchExpression e("x", temp["x"]);
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 5 }")));
         ASSERT_FALSE(e.matchesBSON(fromjson("{ x : 4 }")));
         ASSERT_TRUE(e.matchesBSON(fromjson("{ x : 6 }")));
@@ -99,8 +94,7 @@ TEST(LeafMatchExpressionTest, Comp1) {
 
 TEST(MatchesBSONElement, ScalarEquality) {
     auto filterObj = fromjson("{i: 5}");
-    EqualityMatchExpression filter;
-    ASSERT_OK(filter.init("i", filterObj["i"]));
+    EqualityMatchExpression filter("i", filterObj["i"]);
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
@@ -140,8 +134,7 @@ TEST(MatchesBSONElement, ScalarEquality) {
 
 TEST(MatchesBSONElement, DottedPathEquality) {
     auto filterObj = fromjson("{'i.a': 5}");
-    EqualityMatchExpression filter;
-    ASSERT_OK(filter.init("i.a", filterObj["i.a"]));
+    EqualityMatchExpression filter("i.a", filterObj["i.a"]);
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
@@ -191,8 +184,7 @@ TEST(MatchesBSONElement, DottedPathEquality) {
 
 TEST(MatchesBSONElement, ArrayIndexEquality) {
     auto filterObj = fromjson("{'i.1': 5}");
-    EqualityMatchExpression filter;
-    ASSERT_OK(filter.init("i.1", filterObj["i.1"]));
+    EqualityMatchExpression filter("i.1", filterObj["i.1"]);
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
@@ -237,8 +229,7 @@ TEST(MatchesBSONElement, ArrayIndexEquality) {
 
 TEST(MatchesBSONElement, ObjectEquality) {
     auto filterObj = fromjson("{i: {a: 5}}");
-    EqualityMatchExpression filter;
-    ASSERT_OK(filter.init("i", filterObj["i"]));
+    EqualityMatchExpression filter("i", filterObj["i"]);
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
@@ -288,8 +279,7 @@ TEST(MatchesBSONElement, ObjectEquality) {
 
 TEST(MatchesBSONElement, ArrayEquality) {
     auto filterObj = fromjson("{i: [5]}");
-    EqualityMatchExpression filter;
-    ASSERT_OK(filter.init("i", filterObj["i"]));
+    EqualityMatchExpression filter("i", filterObj["i"]);
 
     auto aFive = fromjson("{a: 5}");
     auto iFive = fromjson("{i: 5}");
@@ -320,10 +310,10 @@ TEST(MatchesBSONElement, ArrayEquality) {
 TEST(MatchesBSONElement, LogicalExpression) {
     auto clauseObj1 = fromjson("{i: 5}");
     auto clauseObj2 = fromjson("{'i.a': 6}");
-    std::unique_ptr<ComparisonMatchExpression> clause1(new EqualityMatchExpression());
-    ASSERT_OK(clause1->init("i", clauseObj1["i"]));
-    std::unique_ptr<ComparisonMatchExpression> clause2(new EqualityMatchExpression());
-    ASSERT_OK(clause2->init("i.a", clauseObj2["i.a"]));
+    std::unique_ptr<ComparisonMatchExpression> clause1(
+        new EqualityMatchExpression("i", clauseObj1["i"]));
+    std::unique_ptr<ComparisonMatchExpression> clause2(
+        new EqualityMatchExpression("i.a", clauseObj2["i.a"]));
 
     OrMatchExpression filter;
     filter.add(clause1.release());

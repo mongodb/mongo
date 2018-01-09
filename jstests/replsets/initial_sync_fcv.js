@@ -9,6 +9,10 @@
 
     load('jstests/libs/check_log.js');
 
+    // Skip collection validation since this test leaves collections in an invalid state, where
+    // FCV=3.4 but UUIDs exist.
+    TestData.skipCollectionAndIndexValidation = true;
+
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet();
 

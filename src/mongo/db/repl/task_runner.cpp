@@ -113,7 +113,7 @@ void TaskRunner::schedule(const Task& task) {
         return;
     }
 
-    _threadPool->schedule(stdx::bind(&TaskRunner::_runTasks, this));
+    _threadPool->schedule([this] { _runTasks(); });
 
     _active = true;
     _cancelRequested = false;

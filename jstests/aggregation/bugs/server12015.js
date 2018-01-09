@@ -10,9 +10,9 @@ load("jstests/aggregation/extras/utils.js");  // For orderedArrayEq.
 
 (function() {
     "use strict";
-    var coll = db.server12015;
+    const coll = db.server12015;
     coll.drop();
-    var indexSpec = {a: 1, b: 1};
+    const indexSpec = {a: 1, b: 1};
 
     assert.writeOK(coll.insert({_id: 0, a: 0, b: 0}));
     assert.writeOK(coll.insert({_id: 1, a: 0, b: 1}));
@@ -21,10 +21,11 @@ load("jstests/aggregation/extras/utils.js");  // For orderedArrayEq.
 
     /**
      * Helper to test that for a given pipeline, the same results are returned whether or not an
-     * index is present.
+     * index is present. If 'ignoreSortOrder' is present, test for result parity without assuming
+     * the order of results.
      */
-    function assertResultsMatch(pipeline) {
-        // Add a match stage to ensure index scans are considerd for planning (workaround for
+    function assertResultsMatch(pipeline, ignoreSortOrder) {
+        // Add a match stage to ensure index scans are considered for planning (workaround for
         // SERVER-20066).
         pipeline = [{$match: {a: {$gte: 0}}}].concat(pipeline);
 
@@ -36,18 +37,27 @@ load("jstests/aggregation/extras/utils.js");  // For orderedArrayEq.
         assert.commandWorked(coll.dropIndex(indexSpec));
         var resultsWithoutIndex = coll.aggregate(pipeline).toArray();
 
-        assert(orderedArrayEq(resultsWithIndex, resultsWithoutIndex));
+        if (ignoreSortOrder) {
+            assert(arrayEq(resultsWithIndex, resultsWithoutIndex), tojson({
+                       resultsWithIndex: resultsWithIndex,
+                       resultsWithoutIndex: resultsWithoutIndex
+                   }));
+        } else {
+            assert.eq(resultsWithIndex, resultsWithoutIndex);
+        }
     }
 
     // Uncovered $project, no $sort.
-    assertResultsMatch([{$project: {_id: 1, a: 1, b: 1}}]);
+    const ignoreSortOrder = true;
+    assertResultsMatch([{$project: {_id: 1, a: 1, b: 1}}], ignoreSortOrder);
 
     // Covered $project, no $sort.
-    assertResultsMatch([{$project: {_id: 0, a: 1}}]);
-    assertResultsMatch([{$project: {_id: 0, a: 1, b: 1}}]);
-    assertResultsMatch([{$project: {_id: 0, a: 1, b: 1, c: {$literal: 1}}}]);
-    assertResultsMatch([{$project: {_id: 0, a: 1, b: 1}}, {$project: {a: 1}}]);
-    assertResultsMatch([{$project: {_id: 0, a: 1, b: 1}}, {$group: {_id: null, a: {$sum: "$a"}}}]);
+    assertResultsMatch([{$project: {_id: 0, a: 1}}], ignoreSortOrder);
+    assertResultsMatch([{$project: {_id: 0, a: 1, b: 1}}], ignoreSortOrder);
+    assertResultsMatch([{$project: {_id: 0, a: 1, b: 1, c: {$literal: 1}}}], ignoreSortOrder);
+    assertResultsMatch([{$project: {_id: 0, a: 1, b: 1}}, {$project: {a: 1}}], ignoreSortOrder);
+    assertResultsMatch([{$project: {_id: 0, a: 1, b: 1}}, {$group: {_id: null, a: {$sum: "$a"}}}],
+                       ignoreSortOrder);
 
     // Non-blocking $sort, uncovered $project.
     assertResultsMatch([{$sort: {a: -1, b: -1}}, {$project: {_id: 1, a: 1, b: 1}}]);

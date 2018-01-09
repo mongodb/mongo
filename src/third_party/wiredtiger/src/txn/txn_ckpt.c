@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -122,7 +122,7 @@ __checkpoint_update_generation(WT_SESSION_IMPL *session)
  */
 static int
 __checkpoint_apply_all(WT_SESSION_IMPL *session, const char *cfg[],
-	int (*op)(WT_SESSION_IMPL *, const char *[]), bool *fullp)
+    int (*op)(WT_SESSION_IMPL *, const char *[]), bool *fullp)
 {
 	WT_CONFIG targetconf;
 	WT_CONFIG_ITEM cval, k, v;
@@ -205,7 +205,7 @@ err:	__wt_scr_free(session, &tmp);
  */
 static int
 __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
-	int (*op)(WT_SESSION_IMPL *, const char *[]))
+    int (*op)(WT_SESSION_IMPL *, const char *[]))
 {
 	WT_DECL_RET;
 	u_int i;
@@ -369,13 +369,13 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 static void
 __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 {
-	struct timespec last, start, stop;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	double current_dirty, delta, scrub_min;
 	uint64_t bytes_written_last, bytes_written_start, bytes_written_total;
 	uint64_t cache_size, max_write;
 	uint64_t current_us, stepdown_us, total_ms, work_us;
+	uint64_t time_last, time_start, time_stop;
 	bool progress;
 
 	conn = S2C(session);
@@ -386,8 +386,7 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	    cache->eviction_checkpoint_target >= cache->eviction_dirty_trigger)
 		return;
 
-	__wt_epoch(session, &start);
-	last = start;
+	time_last = time_start = __wt_rdtsc(session);
 	bytes_written_last = 0;
 	bytes_written_start = cache->bytes_written;
 	cache_size = conn->cache_size;
@@ -440,9 +439,16 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 		if (current_dirty <= (double)cache->eviction_checkpoint_target)
 			break;
 
+		/*
+		 * Don't scrub when the lookaside table is in use: scrubbing is
+		 * counter-productive in that case.
+		 */
+		if (F_ISSET(cache, WT_CACHE_EVICT_LOOKASIDE))
+			break;
+
 		__wt_sleep(0, stepdown_us / 10);
-		__wt_epoch(session, &stop);
-		current_us = WT_TIMEDIFF_US(stop, last);
+		time_stop = __wt_rdtsc(session);
+		current_us = WT_TSCDIFF_US(time_stop, time_last);
 		bytes_written_total =
 		    cache->bytes_written - bytes_written_start;
 
@@ -496,11 +502,11 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 		    WT_MAX(cache->eviction_dirty_target, current_dirty - delta);
 		WT_STAT_CONN_SET(session, txn_checkpoint_scrub_target,
 		    cache->eviction_scrub_limit);
-		__wt_epoch(session, &last);
+		time_last = __wt_rdtsc(session);
 	}
 
-	__wt_epoch(session, &stop);
-	total_ms = WT_TIMEDIFF_MS(stop, start);
+	time_stop = __wt_rdtsc(session);
+	total_ms = WT_TSCDIFF_MS(time_stop, time_start);
 	WT_STAT_CONN_SET(session, txn_checkpoint_scrub_time, total_ms);
 }
 
@@ -568,7 +574,6 @@ __checkpoint_stats(WT_SESSION_IMPL *session)
 static void
 __checkpoint_verbose_track(WT_SESSION_IMPL *session, const char *msg)
 {
-#ifdef HAVE_VERBOSE
 	struct timespec stop;
 	WT_CONNECTION_IMPL *conn;
 	uint64_t msec;
@@ -586,10 +591,6 @@ __checkpoint_verbose_track(WT_SESSION_IMPL *session, const char *msg)
 	    ": Full database checkpoint %s",
 	    msec, __wt_gen(session, WT_GEN_CHECKPOINT), msg);
 
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(msg);
-#endif
 }
 
 /*
@@ -738,14 +739,13 @@ __checkpoint_prepare(WT_SESSION_IMPL *session, const char *cfg[])
 static int
 __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	struct timespec fsync_start, fsync_stop;
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_ISOLATION saved_isolation;
-	uint64_t fsync_duration_usecs, generation;
+	uint64_t fsync_duration_usecs, generation, time_start, time_stop;
 	u_int i;
 	bool failed, full, idle, logging, tracking;
 	void *saved_meta_next;
@@ -880,10 +880,10 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
 	 * lazy checkpoints, but we don't support them yet).
 	 */
-	__wt_epoch(session, &fsync_start);
+	time_start = __wt_rdtsc(session);
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
-	__wt_epoch(session, &fsync_stop);
-	fsync_duration_usecs = WT_TIMEDIFF_US(fsync_stop, fsync_start);
+	time_stop = __wt_rdtsc(session);
+	fsync_duration_usecs = WT_TSCDIFF_US(time_stop, time_start);
 	WT_STAT_CONN_INCR(session, txn_checkpoint_fsync_post);
 	WT_STAT_CONN_SET(session,
 	    txn_checkpoint_fsync_post_duration, fsync_duration_usecs);
@@ -1080,7 +1080,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[], bool waiting)
 	 */
 #undef WT_CHECKPOINT_SESSION_FLAGS
 #define	WT_CHECKPOINT_SESSION_FLAGS \
-	(WT_SESSION_CAN_WAIT | WT_SESSION_NO_EVICTION)
+	(WT_SESSION_CAN_WAIT | WT_SESSION_IGNORE_CACHE_SIZE)
 #undef WT_CHECKPOINT_SESSION_FLAGS_OFF
 #define	WT_CHECKPOINT_SESSION_FLAGS_OFF \
 	(WT_SESSION_LOOKASIDE_CURSOR)

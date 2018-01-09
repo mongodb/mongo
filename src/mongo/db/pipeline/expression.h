@@ -67,7 +67,7 @@ class DocumentSource;
         return Status::OK();                                                 \
     }
 
-class Expression : public IntrusiveCounterUnsigned {
+class Expression : public RefCountable {
 public:
     using Parser = stdx::function<boost::intrusive_ptr<Expression>(
         const boost::intrusive_ptr<ExpressionContext>&, BSONElement, const VariablesParseState&)>;
@@ -912,7 +912,7 @@ private:
      * range. If the field is missing or empty, the function returns the defaultValue.
      */
     bool evaluateNumberWithinRange(const Document& root,
-                                   boost::intrusive_ptr<Expression> field,
+                                   const Expression* field,
                                    StringData fieldName,
                                    int defaultValue,
                                    int minValue,

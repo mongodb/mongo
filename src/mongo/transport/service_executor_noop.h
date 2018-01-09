@@ -30,6 +30,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/service_executor_task_names.h"
 
 namespace mongo {
 namespace transport {
@@ -48,7 +49,7 @@ public:
     Status shutdown(Milliseconds timeout) override {
         return Status::OK();
     }
-    Status schedule(Task task, ScheduleFlags flags) override {
+    Status schedule(Task task, ScheduleFlags flags, ServiceExecutorTaskName taskName) override {
         return Status::OK();
     }
 

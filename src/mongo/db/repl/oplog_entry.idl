@@ -49,6 +49,7 @@ structs:
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.
         immutable: true
+        inline_chained_structs: true
         chained_structs:
             OperationSessionInfo : OperationSessionInfo
         fields:

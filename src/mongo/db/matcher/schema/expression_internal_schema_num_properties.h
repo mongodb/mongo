@@ -39,15 +39,12 @@ namespace mongo {
  */
 class InternalSchemaNumPropertiesMatchExpression : public MatchExpression {
 public:
-    InternalSchemaNumPropertiesMatchExpression(MatchType type, std::string name)
-        : MatchExpression(type), _name(name) {}
+    InternalSchemaNumPropertiesMatchExpression(MatchType type,
+                                               long long numProperties,
+                                               std::string name)
+        : MatchExpression(type), _numProperties(numProperties), _name(name) {}
 
     virtual ~InternalSchemaNumPropertiesMatchExpression() {}
-
-    Status init(long long numProperties) {
-        _numProperties = numProperties;
-        return Status::OK();
-    }
 
     size_t numChildren() const final {
         return 0;

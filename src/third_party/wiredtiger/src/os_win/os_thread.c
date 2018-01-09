@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -77,12 +77,32 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
 
 /*
  * __wt_thread_id --
+ *	Return an arithmetic representation of a thread ID on POSIX.
+ */
+void
+__wt_thread_id(uintmax_t *id)
+{
+	*id = (uintmax_t)GetCurrentThreadId();
+}
+
+/*
+ * __wt_thread_str --
  *	Fill in a printable version of the process and thread IDs.
  */
 int
-__wt_thread_id(char *buf, size_t buflen)
+__wt_thread_str(char *buf, size_t buflen)
 {
 	return (__wt_snprintf(buf, buflen,
 	    "%" PRIu64 ":%" PRIu64,
 	    (uint64_t)GetCurrentProcessId(), (uint64_t)GetCurrentThreadId));
+}
+
+/*
+ * __wt_process_id --
+ *      Return the process ID assigned by the operating system.
+ */
+uintmax_t
+__wt_process_id(void)
+{
+	return (uintmax_t)GetCurrentProcessId();
 }

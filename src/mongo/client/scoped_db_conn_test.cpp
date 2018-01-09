@@ -43,7 +43,7 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/transport/transport_layer_legacy.h"
+#include "mongo/transport/transport_layer_asio.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -197,10 +197,10 @@ public:
             return;
         }
 
-        transport::TransportLayerLegacy::Options options;
+        transport::TransportLayerASIO::Options options;
         options.port = _port;
 
-        _server = stdx::make_unique<transport::TransportLayerLegacy>(options, serviceEntryPoint);
+        _server = stdx::make_unique<transport::TransportLayerASIO>(options, serviceEntryPoint);
         _serverThread = stdx::thread(runServer, _server.get());
     }
 
@@ -233,7 +233,7 @@ public:
     /**
      * Helper method for running the server on a separate thread.
      */
-    static void runServer(transport::TransportLayerLegacy* server) {
+    static void runServer(transport::TransportLayer* server) {
         server->setup().transitional_ignore();
         server->start().transitional_ignore();
     }
@@ -242,7 +242,7 @@ private:
     const int _port;
 
     stdx::thread _serverThread;
-    unique_ptr<transport::TransportLayerLegacy> _server;
+    unique_ptr<transport::TransportLayer> _server;
 };
 
 /**
@@ -369,7 +369,7 @@ protected:
     }
 
 private:
-    static void runServer(transport::TransportLayerLegacy* server) {
+    static void runServer(transport::TransportLayer* server) {
         server->setup().transitional_ignore();
         server->start().transitional_ignore();
     }

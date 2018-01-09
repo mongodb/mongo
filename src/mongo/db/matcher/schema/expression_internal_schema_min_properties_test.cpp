@@ -38,16 +38,14 @@ namespace mongo {
 namespace {
 
 TEST(InternalSchemaMinPropertiesMatchExpression, RejectsObjectsWithTooFewElements) {
-    InternalSchemaMinPropertiesMatchExpression minProperties;
-    ASSERT_OK(minProperties.init(2));
+    InternalSchemaMinPropertiesMatchExpression minProperties(2);
 
     ASSERT_FALSE(minProperties.matchesBSON(BSONObj()));
     ASSERT_FALSE(minProperties.matchesBSON(BSON("b" << 21)));
 }
 
 TEST(InternalSchemaMinPropertiesMatchExpression, AcceptsObjectWithAtLeastMinElements) {
-    InternalSchemaMinPropertiesMatchExpression minProperties;
-    ASSERT_OK(minProperties.init(2));
+    InternalSchemaMinPropertiesMatchExpression minProperties(2);
 
     ASSERT_TRUE(minProperties.matchesBSON(BSON("b" << 21 << "c" << BSONNULL)));
     ASSERT_TRUE(minProperties.matchesBSON(BSON("b" << 21 << "c" << 3)));
@@ -55,33 +53,27 @@ TEST(InternalSchemaMinPropertiesMatchExpression, AcceptsObjectWithAtLeastMinElem
 }
 
 TEST(InternalSchemaMinPropertiesMatchExpression, MinPropertiesZeroAllowsEmptyObjects) {
-    InternalSchemaMinPropertiesMatchExpression minProperties;
-    ASSERT_OK(minProperties.init(0));
+    InternalSchemaMinPropertiesMatchExpression minProperties(0);
 
     ASSERT_TRUE(minProperties.matchesBSON(BSONObj()));
 }
 
 TEST(InternalSchemaMinPropertiesMatchExpression, NestedObjectsAreNotUnwound) {
-    InternalSchemaMinPropertiesMatchExpression minProperties;
-    ASSERT_OK(minProperties.init(2));
+    InternalSchemaMinPropertiesMatchExpression minProperties(2);
 
     ASSERT_FALSE(minProperties.matchesBSON(BSON("b" << BSON("c" << 2 << "d" << 3))));
 }
 
 TEST(InternalSchemaMinPropertiesMatchExpression, NestedArraysAreNotUnwound) {
-    InternalSchemaMinPropertiesMatchExpression minProperties;
-    ASSERT_OK(minProperties.init(2));
+    InternalSchemaMinPropertiesMatchExpression minProperties(2);
 
     ASSERT_FALSE(minProperties.matchesBSON(BSON("a" << (BSON("b" << 2 << "c" << 3 << "d" << 4)))));
 }
 
 TEST(InternalSchemaMinPropertiesMatchExpression, EquivalentFunctionIsAccurate) {
-    InternalSchemaMinPropertiesMatchExpression minProperties1;
-    InternalSchemaMinPropertiesMatchExpression minProperties2;
-    InternalSchemaMinPropertiesMatchExpression minProperties3;
-    ASSERT_OK(minProperties1.init(1));
-    ASSERT_OK(minProperties2.init(1));
-    ASSERT_OK(minProperties3.init(2));
+    InternalSchemaMinPropertiesMatchExpression minProperties1(1);
+    InternalSchemaMinPropertiesMatchExpression minProperties2(1);
+    InternalSchemaMinPropertiesMatchExpression minProperties3(2);
 
     ASSERT_TRUE(minProperties1.equivalent(&minProperties1));
     ASSERT_TRUE(minProperties1.equivalent(&minProperties2));

@@ -58,16 +58,16 @@ namespace {
 
 using LockGuard = stdx::lock_guard<stdx::mutex>;
 using UniqueLock = stdx::unique_lock<stdx::mutex>;
+using executor::RemoteCommandRequest;
 
 const char* kNameFieldName = "name";
 const char* kOptionsFieldName = "options";
 const char* kInfoFieldName = "info";
 const char* kUUIDFieldName = "uuid";
-// 16MB max batch size / 12 byte min doc size * 10 (for good measure) = defaultBatchSize to use.
-const auto defaultBatchSize = (16 * 1024 * 1024) / 12 * 10;
 
 // The batchSize to use for the find/getMore queries called by the CollectionCloner
-MONGO_EXPORT_STARTUP_SERVER_PARAMETER(collectionClonerBatchSize, int, defaultBatchSize);
+constexpr int kUseARMDefaultBatchSize = -1;
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(collectionClonerBatchSize, int, kUseARMDefaultBatchSize);
 
 // The number of attempts for the listCollections commands.
 MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListCollectionsAttempts, int, 3);
@@ -125,11 +125,11 @@ DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
                               _source,
                               _dbname,
                               createListCollectionsCommandObject(_listCollectionsFilter),
-                              stdx::bind(&DatabaseCloner::_listCollectionsCallback,
-                                         this,
-                                         stdx::placeholders::_1,
-                                         stdx::placeholders::_2,
-                                         stdx::placeholders::_3),
+                              [=](const StatusWith<Fetcher::QueryResponse>& result,
+                                  Fetcher::NextAction * nextAction,
+                                  BSONObjBuilder * getMoreBob) {
+                                  _listCollectionsCallback(result, nextAction, getMoreBob);
+                              },
                               ReadPreferenceSetting::secondaryPreferredMetadata(),
                               RemoteCommandRequest::kNoTimeout /* find network timeout */,
                               RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
@@ -403,8 +403,7 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
                 _source,
                 nss,
                 options,
-                stdx::bind(
-                    &DatabaseCloner::_collectionClonerCallback, this, stdx::placeholders::_1, nss),
+                [=](const Status& status) { return _collectionClonerCallback(status, nss); },
                 _storageInterface,
                 collectionClonerBatchSize,
                 maxNumInitialSyncCollectionClonerCursors.load());

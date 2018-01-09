@@ -7,7 +7,7 @@
  * engines. When all nodes in a replica set are using an ephemeral storage engine, the set cannot
  * recover from a full restart. Once restarted, the nodes will have no knowledge of the replica set
  * config and will be unable to elect a primary.
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, requires_find_command]
  */
 (function() {
     'use strict';
@@ -47,6 +47,7 @@
     adminDB.createUser({user: 'user', pwd: 'password', roles: jsTest.adminUserRoles});
     adminDB.auth('user', 'password');
     var priAdminDB = replTest.getPrimary().getDB('admin');
+    replTest.getPrimary().waitForClusterTime(60);
     priAdminDB.createUser({user: 'user', pwd: 'password', roles: jsTest.adminUserRoles},
                           {w: 3, wtimeout: 30000});
 

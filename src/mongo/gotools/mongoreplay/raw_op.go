@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package mongoreplay
 
 import (
@@ -162,6 +168,8 @@ func (op *RawOp) Parse() (Op, error) {
 		parsedOp = &CommandOp{Header: op.Header}
 	case OpCodeCommandReply:
 		parsedOp = &CommandReplyOp{Header: op.Header}
+	case OpCodeMessage:
+		parsedOp = &MsgOp{Header: op.Header}
 	default:
 		return nil, nil
 	}
@@ -170,15 +178,45 @@ func (op *RawOp) Parse() (Op, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Special case to check if this commandOp contains a cursor, which
-	// means it needs to be remapped at some point.
-	if commandOp, ok := parsedOp.(*CommandOp); ok {
-		if commandOp.CommandName == "getMore" {
-			return &CommandGetMore{
-				CommandOp: *commandOp,
-			}, nil
+
+	parsedOp, err = maybeChangeOpToGetMore(parsedOp)
+	if err != nil {
+		return nil, err
+	}
+
+	if op, ok := parsedOp.(*MsgOp); ok && op.Header.ResponseTo != 0 {
+		op.CommandName = "reply"
+		parsedOp = &MsgOpReply{
+			MsgOp: *op,
 		}
 	}
 	return parsedOp, nil
 
+}
+
+// maybeChangeOpToGetMore determines if the op is a more specific case of the Op
+// interface and should be returned as a type of getmore
+func maybeChangeOpToGetMore(parsedOp Op) (Op, error) {
+
+	switch castOp := parsedOp.(type) {
+	case *CommandOp:
+		if castOp.CommandName == "getMore" {
+			return &CommandGetMore{
+				CommandOp: *castOp,
+			}, nil
+		}
+	case *MsgOp:
+		id, err := castOp.getCommandName()
+		if err != nil {
+			return nil, err
+		}
+		if id == "getMore" {
+			return &MsgOpGetMore{
+				MsgOp: *castOp,
+			}, nil
+		}
+	}
+
+	// not any special case, return the original op
+	return parsedOp, nil
 }

@@ -139,6 +139,12 @@ bool ClusterCursorManager::PinnedCursor::isTailableAndAwaitData() const {
     return _cursor->isTailableAndAwaitData();
 }
 
+boost::optional<ReadPreferenceSetting> ClusterCursorManager::PinnedCursor::getReadPreference()
+    const {
+    invariant(_cursor);
+    return _cursor->getReadPreference();
+}
+
 UserNameIterator ClusterCursorManager::PinnedCursor::getAuthenticatedUsers() const {
     invariant(_cursor);
     return _cursor->getAuthenticatedUsers();
@@ -270,7 +276,10 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
 }
 
 StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCursor(
-    const NamespaceString& nss, CursorId cursorId, OperationContext* opCtx) {
+    const NamespaceString& nss,
+    CursorId cursorId,
+    OperationContext* opCtx,
+    AuthCheck checkSessionAuth) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
     if (_inShutdown) {
@@ -286,9 +295,11 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
         return cursorNotFoundStatus(nss, cursorId);
     }
 
-    const auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, entry->getLsid());
-    if (!cursorPrivilegeStatus.isOK()) {
-        return cursorPrivilegeStatus;
+    if (checkSessionAuth == kCheckSession) {
+        const auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, entry->getLsid());
+        if (!cursorPrivilegeStatus.isOK()) {
+            return cursorPrivilegeStatus;
+        }
     }
 
     std::unique_ptr<ClusterClientCursor> cursor = entry->releaseCursor();

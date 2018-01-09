@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2017 MongoDB, Inc.
+# Public Domain 2014-2018 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -39,11 +39,6 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:' + tablename
     source_uri = 'table:' + tablename + "_src"
     nrows = 100000
-
-    def conn_config(self):
-        if not wiredtiger.verbose_build():
-            self.skipTest('requires a verbose build')
-        return ''
 
     def test_long_running(self):
         # Populate a table

@@ -1,0 +1,50 @@
+#! /bin/sh
+
+t=__wt.$$
+trap 'rm -rf $t /tmp/scan-build-*' 0 1 2 3 13 15
+
+# Installation of the clang development package isn't standard, list a
+# couple of the places we're using.
+export PATH=$PATH:/usr/local/clang50/bin:/usr/local/llvm-devel/bin
+
+# Remove old reports.
+rm -rf /tmp/scan-build-*
+
+# Find the top-level WiredTiger directory and move to there.
+p="$PWD"
+while test "$p" != "/" ; do
+	if test -d "$p/build_posix"; then
+		break;
+	fi
+	p=`dirname $p`
+done
+test "$p" != "/" || {
+	echo "$0: cannot find the WiredTiger top-level directory"
+	exit 1
+}
+
+cd $p || exit 1
+echo "$0: running scan-build in $p..."
+
+sh autogen.sh > /dev/null || exit 1
+
+args="--use-cc=clang40 -no-failure-reports"
+args="$args -disable-checker core.NullDereference"
+scan-build $args ./configure 'CFLAGS=-g -Wall' \
+    --disable-shared --enable-diagnostic --enable-strict > /dev/null
+scan-build $args make -j 8 wt 2>&1 > $t
+
+make -j 8 distclean > /dev/null
+
+grep 'No bugs found' $t > /dev/null || {
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	echo 'unexpected scan-build output'
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	sed -e '/^--- /d' \
+	    -e '/^\/bin\/sh /d' \
+	    -e '/^depbase=/d' \
+	    -e '/^libtool: /d' < $t
+	exit 1
+}
+
+exit 0

@@ -41,6 +41,17 @@ namespace mongo {
 // For example, with the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause the
 // index to be multikey, we'd have a std::vector<std::set<size_t>>{{0U, 1U}, {0U}}.
 //
+// Further Examples:
+// Index                  PathsThatAreMultiKey  MultiKeyPaths
+// --------------------   --------------------  --------------------
+// {'a.b': 1, 'a.c': 1}   "a", "a.b"            {{0U, 1U}, {0U}}
+// {a: 1, b: 1}           "b"                   {{}, {0U}}
+// {a: 1, b: 1}           "a"                   {{0U}, {}}
+// {'a.b.c': 1, d: 1}     "a.b.c"               {{2U}, {}}
+// {'a.b': 1, c: 1, d: 1} "a.b", "d"            {{1U}, {}, {0U}}
+// {a: 1, b: 1}           none                  {{}, {}}
+// {a: 1, b: 1}           no multikey metadata  {}
+//
 // An empty vector is used to represent that the index doesn't support path-level multikey tracking.
 using MultikeyPaths = std::vector<std::set<std::size_t>>;
 

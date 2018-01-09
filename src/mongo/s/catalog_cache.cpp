@@ -188,11 +188,6 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
     }
 }
 
-StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
-    OperationContext* opCtx, StringData ns) {
-    return getCollectionRoutingInfo(opCtx, NamespaceString(ns));
-}
-
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefresh(
     OperationContext* opCtx, const NamespaceString& nss) {
     invalidateShardedCollection(nss);
@@ -210,11 +205,6 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutin
     }
 
     return routingInfoStatus;
-}
-
-StatusWith<CachedCollectionRoutingInfo> CatalogCache::getShardedCollectionRoutingInfoWithRefresh(
-    OperationContext* opCtx, StringData ns) {
-    return getShardedCollectionRoutingInfoWithRefresh(opCtx, NamespaceString(ns));
 }
 
 void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccriToInvalidate) {
@@ -269,10 +259,6 @@ void CatalogCache::invalidateShardedCollection(const NamespaceString& nss) {
     it->second->collections[nss.ns()].needsRefresh = true;
 }
 
-void CatalogCache::invalidateShardedCollection(StringData ns) {
-    invalidateShardedCollection(NamespaceString(ns));
-}
-
 void CatalogCache::purgeDatabase(StringData dbName) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     _databases.erase(dbName);
@@ -302,10 +288,9 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(Oper
     const auto& dbDesc = opTimeWithDb.value;
 
     // Load the sharded collections entries
-    std::vector<CollectionType> collections;
     repl::OpTime collLoadConfigOptime;
-    uassertStatusOK(
-        catalogClient->getCollections(opCtx, &dbNameCopy, &collections, &collLoadConfigOptime));
+    const std::vector<CollectionType> collections =
+        uassertStatusOK(catalogClient->getCollections(opCtx, &dbNameCopy, &collLoadConfigOptime));
 
     StringMap<CollectionRoutingInfoEntry> collectionEntries;
     for (const auto& coll : collections) {

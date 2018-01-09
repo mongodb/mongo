@@ -45,8 +45,7 @@ TEST(InternalSchemaObjectMatchExpression, RejectsNonObjectElements) {
     auto subExpr = MatchExpressionParser::parse(BSON("b" << 1), expCtx);
     ASSERT_OK(subExpr.getStatus());
 
-    InternalSchemaObjectMatchExpression objMatch;
-    ASSERT_OK(objMatch.init(std::move(subExpr.getValue()), "a"_sd));
+    InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
     ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << 1)));
     ASSERT_FALSE(objMatch.matchesBSON(BSON("a"
@@ -61,8 +60,7 @@ TEST(InternalSchemaObjectMatchExpression, RejectsObjectsThatDontMatch) {
                                                 expCtx);
     ASSERT_OK(subExpr.getStatus());
 
-    InternalSchemaObjectMatchExpression objMatch;
-    ASSERT_OK(objMatch.init(std::move(subExpr.getValue()), "a"_sd));
+    InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
     ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << BSON("b" << 1))));
     ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << BSON("b" << BSONObj()))));
@@ -75,8 +73,7 @@ TEST(InternalSchemaObjectMatchExpression, AcceptsObjectsThatMatch) {
                                                 expCtx);
     ASSERT_OK(subExpr.getStatus());
 
-    InternalSchemaObjectMatchExpression objMatch;
-    ASSERT_OK(objMatch.init(std::move(subExpr.getValue()), "a"_sd));
+    InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
     ASSERT_TRUE(objMatch.matchesBSON(BSON("a" << BSON("b"
                                                       << "string"))));
@@ -97,8 +94,7 @@ TEST(InternalSchemaObjectMatchExpression, DottedPathAcceptsObjectsThatMatch) {
                                                 expCtx);
     ASSERT_OK(subExpr.getStatus());
 
-    InternalSchemaObjectMatchExpression objMatch;
-    ASSERT_OK(objMatch.init(std::move(subExpr.getValue()), "a"_sd));
+    InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
     ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << BSON("d"
                                                        << "string"))));
@@ -112,8 +108,7 @@ TEST(InternalSchemaObjectMatchExpression, EmptyMatchAcceptsAllObjects) {
     auto subExpr = MatchExpressionParser::parse(BSONObj(), expCtx);
     ASSERT_OK(subExpr.getStatus());
 
-    InternalSchemaObjectMatchExpression objMatch;
-    ASSERT_OK(objMatch.init(std::move(subExpr.getValue()), "a"_sd));
+    InternalSchemaObjectMatchExpression objMatch("a"_sd, std::move(subExpr.getValue()));
 
     ASSERT_FALSE(objMatch.matchesBSON(BSON("a" << 1)));
     ASSERT_FALSE(objMatch.matchesBSON(BSON("a"

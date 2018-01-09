@@ -116,6 +116,14 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target= 'op_observer_registry_test',
+    source= 'op_observer_registry_test.cpp',
+    LIBDEPS=[
+        'common',
+    ],
+)
+
+env.CppUnitTest(
     target= 'op_observer_impl_test',
     source= 'op_observer_impl_test.cpp',
     LIBDEPS=[
@@ -532,13 +540,10 @@ env.Library(
         'db_raii.cpp',
     ],
     LIBDEPS=[
+        'catalog/catalog_raii',
         'curop',
+        's/sharding',
         'stats/top',
-        'views/views',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/s/sharding',
-        '$BUILD_DIR/mongo/db/catalog/database',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
     ],
 )
 
@@ -611,9 +616,9 @@ env.Library(
         "op_observer_impl.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'repl/serveronly',
+        'repl/serveronly_repl',
         'views/views_mongod',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
@@ -792,7 +797,7 @@ env.Library(
         "auth/authmongod",
         "authz_manager_external_state_factory_d",
         "background",
-        "catalog/catalog",
+        "catalog/catalog_impl",
         "catalog/collection_options",
         "catalog/document_validation",
         "catalog/index_key_validate",
@@ -823,7 +828,7 @@ env.Library(
         "write_ops",
         "ops/write_ops_parsers",
         "pipeline/aggregation",
-        "pipeline/serveronly",
+        "pipeline/serveronly_pipeline",
         "prefetch",
         "query/query",
         "repair_database",
@@ -836,18 +841,18 @@ env.Library(
         "repl/repl_settings",
         "repl/rs_rollback",
         "repl/rslog",
-        "repl/serveronly",
+        "repl/serveronly_repl",
         "repl/storage_interface",
         "repl/sync_tail",
-        "repl/topology_coordinator_impl",
+        "repl/topology_coordinator",
         "rw_concern_d",
         "s/collection_metadata",
-        "s/commands",
+        "s/commands_db_s",
         "s/sharding",
         "service_context_d",
         "startup_warnings_mongod",
         "stats/counters",
-        "stats/serveronly",
+        "stats/serveronly_stats",
         "stats/top",
         "storage/devnull/storage_devnull",
         "storage/ephemeral_for_test/storage_ephemeral_for_test",
@@ -901,8 +906,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/sha1_block',
         'keys_collection_document',
-        'keys_collection_manager',
-        'keys_collection_manager_zero',
         'logical_clock',
     ],
 )
@@ -1239,40 +1242,6 @@ env.Library(
 )
 
 env.Library(
-    target='keys_collection_manager',
-    source=[
-        'keys_collection_manager.cpp',
-    ],
-    LIBDEPS=[
-        'server_parameters',
-    ],
-)
-
-env.Library(
-    target='keys_collection_manager_direct',
-    source=[
-        'keys_collection_manager_direct.cpp',
-    ],
-    LIBDEPS=[
-        'dbdirectclient',
-        'keys_collection_manager',
-        'logical_clock',
-        'logical_time',
-    ],
-)
-
-env.Library(
-    target='keys_collection_manager_zero',
-    source=[
-        'keys_collection_manager_zero.cpp',
-    ],
-    LIBDEPS=[
-        'keys_collection_manager',
-        'logical_time',
-    ],
-)
-
-env.Library(
     target='keys_collection_client_direct',
     source=[
         'keys_collection_client_direct.cpp',
@@ -1301,16 +1270,15 @@ env.Library(
 )
 
 env.Library(
-    target='keys_collection_manager_sharding',
+    target='keys_collection_manager',
     source=[
-        'keys_collection_manager_sharding.cpp',
+        'keys_collection_manager.cpp',
         'keys_collection_cache_reader.cpp',
         'keys_collection_cache_reader_and_updater.cpp',
     ],
     LIBDEPS=[
         'logical_clock',
         'keys_collection_document',
-        'keys_collection_manager',
         'logical_time',
         'server_options',
         'keys_collection_client_sharded',
@@ -1335,7 +1303,7 @@ env.Library(
         'logical_time_validator.cpp',
     ],
     LIBDEPS=[
-        'keys_collection_manager_sharding',
+        'keys_collection_manager',
         'service_context',
         'signed_logical_time',
         'time_proof_service',
@@ -1393,7 +1361,7 @@ env.CppUnitTest(
         'logical_time_validator_test.cpp',
     ],
     LIBDEPS=[
-        'keys_collection_manager_sharding',
+        'keys_collection_manager',
         'logical_time_validator',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
         '$BUILD_DIR/mongo/s/coreshard',
@@ -1465,20 +1433,8 @@ env.CppUnitTest(
         'keys_collection_manager_sharding_test.cpp',
     ],
     LIBDEPS=[
-        'keys_collection_manager_sharding',
+        'keys_collection_manager',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
-    ],
-)
-
-env.Library(
-    target= 'op_observer_noop',
-    source= [
-        'op_observer_noop.cpp',
-    ],
-    LIBDEPS= [
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
     ],
 )
 
@@ -1488,10 +1444,10 @@ env.Library(
         'service_context_d_test_fixture.cpp',
     ],
     LIBDEPS= [
-        'op_observer_noop',
         '$BUILD_DIR/mongo/db/serveronly',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
+        'service_context_d',
     ],
 )
 
@@ -1536,39 +1492,11 @@ env.Library(
 env.Library(
     target='generic_cursor',
     source=[
-        'generic_cursor_manager.cpp',
         env.Idlc('generic_cursor.idl')[0],
     ],
     LIBDEPS=[
         'service_context',
         '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
-env.Library(
-    target='generic_cursor_mongod',
-    source=[
-        'generic_cursor_manager_mongod.cpp',
-    ],
-    LIBDEPS=[
-        'generic_cursor',
-    ],
-    LIBDEPS_PRIVATE=[
-        'clientcursor',
-    ],
-)
-
-env.Library(
-    target='generic_cursor_mongos',
-    source=[
-        'generic_cursor_manager_mongos.cpp',
-    ],
-    LIBDEPS=[
-        'generic_cursor',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
     ],
 )
 
@@ -1631,6 +1559,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop_metrics',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/introspect',
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
         '$BUILD_DIR/mongo/db/namespace_string',

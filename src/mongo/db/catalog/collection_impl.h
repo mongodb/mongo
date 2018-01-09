@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -35,7 +36,6 @@
 
 namespace mongo {
 class IndexConsistency;
-class IndexObserver;
 class UUIDCatalog;
 class CollectionImpl final : virtual public Collection::Impl,
                              virtual CappedCallback,
@@ -305,6 +305,16 @@ public:
     StringData getValidationLevel() const final;
     StringData getValidationAction() const final;
 
+    /**
+     * Sets the validator to exactly what's provided. If newLevel or newAction are empty, this
+     * sets them to the defaults. Any error Status returned by this function should be considered
+     * fatal.
+     */
+    Status updateValidator(OperationContext* opCtx,
+                           BSONObj newValidator,
+                           StringData newLevel,
+                           StringData newAction) final;
+
     // -----------
 
     //
@@ -341,11 +351,11 @@ public:
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must error.
      */
-    boost::optional<SnapshotName> getMinimumVisibleSnapshot() final {
+    boost::optional<Timestamp> getMinimumVisibleSnapshot() final {
         return _minVisibleSnapshot;
     }
 
-    void setMinimumVisibleSnapshot(SnapshotName name) final {
+    void setMinimumVisibleSnapshot(Timestamp name) final {
         _minVisibleSnapshot = name;
     }
 
@@ -360,15 +370,6 @@ public:
      */
     const CollatorInterface* getDefaultCollator() const final;
 
-    /**
-     * Calls the Inform function in the IndexObserver if it's hooked.
-     */
-    void informIndexObserver(OperationContext* opCtx,
-                             const IndexDescriptor* descriptor,
-                             const IndexKeyEntry& indexEntry,
-                             const ValidationOperation operation) const;
-
-
 private:
     inline DatabaseCatalogEntry* dbce() const final {
         return this->_dbce;
@@ -377,16 +378,6 @@ private:
     inline CollectionCatalogEntry* details() const final {
         return this->_details;
     }
-
-    /**
-     * Hooks the IndexObserver into the collection.
-     */
-    void hookIndexObserver(IndexConsistency* consistency);
-
-    /**
-     * Unhooks the IndexObserver from the collection.
-     */
-    void unhookIndexObserver();
 
     /**
      * Returns a non-ok Status if document does not pass this collection's validator.
@@ -436,8 +427,6 @@ private:
     CollectionInfoCache _infoCache;
     IndexCatalog _indexCatalog;
 
-    mutable stdx::mutex _indexObserverMutex;
-    mutable std::unique_ptr<IndexObserver> _indexObserver;
 
     // The default collation which is applied to operations and indices which have no collation of
     // their own. The collection's validator will respect this collation.
@@ -466,7 +455,7 @@ private:
     const std::shared_ptr<CappedInsertNotifier> _cappedNotifier;
 
     // The earliest snapshot that is allowed to use this collection.
-    boost::optional<SnapshotName> _minVisibleSnapshot;
+    boost::optional<Timestamp> _minVisibleSnapshot;
 
     Collection* _this;
 

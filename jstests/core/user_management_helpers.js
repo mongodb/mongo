@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // This test is a basic sanity check of the shell helpers for manipulating user objects
 // It is not a comprehensive test of the functionality of the user manipulation commands
 function assertHasRole(rolesArray, roleName, roleDB) {

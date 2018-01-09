@@ -168,12 +168,16 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeFirstOplogEntryFetcher(
         _taskExecutor,
         candidate,
         kLocalOplogNss.db().toString(),
-        BSON("find" << kLocalOplogNss.coll() << "limit" << 1 << "sort" << BSON("$natural" << 1)),
-        stdx::bind(&SyncSourceResolver::_firstOplogEntryFetcherCallback,
-                   this,
-                   stdx::placeholders::_1,
-                   candidate,
-                   earliestOpTimeSeen),
+        BSON("find" << kLocalOplogNss.coll() << "limit" << 1 << "sort" << BSON("$natural" << 1)
+                    << "projection"
+                    << BSON(OplogEntryBase::kTimestampFieldName << 1
+                                                                << OplogEntryBase::kTermFieldName
+                                                                << 1)),
+        [=](const StatusWith<Fetcher::QueryResponse>& response,
+            Fetcher::NextAction*,
+            BSONObjBuilder*) {
+            return _firstOplogEntryFetcherCallback(response, candidate, earliestOpTimeSeen);
+        },
         ReadPreferenceSetting::secondaryPreferredMetadata(),
         kFetcherTimeout /* find network timeout */,
         kFetcherTimeout /* getMore network timeout */);
@@ -191,12 +195,11 @@ std::unique_ptr<Fetcher> SyncSourceResolver::_makeRequiredOpTimeFetcher(HostAndP
         BSON("find" << kLocalOplogNss.coll() << "oplogReplay" << true << "filter"
                     << BSON("ts" << BSON("$gte" << _requiredOpTime.getTimestamp() << "$lte"
                                                 << _requiredOpTime.getTimestamp()))),
-        stdx::bind(&SyncSourceResolver::_requiredOpTimeFetcherCallback,
-                   this,
-                   stdx::placeholders::_1,
-                   candidate,
-                   earliestOpTimeSeen,
-                   rbid),
+        [=](const StatusWith<Fetcher::QueryResponse>& response,
+            Fetcher::NextAction*,
+            BSONObjBuilder*) {
+            return _requiredOpTimeFetcherCallback(response, candidate, earliestOpTimeSeen, rbid);
+        },
         ReadPreferenceSetting::secondaryPreferredMetadata(),
         kFetcherTimeout /* find network timeout */,
         kFetcherTimeout /* getMore network timeout */);
@@ -242,9 +245,18 @@ OpTime SyncSourceResolver::_parseRemoteEarliestOpTime(const HostAndPort& candida
         return OpTime();
     }
 
-    const OplogEntry oplogEntry(firstObjFound);
-    const auto remoteEarliestOpTime = oplogEntry.getOpTime();
-    if (remoteEarliestOpTime.isNull()) {
+    const auto remoteEarliestOpTime = OpTime::parseFromOplogEntry(firstObjFound);
+    if (!remoteEarliestOpTime.isOK()) {
+        const auto until = _taskExecutor->now() + kFirstOplogEntryNullTimestampBlacklistDuration;
+        log() << "Blacklisting " << candidate << " due to error parsing OpTime from the oldest"
+              << " oplog entry for " << kFirstOplogEntryNullTimestampBlacklistDuration
+              << " until: " << until << ". Error: " << remoteEarliestOpTime.getStatus()
+              << ", Entry: " << redact(firstObjFound);
+        _syncSourceSelector->blacklistSyncSource(candidate, until);
+        return OpTime();
+    }
+
+    if (remoteEarliestOpTime.getValue().isNull()) {
         // First document in remote oplog is empty.
         const auto until = _taskExecutor->now() + kFirstOplogEntryNullTimestampBlacklistDuration;
         log() << "Blacklisting " << candidate << " due to null timestamp in first document for "
@@ -253,7 +265,7 @@ OpTime SyncSourceResolver::_parseRemoteEarliestOpTime(const HostAndPort& candida
         return OpTime();
     }
 
-    return remoteEarliestOpTime;
+    return remoteEarliestOpTime.getValue();
 }
 
 void SyncSourceResolver::_firstOplogEntryFetcherCallback(
@@ -341,12 +353,9 @@ Status SyncSourceResolver::_scheduleRBIDRequest(HostAndPort candidate, OpTime ea
     invariant(_state == State::kRunning);
     auto handle = _taskExecutor->scheduleRemoteCommand(
         {candidate, "admin", BSON("replSetGetRBID" << 1), nullptr, kFetcherTimeout},
-        stdx::bind(&SyncSourceResolver::_rbidRequestCallback,
-                   this,
-                   candidate,
-                   earliestOpTimeSeen,
-                   stdx::placeholders::_1));
-
+        [=](const executor::TaskExecutor::RemoteCommandCallbackArgs& rbidReply) {
+            _rbidRequestCallback(candidate, earliestOpTimeSeen, rbidReply);
+        });
     if (!handle.isOK()) {
         return handle.getStatus();
     }

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -58,6 +58,7 @@ __sync_checkpoint_can_skip(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    i = 0; i < mod->mod_multi_entries; ++multi, ++i)
 			if (multi->addr.addr == NULL)
 				return (false);
+
 	return (true);
 }
 
@@ -113,7 +114,6 @@ __sync_dup_walk(
 static int
 __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 {
-	struct timespec end, start;
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
@@ -121,7 +121,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	WT_REF *prev, *walk;
 	WT_TXN *txn;
 	uint64_t internal_bytes, internal_pages, leaf_bytes, leaf_pages;
-	uint64_t oldest_id, saved_pinned_id;
+	uint64_t oldest_id, saved_pinned_id, time_start, time_stop;
 	uint32_t flags;
 	bool timer, tried_eviction;
 
@@ -130,6 +130,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	prev = walk = NULL;
 	txn = &session->txn;
 	tried_eviction = false;
+	time_start = time_stop = 0;
 
 	flags = WT_READ_CACHE | WT_READ_NO_GEN;
 	internal_bytes = leaf_bytes = 0;
@@ -137,7 +138,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	saved_pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
 	timer = WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT);
 	if (timer)
-		__wt_epoch(session, &start);
+		time_start = __wt_rdtsc(session);
 
 	switch (syncop) {
 	case WT_SYNC_WRITE_LEAVES:
@@ -329,7 +330,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	}
 
 	if (timer) {
-		__wt_epoch(session, &end);
+		time_stop = __wt_rdtsc(session);
 		__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "__sync_file WT_SYNC_%s wrote: %" PRIu64
 		    " leaf pages (%" PRIu64 "B), %" PRIu64
@@ -337,7 +338,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		    syncop == WT_SYNC_WRITE_LEAVES ?
 		    "WRITE_LEAVES" : "CHECKPOINT",
 		    leaf_pages, leaf_bytes, internal_pages, internal_bytes,
-		    WT_TIMEDIFF_MS(end, start));
+		    WT_TSCDIFF_MS(time_stop, time_start));
 	}
 
 err:	/* On error, clear any left-over tree walk. */

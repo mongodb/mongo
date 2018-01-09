@@ -56,11 +56,10 @@
                       function(conn) {
                           const res = conn.adminCommand({listDatabases: 1});
                           if (!res.ok) {
-                              assert.commandFailedWithCode(res, ErrorCodes.Unauthorized);
-                              return {
-                                  shouldStop: true,
-                                  reason: "not authorized to run listDatabases"
-                              };
+                              // TODO: SERVER-31916 for the KeyNotFound error
+                              assert.commandFailedWithCode(
+                                  res, [ErrorCodes.Unauthorized, ErrorCodes.KeyNotFound]);
+                              return {shouldStop: true, reason: "cannot run listDatabases"};
                           }
                           assert.commandWorked(res);
                           dbNames = res.databases.map(dbInfo => dbInfo.name);
@@ -75,8 +74,9 @@
         load('jstests/hooks/validate_collections.js');  // for validateCollections
 
         const cmds = new CommandSequenceWithRetries(conn);
-        for (let dbName of dbNames) {
-            cmds.then("DEBUG: validating " + dbName, function(conn) {
+        for (let i = 0; i < dbNames.length; ++i) {
+            const dbName = dbNames[i];
+            cmds.then("validating " + dbName, function(conn) {
                 if (!validateCollections(conn.getDB(dbName), {full: true})) {
                     return {shouldStop: true, reason: "collection validation failed"};
                 }

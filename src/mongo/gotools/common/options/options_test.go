@@ -1,3 +1,9 @@
+// Copyright (C) MongoDB, Inc. 2014-present.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License. You may obtain
+// a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+
 package options
 
 import (
@@ -104,11 +110,46 @@ func TestParseAndSetOptions(t *testing.T) {
 				ShouldError:  true,
 			},
 			{
+				Name: "not built with ssl using SRV",
+				CS: connstring.ConnString{
+					UseSSL:   true,
+					UsingSRV: true,
+				},
+				WithSSL:      false,
+				OptsIn:       New("", "", enabledURIOnly),
+				OptsExpected: New("", "", enabledURIOnly),
+				ShouldError:  true,
+			},
+			{
 				Name: "built with ssl",
 				CS: connstring.ConnString{
 					UseSSL: true,
 				},
-				WithSSL: true, OptsIn: New("", "", enabledURIOnly),
+				WithSSL: true,
+				OptsIn:  New("", "", enabledURIOnly),
+				OptsExpected: &ToolOptions{
+					General:    &General{},
+					Verbosity:  &Verbosity{},
+					Connection: &Connection{},
+					URI:        &URI{},
+					SSL: &SSL{
+						UseSSL: true,
+					},
+					Auth:           &Auth{},
+					Namespace:      &Namespace{},
+					Kerberos:       &Kerberos{},
+					enabledOptions: enabledURIOnly,
+				},
+				ShouldError: false,
+			},
+			{
+				Name: "built with ssl using SRV",
+				CS: connstring.ConnString{
+					UseSSL:   true,
+					UsingSRV: true,
+				},
+				WithSSL: true,
+				OptsIn:  New("", "", enabledURIOnly),
 				OptsExpected: &ToolOptions{
 					General:    &General{},
 					Verbosity:  &Verbosity{},

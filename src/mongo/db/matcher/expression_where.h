@@ -37,9 +37,7 @@ class OperationContext;
 
 class WhereMatchExpression final : public WhereMatchExpressionBase {
 public:
-    WhereMatchExpression(OperationContext* opCtx, WhereParams params);
-
-    Status init(StringData dbName);
+    WhereMatchExpression(OperationContext* opCtx, WhereParams params, StringData dbName);
 
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 

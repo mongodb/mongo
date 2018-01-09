@@ -164,25 +164,5 @@ void storageValid(mutablebson::ConstElement elem, const bool deep, std::uint32_t
     }
 }
 
-std::uint32_t storageValidParents(mutablebson::ConstElement elem, std::uint32_t recursionLevel) {
-    uassert(ErrorCodes::Overflow,
-            str::stream() << "Document exceeds maximum nesting depth of "
-                          << BSONDepth::getMaxDepthForUserStorage(),
-            recursionLevel <= BSONDepth::getMaxDepthForUserStorage());
-
-    auto root = elem.getDocument().root();
-    if (elem != root) {
-        auto parent = elem.parent();
-        if (parent.ok() && parent != root) {
-            const bool doRecursiveCheck = false;
-            const uint32_t parentsRecursionLevel = 0;
-            storageValid(parent, doRecursiveCheck, parentsRecursionLevel);
-            return storageValidParents(parent, recursionLevel + 1);
-        }
-        return recursionLevel + 1;
-    }
-    return recursionLevel;
-}
-
 }  // namespace storage_validation
 }  // namespace mongo

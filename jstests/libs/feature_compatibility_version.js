@@ -31,3 +31,30 @@ function checkFCV34(adminDB, version) {
     let doc = adminDB.system.version.findOne({_id: "featureCompatibilityVersion"});
     assert.eq(doc.version, version, tojson(doc));
 }
+
+/**
+ * Since SERVER-29453 disallows us to remove the FCV document in 3.6, we need to
+ * do this hack to remove it. Notice this is only for 3.6. For 3.4, we can
+ * simply remove the FCV document.
+ */
+function removeFCVDocument(adminDB) {
+    let res = adminDB.runCommand({listCollections: 1, filter: {name: "system.version"}});
+    assert.commandWorked(res, "failed to list collections");
+    let originalUUID = res.cursor.firstBatch[0].info.uuid;
+    let newUUID = UUID();
+
+    // Create new collection with no FCV document, and then delete the
+    // original collection.
+    let createNewAdminSystemVersionCollection =
+        {op: "c", ns: "admin.$cmd", ui: newUUID, o: {create: "system.version"}};
+    let dropOriginalAdminSystemVersionCollection =
+        {op: "c", ns: "admin.$cmd", ui: originalUUID, o: {drop: "admin.tmp_system_version"}};
+    assert.commandWorked(adminDB.runCommand({
+        applyOps:
+            [createNewAdminSystemVersionCollection, dropOriginalAdminSystemVersionCollection]
+    }));
+
+    res = adminDB.runCommand({listCollections: 1, filter: {name: "system.version"}});
+    assert.commandWorked(res, "failed to list collections");
+    assert.eq(newUUID, res.cursor.firstBatch[0].info.uuid);
+}

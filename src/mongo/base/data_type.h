@@ -166,3 +166,8 @@ struct DataType {
 };
 
 }  // namespace mongo
+
+// Force the visibility of the DataType::Handler specializations.
+#define MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
+#include "mongo/base/data_type_string_data.h"
+#undef MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_

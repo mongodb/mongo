@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // SERVER-2282 $or de duping with sparse indexes
 
 t = db.jstests_org;

@@ -67,6 +67,42 @@ class TestGenerator(testcase.IDLTestcase):
         args.input_file = unittest_idl_file
         self.assertTrue(idl.compiler.compile_idl(args))
 
+    def test_enum_non_const(self):
+        # type: () -> None
+        """Validate enums are not marked as const in getters."""
+        header, _ = self.assert_generate("""
+        enums:
+
+            StringEnum:
+                description: "An example string enum"
+                type: string
+                values:
+                    s0: "zero"
+                    s1: "one"
+                    s2: "two"
+
+        structs:
+            one_string_enum:
+                description: mock
+                fields:
+                    value: StringEnum
+        """)
+
+        # Look for the getter.
+        # Make sure the getter is marked as const.
+        # Make sure the return type is not marked as const by validating the getter marked as const
+        # is the only occurrence of the word "const".
+        header_lines = header.split('\n')
+
+        found = False
+        for header_line in header_lines:
+            if header_line.find("getValue") > 0 \
+                and header_line.find("const {") > 0 \
+                and header_line.find("const {") == header_line.find("const"):
+                found = True
+
+        self.assertTrue(found, "Bad Header: " + header)
+
 
 if __name__ == '__main__':
 

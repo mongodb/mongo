@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 // Tests query/command option $maxTimeMS.
 
 var t = db.max_time_ms;

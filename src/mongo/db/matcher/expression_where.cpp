@@ -50,38 +50,24 @@ using std::string;
 using std::stringstream;
 using stdx::make_unique;
 
-WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx, WhereParams params)
-    : WhereMatchExpressionBase(std::move(params)), _opCtx(opCtx) {
+WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
+                                           WhereParams params,
+                                           StringData dbName)
+    : WhereMatchExpressionBase(std::move(params)), _dbName(dbName.toString()), _opCtx(opCtx) {
     invariant(_opCtx != NULL);
 
-    _func = 0;
-}
+    uassert(
+        ErrorCodes::BadValue, "no globalScriptEngine in $where parsing", getGlobalScriptEngine());
 
-Status WhereMatchExpression::init(StringData dbName) {
-    if (!getGlobalScriptEngine()) {
-        return Status(ErrorCodes::BadValue, "no globalScriptEngine in $where parsing");
-    }
-
-    if (dbName.size() == 0) {
-        return Status(ErrorCodes::BadValue, "ns for $where cannot be empty");
-    }
-
-    _dbName = dbName.toString();
+    uassert(ErrorCodes::BadValue, "ns for $where cannot be empty", dbName.size() != 0);
 
     const string userToken =
         AuthorizationSession::get(Client::getCurrent())->getAuthenticatedUserNamesToken();
 
-    try {
-        _scope = getGlobalScriptEngine()->getPooledScope(_opCtx, _dbName, "where" + userToken);
-        _func = _scope->createFunction(getCode().c_str());
-    } catch (...) {
-        return exceptionToStatus();
-    }
+    _scope = getGlobalScriptEngine()->getPooledScope(_opCtx, _dbName, "where" + userToken);
+    _func = _scope->createFunction(getCode().c_str());
 
-    if (!_func)
-        return Status(ErrorCodes::BadValue, "$where compile error");
-
-    return Status::OK();
+    uassert(ErrorCodes::BadValue, "$where compile error", _func);
 }
 
 bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
@@ -113,8 +99,7 @@ unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {
     params.code = getCode();
     params.scope = getScope();
     unique_ptr<WhereMatchExpression> e =
-        make_unique<WhereMatchExpression>(_opCtx, std::move(params));
-    uassertStatusOK(e->init(_dbName));
+        make_unique<WhereMatchExpression>(_opCtx, std::move(params), _dbName);
     if (getTag()) {
         e->setTag(getTag()->clone());
     }

@@ -55,9 +55,8 @@ OplogStart::OplogStart(OperationContext* opCtx,
       _done(false),
       _collection(collection),
       _workingSet(ws),
-      _filterBSON(BSON("$lte" << timestamp)) {
-    invariantOK(_filter.init(repl::OpTime::kTimestampFieldName, _filterBSON.firstElement()));
-}
+      _filterBSON(BSON("$lte" << timestamp)),
+      _filter(repl::OpTime::kTimestampFieldName, _filterBSON.firstElement()) {}
 
 PlanStage::StageState OplogStart::doWork(WorkingSetID* out) {
     // We do our (heavy) init in a work(), where work is expected.

@@ -38,8 +38,7 @@ namespace mongo {
  * a ParsedSingleDocumentTransformation. It is not a registered DocumentSource, and it cannot be
  * created from BSON.
  */
-class DocumentSourceSingleDocumentTransformation final
-    : public DocumentSourceNeedsMongoProcessInterface {
+class DocumentSourceSingleDocumentTransformation final : public DocumentSource {
 public:
     /**
      * This class defines the minimal interface that every parser wishing to take advantage of
@@ -88,14 +87,7 @@ public:
             return false;
         }
 
-    protected:
-        MongoProcessInterface* _mongoProcess{nullptr};
-
     private:
-        void injectMongoProcess(MongoProcessInterface* p) {
-            _mongoProcess = p;
-        }
-
         friend class DocumentSourceSingleDocumentTransformation;
     };
 
@@ -112,12 +104,6 @@ public:
     DocumentSource::GetDepsReturn getDependencies(DepsTracker* deps) const final;
     GetModPathsReturn getModifiedPaths() const final;
 
-    void doInjectMongoProcessInterface(
-        std::shared_ptr<MongoProcessInterface> mongoProcessInterface) override {
-
-        _parsedTransform->injectMongoProcess(mongoProcessInterface.get());
-    }
-
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(
             StreamType::kStreaming,
@@ -132,6 +118,7 @@ public:
                  : ChangeStreamRequirement::kWhitelist));
 
         constraints.canSwapWithMatch = true;
+        constraints.canSwapWithLimit = true;
         return constraints;
     }
 

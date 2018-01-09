@@ -610,7 +610,12 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
 
     OpTime minValid = fassertStatusOK(40492, OpTime::parseFromOplogEntry(newMinValidDoc));
     log() << "Setting minvalid to " << minValid;
-    replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});  // Use top of oplog.
+
+    // This method is only used with storage engines that do not support recover to stable
+    // timestamp. As a result, the timestamp on the 'appliedThrough' update does not matter.
+    invariant(
+        !opCtx->getServiceContext()->getGlobalStorageEngine()->supportsRecoverToStableTimestamp());
+    replicationProcess->getConsistencyMarkers()->clearAppliedThrough(opCtx, {});
     replicationProcess->getConsistencyMarkers()->setMinValid(opCtx, minValid);
 
     if (MONGO_FAIL_POINT(rollbackHangThenFailAfterWritingMinValid)) {
@@ -798,7 +803,6 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
     // Finds the UUID of the collection that we are renaming out of the way.
     auto collection = db->getCollection(opCtx, info.renameTo);
     invariant(collection);
-    BSONObj tempRenameCollUUID = collection->uuid().get().toBSON();
 
     // Creates the oplog entry to temporarily rename the collection that is
     // preventing the renameCollection command from rolling back to a unique
@@ -817,15 +821,10 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
            << info.renameTo << " with UUID " << collection->uuid().get() << " out of the way to "
            << tempNss;
 
-    BSONObjBuilder tempRenameCmd;
-    tempRenameCmd.append("renameCollection", info.renameTo.ns());
-    tempRenameCmd.append("to", tempNss.ns());
-    tempRenameCmd.append("dropTarget", false);
-
     // Renaming the collection that was clashing with the attempted rename
     // operation to a different collection name.
-    auto renameStatus = renameCollectionForApplyOps(
-        opCtx, db->name(), tempRenameCollUUID.getField("uuid"), tempRenameCmd.obj(), {});
+    auto uuid = collection->uuid().get();
+    auto renameStatus = renameCollectionForRollback(opCtx, tempNss, uuid);
 
     if (!renameStatus.isOK()) {
         severe() << "Unable to rename collection " << info.renameTo << " out of the way to "
@@ -839,8 +838,7 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
  */
 void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollectionInfo info) {
 
-    std::string dbName = info.renameFrom.db().toString();
-    BSONObj ui = uuid.toBSON();
+    auto dbName = info.renameFrom.db();
 
     log() << "Attempting to rename collection with UUID: " << uuid << ", from: " << info.renameFrom
           << ", to: " << info.renameTo;
@@ -848,13 +846,7 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
     auto db = dbHolder().openDb(opCtx, dbName);
     invariant(db);
 
-    BSONObjBuilder cmd;
-    cmd.append("renameCollection", info.renameFrom.ns());
-    cmd.append("to", info.renameTo.ns());
-    cmd.append("dropTarget", false);
-    BSONObj obj = cmd.obj();
-
-    auto status = renameCollectionForApplyOps(opCtx, dbName, ui.getField("uuid"), obj, {});
+    auto status = renameCollectionForRollback(opCtx, info.renameTo, uuid);
 
     // If we try to roll back a collection to a collection name that currently exists
     // because another collection was renamed or created with the same collection name,
@@ -865,7 +857,7 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
 
         // Retrying to renameCollection command again now that the conflicting
         // collection has been renamed out of the way.
-        status = renameCollectionForApplyOps(opCtx, dbName, ui.getField("uuid"), obj, {});
+        status = renameCollectionForRollback(opCtx, info.renameTo, uuid);
 
         if (!status.isOK()) {
             severe() << "Rename collection failed to roll back twice. We were unable to rename "
@@ -935,9 +927,20 @@ Status _syncRollback(OperationContext* opCtx,
                           << e.what());
     }
 
-    log() << "Rollback common point is " << how.commonPoint;
+    OpTime commonPoint = how.commonPoint;
+    OpTime lastCommittedOpTime = replCoord->getLastCommittedOpTime();
+    OpTime committedSnapshot = replCoord->getCurrentCommittedSnapshotOpTime();
+
+    log() << "Rollback common point is " << commonPoint;
+
+    // Rollback common point should be >= the replication commit point.
     invariant(!replCoord->isV1ElectionProtocol() ||
-              how.commonPoint >= replCoord->getLastCommittedOpTime());
+              commonPoint.getTimestamp() >= lastCommittedOpTime.getTimestamp());
+    invariant(!replCoord->isV1ElectionProtocol() || commonPoint >= lastCommittedOpTime);
+
+    // Rollback common point should be >= the committed snapshot optime.
+    invariant(commonPoint.getTimestamp() >= committedSnapshot.getTimestamp());
+    invariant(commonPoint >= committedSnapshot);
 
     try {
         ON_BLOCK_EXIT([&] {
@@ -1046,6 +1049,24 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, replicationProcess);
 
     invariant(!fixUpInfo.commonPointOurDiskloc.isNull());
+
+    // Rolls back createIndexes commands by dropping the indexes that were created. It is
+    // necessary to roll back createIndexes commands before dropIndexes commands because
+    // it is possible that we previously dropped an index with the same name but a different
+    // index spec. If we attempt to re-create an index that has the same name as an existing
+    // index, the operation will fail. Thus, we roll back createIndexes commands first in
+    // order to ensure that no collisions will occur when we re-create previously dropped
+    // indexes.
+    // We drop indexes before renaming collections so that if a collection name gets longer,
+    // any indexes with names that are now too long will already be dropped.
+    log() << "Rolling back createIndexes commands.";
+    for (auto it = fixUpInfo.indexesToDrop.begin(); it != fixUpInfo.indexesToDrop.end(); it++) {
+
+        UUID uuid = it->first;
+        std::set<std::string> indexNames = it->second;
+
+        rollbackCreateIndexes(opCtx, uuid, indexNames);
+    }
 
     log() << "Dropping collections to roll back create operations";
 
@@ -1169,11 +1190,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
             WriteUnitOfWork wuow(opCtx);
 
-            // If the collection is temporary, we set the temp field to true. Otherwise, we do not
-            // add the the temp field.
-            if (options.temp) {
-                cce->setIsTemp(opCtx, options.temp);
-            }
+            // Set collection to whatever temp status is on the sync source.
+            cce->setIsTemp(opCtx, options.temp);
 
             // Resets collection user flags such as noPadding and usePowerOf2Sizes.
             if (options.flagsSet || cce->getCollectionOptions(opCtx).flagsSet) {
@@ -1183,13 +1201,22 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             // Set any document validation options. We update the validator fields without
             // parsing/validation, since we fetched the options object directly from the sync
             // source, and we should set our validation options to match it exactly.
-            cce->updateValidator(
+            auto validatorStatus = collection->updateValidator(
                 opCtx, options.validator, options.validationLevel, options.validationAction);
+            if (!validatorStatus.isOK()) {
+                throw RSFatalException(
+                    str::stream() << "Failed to update validator for " << nss.toString() << " ("
+                                  << uuid
+                                  << ") with "
+                                  << redact(info)
+                                  << ". Got: "
+                                  << validatorStatus.toString());
+            }
 
             wuow.commit();
 
             LOG(1) << "Resynced collection metadata for collection: " << nss << ", UUID: " << uuid
-                   << ", with: " << redact(options.toBSON())
+                   << ", with: " << redact(info)
                    << ", to: " << redact(cce->getCollectionOptions(opCtx).toBSON());
         }
 
@@ -1198,22 +1225,6 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         // minValid if necessary.
         log() << "Rechecking the Rollback ID and minValid";
         checkRbidAndUpdateMinValid(opCtx, fixUpInfo.rbid, rollbackSource, replicationProcess);
-    }
-
-    // Rolls back createIndexes commands by dropping the indexes that were created. It is
-    // necessary to roll back createIndexes commands before dropIndexes commands because
-    // it is possible that we previously dropped an index with the same name but a different
-    // index spec. If we attempt to re-create an index that has the same name as an existing
-    // index, the operation will fail. Thus, we roll back createIndexes commands first in
-    // order to ensure that no collisions will occur when we re-create previously dropped
-    // indexes.
-    log() << "Rolling back createIndexes commands.";
-    for (auto it = fixUpInfo.indexesToDrop.begin(); it != fixUpInfo.indexesToDrop.end(); it++) {
-
-        UUID uuid = it->first;
-        std::set<std::string> indexNames = it->second;
-
-        rollbackCreateIndexes(opCtx, uuid, indexNames);
     }
 
     // Rolls back dropIndexes commands by re-creating the indexes that were dropped.
@@ -1412,8 +1423,13 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     }
 
     // Reload the lastAppliedOpTime and lastDurableOpTime value in the replcoord and the
-    // lastAppliedHash value in bgsync to reflect our new last op.
-    replCoord->resetLastOpTimesFromOplog(opCtx);
+    // lastAppliedHash value in bgsync to reflect our new last op. The rollback common point does
+    // not necessarily represent a consistent database state. For example, on a secondary, we may
+    // have rolled back to an optime that fell in the middle of an oplog application batch. We make
+    // the database consistent again after rollback by applying ops forward until we reach
+    // 'minValid'.
+    replCoord->resetLastOpTimesFromOplog(opCtx,
+                                         ReplicationCoordinator::DataConsistency::Inconsistent);
 }
 
 Status syncRollback(OperationContext* opCtx,

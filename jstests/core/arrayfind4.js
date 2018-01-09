@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_writes]
+
 // Test query empty array SERVER-2258
 
 t = db.jstests_arrayfind4;

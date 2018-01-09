@@ -38,8 +38,7 @@ namespace mongo {
 namespace {
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsNonStringElements) {
-    InternalSchemaMaxLengthMatchExpression maxLength;
-    ASSERT_OK(maxLength.init("a", 1));
+    InternalSchemaMaxLengthMatchExpression maxLength("a", 1);
 
     ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << BSONObj())));
     ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << 1)));
@@ -47,8 +46,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, RejectsNonStringElements) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsStringsWithTooManyChars) {
-    InternalSchemaMaxLengthMatchExpression maxLength;
-    ASSERT_OK(maxLength.init("a", 2));
+    InternalSchemaMaxLengthMatchExpression maxLength("a", 2);
 
     ASSERT_FALSE(maxLength.matchesBSON(BSON("a"
                                             << "abc")));
@@ -57,8 +55,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, RejectsStringsWithTooManyChars) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, AcceptsStringsWithLessThanOrEqualToMax) {
-    InternalSchemaMaxLengthMatchExpression maxLength;
-    ASSERT_OK(maxLength.init("a", 2));
+    InternalSchemaMaxLengthMatchExpression maxLength("a", 2);
 
     ASSERT_TRUE(maxLength.matchesBSON(BSON("a"
                                            << "ab")));
@@ -69,26 +66,21 @@ TEST(InternalSchemaMaxLengthMatchExpression, AcceptsStringsWithLessThanOrEqualTo
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, MaxLengthZeroAllowsEmptyString) {
-    InternalSchemaMaxLengthMatchExpression maxLength;
-    ASSERT_OK(maxLength.init("a", 0));
+    InternalSchemaMaxLengthMatchExpression maxLength("a", 0);
 
     ASSERT_TRUE(maxLength.matchesBSON(BSON("a"
                                            << "")));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, RejectsNull) {
-    InternalSchemaMaxLengthMatchExpression maxLength;
-    ASSERT_OK(maxLength.init("a", 1));
+    InternalSchemaMaxLengthMatchExpression maxLength("a", 1);
 
     ASSERT_FALSE(maxLength.matchesBSON(BSON("a" << BSONNULL)));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, TreatsMultiByteCodepointAsOneCharacter) {
-    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength;
-    InternalSchemaMaxLengthMatchExpression matchingMaxLength;
-
-    ASSERT_OK(nonMatchingMaxLength.init("a", 0));
-    ASSERT_OK(matchingMaxLength.init("a", 1));
+    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength("a", 0);
+    InternalSchemaMaxLengthMatchExpression matchingMaxLength("a", 1);
 
     // This string has one code point, so it should meet maximum length 1 but not maximum length 0.
     constexpr auto testString = u8"\U0001f4a9";
@@ -97,11 +89,8 @@ TEST(InternalSchemaMaxLengthMatchExpression, TreatsMultiByteCodepointAsOneCharac
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
-    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength;
-    InternalSchemaMaxLengthMatchExpression matchingMaxLength;
-
-    ASSERT_OK(nonMatchingMaxLength.init("a", 4));
-    ASSERT_OK(matchingMaxLength.init("a", 5));
+    InternalSchemaMaxLengthMatchExpression nonMatchingMaxLength("a", 4);
+    InternalSchemaMaxLengthMatchExpression matchingMaxLength("a", 5);
 
     // A test string that contains single-byte, 2-byte, 3-byte, and 4-byte codepoints.
     constexpr auto testString =
@@ -118,9 +107,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, CorectlyCountsUnicodeCodepoints) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, DealsWithInvalidUTF8) {
-    InternalSchemaMaxLengthMatchExpression maxLength;
-
-    ASSERT_OK(maxLength.init("a", 1));
+    InternalSchemaMaxLengthMatchExpression maxLength("a", 1);
 
     // Several kinds of invalid byte sequences listed in the Wikipedia article about UTF-8:
     // https://en.wikipedia.org/wiki/UTF-8
@@ -138,8 +125,7 @@ TEST(InternalSchemaMaxLengthMatchExpression, DealsWithInvalidUTF8) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, NestedArraysWorkWithDottedPaths) {
-    InternalSchemaMaxLengthMatchExpression maxLength;
-    ASSERT_OK(maxLength.init("a.b", 2));
+    InternalSchemaMaxLengthMatchExpression maxLength("a.b", 2);
 
     ASSERT_TRUE(maxLength.matchesBSON(BSON("a" << BSON("b"
                                                        << "a"))));
@@ -150,22 +136,17 @@ TEST(InternalSchemaMaxLengthMatchExpression, NestedArraysWorkWithDottedPaths) {
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, SameMaxLengthTreatedEquivalent) {
-    InternalSchemaMaxLengthMatchExpression maxLength1;
-    InternalSchemaMaxLengthMatchExpression maxLength2;
-    InternalSchemaMaxLengthMatchExpression maxLength3;
-    ASSERT_OK(maxLength1.init("a", 2));
-    ASSERT_OK(maxLength2.init("a", 2));
-    ASSERT_OK(maxLength3.init("a", 3));
+    InternalSchemaMaxLengthMatchExpression maxLength1("a", 2);
+    InternalSchemaMaxLengthMatchExpression maxLength2("a", 2);
+    InternalSchemaMaxLengthMatchExpression maxLength3("a", 3);
 
     ASSERT_TRUE(maxLength1.equivalent(&maxLength2));
     ASSERT_FALSE(maxLength1.equivalent(&maxLength3));
 }
 
 TEST(InternalSchemaMaxLengthMatchExpression, MinLengthAndMaxLengthAreNotEquivalent) {
-    InternalSchemaMinLengthMatchExpression minLength;
-    InternalSchemaMaxLengthMatchExpression maxLength;
-    ASSERT_OK(minLength.init("a", 2));
-    ASSERT_OK(maxLength.init("a", 2));
+    InternalSchemaMinLengthMatchExpression minLength("a", 2);
+    InternalSchemaMaxLengthMatchExpression maxLength("a", 2);
 
     ASSERT_FALSE(maxLength.equivalent(&minLength));
 }

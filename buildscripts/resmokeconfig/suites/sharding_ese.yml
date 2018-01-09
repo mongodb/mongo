@@ -8,6 +8,7 @@ selector:
   roots:
   - jstests/sharding/*.js
   exclude_files:
+  # TODO: SERVER-31937
   - jstests/sharding/kill_sessions.js
 
 executor:

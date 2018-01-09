@@ -670,21 +670,13 @@ var ShardingTest = function(params) {
             this.s.adminCommand({enableSharding: dbName});
         }
 
-        var result = this.s.adminCommand({shardcollection: c, key: key});
-        if (!result.ok) {
-            printjson(result);
-            assert(false);
-        }
+        var result = assert.commandWorked(this.s.adminCommand({shardcollection: c, key: key}));
 
         if (split == false) {
             return;
         }
 
-        result = this.s.adminCommand({split: c, middle: split});
-        if (!result.ok) {
-            printjson(result);
-            assert(false);
-        }
+        result = assert.commandWorked(this.s.adminCommand({split: c, middle: split}));
 
         if (move == false) {
             return;
@@ -701,8 +693,7 @@ var ShardingTest = function(params) {
             sleep(5 * 1000);
         }
 
-        printjson(result);
-        assert(result.ok);
+        assert.commandWorked(result);
     };
 
     /**

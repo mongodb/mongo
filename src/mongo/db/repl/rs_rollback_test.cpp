@@ -46,6 +46,8 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface.h"
@@ -76,6 +78,10 @@ private:
 void RSRollbackTest::setUp() {
     RollbackTest::setUp();
     enableCollectionUUIDs = true;
+    auto observerRegistry = stdx::make_unique<OpObserverRegistry>();
+    observerRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
+    _serviceContextMongoDTest.getServiceContext()->setOpObserver(
+        std::unique_ptr<OpObserver>(observerRegistry.release()));
 }
 
 void RSRollbackTest::tearDown() {
@@ -638,6 +644,63 @@ TEST_F(RSRollbackTest, RollingBackCreateAndDropOfSameIndexIgnoresBothCommands) {
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
         auto indexDescriptor = indexCatalog->findIndexByName(_opCtx.get(), "a_1", false);
         ASSERT(!indexDescriptor);
+    }
+}
+
+TEST_F(RSRollbackTest, RollingBackCreateIndexAndRenameWithLongName) {
+    createOplog(_opCtx.get());
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    NamespaceString nss("test", "coll");
+    auto collection = _createCollection(_opCtx.get(), nss.toString(), options);
+
+    auto longName = std::string(115, 'a');
+    auto indexSpec = BSON("ns" << nss.toString() << "v" << static_cast<int>(kIndexVersion) << "key"
+                               << BSON("b" << 1)
+                               << "name"
+                               << longName);
+
+    int numIndexes = createIndexForColl(_opCtx.get(), collection, nss, indexSpec);
+    ASSERT_EQUALS(2, numIndexes);
+
+    auto commonOperation =
+        std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
+
+    auto createIndexOperation = makeCreateIndexOplogEntry(collection, BSON("b" << 1), longName, 2);
+
+    // A collection rename will fail if it would cause an index name to become more than 128 bytes.
+    // The old collection name plus the index name is not too long, but the new collection name
+    // plus the index name is too long.
+    auto newName = NamespaceString("test", "collcollcollcollcoll");
+    auto renameCollectionOperation =
+        makeRenameCollectionOplogEntry(newName,
+                                       nss,
+                                       collection->uuid().get(),
+                                       boost::none,
+                                       false,
+                                       OpTime(Timestamp(Seconds(2), 0), 1));
+
+    RollbackSourceMock rollbackSource(std::unique_ptr<OplogInterface>(new OplogInterfaceMock({
+        commonOperation,
+    })));
+
+    ASSERT_OK(syncRollback(
+        _opCtx.get(),
+        OplogInterfaceMock({createIndexOperation, renameCollectionOperation, commonOperation}),
+        rollbackSource,
+        {},
+        _coordinator,
+        _replicationProcess.get()));
+
+    {
+        AutoGetCollectionForReadCommand coll(_opCtx.get(), newName);
+        auto indexCatalog = coll.getCollection()->getIndexCatalog();
+        ASSERT(indexCatalog);
+        ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
+
+        std::vector<IndexDescriptor*> indexes;
+        indexCatalog->findIndexesByKeyPattern(_opCtx.get(), BSON("b" << 1), false, &indexes);
+        ASSERT(indexes.size() == 0);
     }
 }
 
@@ -1848,6 +1911,48 @@ TEST_F(RollbackResyncsCollectionOptionsTest,
     localCollOptions.validationAction = "warn";
 
     BSONObj remoteCollOptionsObj = BSONObj();
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, LocalTempCollectionRemotePermanentCollection) {
+    CollectionOptions localCollOptions;
+    localCollOptions.uuid = UUID::gen();
+    localCollOptions.temp = true;
+
+    BSONObj remoteCollOptionsObj = BSONObj();
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, LocalPermanentCollectionRemoteTempCollection) {
+    CollectionOptions localCollOptions;
+    localCollOptions.uuid = UUID::gen();
+
+    BSONObj remoteCollOptionsObj = BSON("temp" << true);
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, BothCollectionsTemp) {
+    CollectionOptions localCollOptions;
+    localCollOptions.uuid = UUID::gen();
+    localCollOptions.temp = true;
+
+    BSONObj remoteCollOptionsObj = BSON("temp" << true);
+
+    resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
+}
+
+TEST_F(RollbackResyncsCollectionOptionsTest, ChangingTempStatusAlsoChangesOtherCollectionOptions) {
+    CollectionOptions localCollOptions;
+    localCollOptions.uuid = UUID::gen();
+    localCollOptions.temp = true;
+
+    BSONObj remoteCollOptionsObj = BSON("validationLevel"
+                                        << "strict"
+                                        << "validationAction"
+                                        << "error");
 
     resyncCollectionOptionsTest(localCollOptions, remoteCollOptionsObj);
 }

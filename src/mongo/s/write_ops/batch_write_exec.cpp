@@ -49,6 +49,8 @@
 namespace mongo {
 namespace {
 
+const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
+
 //
 // Map which allows associating ConnectionString hosts with TargetedWriteBatches
 // This is needed since the dispatcher only returns hosts with responses.
@@ -66,10 +68,10 @@ WriteErrorDetail errorFromStatus(const Status& status) {
 }
 
 // Helper to note several stale errors from a response
-void noteStaleResponses(const std::vector<ShardError*>& staleErrors, NSTargeter* targeter) {
-    for (const auto error : staleErrors) {
+void noteStaleResponses(const std::vector<ShardError>& staleErrors, NSTargeter* targeter) {
+    for (const auto& error : staleErrors) {
         targeter->noteStaleResponse(
-            error->endpoint, error->error.isErrInfoSet() ? error->error.getErrInfo() : BSONObj());
+            error.endpoint, error.error.isErrInfoSet() ? error.error.getErrInfo() : BSONObj());
     }
 }
 
@@ -141,8 +143,9 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
         // Send all child batches
         //
 
+        const size_t numToSend = childBatches.size();
         size_t numSent = 0;
-        size_t numToSend = childBatches.size();
+
         while (numSent != numToSend) {
             // Collect batches out on the network, mapped by endpoint
             OwnedShardBatchMap ownedPendingBatches;
@@ -163,11 +166,9 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     continue;
 
                 // If we already have a batch for this shard, wait until the next time
-                ShardId targetShardId = nextBatch->getEndpoint().shardName;
+                const auto& targetShardId = nextBatch->getEndpoint().shardName;
 
-                OwnedShardBatchMap::MapType::iterator pendingIt =
-                    pendingBatches.find(targetShardId);
-                if (pendingIt != pendingBatches.end())
+                if (pendingBatches.count(targetShardId))
                     continue;
 
                 const auto request = [&] {
@@ -200,19 +201,14 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 childBatch.second = nullptr;
 
                 // Recv-side is responsible for cleaning up the nextBatch when used
-                pendingBatches.insert(std::make_pair(targetShardId, nextBatch));
+                pendingBatches.emplace(targetShardId, nextBatch);
             }
 
-            //
-            // Send the requests.
-            //
-
-            const ReadPreferenceSetting readPref(ReadPreference::PrimaryOnly, TagSet());
             AsyncRequestsSender ars(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                                     clientRequest.getTargetingNS().db().toString(),
                                     requests,
-                                    readPref,
+                                    kPrimaryOnlyReadPreference,
                                     opCtx->getTxnNumber() ? Shard::RetryPolicy::kIdempotent
                                                           : Shard::RetryPolicy::kNoRetry);
             numSent += pendingBatches.size();
@@ -277,7 +273,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     // Note if anything was stale
                     const auto& staleErrors =
                         trackedErrors.getErrors(ErrorCodes::StaleShardVersion);
-                    if (staleErrors.size() > 0) {
+                    if (!staleErrors.empty()) {
                         noteStaleResponses(staleErrors, &targeter);
                         ++stats->numStaleBatches;
                     }

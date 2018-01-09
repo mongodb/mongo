@@ -1,6 +1,4 @@
-// Cannot implicitly shard accessed collections because of use of $near query instead of geoNear
-// command.
-// @tags: [assumes_unsharded_collection]
+// @tags: [requires_getmore]
 
 //
 // Tests the error handling of spherical queries
@@ -9,12 +7,7 @@
 // multiple documents, and so requires simultaneous testing.
 //
 
-function deg2rad(arg) {
-    return arg * Math.PI / 180.0;
-}
-function rad2deg(arg) {
-    return arg * 180.0 / Math.PI;
-}
+load("jstests/libs/geo_math.js");
 
 function computexscandist(y, maxDistDegrees) {
     return maxDistDegrees /

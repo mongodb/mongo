@@ -31,6 +31,7 @@
 #include <functional>
 #include <string>
 
+#include "mongo/base/status_with.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/condition_variable.h"
@@ -75,6 +76,7 @@ class TransportLayerASIO final : public TransportLayer {
 public:
     struct Options {
         explicit Options(const ServerGlobalParams* params);
+        Options() = default;
 
         int port = ServerGlobalParams::DefaultDBPort;  // port to bind to
         std::string ipList;                            // addresses to bind to
@@ -112,6 +114,10 @@ public:
 
     const std::shared_ptr<asio::io_context>& getIOContext();
 
+    int listenerPort() const {
+        return _listenerPort;
+    }
+
 private:
     class ASIOSession;
     class ASIOTicket;
@@ -123,6 +129,9 @@ private:
     using GenericAcceptor = asio::basic_socket_acceptor<asio::generic::stream_protocol>;
 
     void _acceptConnection(GenericAcceptor& acceptor);
+#ifdef MONGO_CONFIG_SSL
+    SSLParams::SSLModes _sslMode() const;
+#endif
 
     stdx::mutex _mutex;
 
@@ -154,10 +163,9 @@ private:
 
 #ifdef MONGO_CONFIG_SSL
     std::unique_ptr<asio::ssl::context> _sslContext;
-    SSLParams::SSLModes _sslMode;
 #endif
 
-    std::vector<GenericAcceptor> _acceptors;
+    std::vector<std::pair<SockAddr, GenericAcceptor>> _acceptors;
 
     // Only used if _listenerOptions.async is false.
     stdx::thread _listenerThread;
@@ -165,6 +173,8 @@ private:
     ServiceEntryPoint* const _sep = nullptr;
     AtomicWord<bool> _running{false};
     Options _listenerOptions;
+    // The real incoming port in case of _listenerOptions.port==0 (ephemeral).
+    int _listenerPort = 0;
 };
 
 }  // namespace transport

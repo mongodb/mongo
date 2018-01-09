@@ -60,7 +60,6 @@ tlEnv.Library(
     source=[
         'ticket_asio.cpp',
         'transport_layer_asio.cpp',
-        'transport_layer_legacy.cpp',
     ],
     LIBDEPS=[
         'transport_layer_common',
@@ -220,9 +219,9 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='transport_layer_legacy_test',
+    target='transport_layer_asio_test',
     source=[
-        'transport_layer_legacy_test.cpp',
+        'transport_layer_asio_test.cpp',
     ],
     LIBDEPS=[
         'transport_layer',

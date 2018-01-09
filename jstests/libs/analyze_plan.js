@@ -92,8 +92,8 @@ function hasRejectedPlans(root) {
         }
         // This is a sharded explain. Each entry in the shards array contains a 'winningPlan' and
         // 'rejectedPlans'.
-        return root.queryPlanner.shards.find((shard) => sectionHasRejectedPlans(shard)) !==
-            undefined;
+        return root.queryPlanner.winningPlan.shards.find(
+                   (shard) => sectionHasRejectedPlans(shard)) !== undefined;
     }
 }
 

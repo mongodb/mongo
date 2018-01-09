@@ -34,9 +34,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/concurrency/locker.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -207,8 +206,8 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx) {
 
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-        _sessionCatalogSource = stdx::make_unique<SessionCatalogMigrationSource>(_args.getNss());
-        _sessionCatalogSource->init(opCtx);
+        _sessionCatalogSource =
+            stdx::make_unique<SessionCatalogMigrationSource>(opCtx, _args.getNss());
 
         // Prime up the session migration source if there are oplog entries to migrate.
         _sessionCatalogSource->fetchNextOplog(opCtx);
@@ -295,7 +294,8 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
         }
 
         if (res["state"].String() == "fail") {
-            return {ErrorCodes::OperationFailed, "Data transfer error"};
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "Data transfer error: " << res["errmsg"].str()};
         }
 
         auto migrationSessionIdStatus = MigrationSessionId::extractFromBSON(res);

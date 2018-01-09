@@ -241,9 +241,9 @@ Status AsyncRequestsSender::_scheduleRequest(WithLock, size_t remoteIndex) {
         *remote.shardHostAndPort, _db, remote.cmdObj, _metadataObj, _opCtx);
 
     auto callbackStatus = _executor->scheduleRemoteCommand(
-        request,
-        stdx::bind(
-            &AsyncRequestsSender::_handleResponse, this, stdx::placeholders::_1, remoteIndex));
+        request, [=](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+            _handleResponse(cbData, remoteIndex);
+        });
     if (!callbackStatus.isOK()) {
         return callbackStatus.getStatus();
     }

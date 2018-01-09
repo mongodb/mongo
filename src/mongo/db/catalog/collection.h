@@ -36,6 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection_info_cache.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -111,17 +112,12 @@ public:
     void notifyAll();
 
     /**
-     * Waits for 'timeout' microseconds, or until notifyAll() is called to indicate that new
+     * Waits until 'deadline', or until notifyAll() is called to indicate that new
      * data is available in the capped collection.
      *
      * NOTE: Waiting threads can be signaled by calling kill or notify* methods.
      */
-    void wait(Microseconds timeout) const;
-
-    /**
-     * Same as above but also ensures that if the version has changed, it also returns.
-     */
-    void wait(uint64_t prevVersion, Microseconds timeout) const;
+    void waitUntil(uint64_t prevVersion, Date_t deadline) const;
 
     /**
      * Returns the version for use as an additional wake condition when used above.
@@ -129,11 +125,6 @@ public:
     uint64_t getVersion() const {
         return _version;
     }
-
-    /**
-     * Same as above but without a timeout.
-     */
-    void wait() const;
 
     /**
      * Cancels the notifier if the collection is dropped/invalidated, and wakes all waiting.
@@ -146,11 +137,6 @@ public:
     bool isDead();
 
 private:
-    // Helper for wait impls.
-    void _wait(stdx::unique_lock<stdx::mutex>& lk,
-               uint64_t prevVersion,
-               Microseconds timeout) const;
-
     // Signalled when a successful insert is made into a capped collection.
     mutable stdx::condition_variable _notifier;
 
@@ -314,6 +300,11 @@ public:
         virtual StringData getValidationLevel() const = 0;
         virtual StringData getValidationAction() const = 0;
 
+        virtual Status updateValidator(OperationContext* opCtx,
+                                       BSONObj newValidator,
+                                       StringData newLevel,
+                                       StringData newAction) = 0;
+
         virtual bool isCapped() const = 0;
 
         virtual std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const = 0;
@@ -326,18 +317,13 @@ public:
                                       BSONObjBuilder* details,
                                       int scale) = 0;
 
-        virtual boost::optional<SnapshotName> getMinimumVisibleSnapshot() = 0;
+        virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() = 0;
 
-        virtual void setMinimumVisibleSnapshot(SnapshotName name) = 0;
+        virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
 
         virtual void notifyCappedWaitersIfNeeded() = 0;
 
         virtual const CollatorInterface* getDefaultCollator() const = 0;
-
-        virtual void informIndexObserver(OperationContext* opCtx,
-                                         const IndexDescriptor* descriptor,
-                                         const IndexKeyEntry& indexEntry,
-                                         const ValidationOperation operation) const = 0;
     };
 
 private:
@@ -666,6 +652,13 @@ public:
         return this->_impl().getValidationAction();
     }
 
+    inline Status updateValidator(OperationContext* opCtx,
+                                  BSONObj newValidator,
+                                  StringData newLevel,
+                                  StringData newAction) {
+        return this->_impl().updateValidator(opCtx, newValidator, newLevel, newAction);
+    }
+
     // -----------
 
     //
@@ -712,11 +705,11 @@ public:
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must error.
      */
-    inline boost::optional<SnapshotName> getMinimumVisibleSnapshot() {
+    inline boost::optional<Timestamp> getMinimumVisibleSnapshot() {
         return this->_impl().getMinimumVisibleSnapshot();
     }
 
-    inline void setMinimumVisibleSnapshot(const SnapshotName name) {
+    inline void setMinimumVisibleSnapshot(const Timestamp name) {
         return this->_impl().setMinimumVisibleSnapshot(name);
     }
 
@@ -735,15 +728,6 @@ public:
         return this->_impl().getDefaultCollator();
     }
 
-    /**
-     * Calls the Inforn function in the IndexObserver if it's hooked.
-     */
-    inline void informIndexObserver(OperationContext* opCtx,
-                                    const IndexDescriptor* descriptor,
-                                    const IndexKeyEntry& indexEntry,
-                                    const ValidationOperation operation) const {
-        return this->_impl().informIndexObserver(opCtx, descriptor, indexEntry, operation);
-    }
 
 private:
     inline DatabaseCatalogEntry* dbce() const {

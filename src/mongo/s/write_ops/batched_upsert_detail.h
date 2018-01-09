@@ -29,9 +29,7 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
@@ -56,7 +54,6 @@ public:
     //
 
     BatchedUpsertDetail();
-    ~BatchedUpsertDetail();
 
     /** Copies all the fields present in 'this' to 'other'. */
     void cloneTo(BatchedUpsertDetail* other) const;
@@ -68,7 +65,6 @@ public:
     BSONObj toBSON() const;
     bool parseBSON(const BSONObj& source, std::string* errMsg);
     void clear();
-    std::string toString() const;
 
     //
     // individual field accessors

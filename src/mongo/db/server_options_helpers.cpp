@@ -818,26 +818,16 @@ Status storeServerOptions(const moe::Environment& params) {
 
     if (params.count("net.transportLayer")) {
         serverGlobalParams.transportLayer = params["net.transportLayer"].as<std::string>();
-        if (serverGlobalParams.transportLayer != "asio" &&
-            serverGlobalParams.transportLayer != "legacy") {
-            return {ErrorCodes::BadValue,
-                    "Unsupported value for transportLayer. Must be \"asio\" or \"legacy\""};
+        if (serverGlobalParams.transportLayer != "asio") {
+            return {ErrorCodes::BadValue, "Unsupported value for transportLayer. Must be \"asio\""};
         }
     }
 
     if (params.count("net.serviceExecutor")) {
         auto value = params["net.serviceExecutor"].as<std::string>();
-        if (serverGlobalParams.transportLayer == "legacy") {
-            if (value != "synchronous"_sd) {
-                return {ErrorCodes::BadValue,
-                        "Unsupported value for serviceExecutor with the legacy transportLayer, "
-                        "must be \"synchronous\""};
-            }
-        } else {
-            const auto valid = {"synchronous"_sd, "adaptive"_sd};
-            if (std::find(valid.begin(), valid.end(), value) == valid.end()) {
-                return {ErrorCodes::BadValue, "Unsupported value for serviceExecutor"};
-            }
+        const auto valid = {"synchronous"_sd, "adaptive"_sd};
+        if (std::find(valid.begin(), valid.end(), value) == valid.end()) {
+            return {ErrorCodes::BadValue, "Unsupported value for serviceExecutor"};
         }
         serverGlobalParams.serviceExecutor = value;
     } else {

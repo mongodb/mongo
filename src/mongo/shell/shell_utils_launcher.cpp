@@ -809,7 +809,10 @@ BSONObj RunMongoProgram(const BSONObj& a, void* data) {
 BSONObj ResetDbpath(const BSONObj& a, void* data) {
     verify(a.nFields() == 1);
     string path = a.firstElement().valuestrsafe();
-    verify(!path.empty());
+    if (path.empty()) {
+        warning() << "ResetDbpath(): nothing to do, path was empty";
+        return undefinedReturn;
+    }
     if (boost::filesystem::exists(path))
         boost::filesystem::remove_all(path);
     boost::filesystem::create_directory(path);
@@ -819,7 +822,10 @@ BSONObj ResetDbpath(const BSONObj& a, void* data) {
 BSONObj PathExists(const BSONObj& a, void* data) {
     verify(a.nFields() == 1);
     string path = a.firstElement().valuestrsafe();
-    verify(!path.empty());
+    if (path.empty()) {
+        warning() << "PathExists(): path was empty";
+        return BSON(string("") << false);
+    };
     bool exists = boost::filesystem::exists(path);
     return BSON(string("") << exists);
 }
@@ -856,8 +862,10 @@ BSONObj CopyDbpath(const BSONObj& a, void* data) {
     BSONObjIterator i(a);
     string from = i.next().str();
     string to = i.next().str();
-    verify(!from.empty());
-    verify(!to.empty());
+    if (from.empty() || to.empty()) {
+        warning() << "CopyDbpath(): nothing to do, source or destination path(s) were empty";
+        return undefinedReturn;
+    }
     if (boost::filesystem::exists(to))
         boost::filesystem::remove_all(to);
     boost::filesystem::create_directory(to);

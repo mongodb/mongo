@@ -179,6 +179,12 @@ public:
     StatusWith<executor::TaskExecutor::EventHandle> nextEvent();
 
     /**
+     * Adds the specified shard cursors to the set of cursors to be merged.  The results from the
+     * new cursors will be returned as normal through nextReady().
+     */
+    void addNewShardCursors(const std::vector<ClusterClientCursorParams::RemoteCursor>& newCursors);
+
+    /**
      * Starts shutting down this ARM by canceling all pending requests. Returns a handle to an event
      * that is signaled when this ARM is safe to destroy.
      * If there are no pending requests, schedules killCursors and signals the event immediately.
@@ -263,8 +269,10 @@ private:
 
     class MergingComparator {
     public:
-        MergingComparator(const std::vector<RemoteCursorData>& remotes, const BSONObj& sort)
-            : _remotes(remotes), _sort(sort) {}
+        MergingComparator(const std::vector<RemoteCursorData>& remotes,
+                          const BSONObj& sort,
+                          bool compareWholeSortKey)
+            : _remotes(remotes), _sort(sort), _compareWholeSortKey(compareWholeSortKey) {}
 
         bool operator()(const size_t& lhs, const size_t& rhs);
 
@@ -272,6 +280,11 @@ private:
         const std::vector<RemoteCursorData>& _remotes;
 
         const BSONObj& _sort;
+
+        // When '_compareWholeSortKey' is true, $sortKey is a scalar value, rather than an object.
+        // We extract the sort key {$sortKey: <value>}. The sort key pattern '_sort' is verified to
+        // be {$sortKey: 1}.
+        const bool _compareWholeSortKey;
     };
 
     enum LifecycleState { kAlive, kKillStarted, kKillComplete };
@@ -349,7 +362,7 @@ private:
     bool _addBatchToBuffer(WithLock, size_t remoteIndex, const CursorResponse& response);
 
     /**
-     * If there is a valid unsignaled event that has been requested via nextReady() and there are
+     * If there is a valid unsignaled event that has been requested via nextEvent() and there are
      * buffered results that are ready to return, signals that event.
      *
      * Invalidates the current event, as we must signal the event exactly once and we only keep a

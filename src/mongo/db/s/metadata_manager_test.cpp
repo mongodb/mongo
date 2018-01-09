@@ -32,14 +32,12 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/collection_metadata.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_identity.h"
@@ -116,7 +114,8 @@ protected:
         invariant(!rangeMapOverlaps(metadata.getChunks(), minKey, maxKey));
 
         auto cm = metadata.getChunkManager();
-        auto chunkToSplit = cm->findIntersectingChunkWithSimpleCollation(minKey);
+
+        const auto chunkToSplit = cm->findIntersectingChunkWithSimpleCollation(minKey);
         ASSERT(SimpleBSONObjComparator::kInstance.evaluate(maxKey <= chunkToSplit->getMax()))
             << "maxKey == " << maxKey
             << " and chunkToSplit->getMax() == " << chunkToSplit->getMax();
@@ -145,24 +144,6 @@ protected:
     }
 
     std::shared_ptr<MetadataManager> _manager;
-};
-
-TEST_F(MetadataManagerTest, SetAndGetActiveMetadata) {
-    std::unique_ptr<CollectionMetadata> cm = makeEmptyMetadata();
-    auto cmPtr = cm.get();
-
-    _manager->refreshActiveMetadata(std::move(cm));
-    ScopedCollectionMetadata scopedMetadata = _manager->getActiveMetadata(_manager);
-
-    ASSERT_EQ(cmPtr, scopedMetadata.getMetadata());
-};
-
-
-TEST_F(MetadataManagerTest, ResetActiveMetadata) {
-    _manager->refreshActiveMetadata(makeEmptyMetadata());
-    auto cm2Ptr = addChunk(_manager);
-    ScopedCollectionMetadata scopedMetadata2 = _manager->getActiveMetadata(_manager);
-    ASSERT_EQ(cm2Ptr, scopedMetadata2.getMetadata());
 };
 
 // In the following tests, the ranges-to-clean is not drained by the background deleter thread
@@ -318,13 +299,11 @@ TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
     auto recreateMetadata = makeEmptyMetadata();
     _manager->refreshActiveMetadata(
         cloneMetadataPlusChunk(*recreateMetadata, BSON("key" << 20), BSON("key" << 30)));
-    ChunkVersion newVersion = _manager->getActiveMetadata(_manager)->getShardVersion();
     ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 1UL);
 
     const auto chunkEntry = _manager->getActiveMetadata(_manager)->getChunks().begin();
     ASSERT_BSONOBJ_EQ(BSON("key" << 20), chunkEntry->first);
-    ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second.getMaxKey());
-    ASSERT_EQ(newVersion.epoch(), chunkEntry->second.getVersion().epoch());
+    ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second);
 }
 
 // Tests membership functions for _rangesToClean

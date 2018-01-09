@@ -34,17 +34,12 @@
 namespace mongo {
 
 /**
- * There are two update subsystems in MongoDB with slightly different semantics.
+ * Previously, there were multiple supported versions of the update language.
  */
 enum class UpdateSemantics {
-    // The update system that was in use up until v3.4, which is implemented in ModifierInterface
-    // and its subclasses. When a single update adds multiple fields, those fields are added in the
-    // same order as they are specified in the update document.
-    kModifierInterface = 0,
-
-    // The update system introduced in v3.6, which is implemented in UpdateNode and its subclassees.
-    // When a single update adds multiple fields, those fields are added in lexicographic order by
-    // field name. This system introduces support for arrayFilters and $[] syntax.
+    // The update system introduced in v3.6, and is the only supported system. When a single update
+    // adds multiple fields, those fields are added in lexicographic order by field name. This
+    // system introduces support for arrayFilters and $[] syntax.
     kUpdateNode = 1,
 
     // Must be last.

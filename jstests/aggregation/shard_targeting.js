@@ -38,6 +38,13 @@
     const shard0DB = primaryShardDB = st.shard0.getDB(jsTestName());
     const shard1DB = st.shard1.getDB(jsTestName());
 
+    // Turn off best-effort recipient metadata refresh post-migration commit on both shards because
+    // it creates non-determinism for the profiler.
+    assert.commandWorked(st.shard0.getDB('admin').runCommand(
+        {configureFailPoint: 'doNotRefreshRecipientAfterCommit', mode: 'alwaysOn'}));
+    assert.commandWorked(st.shard1.getDB('admin').runCommand(
+        {configureFailPoint: 'doNotRefreshRecipientAfterCommit', mode: 'alwaysOn'}));
+
     assert.commandWorked(mongosDB.dropDatabase());
 
     // Enable sharding on the test DB and ensure its primary is shard0000.

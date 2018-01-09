@@ -34,6 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -52,8 +53,8 @@ public:
     StorageInterfaceImpl();
 
     StatusWith<int> getRollbackID(OperationContext* opCtx) override;
-    Status initializeRollbackID(OperationContext* opCtx) override;
-    Status incrementRollbackID(OperationContext* opCtx) override;
+    StatusWith<int> initializeRollbackID(OperationContext* opCtx) override;
+    StatusWith<int> incrementRollbackID(OperationContext* opCtx) override;
 
     /**
      *  Allocates a new TaskRunner for use by the passed in collection.
@@ -112,12 +113,12 @@ public:
 
     Status putSingleton(OperationContext* opCtx,
                         const NamespaceString& nss,
-                        const BSONObj& update) override;
+                        const TimestampedBSONObj& update) override;
 
     Status updateSingleton(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const BSONObj& query,
-                           const BSONObj& update) override;
+                           const TimestampedBSONObj& update) override;
 
     StatusWith<BSONObj> findById(OperationContext* opCtx,
                                  const NamespaceString& nss,
@@ -147,9 +148,9 @@ public:
 
     Status upgradeUUIDSchemaVersionNonReplicated(OperationContext* opCtx) override;
 
-    void setStableTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
+    void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override;
 
-    void setInitialDataTimestamp(ServiceContext* serviceCtx, SnapshotName snapshotName) override;
+    void setInitialDataTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override;
 
     Status recoverToStableTimestamp(ServiceContext* serviceCtx) override;
 

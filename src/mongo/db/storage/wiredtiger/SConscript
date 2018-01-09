@@ -18,8 +18,10 @@ env.Library(
     ],
     LIBDEPS= ['$BUILD_DIR/mongo/base',
               '$BUILD_DIR/mongo/db/service_context'],
+    LIBDEPS_DEPENDENTS=[
+        '$BUILD_DIR/mongo/mongodmain',
+    ],
     PROGDEPS_DEPENDENTS=[
-        '$BUILD_DIR/mongo/mongod',
         '$BUILD_DIR/mongo/mongos',
     ],
 )
@@ -116,6 +118,10 @@ if wiredtiger:
                 ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/serveronly',
+            '$BUILD_DIR/mongo/db/service_context',
+            '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
+            '$BUILD_DIR/mongo/db/storage/storage_options',
+            '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger_core',
             ],
         )
 

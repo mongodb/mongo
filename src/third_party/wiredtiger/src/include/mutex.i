@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -293,21 +293,21 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline void
 __wt_spin_lock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
-	struct timespec enter, leave;
+	uint64_t time_start, time_stop;
 	int64_t **stats;
 
 	if (t->stat_count_off != -1 && WT_STAT_ENABLED(session)) {
-		__wt_epoch(session, &enter);
+		time_start = __wt_rdtsc(session);
 		__wt_spin_lock(session, t);
-		__wt_epoch(session, &leave);
+		time_stop = __wt_rdtsc(session);
 		stats = (int64_t **)S2C(session)->stats;
 		stats[session->stat_bucket][t->stat_count_off]++;
 		if (F_ISSET(session, WT_SESSION_INTERNAL))
 			stats[session->stat_bucket][t->stat_int_usecs_off] +=
-			    (int64_t)WT_TIMEDIFF_US(leave, enter);
+			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
 		else
 			stats[session->stat_bucket][t->stat_app_usecs_off] +=
-			    (int64_t)WT_TIMEDIFF_US(leave, enter);
+			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
 	} else
 		__wt_spin_lock(session, t);
 }

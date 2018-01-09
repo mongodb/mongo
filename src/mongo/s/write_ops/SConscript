@@ -17,7 +17,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/s/common',
+        '$BUILD_DIR/mongo/s/common_s',
     ],
 )
 

@@ -1367,7 +1367,8 @@ void toBsonValue(uint8_t ctype,
                 Decimal128 dec(Decimal128::Value{lowbits, highbits});
                 if (isNegative)
                     dec = dec.negate();
-                dec = adjustDecimalExponent(typeBits, dec);
+                if (dec.isFinite())
+                    dec = adjustDecimalExponent(typeBits, dec);
                 *stream << dec;
                 break;
             }
@@ -1386,7 +1387,8 @@ void toBsonValue(uint8_t ctype,
                 Decimal128 dec(bin, Decimal128::kRoundTo34Digits, roundAwayFromZero);
                 if (hasDecimalContinuation)
                     dec = readDecimalContinuation(reader, inverted, dec);
-                dec = adjustDecimalExponent(typeBits, dec);
+                if (dec.isFinite())
+                    dec = adjustDecimalExponent(typeBits, dec);
                 *stream << dec;
             }
             break;

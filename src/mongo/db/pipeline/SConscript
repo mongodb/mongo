@@ -344,6 +344,7 @@ env.Library(
         'document_source',
         'pipeline',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
     ],
 )
 
@@ -509,7 +510,7 @@ env.CppUnitTest(
 )
 
 env.Library(
-    target='serveronly',
+    target='serveronly_pipeline',
     source=[
         'document_source_cursor.cpp',
         'pipeline_d.cpp',
@@ -517,11 +518,12 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
+        '$BUILD_DIR/mongo/db/clientcursor',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
-        '$BUILD_DIR/mongo/db/stats/serveronly',
+        '$BUILD_DIR/mongo/db/stats/serveronly_stats',
     ],
 )
 

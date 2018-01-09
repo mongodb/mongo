@@ -128,6 +128,10 @@ TEST_F(DocumentSourceMatchTest, RedactSafePortion) {
 
     assertExpectedRedactSafePortion("{a: {$_internalSchemaType: 2}}", "{}");
 
+    // In some cases, $_internalExprEq could be redact-safe (just like a regular $eq match
+    // expression), but this optimization is not yet implemented.
+    assertExpectedRedactSafePortion("{a: {$_internalExprEq: 2}}", "{}");
+
     // Combinations
     assertExpectedRedactSafePortion("{a:1, b: 'asdf'}", "{a:1, b: 'asdf'}");
 

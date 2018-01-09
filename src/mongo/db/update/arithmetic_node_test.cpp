@@ -240,7 +240,7 @@ TEST_F(ArithmeticNodeTest, ApplyPositional) {
     setPathTaken("a.1");
     setMatchedField("1");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["1"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][1]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [0, 7, 2]}"), doc);
@@ -759,7 +759,7 @@ TEST_F(ArithmeticNodeTest, ApplyNoOpArrayIndex) {
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][2]["b"]));
     ASSERT_TRUE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 2}]}"), doc);
@@ -776,7 +776,7 @@ TEST_F(ArithmeticNodeTest, TypePromotionInArrayIsNotANoOp) {
         fromjson("{a: [{b: NumberInt(0)},{b: NumberInt(1)},{b: NumberInt(2)}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][2]["b"]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: NumberLong(2)}]}"), doc);
@@ -807,7 +807,7 @@ TEST_F(ArithmeticNodeTest, ApplyInPlaceArrayIndex) {
     mutablebson::Document doc(fromjson("{a: [{b: 0},{b: 1},{b: 1}]}"));
     setPathTaken("a.2.b");
     addIndexedPath("a");
-    auto result = node.apply(getApplyParams(doc.root()["a"]["2"]["b"]));
+    auto result = node.apply(getApplyParams(doc.root()["a"][2]["b"]));
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
     ASSERT_EQUALS(fromjson("{a: [{b: 0},{b: 1},{b: 3}]}"), doc);

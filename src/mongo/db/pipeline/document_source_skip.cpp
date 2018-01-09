@@ -83,16 +83,9 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
 
-    auto nextLimit = dynamic_cast<DocumentSourceLimit*>((*std::next(itr)).get());
     auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
 
-    if (nextLimit) {
-        // Swap the $limit before this stage, allowing a top-k sort to be possible, provided there
-        // is a $sort stage.
-        nextLimit->setLimit(nextLimit->getLimit() + _nToSkip);
-        std::swap(*itr, *std::next(itr));
-        return itr == container->begin() ? itr : std::prev(itr);
-    } else if (nextSkip) {
+    if (nextSkip) {
         _nToSkip += nextSkip->getSkip();
         container->erase(std::next(itr));
         return itr;

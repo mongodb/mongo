@@ -6,7 +6,7 @@
     var nodenames = replTest.nodeList();
 
     var nodes = replTest.startSet();
-    replTest.initiate({
+    replTest.initiateWithAnyNodeAsPrimary({
         "_id": "testSet",
         "members": [
             {"_id": 0, "host": nodenames[0], "priority": 1},

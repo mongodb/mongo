@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -67,7 +67,7 @@ checkpointer(void *arg)
 
 	WT_UNUSED(arg);
 
-	testutil_check(__wt_thread_id(tid, sizeof(tid)));
+	testutil_check(__wt_thread_str(tid, sizeof(tid)));
 	printf("checkpointer thread starting: tid: %s\n", tid);
 
 	(void)real_checkpointer();

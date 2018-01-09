@@ -199,5 +199,12 @@ extern bool isSSLServer;
  * "EndStartupOptionStorage" as a prerequisite.
  */
 const SSLParams& getSSLGlobalParams();
-}
+
+
+/**
+ * Returns true if the `nameToMatch` is a valid match against the `certHostName` requirement from an
+ * x.509 certificate.  Matches a remote host name to an x.509 host name, including wildcards.
+ */
+bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName);
+}  // namespace mongo
 #endif  // #ifdef MONGO_CONFIG_SSL

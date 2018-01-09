@@ -143,8 +143,9 @@ void AbstractOplogFetcher::_makeAndScheduleFetcherCallback(
 
 Status AbstractOplogFetcher::_doStartup_inlock() noexcept {
     return _scheduleWorkAndSaveHandle_inlock(
-        stdx::bind(
-            &AbstractOplogFetcher::_makeAndScheduleFetcherCallback, this, stdx::placeholders::_1),
+        [this](const executor::TaskExecutor::CallbackArgs& args) {
+            _makeAndScheduleFetcherCallback(args);
+        },
         &_makeAndScheduleFetcherHandle,
         "_makeAndScheduleFetcherCallback");
 }
@@ -323,8 +324,9 @@ std::unique_ptr<Fetcher> AbstractOplogFetcher::_makeFetcher(const BSONObj& findC
         _source,
         _nss.db().toString(),
         findCommandObj,
-        stdx::bind(
-            &AbstractOplogFetcher::_callback, this, stdx::placeholders::_1, stdx::placeholders::_3),
+        [this](const StatusWith<Fetcher::QueryResponse>& resp,
+               Fetcher::NextAction*,
+               BSONObjBuilder* builder) { return _callback(resp, builder); },
         metadataObj,
         _getFindMaxTime() + kNetworkTimeoutBufferMS,
         _getGetMoreMaxTime() + kNetworkTimeoutBufferMS);

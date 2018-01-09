@@ -209,9 +209,9 @@ BSONObj ShardKeyPattern::normalizeShardKey(const BSONObj& shardKey) const {
 static BSONElement extractKeyElementFromMatchable(const MatchableDocument& matchable,
                                                   StringData pathStr) {
     ElementPath path;
-    path.init(pathStr).transitional_ignore();
-    path.setTraverseNonleafArrays(false);
-    path.setTraverseLeafArray(false);
+    path.init(pathStr);
+    path.setLeafArrayBehavior(ElementPath::LeafArrayBehavior::kNoTraversal);
+    path.setNonLeafArrayBehavior(ElementPath::NonLeafArrayBehavior::kNoTraversal);
 
     MatchableDocument::IteratorHolder matchIt(&matchable, &path);
     if (!matchIt->more())

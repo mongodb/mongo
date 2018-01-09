@@ -39,8 +39,9 @@ namespace mongo {
 class InternalSchemaMinPropertiesMatchExpression final
     : public InternalSchemaNumPropertiesMatchExpression {
 public:
-    InternalSchemaMinPropertiesMatchExpression()
+    explicit InternalSchemaMinPropertiesMatchExpression(long long numProperties)
         : InternalSchemaNumPropertiesMatchExpression(MatchType::INTERNAL_SCHEMA_MIN_PROPERTIES,
+                                                     numProperties,
                                                      "$_internalSchemaMinProperties") {}
 
     bool matches(const MatchableDocument* doc, MatchDetails* details) const final {
@@ -57,8 +58,8 @@ public:
     }
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto minProperties = stdx::make_unique<InternalSchemaMinPropertiesMatchExpression>();
-        invariantOK(minProperties->init(numProperties()));
+        auto minProperties =
+            stdx::make_unique<InternalSchemaMinPropertiesMatchExpression>(numProperties());
         if (getTag()) {
             minProperties->setTag(getTag()->clone());
         }

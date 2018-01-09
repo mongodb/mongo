@@ -288,10 +288,7 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
             Status status = wasPreviouslyCanceled
                 ? Status(ErrorCodes::CallbackCanceled, "Callback canceled")
                 : swConn.getStatus();
-            if (status.code() == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
-                status = Status(ErrorCodes::ExceededTimeLimit, status.reason());
-            }
-            if (status.code() == ErrorCodes::ExceededTimeLimit) {
+            if (ErrorCodes::isExceededTimeLimitError(status.code())) {
                 _numTimedOutOps.fetchAndAdd(1);
             }
             if (status.code() != ErrorCodes::CallbackCanceled) {
@@ -394,28 +391,27 @@ Status NetworkInterfaceASIO::startCommand(const TaskExecutor::CallbackHandle& cb
                     generation = access->id;
                 }
 
-                op->_timeoutAlarm->asyncWait(
-                    [this, op, access, generation, requestId, adjustedTimeout](std::error_code ec) {
-                        // We must pass a check for safe access before using op inside the
-                        // callback or we may attempt access on an invalid pointer.
-                        stdx::lock_guard<stdx::mutex> lk(access->mutex);
-                        if (generation != access->id) {
-                            // The operation has been cleaned up, do not access.
-                            return;
-                        }
+                op->_timeoutAlarm->asyncWait([op, access, generation, requestId, adjustedTimeout](
+                    std::error_code ec) {
+                    // We must pass a check for safe access before using op inside the
+                    // callback or we may attempt access on an invalid pointer.
+                    stdx::lock_guard<stdx::mutex> lk(access->mutex);
+                    if (generation != access->id) {
+                        // The operation has been cleaned up, do not access.
+                        return;
+                    }
 
-                        if (!ec) {
-                            LOG(2) << "Request " << requestId << " timed out"
-                                   << ", adjusted timeout after getting connection from pool was "
-                                   << adjustedTimeout << ", op was " << redact(op->toString());
+                    if (!ec) {
+                        LOG(2) << "Request " << requestId << " timed out"
+                               << ", adjusted timeout after getting connection from pool was "
+                               << adjustedTimeout << ", op was " << redact(op->toString());
 
-                            op->timeOut_inlock();
-                        } else {
-                            LOG(2) << "Failed to time request " << requestId
-                                   << "out: " << ec.message() << ", op was "
-                                   << redact(op->toString());
-                        }
-                    });
+                        op->timeOut_inlock();
+                    } else {
+                        LOG(2) << "Failed to time request " << requestId << "out: " << ec.message()
+                               << ", op was " << redact(op->toString());
+                    }
+                });
             }
 
             _beginCommunication(op);

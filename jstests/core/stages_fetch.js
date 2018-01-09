@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns]
+
 // Test basic fetch functionality.
 t = db.stages_fetch;
 t.drop();

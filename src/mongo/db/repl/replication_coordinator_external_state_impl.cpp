@@ -242,11 +242,9 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     _applierThread->startup();
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
-    _syncSourceFeedbackThread.reset(new stdx::thread(stdx::bind(&SyncSourceFeedback::run,
-                                                                &_syncSourceFeedback,
-                                                                _taskExecutor.get(),
-                                                                _bgSync.get(),
-                                                                replCoord)));
+    _syncSourceFeedbackThread = stdx::make_unique<stdx::thread>([this, replCoord] {
+        _syncSourceFeedback.run(_taskExecutor.get(), _bgSync.get(), replCoord);
+    });
 }
 
 void ReplicationCoordinatorExternalStateImpl::stopDataReplication(OperationContext* opCtx) {
@@ -341,8 +339,12 @@ void ReplicationCoordinatorExternalStateImpl::shutdown(OperationContext* opCtx) 
         loadLastOpTime(opCtx) ==
             _replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx)) {
         // Clear the appliedThrough marker to indicate we are consistent with the top of the
-        // oplog.
-        _replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});
+        // oplog. We record this update at the 'lastAppliedOpTime'. If there are any outstanding
+        // checkpoints being taken, they should only reflect this write if they see all writes up
+        // to our 'lastAppliedOpTime'.
+        auto lastAppliedOpTime = repl::getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();
+        _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
+            opCtx, lastAppliedOpTime.getTimestamp());
     }
 }
 
@@ -378,12 +380,11 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                                                          const BSONObj& config) {
     try {
         createOplog(opCtx);
-        const auto& kRsOplogNamespace = NamespaceString::kRsOplogNamespace;
 
         writeConflictRetry(opCtx,
                            "initiate oplog entry",
-                           kRsOplogNamespace.toString(),
-                           [this, &opCtx, &config, &kRsOplogNamespace] {
+                           NamespaceString::kRsOplogNamespace.toString(),
+                           [this, &opCtx, &config] {
                                Lock::GlobalWrite globalWrite(opCtx);
 
                                WriteUnitOfWork wuow(opCtx);
@@ -397,20 +398,28 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                // retries and they will succeed.  Unfortunately, initial sync will
                                // fail if it finds its sync source has an empty oplog.  Thus, we
                                // need to wait here until the seed document is visible in our oplog.
-                               AutoGetCollection oplog(opCtx, kRsOplogNamespace, MODE_IS);
+                               AutoGetCollection oplog(
+                                   opCtx, NamespaceString::kRsOplogNamespace, MODE_IS);
                                waitForAllEarlierOplogWritesToBeVisible(opCtx);
                            });
 
         // Set UUIDs for all non-replicated collections. This is necessary for independent replica
-        // sets started with no data files because collections in local are created prior to the
-        // featureCompatibilityVersion being set to 3.6, so the collections are not created with
-        // UUIDs. This is not an issue for sharded clusters because the config server sends a
-        // setFeatureCompatibilityVersion command with the featureCompatibilityVersion equal to the
-        // cluster's featureCompatibilityVersion during addShard, which will add UUIDs to all
-        // collections that do not already have them. Here, we add UUIDs to the non-replicated
-        // collections on the primary. We add them on the secondaries during InitialSync.
+        // sets and config server replica sets started with no data files because collections in
+        // local are created prior to the featureCompatibilityVersion being set to 3.6, so the
+        // collections are not created with UUIDs. We exclude ShardServers when adding UUIDs to
+        // non-replicated collections on the primary because ShardServers are started up by default
+        // with featureCompatibilityVersion 3.4, so we don't want to assign UUIDs to them until the
+        // cluster's featureCompatibilityVersion is explicitly set to 3.6 by the config server. The
+        // below UUID addition for non-replicated collections only occurs on the primary; UUIDs are
+        // added to non-replicated collections on secondaries during InitialSync. When the config
+        // server sets the featureCompatibilityVersion to 3.6, the shard primary will add UUIDs to
+        // all the collections that need them. One special case here is if a shard is already in
+        // featureCompatibilityVersion 3.6 and a new node is started up with --shardsvr and added to
+        // that shard, the new node will still start up with featureCompatibilityVersion 3.4 and
+        // need to have UUIDs added to each collection. These UUIDs are added during InitialSync,
+        // because the new node is a secondary.
         if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
-            serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+            FeatureCompatibilityVersion::isCleanStartUp()) {
             auto schemaStatus = updateUUIDSchemaVersionNonReplicated(opCtx, true);
             if (!schemaStatus.isOK()) {
                 return schemaStatus;
@@ -446,9 +455,14 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     // Clear the appliedThrough marker so on startup we'll use the top of the oplog. This must be
     // done before we add anything to our oplog.
+    // We record this update at the 'lastAppliedOpTime'. If there are any outstanding
+    // checkpoints being taken, they should only reflect this write if they see all writes up
+    // to our 'lastAppliedOpTime'.
     invariant(
         _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());
-    _replicationProcess->getConsistencyMarkers()->setAppliedThrough(opCtx, {});
+    auto lastAppliedOpTime = repl::getGlobalReplicationCoordinator()->getMyLastAppliedOpTime();
+    _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(
+        opCtx, lastAppliedOpTime.getTimestamp());
 
     if (isV1ElectionProtocol) {
         writeConflictRetry(opCtx, "logging transition to primary to oplog", "local.oplog.rs", [&] {
@@ -664,8 +678,6 @@ void ReplicationCoordinatorExternalStateImpl::shardingOnStepDownHook() {
         CatalogCacheLoader::get(_service).onStepDown();
     }
 
-    ShardingState::get(_service)->markCollectionsNotShardedAtStepdown();
-
     if (auto validator = LogicalTimeValidator::get(_service)) {
         auto opCtx = cc().getOperationContext();
 
@@ -756,10 +768,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
     }
 
     SessionCatalog::get(_service)->onStepUp(opCtx);
-
-    // There is a slight chance that some stale metadata might have been loaded before the latest
-    // optime has been recovered, so throw out everything that we have up to now
-    ShardingState::get(opCtx)->markCollectionsNotShardedAtStepdown();
 }
 
 void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
@@ -808,13 +816,13 @@ void ReplicationCoordinatorExternalStateImpl::dropAllSnapshots() {
         manager->dropAllSnapshots();
 }
 
-void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(SnapshotInfo newCommitPoint) {
+void ReplicationCoordinatorExternalStateImpl::updateCommittedSnapshot(
+    const OpTime& newCommitPoint) {
     auto manager = _service->getGlobalStorageEngine()->getSnapshotManager();
     if (manager) {
-        manager->setCommittedSnapshot(SnapshotName(newCommitPoint.opTime.getTimestamp()),
-                                      newCommitPoint.opTime.getTimestamp());
+        manager->setCommittedSnapshot(newCommitPoint.getTimestamp());
     }
-    notifyOplogMetadataWaiters(newCommitPoint.opTime);
+    notifyOplogMetadataWaiters(newCommitPoint);
 }
 
 bool ReplicationCoordinatorExternalStateImpl::snapshotsEnabled() const {

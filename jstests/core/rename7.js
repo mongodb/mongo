@@ -1,3 +1,5 @@
+// @tags: [requires_non_retryable_commands]
+
 // ***************************************************************
 // rename7.js
 // Test renameCollection functionality across different databases.

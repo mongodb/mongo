@@ -42,7 +42,6 @@
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/password_digest.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/text.h"
 
@@ -189,17 +188,10 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_firstStep(std::vector<string>
                                 "on servers started without a --keyFile parameter");
     }
 
-    // Generate SCRAM credentials on the fly for mixed MONGODB-CR/SCRAM mode.
-    if (_creds.scram.salt.empty() && !_creds.password.empty()) {
-        // Use a default value of 5000 for the scramIterationCount when in mixed mode,
-        // overriding the default value (10000) used for SCRAM mode or the user-given value.
-        const int mixedModeScramIterationCount = 5000;
-        BSONObj scramCreds =
-            scram::generateCredentials(_creds.password, mixedModeScramIterationCount);
-        _creds.scram.iterationCount = scramCreds[scram::iterationCountFieldName].Int();
-        _creds.scram.salt = scramCreds[scram::saltFieldName].String();
-        _creds.scram.storedKey = scramCreds[scram::storedKeyFieldName].String();
-        _creds.scram.serverKey = scramCreds[scram::serverKeyFieldName].String();
+    if (!_creds.scram.isValid()) {
+        return Status(ErrorCodes::AuthenticationFailed,
+                      "Unable to perform SCRAM-SHA-1 authentication for a user with missing "
+                      "or invalid SCRAM credentials");
     }
 
     // Generate server-first-message
@@ -284,6 +276,7 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_secondStep(const std::vector<
     // ClientSignature := HMAC(StoredKey, AuthMessage)
     // ClientKey := ClientSignature XOR ClientProof
     // ServerSignature := HMAC(ServerKey, AuthMessage)
+    invariant(_creds.scram.isValid());
 
     if (!scram::verifyClientProof(
             base64::decode(clientProof), base64::decode(_creds.scram.storedKey), _authMessage)) {

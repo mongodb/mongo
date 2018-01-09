@@ -45,12 +45,8 @@ class InternalSchemaUniqueItemsMatchExpression final : public ArrayMatchingMatch
 public:
     static constexpr StringData kName = "$_internalSchemaUniqueItems"_sd;
 
-    InternalSchemaUniqueItemsMatchExpression()
-        : ArrayMatchingMatchExpression(MatchExpression::INTERNAL_SCHEMA_UNIQUE_ITEMS) {}
-
-    Status init(StringData path) {
-        return setPath(path);
-    }
+    explicit InternalSchemaUniqueItemsMatchExpression(StringData path)
+        : ArrayMatchingMatchExpression(MatchExpression::INTERNAL_SCHEMA_UNIQUE_ITEMS, path) {}
 
     size_t numChildren() const final {
         return 0;

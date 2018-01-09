@@ -248,7 +248,7 @@ class TestSuiteExecutor(object):
             behavior_config = behavior_config.copy()
             behavior_class = behavior_config.pop("class")
 
-            hook_logger = self.logger.new_hook_logger(behavior_class, job_num)
+            hook_logger = self.logger.new_hook_logger(behavior_class, job_num, fixture.logger)
             behavior = _hooks.make_custom_behavior(behavior_class,
                                                    hook_logger,
                                                    fixture,

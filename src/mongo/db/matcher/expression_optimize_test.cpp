@@ -339,7 +339,7 @@ TEST(ExpressionOptimizeTest, NormalizeWithInAndRegexPreservesTags) {
 TEST(ExpressionOptimizeTest, NormalizeWithInPreservesCollator) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     BSONObj obj = fromjson("{'': 'string'}");
-    auto inMatchExpression = stdx::make_unique<InMatchExpression>();
+    auto inMatchExpression = stdx::make_unique<InMatchExpression>("");
     inMatchExpression->setCollator(&collator);
     std::vector<BSONElement> equalities{obj.firstElement()};
     ASSERT_OK(inMatchExpression->setEqualities(std::move(equalities)));
@@ -348,6 +348,69 @@ TEST(ExpressionOptimizeTest, NormalizeWithInPreservesCollator) {
     EqualityMatchExpression* eqMatchExpression =
         static_cast<EqualityMatchExpression*>(matchExpression.get());
     ASSERT_EQ(eqMatchExpression->getCollator(), &collator);
+}
+
+TEST(ExpressionOptimizeTest, AndWithAlwaysFalseChildOptimizesToAlwaysFalse) {
+    BSONObj obj = fromjson("{$and: [{a: 1}, {$alwaysFalse: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, AndRemovesAlwaysTrueChildren) {
+    BSONObj obj = fromjson("{$and: [{a: 1}, {$alwaysTrue: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{a: {$eq: 1}}"));
+}
+
+TEST(ExpressionOptimizeTest, NestedAndWithAlwaysFalseOptimizesToAlwaysFalse) {
+    BSONObj obj = fromjson("{$and: [{$and: [{$alwaysFalse: 1}, {a: 1}]}, {b: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, OrWithAlwaysTrueOptimizesToAlwaysTrue) {
+    BSONObj obj = fromjson("{$or: [{a: 1}, {$alwaysTrue: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysTrue: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, OrRemovesAlwaysFalseChildren) {
+    BSONObj obj = fromjson("{$or: [{a: 1}, {$alwaysFalse: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{a: {$eq: 1}}"));
+}
+
+TEST(ExpressionOptimizeTest, OrPromotesSingleAlwaysFalse) {
+    BSONObj obj = fromjson("{$or: [{$alwaysFalse: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysFalse: 1}"));
+}
+
+TEST(ExpressionOptimizeTest, NestedOrWithAlwaysTrueOptimizesToAlwaysTrue) {
+    BSONObj obj = fromjson("{$or: [{$or: [{$alwaysTrue: 1}, {a: 1}]}, {b: 1}]}");
+    std::unique_ptr<MatchExpression> matchExpression(parseMatchExpression(obj));
+    auto optimizedMatchExpression = MatchExpression::optimize(std::move(matchExpression));
+    BSONObjBuilder bob;
+    optimizedMatchExpression->serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), fromjson("{$alwaysTrue: 1}"));
 }
 
 }  // namespace

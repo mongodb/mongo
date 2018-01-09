@@ -34,6 +34,7 @@
         {binVersion: '3.0', testCollection: 'three_zero'},
         {binVersion: '3.2', testCollection: 'three_two'},
         {binVersion: '3.4', testCollection: 'three_four'},
+        {binVersion: '3.6', testCollection: 'three_six'},
         {binVersion: 'last-stable', testCollection: 'last_stable'},
         {binVersion: 'latest', testCollection: 'latest'},
     ];
@@ -120,21 +121,41 @@
     // Standalone
     // Iterate from earliest to latest versions specified in the versions list, and follow the steps
     // outlined at the top of this test file.
+    let authSchemaUpgraded = false;
     for (let i = 0; i < versions.length; i++) {
         let version = versions[i];
         let mongodOptions = Object.extend({binVersion: version.binVersion}, defaultOptions);
-        var changedAuthMechanism = false;
-        if (TestData.authMechanism === "SCRAM-SHA-1" && version.binVersion === "2.6") {
-            TestData.authMechanism = undefined;
-            DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
-            changedAuthMechanism = true;
-        }
 
         // Start a mongod with specified version.
         let conn = MongoRunner.runMongod(mongodOptions);
+
+        if ((conn === null) && (i > 0) && !authSchemaUpgraded) {
+            // As of 3.8, mongod will refuse to start up with authSchema 3
+            // until the schema has been upgraded.
+            // Step back a version (to 3.6) in order to perform the upgrade,
+            // Then try startuing 3.8 again.
+            conn = MongoRunner.runMongod(
+                Object.extend({binVersion: version[i - 1].binVersion}, defaultOptions));
+            assert.neq(null,
+                       conn,
+                       'mongod was previously able to start with version ' +
+                           tojson(version.binVersion) + " but now can't");
+            assert.commandWorked(conn.getDB('admin').runCommand({authSchemaUpgrade: 1}));
+
+            authSchemaUpgraded = true;
+            conn = MongoRunner.runMongod(mongodOptions);
+        }
+
         assert.neq(
             null, conn, 'mongod was unable to start up with options: ' + tojson(mongodOptions));
         assert.binVersion(conn, version.binVersion);
+
+        if ((i === 0) && (version.binVersion < 3.8)) {
+            // Simulate coming from a <= 2.6 installation where MONGODB-CR was the default/only
+            // authentication mechanism. Eventually, the upgrade process will fail (above) when
+            // running on 3.8 where support for MONGODB-CR has been removed.
+            conn.getDB('admin').system.version.save({"_id": "authSchema", "currentVersion": 3});
+        }
 
         // Connect to the 'test' database.
         let testDB = conn.getDB('test');
@@ -184,12 +205,6 @@
 
         // Shutdown the current mongod.
         MongoRunner.stopMongod(conn);
-
-        if (version.binVersion === "2.6" && changedAuthMechanism) {
-            TestData.authMechanism = "SCRAM-SHA-1";
-            DB.prototype._defaultAuthenticationMechanism = "SCRAM-SHA-1";
-            changedAuthMechanisms = false;
-        }
     }
 
     // Replica Sets
@@ -199,13 +214,6 @@
         n2: {binVersion: versions[0].binVersion},
         n3: {binVersion: versions[0].binVersion},
     };
-    var changedAuthMechanisms = false;
-    if (TestData.authMechanism === "SCRAM-SHA-1" && versions[0].binVersion === "2.6") {
-        TestData.authMechanism = undefined;
-        DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
-        changedAuthMechanism = true;
-    }
-
     let rst = new ReplSetTest({nodes});
 
     // Start up and initiate the replica set.
@@ -216,11 +224,6 @@
     // outlined at the top of this test file.
     for (let i = 0; i < versions.length; i++) {
         let version = versions[i];
-        if (version.binVersion != "2.6" && changedAuthMechanism) {
-            TestData.authMechanism = "SCRAM-SHA-1";
-            DB.prototype._defaultAuthenticationMechanism = "SCRAM-SHA-1";
-            changedAuthMechanisms = false;
-        }
 
         // Connect to the primary running the old version to ensure that the test can insert and
         // create indices.

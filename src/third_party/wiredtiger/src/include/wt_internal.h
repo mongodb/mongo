@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -35,6 +35,7 @@ extern "C" {
 #endif
 #include <errno.h>
 #include <fcntl.h>
+#include <float.h>
 #include <inttypes.h>
 #ifdef _WIN32
 #include <io.h>
@@ -246,6 +247,10 @@ struct __wt_named_extractor;
     typedef struct __wt_named_extractor WT_NAMED_EXTRACTOR;
 struct __wt_named_snapshot;
     typedef struct __wt_named_snapshot WT_NAMED_SNAPSHOT;
+struct __wt_optrack_header;
+    typedef struct __wt_optrack_header WT_OPTRACK_HEADER;
+struct __wt_optrack_record;
+    typedef struct __wt_optrack_record WT_OPTRACK_RECORD;
 struct __wt_ovfl_reuse;
     typedef struct __wt_ovfl_reuse WT_OVFL_REUSE;
 struct __wt_ovfl_track;
@@ -352,10 +357,10 @@ union __wt_rand_state;
 #include "cursor.h"
 #include "dlh.h"
 #include "error.h"
-#include "flags.h"
 #include "log.h"
 #include "lsm.h"
 #include "meta.h"
+#include "optrack.h"
 #include "os.h"
 #include "schema.h"
 #include "thread_group.h"
@@ -374,6 +379,7 @@ union __wt_rand_state;
 
 #include "ctype.i"			/* required by packing.i */
 #include "intpack.i"			/* required by cell.i, packing.i */
+#include "misc.i"			/* required by mutex.i */
 
 #include "buf.i"                        /* required by cell.i */
 #include "cache.i"			/* required by txn.i */
@@ -387,7 +393,6 @@ union __wt_rand_state;
 #include "column.i"
 #include "cursor.i"
 #include "log.i"
-#include "misc.i"
 #include "os_fhandle.i"
 #include "os_fs.i"
 #include "os_fstream.i"

@@ -1,10 +1,16 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
+
+/*
+ * Helper: in order to read without any calls to eviction, we have to ignore
+ * the cache size and disable splits.
+ */
+#define	WT_READ_NO_EVICT	(WT_READ_IGNORE_CACHE_SIZE | WT_READ_NO_SPLIT)
 
 /*
  * Tuning constants: I hesitate to call this tuning, but we want to review some
@@ -72,6 +78,8 @@ struct __wt_cache {
 	uint64_t bytes_read;		/* Bytes read into memory */
 	uint64_t bytes_written;
 
+	uint64_t bytes_lookaside;	/* Lookaside bytes inmem */
+
 	volatile uint64_t eviction_progress;	/* Eviction progress count */
 	uint64_t last_eviction_progress;/* Tracked eviction progress */
 
@@ -81,9 +89,7 @@ struct __wt_cache {
 	uint64_t worker_evicts;		/* Pages evicted by worker threads */
 
 	uint64_t evict_max_page_size;	/* Largest page seen at eviction */
-#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 	struct timespec stuck_time;	/* Stuck time */
-#endif
 
 	/*
 	 * Read information.
@@ -134,7 +140,8 @@ struct __wt_cache {
 	 */
 	WT_SPINLOCK evict_pass_lock;	/* Eviction pass lock */
 	WT_SESSION_IMPL *walk_session;	/* Eviction pass session */
-	WT_DATA_HANDLE *evict_file_next;/* LRU next file to search */
+	WT_DATA_HANDLE *walk_tree;	/* LRU walk current tree */
+	uint32_t walk_progress, walk_target;/* Progress in current tree */
 
 	WT_SPINLOCK evict_queue_lock;	/* Eviction current queue lock */
 	WT_EVICT_QUEUE evict_queues[WT_EVICT_QUEUE_MAX];
@@ -176,6 +183,38 @@ struct __wt_cache {
 	int32_t evict_lookaside_score;
 
 	/*
+	 * Shared lookaside lock, session and cursor, used by threads accessing
+	 * the lookaside table (other than eviction server and worker threads
+	 * and the sweep thread, all of which have their own lookaside cursors).
+	 */
+#define	WT_LAS_NUM_SESSIONS 5
+	WT_SPINLOCK	 las_lock;
+	WT_SESSION_IMPL *las_session[WT_LAS_NUM_SESSIONS];
+	bool las_session_inuse[WT_LAS_NUM_SESSIONS];
+
+	uint32_t las_fileid;            /* Lookaside table file ID */
+	uint64_t las_entry_count;       /* Count of entries in lookaside */
+	uint64_t las_pageid;		/* Lookaside table page ID counter */
+
+	WT_SPINLOCK	 las_sweep_lock;
+	WT_ITEM las_sweep_key;		/* Track sweep position. */
+	uint32_t las_sweep_dropmin;	/* Minimum btree ID in current set. */
+	uint8_t *las_sweep_dropmap;	/* Bitmap of dropped btree IDs. */
+	uint32_t las_sweep_dropmax;	/* Maximum btree ID in current set. */
+
+	uint32_t *las_dropped;		/* List of dropped btree IDs. */
+	size_t las_dropped_next;	/* Next index into drop list. */
+	size_t las_dropped_alloc;	/* Allocated size of drop list. */
+
+	/*
+	 * The "lookaside_activity" verbose messages are throttled to once per
+	 * checkpoint. To accomplish this we track the checkpoint generation
+	 * for the most recent read and write verbose messages.
+	 */
+	uint64_t las_verb_gen_read;
+	uint64_t las_verb_gen_write;
+
+	/*
 	 * Cache pool information.
 	 */
 	uint64_t cp_pass_pressure;	/* Calculated pressure from this pass */
@@ -192,16 +231,21 @@ struct __wt_cache {
 	/*
 	 * Flags.
 	 */
-#define	WT_CACHE_POOL_MANAGER	  0x001 /* The active cache pool manager */
-#define	WT_CACHE_POOL_RUN	  0x002 /* Cache pool thread running */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CACHE_POOL_MANAGER	  0x1u	/* The active cache pool manager */
+#define	WT_CACHE_POOL_RUN	  0x2u	/* Cache pool thread running */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t pool_flags;		/* Cache pool flags */
 
-#define	WT_CACHE_EVICT_CLEAN	  0x001 /* Evict clean pages */
-#define	WT_CACHE_EVICT_CLEAN_HARD 0x002 /* Clean % blocking app threads */
-#define	WT_CACHE_EVICT_DIRTY	  0x004 /* Evict dirty pages */
-#define	WT_CACHE_EVICT_DIRTY_HARD 0x008 /* Dirty % blocking app threads */
-#define	WT_CACHE_EVICT_SCRUB	  0x010 /* Scrub dirty pages */
-#define	WT_CACHE_EVICT_URGENT	  0x020 /* Pages are in the urgent queue */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CACHE_EVICT_CLEAN	  0x01u	/* Evict clean pages */
+#define	WT_CACHE_EVICT_CLEAN_HARD 0x02u	/* Clean % blocking app threads */
+#define	WT_CACHE_EVICT_DIRTY	  0x04u	/* Evict dirty pages */
+#define	WT_CACHE_EVICT_DIRTY_HARD 0x08u	/* Dirty % blocking app threads */
+#define	WT_CACHE_EVICT_LOOKASIDE  0x10u	/* Try lookaside eviction */
+#define	WT_CACHE_EVICT_SCRUB	  0x20u	/* Scrub dirty pages */
+#define	WT_CACHE_EVICT_URGENT	  0x40u	/* Pages are in the urgent queue */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 #define	WT_CACHE_EVICT_ALL	(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY)
 	uint32_t flags;
 };
@@ -230,6 +274,8 @@ struct __wt_cache_pool {
 
 	uint8_t pool_managed;		/* Cache pool has a manager thread */
 
-#define	WT_CACHE_POOL_ACTIVE	0x01	/* Cache pool is active */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CACHE_POOL_ACTIVE	0x1u	/* Cache pool is active */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint8_t flags;
 };

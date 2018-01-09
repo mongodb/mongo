@@ -36,21 +36,15 @@
 
 namespace mongo {
 
-Status InternalSchemaFmodMatchExpression::init(StringData path,
-                                               Decimal128 divisor,
-                                               Decimal128 remainder) {
-    if (divisor.isZero()) {
-        return Status(ErrorCodes::BadValue, "divisor cannot be 0");
-    }
-    if (divisor.isNaN()) {
-        return Status(ErrorCodes::BadValue, "divisor cannot be NaN");
-    }
-    if (divisor.isInfinite()) {
-        return Status(ErrorCodes::BadValue, "divisor cannot be infinite");
-    }
-    _divisor = divisor;
-    _remainder = remainder;
-    return setPath(path);
+InternalSchemaFmodMatchExpression::InternalSchemaFmodMatchExpression(StringData path,
+                                                                     Decimal128 divisor,
+                                                                     Decimal128 remainder)
+    : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_FMOD, path),
+      _divisor(divisor),
+      _remainder(remainder) {
+    uassert(ErrorCodes::BadValue, "divisor cannot be 0", !divisor.isZero());
+    uassert(ErrorCodes::BadValue, "divisor cannot be NaN", !divisor.isNaN());
+    uassert(ErrorCodes::BadValue, "divisor cannot be infinite", !divisor.isInfinite());
 }
 
 bool InternalSchemaFmodMatchExpression::matchesSingleElement(const BSONElement& e,

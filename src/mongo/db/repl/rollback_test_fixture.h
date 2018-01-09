@@ -114,7 +114,8 @@ public:
      * Base class implementation triggers an invariant. This function is overridden to be a no-op
      * for rollback tests.
      */
-    void resetLastOpTimesFromOplog(OperationContext* opCtx) override;
+    void resetLastOpTimesFromOplog(OperationContext* opCtx,
+                                   ReplicationCoordinator::DataConsistency consistency) override;
 
     /**
      * Returns IllegalOperation (does not forward call to
@@ -172,9 +173,9 @@ private:
  * 'remoteCollOptionsObj': the collection options object that the sync source will respond with to
  * the rollback node when it fetches collection metadata.
  *
- * A collMod operation with a 'noPadding' argument is used to trigger a collection metadata resync,
- * since the rollback of collMod operations does not take into account the actual command object. It
- * simply re-syncs all the collection options.
+ * If no command is provided, a collMod operation with a 'noPadding' argument is used to trigger a
+ * collection metadata resync, since the rollback of collMod operations does not take into account
+ * the actual command object. It simply re-syncs all the collection options.
  */
 class RollbackResyncsCollectionOptionsTest : public RollbackTest {
 
@@ -193,6 +194,10 @@ class RollbackResyncsCollectionOptionsTest : public RollbackTest {
     };
 
 public:
+    void resyncCollectionOptionsTest(CollectionOptions localCollOptions,
+                                     BSONObj remoteCollOptionsObj,
+                                     BSONObj collModCmd,
+                                     std::string collName);
     void resyncCollectionOptionsTest(CollectionOptions localCollOptions,
                                      BSONObj remoteCollOptionsObj);
 };

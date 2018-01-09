@@ -1,3 +1,5 @@
+// @tags: [does_not_support_stepdowns, requires_getmore, requires_non_retryable_writes]
+
 // Tests for $expr in the CRUD commands.
 (function() {
     "use strict";

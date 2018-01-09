@@ -69,8 +69,12 @@ options = {
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
 // Restarts B, which should attempt to rollback but then fassert.
+jsTestLog("Restarting node B (" + b_conn.host + ") and waiting for it to fassert.");
 clearRawMongoProgramOutput();
-replTest.restart(BID);
+
+// Don't wait for a connection to the node after startup, since it might roll back and crash
+// immediately.
+replTest.start(BID, {waitForConnect: false}, true /*restart*/);
 var msg = RegExp("Can't roll back this command yet: ");
 assert.soon(function() {
     return rawMongoProgramOutput().match(msg);

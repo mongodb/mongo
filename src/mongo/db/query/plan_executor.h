@@ -53,13 +53,6 @@ struct PlanStageStats;
 class WorkingSet;
 
 /**
- * If true, when no results are available from a plan, then instead of returning immediately, the
- * system should wait up to the length of the operation deadline for data to be inserted which
- * causes results to become available.
- */
-extern const OperationContext::Decoration<bool> shouldWaitForInserts;
-
-/**
  * If a getMore command specified a lastKnownCommittedOpTime (as secondaries do), we want to stop
  * waiting for new data as soon as the committed op time changes.
  *
@@ -539,14 +532,6 @@ private:
      * catalog operation.
      */
     Status pickBestPlan(const Collection* collection);
-
-    /**
-     * Given a non-OK status returned from a yield 'yieldError', checks if this PlanExecutor
-     * represents a tailable, awaitData cursor and whether 'yieldError' is the error object
-     * describing an operation time out. If so, returns IS_EOF. Otherwise returns DEAD, and
-     * populates 'errorObj' with the error - if 'errorObj' is not null.
-     */
-    ExecState swallowTimeoutIfAwaitData(Status yieldError, Snapshotted<BSONObj>* errorObj) const;
 
     // The OperationContext that we're executing within. This can be updated if necessary by using
     // detachFromOperationContext() and reattachToOperationContext().

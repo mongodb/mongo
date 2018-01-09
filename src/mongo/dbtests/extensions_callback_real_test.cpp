@@ -79,11 +79,10 @@ protected:
 
 TEST_F(ExtensionsCallbackRealTest, TextNoIndex) {
     BSONObj query = fromjson("{$text: {$search:\"awesome\"}}");
-    StatusWithMatchExpression result =
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement());
-
-    ASSERT_NOT_OK(result.getStatus());
-    ASSERT_EQ(ErrorCodes::IndexNotFound, result.getStatus());
+    ASSERT_THROWS_CODE(StatusWithMatchExpression result(
+                           ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement())),
+                       AssertionException,
+                       ErrorCodes::IndexNotFound);
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextBasic) {
@@ -116,10 +115,10 @@ TEST_F(ExtensionsCallbackRealTest, TextLanguageError) {
                                    false));  // isUnique
 
     BSONObj query = fromjson("{$text: {$search:\"awesome\", $language:\"spanglish\"}}");
-    StatusWithMatchExpression result =
-        ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement());
-
-    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_THROWS_CODE(StatusWithMatchExpression result(
+                           ExtensionsCallbackReal(&_opCtx, &_nss).parseText(query.firstElement())),
+                       AssertionException,
+                       ErrorCodes::BadValue);
 }
 
 TEST_F(ExtensionsCallbackRealTest, TextCaseSensitiveTrue) {

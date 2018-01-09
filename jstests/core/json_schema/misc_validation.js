@@ -10,9 +10,11 @@
  * - update
  * - findAndModify
  * - applyOps
+ * - doTxn
  * - $elemMatch projection
  *
- * @tags: [assumes_no_implicit_collection_creation_after_drop]
+ * @tags: [assumes_no_implicit_collection_creation_after_drop, requires_non_retryable_commands,
+ * requires_non_retryable_writes]
  */
 (function() {
     "use strict";
@@ -297,6 +299,23 @@
         res = testDB.adminCommand({
             applyOps: [
                 {op: "u", ns: coll.getFullName(), o2: {_id: 0}, o: {$set: {a: false}}},
+            ],
+            preCondition: [{
+                ns: coll.getFullName(),
+                q: {$jsonSchema: {properties: {a: {type: "boolean"}}}},
+                res: {a: true}
+            }]
+        });
+        assert.commandWorked(res);
+        assert.eq(1, res.applied);
+
+        coll.drop();
+        assert.writeOK(coll.insert({_id: 1, a: true}));
+
+        // Test $jsonSchema in the precondition checking for doTxn.
+        res = testDB.adminCommand({
+            doTxn: [
+                {op: "u", ns: coll.getFullName(), o2: {_id: 1}, o: {$set: {a: false}}},
             ],
             preCondition: [{
                 ns: coll.getFullName(),

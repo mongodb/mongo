@@ -86,7 +86,7 @@ void RollbackTest::setUp() {
     SessionCatalog::create(serviceContext);
 
     _opCtx = cc().makeOperationContext();
-    _replicationProcess->getConsistencyMarkers()->setAppliedThrough(_opCtx.get(), OpTime{});
+    _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(_opCtx.get(), {});
     _replicationProcess->getConsistencyMarkers()->setMinValid(_opCtx.get(), OpTime{});
     _replicationProcess->initializeRollbackID(_opCtx.get()).transitional_ignore();
 
@@ -118,7 +118,7 @@ RollbackTest::ReplicationCoordinatorRollbackMock::ReplicationCoordinatorRollback
     : ReplicationCoordinatorMock(service, createReplSettings()) {}
 
 void RollbackTest::ReplicationCoordinatorRollbackMock::resetLastOpTimesFromOplog(
-    OperationContext* opCtx) {}
+    OperationContext* opCtx, ReplicationCoordinator::DataConsistency consistency) {}
 
 void RollbackTest::ReplicationCoordinatorRollbackMock::failSettingFollowerMode(
     const MemberState& transitionToFail, ErrorCodes::Error codeToFailWith) {
@@ -239,18 +239,28 @@ RollbackResyncsCollectionOptionsTest::RollbackSourceWithCollectionOptions::getCo
 
 void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
     CollectionOptions localCollOptions, BSONObj remoteCollOptionsObj) {
+    resyncCollectionOptionsTest(localCollOptions,
+                                remoteCollOptionsObj,
+                                BSON("collMod"
+                                     << "coll"
+                                     << "noPadding"
+                                     << false),
+                                "coll");
+}
+void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
+    CollectionOptions localCollOptions,
+    BSONObj remoteCollOptionsObj,
+    BSONObj collModCmd,
+    std::string collName) {
     createOplog(_opCtx.get());
 
     auto dbName = "test";
-    auto collName = "coll";
     auto nss = NamespaceString(dbName, collName);
 
     auto coll = _createCollection(_opCtx.get(), nss.toString(), localCollOptions);
     auto commonOperation =
         std::make_pair(BSON("ts" << Timestamp(Seconds(1), 0) << "h" << 1LL), RecordId(1));
 
-    // 'collMod' operation used to trigger metadata re-sync.
-    BSONObj collModCmd = BSON("collMod" << collName << "noPadding" << false);
     auto collectionModificationOperation =
         makeCommandOp(Timestamp(Seconds(2), 0), coll->uuid(), nss.toString(), collModCmd, 2);
 

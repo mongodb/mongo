@@ -47,6 +47,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -238,16 +239,16 @@ void Test::stopCapturingLogMessages() {
 }
 void Test::printCapturedLogLines() const {
     log() << "****************************** Captured Lines (start) *****************************";
-    std::for_each(getCapturedLogMessages().begin(),
-                  getCapturedLogMessages().end(),
-                  [](std::string line) { log() << line; });
+    for (const auto& line : getCapturedLogMessages()) {
+        log() << line;
+    }
     log() << "****************************** Captured Lines (end) ******************************";
 }
 
 int64_t Test::countLogLinesContaining(const std::string& needle) {
-    return std::count_if(getCapturedLogMessages().begin(),
-                         getCapturedLogMessages().end(),
-                         stdx::bind(stringContains, stdx::placeholders::_1, needle));
+    const auto& msgs = getCapturedLogMessages();
+    return std::count_if(
+        msgs.begin(), msgs.end(), [&](const std::string& s) { return stringContains(s, needle); });
 }
 
 Suite::Suite(const std::string& name) : _name(name) {
@@ -296,16 +297,18 @@ Result* Suite::run(const std::string& filter, int runsPerTest) {
             }
             passes = true;
         } catch (const TestAssertionFailureException& ae) {
-            err << ae.toString();
+            err << ae.toString() << " in test " << tc->getName() << '\n' << ae.getStacktrace();
+        } catch (const DBException& e) {
+            err << "DBException: " << e.toString() << " in test " << tc->getName();
         } catch (const std::exception& e) {
-            err << " std::exception: " << e.what() << " in test " << tc->getName();
+            err << "std::exception: " << e.what() << " in test " << tc->getName();
         } catch (int x) {
-            err << " caught int " << x << " in test " << tc->getName();
+            err << "caught int " << x << " in test " << tc->getName();
         }
 
         if (!passes) {
             std::string s = err.str();
-            log() << "FAIL: " << s << std::endl;
+            log() << "FAIL: " << s;
             r->_fails.push_back(tc->getName());
             r->_messages.push_back(s);
         }
@@ -432,7 +435,11 @@ void Suite::setupTests() {}
 
 TestAssertionFailureException::TestAssertionFailureException(
     const std::string& theFile, unsigned theLine, const std::string& theFailingExpression)
-    : _file(theFile), _line(theLine), _message(theFailingExpression) {}
+    : _file(theFile), _line(theLine), _message(theFailingExpression) {
+    std::ostringstream ostream;
+    printStackTrace(ostream);
+    _stacktrace = ostream.str();
+}
 
 std::string TestAssertionFailureException::toString() const {
     std::ostringstream os;

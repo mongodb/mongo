@@ -32,7 +32,7 @@ load('jstests/aggregation/extras/utils.js');
 
     // valid use of $abs: numbers become positive, null/undefined/nonexistent become null
 
-    var results = coll.aggregate([{$project: {a: {$abs: "$a"}}}]).toArray();
+    var results = coll.aggregate([{$project: {a: {$abs: "$a"}}}, {$sort: {_id: 1}}]).toArray();
     assert.eq(results, [
         {_id: 0, a: 5},
         {_id: 1, a: 5},

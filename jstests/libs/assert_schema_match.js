@@ -30,7 +30,7 @@ function assertSchemaMatch(coll, schema, doc, valid) {
     // Test that 'doc' can be inserted into a collection using 'schema' as its document validator
     // iff 'valid' is true. We explicitly use runCommand to issue the drop to avoid an implicit
     // collection creation in sharded_collections_jscore_passthrough.
-    coll.runCommand("drop");
+    assert.commandWorked(coll.runCommand("drop"));
     assert.commandWorked(coll.runCommand("create", {validator: {$jsonSchema: schema}}));
     let res = coll.insert(doc);
     if (valid) {
@@ -43,7 +43,7 @@ function assertSchemaMatch(coll, schema, doc, valid) {
 
     // Test that we can update an existing document to look like 'doc' when the collection has
     // 'schema' as its document validator in "strict" mode iff 'valid' is true.
-    coll.runCommand("drop");
+    assert.commandWorked(coll.runCommand("drop"));
     assert.writeOK(coll.insert({_id: 0}));
     assert.commandWorked(
         coll.runCommand("collMod", {validator: {$jsonSchema: schema}, validationLevel: "strict"}));

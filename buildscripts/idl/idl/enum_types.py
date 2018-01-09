@@ -40,6 +40,11 @@ class EnumTypeInfoBase(object):
         """Construct a EnumTypeInfoBase."""
         self._enum = idl_enum
 
+    def get_qualified_cpp_type_name(self):
+        # type: () -> unicode
+        """Get the fully qualified C++ type name for an enum."""
+        return common.qualify_cpp_name(self._enum.cpp_namespace, self.get_cpp_type_name())
+
     @abstractmethod
     def get_cpp_type_name(self):
         # type: () -> unicode
@@ -61,7 +66,8 @@ class EnumTypeInfoBase(object):
     def get_enum_deserializer_name(self):
         # type: () -> unicode
         """Return the name of deserializer function with non-method prefix."""
-        return "::" + self._get_enum_deserializer_name()
+        return "::" + common.qualify_cpp_name(self._enum.cpp_namespace,
+                                              self._get_enum_deserializer_name())
 
     def _get_enum_serializer_name(self):
         # type: () -> unicode
@@ -72,7 +78,8 @@ class EnumTypeInfoBase(object):
     def get_enum_serializer_name(self):
         # type: () -> unicode
         """Return the name of serializer function with non-method prefix."""
-        return "::" + self._get_enum_serializer_name()
+        return "::" + common.qualify_cpp_name(self._enum.cpp_namespace,
+                                              self._get_enum_serializer_name())
 
     @abstractmethod
     def get_cpp_value_assignment(self, enum_value):

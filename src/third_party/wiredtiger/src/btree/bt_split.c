@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -141,6 +141,9 @@ __split_verify_root(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
 	WT_REF *ref;
+	uint32_t read_flags;
+
+	read_flags = WT_READ_CACHE | WT_READ_NO_EVICT;
 
 	/* The split is complete and live, verify all of the pages involved. */
 	__split_verify_intl_key_order(session, page);
@@ -156,14 +159,14 @@ __split_verify_root(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Ignore pages not in-memory (deleted, on-disk, being read),
 		 * there's no in-memory structure to check.
 		 */
-		if ((ret = __wt_page_in(session,
-		    ref, WT_READ_CACHE | WT_READ_NO_EVICT)) == WT_NOTFOUND)
+		if ((ret =
+		    __wt_page_in(session, ref, read_flags)) == WT_NOTFOUND)
 			continue;
 		WT_ERR(ret);
 
 		__split_verify_intl_key_order(session, ref->page);
 
-		WT_ERR(__wt_page_release(session, ref, WT_READ_NO_EVICT));
+		WT_ERR(__wt_page_release(session, ref, read_flags));
 	} WT_INTL_FOREACH_END;
 
 	return (0);
@@ -345,6 +348,9 @@ __split_ref_prepare(
 	 * ascend into the created children, but eventually fail as that parent
 	 * page won't yet know about the created children pages. That's OK, we
 	 * spin there until the parent's page index is updated.
+	 *
+	 * Lock the newly created page to ensure it doesn't split until all
+	 * child pages have been updated.
 	 */
 	for (i = skip_first ? 1 : 0; i < pindex->entries; ++i) {
 		ref = pindex->index[i];
@@ -352,10 +358,12 @@ __split_ref_prepare(
 
 		/* Switch the WT_REF's to their new page. */
 		j = 0;
+		WT_PAGE_LOCK(session, child);
 		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
 			child_ref->home = child;
 			child_ref->pindex_hint = j++;
 		} WT_INTL_FOREACH_END;
+		WT_PAGE_UNLOCK(session, child);
 
 #ifdef HAVE_DIAGNOSTIC
 		WT_WITH_PAGE_INDEX(session,
@@ -712,6 +720,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 
 	/* Start making real changes to the tree, errors are fatal. */
 	complete = WT_ERR_PANIC;
+	WT_NOT_READ(complete);
 
 	/* Encourage a race */
 	__page_split_timing_stress(session,
@@ -1468,6 +1477,12 @@ __split_multi_inmem(
 			WT_ERR(__wt_row_search(
 			    session, key, ref, &cbt, true, true));
 
+			/*
+			 * Birthmarks should only be applied to on-page values.
+			 */
+			WT_ASSERT(session, cbt.compare == 0 ||
+			    upd->type != WT_UPDATE_BIRTHMARK);
+
 			/* Apply the modification. */
 			WT_ERR(__wt_row_modify(session,
 			    &cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
@@ -1485,10 +1500,13 @@ __split_multi_inmem(
 	page->modify->first_dirty_txn = WT_TXN_FIRST;
 
 	/*
-	 * If the new page is modified, save the oldest ID from reconciliation
-	 * to avoid repeatedly attempting eviction on the same page.
+	 * If the new page is modified, save the eviction generation to avoid
+	 * repeatedly attempting eviction on the same page.
 	 */
+	page->modify->last_evict_pass_gen = orig->modify->last_evict_pass_gen;
 	page->modify->last_eviction_id = orig->modify->last_eviction_id;
+	__wt_timestamp_set(&page->modify->last_eviction_timestamp,
+	    &orig->modify->last_eviction_timestamp);
 	page->modify->update_restored = 1;
 
 err:	/* Free any resources that may have been cached in the cursor. */
@@ -1643,6 +1661,7 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session,
 
 		WT_RET(__wt_calloc_one(session, &ref->page_las));
 		*ref->page_las = multi->page_las;
+		WT_ASSERT(session, ref->page_las->las_max_txn != WT_TXN_NONE);
 		ref->state = WT_REF_LOOKASIDE;
 	}
 
@@ -2248,6 +2267,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 
 	/* Swap the new page into place. */
 	ref->page = new->page;
+
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 
 	__wt_free(session, new);

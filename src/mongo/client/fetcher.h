@@ -47,12 +47,10 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-namespace {
-using executor::RemoteCommandRequest;
-}
 
 class Fetcher {
     MONGO_DISALLOW_COPYING(Fetcher);
+    using RemoteCommandRequest = executor::RemoteCommandRequest;
 
 public:
     /**

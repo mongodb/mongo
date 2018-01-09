@@ -1,3 +1,5 @@
+// @tags: [requires_getmore]
+
 t = db.jstests_or5;
 t.drop();
 

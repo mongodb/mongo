@@ -1,5 +1,5 @@
 // Write ops tests for partial indexes.
-// @tags: [cannot_create_unique_index_when_using_hashed_shard_key]
+// @tags: [cannot_create_unique_index_when_using_hashed_shard_key, requires_non_retryable_writes]
 
 (function() {
     "use strict";

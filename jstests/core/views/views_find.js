@@ -1,6 +1,6 @@
 /**
  * Tests the find command on views.
- * @tags: [requires_find_command]
+ * @tags: [requires_find_command, requires_getmore]
  */
 (function() {
     "use strict";

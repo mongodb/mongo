@@ -35,11 +35,10 @@
 #include <algorithm>
 #include <utility>
 
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -49,9 +48,7 @@
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern.h"
@@ -431,19 +428,16 @@ void CollectionRangeDeleter::_pop(Status result) {
 // DeleteNotification
 
 CollectionRangeDeleter::DeleteNotification::DeleteNotification()
-    : notification(std::make_shared<Notification<Status>>()) {}
+    : _notification(std::make_shared<Notification<Status>>()) {}
 
 CollectionRangeDeleter::DeleteNotification::DeleteNotification(Status status)
-    : notification(std::make_shared<Notification<Status>>()) {
-    notify(status);
-}
+    : _notification(std::make_shared<Notification<Status>>(std::move(status))) {}
 
 Status CollectionRangeDeleter::DeleteNotification::waitStatus(OperationContext* opCtx) {
     try {
-        return notification->get(opCtx);
-    } catch (...) {
-        notification = std::make_shared<Notification<Status>>();
-        notify({ErrorCodes::Interrupted, "Wait for range delete request completion interrupted"});
+        return _notification->get(opCtx);
+    } catch (const DBException& ex) {
+        _notification = std::make_shared<Notification<Status>>(ex.toStatus());
         throw;
     }
 }

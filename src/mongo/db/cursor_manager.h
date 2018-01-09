@@ -167,7 +167,10 @@ public:
      * handle this error, as it should only happen if a misbehaving client attempts to
      * simultaneously issue two operations against the same cursor id.
      */
-    StatusWith<ClientCursorPin> pinCursor(OperationContext* opCtx, CursorId id);
+    enum AuthCheck { kCheckSession = true, kNoCheckSession = false };
+    StatusWith<ClientCursorPin> pinCursor(OperationContext* opCtx,
+                                          CursorId id,
+                                          AuthCheck checkSessionAuth = kCheckSession);
 
     /**
      * Returns an OK status if the cursor was successfully erased.
@@ -226,6 +229,15 @@ public:
      * managers. Returns the number of cursors that were timed out.
      */
     static std::size_t timeoutCursorsGlobal(OperationContext* opCtx, Date_t now);
+
+    /**
+     * Locate the correct cursor manager for a given cursorId and execute the provided callback.
+     * Returns ErrorCodes::CursorNotFound if cursorId does not exist.
+     */
+    static Status withCursorManager(OperationContext* opCtx,
+                                    CursorId id,
+                                    const NamespaceString& nss,
+                                    stdx::function<Status(CursorManager*)> callback);
 
 private:
     static constexpr int kNumPartitions = 16;

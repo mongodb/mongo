@@ -38,14 +38,11 @@ namespace mongo {
  */
 class InternalSchemaFmodMatchExpression final : public LeafMatchExpression {
 public:
-    InternalSchemaFmodMatchExpression() : LeafMatchExpression(MatchType::INTERNAL_SCHEMA_FMOD) {}
-
-    Status init(StringData path, Decimal128 divisor, Decimal128 remainder);
+    InternalSchemaFmodMatchExpression(StringData path, Decimal128 divisor, Decimal128 remainder);
 
     std::unique_ptr<MatchExpression> shallowClone() const final {
         std::unique_ptr<InternalSchemaFmodMatchExpression> m =
-            stdx::make_unique<InternalSchemaFmodMatchExpression>();
-        invariantOK(m->init(path(), _divisor, _remainder));
+            stdx::make_unique<InternalSchemaFmodMatchExpression>(path(), _divisor, _remainder);
         if (getTag()) {
             m->setTag(getTag()->clone());
         }

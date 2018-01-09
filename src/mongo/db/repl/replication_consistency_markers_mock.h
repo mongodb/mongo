@@ -66,6 +66,7 @@ public:
     void removeOldOplogDeleteFromPointField(OperationContext* opCtx) override;
 
     void setAppliedThrough(OperationContext* opCtx, const OpTime& optime) override;
+    void clearAppliedThrough(OperationContext* opCtx, const Timestamp& writeTimestamp) override;
     OpTime getAppliedThrough(OperationContext* opCtx) const override;
 
     void writeCheckpointTimestamp(OperationContext* opCtx, const Timestamp& timestamp) override;

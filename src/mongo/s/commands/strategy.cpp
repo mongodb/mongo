@@ -121,18 +121,23 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
     auto validator = LogicalTimeValidator::get(opCtx);
     if (validator->shouldGossipLogicalTime()) {
         // Add $clusterTime.
-        auto currentTime =
-            validator->signLogicalTime(opCtx, LogicalClock::get(opCtx)->getClusterTime());
-        rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);
+        auto now = LogicalClock::get(opCtx)->getClusterTime();
+        if (LogicalTimeValidator::isAuthorizedToAdvanceClock(opCtx)) {
+            SignedLogicalTime dummySignedTime(now, TimeProofService::TimeProof(), 0);
+            rpc::LogicalTimeMetadata(dummySignedTime).writeToMetadata(responseBuilder);
+        } else {
+            auto currentTime = validator->signLogicalTime(opCtx, now);
+            rpc::LogicalTimeMetadata(currentTime).writeToMetadata(responseBuilder);
+        }
 
         // Add operationTime.
         auto operationTime = OperationTimeTracker::get(opCtx)->getMaxOperationTime();
         if (operationTime != LogicalTime::kUninitialized) {
             responseBuilder->append(kOperationTime, operationTime.asTimestamp());
-        } else if (currentTime.getTime() != LogicalTime::kUninitialized) {
+        } else if (now != LogicalTime::kUninitialized) {
             // If we don't know the actual operation time, use the cluster time instead. This is
             // safe but not optimal because we can always return a later operation time than actual.
-            responseBuilder->append(kOperationTime, currentTime.getTime().asTimestamp());
+            responseBuilder->append(kOperationTime, now.asTimestamp());
         }
     }
 }
@@ -250,7 +255,7 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
         return;
     }
 
-    initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true);
+    initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
 
     int loops = 5;
 
@@ -542,16 +547,28 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
             continue;
         }
 
-        Status authorizationStatus = authSession->checkAuthForKillCursors(*nss, cursorId);
-        audit::logKillCursorsAuthzCheck(client,
-                                        *nss,
-                                        cursorId,
-                                        authorizationStatus.isOK() ? ErrorCodes::OK
-                                                                   : ErrorCodes::Unauthorized);
-        if (!authorizationStatus.isOK()) {
-            LOG(3) << "Not authorized to kill cursor.  Namespace: '" << *nss
-                   << "', cursor id: " << cursorId << ".";
-            continue;
+        {
+            // Block scope ccPin so that it releases our checked out cursor
+            // prior to the killCursor invocation below.
+            auto ccPin = manager->checkOutCursor(*nss, cursorId, opCtx);
+            if (!ccPin.isOK()) {
+                LOG(3) << "Unable to check out cursor for killCursor.  Namespace: '" << *nss
+                       << "', cursor id: " << cursorId << ".";
+                continue;
+            }
+            auto cursorOwners = ccPin.getValue().getAuthenticatedUsers();
+            auto authorizationStatus = authSession->checkAuthForKillCursors(*nss, cursorOwners);
+
+            audit::logKillCursorsAuthzCheck(client,
+                                            *nss,
+                                            cursorId,
+                                            authorizationStatus.isOK() ? ErrorCodes::OK
+                                                                       : ErrorCodes::Unauthorized);
+            if (!authorizationStatus.isOK()) {
+                LOG(3) << "Not authorized to kill cursor.  Namespace: '" << *nss
+                       << "', cursor id: " << cursorId << ".";
+                continue;
+            }
         }
 
         Status killCursorStatus = manager->killCursor(*nss, cursorId);

@@ -93,7 +93,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/concurrency/write_conflict_exception",
         "$BUILD_DIR/mongo/db/commands",
         "$BUILD_DIR/mongo/db/curop",
-        "$BUILD_DIR/mongo/db/fts/base",
+        "$BUILD_DIR/mongo/db/fts/base_fts",
         "$BUILD_DIR/mongo/db/index/index_descriptor",
         "$BUILD_DIR/mongo/db/index/key_generator",
         "$BUILD_DIR/mongo/db/pipeline/pipeline",
@@ -101,7 +101,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/update/update_driver",
         "$BUILD_DIR/mongo/scripting/scripting",
         "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/s/common",
+        "$BUILD_DIR/mongo/s/common_s",
         '$BUILD_DIR/third_party/s2/s2',
         '$BUILD_DIR/mongo/db/query/query_common',
         #'$BUILD_DIR/mongo/db/write_ops', # CYCLE

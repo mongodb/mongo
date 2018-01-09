@@ -46,10 +46,8 @@ public:
     class RewriteResult final {
     public:
         RewriteResult(std::unique_ptr<MatchExpression> matchExpression,
-                      std::vector<std::string> matchExprStringStorage,
                       std::vector<BSONObj> matchExprElemStorage)
             : _matchExpression(std::move(matchExpression)),
-              _matchExprStringStorage(std::move(matchExprStringStorage)),
               _matchExprElemStorage(std::move(matchExprElemStorage)) {}
 
         MatchExpression* matchExpression() const {
@@ -60,14 +58,17 @@ public:
             return std::move(_matchExpression);
         }
 
+        RewriteResult clone() const {
+            auto clonedMatch = _matchExpression ? _matchExpression->shallowClone() : nullptr;
+            return {std::move(clonedMatch), _matchExprElemStorage};
+        }
+
     private:
         std::unique_ptr<MatchExpression> _matchExpression;
 
-        // MatchExpression nodes are constructed with BSONElement and StringData arguments that are
-        // externally owned and expected to outlive the MatchExpression. '_matchExprStringStorage'
-        // and '_matchExprElemStorage' hold the underlying std::string and BSONObj storage for these
-        // arguments.
-        std::vector<std::string> _matchExprStringStorage;
+        // MatchExpression nodes are constructed with BSONElement arguments that are externally
+        // owned and expected to outlive the MatchExpression. '_matchExprElemStorage' holds the
+        // underlying BSONObj storage for these arguments.
         std::vector<BSONObj> _matchExprElemStorage;
     };
 
@@ -95,27 +96,15 @@ private:
         const boost::intrusive_ptr<ExpressionOr>& currExprNode);
 
     // Returns rewritten MatchExpression or null unique_ptr if not rewritable.
-    std::unique_ptr<MatchExpression> _rewriteInExpression(
-        const boost::intrusive_ptr<ExpressionIn>& currExprNode);
-
-    // Returns rewritten MatchExpression or null unique_ptr if not rewritable.
     std::unique_ptr<MatchExpression> _rewriteComparisonExpression(
-        const boost::intrusive_ptr<ExpressionCompare>& currExprNode);
-
-    bool _isValidMatchComparison(const boost::intrusive_ptr<ExpressionCompare>& expr) const;
-
-    bool _isValidMatchIn(const boost::intrusive_ptr<ExpressionIn>& expr) const;
-
-    bool _isValidFieldPath(const FieldPath& fieldPath) const;
-
-    std::unique_ptr<MatchExpression> _buildComparisonMatchExpression(
         const boost::intrusive_ptr<ExpressionCompare>& expr);
+
+    bool _canRewriteComparison(const boost::intrusive_ptr<ExpressionCompare>& expr) const;
 
     std::unique_ptr<MatchExpression> _buildComparisonMatchExpression(
         ExpressionCompare::CmpOp comparisonOp, BSONElement fieldAndValue);
 
     std::vector<BSONObj> _matchExprElemStorage;
-    std::vector<std::string> _matchExprStringStorage;
     const CollatorInterface* _collator;
 };
 

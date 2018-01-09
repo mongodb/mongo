@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -52,15 +52,15 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 int
 __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	struct timespec start, stop;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
+	uint64_t time_start, time_stop;
 	bool locked, too_big;
 
 	btree = S2BT(session);
 	page = ref->page;
-	__wt_epoch(session, &start);
+	time_start = __wt_rdtsc(session);
 
 	/*
 	 * Take some care with order of operations: if we release the hazard
@@ -83,12 +83,12 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * we have one of two pairs of stats to increment.
 	 */
 	ret = __wt_evict(session, ref, false);
-	__wt_epoch(session, &stop);
+	time_stop = __wt_rdtsc(session);
 	if (ret == 0) {
 		if (too_big) {
 			WT_STAT_CONN_INCR(session, cache_eviction_force);
 			WT_STAT_CONN_INCRV(session, cache_eviction_force_time,
-			    WT_TIMEDIFF_US(stop, start));
+			    WT_TSCDIFF_US(time_stop, time_start));
 		} else {
 			/*
 			 * If the page isn't too big, we are evicting it because
@@ -98,12 +98,12 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 			WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
 			WT_STAT_CONN_INCRV(session,
 			    cache_eviction_force_delete_time,
-			    WT_TIMEDIFF_US(stop, start));
+			    WT_TSCDIFF_US(time_stop, time_start));
 		}
 	} else {
 		WT_STAT_CONN_INCR(session, cache_eviction_force_fail);
 		WT_STAT_CONN_INCRV(session, cache_eviction_force_fail_time,
-		    WT_TIMEDIFF_US(stop, start));
+		    WT_TSCDIFF_US(time_stop, time_start));
 	}
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
@@ -121,7 +121,6 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_PAGE *page;
-	WT_PAGE_MODIFY *mod;
 	bool clean_page, inmem_split, tree_dead;
 
 	conn = S2C(session);
@@ -166,8 +165,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		conn->cache->evict_max_page_size = page->memory_footprint;
 
 	/* Figure out whether reconciliation was done on the page */
-	mod = page->modify;
-	clean_page = mod == NULL || mod->rec_result == 0;
+	clean_page = __wt_page_evict_clean(page);
 
 	/* Update the reference and discard the page. */
 	if (__wt_ref_is_root(ref))
@@ -522,6 +520,13 @@ __evict_review(
 		return (0);
 
 	/*
+	 * If reconciliation is disabled for this thread (e.g., during an
+	 * eviction that writes to lookaside), give up.
+	 */
+	if (F_ISSET(session, WT_SESSION_NO_RECONCILE))
+		return (EBUSY);
+
+	/*
 	 * If the page is dirty, reconcile it to decide if we can evict it.
 	 *
 	 * If we have an exclusive lock (we're discarding the tree), assert
@@ -562,22 +567,20 @@ __evict_review(
 		if (F_ISSET(conn, WT_CONN_IN_MEMORY))
 			LF_SET(WT_REC_IN_MEMORY |
 			    WT_REC_SCRUB | WT_REC_UPDATE_RESTORE);
+		else if (WT_SESSION_IS_CHECKPOINT(session))
+			LF_SET(WT_REC_LOOKASIDE);
 		else if (!WT_IS_METADATA(session->dhandle)) {
-			if (!WT_SESSION_IS_CHECKPOINT(session)) {
-				LF_SET(WT_REC_UPDATE_RESTORE);
+			LF_SET(WT_REC_UPDATE_RESTORE);
 
-				if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB))
-					LF_SET(WT_REC_SCRUB);
-			}
+			if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB))
+				LF_SET(WT_REC_SCRUB);
 
 			/*
 			 * If the cache is under pressure with many updates
 			 * that can't be evicted, check if reconciliation
 			 * suggests trying the lookaside table.
 			 */
-			if (!F_ISSET(conn, WT_CONN_EVICTION_NO_LOOKASIDE) &&
-			    (__wt_cache_lookaside_score(cache) > 50 ||
-			    __wt_cache_stuck(session)))
+			if (F_ISSET(cache, WT_CACHE_EVICT_LOOKASIDE))
 				lookaside_retryp = &lookaside_retry;
 		}
 	}

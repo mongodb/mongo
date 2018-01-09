@@ -37,15 +37,14 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
@@ -66,11 +65,6 @@
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-
-#include <chrono>
-#include <ctime>
-#include <iomanip>
-#include <iostream>
 
 namespace mongo {
 
@@ -100,7 +94,7 @@ void updateShardIdentityConfigStringCB(const string& setName, const string& newC
     }
 
     Client::initThread("updateShardIdentityConfigConnString");
-    auto uniqOpCtx = getGlobalServiceContext()->makeOperationContext(&cc());
+    auto uniqOpCtx = Client::getCurrent()->makeOperationContext();
 
     auto status = ShardingState::get(uniqOpCtx.get())
                       ->updateShardIdentityConfigString(uniqOpCtx.get(), newConnectionString);
@@ -217,14 +211,6 @@ void ShardingState::interruptChunkSplitter() {
     _chunkSplitter->interruptChunkSplitter();
 }
 
-void ShardingState::markCollectionsNotShardedAtStepdown() {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    for (auto& coll : _collections) {
-        auto& css = coll.second;
-        css->markNotShardedAtStepdown();
-    }
-}
-
 void ShardingState::setGlobalInitMethodForTest(GlobalInitFunc func) {
     _globalInit = func;
 }
@@ -243,26 +229,23 @@ Status ShardingState::onStaleShardVersion(OperationContext* opCtx,
     auto& oss = OperationShardingState::get(opCtx);
     oss.waitForMigrationCriticalSectionSignal(opCtx);
 
-    ChunkVersion collectionShardVersion;
-
-    // Fast path - check if the requested version is at a higher version than the current metadata
-    // version or a different epoch before verifying against config server.
-    ScopedCollectionMetadata currentMetadata;
-
-    {
+    const auto collectionShardVersion = [&] {
+        // Fast path - check if the requested version is at a higher version than the current
+        // metadata version or a different epoch before verifying against config server
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-
-        currentMetadata = CollectionShardingState::get(opCtx, nss)->getMetadata();
+        const auto currentMetadata = CollectionShardingState::get(opCtx, nss)->getMetadata();
         if (currentMetadata) {
-            collectionShardVersion = currentMetadata->getShardVersion();
+            return currentMetadata->getShardVersion();
         }
 
-        if (collectionShardVersion.epoch() == expectedVersion.epoch() &&
-            collectionShardVersion >= expectedVersion) {
-            // Don't need to remotely reload if we're in the same epoch and the requested version is
-            // smaller than the one we know about. This means that the remote side is behind.
-            return Status::OK();
-        }
+        return ChunkVersion::UNSHARDED();
+    }();
+
+    if (collectionShardVersion.epoch() == expectedVersion.epoch() &&
+        collectionShardVersion >= expectedVersion) {
+        // Don't need to remotely reload if we're in the same epoch and the requested version is
+        // smaller than the one we know about. This means that the remote side is behind.
+        return Status::OK();
     }
 
     try {

@@ -33,6 +33,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -47,7 +49,7 @@
 #include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/unittest/ensure_fcv.h"
+#include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -65,8 +67,6 @@ using D = Document;
 using V = Value;
 
 using DSChangeStream = DocumentSourceChangeStream;
-
-using unittest::EnsureFCV;
 
 static const Timestamp ts(100, 1);
 static const repl::OpTime optime(ts, 1);
@@ -102,19 +102,18 @@ repl::OplogEntry makeOplogEntry(repl::OpTypeEnum opType,
 class ChangeStreamStageTestNoSetup : public AggregationContextFixture {
 public:
     ChangeStreamStageTestNoSetup() : ChangeStreamStageTestNoSetup(nss) {}
-    ChangeStreamStageTestNoSetup(NamespaceString nsString)
-        : AggregationContextFixture(nsString), _ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36) {}
-
-private:
-    EnsureFCV _ensureFCV;
+    explicit ChangeStreamStageTestNoSetup(NamespaceString nsString)
+        : AggregationContextFixture(nsString) {}
 };
 
 // This is needed only for the "insert" tests.
-struct MockMongoProcessInterface final : public StubMongoProcessInterface {
+struct MockMongoInterface final : public StubMongoProcessInterface {
 
-    MockMongoProcessInterface(std::vector<FieldPath> fields) : _fields(std::move(fields)) {}
+    MockMongoInterface(std::vector<FieldPath> fields) : _fields(std::move(fields)) {}
 
-    std::vector<FieldPath> collectDocumentKeyFields(UUID) const final {
+    std::vector<FieldPath> collectDocumentKeyFields(OperationContext*,
+                                                    const NamespaceString&,
+                                                    UUID) const final {
         return _fields;
     }
 
@@ -135,9 +134,7 @@ public:
         vector<intrusive_ptr<DocumentSource>> stages = makeStages(entry);
         auto transform = stages[2].get();
 
-        auto mongoProcess = std::make_shared<MockMongoProcessInterface>(docKeyFields);
-        using NeedyDS = DocumentSourceNeedsMongoProcessInterface;
-        dynamic_cast<NeedyDS&>(*transform).injectMongoProcessInterface(std::move(mongoProcess));
+        getExpCtx()->mongoProcessInterface = stdx::make_unique<MockMongoInterface>(docKeyFields);
 
         auto next = transform->getNext();
         // Match stage should pass the doc down if expectedDoc is given.
@@ -156,6 +153,8 @@ public:
         list<intrusive_ptr<DocumentSource>> result =
             DSChangeStream::createFromBson(spec.firstElement(), getExpCtx());
         vector<intrusive_ptr<DocumentSource>> stages(std::begin(result), std::end(result));
+        getExpCtx()->mongoProcessInterface =
+            stdx::make_unique<MockMongoInterface>(std::vector<FieldPath>{});
 
         // This match stage is a DocumentSourceOplogMatch, which we explicitly disallow from
         // executing as a safety mechanism, since it needs to use the collection-default collation,
@@ -246,6 +245,25 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
                                        expCtx),
         AssertionException,
         40575);
+}
+
+TEST_F(ChangeStreamStageTest, ShouldRejectBothResumeAfterClusterTimeAndResumeAfterOptions) {
+    auto expCtx = getExpCtx();
+
+    // Need to put the collection in the UUID catalog so the resume token is valid.
+    Collection collection(stdx::make_unique<CollectionMock>(nss));
+    UUIDCatalog::get(expCtx->opCtx).onCreateCollection(expCtx->opCtx, &collection, testUuid());
+
+    ASSERT_THROWS_CODE(
+        DSChangeStream::createFromBson(
+            BSON(DSChangeStream::kStageName << BSON(
+                     "resumeAfter" << makeResumeToken(ts, testUuid(), BSON("x" << 2 << "_id" << 1))
+                                   << "$_resumeAfterClusterTime"
+                                   << BSON("ts" << ts)))
+                .firstElement(),
+            expCtx),
+        AssertionException,
+        40674);
 }
 
 TEST_F(ChangeStreamStageTestNoSetup, FailsWithNoReplicationCoordinator) {
@@ -539,6 +557,22 @@ TEST_F(ChangeStreamStageTest, TransformInvalidateRenameDropTarget) {
     checkTransformation(rename, expectedInvalidate);
 }
 
+TEST_F(ChangeStreamStageTest, TransformNewShardDetected) {
+    auto o2Field = D{{"type", "migrateChunkToNewShard"_sd}};
+    auto newShardDetected = makeOplogEntry(OpTypeEnum::kNoop,
+                                           nss,
+                                           testUuid(),
+                                           boost::none,  // fromMigrate
+                                           BSONObj(),
+                                           o2Field.toBson());
+
+    Document expectedNewShardDetected{
+        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), BSON("_id" << o2Field))},
+        {DSChangeStream::kOperationTypeField, DSChangeStream::kNewShardDetectedOpType},
+    };
+    checkTransformation(newShardDetected, expectedNewShardDetected);
+}
+
 TEST_F(ChangeStreamStageTest, MatchFiltersCreateCollection) {
     auto collSpec =
         D{{"create", "foo"_sd},
@@ -648,30 +682,6 @@ TEST_F(ChangeStreamStageTest, CloseCursorEvenIfInvalidateEntriesGetFilteredOut) 
 
     // Throw an exception on the call of getNext().
     ASSERT_THROWS(match->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
-}
-
-TEST_F(ChangeStreamStageTest, CloseCursorOnRetryNeededEntries) {
-    auto o2Field = D{{"type", "migrateChunkToNewShard"_sd}};
-    auto retryNeeded = makeOplogEntry(OpTypeEnum::kNoop,  // op type
-                                      nss,                // namespace
-                                      testUuid(),         // uuid
-                                      boost::none,        // fromMigrate
-                                      {},                 // o
-                                      o2Field.toBson());  // o2
-
-    auto stages = makeStages(retryNeeded);
-    auto closeCursor = stages.back();
-
-    Document expectedRetryNeeded{
-        {DSChangeStream::kIdField, makeResumeToken(ts, testUuid(), BSON("_id" << o2Field))},
-        {DSChangeStream::kOperationTypeField, DSChangeStream::kRetryNeededOpType},
-    };
-
-    auto next = closeCursor->getNext();
-    // Transform into RetryNeeded entry.
-    ASSERT_DOCUMENT_EQ(next.releaseDocument(), expectedRetryNeeded);
-    // Then throw an exception on the next call of getNext().
-    ASSERT_THROWS(closeCursor->getNext(), ExceptionFor<ErrorCodes::CloseChangeStream>);
 }
 
 }  // namespace

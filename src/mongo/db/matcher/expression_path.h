@@ -41,19 +41,17 @@ namespace mongo {
  */
 class PathMatchExpression : public MatchExpression {
 public:
-    PathMatchExpression(MatchType matchType) : MatchExpression(matchType) {}
+    PathMatchExpression(MatchType matchType,
+                        StringData path,
+                        ElementPath::LeafArrayBehavior leafArrBehavior,
+                        ElementPath::NonLeafArrayBehavior nonLeafArrayBehavior)
+        : MatchExpression(matchType), _path(path) {
+        _elementPath.init(_path);
+        _elementPath.setLeafArrayBehavior(leafArrBehavior);
+        _elementPath.setNonLeafArrayBehavior(nonLeafArrayBehavior);
+    }
 
     virtual ~PathMatchExpression() {}
-
-    /**
-     * Returns whether or not this expression should match against each element of an array (in
-     * addition to the array as a whole).
-     *
-     * For example, returns true if a path match expression on "f" should match against 1, 2, and
-     * [1, 2] for document {f: [1, 2]}. Returns false if this expression should only match against
-     * [1, 2].
-     */
-    virtual bool shouldExpandLeafArray() const = 0;
 
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final {
         MatchableDocument::IteratorHolder cursor(doc, &_elementPath);
@@ -74,15 +72,9 @@ public:
         return _path;
     }
 
-    Status setPath(StringData path) {
+    void setPath(StringData path) {
         _path = path;
-        auto status = _elementPath.init(_path);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        _elementPath.setTraverseLeafArray(shouldExpandLeafArray());
-        return Status::OK();
+        _elementPath.init(_path);
     }
 
     /**
@@ -98,7 +90,7 @@ public:
         for (auto rename : renameList) {
             if (rename.first == _path) {
                 _rewrittenPath = rename.second;
-                invariantOK(setPath(_rewrittenPath));
+                setPath(_rewrittenPath);
 
                 ++renamesFound;
             }
@@ -112,7 +104,7 @@ public:
                 // Replace the chopped off components with the component names resulting from the
                 // rename.
                 _rewrittenPath = str::stream() << rename.second << "." << pathTail.toString();
-                invariantOK(setPath(_rewrittenPath));
+                setPath(_rewrittenPath);
 
                 ++renamesFound;
             }

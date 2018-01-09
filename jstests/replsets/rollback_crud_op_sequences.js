@@ -71,12 +71,6 @@ load("jstests/replsets/rslib.js");
     a.createCollection("kap2", {capped: true, size: 5501});
     replTest.awaitReplication();
 
-    var timeout;
-    if (replTest.getReplSetConfigFromNode().protocolVersion == 1) {
-        timeout = 30 * 1000;
-    } else {
-        timeout = 60 * 1000;
-    }
     // isolate A and wait for B to become master
     conns[0].disconnect(conns[1]);
     conns[0].disconnect(conns[2]);
@@ -86,7 +80,7 @@ load("jstests/replsets/rslib.js");
         } catch (e) {
             return false;
         }
-    }, "node B did not become master as expected", timeout);
+    }, "node B did not become master as expected", ReplSetTest.kDefaultTimeoutMS);
 
     // do operations on B and B alone, these will be rolled back
     assert.writeOK(b.bar.insert({q: 4}));
