@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/op_observer.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_concern_options.h"
@@ -200,8 +201,14 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         Lock::TempRelease release(opCtx->lockState());
 
         if (numCollectionsToDrop > 0U) {
+            // Prefer awaitReplication() to awaitReplicationOfLastOpForClient() because we do not
+            // need to wait for any reserved snapshots to be available. More importantly, this
+            // matches the conditional used to trigger the drop pending collection reaper which only
+            // waits for the committed optime.
+            const auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+            auto clientLastOpTime = clientInfo.getLastOp();
             auto status =
-                replCoord->awaitReplicationOfLastOpForClient(opCtx, kDropDatabaseWriteConcern)
+                replCoord->awaitReplication(opCtx, clientLastOpTime, kDropDatabaseWriteConcern)
                     .status;
             if (!status.isOK()) {
                 return Status(status.code(),
