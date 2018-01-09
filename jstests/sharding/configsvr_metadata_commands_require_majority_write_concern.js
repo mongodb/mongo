@@ -26,8 +26,7 @@
     const acceptableWCsForConfig = [
         {},
         {writeConcern: {w: "majority"}},
-        {writeConcern: {w: "majority", j: true}},
-        {writeConcern: {w: "majority", j: true, wtimeout: 15000}},
+        {writeConcern: {w: "majority", wtimeout: 15000}},
     ];
 
     // Any write concern can be sent to a mongos, because mongos will upconvert it to majority.
@@ -40,8 +39,7 @@
         {writeConcern: {w: 2}},
         {writeConcern: {w: 3}},
         {writeConcern: {w: "majority"}},
-        {writeConcern: {w: "majority", j: true}},
-        {writeConcern: {w: "majority", j: true, wtimeout: 15000}},
+        {writeConcern: {w: "majority", wtimeout: 15000}},
     ];
 
     const setupFuncs = {
