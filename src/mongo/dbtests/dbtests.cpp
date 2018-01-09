@@ -158,9 +158,9 @@ int dbtestsMain(int argc, char** argv, char** envp) {
         ->setFollowerMode(repl::MemberState::RS_PRIMARY)
         .ignore();
 
+    auto storageMock = stdx::make_unique<repl::StorageInterfaceMock>();
     repl::DropPendingCollectionReaper::set(
-        service,
-        stdx::make_unique<repl::DropPendingCollectionReaper>(new repl::StorageInterfaceMock()));
+        service, stdx::make_unique<repl::DropPendingCollectionReaper>(storageMock.get()));
 
     getGlobalAuthorizationManager()->setAuthEnabled(false);
     ScriptEngine::setup();
