@@ -200,17 +200,15 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
     _specificStats.replanned = true;
 
     // Use the query planning module to plan the whole query.
-    std::vector<QuerySolution*> rawSolutions;
-    Status status = QueryPlanner::plan(*_canonicalQuery, _plannerParams, &rawSolutions);
-    if (!status.isOK()) {
+    auto statusWithSolutions = QueryPlanner::plan(*_canonicalQuery, _plannerParams);
+    if (!statusWithSolutions.isOK()) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "error processing query: " << _canonicalQuery->toString()
                                     << " planner returned error: "
-                                    << status.reason());
+                                    << statusWithSolutions.getStatus().reason());
     }
 
-    std::vector<std::unique_ptr<QuerySolution>> solutions =
-        transitional_tools_do_not_use::spool_vector(rawSolutions);
+    auto solutions = std::move(statusWithSolutions.getValue());
 
     // We cannot figure out how to answer the query.  Perhaps it requires an index
     // we do not have?
@@ -261,8 +259,8 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache) {
         verify(StageBuilder::build(
             getOpCtx(), _collection, *_canonicalQuery, *solutions[ix], _ws, &nextPlanRoot));
 
-        // Takes ownership of 'solutions[ix]' and 'nextPlanRoot'.
-        multiPlanStage->addPlan(solutions[ix].release(), nextPlanRoot, _ws);
+        // Takes ownership of 'nextPlanRoot'.
+        multiPlanStage->addPlan(std::move(solutions[ix]), nextPlanRoot, _ws);
     }
 
     // Delegate to the MultiPlanStage's plan selection facility.

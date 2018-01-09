@@ -69,8 +69,8 @@ public:
  * Does not own any of its pointers.
  */
 struct CandidatePlan {
-    CandidatePlan(QuerySolution* s, PlanStage* r, WorkingSet* w)
-        : solution(s), root(r), ws(w), failed(false) {}
+    CandidatePlan(std::unique_ptr<QuerySolution> solution, PlanStage* r, WorkingSet* w)
+        : solution(std::move(solution)), root(r), ws(w), failed(false) {}
 
     std::unique_ptr<QuerySolution> solution;
     PlanStage* root;  // Not owned here.

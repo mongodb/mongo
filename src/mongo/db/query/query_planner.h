@@ -48,50 +48,35 @@ public:
     static const int kPlannerVersion;
 
     /**
-     * Outputs a series of possible solutions for the provided 'query' into 'out'.  Uses the
-     * indices and other data in 'params' to plan with.
-     *
-     * Caller owns pointers in *out.
+     * Returns the list of possible query solutions for the provided 'query'. Uses the indices and
+     * other data in 'params' to determine the set of available plans.
      */
-    static Status plan(const CanonicalQuery& query,
-                       const QueryPlannerParams& params,
-                       std::vector<QuerySolution*>* out);
+    static StatusWith<std::vector<std::unique_ptr<QuerySolution>>> plan(
+        const CanonicalQuery& query, const QueryPlannerParams& params);
 
     /**
-     * Attempt to generate a query solution, given data retrieved
-     * from the plan cache.
+     * Generates and returns a query solution, given data retrieved from the plan cache.
      *
      * @param query -- query for which we are generating a plan
      * @param params -- planning parameters
      * @param cachedSoln -- the CachedSolution retrieved from the plan cache.
-     * @param out -- an out-parameter which will be filled in with the solution
-     *   generated from the cache data
-     *
-     * On success, the caller is responsible for deleting *out.
      */
-    static Status planFromCache(const CanonicalQuery& query,
-                                const QueryPlannerParams& params,
-                                const CachedSolution& cachedSoln,
-                                QuerySolution** out);
+    static StatusWith<std::unique_ptr<QuerySolution>> planFromCache(
+        const CanonicalQuery& query,
+        const QueryPlannerParams& params,
+        const CachedSolution& cachedSoln);
 
     /**
-     * Used to generated the index tag tree that will be inserted
-     * into the plan cache. This data gets stashed inside a QuerySolution
-     * until it can be inserted into the cache proper.
+     * Generates and returns the index tag tree that will be inserted into the plan cache. This data
+     * gets stashed inside a QuerySolution until it can be inserted into the cache proper.
      *
      * @param taggedTree -- a MatchExpression with index tags that has been
      *   produced by the enumerator.
      * @param relevantIndices -- a list of the index entries used to tag
      *   the tree (i.e. index numbers in the tags refer to entries in this vector)
-     *
-     * On success, a new tagged tree is returned through the out-parameter 'out'.
-     * The caller has ownership of both taggedTree and *out.
-     *
-     * On failure, 'out' is set to NULL.
      */
-    static Status cacheDataFromTaggedTree(const MatchExpression* const taggedTree,
-                                          const std::vector<IndexEntry>& relevantIndices,
-                                          PlanCacheIndexTree** out);
+    static StatusWith<std::unique_ptr<PlanCacheIndexTree>> cacheDataFromTaggedTree(
+        const MatchExpression* const taggedTree, const std::vector<IndexEntry>& relevantIndices);
 
     /**
      * @param filter -- an untagged MatchExpression

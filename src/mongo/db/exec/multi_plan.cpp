@@ -77,8 +77,10 @@ MultiPlanStage::MultiPlanStage(OperationContext* opCtx,
     invariant(_collection);
 }
 
-void MultiPlanStage::addPlan(QuerySolution* solution, PlanStage* root, WorkingSet* ws) {
-    _candidates.push_back(CandidatePlan(solution, root, ws));
+void MultiPlanStage::addPlan(std::unique_ptr<QuerySolution> solution,
+                             PlanStage* root,
+                             WorkingSet* ws) {
+    _candidates.push_back(CandidatePlan(std::move(solution), root, ws));
     _children.emplace_back(root);
 }
 

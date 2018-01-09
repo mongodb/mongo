@@ -4322,13 +4322,9 @@ TEST_F(QueryPlannerTest, KeyPatternOverflowsInt) {
 //
 
 TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
-    PlanCacheIndexTree* indexTree;
-
     // Null match expression.
     std::vector<IndexEntry> relevantIndices;
-    Status s = QueryPlanner::cacheDataFromTaggedTree(NULL, relevantIndices, &indexTree);
-    ASSERT_NOT_OK(s);
-    ASSERT(NULL == indexTree);
+    ASSERT_NOT_OK(QueryPlanner::cacheDataFromTaggedTree(NULL, relevantIndices).getStatus());
 
     // No relevant index matching the index tag.
     relevantIndices.push_back(IndexEntry(BSON("a" << 1)));
@@ -4340,9 +4336,8 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
     scopedCq->root()->setTag(new IndexTag(1));
 
-    s = QueryPlanner::cacheDataFromTaggedTree(scopedCq->root(), relevantIndices, &indexTree);
-    ASSERT_NOT_OK(s);
-    ASSERT(NULL == indexTree);
+    ASSERT_NOT_OK(
+        QueryPlanner::cacheDataFromTaggedTree(scopedCq->root(), relevantIndices).getStatus());
 }
 
 TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {

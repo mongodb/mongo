@@ -259,9 +259,9 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    std::vector<QuerySolution*> solnsRaw;
-    ASSERT_OK(QueryPlanner::plan(*cq, params, &solnsRaw));
-    solns = transitional_tools_do_not_use::spool_vector(solnsRaw);
+    auto statusWithSolutions = QueryPlanner::plan(*cq, params);
+    ASSERT_OK(statusWithSolutions.getStatus());
+    solns = std::move(statusWithSolutions.getValue());
 }
 
 void QueryPlannerTest::runInvalidQuery(const BSONObj& query) {
@@ -343,10 +343,8 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    std::vector<QuerySolution*> solnsRaw;
-    Status s = QueryPlanner::plan(*cq, params, &solnsRaw);
-    solns = transitional_tools_do_not_use::spool_vector(solnsRaw);
-    ASSERT_NOT_OK(s);
+    auto statusWithSolutions = QueryPlanner::plan(*cq, params);
+    ASSERT_NOT_OK(statusWithSolutions.getStatus());
 }
 
 void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
@@ -369,10 +367,9 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    std::vector<QuerySolution*> solnsRaw;
-    Status s = QueryPlanner::plan(*cq, params, &solnsRaw);
-    solns = transitional_tools_do_not_use::spool_vector(solnsRaw);
-    ASSERT_OK(s);
+    auto statusWithSolutions = QueryPlanner::plan(*cq, params);
+    ASSERT_OK(statusWithSolutions.getStatus());
+    solns = std::move(statusWithSolutions.getValue());
 }
 
 void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
@@ -395,10 +392,8 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
 
-    std::vector<QuerySolution*> solnsRaw;
-    Status status = QueryPlanner::plan(*cq, params, &solnsRaw);
-    solns = transitional_tools_do_not_use::spool_vector(solnsRaw);
-    ASSERT_NOT_OK(status);
+    auto statusWithSolutions = QueryPlanner::plan(*cq, params);
+    ASSERT_NOT_OK(statusWithSolutions.getStatus());
 }
 
 size_t QueryPlannerTest::getNumSolutions() const {
