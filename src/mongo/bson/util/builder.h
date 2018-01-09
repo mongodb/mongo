@@ -37,6 +37,7 @@
 #include <string.h>
 #include <string>
 
+#include <boost/optional.hpp>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
@@ -447,6 +448,11 @@ public:
     StringBuilderImpl& operator<<(ErrorCodes::Error code) {
         append(ErrorCodes::errorString(code));
         return *this;
+    }
+
+    template <typename T>
+    StringBuilderImpl& operator<<(const boost::optional<T>& optional) {
+        return optional ? *this << *optional : *this << "(None)";
     }
 
     void appendDoubleNice(double x) {

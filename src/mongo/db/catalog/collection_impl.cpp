@@ -42,6 +42,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/background.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_consistency.h"
@@ -132,7 +133,7 @@ std::unique_ptr<CollatorInterface> parseCollation(OperationContext* opCtx,
 
     return std::move(collator.getValue());
 }
-}
+}  // namespace
 
 using std::unique_ptr;
 using std::endl;
@@ -907,6 +908,14 @@ Status CollectionImpl::setValidator(OperationContext* opCtx, BSONObj validatorDo
 
     _details->updateValidator(opCtx, validatorDoc, getValidationLevel(), getValidationAction());
 
+    opCtx->recoveryUnit()->onRollback([
+        this,
+        oldValidator = std::move(_validator),
+        oldValidatorDoc = std::move(_validatorDoc)
+    ]() mutable {
+        this->_validator = std::move(oldValidator);
+        this->_validatorDoc = std::move(oldValidatorDoc);
+    });
     _validator = std::move(statusWithMatcher.getValue());
     _validatorDoc = std::move(validatorDoc);
     return Status::OK();
@@ -972,9 +981,12 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData ne
         return status.getStatus();
     }
 
+    auto oldValidationLevel = _validationLevel;
     _validationLevel = status.getValue();
 
     _details->updateValidator(opCtx, _validatorDoc, getValidationLevel(), getValidationAction());
+    opCtx->recoveryUnit()->onRollback(
+        [this, oldValidationLevel]() { this->_validationLevel = oldValidationLevel; });
 
     return Status::OK();
 }
@@ -987,9 +999,12 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
         return status.getStatus();
     }
 
+    auto oldValidationAction = _validationAction;
     _validationAction = status.getValue();
 
     _details->updateValidator(opCtx, _validatorDoc, getValidationLevel(), getValidationAction());
+    opCtx->recoveryUnit()->onRollback(
+        [this, oldValidationAction]() { this->_validationAction = oldValidationAction; });
 
     return Status::OK();
 }
@@ -999,6 +1014,19 @@ Status CollectionImpl::updateValidator(OperationContext* opCtx,
                                        StringData newLevel,
                                        StringData newAction) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(ns().toString(), MODE_X));
+
+    opCtx->recoveryUnit()->onRollback([
+        this,
+        oldValidator = std::move(_validator),
+        oldValidatorDoc = std::move(_validatorDoc),
+        oldValidationLevel = _validationLevel,
+        oldValidationAction = _validationAction
+    ]() mutable {
+        this->_validator = std::move(oldValidator);
+        this->_validatorDoc = std::move(oldValidatorDoc);
+        this->_validationLevel = oldValidationLevel;
+        this->_validationAction = oldValidationAction;
+    });
 
     _details->updateValidator(opCtx, newValidator, newLevel, newAction);
     _validatorDoc = std::move(newValidator);
@@ -1182,6 +1210,54 @@ void _reportValidationResults(OperationContext* opCtx,
         output->append("indexDetails", indexDetails->done());
     }
 }
+template <typename T>
+void addErrorIfUnequal(T stored, T cached, StringData name, ValidateResults* results) {
+    if (stored != cached) {
+        results->valid = false;
+        results->errors.push_back(str::stream() << "stored value for " << name
+                                                << " does not match cached value: "
+                                                << stored
+                                                << " != "
+                                                << cached);
+    }
+}
+
+void _validateCatalogEntry(OperationContext* opCtx,
+                           CollectionImpl* coll,
+                           BSONObj validatorDoc,
+                           ValidateResults* results) {
+    CollectionOptions options = coll->getCatalogEntry()->getCollectionOptions(opCtx);
+    addErrorIfUnequal(options.uuid, coll->uuid(), "UUID", results);
+    const CollatorInterface* collation = coll->getDefaultCollator();
+    addErrorIfUnequal(options.collation.isEmpty(), !collation, "simple collation", results);
+    if (!options.collation.isEmpty() && collation)
+        addErrorIfUnequal(options.collation.toString(),
+                          collation->getSpec().toBSON().toString(),
+                          "collation",
+                          results);
+    addErrorIfUnequal(options.capped, coll->isCapped(), "is capped", results);
+
+    addErrorIfUnequal(options.validator.toString(), validatorDoc.toString(), "validator", results);
+    if (!options.validator.isEmpty() && !validatorDoc.isEmpty()) {
+        addErrorIfUnequal(options.validationAction.length() ? options.validationAction : "error",
+                          coll->getValidationAction().toString(),
+                          "validation action",
+                          results);
+        addErrorIfUnequal(options.validationLevel.length() ? options.validationLevel : "strict",
+                          coll->getValidationLevel().toString(),
+                          "validation level",
+                          results);
+    }
+
+    addErrorIfUnequal(options.isView(), false, "is a view", results);
+    auto status = options.validateForStorage();
+    if (!status.isOK()) {
+        results->valid = false;
+        results->errors.push_back(str::stream() << "collection options are not valid for storage: "
+                                                << options.toBSON());
+    }
+}
+
 }  // namespace
 
 Status CollectionImpl::validate(OperationContext* opCtx,
@@ -1200,11 +1276,13 @@ Status CollectionImpl::validate(OperationContext* opCtx,
         RecordStoreValidateAdaptor indexValidator = RecordStoreValidateAdaptor(
             opCtx, &indexConsistency, level, &_indexCatalog, &indexNsResultsMap);
 
-
         // Validate the record store
         log(LogComponent::kIndex) << "validating collection " << ns().toString() << endl;
         _validateRecordStore(
             opCtx, _recordStore, level, background, &indexValidator, results, output);
+
+        // Validate in-memory catalog information with the persisted info.
+        _validateCatalogEntry(opCtx, this, _validatorDoc, results);
 
         // Validate indexes and check for mismatches.
         if (results->valid) {

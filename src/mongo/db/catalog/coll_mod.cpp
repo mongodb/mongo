@@ -379,6 +379,9 @@ Status _collModInternal(OperationContext* opCtx,
             // Notify the index catalog that the definition of this index changed.
             cmr.idx = coll->getIndexCatalog()->refreshEntry(opCtx, cmr.idx);
             result->appendAs(newExpireSecs, "expireAfterSeconds_new");
+            opCtx->recoveryUnit()->onRollback([ opCtx, idx = cmr.idx, coll ]() {
+                coll->getIndexCatalog()->refreshEntry(opCtx, idx);
+            });
         }
 
         // Save previous TTL index expiration.
@@ -387,17 +390,13 @@ Status _collModInternal(OperationContext* opCtx,
                                  cmr.idx->indexName()};
     }
 
-    // Validator
+    // The Validator, ValidationAction and ValidationLevel are already parsed and must be OK.
     if (!cmr.collValidator.eoo())
-        coll->setValidator(opCtx, cmr.collValidator.Obj()).transitional_ignore();
-
-    // ValidationAction
+        invariantOK(coll->setValidator(opCtx, cmr.collValidator.Obj()));
     if (!cmr.collValidationAction.empty())
-        coll->setValidationAction(opCtx, cmr.collValidationAction).transitional_ignore();
-
-    // ValidationLevel
+        invariantOK(coll->setValidationAction(opCtx, cmr.collValidationAction));
     if (!cmr.collValidationLevel.empty())
-        coll->setValidationLevel(opCtx, cmr.collValidationLevel).transitional_ignore();
+        invariantOK(coll->setValidationLevel(opCtx, cmr.collValidationLevel));
 
     // UsePowerof2Sizes
     if (!cmr.usePowerOf2Sizes.eoo())
@@ -432,6 +431,7 @@ Status _collModInternal(OperationContext* opCtx,
                                         << nss.ns());
         }
         coll->refreshUUID(opCtx);
+        opCtx->recoveryUnit()->onRollback([coll, opCtx]() { coll->refreshUUID(opCtx); });
     }
 
     // Only observe non-view collMods, as view operations are observed as operations on the
