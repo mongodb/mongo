@@ -280,7 +280,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'db/catalog/health_log',
-        'db/clientcursor',
         'db/commands/core',
         'db/conn_pool_options',
         'db/dbdirectclient',
@@ -293,6 +292,7 @@ env.Library(
         'db/mongod_options',
         'db/mongodandmongos',
         'db/op_observer_d',
+        'db/query_exec',
         'db/repair_database',
         'db/repl/repl_set_commands',
         'db/repl/storage_interface_impl',

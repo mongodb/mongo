@@ -105,8 +105,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/db/write_ops',
     ],
 )
 
@@ -201,9 +201,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/db_raii',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/util/md5',
-        '$BUILD_DIR/mongo/db/query/internal_plans',
-        '$BUILD_DIR/mongo/db/query/query',
     ],
 )
 
@@ -245,9 +244,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/exec/exec',
-        '$BUILD_DIR/mongo/db/query/internal_plans',
-        '$BUILD_DIR/mongo/db/query/query',
+        '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/serveronly', # For OperationContextImpl
     ],
 )
@@ -465,9 +462,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/database',
-        '$BUILD_DIR/mongo/db/query/internal_plans',
-        '$BUILD_DIR/mongo/db/query/query',
         '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/query_exec',
     ],
 )
 
@@ -520,9 +516,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/s/sharding',
-        '$BUILD_DIR/mongo/db/write_ops',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/query_exec',
     ],
 )
 
@@ -564,9 +560,9 @@ env.Library(
         'rs_rollback',
         'rs_rollback_no_uuid',
         'storage_interface_impl',
+        '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/db/write_ops',
     ],
 )
 
@@ -651,9 +647,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/prefetch',
+        '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/stats/timer_stats',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/write_ops',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/net/network',
         'oplog_entry',
@@ -1567,12 +1563,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/logical_time',
-        '$BUILD_DIR/mongo/db/query/query',
+        '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/repair_database',
         '$BUILD_DIR/mongo/db/repl/oplog_buffer_proxy',
         '$BUILD_DIR/mongo/db/s/balancer',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/write_ops',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager',

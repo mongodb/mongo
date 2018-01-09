@@ -38,84 +38,14 @@ env.Library(
 )
 
 env.Library(
-    target = 'exec',
-    source = [
-        "and_hash.cpp",
-        "and_sorted.cpp",
-        "cached_plan.cpp",
-        "collection_scan.cpp",
-        "count.cpp",
-        "count_scan.cpp",
-        "delete.cpp",
-        "distinct_scan.cpp",
-        "ensure_sorted.cpp",
-        "eof.cpp",
-        "fetch.cpp",
-        "geo_near.cpp",
-        "group.cpp",
-        "idhack.cpp",
-        "index_iterator.cpp",
-        "index_scan.cpp",
-        "keep_mutations.cpp",
-        "limit.cpp",
-        "merge_sort.cpp",
-        "multi_iterator.cpp",
-        "multi_plan.cpp",
-        "near.cpp",
-        "oplogstart.cpp",
-        "or.cpp",
-        "pipeline_proxy.cpp",
-        "plan_stage.cpp",
-        "projection.cpp",
-        "projection_exec.cpp",
-        "queued_data_stage.cpp",
-        "shard_filter.cpp",
-        "skip.cpp",
-        "sort.cpp",
-        "sort_key_generator.cpp",
-        "stagedebug_cmd.cpp",
-        "subplan.cpp",
-        "text.cpp",
-        "text_match.cpp",
-        "text_or.cpp",
-        "update.cpp",
-        "working_set_common.cpp",
-        "write_stage_common.cpp",
+    target='stagedebug_cmd',
+    source=[
+        'stagedebug_cmd.cpp'
     ],
-    LIBDEPS = [
-        "scoped_timer",
-        "working_set",
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/bson/dotted_path_support",
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/catalog/collection_info_cache',
-        '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        "$BUILD_DIR/mongo/db/concurrency/write_conflict_exception",
-        "$BUILD_DIR/mongo/db/commands",
-        "$BUILD_DIR/mongo/db/curop",
-        "$BUILD_DIR/mongo/db/fts/base_fts",
-        "$BUILD_DIR/mongo/db/index/index_descriptor",
-        "$BUILD_DIR/mongo/db/index/key_generator",
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_global",
-        "$BUILD_DIR/mongo/db/update/update_driver",
-        "$BUILD_DIR/mongo/scripting/scripting",
-        "$BUILD_DIR/mongo/db/storage/storage_options",
-        "$BUILD_DIR/mongo/s/common_s",
-        '$BUILD_DIR/third_party/s2/s2',
-        '$BUILD_DIR/mongo/db/query/query_common',
-        #'$BUILD_DIR/mongo/db/write_ops', # CYCLE
-        #'$BUILD_DIR/mongo/db/index/index_access_methods', # CYCLE
-        #'$BUILD_DIR/mongo/db/matcher/expressions_mongod_only', # CYCLE
-        #'$BUILD_DIR/mongo/db/s/sharding', # CYCLE
-        #'$BUILD_DIR/mongo/db/query/query', # CYCLE
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-        #'$BUILD_DIR/mongo/db/pipeline/serveronly', # CYCLE
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/db/index/index_access_methods",
+        "$BUILD_DIR/mongo/db/query_exec",
     ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-06): See `CYCLE` tags above
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
-    ]
 )
 
 env.CppUnitTest(
@@ -124,7 +54,7 @@ env.CppUnitTest(
         "queued_data_stage_test.cpp",
     ],
     LIBDEPS = [
-        "exec",
+        "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/util/clock_source_mock",
@@ -137,7 +67,7 @@ env.CppUnitTest(
         "sort_test.cpp",
     ],
     LIBDEPS = [
-        "exec",
+        "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/dbtests/mocklib",
         "$BUILD_DIR/mongo/db/query/collation/collator_factory_mock",
@@ -152,9 +82,9 @@ env.CppUnitTest(
         "projection_exec_test.cpp",
     ],
     LIBDEPS = [
+        "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/query/collation/collator_interface_mock",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/db/serveronly",
-        "exec",
     ],
 )

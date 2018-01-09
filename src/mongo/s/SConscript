@@ -264,35 +264,39 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='grid',
+    source=[
+        'balancer_configuration.cpp',
+        'catalog_cache.cpp',
+        'client/shard_factory.cpp',
+        'client/shard_registry.cpp',
+        'grid.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
+        'client/shard_interface',
+        'query/cluster_cursor_manager',
+        'routing_table',
+    ],
+)
+
 # This library contains sharding functionality used by both mongod and mongos
 env.Library(
     target='coreshard',
     source=[
-        'balancer_configuration.cpp',
-        'catalog_cache.cpp',
         'catalog_cache_loader.cpp',
         'cluster_identity_loader.cpp',
         'config_server_catalog_cache_loader.cpp',
         'config_server_client.cpp',
-        'grid.cpp',
         'shard_util.cpp',
         'sharding_egress_metadata_hook.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/lasterror',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
-        '$BUILD_DIR/mongo/executor/task_executor_pool',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
-        '$BUILD_DIR/mongo/s/query/cluster_cursor_manager',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        'common_s',
-        'routing_table',
-        #'client/sharding_client', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017,05-16): See `CYCLE` tags above
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
+        'grid',
     ],
 )
 
