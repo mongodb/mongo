@@ -141,13 +141,11 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
 
             // Failing to establish a consistent shardVersion means no results should be examined.
             if (ErrorCodes::isStaleShardingError(status.code())) {
-                throw StaleConfigException(str::stream() << "got stale shardVersion response "
-                                                         << responseObj
-                                                         << " from shard "
-                                                         << response.shardId
-                                                         << " at host "
-                                                         << response.shardHostAndPort->toString(),
-                                           responseObj);
+                uassertStatusOK(status.withContext(str::stream()
+                                                   << "got stale shardVersion response from shard "
+                                                   << response.shardId
+                                                   << " at host "
+                                                   << response.shardHostAndPort->toString()));
             }
 
             // In the case a read is performed against a view, the server can return an error

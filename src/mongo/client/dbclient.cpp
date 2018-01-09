@@ -179,8 +179,9 @@ rpc::UniqueReply DBClientBase::parseCommandReplyMessage(const std::string& host,
         uassertStatusOK(_metadataReader(opCtx, commandReply->getMetadata(), host));
     }
 
-    if (ErrorCodes::StaleConfig == getStatusFromCommandResult(commandReply->getCommandReply())) {
-        throw StaleConfigException("stale config in runCommand", commandReply->getCommandReply());
+    auto status = getStatusFromCommandResult(commandReply->getCommandReply());
+    if (status == ErrorCodes::StaleConfig) {
+        uassertStatusOK(status.withContext("stale config in runCommand"));
     }
 
     return rpc::UniqueReply(replyMsg, std::move(commandReply));
@@ -683,7 +684,7 @@ void DBClientBase::findN(vector<BSONObj>& out,
     if (c->hasResultFlag(ResultFlag_ShardConfigStale)) {
         BSONObj error;
         c->peekError(&error);
-        throw StaleConfigException("findN stale config", error);
+        uasserted(StaleConfigInfo(error), "findN stale config");
     }
 
     for (int i = 0; i < nToReturn; i++) {

@@ -194,12 +194,6 @@ private:
             dropCommandBSON,
             Shard::RetryPolicy::kIdempotent));
 
-        // Special-case SendStaleVersion errors
-        if (cmdDropResult.commandStatus == ErrorCodes::StaleConfig) {
-            throw StaleConfigException(str::stream() << "Stale config while dropping collection",
-                                       cmdDropResult.response);
-        }
-
         // If the collection doesn't exist, consider the drop a success.
         if (cmdDropResult.commandStatus == ErrorCodes::NamespaceNotFound) {
             return;

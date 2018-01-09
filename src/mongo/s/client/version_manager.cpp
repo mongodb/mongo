@@ -311,7 +311,7 @@ bool checkShardVersion(OperationContext* opCtx,
                                      << shard->getConnString().toString()
                                      << ")");
 
-            throw StaleConfigException(ns, msg, refVersion, currentVersion);
+            uasserted(StaleConfigInfo(ns, refVersion, currentVersion), msg);
         }
     } else if (refManager) {
         string msg(str::stream() << "not sharded (" << (!manager ? string("<none>") : str::stream()
@@ -325,8 +325,9 @@ bool checkShardVersion(OperationContext* opCtx,
                                  << conn_in->getServerAddress()
                                  << ")");
 
-        throw StaleConfigException(
-            ns, msg, refManager->getVersion(shard->getId()), ChunkVersion::UNSHARDED());
+        uasserted(
+            StaleConfigInfo(ns, refManager->getVersion(shard->getId()), ChunkVersion::UNSHARDED()),
+            msg);
     }
 
     // Has the ChunkManager been reloaded since the last time we updated the shard version over

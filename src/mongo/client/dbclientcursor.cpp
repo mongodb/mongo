@@ -259,8 +259,8 @@ BSONObj DBClientCursor::commandDataReceived(const Message& reply) {
     auto commandStatus = getStatusFromCommandResult(commandReply->getCommandReply());
 
     if (ErrorCodes::StaleConfig == commandStatus) {
-        throw StaleConfigException("stale config in DBClientCursor::dataReceived()",
-                                   commandReply->getCommandReply());
+        uassertStatusOK(
+            commandStatus.withContext("stale config in DBClientCursor::dataReceived()"));
     } else if (!commandStatus.isOK()) {
         wasError = true;
     }
@@ -346,8 +346,7 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
     if (qr.getResultFlags() & ResultFlag_ShardConfigStale) {
         BSONObj error;
         verify(peekError(&error));
-        throw StaleConfigException(
-            (string) "stale config on lazy receive" + causedBy(getErrField(error)), error);
+        uasserted(StaleConfigInfo(error), "stale config on lazy receive");
     }
 
     /* this assert would fire the way we currently work:

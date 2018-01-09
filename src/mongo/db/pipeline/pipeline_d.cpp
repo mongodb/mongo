@@ -832,7 +832,7 @@ std::vector<FieldPath> PipelineD::MongoDInterface::collectDocumentKeyFields(
         return {"_id"};  // Collection is not sharded.
     }
 
-    uassert(ErrorCodes::StaleConfig,
+    uassert(ErrorCodes::InvalidUUID,
             str::stream() << "Collection " << nss.ns()
                           << " UUID differs from UUID on change stream operations",
             scm->uuidMatches(uuid));

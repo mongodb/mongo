@@ -38,6 +38,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/query_request.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
@@ -328,10 +329,7 @@ void ParallelSortClusteredCursor::_markStaleNS(const NamespaceString& staleNS,
     const int tries = ++_staleNSMap[staleNS.ns()];
 
     if (tries >= 5) {
-        throw StaleConfigException(staleNS.ns(),
-                                   "too many retries of stale version info",
-                                   e.getVersionReceived(),
-                                   e.getVersionWanted());
+        uassertStatusOK(e.toStatus("too many retries of stale version info"));
     }
 }
 
@@ -611,7 +609,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
         } catch (StaleConfigException& e) {
             // Our version isn't compatible with the current version anymore on at least one shard,
             // need to retry immediately
-            NamespaceString staleNS(e.getns());
+            NamespaceString staleNS(e->getns());
 
             // For legacy reasons, this may not be set in the exception :-(
             if (staleNS.size() == 0)
@@ -766,13 +764,13 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
         } catch (StaleConfigException& e) {
             retry = true;
 
-            string staleNS = e.getns();
+            string staleNS = e->getns();
             // For legacy reasons, ns may not always be set in exception :-(
             if (staleNS.size() == 0)
                 staleNS = ns;  // ns is versioned namespace, be careful of this
 
             // Will retry all at once
-            staleNSExceptions[staleNS] = e;
+            staleNSExceptions.emplace(staleNS, e);
 
             // Fully clear this cursor, as it needs to be re-established
             mdata.cleanup(true);
@@ -996,14 +994,9 @@ void ParallelSortClusteredCursor::_oldInit() {
                 conns[i]->done();
 
                 // Version is zero b/c this is deprecated codepath
-                staleConfigExs.push_back(str::stream()
-                                         << "stale config detected for "
-                                         << StaleConfigException(_ns,
-                                                                 "ParallelCursor::_init",
-                                                                 ChunkVersion(0, 0, OID()),
-                                                                 ChunkVersion(0, 0, OID()))
-                                                .what()
-                                         << errLoc);
+                staleConfigExs.push_back(str::stream() << "stale config detected for " << _ns
+                                                       << " in ParallelCursor::_init "
+                                                       << errLoc);
                 break;
             }
 
@@ -1080,7 +1073,7 @@ void ParallelSortClusteredCursor::_oldInit() {
                 allConfigStale = true;
 
                 staleConfigExs.push_back(
-                    (string) "stale config detected when receiving response for " + e.what() +
+                    (string) "stale config detected when receiving response for " + e.toString() +
                     errLoc);
                 _cursors[i].reset(NULL, NULL);
                 conns[i]->done();
@@ -1109,7 +1102,8 @@ void ParallelSortClusteredCursor::_oldInit() {
                 // when we throw our exception
                 allConfigStale = true;
 
-                staleConfigExs.push_back((string) "stale config detected for " + e.what() + errLoc);
+                staleConfigExs.push_back((string) "stale config detected for " + e.toString() +
+                                         errLoc);
                 _cursors[i].reset(NULL, NULL);
                 conns[i]->done();
                 continue;
@@ -1156,8 +1150,8 @@ void ParallelSortClusteredCursor::_oldInit() {
 
         if (throwException && staleConfigExs.size() > 0) {
             // Version is zero b/c this is deprecated codepath
-            throw StaleConfigException(
-                _ns, errMsg.str(), ChunkVersion(0, 0, OID()), ChunkVersion(0, 0, OID()));
+            uasserted(StaleConfigInfo(_ns, ChunkVersion(0, 0, OID()), ChunkVersion(0, 0, OID())),
+                      errMsg.str());
         } else if (throwException) {
             uasserted(14827, errMsg.str());
         } else {
@@ -1340,7 +1334,7 @@ void throwCursorStale(DBClientCursor* cursor) {
     if (cursor->hasResultFlag(ResultFlag_ShardConfigStale)) {
         BSONObj error;
         cursor->peekError(&error);
-        throw StaleConfigException("query returned a stale config error", error);
+        uasserted(StaleConfigInfo(error), "query returned a stale config error");
     }
 
     if (NamespaceString(cursor->getns()).isCommand()) {
@@ -1350,8 +1344,9 @@ void throwCursorStale(DBClientCursor* cursor) {
         //
         // TODO: Standardize stale config reporting.
         BSONObj res = cursor->peekFirst();
-        if (res.hasField("code") && res["code"].Number() == ErrorCodes::StaleConfig) {
-            throw StaleConfigException("command returned a stale config error", res);
+        auto status = getStatusFromCommandResult(res);
+        if (status == ErrorCodes::StaleConfig) {
+            uassertStatusOK(status.withContext("command returned a stale config error"));
         }
     }
 }

@@ -265,6 +265,17 @@ env.Library(
 )
 
 env.Library(
+    target='stale_config',
+    source=[
+        'stale_exception.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+# This library contains sharding functionality used by both mongod and mongos
+env.Library(
     target='grid',
     source=[
         'balancer_configuration.cpp',

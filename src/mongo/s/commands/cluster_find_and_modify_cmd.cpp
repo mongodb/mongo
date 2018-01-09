@@ -218,7 +218,7 @@ private:
         const auto responseStatus = getStatusFromCommandResult(response.data);
         if (ErrorCodes::isStaleShardingError(responseStatus.code())) {
             // Command code traps this exception and re-runs
-            throw StaleConfigException("findAndModify", response.data);
+            uassertStatusOK(responseStatus.withContext("findAndModify"));
         }
 
         // First append the properly constructed writeConcernError. It will then be skipped in

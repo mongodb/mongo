@@ -314,13 +314,10 @@ std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(
                                 requests,
                                 false /* do not allow partial results */);
 
-    } catch (const DBException& ex) {
-        // TODO SERVER-32587 only catch this category.
-        if (ex.isA<ErrorCategory::StaleShardingError>()) {
-            // If any shard returned a stale shardVersion error, invalidate the routing table cache.
-            // This will cause the cache to be refreshed the next time it is accessed.
-            Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(*routingInfo));
-        }
+    } catch (const ExceptionForCat<ErrorCategory::StaleShardingError>&) {
+        // If any shard returned a stale shardVersion error, invalidate the routing table cache.
+        // This will cause the cache to be refreshed the next time it is accessed.
+        Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(*routingInfo));
         throw;
     }
 }
@@ -475,10 +472,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                                 shardQuery,
                                                 aggRequest.getCollation());
             }
-        } catch (const DBException& ex) {
-            // TODO SERVER-32587 only catch this category.
-            if (!ex.isA<ErrorCategory::StaleShardingError>())
-                throw;
+        } catch (const ExceptionForCat<ErrorCategory::StaleShardingError>& ex) {
             LOG(1) << "got stale shardVersion error " << redact(ex) << " while dispatching "
                    << redact(targetedCommand) << " after " << (numAttempts + 1)
                    << " dispatch attempts";
@@ -910,7 +904,8 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         Shard::RetryPolicy::kIdempotent));
 
     if (ErrorCodes::isStaleShardingError(cmdResponse.commandStatus.code())) {
-        throw StaleConfigException("command failed because of stale config", cmdResponse.response);
+        uassertStatusOK(
+            cmdResponse.commandStatus.withContext("command failed because of stale config"));
     }
 
     BSONObj result;

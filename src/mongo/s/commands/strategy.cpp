@@ -265,7 +265,7 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
             execCommandClient(opCtx, command, request, builder);
             return;
         } catch (const StaleConfigException& e) {
-            if (e.getns().empty()) {
+            if (e->getns().empty()) {
                 // This should be impossible but older versions tried incorrectly to handle it here.
                 log() << "Received a stale config error with an empty namespace while executing "
                       << redact(request.body) << " : " << redact(e);
@@ -278,9 +278,9 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
             loops--;
             log() << "Retrying command " << redact(request.body) << causedBy(e);
 
-            ShardConnection::checkMyConnectionVersions(opCtx, e.getns());
+            ShardConnection::checkMyConnectionVersions(opCtx, e->getns());
             if (loops < 4) {
-                const NamespaceString staleNSS(e.getns());
+                const NamespaceString staleNSS(e->getns());
                 if (staleNSS.isValid()) {
                     Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNSS);
                 }

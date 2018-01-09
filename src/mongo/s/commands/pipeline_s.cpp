@@ -153,10 +153,7 @@ boost::optional<Document> PipelineS::MongoSInterface::lookupSingleDocument(
             // If it's an unsharded collection which has been deleted and re-created, we may get a
             // NamespaceNotFound error when looking up by UUID.
             return boost::none;
-        } catch (const DBException& ex) {
-            // TODO SERVER-32587 only catch this category.
-            if (!ex.isA<ErrorCategory::StaleShardingError>())
-                throw;
+        } catch (const ExceptionForCat<ErrorCategory::StaleShardingError>&) {
             // If we hit a stale shardVersion exception, invalidate the routing table cache.
             catalogCache->onStaleConfigError(std::move(routingInfo));
             continue;  // Try again if allowed.

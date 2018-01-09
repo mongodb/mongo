@@ -105,7 +105,7 @@ bool cursorCommandPassthrough(OperationContext* opCtx,
     conn.done();
     Status status = getStatusFromCommandResult(response);
     if (ErrorCodes::StaleConfig == status) {
-        throw StaleConfigException("command failed because of stale config", response);
+        uassertStatusOK(status.withContext("command failed because of stale config"));
     }
     if (!status.isOK()) {
         return CommandHelpers::appendCommandStatus(*out, status);

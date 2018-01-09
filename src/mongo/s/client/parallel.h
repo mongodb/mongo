@@ -34,6 +34,7 @@
 #include "mongo/client/query.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/stale_exception.h"
 
 namespace mongo {
 
@@ -43,7 +44,6 @@ class DBClientCursorHolder;
 class OperationContext;
 struct ParallelConnectionMetadata;
 struct ParallelConnectionState;
-class StaleConfigException;
 
 struct CommandInfo {
     CommandInfo() = default;

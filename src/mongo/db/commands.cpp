@@ -85,8 +85,7 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
         bool ok = command->publicRun(opCtx, request, out);
         appendCommandStatus(out, ok);
     } catch (const StaleConfigException&) {
-        // These exceptions are intended to be handled at a higher level and cannot losslessly
-        // round-trip through Status.
+        // These exceptions are intended to be handled at a higher level.
         throw;
     } catch (const DBException& ex) {
         out.resetToEmpty();

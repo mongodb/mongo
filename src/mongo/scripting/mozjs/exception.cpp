@@ -119,6 +119,11 @@ Status JSErrorReportToStatus(JSContext* cx,
             error = ErrorCodes::JSInterpreterFailure;
         } else {
             error = ErrorCodes::Error(report->errorNumber - JSErr_Limit);
+            if (ErrorCodes::shouldHaveExtraInfo(error)) {
+                // For now we can't propagate extra info through js exceptions.
+                // TODO SERVER-32239 delete this block.
+                error = ErrorCodes::UnknownError;
+            }
         }
     }
 

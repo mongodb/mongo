@@ -122,9 +122,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                   << " ntoreturn:" << queryMessage.ntoreturn;
     }
 
-    const StaleConfigException* scex = (exception->code() == ErrorCodes::StaleConfig)
-        ? checked_cast<const StaleConfigException*>(exception)
-        : NULL;
+    auto scex = exception->extraInfo<StaleConfigInfo>();
 
     BSONObjBuilder err;
     err.append("$err", exception->reason());
@@ -174,19 +172,7 @@ void _generateErrorResponse(OperationContext* opCtx,
     // We could have thrown an exception after setting fields in the builder,
     // so we need to reset it to a clean state just to be sure.
     replyBuilder->reset();
-
-    // We need to include some extra information for StaleConfig.
-    if (exception.code() == ErrorCodes::StaleConfig) {
-        const StaleConfigException& scex = checked_cast<const StaleConfigException&>(exception);
-        replyBuilder->setCommandReply(scex.toStatus(),
-                                      BSON("ns" << scex.getns() << "vReceived"
-                                                << BSONArray(scex.getVersionReceived().toBSON())
-                                                << "vWanted"
-                                                << BSONArray(scex.getVersionWanted().toBSON())));
-    } else {
-        replyBuilder->setCommandReply(exception.toStatus());
-    }
-
+    replyBuilder->setCommandReply(exception.toStatus());
     replyBuilder->setMetadata(replyMetadata);
 }
 
@@ -200,22 +186,8 @@ void _generateErrorResponse(OperationContext* opCtx,
     // We could have thrown an exception after setting fields in the builder,
     // so we need to reset it to a clean state just to be sure.
     replyBuilder->reset();
-
-    // We need to include some extra information for StaleConfig.
-    if (exception.code() == ErrorCodes::StaleConfig) {
-        const StaleConfigException& scex = checked_cast<const StaleConfigException&>(exception);
-        replyBuilder->setCommandReply(scex.toStatus(),
-                                      BSON("ns" << scex.getns() << "vReceived"
-                                                << BSONArray(scex.getVersionReceived().toBSON())
-                                                << "vWanted"
-                                                << BSONArray(scex.getVersionWanted().toBSON())
-                                                << "operationTime"
-                                                << operationTime.asTimestamp()));
-    } else {
-        replyBuilder->setCommandReply(exception.toStatus(),
-                                      BSON("operationTime" << operationTime.asTimestamp()));
-    }
-
+    replyBuilder->setCommandReply(exception.toStatus(),
+                                  BSON("operationTime" << operationTime.asTimestamp()));
     replyBuilder->setMetadata(replyMetadata);
 }
 
@@ -763,10 +735,7 @@ void execCommandDatabase(OperationContext* opCtx,
         }
     } catch (const DBException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (e.code() == ErrorCodes::StaleConfig) {
-            auto sce = dynamic_cast<const StaleConfigException*>(&e);
-            invariant(sce);  // do not upcasts from DBException created by uassert variants.
-
+        if (auto sce = e.extraInfo<StaleConfigInfo>()) {
             if (!opCtx->getClient()->isInDirectClient()) {
                 ShardingState::get(opCtx)
                     ->onStaleShardVersion(
@@ -926,11 +895,13 @@ DbResponse receivedQuery(OperationContext* opCtx,
         dbResponse.exhaustNS = runQuery(opCtx, q, nss, dbResponse.response);
     } catch (const AssertionException& e) {
         // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (!opCtx->getClient()->isInDirectClient() && e.code() == ErrorCodes::StaleConfig) {
-            auto& sce = static_cast<const StaleConfigException&>(e);
-            ShardingState::get(opCtx)
-                ->onStaleShardVersion(opCtx, NamespaceString(sce.getns()), sce.getVersionReceived())
-                .transitional_ignore();
+        if (auto sce = e.extraInfo<StaleConfigInfo>()) {
+            if (!opCtx->getClient()->isInDirectClient()) {
+                ShardingState::get(opCtx)
+                    ->onStaleShardVersion(
+                        opCtx, NamespaceString(sce->getns()), sce->getVersionReceived())
+                    .transitional_ignore();
+            }
         }
 
         dbResponse.response.reset();

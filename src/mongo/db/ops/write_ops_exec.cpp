@@ -205,32 +205,19 @@ bool handleError(OperationContext* opCtx,
         throw;  // These have always failed the whole batch.
     }
 
-    if (ErrorCodes::isStaleShardingError(ex.code())) {
-        auto staleConfigException = dynamic_cast<const StaleConfigException*>(&ex);
-        if (!staleConfigException) {
-            // We need to get extra info off of the SCE, but some common patterns can result in the
-            // exception being converted to a Status then rethrown as a AssertionException, losing
-            // the info we need. It would be a bug if this happens so we want to detect it in
-            // testing, but it isn't severe enough that we should bring down the server if it
-            // happens in production.
-            dassert(staleConfigException);
-            msgasserted(35475,
-                        str::stream()
-                            << "Got a StaleConfig error but exception was the wrong type: "
-                            << demangleName(typeid(ex)));
-        }
-
+    if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
         if (!opCtx->getClient()->isInDirectClient()) {
             ShardingState::get(opCtx)
-                ->onStaleShardVersion(opCtx, nss, staleConfigException->getVersionReceived())
-                .transitional_ignore();
+                ->onStaleShardVersion(opCtx, nss, staleInfo->getVersionReceived())
+                .ignore();  // We already have an error to report so ignore this one.
         }
-        out->staleConfigException = stdx::make_unique<StaleConfigException>(*staleConfigException);
+        // Don't try doing more ops since they will fail with the same error.
+        // Command reply serializer will handle repeating this error if needed.
+        out->results.emplace_back(ex.toStatus());
         return false;
     }
 
     out->results.emplace_back(ex.toStatus());
-
     return !wholeOp.getOrdered();
 }
 

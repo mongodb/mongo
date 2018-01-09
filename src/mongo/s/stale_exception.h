@@ -35,51 +35,16 @@
 
 namespace mongo {
 
-/**
- * Thrown whenever the config info for a given shard/chunk is out of date.
- */
-class StaleConfigException final : public AssertionException {
+class StaleConfigInfo final : public ErrorExtraInfo {
 public:
-    StaleConfigException(const std::string& ns,
-                         const std::string& raw,
-                         ChunkVersion received,
-                         ChunkVersion wanted)
-        : AssertionException(Status(ErrorCodes::StaleConfig,
-                                    str::stream() << raw << " ( ns : " << ns << ", received : "
-                                                  << received.toString()
-                                                  << ", wanted : "
-                                                  << wanted.toString()
-                                                  << " )")),
-          _ns(ns),
-          _received(received),
-          _wanted(wanted) {}
+    static constexpr auto code = ErrorCodes::StaleConfig;
 
-    /** Preferred if we're rebuilding this from a thrown exception */
-    StaleConfigException(const std::string& raw, const BSONObj& error)
-        : AssertionException(
-              Status(ErrorCodes::StaleConfig,
-                     str::stream() << raw << " ( ns : " << (error["ns"].type() == String
-                                                                ? error["ns"].String()
-                                                                : std::string("<unknown>"))
-                                   << ", received : "
-                                   << ChunkVersion::fromBSON(error, "vReceived").toString()
-                                   << ", wanted : "
-                                   << ChunkVersion::fromBSON(error, "vWanted").toString()
-                                   << " )")),
-          // For legacy reasons, we may not always get a namespace here
-          _ns(error["ns"].type() == String ? error["ns"].String() : ""),
-          _received(ChunkVersion::fromBSON(error, "vReceived")),
-          _wanted(ChunkVersion::fromBSON(error, "vWanted")) {}
+    StaleConfigInfo(const std::string& ns, ChunkVersion received, ChunkVersion wanted)
+        : _ns(ns), _received(received), _wanted(wanted) {}
 
-    /**
-     * TODO: This constructor is only necessary, because ParallelSortClusteredCursor puts per-host
-     * stale config exceptions in a map and this requires a default constructor.
-     */
-    StaleConfigException()
-        : AssertionException(Status(ErrorCodes::InternalError,
-                                    "initializing empty stale config exception object")) {}
+    StaleConfigInfo(const BSONObj& commandError);
 
-    virtual ~StaleConfigException() throw() {}
+    StaleConfigInfo() = default;
 
     std::string getns() const {
         return _ns;
@@ -100,12 +65,15 @@ public:
         return !_received.hasEqualEpoch(_wanted) || _received.isSet() != _wanted.isSet();
     }
 
-private:
-    void defineOnlyInFinalSubclassToPreventSlicing() final {}
+    void serialize(BSONObjBuilder* bob) const final;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
+private:
     std::string _ns;
     ChunkVersion _received;
     ChunkVersion _wanted;
 };
+
+using StaleConfigException = ExceptionFor<ErrorCodes::StaleConfig>;
 
 }  // namespace mongo
