@@ -4,7 +4,7 @@ Interface for customizing the behavior of a test fixture.
 
 from __future__ import absolute_import
 
-from ... import logging
+from ...logging import loggers
 from ...utils import registry
 
 
@@ -46,14 +46,20 @@ class CustomBehavior(object):
         Initializes the CustomBehavior with the specified fixture.
         """
 
-        if not isinstance(hook_logger, logging.Logger):
-            raise TypeError("logger must be a Logger instance")
+        if not isinstance(hook_logger, loggers.HookLogger):
+            raise TypeError("logger must be a HookLogger instance")
 
         self.logger = hook_logger
         self.fixture = fixture
-        self.hook_test_case = None
-        self.logger_name = self.__class__.__name__
         self.description = description
+        self.hook_test_case = None
+
+    def make_dynamic_test(self, test_case_class, *args, **kwargs):
+        """
+        Returns an instance of 'test_case_class' configured to use the
+        appropriate logger.
+        """
+        return test_case_class(self.logger.test_case_logger, *args, **kwargs)
 
     def before_suite(self, test_report):
         """

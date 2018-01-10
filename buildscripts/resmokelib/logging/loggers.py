@@ -149,9 +149,9 @@ class ExecutorRootLogger(RootLogger):
         """Create a new TestQueueLogger that will be a child of the "tests" root logger."""
         return TestQueueLogger(test_kind, self.tests_root_logger)
 
-    def new_hook_logger(self, behavior_class, job_num, fixture_logger):
+    def new_hook_logger(self, behavior_class, fixture_logger):
         """Create a new child hook logger."""
-        return BaseLogger("%s:job%d" % (behavior_class, job_num), parent=fixture_logger)
+        return HookLogger(behavior_class, fixture_logger, self.tests_root_logger)
 
 
 class JobLogger(BaseLogger):
@@ -312,6 +312,20 @@ class TestQueueLogger(BaseLogger):
         :param tests_root_logger: the root logger for the tests logs.
         """
         BaseLogger.__init__(self, test_kind, parent=tests_root_logger)
+
+
+class HookLogger(BaseLogger):
+    def __init__(self, behavior_class, fixture_logger, tests_root_logger):
+        """Initialize a HookLogger.
+
+        :param behavior_class: the hook's name (e.g. CheckReplDBHash, ValidateCollections, etc.).
+        :param fixture_logger: the logger for the fixtures logs.
+        :param tests_root_logger: the root logger for the tests logs.
+        """
+        logger_name = "{}:job{:d}".format(behavior_class, fixture_logger.job_num)
+        BaseLogger.__init__(self, logger_name, parent=fixture_logger)
+
+        self.test_case_logger = BaseLogger(logger_name, parent=tests_root_logger)
 
 
 # Util methods

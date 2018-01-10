@@ -76,12 +76,10 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
         self._run(test_report)
 
     def _run(self, test_report):
-        self.hook_test_case = testcase.TestCase(
-            self.logger,
-            "Hook",
-            "{}:{}".format(self._last_test_name, self.logger_name))
-        interface.CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
+        test_name = "{}:{}".format(self._last_test_name, self.__class__.__name__)
+        self.hook_test_case = self.make_dynamic_test(testcase.TestCase, "Hook", test_name)
 
+        interface.CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
         try:
             self._kill_secondaries()
             self._check_secondaries_and_restart_fixture()
