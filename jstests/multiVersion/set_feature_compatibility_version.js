@@ -30,25 +30,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     };
 
     let doStartupFailTests = function(withUUIDs, dbpath) {
-        // Fail to start up if no admin database is present but other non-local databases are
-        // present.
-        if (withUUIDs) {
-            setupMissingAdminDB(latest, dbpath);
-        } else {
-            setupMissingAdminDB(downgrade, dbpath);
-        }
-        conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
-        assert.eq(
-            null,
-            conn,
-            "expected mongod to fail when data files are present and no admin database is found.");
-        if (!withUUIDs) {
-            conn =
-                MongoRunner.runMongod({dbpath: dbpath, binVersion: downgrade, noCleanData: true});
-            assert.neq(null, conn, "expected 3.4 to startup when the admin database is missing");
-            MongoRunner.stopMongod(conn);
-        }
-
         // Fail to start up if no featureCompatibilityVersion document is present and non-local
         // databases are present.
         if (withUUIDs) {
@@ -89,20 +70,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
             assert.writeOK(adminDB.system.version.remove({_id: "featureCompatibilityVersion"}));
         }
 
-        MongoRunner.stopMongod(conn);
-        return conn;
-    };
-
-    let setupMissingAdminDB = function(version, dbpath) {
-        conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: version});
-        assert.neq(null,
-                   conn,
-                   "mongod was unable to start up with version=" + version + " and no data files");
-        let testDB = conn.getDB("test");
-        assert.commandWorked(testDB.createCollection("testcoll"));
-        adminDB = conn.getDB("admin");
-        assert.commandWorked(adminDB.runCommand({dropDatabase: 1}),
-                             "expected drop of admin database to be successful");
         MongoRunner.stopMongod(conn);
         return conn;
     };
@@ -230,35 +197,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     // Fail to start up if no featureCompatibilityVersion is present and no collections have UUIDs.
     doStartupFailTests(/*withUUIDs*/ false, dbpath);
 
-    // --repair can be used to restore a missing admin database and featureCompatibilityVersion
-    // document if at least some collections have UUIDs.
-    conn = setupMissingAdminDB(latest, dbpath);
-    recoverMMapJournal(isMMAPv1, conn, dbpath);
-    let returnCode = runMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
-    assert.eq(
-        returnCode,
-        0,
-        "expected mongod --repair to execute successfully when restoring a missing admin database.");
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
-    assert.neq(null,
-               conn,
-               "mongod was unable to start up with version=" + latest + " and existing data files");
-    // featureCompatibilityVersion is 3.4 and targetVersion is 3.6 because the admin.system.version
-    // collection was restored without a UUID.
-    adminDB = conn.getDB("admin");
-    assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.4");
-    assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).targetVersion,
-              "3.6");
-    let adminInfos = adminDB.getCollectionInfos();
-    assert(!adminInfos[0].info.uuid,
-           "Expected collection with infos " + tojson(adminInfos) + " to not have a UUID.");
-    MongoRunner.stopMongod(conn);
-
     // --repair can be used to restore a missing featureCompatibilityVersion document to an
     // existing admin database if at least some collections have UUIDs.
     conn = setupMissingFCVDoc(latest, dbpath);
     recoverMMapJournal(isMMAPv1, conn, dbpath);
-    returnCode = runMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
+    let returnCode = runMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
     assert.eq(
         returnCode,
         0,

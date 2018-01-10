@@ -91,9 +91,5 @@
         adminDB.system.version.insert({_id: "featureCompatibilityVersion", version: "3.6"}));
     checkFCV(adminDB, "3.6");
 
-    // Dropping the admin database changes the featureCompatibilityVersion server parameter to 3.4.
-    adminDB.dropDatabase();
-    checkFCVDocumentMissing(adminDB);
-
     MongoRunner.stopMongod(conn);
 }());

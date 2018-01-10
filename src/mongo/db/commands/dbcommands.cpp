@@ -181,7 +181,7 @@ public:
 
         if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
-            ((dbname == NamespaceString::kLocalDb) || (dbname == NamespaceString::kAdminDb))) {
+            (dbname == NamespaceString::kLocalDb)) {
             return appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,
