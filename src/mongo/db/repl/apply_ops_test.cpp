@@ -445,6 +445,30 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
     }
 }
 
+TEST_F(ApplyOpsTest, ApplyOpsFailsToDropAdmin) {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+
+    // Create a collection on the admin database.
+    NamespaceString nss("admin.foo");
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, options));
+
+    auto dropDatabaseOp = BSON("op"
+                               << "c"
+                               << "ns"
+                               << nss.getCommandNS().ns()
+                               << "o"
+                               << BSON("dropDatabase" << 1));
+
+    auto dropDatabaseCmdObj = BSON("applyOps" << BSON_ARRAY(dropDatabaseOp));
+    BSONObjBuilder resultBuilder;
+    auto status =
+        applyOps(opCtx.get(), nss.db().toString(), dropDatabaseCmdObj, mode, &resultBuilder);
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

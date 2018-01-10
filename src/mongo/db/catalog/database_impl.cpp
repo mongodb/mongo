@@ -855,6 +855,7 @@ void DatabaseImpl::dropDatabase(OperationContext* opCtx, Database* db) {
 
     // Store the name so we have if for after the db object is deleted
     const string name = db->name();
+
     LOG(1) << "dropDatabase " << name;
 
     invariant(opCtx->lockState()->isDbLockedForMode(name, MODE_X));

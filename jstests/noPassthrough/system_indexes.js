@@ -45,17 +45,16 @@
     assert.eq(2, db.system.users.getIndexes().length);
     assert.eq(2, db.system.roles.getIndexes().length);
 
-    // Retain the current FCV so that it can be restored after the admin db is dropped.
-    const fcv =
-        assert.commandWorked(db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}))
-            .featureCompatibilityVersion.version;
-
     // TEST: Destroying the admin.system.users index and restarting will recreate it, even if
     // admin.system.roles does not exist
-    db.dropDatabase();
-    // Restore the featureCompatibilityVersion document since as of SERVER-29452, mongod fails to
-    // startup without such a document.
-    assert.commandWorked(db.runCommand({setFeatureCompatibilityVersion: fcv}));
+    // Use _mergeAuthzCollections to clear admin.system.users and admin.system.roles.
+    assert.commandWorked(db.adminCommand({
+        _mergeAuthzCollections: 1,
+        tempUsersCollection: 'admin.tempusers',
+        tempRolesCollection: 'admin.temproles',
+        db: "",
+        drop: true
+    }));
     db.createUser({user: "user", pwd: "pwd", roles: []});
     assert.commandWorked(db.system.users.dropIndexes());
     MongoRunner.stopMongod(conn);
@@ -65,10 +64,14 @@
 
     // TEST: Destroying the admin.system.roles index and restarting will recreate it, even if
     // admin.system.users does not exist
-    db.dropDatabase();
-    // Restore the featureCompatibilityVersion document since as of SERVER-29452, mongod fails to
-    // startup without such a document.
-    assert.commandWorked(db.runCommand({setFeatureCompatibilityVersion: fcv}));
+    // Use _mergeAuthzCollections to clear admin.system.users and admin.system.roles.
+    assert.commandWorked(db.adminCommand({
+        _mergeAuthzCollections: 1,
+        tempUsersCollection: 'admin.tempusers',
+        tempRolesCollection: 'admin.temproles',
+        db: "",
+        drop: true
+    }));
     db.createRole({role: "role", privileges: [], roles: []});
     assert.commandWorked(db.system.roles.dropIndexes());
     MongoRunner.stopMongod(conn);

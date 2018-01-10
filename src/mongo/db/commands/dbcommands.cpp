@@ -182,7 +182,7 @@ public:
 
         if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
-            ((dbname == NamespaceString::kLocalDb) || (dbname == NamespaceString::kAdminDb))) {
+            (dbname == NamespaceString::kLocalDb)) {
             return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,

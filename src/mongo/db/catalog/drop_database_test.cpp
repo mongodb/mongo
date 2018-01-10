@@ -458,4 +458,13 @@ TEST_F(DropDatabaseTest,
     ASSERT_FALSE(db->isDropPending(_opCtx.get()));
 }
 
+TEST_F(DropDatabaseTest, DropDatabaseFailsToDropAdmin) {
+    NamespaceString adminNSS(NamespaceString::kAdminDb, "foo");
+    _createCollection(_opCtx.get(), adminNSS);
+    ASSERT_THROWS_CODE_AND_WHAT(dropDatabase(_opCtx.get(), adminNSS.db().toString()).ignore(),
+                                AssertionException,
+                                ErrorCodes::IllegalOperation,
+                                "Dropping the 'admin' database is prohibited.");
+}
+
 }  // namespace
