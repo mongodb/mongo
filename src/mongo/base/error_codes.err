@@ -234,6 +234,7 @@ error_code("TooManyDocumentSequences", 233)
 error_code("RetryChangeStream", 234)
 error_code("InternalErrorNotSupported", 235) # this function or module is not available on this platform or configuration
 error_code("ForTestingErrorExtraInfo", 236, extra="ErrorExtraInfoExample")
+error_code("CursorKilled", 237)
 
 # Error codes 4000-8999 are reserved.
 
@@ -262,7 +263,8 @@ error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout"
 error_class("Interruption", ["Interrupted",
                              "InterruptedAtShutdown",
                              "InterruptedDueToReplStateChange",
-                             "ExceededTimeLimit"])
+                             "ExceededTimeLimit",
+                             "CursorKilled"])
 
 # isNotMasterError() includes all codes that indicate that the node that received the request was
 # not master at some point during command processing, regardless of whether some write may have

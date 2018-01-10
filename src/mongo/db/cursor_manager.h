@@ -173,14 +173,24 @@ public:
                                           AuthCheck checkSessionAuth = kCheckSession);
 
     /**
-     * Returns an OK status if the cursor was successfully erased.
+     * Returns an OK status if the cursor was successfully killed, meaning either:
+     * (1) The cursor was erased from the cursor registry
+     * (2) The cursor's operation was interrupted, and the cursor will be cleaned up when the
+     * operation next checks for interruption.
+     * Case (2) will only occur if the cursor is pinned.
      *
      * Returns ErrorCodes::CursorNotFound if the cursor id is not owned by this manager. Returns
      * ErrorCodes::OperationFailed if attempting to erase a pinned cursor.
      *
      * If 'shouldAudit' is true, will perform audit logging.
      */
-    Status eraseCursor(OperationContext* opCtx, CursorId id, bool shouldAudit);
+    Status killCursor(OperationContext* opCtx, CursorId id, bool shouldAudit);
+
+    /**
+     * Returns an OK status if we're authorized to erase the cursor. Otherwise, returns
+     * ErrorCodes::Unauthorized.
+     */
+    Status checkAuthForKillCursors(OperationContext* opCtx, CursorId id);
 
     void getCursorIds(std::set<CursorId>* openCursors) const;
 
@@ -218,11 +228,11 @@ public:
         return (cursorId & mask) == (static_cast<long long>(0b01) << 62);
     }
 
-    static int eraseCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* ids);
+    static int killCursorGlobalIfAuthorized(OperationContext* opCtx, int n, const char* ids);
 
-    static bool eraseCursorGlobalIfAuthorized(OperationContext* opCtx, CursorId id);
+    static bool killCursorGlobalIfAuthorized(OperationContext* opCtx, CursorId id);
 
-    static bool eraseCursorGlobal(OperationContext* opCtx, CursorId id);
+    static bool killCursorGlobal(OperationContext* opCtx, CursorId id);
 
     /**
      * Deletes inactive cursors from the global cursor manager and from all per-collection cursor

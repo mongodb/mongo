@@ -255,7 +255,7 @@ private:
     ClientCursor(ClientCursorParams params,
                  CursorManager* cursorManager,
                  CursorId cursorId,
-                 boost::optional<LogicalSessionId> lsid,
+                 OperationContext* operationUsingCursor,
                  Date_t now);
 
     /**
@@ -287,10 +287,15 @@ private:
     // The ID of the ClientCursor. A value of 0 is used to mean that no cursor id has been assigned.
     CursorId _cursorid = 0;
 
+    // Threads may read from this field even if they don't have the cursor pinned, as long as they
+    // have the correct partition of the CursorManager locked (just like _authenticatedUsers).
     const NamespaceString _nss;
 
-    // The set of authenticated users when this cursor was created.
-    std::vector<UserName> _authenticatedUsers;
+    // The set of authenticated users when this cursor was created. Threads may read from this
+    // field (using the getter) even if they don't have the cursor pinned as long as they hold the
+    // correct partition's lock in the CursorManager. They must hold the lock to prevent the cursor
+    // from being freed by another thread during the read.
+    const std::vector<UserName> _authenticatedUsers;
 
     // A logical session id for this cursor, if it is running inside of a session.
     const boost::optional<LogicalSessionId> _lsid;
@@ -333,29 +338,41 @@ private:
     //     CursorManager, at which point it has sole ownership of the ClientCursor.
     //
 
-    // While a cursor is being used by a client, it is marked as "pinned". See ClientCursorPin
-    // below.
+    // While a cursor is being used by a client, it is marked as "pinned" by setting
+    // _operationUsingCursor to the current OperationContext.
     //
-    // Cursors always come into existence in a pinned state.
-    bool _isPinned = true;
+    // Cursors always come into existence in a pinned state (this must be non-null at construction).
+    //
+    // To write to this field one of the following must be true:
+    // 1) You have a lock on the appropriate partition in CursorManager and the cursor is unpinned
+    // (the field is null).
+    // 2) You own the cursor and the cursor manager it was associated with is gone (this can only
+    // happen in ClientCursorPin). In this case, nobody else will try to pin the cursor.
+    //
+    // To read this field one of the following must be true:
+    // 1) You have a lock on the appropriate partition in CursorManager.
+    // 2) You know you have the cursor pinned.
+    OperationContext* _operationUsingCursor;
 
     Date_t _lastUseDate;
 };
 
 /**
- * ClientCursorPin is an RAII class which must be used in order to access a cursor. On construction,
- * the ClientCursorPin marks its cursor as in use, which is called "pinning" the cursor. On
- * destructrution, the ClientCursorPin marks its cursor as no longer in use, which is called
- * "unpinning" the cursor. Pinning is used to prevent multiple concurrent uses of the same cursor---
- * pinned cursors cannot be killed or timed out and cannot be used concurrently by other operations
- * such as getMore or killCursors. A pin is obtained using the CursorManager. See cursor_manager.h
- * for more details.
+ * ClientCursorPin is an RAII class which must be used in order to access a cursor. On
+ * construction, the ClientCursorPin marks its cursor as in use, which is called "pinning" the
+ * cursor. On destruction, the ClientCursorPin marks its cursor as no longer in use, which is
+ * called "unpinning" the cursor. Pinning is used to prevent multiple concurrent uses of the same
+ * cursor--- pinned cursors cannot be deleted or timed out and cannot be used concurrently by other
+ * operations such as getMore. They can however, be marked as interrupted and instructed to destroy
+ * themselves through killCursors.
  *
- * A pin extends the lifetime of a ClientCursor object until the pin's release.  Pinned
- * ClientCursor objects cannot not be killed due to inactivity, and cannot be killed by user
- * kill requests.  When a CursorManager is destroyed (e.g. by a collection drop), ownership of
- * any still-pinned ClientCursor objects is transferred to their managing ClientCursorPin
- * objects.
+ * A pin is obtained using the CursorManager. See cursor_manager.h for more details.
+ *
+ * A pin extends the lifetime of a ClientCursor object until the pin's release. Pinned ClientCursor
+ * objects cannot not be killed due to inactivity, and cannot be immediately erased by user kill
+ * requests (though they can be marked as interrupted). When a CursorManager is destroyed (e.g. by
+ * a collection drop), ownership of any still-pinned ClientCursor objects is transferred to their
+ * managing ClientCursorPin objects.
  *
  * Example usage:
  * {

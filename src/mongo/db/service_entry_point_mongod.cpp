@@ -957,7 +957,7 @@ void receivedKillCursors(OperationContext* opCtx, const Message& m) {
 
     const char* cursorArray = dbmessage.getArray(n);
 
-    int found = CursorManager::eraseCursorGlobalIfAuthorized(opCtx, n, cursorArray);
+    int found = CursorManager::killCursorGlobalIfAuthorized(opCtx, n, cursorArray);
 
     if (shouldLog(logger::LogSeverity::Debug(1)) || found != n) {
         LOG(found == n ? 1 : 0) << "killcursors: found " << found << " of " << n;
@@ -1062,7 +1062,7 @@ DbResponse receivedGetMore(OperationContext* opCtx,
             // because it may now be out of sync with the client's iteration state.
             // SERVER-7952
             // TODO Temporary code, see SERVER-4563 for a cleanup overview.
-            CursorManager::eraseCursorGlobal(opCtx, cursorid);
+            CursorManager::killCursorGlobal(opCtx, cursorid);
         }
 
         BSONObjBuilder err;
