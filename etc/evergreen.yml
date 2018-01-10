@@ -1222,6 +1222,16 @@ tasks:
   - name: jsCore_WT
   commands:
   - func: "do setup"
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        ${activate_virtualenv}
+        python2 -m pip install -r src/mongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt
   - func: "run tests"
     vars:
       resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger
