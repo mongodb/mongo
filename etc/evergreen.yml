@@ -113,7 +113,7 @@ variables:
   - enterprise-debian71-64
   - enterprise-debian81-64
   - enterprise-linux-64-amazon-ami
-  - enterprise-osx-107
+  - enterprise-osx-108
   - enterprise-rhel-62-64-bit
   - enterprise-rhel-62-64-bit-coverage
   - enterprise-rhel-62-64-bit-inmem
@@ -145,9 +145,9 @@ variables:
   - linux-64-ephemeralForTest
   - linux-64-lsm
   - linux-64-repeated-execution
-  - osx-107
-  - osx-107-debug
-  - osx-107-ssl
+  - osx-108
+  - osx-108-debug
+  - osx-108-ssl
   - rhel62
   - rhel70
   - suse11
@@ -5372,7 +5372,7 @@ buildvariants:
 #             OSX buildvariants           #
 ###########################################
 
-- name: osx-107
+- name: osx-108
   display_name: OS X 10.8
   run_on:
   - macos-1012
@@ -5472,7 +5472,7 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: osx-107-ssl
+- name: osx-108-ssl
   display_name: SSL OS X 10.8
   run_on:
   - macos-1012
@@ -5573,7 +5573,7 @@ buildvariants:
     distros:
     - rhel70-small
 
-- name: osx-107-debug
+- name: osx-108-debug
   display_name: "* OS X 10.8 DEBUG"
   run_on:
   - macos-1012
@@ -5614,7 +5614,7 @@ buildvariants:
   - name: tool_WT
   - name: unittests
 
-- name: enterprise-osx-107
+- name: enterprise-osx-108
   display_name: Enterprise OS X 10.8
   modules:
   - enterprise
