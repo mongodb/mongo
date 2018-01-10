@@ -8,8 +8,14 @@
     function getConnectionStrings(conn) {
         // If conn does not point to a repl set, then this function returns [conn].
         const res = conn.adminCommand({isMaster: 1});
-        if (res.hasOwnProperty('hosts')) {
-            return res.hosts;
+        let hostList = [];
+
+        if (res.hasOwnProperty('setName')) {
+            hostList = res.hosts;
+            if (res.hasOwnProperty('passives')) {
+                hostList = hostList.concat(res.passives);
+            }
+            return hostList;
         } else {
             return [conn.host];
         }

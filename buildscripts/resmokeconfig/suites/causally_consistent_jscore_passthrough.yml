@@ -156,6 +156,7 @@ executor:
       eval: load("jstests/libs/override_methods/enable_causal_consistency.js")
       readMode: commands
   hooks:
+  - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20

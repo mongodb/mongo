@@ -17,6 +17,7 @@ executor:
       eval: "var testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');"
       readMode: commands
   hooks:
+  - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20
