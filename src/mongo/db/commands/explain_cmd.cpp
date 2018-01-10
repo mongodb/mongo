@@ -88,7 +88,7 @@ public:
                 Object == cmdObj.firstElement().type());
         auto explainObj = cmdObj.firstElement().Obj();
 
-        Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
+        Command* commToExplain = CommandHelpers::findCommand(explainObj.firstElementFieldName());
         uassert(ErrorCodes::CommandNotFound,
                 str::stream() << "explain failed due to unknown command: "
                               << explainObj.firstElementFieldName(),
@@ -110,7 +110,7 @@ public:
 
         BSONObj explainObj = cmdObj.firstElement().Obj();
 
-        Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
+        Command* commToExplain = CommandHelpers::findCommand(explainObj.firstElementFieldName());
         if (NULL == commToExplain) {
             mongoutils::str::stream ss;
             ss << "unknown command: " << explainObj.firstElementFieldName();
@@ -127,7 +127,7 @@ public:
                      BSONObjBuilder& result) {
         auto verbosity = ExplainOptions::parseCmdBSON(cmdObj);
         if (!verbosity.isOK()) {
-            return appendCommandStatus(result, verbosity.getStatus());
+            return CommandHelpers::appendCommandStatus(result, verbosity.getStatus());
         }
 
         // This is the nested command which we are explaining.
@@ -141,12 +141,12 @@ public:
                     innerDb.checkAndGetStringData() == dbname);
         }
 
-        Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
+        Command* commToExplain = CommandHelpers::findCommand(explainObj.firstElementFieldName());
         if (NULL == commToExplain) {
             mongoutils::str::stream ss;
             ss << "Explain failed due to unknown command: " << explainObj.firstElementFieldName();
             Status explainStatus(ErrorCodes::CommandNotFound, ss);
-            return appendCommandStatus(result, explainStatus);
+            return CommandHelpers::appendCommandStatus(result, explainStatus);
         }
 
         // Check whether the child command is allowed to run here. TODO: this logic is
@@ -167,7 +167,7 @@ public:
             mongoutils::str::stream ss;
             ss << "Explain's child command cannot run on this node. "
                << "Are you explaining a write command on a secondary?";
-            appendCommandStatus(result, false, ss);
+            CommandHelpers::appendCommandStatus(result, false, ss);
             return false;
         }
 
@@ -175,7 +175,7 @@ public:
         Status explainStatus =
             commToExplain->explain(opCtx, dbname, explainObj, verbosity.getValue(), &result);
         if (!explainStatus.isOK()) {
-            return appendCommandStatus(result, explainStatus);
+            return CommandHelpers::appendCommandStatus(result, explainStatus);
         }
 
         return true;

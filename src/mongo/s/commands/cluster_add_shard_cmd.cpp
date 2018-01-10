@@ -98,11 +98,11 @@ public:
             opCtx,
             kPrimaryOnlyReadPreference,
             "admin",
-            Command::appendMajorityWriteConcern(
-                Command::appendPassthroughFields(cmdObj, parsedRequest.toCommandForConfig())),
+            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
+                cmdObj, parsedRequest.toCommandForConfig())),
             Shard::RetryPolicy::kIdempotent));
 
-        Command::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
 

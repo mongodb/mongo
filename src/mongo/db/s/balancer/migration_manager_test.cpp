@@ -283,7 +283,7 @@ void MigrationManagerTest::expectMoveChunkCommand(const ChunkType& chunk,
                                                   const ShardId& toShardId,
                                                   const Status& returnStatus) {
     BSONObjBuilder resultBuilder;
-    Command::appendCommandStatus(resultBuilder, returnStatus);
+    CommandHelpers::appendCommandStatus(resultBuilder, returnStatus);
     expectMoveChunkCommand(chunk, toShardId, resultBuilder.obj());
 }
 

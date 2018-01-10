@@ -76,7 +76,7 @@ public:
 
         auto res = cache->reapNow(client);
         if (!res.isOK()) {
-            return appendCommandStatus(result, res);
+            return CommandHelpers::appendCommandStatus(result, res);
         }
 
         return true;

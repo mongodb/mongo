@@ -255,7 +255,7 @@ SingleWriteResult createIndex(OperationContext* opCtx,
     cmdBuilder << "createIndexes" << ns.coll();
     cmdBuilder << "indexes" << BSON_ARRAY(spec);
 
-    auto cmdResult = Command::runCommandDirectly(
+    auto cmdResult = CommandHelpers::runCommandDirectly(
         opCtx, OpMsgRequest::fromDBAndBody(systemIndexes.db(), cmdBuilder.obj()));
     uassertStatusOK(getStatusFromCommandResult(cmdResult));
 

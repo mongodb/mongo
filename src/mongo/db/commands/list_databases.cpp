@@ -95,11 +95,11 @@ public:
         std::unique_ptr<MatchExpression> filter;
         if (auto filterElt = jsobj[kFilterField]) {
             if (filterElt.type() != BSONType::Object) {
-                return appendCommandStatus(result,
-                                           {ErrorCodes::TypeMismatch,
-                                            str::stream() << "Field '" << kFilterField
-                                                          << "' must be of type Object in: "
-                                                          << jsobj});
+                return CommandHelpers::appendCommandStatus(
+                    result,
+                    {ErrorCodes::TypeMismatch,
+                     str::stream() << "Field '" << kFilterField << "' must be of type Object in: "
+                                   << jsobj});
             }
             // The collator is null because database metadata objects are compared using simple
             // binary comparison.
@@ -108,7 +108,7 @@ public:
             auto statusWithMatcher =
                 MatchExpressionParser::parse(filterElt.Obj(), std::move(expCtx));
             if (!statusWithMatcher.isOK()) {
-                return appendCommandStatus(result, statusWithMatcher.getStatus());
+                return CommandHelpers::appendCommandStatus(result, statusWithMatcher.getStatus());
             }
             filter = std::move(statusWithMatcher.getValue());
         }

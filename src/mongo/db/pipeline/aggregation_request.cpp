@@ -214,7 +214,7 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             request.setAllowDiskUse(elem.Bool());
         } else if (bypassDocumentValidationCommandOption() == fieldName) {
             request.setBypassDocumentValidation(elem.trueValue());
-        } else if (!Command::isGenericArgument(fieldName)) {
+        } else if (!CommandHelpers::isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "unrecognized field '" << elem.fieldName() << "'"};
         }

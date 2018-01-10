@@ -239,7 +239,7 @@ public:
         BSONElement filterElt = jsobj["filter"];
         if (!filterElt.eoo()) {
             if (filterElt.type() != mongo::Object) {
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result, Status(ErrorCodes::BadValue, "\"filter\" must be an object"));
             }
             // The collator is null because collection objects are compared using binary comparison.
@@ -248,7 +248,7 @@ public:
             StatusWithMatchExpression statusWithMatcher =
                 MatchExpressionParser::parse(filterElt.Obj(), std::move(expCtx));
             if (!statusWithMatcher.isOK()) {
-                return appendCommandStatus(result, statusWithMatcher.getStatus());
+                return CommandHelpers::appendCommandStatus(result, statusWithMatcher.getStatus());
             }
             matcher = std::move(statusWithMatcher.getValue());
         }
@@ -258,7 +258,7 @@ public:
         Status parseCursorStatus =
             CursorRequest::parseCommandCursorOptions(jsobj, defaultBatchSize, &batchSize);
         if (!parseCursorStatus.isOK()) {
-            return appendCommandStatus(result, parseCursorStatus);
+            return CommandHelpers::appendCommandStatus(result, parseCursorStatus);
         }
 
         // Check for 'includePendingDrops' flag. The default is to not include drop-pending
@@ -268,7 +268,7 @@ public:
             jsobj, "includePendingDrops", false, &includePendingDrops);
 
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         AutoGetDb autoDb(opCtx, dbname, MODE_S);
@@ -316,7 +316,7 @@ public:
         auto statusWithPlanExecutor = PlanExecutor::make(
             opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD);
         if (!statusWithPlanExecutor.isOK()) {
-            return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
         auto exec = std::move(statusWithPlanExecutor.getValue());
 

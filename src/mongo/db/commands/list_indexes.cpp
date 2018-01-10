@@ -104,7 +104,8 @@ public:
 
         // Check for the listIndexes ActionType on the database, or find on system.indexes for pre
         // 3.0 systems.
-        const NamespaceString ns(parseNsOrUUID(client->getOperationContext(), dbname, cmdObj));
+        const NamespaceString ns(
+            CommandHelpers::parseNsOrUUID(client->getOperationContext(), dbname, cmdObj));
         if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns),
                                                            ActionType::listIndexes) ||
             authzSession->isAuthorizedForActionsOnResource(
@@ -125,25 +126,25 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
-        const NamespaceString ns(parseNsOrUUID(opCtx, dbname, cmdObj));
+        const NamespaceString ns(CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj));
         const long long defaultBatchSize = std::numeric_limits<long long>::max();
         long long batchSize;
         Status parseCursorStatus =
             CursorRequest::parseCommandCursorOptions(cmdObj, defaultBatchSize, &batchSize);
         if (!parseCursorStatus.isOK()) {
-            return appendCommandStatus(result, parseCursorStatus);
+            return CommandHelpers::appendCommandStatus(result, parseCursorStatus);
         }
 
         AutoGetCollectionForReadCommand autoColl(opCtx, ns, std::move(dbSLock));
         if (!autoColl.getDb()) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::NamespaceNotFound, "Database " + ns.db() + " doesn't exist"));
         }
 
         const Collection* collection = autoColl.getCollection();
         if (!collection) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::NamespaceNotFound, "Collection " + ns.ns() + " doesn't exist"));
         }
@@ -181,7 +182,7 @@ public:
         auto statusWithPlanExecutor = PlanExecutor::make(
             opCtx, std::move(ws), std::move(root), cursorNss, PlanExecutor::NO_YIELD);
         if (!statusWithPlanExecutor.isOK()) {
-            return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
         auto exec = std::move(statusWithPlanExecutor.getValue());
 

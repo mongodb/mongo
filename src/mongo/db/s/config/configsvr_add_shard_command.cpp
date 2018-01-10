@@ -92,7 +92,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,
                        "_configsvrAddShard can only be run on config servers"));
@@ -104,7 +104,7 @@ public:
 
         auto swParsedRequest = AddShardRequest::parseFromConfigCommand(cmdObj);
         if (!swParsedRequest.isOK()) {
-            return appendCommandStatus(result, swParsedRequest.getStatus());
+            return CommandHelpers::appendCommandStatus(result, swParsedRequest.getStatus());
         }
         auto parsedRequest = std::move(swParsedRequest.getValue());
 
@@ -113,7 +113,7 @@ public:
 
         auto validationStatus = parsedRequest.validate(rsConfig.isLocalHostAllowed());
         if (!validationStatus.isOK()) {
-            return appendCommandStatus(result, validationStatus);
+            return CommandHelpers::appendCommandStatus(result, validationStatus);
         }
 
         uassert(ErrorCodes::InvalidOptions,
@@ -136,7 +136,7 @@ public:
         if (!addShardResult.isOK()) {
             log() << "addShard request '" << parsedRequest << "'"
                   << "failed" << causedBy(addShardResult.getStatus());
-            return appendCommandStatus(result, addShardResult.getStatus());
+            return CommandHelpers::appendCommandStatus(result, addShardResult.getStatus());
         }
 
         result << "shardAdded" << addShardResult.getValue();

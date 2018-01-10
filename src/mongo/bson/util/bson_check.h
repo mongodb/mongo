@@ -91,7 +91,7 @@ Status bsonCheckOnlyHasFieldsForCommand(StringData objectName,
                                         const BSONObj& obj,
                                         const Container& allowedFields) {
     return bsonCheckOnlyHasFieldsImpl(objectName, obj, [&](StringData name) {
-        return Command::isGenericArgument(name) ||
+        return CommandHelpers::isGenericArgument(name) ||
             (std::find(std::begin(allowedFields), std::end(allowedFields), name) !=
              std::end(allowedFields));
     });

@@ -77,13 +77,13 @@ public:
 
         Collection* collection = ctx.getCollection();
         if (!collection) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result, Status(ErrorCodes::NamespaceNotFound, "ns does not exist: " + ns.ns()));
         }
 
         auto cursor = collection->getRecordStore()->getCursorForRepair(opCtx);
         if (!cursor) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result, Status(ErrorCodes::CommandNotSupported, "repair iterator not supported"));
         }
 

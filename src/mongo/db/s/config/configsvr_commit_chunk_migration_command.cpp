@@ -114,7 +114,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
@@ -136,7 +136,7 @@ public:
             commitRequest.getFromShard(),
             commitRequest.getToShard());
         if (!response.isOK()) {
-            return appendCommandStatus(result, response.getStatus());
+            return CommandHelpers::appendCommandStatus(result, response.getStatus());
         }
         result.appendElements(response.getValue());
         return true;

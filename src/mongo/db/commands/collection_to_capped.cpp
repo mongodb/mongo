@@ -121,7 +121,7 @@ public:
 
         NamespaceString nss(dbname, to);
         if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesFor(opCtx, nss)) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::NotMaster,
                        str::stream() << "Not primary while cloning collection " << from << " to "
@@ -131,7 +131,7 @@ public:
 
         Database* const db = autoDb.getDb();
         if (!db) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::NamespaceNotFound,
                        str::stream() << "database " << dbname << " not found"));
@@ -139,7 +139,7 @@ public:
 
         Status status =
             cloneCollectionAsCapped(opCtx, db, from.toString(), to.toString(), size, temp);
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 } cmdCloneCollectionAsCapped;
 
@@ -173,7 +173,7 @@ public:
                    const BSONObj& jsobj,
                    string& errmsg,
                    BSONObjBuilder& result) {
-        const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, jsobj));
         double size = jsobj.getField("size").number();
 
         if (size == 0) {
@@ -181,7 +181,7 @@ public:
             return false;
         }
 
-        return appendCommandStatus(result, convertToCapped(opCtx, nss, size));
+        return CommandHelpers::appendCommandStatus(result, convertToCapped(opCtx, nss, size));
     }
 
 } cmdConvertToCapped;

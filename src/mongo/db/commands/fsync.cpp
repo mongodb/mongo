@@ -184,7 +184,7 @@ public:
             if (!status.isOK()) {
                 releaseLock();
                 warning() << "fsyncLock failed. Lock count reset to 0. Status: " << status;
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
         }
 

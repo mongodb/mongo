@@ -100,13 +100,13 @@ public:
 
         StatusWith<GetMoreRequest> parseStatus = GetMoreRequest::parseFromBSON(dbname, cmdObj);
         if (!parseStatus.isOK()) {
-            return appendCommandStatus(result, parseStatus.getStatus());
+            return CommandHelpers::appendCommandStatus(result, parseStatus.getStatus());
         }
         const GetMoreRequest& request = parseStatus.getValue();
 
         auto response = ClusterFind::runGetMore(opCtx, request);
         if (!response.isOK()) {
-            return appendCommandStatus(result, response.getStatus());
+            return CommandHelpers::appendCommandStatus(result, response.getStatus());
         }
 
         response.getValue().addToBSON(CursorResponse::ResponseType::SubsequentResponse, &result);

@@ -116,7 +116,7 @@ public:
                            const BSONObj& cmdObj,
                            ExplainOptions::Verbosity verbosity,
                            BSONObjBuilder* out) const {
-        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         auto parsedDistinct = ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true);
@@ -159,12 +159,12 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
-        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         auto parsedDistinct = ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false);
         if (!parsedDistinct.isOK()) {
-            return appendCommandStatus(result, parsedDistinct.getStatus());
+            return CommandHelpers::appendCommandStatus(result, parsedDistinct.getStatus());
         }
 
         AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
@@ -175,10 +175,10 @@ public:
 
             auto viewAggregation = parsedDistinct.getValue().asAggregationCommand();
             if (!viewAggregation.isOK()) {
-                return appendCommandStatus(result, viewAggregation.getStatus());
+                return CommandHelpers::appendCommandStatus(result, viewAggregation.getStatus());
             }
 
-            BSONObj aggResult = Command::runCommandDirectly(
+            BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregation.getValue())));
 
             if (ResolvedView::isResolvedViewErrorResponse(aggResult)) {
@@ -189,7 +189,7 @@ public:
             ViewResponseFormatter formatter(aggResult);
             Status formatStatus = formatter.appendAsDistinctResponse(&result);
             if (!formatStatus.isOK()) {
-                return appendCommandStatus(result, formatStatus);
+                return CommandHelpers::appendCommandStatus(result, formatStatus);
             }
             return true;
         }
@@ -197,7 +197,7 @@ public:
         auto executor = getExecutorDistinct(
             opCtx, collection, nss.ns(), &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
         if (!executor.isOK()) {
-            return appendCommandStatus(result, executor.getStatus());
+            return CommandHelpers::appendCommandStatus(result, executor.getStatus());
         }
 
         {
@@ -249,11 +249,11 @@ public:
                   << redact(PlanExecutor::statestr(state))
                   << ", stats: " << redact(Explain::getWinningPlanStats(executor.getValue().get()));
 
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::OperationFailed,
-                                              str::stream()
-                                                  << "Executor error during distinct command: "
-                                                  << WorkingSetCommon::toStatusString(obj)));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(ErrorCodes::OperationFailed,
+                       str::stream() << "Executor error during distinct command: "
+                                     << WorkingSetCommon::toStatusString(obj)));
         }
 
 

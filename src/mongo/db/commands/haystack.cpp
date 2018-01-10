@@ -101,7 +101,7 @@ public:
                    const BSONObj& cmdObj,
                    string& errmsg,
                    BSONObjBuilder& result) {
-        const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
 
         AutoGetCollectionForReadCommand ctx(opCtx, nss);
 

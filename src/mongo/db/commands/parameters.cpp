@@ -162,7 +162,7 @@ public:
         while (parameterCheckIterator.more()) {
             BSONElement parameter = parameterCheckIterator.next();
             std::string parameterName = parameter.fieldName();
-            if (Command::isGenericArgument(parameterName))
+            if (CommandHelpers::isGenericArgument(parameterName))
                 continue;
 
             ServerParameter::Map::const_iterator foundParameter = parameterMap.find(parameterName);

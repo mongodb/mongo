@@ -80,7 +80,7 @@ public:
                            const BSONObj& cmdObj,
                            string& errmsg,
                            BSONObjBuilder& result) {
-        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
         log() << "test only command godinsert invoked coll:" << nss.coll();
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
 
@@ -103,7 +103,7 @@ public:
         if (status.isOK()) {
             wunit.commit();
         }
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 };
 
@@ -215,9 +215,9 @@ public:
                      const string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        const NamespaceString fullNs = parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
         if (!fullNs.isValid()) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 {ErrorCodes::InvalidNamespace,
                  str::stream() << "collection name " << fullNs.ns() << " is not valid"});
@@ -227,23 +227,23 @@ public:
         bool inc = cmdObj.getBoolField("inc");  // inclusive range?
 
         if (n <= 0) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::BadValue, "n must be a positive integer"});
+            return CommandHelpers::appendCommandStatus(
+                result, {ErrorCodes::BadValue, "n must be a positive integer"});
         }
 
         // Lock the database in mode IX and lock the collection exclusively.
         AutoGetCollection autoColl(opCtx, fullNs, MODE_IX, MODE_X);
         Collection* collection = autoColl.getCollection();
         if (!collection) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 {ErrorCodes::NamespaceNotFound,
                  str::stream() << "collection " << fullNs.ns() << " does not exist"});
         }
 
         if (!collection->isCapped()) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::IllegalOperation, "collection must be capped"});
+            return CommandHelpers::appendCommandStatus(
+                result, {ErrorCodes::IllegalOperation, "collection must be capped"});
         }
 
         RecordId end;
@@ -257,7 +257,7 @@ public:
             for (int i = 0; i < n + 1; ++i) {
                 PlanExecutor::ExecState state = exec->getNext(nullptr, &end);
                 if (PlanExecutor::ADVANCED != state) {
-                    return appendCommandStatus(
+                    return CommandHelpers::appendCommandStatus(
                         result,
                         {ErrorCodes::IllegalOperation,
                          str::stream() << "invalid n, collection contains fewer than " << n
@@ -291,9 +291,9 @@ public:
                      const string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
 
-        return appendCommandStatus(result, emptyCapped(opCtx, nss));
+        return CommandHelpers::appendCommandStatus(result, emptyCapped(opCtx, nss));
     }
 };
 

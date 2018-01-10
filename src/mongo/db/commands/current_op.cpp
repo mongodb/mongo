@@ -76,7 +76,7 @@ public:
             return status;
         }
 
-        appendCommandStatus(responseBuilder, Status::OK());
+        CommandHelpers::appendCommandStatus(responseBuilder, Status::OK());
 
         return CursorResponse::parseFromBSON(responseBuilder.obj());
     }

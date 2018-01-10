@@ -72,7 +72,7 @@ StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersion
     // Ensure that the command does not contain any unrecognized parameters
     for (const auto& cmdElem : cmdObj) {
         const auto fieldName = cmdElem.fieldNameStringData();
-        if (fieldName == commandName || Command::isGenericArgument(fieldName)) {
+        if (fieldName == commandName || CommandHelpers::isGenericArgument(fieldName)) {
             continue;
         }
 

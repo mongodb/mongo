@@ -81,7 +81,8 @@ public:
 
         if (serverGlobalParams.featureCompatibility.getVersion() !=
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            return appendCommandStatus(result, SessionsCommandFCV34Status(getName()));
+            return CommandHelpers::appendCommandStatus(result,
+                                                       SessionsCommandFCV34Status(getName()));
         }
 
         auto cache = LogicalSessionCache::get(opCtx);
@@ -89,7 +90,7 @@ public:
 
         auto res = cache->refreshNow(client);
         if (!res.isOK()) {
-            return appendCommandStatus(result, res);
+            return CommandHelpers::appendCommandStatus(result, res);
         }
 
         return true;

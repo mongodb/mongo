@@ -123,7 +123,7 @@ public:
             return false;
         }
 
-        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
         AutoGetCollectionForReadCommand ctx(opCtx, nss);
 
         Collection* collection = ctx.getCollection();
@@ -178,7 +178,7 @@ public:
             Status collationEltStatus =
                 bsonExtractTypedField(cmdObj, "collation", BSONType::Object, &collationElt);
             if (!collationEltStatus.isOK() && (collationEltStatus != ErrorCodes::NoSuchKey)) {
-                return appendCommandStatus(result, collationEltStatus);
+                return CommandHelpers::appendCommandStatus(result, collationEltStatus);
             }
             if (collationEltStatus.isOK()) {
                 collation = collationElt.Obj();
@@ -303,11 +303,11 @@ public:
             log() << "Plan executor error during geoNear command: " << PlanExecutor::statestr(state)
                   << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::OperationFailed,
-                                              str::stream()
-                                                  << "Executor error during geoNear command: "
-                                                  << WorkingSetCommon::toStatusString(currObj)));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(ErrorCodes::OperationFailed,
+                       str::stream() << "Executor error during geoNear command: "
+                                     << WorkingSetCommon::toStatusString(currObj)));
         }
 
         PlanSummaryStats summary;

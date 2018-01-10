@@ -103,7 +103,7 @@ public:
         // Will throw if shard id is not found
         auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardIdent);
         if (!shardStatus.isOK()) {
-            return appendCommandStatus(result, shardStatus.getStatus());
+            return CommandHelpers::appendCommandStatus(result, shardStatus.getStatus());
         }
         auto shard = shardStatus.getValue();
 

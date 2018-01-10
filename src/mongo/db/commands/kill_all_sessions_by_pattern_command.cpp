@@ -94,7 +94,8 @@ public:
 
         if (serverGlobalParams.featureCompatibility.getVersion() !=
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            return appendCommandStatus(result, SessionsCommandFCV34Status(getName()));
+            return CommandHelpers::appendCommandStatus(result,
+                                                       SessionsCommandFCV34Status(getName()));
         }
 
         IDLParserErrorContext ctx("KillAllSessionsByPatternCmd");
@@ -113,7 +114,7 @@ public:
 
                 for (const auto& pattern : ksc.getKillAllSessionsByPattern()) {
                     if (pattern.getUsers() || pattern.getRoles()) {
-                        return appendCommandStatus(
+                        return CommandHelpers::appendCommandStatus(
                             result,
                             Status(ErrorCodes::Unauthorized,
                                    "Not authorized to impersonate in killAllSessionsByPattern"));
@@ -125,7 +126,8 @@ public:
         KillAllSessionsByPatternSet patterns{ksc.getKillAllSessionsByPattern().begin(),
                                              ksc.getKillAllSessionsByPattern().end()};
 
-        return appendCommandStatus(result, killSessionsCmdHelper(opCtx, result, patterns));
+        return CommandHelpers::appendCommandStatus(result,
+                                                   killSessionsCmdHelper(opCtx, result, patterns));
     }
 } killAllSessionsByPatternCommand;
 

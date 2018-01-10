@@ -84,12 +84,12 @@ public:
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
-            Command::appendMajorityWriteConcern(
-                Command::appendPassthroughFields(cmdObj, BSON("_configsvrRemoveShard" << target))),
+            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
+                cmdObj, BSON("_configsvrRemoveShard" << target))),
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponseStatus.commandStatus);
 
-        Command::filterCommandReplyForPassthrough(cmdResponseStatus.response, &result);
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponseStatus.response, &result);
 
         return true;
     }

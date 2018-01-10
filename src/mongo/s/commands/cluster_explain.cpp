@@ -118,7 +118,7 @@ std::vector<Strategy::CommandResult> ClusterExplain::downconvert(
         }
         // Convert the error status back into the format of a command result.
         BSONObjBuilder statusObjBob;
-        Command::appendCommandStatus(statusObjBob, status);
+        CommandHelpers::appendCommandStatus(statusObjBob, status);
 
         // Get the Shard object in order to get the ConnectionString.
         auto shard =
@@ -130,7 +130,7 @@ std::vector<Strategy::CommandResult> ClusterExplain::downconvert(
 
 // static
 BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Verbosity verbosity) {
-    auto filtered = Command::filterCommandRequestForPassthrough(cmdObj);
+    auto filtered = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
     BSONObjBuilder out;
     out.append("explain", filtered);
     out.append("verbosity", ExplainOptions::verbosityString(verbosity));
@@ -138,7 +138,7 @@ BSONObj ClusterExplain::wrapAsExplain(const BSONObj& cmdObj, ExplainOptions::Ver
     // Propagate all generic arguments out of the inner command since the shards will only process
     // them at the top level.
     for (auto elem : filtered) {
-        if (Command::isGenericArgument(elem.fieldNameStringData())) {
+        if (CommandHelpers::isGenericArgument(elem.fieldNameStringData())) {
             out.append(elem);
         }
     }

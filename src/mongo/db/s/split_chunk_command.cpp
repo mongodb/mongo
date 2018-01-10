@@ -87,7 +87,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -126,7 +126,7 @@ public:
         string shardName;
         auto parseShardNameStatus = bsonExtractStringField(cmdObj, "from", &shardName);
         if (!parseShardNameStatus.isOK())
-            return appendCommandStatus(result, parseShardNameStatus);
+            return CommandHelpers::appendCommandStatus(result, parseShardNameStatus);
 
         log() << "received splitChunk request: " << redact(cmdObj);
 

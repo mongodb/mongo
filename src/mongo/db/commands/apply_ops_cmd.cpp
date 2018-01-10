@@ -234,7 +234,7 @@ public:
 
         auto status = OplogApplicationChecks::checkOperationArray(cmdObj.firstElement());
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // TODO (SERVER-30217): When a write concern is provided to the applyOps command, we
@@ -259,7 +259,7 @@ public:
             auto modeSW = repl::OplogApplication::parseMode(oplogApplicationModeString);
             if (!modeSW.isOK()) {
                 // Unable to parse the mode argument.
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result,
                     modeSW.getStatus().withContext(str::stream() << "Could not parse " +
                                                        ApplyOps::kOplogApplicationModeFieldName));
@@ -267,16 +267,16 @@ public:
             oplogApplicationMode = modeSW.getValue();
         } else if (status != ErrorCodes::NoSuchKey) {
             // NoSuchKey means the user did not supply a mode.
-            return appendCommandStatus(result,
-                                       Status(status.code(),
-                                              str::stream()
-                                                  << "Could not parse out "
-                                                  << ApplyOps::kOplogApplicationModeFieldName
-                                                  << ": "
-                                                  << status.reason()));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(status.code(),
+                       str::stream() << "Could not parse out "
+                                     << ApplyOps::kOplogApplicationModeFieldName
+                                     << ": "
+                                     << status.reason()));
         }
 
-        auto applyOpsStatus = appendCommandStatus(
+        auto applyOpsStatus = CommandHelpers::appendCommandStatus(
             result, applyOps(opCtx, dbname, cmdObj, oplogApplicationMode, &result));
 
         return applyOpsStatus;

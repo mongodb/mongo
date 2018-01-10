@@ -183,7 +183,7 @@ public:
             }
 
             if (!ret["done"].Bool()) {
-                filterCommandReplyForPassthrough(ret, &result);
+                CommandHelpers::filterCommandReplyForPassthrough(ret, &result);
                 return true;
             }
 

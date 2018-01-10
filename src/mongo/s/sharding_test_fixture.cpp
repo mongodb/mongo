@@ -517,7 +517,7 @@ void ShardingTestFixture::expectCount(const HostAndPort& configHost,
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
         BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder, response.getStatus());
+        CommandHelpers::appendCommandStatus(responseBuilder, response.getStatus());
         return responseBuilder.obj();
     });
 }

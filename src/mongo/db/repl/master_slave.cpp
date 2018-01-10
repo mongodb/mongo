@@ -389,13 +389,13 @@ public:
         HandshakeArgs handshake;
         Status status = handshake.initialize(cmdObj);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         ReplClientInfo::forClient(opCtx->getClient()).setRemoteID(handshake.getRid());
 
         status = getGlobalReplicationCoordinator()->processHandshake(opCtx, handshake);
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
 } handshakeCmd;

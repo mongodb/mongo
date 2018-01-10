@@ -285,7 +285,7 @@ bool CmdSaslStart::run(OperationContext* opCtx,
     session->setOpCtxt(opCtx);
 
     Status status = doSaslStart(client, session, db, cmdObj, &result);
-    appendCommandStatus(result, status);
+    CommandHelpers::appendCommandStatus(result, status);
 
     if (session->isDone()) {
         audit::logAuthentication(client,
@@ -314,7 +314,7 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
     AuthenticationSession::swap(client, sessionGuard);
 
     if (!sessionGuard || sessionGuard->getType() != AuthenticationSession::SESSION_TYPE_SASL) {
-        return appendCommandStatus(
+        return CommandHelpers::appendCommandStatus(
             result, Status(ErrorCodes::ProtocolError, "No SASL session state found"));
     }
 
@@ -324,7 +324,7 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
     // Authenticating the __system@local user to the admin database on mongos is required
     // by the auth passthrough test suite.
     if (session->getAuthenticationDatabase() != db && !Command::testCommandsEnabled) {
-        return appendCommandStatus(
+        return CommandHelpers::appendCommandStatus(
             result,
             Status(ErrorCodes::ProtocolError,
                    "Attempt to switch database target during SASL authentication."));
@@ -333,7 +333,7 @@ bool CmdSaslContinue::run(OperationContext* opCtx,
     session->setOpCtxt(opCtx);
 
     Status status = doSaslContinue(client, session, cmdObj, &result);
-    appendCommandStatus(result, status);
+    CommandHelpers::appendCommandStatus(result, status);
 
     if (session->isDone()) {
         audit::logAuthentication(client,

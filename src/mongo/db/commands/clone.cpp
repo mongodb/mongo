@@ -128,7 +128,7 @@ public:
 
         result.append("clonedColls", barr.arr());
 
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
 } cmdClone;

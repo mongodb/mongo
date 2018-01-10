@@ -234,7 +234,7 @@ Status rollback_internal_no_uuid::updateFixUpInfoFromLocalOplogEntry(FixUpInfo& 
         // Retrieves the command name, so out of {renameCollection: "test.x"} it returns
         // "renameCollection".
         string cmdname = first.fieldName();
-        Command* cmd = Command::findCommand(cmdname.c_str());
+        Command* cmd = CommandHelpers::findCommand(cmdname.c_str());
         if (cmd == NULL) {
             severe() << "Rollback no such command " << first.fieldName();
             return Status(ErrorCodes::UnrecoverableRollbackError,

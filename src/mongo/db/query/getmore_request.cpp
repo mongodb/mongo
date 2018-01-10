@@ -158,7 +158,7 @@ StatusWith<GetMoreRequest> GetMoreRequest::parseFromBSON(const std::string& dbna
                 return status;
             }
             lastKnownCommittedOpTime = ot;
-        } else if (!Command::isGenericArgument(fieldName)) {
+        } else if (!CommandHelpers::isGenericArgument(fieldName)) {
             return {ErrorCodes::FailedToParse,
                     str::stream() << "Failed to parse: " << cmdObj << ". "
                                   << "Unrecognized field '"

@@ -593,8 +593,8 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandSuccess) {
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder,
-                                     Status(ErrorCodes::UserNotFound, "User test@test not found"));
+        CommandHelpers::appendCommandStatus(
+            responseBuilder, Status(ErrorCodes::UserNotFound, "User test@test not found"));
         return responseBuilder.obj();
     });
 
@@ -666,8 +666,8 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandRewriteWriteConce
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
         BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder,
-                                     Status(ErrorCodes::UserNotFound, "User test@test not found"));
+        CommandHelpers::appendCommandStatus(
+            responseBuilder, Status(ErrorCodes::UserNotFound, "User test@test not found"));
         return responseBuilder.obj();
     });
 
@@ -695,8 +695,8 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMaster) {
     for (int i = 0; i < 3; ++i) {
         onCommand([](const RemoteCommandRequest& request) {
             BSONObjBuilder responseBuilder;
-            Command::appendCommandStatus(responseBuilder,
-                                         Status(ErrorCodes::NotMaster, "not master"));
+            CommandHelpers::appendCommandStatus(responseBuilder,
+                                                Status(ErrorCodes::NotMaster, "not master"));
             return responseBuilder.obj();
         });
     }
@@ -729,7 +729,8 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotMasterRetrySuc
         ASSERT_EQUALS(host1, request.target);
 
         BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder, Status(ErrorCodes::NotMaster, "not master"));
+        CommandHelpers::appendCommandStatus(responseBuilder,
+                                            Status(ErrorCodes::NotMaster, "not master"));
 
         // Ensure that when the catalog manager tries to retarget after getting the
         // NotMaster response, it will get back a new target.
@@ -1233,8 +1234,8 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessfulWithCheck) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder,
-                                     Status(ErrorCodes::DuplicateKey, "precondition failed"));
+        CommandHelpers::appendCommandStatus(
+            responseBuilder, Status(ErrorCodes::DuplicateKey, "precondition failed"));
         return responseBuilder.obj();
     });
 
@@ -1281,8 +1282,8 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedFailedWithCheck) {
 
     onCommand([&](const RemoteCommandRequest& request) {
         BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder,
-                                     Status(ErrorCodes::NoMatchingDocument, "some error"));
+        CommandHelpers::appendCommandStatus(responseBuilder,
+                                            Status(ErrorCodes::NoMatchingDocument, "some error"));
         return responseBuilder.obj();
     });
 

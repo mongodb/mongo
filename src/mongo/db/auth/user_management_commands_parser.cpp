@@ -62,7 +62,7 @@ Status _checkNoExtraFields(const BSONObj& cmdObj,
     // ones.
     for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
         StringData fieldName = (*iter).fieldNameStringData();
-        if (!Command::isGenericArgument(fieldName) &&
+        if (!CommandHelpers::isGenericArgument(fieldName) &&
             !validFieldNames.count(fieldName.toString())) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream() << "\"" << fieldName << "\" is not "

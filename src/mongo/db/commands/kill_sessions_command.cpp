@@ -117,7 +117,8 @@ public:
 
         if (serverGlobalParams.featureCompatibility.getVersion() !=
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            return appendCommandStatus(result, SessionsCommandFCV34Status(getName()));
+            return CommandHelpers::appendCommandStatus(result,
+                                                       SessionsCommandFCV34Status(getName()));
         }
 
         IDLParserErrorContext ctx("KillSessionsCmd");
@@ -139,7 +140,8 @@ public:
             }
         }
 
-        return appendCommandStatus(result, killSessionsCmdHelper(opCtx, result, patterns));
+        return CommandHelpers::appendCommandStatus(result,
+                                                   killSessionsCmdHelper(opCtx, result, patterns));
     }
 } killSessionsCommand;
 

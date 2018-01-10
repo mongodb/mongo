@@ -107,7 +107,7 @@ public:
         const BSONObj query;
         Strategy::commandOp(opCtx,
                             dbname,
-                            filterCommandRequestForPassthrough(cmdObj),
+                            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
                             nss.ns(),
                             query,
                             CollationSpec::kSimpleSpec,
@@ -124,7 +124,7 @@ public:
             // XXX: In absence of sensible aggregation strategy,
             //      promote first shard's result to top level.
             if (i == results.begin()) {
-                filterCommandReplyForPassthrough(cmdResult.result, &result);
+                CommandHelpers::filterCommandReplyForPassthrough(cmdResult.result, &result);
                 clusterCmdResult = cmdResult.result["ok"].trueValue();
             }
 

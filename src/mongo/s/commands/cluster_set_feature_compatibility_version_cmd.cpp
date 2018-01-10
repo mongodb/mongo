@@ -98,7 +98,7 @@ public:
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             dbname,
-            Command::appendMajorityWriteConcern(Command::appendPassthroughFields(
+            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
                 cmdObj, BSON("setFeatureCompatibilityVersion" << version))),
             Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(response.commandStatus);

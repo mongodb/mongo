@@ -110,7 +110,7 @@ public:
         if (status.isOK()) {
             collation = collationElement.Obj();
         } else if (status != ErrorCodes::NoSuchKey) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (cmdObj["limit"].isNumber()) {
@@ -154,7 +154,7 @@ public:
 
         if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == swShardResponses.getStatus()) {
             if (viewDefinition.isEmpty()) {
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result,
                     {ErrorCodes::InternalError,
                      str::stream()
@@ -166,17 +166,17 @@ public:
 
             auto countRequest = CountRequest::parseFromBSON(nss, cmdObj, false);
             if (!countRequest.isOK()) {
-                return appendCommandStatus(result, countRequest.getStatus());
+                return CommandHelpers::appendCommandStatus(result, countRequest.getStatus());
             }
 
             auto aggCmdOnView = countRequest.getValue().asAggregationCommand();
             if (!aggCmdOnView.isOK()) {
-                return appendCommandStatus(result, aggCmdOnView.getStatus());
+                return CommandHelpers::appendCommandStatus(result, aggCmdOnView.getStatus());
             }
 
             auto aggRequestOnView = AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue());
             if (!aggRequestOnView.isOK()) {
-                return appendCommandStatus(result, aggRequestOnView.getStatus());
+                return CommandHelpers::appendCommandStatus(result, aggRequestOnView.getStatus());
             }
 
             auto resolvedView = ResolvedView::fromBSON(viewDefinition);
@@ -184,14 +184,14 @@ public:
                 resolvedView.asExpandedViewAggregation(aggRequestOnView.getValue());
             auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
 
-            BSONObj aggResult = Command::runCommandDirectly(
+            BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(resolvedAggCmd)));
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult);
             auto formatStatus = formatter.appendAsCountResponse(&result);
             if (!formatStatus.isOK()) {
-                return appendCommandStatus(result, formatStatus);
+                return CommandHelpers::appendCommandStatus(result, formatStatus);
             }
 
             return true;
@@ -228,7 +228,7 @@ public:
             auto errorWithContext = Status(status.code(),
                                            str::stream() << "failed on: " << response.shardId
                                                          << causedBy(status.reason()));
-            return appendCommandStatus(result, errorWithContext);
+            return CommandHelpers::appendCommandStatus(result, errorWithContext);
         }
 
         shardSubTotal.doneFast();

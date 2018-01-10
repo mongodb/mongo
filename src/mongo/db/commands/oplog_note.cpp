@@ -119,15 +119,16 @@ public:
                      BSONObjBuilder& result) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         if (!replCoord->isReplEnabled()) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::NoReplicationEnabled,
-                                        "Must have replication set up to run \"appendOplogNote\""});
+            return CommandHelpers::appendCommandStatus(
+                result,
+                {ErrorCodes::NoReplicationEnabled,
+                 "Must have replication set up to run \"appendOplogNote\""});
         }
 
         BSONElement dataElement;
         auto dataStatus = bsonExtractTypedField(cmdObj, "data", Object, &dataElement);
         if (!dataStatus.isOK()) {
-            return appendCommandStatus(result, dataStatus);
+            return CommandHelpers::appendCommandStatus(result, dataStatus);
         }
 
         Timestamp maxClusterTime;
@@ -136,22 +137,23 @@ public:
 
         if (!maxClusterTimeStatus.isOK()) {
             if (maxClusterTimeStatus == ErrorCodes::NoSuchKey) {  // no need to use maxClusterTime
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result, _performNoopWrite(opCtx, dataElement.Obj(), "appendOpLogNote"));
             }
-            return appendCommandStatus(result, maxClusterTimeStatus);
+            return CommandHelpers::appendCommandStatus(result, maxClusterTimeStatus);
         }
 
         auto lastAppliedOpTime = replCoord->getMyLastAppliedOpTime().getTimestamp();
         if (maxClusterTime > lastAppliedOpTime) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result, _performNoopWrite(opCtx, dataElement.Obj(), "appendOpLogNote"));
         } else {
             std::stringstream ss;
             ss << "Requested maxClusterTime " << LogicalTime(maxClusterTime).toString()
                << " is less or equal to the last primary OpTime: "
                << LogicalTime(lastAppliedOpTime).toString();
-            return appendCommandStatus(result, {ErrorCodes::StaleClusterTime, ss.str()});
+            return CommandHelpers::appendCommandStatus(result,
+                                                       {ErrorCodes::StaleClusterTime, ss.str()});
         }
     }
 };

@@ -832,12 +832,12 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
         if (initialCmdHadWriteConcern) {
             Status status = writeConcern.parse(writeConcernElement.Obj());
             if (!status.isOK()) {
-                return Command::appendCommandStatus(*result, status);
+                return CommandHelpers::appendCommandStatus(*result, status);
             }
 
             if (!(writeConcern.wNumNodes == 1 ||
                   writeConcern.wMode == WriteConcernOptions::kMajority)) {
-                return Command::appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     *result,
                     {ErrorCodes::InvalidOptions,
                      str::stream() << "Invalid replication write concern. User management write "
@@ -876,16 +876,16 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
             Shard::RetryPolicy::kNotIdempotent);
 
     if (!response.isOK()) {
-        return Command::appendCommandStatus(*result, response.getStatus());
+        return CommandHelpers::appendCommandStatus(*result, response.getStatus());
     }
     if (!response.getValue().commandStatus.isOK()) {
-        return Command::appendCommandStatus(*result, response.getValue().commandStatus);
+        return CommandHelpers::appendCommandStatus(*result, response.getValue().commandStatus);
     }
     if (!response.getValue().writeConcernStatus.isOK()) {
-        return Command::appendCommandStatus(*result, response.getValue().writeConcernStatus);
+        return CommandHelpers::appendCommandStatus(*result, response.getValue().writeConcernStatus);
     }
 
-    Command::filterCommandReplyForPassthrough(response.getValue().response, result);
+    CommandHelpers::filterCommandReplyForPassthrough(response.getValue().response, result);
     return true;
 }
 
@@ -905,7 +905,7 @@ bool ShardingCatalogClientImpl::runReadCommandForTest(OperationContext* opCtx,
         return resultStatus.getValue().commandStatus.isOK();
     }
 
-    return Command::appendCommandStatus(*result, resultStatus.getStatus());
+    return CommandHelpers::appendCommandStatus(*result, resultStatus.getStatus());
 }
 
 bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* opCtx,
@@ -921,11 +921,11 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* o
             Shard::kDefaultConfigCommandTimeout,
             Shard::RetryPolicy::kIdempotent);
     if (resultStatus.isOK()) {
-        Command::filterCommandReplyForPassthrough(resultStatus.getValue().response, result);
+        CommandHelpers::filterCommandReplyForPassthrough(resultStatus.getValue().response, result);
         return resultStatus.getValue().commandStatus.isOK();
     }
 
-    return Command::appendCommandStatus(*result, resultStatus.getStatus());
+    return CommandHelpers::appendCommandStatus(*result, resultStatus.getStatus());
 }
 
 Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCtx,

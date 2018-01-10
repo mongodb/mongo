@@ -247,7 +247,7 @@ void IDLParserErrorContext::appendGenericCommandArguments(
 
         StringData name = element.fieldNameStringData();
         // Include a passthrough field as long the IDL class has not defined it.
-        if (Command::isGenericArgument(name) &&
+        if (CommandHelpers::isGenericArgument(name) &&
             std::find(knownFields.begin(), knownFields.end(), name) == knownFields.end()) {
             builder->append(element);
         }

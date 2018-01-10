@@ -1616,7 +1616,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
             case ErrorCodes::BackgroundOperationInProgressForNamespace: {
                 Lock::TempRelease release(opCtx->lockState());
 
-                Command* cmd = Command::findCommand(o.firstElement().fieldName());
+                Command* cmd = CommandHelpers::findCommand(o.firstElement().fieldName());
                 invariant(cmd);
                 BackgroundOperation::awaitNoBgOpInProgForNs(cmd->parseNs(nss.db().toString(), o));
                 opCtx->recoveryUnit()->abandonSnapshot();

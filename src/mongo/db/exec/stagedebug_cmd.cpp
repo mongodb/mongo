@@ -210,12 +210,12 @@ public:
                     << PlanExecutor::statestr(state)
                     << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::OperationFailed,
-                                              str::stream()
-                                                  << "Executor error during "
-                                                  << "StageDebug command: "
-                                                  << WorkingSetCommon::toStatusString(obj)));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(ErrorCodes::OperationFailed,
+                       str::stream() << "Executor error during "
+                                     << "StageDebug command: "
+                                     << WorkingSetCommon::toStatusString(obj)));
         }
 
         return true;

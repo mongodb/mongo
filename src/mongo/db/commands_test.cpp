@@ -38,7 +38,7 @@ namespace mongo {
 
 TEST(Commands, appendCommandStatusOK) {
     BSONObjBuilder actualResult;
-    Command::appendCommandStatus(actualResult, Status::OK());
+    CommandHelpers::appendCommandStatus(actualResult, Status::OK());
 
     BSONObjBuilder expectedResult;
     expectedResult.append("ok", 1.0);
@@ -49,7 +49,7 @@ TEST(Commands, appendCommandStatusOK) {
 TEST(Commands, appendCommandStatusError) {
     BSONObjBuilder actualResult;
     const Status status(ErrorCodes::InvalidLength, "Response payload too long");
-    Command::appendCommandStatus(actualResult, status);
+    CommandHelpers::appendCommandStatus(actualResult, status);
 
     BSONObjBuilder expectedResult;
     expectedResult.append("ok", 0.0);
@@ -66,7 +66,7 @@ TEST(Commands, appendCommandStatusNoOverwrite) {
     actualResult.append("c", "d");
     actualResult.append("ok", "not ok");
     const Status status(ErrorCodes::InvalidLength, "Response payload too long");
-    Command::appendCommandStatus(actualResult, status);
+    CommandHelpers::appendCommandStatus(actualResult, status);
 
     BSONObjBuilder expectedResult;
     expectedResult.append("a", "b");
@@ -82,7 +82,7 @@ TEST(Commands, appendCommandStatusNoOverwrite) {
 TEST(Commands, appendCommandStatusErrorExtraInfo) {
     BSONObjBuilder actualResult;
     const Status status(ErrorExtraInfoExample(123), "not again!");
-    Command::appendCommandStatus(actualResult, status);
+    CommandHelpers::appendCommandStatus(actualResult, status);
 
     BSONObjBuilder expectedResult;
     expectedResult.append("ok", 0.0);
@@ -109,26 +109,27 @@ public:
 TEST_F(ParseNsOrUUID, FailWrongType) {
     auto cmd = BSON("query" << BSON("a" << BSON("$gte" << 11)));
     ASSERT_THROWS_CODE(
-        Command::parseNsOrUUID(opCtx, "db", cmd), DBException, ErrorCodes::InvalidNamespace);
+        CommandHelpers::parseNsOrUUID(opCtx, "db", cmd), DBException, ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ParseNsOrUUID, FailEmptyDbName) {
     auto cmd = BSON("query"
                     << "coll");
     ASSERT_THROWS_CODE(
-        Command::parseNsOrUUID(opCtx, "", cmd), DBException, ErrorCodes::InvalidNamespace);
+        CommandHelpers::parseNsOrUUID(opCtx, "", cmd), DBException, ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ParseNsOrUUID, FailInvalidDbName) {
     auto cmd = BSON("query"
                     << "coll");
-    ASSERT_THROWS_CODE(
-        Command::parseNsOrUUID(opCtx, "test.coll", cmd), DBException, ErrorCodes::InvalidNamespace);
+    ASSERT_THROWS_CODE(CommandHelpers::parseNsOrUUID(opCtx, "test.coll", cmd),
+                       DBException,
+                       ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ParseNsOrUUID, ParseUnknownUUID) {
     auto cmd = BSON("query" << UUID::gen());
-    ASSERT_THROWS_CODE(Command::parseNsOrUUID(opCtx, "test.coll", cmd),
+    ASSERT_THROWS_CODE(CommandHelpers::parseNsOrUUID(opCtx, "test.coll", cmd),
                        DBException,
                        ErrorCodes::NamespaceNotFound);
 }
@@ -136,7 +137,7 @@ TEST_F(ParseNsOrUUID, ParseUnknownUUID) {
 TEST_F(ParseNsOrUUID, ParseValidColl) {
     auto cmd = BSON("query"
                     << "coll");
-    auto parsedNss = Command::parseNsOrUUID(opCtx, "test", cmd);
+    auto parsedNss = CommandHelpers::parseNsOrUUID(opCtx, "test", cmd);
     ASSERT_EQ(parsedNss, NamespaceString("test.coll"));
 }
 
@@ -149,7 +150,7 @@ TEST_F(ParseNsOrUUID, ParseValidUUID) {
     catalog.onCreateCollection(opCtx, &coll, uuid);
 
     auto cmd = BSON("query" << uuid);
-    auto parsedNss = Command::parseNsOrUUID(opCtx, "test", cmd);
+    auto parsedNss = CommandHelpers::parseNsOrUUID(opCtx, "test", cmd);
     ASSERT_EQUALS(nss, parsedNss);
 }
 }  // namespace mongo

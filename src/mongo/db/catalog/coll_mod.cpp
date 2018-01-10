@@ -89,7 +89,7 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
 
     BSONForEach(e, cmdObj) {
         const auto fieldName = e.fieldNameStringData();
-        if (Command::isGenericArgument(fieldName)) {
+        if (CommandHelpers::isGenericArgument(fieldName)) {
             continue;  // Don't add to oplog builder.
         } else if (fieldName == "collMod") {
             // no-op

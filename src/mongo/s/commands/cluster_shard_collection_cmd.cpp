@@ -101,7 +101,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
@@ -129,11 +129,11 @@ public:
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
-            Command::appendMajorityWriteConcern(
-                Command::appendPassthroughFields(cmdObj, configShardCollRequest.toBSON())),
+            CommandHelpers::appendMajorityWriteConcern(
+                CommandHelpers::appendPassthroughFields(cmdObj, configShardCollRequest.toBSON())),
             Shard::RetryPolicy::kIdempotent));
 
-        Command::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
 

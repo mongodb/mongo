@@ -40,7 +40,7 @@ namespace rpc {
 namespace {
 // OP_COMMAND put some generic arguments in the metadata and some in the body.
 bool fieldGoesInMetadata(StringData commandName, StringData field) {
-    if (!Command::isGenericArgument(field))
+    if (!CommandHelpers::isGenericArgument(field))
         return false;  // All non-generic arguments go to the body.
 
     // For some reason this goes in the body only for a single command...

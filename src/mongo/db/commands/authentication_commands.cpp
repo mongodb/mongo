@@ -147,7 +147,8 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
     }
     std::string mechanism = cmdObj.getStringField("mechanism");
     if (mechanism.empty()) {
-        appendCommandStatus(result, {ErrorCodes::BadValue, "Auth mechanism not specified"});
+        CommandHelpers::appendCommandStatus(result,
+                                            {ErrorCodes::BadValue, "Auth mechanism not specified"});
         return false;
     }
     UserName user;
@@ -178,9 +179,10 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
         if (status.code() == ErrorCodes::AuthenticationFailed) {
             // Statuses with code AuthenticationFailed may contain messages we do not wish to
             // reveal to the user, so we return a status with the message "auth failed".
-            appendCommandStatus(result, Status(ErrorCodes::AuthenticationFailed, "auth failed"));
+            CommandHelpers::appendCommandStatus(
+                result, Status(ErrorCodes::AuthenticationFailed, "auth failed"));
         } else {
-            appendCommandStatus(result, status);
+            CommandHelpers::appendCommandStatus(result, status);
         }
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         return false;

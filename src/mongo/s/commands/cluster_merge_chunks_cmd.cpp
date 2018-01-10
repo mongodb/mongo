@@ -73,7 +73,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool adminOnly() const override {
@@ -167,7 +167,7 @@ public:
         const auto shardStatus =
             Grid::get(opCtx)->shardRegistry()->getShard(opCtx, firstChunk->getShardId());
         if (!shardStatus.isOK()) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::ShardNotFound,
                        str::stream() << "Can't find shard for chunk: " << firstChunk->toString()));
@@ -179,7 +179,7 @@ public:
 
         Grid::get(opCtx)->catalogCache()->onStaleConfigError(std::move(routingInfo));
 
-        filterCommandReplyForPassthrough(remoteResult, &result);
+        CommandHelpers::filterCommandReplyForPassthrough(remoteResult, &result);
         return ok;
     }
 

@@ -116,11 +116,11 @@ public:
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
-            Command::appendMajorityWriteConcern(
-                Command::appendPassthroughFields(cmdObj, configMovePrimaryRequest.toBSON())),
+            CommandHelpers::appendMajorityWriteConcern(
+                CommandHelpers::appendPassthroughFields(cmdObj, configMovePrimaryRequest.toBSON())),
             Shard::RetryPolicy::kIdempotent));
 
-        Command::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
 

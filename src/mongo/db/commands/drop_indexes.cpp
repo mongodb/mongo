@@ -88,8 +88,8 @@ public:
              const string& dbname,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
-        const NamespaceString nss = parseNsCollectionRequired(dbname, jsobj);
-        return appendCommandStatus(result, dropIndexes(opCtx, nss, jsobj, &result));
+        const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
+        return CommandHelpers::appendCommandStatus(result, dropIndexes(opCtx, nss, jsobj, &result));
     }
 
 } cmdDropIndexes;
@@ -121,7 +121,8 @@ public:
                    BSONObjBuilder& result) {
         DBDirectClient db(opCtx);
 
-        const NamespaceString toReIndexNs = parseNsCollectionRequired(dbname, jsobj);
+        const NamespaceString toReIndexNs =
+            CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
 
         LOG(0) << "CMD: reIndex " << toReIndexNs;
 
@@ -131,10 +132,10 @@ public:
         Collection* collection = ctx.db()->getCollection(opCtx, toReIndexNs);
         if (!collection) {
             if (ctx.db()->getViewCatalog()->lookup(opCtx, toReIndexNs.ns()))
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result, {ErrorCodes::CommandNotSupportedOnView, "can't re-index a view"});
             else
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result, {ErrorCodes::NamespaceNotFound, "collection does not exist"});
         }
 
@@ -198,12 +199,12 @@ public:
 
         auto indexInfoObjs = indexer.init(all);
         if (!indexInfoObjs.isOK()) {
-            return appendCommandStatus(result, indexInfoObjs.getStatus());
+            return CommandHelpers::appendCommandStatus(result, indexInfoObjs.getStatus());
         }
 
         auto status = indexer.insertAllDocumentsInCollection();
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         {

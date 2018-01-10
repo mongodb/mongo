@@ -100,7 +100,7 @@ public:
             return true;
         }
 
-        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
         const bool full = cmdObj["full"].trueValue();
         const bool scanData = cmdObj["scandata"].trueValue();
@@ -114,7 +114,7 @@ public:
         }
 
         if (!nss.isNormal() && full) {
-            appendCommandStatus(
+            CommandHelpers::appendCommandStatus(
                 result,
                 {ErrorCodes::CommandFailed, "Can only run full validate on a regular collection"});
             return false;
@@ -129,11 +129,12 @@ public:
         Collection* collection = ctx.getDb() ? ctx.getDb()->getCollection(opCtx, nss) : NULL;
         if (!collection) {
             if (ctx.getDb() && ctx.getDb()->getViewCatalog()->lookup(opCtx, nss.ns())) {
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result, {ErrorCodes::CommandNotSupportedOnView, "Cannot validate a view"});
             }
 
-            appendCommandStatus(result, {ErrorCodes::NamespaceNotFound, "ns not found"});
+            CommandHelpers::appendCommandStatus(result,
+                                                {ErrorCodes::NamespaceNotFound, "ns not found"});
             return false;
         }
 
@@ -175,7 +176,7 @@ public:
                     opCtx->waitForConditionOrInterrupt(_validationNotifier, lock);
                 }
             } catch (AssertionException& e) {
-                appendCommandStatus(
+                CommandHelpers::appendCommandStatus(
                     result,
                     {ErrorCodes::CommandFailed,
                      str::stream() << "Exception during validation: " << e.toString()});
@@ -195,7 +196,7 @@ public:
         Status status =
             collection->validate(opCtx, level, background, std::move(collLk), &results, &result);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         CollectionCatalogEntry* catalogEntry = collection->getCatalogEntry();

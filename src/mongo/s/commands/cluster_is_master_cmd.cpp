@@ -81,7 +81,7 @@ public:
         BSONElement element = cmdObj[kMetadataDocumentName];
         if (!element.eoo()) {
             if (seenIsMaster) {
-                return Command::appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result,
                     Status(ErrorCodes::ClientMetadataCannotBeMutated,
                            "The client metadata document may only be sent in the first isMaster"));
@@ -90,7 +90,8 @@ public:
             auto swParseClientMetadata = ClientMetadata::parse(element);
 
             if (!swParseClientMetadata.getStatus().isOK()) {
-                return Command::appendCommandStatus(result, swParseClientMetadata.getStatus());
+                return CommandHelpers::appendCommandStatus(result,
+                                                           swParseClientMetadata.getStatus());
             }
 
             invariant(swParseClientMetadata.getValue());

@@ -362,14 +362,14 @@ void _waitForWriteConcernAndAddToCommandResponse(OperationContext* opCtx,
     WriteConcernResult res;
     auto waitForWCStatus =
         waitForWriteConcern(opCtx, lastOpAfterRun, opCtx->getWriteConcern(), &res);
-    Command::appendCommandWCStatus(*commandResponseBuilder, waitForWCStatus, res);
+    CommandHelpers::appendCommandWCStatus(*commandResponseBuilder, waitForWCStatus, res);
 
     // SERVER-22421: This code is to ensure error response backwards compatibility with the
     // user management commands. This can be removed in 3.6.
-    if (!waitForWCStatus.isOK() && Command::isUserManagementCommand(commandName)) {
+    if (!waitForWCStatus.isOK() && CommandHelpers::isUserManagementCommand(commandName)) {
         BSONObj temp = commandResponseBuilder->asTempObj().copy();
         commandResponseBuilder->resetToEmpty();
-        Command::appendCommandStatus(*commandResponseBuilder, waitForWCStatus);
+        CommandHelpers::appendCommandStatus(*commandResponseBuilder, waitForWCStatus);
         commandResponseBuilder->appendElementsUnique(temp);
     }
 }
@@ -457,7 +457,7 @@ bool runCommandImpl(OperationContext* opCtx,
                             << redact(command->getRedactedCopyForLogging(request.body));
         }
 
-        auto result = Command::appendCommandStatus(inPlaceReplyBob, rcStatus);
+        auto result = CommandHelpers::appendCommandStatus(inPlaceReplyBob, rcStatus);
         inPlaceReplyBob.doneFast();
         BSONObjBuilder metadataBob;
         appendReplyMetadataOnError(opCtx, &metadataBob);
@@ -468,7 +468,7 @@ bool runCommandImpl(OperationContext* opCtx,
     bool result;
     if (!command->supportsWriteConcern(cmd)) {
         if (commandSpecifiesWriteConcern(cmd)) {
-            auto result = Command::appendCommandStatus(
+            auto result = CommandHelpers::appendCommandStatus(
                 inPlaceReplyBob,
                 {ErrorCodes::InvalidOptions, "Command does not support writeConcern"});
             inPlaceReplyBob.doneFast();
@@ -482,7 +482,8 @@ bool runCommandImpl(OperationContext* opCtx,
     } else {
         auto wcResult = extractWriteConcern(opCtx, cmd, db);
         if (!wcResult.isOK()) {
-            auto result = Command::appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
+            auto result =
+                CommandHelpers::appendCommandStatus(inPlaceReplyBob, wcResult.getStatus());
             inPlaceReplyBob.doneFast();
             BSONObjBuilder metadataBob;
             appendReplyMetadataOnError(opCtx, &metadataBob);
@@ -519,7 +520,8 @@ bool runCommandImpl(OperationContext* opCtx,
 
         if (!linearizableReadStatus.isOK()) {
             inPlaceReplyBob.resetToEmpty();
-            auto result = Command::appendCommandStatus(inPlaceReplyBob, linearizableReadStatus);
+            auto result =
+                CommandHelpers::appendCommandStatus(inPlaceReplyBob, linearizableReadStatus);
             inPlaceReplyBob.doneFast();
             BSONObjBuilder metadataBob;
             appendReplyMetadataOnError(opCtx, &metadataBob);
@@ -528,7 +530,7 @@ bool runCommandImpl(OperationContext* opCtx,
         }
     }
 
-    Command::appendCommandStatus(inPlaceReplyBob, result);
+    CommandHelpers::appendCommandStatus(inPlaceReplyBob, result);
 
     auto operationTime = computeOperationTime(
         opCtx, startOperationTime, repl::ReadConcernArgs::get(opCtx).getLevel());
@@ -607,7 +609,7 @@ void execCommandDatabase(OperationContext* opCtx,
                 cmdOptionMaxTimeMSField = element;
             } else if (fieldName == "allowImplicitCollectionCreation") {
                 allowImplicitCollectionCreationField = element;
-            } else if (fieldName == Command::kHelpFieldName) {
+            } else if (fieldName == CommandHelpers::kHelpFieldName) {
                 helpField = element;
             } else if (fieldName == ChunkVersion::kShardVersionField) {
                 shardVersionFieldIdx = element;
@@ -621,7 +623,7 @@ void execCommandDatabase(OperationContext* opCtx,
                     topLevelFields[fieldName]++ == 0);
         }
 
-        if (Command::isHelpRequest(helpField)) {
+        if (CommandHelpers::isHelpRequest(helpField)) {
             CurOp::get(opCtx)->ensureStarted();
             // We disable last-error for help requests due to SERVER-11492, because config servers
             // use help requests to determine which commands are database writes, and so must be
@@ -856,7 +858,7 @@ DbResponse runCommands(OperationContext* opCtx, const Message& message) {
             // to avoid displaying potentially sensitive information in the logs,
             // we restrict the log message to the name of the unrecognized command.
             // However, the complete command object will still be echoed to the client.
-            if (!(c = Command::findCommand(request.getCommandName()))) {
+            if (!(c = CommandHelpers::findCommand(request.getCommandName()))) {
                 globalCommandRegistry()->incrementUnknownCommands();
                 std::string msg = str::stream() << "no such command: '" << request.getCommandName()
                                                 << "'";

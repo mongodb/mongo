@@ -368,7 +368,7 @@ BSONObj PipelineS::establishMergingMongosCursor(
 
     responseBuilder.done(clusterCursorId, requestedNss.ns());
 
-    Command::appendCommandStatus(cursorResponse, Status::OK());
+    CommandHelpers::appendCommandStatus(cursorResponse, Status::OK());
 
     return cursorResponse.obj();
 }

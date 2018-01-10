@@ -83,7 +83,7 @@ public:
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
-        const NamespaceString ns(parseNsOrUUID(opCtx, dbname, cmdObj));
+        const NamespaceString ns(CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj));
         if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -96,25 +96,26 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
-        const NamespaceString ns(parseNsOrUUID(opCtx, dbname, cmdObj));
+        const NamespaceString ns(CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj));
 
         AutoGetCollectionForReadCommand ctx(opCtx, ns, std::move(dbSLock));
 
         Collection* collection = ctx.getCollection();
         if (!collection)
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::NamespaceNotFound,
-                                              str::stream() << "ns does not exist: " << ns.ns()));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(ErrorCodes::NamespaceNotFound,
+                       str::stream() << "ns does not exist: " << ns.ns()));
 
         size_t numCursors = static_cast<size_t>(cmdObj["numCursors"].numberInt());
 
         if (numCursors == 0 || numCursors > 10000)
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::BadValue,
-                                              str::stream()
-                                                  << "numCursors has to be between 1 and 10000"
-                                                  << " was: "
-                                                  << numCursors));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(ErrorCodes::BadValue,
+                       str::stream() << "numCursors has to be between 1 and 10000"
+                                     << " was: "
+                                     << numCursors));
 
         std::vector<std::unique_ptr<RecordCursor>> iterators;
         // Opening multiple cursors on a capped collection and reading them in parallel can produce

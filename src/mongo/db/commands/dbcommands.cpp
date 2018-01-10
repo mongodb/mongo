@@ -132,7 +132,7 @@ public:
         Status status = repl::getGlobalReplicationCoordinator()->stepDown(
             opCtx, force, Seconds(timeoutSecs), Seconds(120));
         if (!status.isOK() && status.code() != ErrorCodes::NotMaster) {  // ignore not master
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // Never returns
@@ -173,16 +173,17 @@ public:
         // disallow dropping the config database
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
             (dbname == NamespaceString::kConfigDb)) {
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::IllegalOperation,
-                                              "Cannot drop 'config' database if mongod started "
-                                              "with --configsvr"));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(ErrorCodes::IllegalOperation,
+                       "Cannot drop 'config' database if mongod started "
+                       "with --configsvr"));
         }
 
         if ((repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
             ((dbname == NamespaceString::kLocalDb) || (dbname == NamespaceString::kAdminDb))) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,
                        str::stream() << "Cannot drop '" << dbname
@@ -191,18 +192,18 @@ public:
         BSONElement e = cmdObj.firstElement();
         int p = (int)e.number();
         if (p != 1) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result, Status(ErrorCodes::IllegalOperation, "have to pass 1 as db parameter"));
         }
 
         Status status = dropDatabase(opCtx, dbname);
         if (status == ErrorCodes::NamespaceNotFound) {
-            return appendCommandStatus(result, Status::OK());
+            return CommandHelpers::appendCommandStatus(result, Status::OK());
         }
         if (status.isOK()) {
             result.append("dropped", dbname);
         }
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
 } cmdDropDatabase;
@@ -284,7 +285,7 @@ public:
 
         // Open database before returning
         dbHolder().openDb(opCtx, dbname);
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 } cmdRepairDatabase;
 
@@ -422,7 +423,7 @@ public:
                            const BSONObj& cmdObj,
                            string& errmsg,
                            BSONObjBuilder& result) {
-        const NamespaceString nsToDrop = parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nsToDrop = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
 
         if (NamespaceString::virtualized(nsToDrop.ns())) {
             errmsg = "can't drop a virtual collection";
@@ -436,7 +437,7 @@ public:
             return false;
         }
 
-        return appendCommandStatus(
+        return CommandHelpers::appendCommandStatus(
             result,
             dropCollection(opCtx,
                            nsToDrop,
@@ -478,7 +479,7 @@ public:
                      const string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        const NamespaceString ns(parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString ns(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
         if (cmdObj.hasField("autoIndexId")) {
             const char* deprecationWarning =
@@ -490,21 +491,21 @@ public:
         // Validate _id index spec and fill in missing fields.
         if (auto idIndexElem = cmdObj["idIndex"]) {
             if (cmdObj["viewOn"]) {
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result,
                     {ErrorCodes::InvalidOptions,
                      str::stream() << "'idIndex' is not allowed with 'viewOn': " << idIndexElem});
             }
             if (cmdObj["autoIndexId"]) {
-                return appendCommandStatus(result,
-                                           {ErrorCodes::InvalidOptions,
-                                            str::stream()
-                                                << "'idIndex' is not allowed with 'autoIndexId': "
-                                                << idIndexElem});
+                return CommandHelpers::appendCommandStatus(
+                    result,
+                    {ErrorCodes::InvalidOptions,
+                     str::stream() << "'idIndex' is not allowed with 'autoIndexId': "
+                                   << idIndexElem});
             }
 
             if (idIndexElem.type() != BSONType::Object) {
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result,
                     {ErrorCodes::TypeMismatch,
                      str::stream() << "'idIndex' has to be a document: " << idIndexElem});
@@ -521,7 +522,7 @@ public:
             std::unique_ptr<CollatorInterface> defaultCollator;
             if (auto collationElem = cmdObj["collation"]) {
                 if (collationElem.type() != BSONType::Object) {
-                    return appendCommandStatus(
+                    return CommandHelpers::appendCommandStatus(
                         result,
                         {ErrorCodes::TypeMismatch,
                          str::stream() << "'collation' has to be a document: " << collationElem});
@@ -529,7 +530,7 @@ public:
                 auto collatorStatus = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                           ->makeFromBSON(collationElem.Obj());
                 if (!collatorStatus.isOK()) {
-                    return appendCommandStatus(result, collatorStatus.getStatus());
+                    return CommandHelpers::appendCommandStatus(result, collatorStatus.getStatus());
                 }
                 defaultCollator = std::move(collatorStatus.getValue());
             }
@@ -545,7 +546,7 @@ public:
                 idIndexCollator = std::move(collatorStatus.getValue());
             }
             if (!CollatorInterface::collatorsMatch(defaultCollator.get(), idIndexCollator.get())) {
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result,
                     {ErrorCodes::BadValue,
                      "'idIndex' must have the same collation as the collection."});
@@ -554,12 +555,13 @@ public:
             // Remove "idIndex" field from command.
             auto resolvedCmdObj = cmdObj.removeField("idIndex");
 
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result, createCollection(opCtx, dbname, resolvedCmdObj, idIndexSpec));
         }
 
         BSONObj idIndexSpec;
-        return appendCommandStatus(result, createCollection(opCtx, dbname, cmdObj, idIndexSpec));
+        return CommandHelpers::appendCommandStatus(
+            result, createCollection(opCtx, dbname, cmdObj, idIndexSpec));
     }
 } cmdCreate;
 
@@ -701,11 +703,11 @@ public:
             }
 
             if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
-                return appendCommandStatus(result,
-                                           Status(ErrorCodes::OperationFailed,
-                                                  str::stream()
-                                                      << "Executor error during filemd5 command: "
-                                                      << WorkingSetCommon::toStatusString(obj)));
+                return CommandHelpers::appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::OperationFailed,
+                           str::stream() << "Executor error during filemd5 command: "
+                                         << WorkingSetCommon::toStatusString(obj)));
             }
 
             if (partialOk)
@@ -739,7 +741,7 @@ public:
 
 class CmdDatasize : public ErrmsgCommandDeprecated {
     virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
 public:
@@ -870,7 +872,7 @@ public:
 
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
             warning() << "Internal error while reading " << ns;
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::OperationFailed,
                        str::stream() << "Executor error while reading during dataSize command: "
@@ -920,7 +922,7 @@ public:
                    const BSONObj& jsobj,
                    string& errmsg,
                    BSONObjBuilder& result) {
-        const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, jsobj));
 
         if (nss.coll().empty()) {
             errmsg = "No collection name specified";
@@ -967,8 +969,8 @@ public:
              const string& dbname,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
-        const NamespaceString nss(parseNsCollectionRequired(dbname, jsobj));
-        return appendCommandStatus(result, collMod(opCtx, nss, jsobj, &result));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, jsobj));
+        return CommandHelpers::appendCommandStatus(result, collMod(opCtx, nss, jsobj, &result));
     }
 
 } collectionModCommand;

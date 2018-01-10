@@ -241,7 +241,7 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
             }
 
             pipeline = e.Obj().getOwned();
-        } else if (!createdOn24OrEarlier && !Command::isGenericArgument(fieldName)) {
+        } else if (!createdOn24OrEarlier && !CommandHelpers::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "The field '" << fieldName
                                         << "' is not a valid collection option. Options: "

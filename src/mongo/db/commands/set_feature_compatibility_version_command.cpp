@@ -127,7 +127,7 @@ public:
                 WriteConcernOptions(
                     WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, timeout),
                 &res);
-            Command::appendCommandWCStatus(result, waitForWCStatus, res);
+            CommandHelpers::appendCommandWCStatus(result, waitForWCStatus, res);
         });
 
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
@@ -168,9 +168,11 @@ public:
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx,
-                        Command::appendMajorityWriteConcern(Command::appendPassthroughFields(
-                            cmdObj,
-                            BSON(FeatureCompatibilityVersion::kCommandName << requestedVersion)))));
+                        CommandHelpers::appendMajorityWriteConcern(
+                            CommandHelpers::appendPassthroughFields(
+                                cmdObj,
+                                BSON(FeatureCompatibilityVersion::kCommandName
+                                     << requestedVersion)))));
             }
 
             if (ShardingState::get(opCtx)->enabled()) {
@@ -216,9 +218,11 @@ public:
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx,
-                        Command::appendMajorityWriteConcern(Command::appendPassthroughFields(
-                            cmdObj,
-                            BSON(FeatureCompatibilityVersion::kCommandName << requestedVersion)))));
+                        CommandHelpers::appendMajorityWriteConcern(
+                            CommandHelpers::appendPassthroughFields(
+                                cmdObj,
+                                BSON(FeatureCompatibilityVersion::kCommandName
+                                     << requestedVersion)))));
 
                 // Stop the background key generator thread from running before trying to drop the
                 // collection so we know the key won't just be recreated.

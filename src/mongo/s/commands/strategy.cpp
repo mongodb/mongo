@@ -164,7 +164,7 @@ void execCommandClient(OperationContext* opCtx,
             help << "help for: " << c->getName() << " ";
             c->help(help);
             result.append("help", help.str());
-            Command::appendCommandStatus(result, true, "");
+            CommandHelpers::appendCommandStatus(result, true, "");
             return;
         }
 
@@ -176,7 +176,7 @@ void execCommandClient(OperationContext* opCtx,
 
     Status status = Command::checkAuthorization(c, opCtx, request);
     if (!status.isOK()) {
-        Command::appendCommandStatus(result, status);
+        CommandHelpers::appendCommandStatus(result, status);
         return;
     }
 
@@ -189,7 +189,7 @@ void execCommandClient(OperationContext* opCtx,
     StatusWith<WriteConcernOptions> wcResult =
         WriteConcernOptions::extractWCFromCommand(request.body, dbname);
     if (!wcResult.isOK()) {
-        Command::appendCommandStatus(result, wcResult.getStatus());
+        CommandHelpers::appendCommandStatus(result, wcResult.getStatus());
         return;
     }
 
@@ -198,7 +198,7 @@ void execCommandClient(OperationContext* opCtx,
         // This command doesn't do writes so it should not be passed a writeConcern.
         // If we did not use the default writeConcern, one was provided when it shouldn't have
         // been by the user.
-        Command::appendCommandStatus(
+        CommandHelpers::appendCommandStatus(
             result, Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern"));
         return;
     }
@@ -210,7 +210,7 @@ void execCommandClient(OperationContext* opCtx,
 
     auto metadataStatus = processCommandMetadata(opCtx, request.body);
     if (!metadataStatus.isOK()) {
-        Command::appendCommandStatus(result, metadataStatus);
+        CommandHelpers::appendCommandStatus(result, metadataStatus);
         return;
     }
 
@@ -228,7 +228,7 @@ void execCommandClient(OperationContext* opCtx,
     if (!ok) {
         c->incrementCommandsFailed();
     }
-    Command::appendCommandStatus(result, ok);
+    CommandHelpers::appendCommandStatus(result, ok);
 }
 
 void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder&& builder) {
@@ -245,10 +245,10 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
     }
 
     auto const commandName = request.getCommandName();
-    auto const command = Command::findCommand(commandName);
+    auto const command = CommandHelpers::findCommand(commandName);
     if (!command) {
         ON_BLOCK_EXIT([opCtx, &builder] { appendRequiredFieldsToResponse(opCtx, &builder); });
-        Command::appendCommandStatus(
+        CommandHelpers::appendCommandStatus(
             builder,
             {ErrorCodes::CommandNotFound, str::stream() << "no such cmd: " << commandName});
         globalCommandRegistry()->incrementUnknownCommands();
@@ -291,7 +291,7 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
             ON_BLOCK_EXIT([opCtx, &builder] { appendRequiredFieldsToResponse(opCtx, &builder); });
             builder.resetToEmpty();
             command->incrementCommandsFailed();
-            Command::appendCommandStatus(builder, e.toStatus());
+            CommandHelpers::appendCommandStatus(builder, e.toStatus());
             LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
             return;
         }
@@ -412,7 +412,7 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
             LOG(1) << "Exception thrown while parsing command " << causedBy(redact(ex));
             reply->reset();
             auto bob = reply->getInPlaceReplyBuilder(0);
-            Command::appendCommandStatus(bob, ex.toStatus());
+            CommandHelpers::appendCommandStatus(bob, ex.toStatus());
             appendRequiredFieldsToResponse(opCtx, &bob);
 
             return;  // From lambda. Don't try executing if parsing failed.
@@ -428,7 +428,7 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
 
             reply->reset();
             auto bob = reply->getInPlaceReplyBuilder(0);
-            Command::appendCommandStatus(bob, ex.toStatus());
+            CommandHelpers::appendCommandStatus(bob, ex.toStatus());
             appendRequiredFieldsToResponse(opCtx, &bob);
         }
     }();

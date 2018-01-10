@@ -97,7 +97,7 @@ public:
              BSONObjBuilder& result) {
 
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,
                        "_configsvrCreateDatabase can only be run on config servers"));

@@ -71,7 +71,7 @@ bool KillCursorsCmdBase::run(OperationContext* opCtx,
                              BSONObjBuilder& result) {
     auto statusWithRequest = KillCursorsRequest::parseFromBSON(dbname, cmdObj);
     if (!statusWithRequest.isOK()) {
-        return appendCommandStatus(result, statusWithRequest.getStatus());
+        return CommandHelpers::appendCommandStatus(result, statusWithRequest.getStatus());
     }
     auto killCursorsRequest = std::move(statusWithRequest.getValue());
 

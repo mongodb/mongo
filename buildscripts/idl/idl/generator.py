@@ -1052,7 +1052,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     # should ignore regardless of strict mode.
                     command_predicate = None
                     if isinstance(struct, ast.Command):
-                        command_predicate = "!Command::isGenericArgument(fieldName)"
+                        command_predicate = "!CommandHelpers::isGenericArgument(fieldName)"
 
                     with self._predicate(command_predicate):
                         self._writer.write_line('ctxt.throwUnknownField(fieldName);')

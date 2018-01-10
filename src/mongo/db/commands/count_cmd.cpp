@@ -101,7 +101,7 @@ public:
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
-        const NamespaceString nss(parseNsOrUUID(opCtx, dbname, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj));
         if (!authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::find)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -116,7 +116,7 @@ public:
                            BSONObjBuilder* out) const {
         const bool isExplain = true;
         Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
-        auto nss = parseNsOrUUID(opCtx, dbname, cmdObj);
+        auto nss = CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj);
         auto request = CountRequest::parseFromBSON(nss, cmdObj, isExplain);
         if (!request.isOK()) {
             return request.getStatus();
@@ -174,10 +174,10 @@ public:
                      BSONObjBuilder& result) {
         const bool isExplain = false;
         Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
-        auto nss = parseNsOrUUID(opCtx, dbname, cmdObj);
+        auto nss = CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj);
         auto request = CountRequest::parseFromBSON(nss, cmdObj, isExplain);
         if (!request.isOK()) {
-            return appendCommandStatus(result, request.getStatus());
+            return CommandHelpers::appendCommandStatus(result, request.getStatus());
         }
 
         AutoGetCollectionOrViewForReadCommand ctx(
@@ -189,10 +189,10 @@ public:
 
             auto viewAggregation = request.getValue().asAggregationCommand();
             if (!viewAggregation.isOK()) {
-                return appendCommandStatus(result, viewAggregation.getStatus());
+                return CommandHelpers::appendCommandStatus(result, viewAggregation.getStatus());
             }
 
-            BSONObj aggResult = Command::runCommandDirectly(
+            BSONObj aggResult = CommandHelpers::runCommandDirectly(
                 opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregation.getValue())));
 
             if (ResolvedView::isResolvedViewErrorResponse(aggResult)) {
@@ -203,7 +203,7 @@ public:
             ViewResponseFormatter formatter(aggResult);
             Status formatStatus = formatter.appendAsCountResponse(&result);
             if (!formatStatus.isOK()) {
-                return appendCommandStatus(result, formatStatus);
+                return CommandHelpers::appendCommandStatus(result, formatStatus);
             }
             return true;
         }
@@ -219,7 +219,7 @@ public:
                                                        false,  // !explain
                                                        PlanExecutor::YIELD_AUTO);
         if (!statusWithPlanExecutor.isOK()) {
-            return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
 
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -233,7 +233,7 @@ public:
 
         Status execPlanStatus = exec->executePlan();
         if (!execPlanStatus.isOK()) {
-            return appendCommandStatus(result, execPlanStatus);
+            return CommandHelpers::appendCommandStatus(result, execPlanStatus);
         }
 
         PlanSummaryStats summaryStats;

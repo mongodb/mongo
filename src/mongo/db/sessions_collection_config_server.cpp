@@ -70,7 +70,7 @@ Status SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext
     DBDirectClient client(opCtx);
     BSONObj info;
     if (!client.runCommand(
-            "admin", Command::appendMajorityWriteConcern(shardCollection.toBSON()), info)) {
+            "admin", CommandHelpers::appendMajorityWriteConcern(shardCollection.toBSON()), info)) {
         return getStatusFromCommandResult(info);
     }
 

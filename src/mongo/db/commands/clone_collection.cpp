@@ -73,7 +73,7 @@ public:
     }
 
     virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -129,7 +129,7 @@ public:
         string collection = parseNs(dbname, cmdObj);
         Status allowedWriteStatus = userAllowedWriteNS(dbname, collection);
         if (!allowedWriteStatus.isOK()) {
-            return appendCommandStatus(result, allowedWriteStatus);
+            return CommandHelpers::appendCommandStatus(result, allowedWriteStatus);
         }
 
         BSONObj query = cmdObj.getObjectField("query");

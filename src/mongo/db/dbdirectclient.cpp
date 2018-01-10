@@ -176,7 +176,7 @@ unsigned long long DBDirectClient::count(
 
     NamespaceString nsString(ns);
 
-    auto result = Command::runCommandDirectly(
+    auto result = CommandHelpers::runCommandDirectly(
         _opCtx, OpMsgRequest::fromDBAndBody(nsString.db(), std::move(cmdObj)));
 
     uassertStatusOK(getStatusFromCommandResult(result));

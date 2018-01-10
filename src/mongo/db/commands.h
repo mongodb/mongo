@@ -56,6 +56,132 @@ namespace mutablebson {
 class Document;
 }  // namespace mutablebson
 
+class Command;
+
+// Various helpers unrelated to any single command or to the command registry.
+// Would be a namespace, but want to keep it closed rather than open.
+// Some of these may move to the BasicCommand shim if they are only for legacy implementations.
+struct CommandHelpers {
+    // The type of the first field in 'cmdObj' must be mongo::String. The first field is
+    // interpreted as a collection name.
+    static std::string parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj);
+
+    // The type of the first field in 'cmdObj' must be mongo::String or Symbol.
+    // The first field is interpreted as a collection name.
+    static NamespaceString parseNsCollectionRequired(const std::string& dbname,
+                                                     const BSONObj& cmdObj);
+
+    static NamespaceString parseNsOrUUID(OperationContext* opCtx,
+                                         const std::string& dbname,
+                                         const BSONObj& cmdObj);
+
+    static Command* findCommand(StringData name);
+
+    // Helper for setting errmsg and ok field in command result object.
+    static void appendCommandStatus(BSONObjBuilder& result,
+                                    bool ok,
+                                    const std::string& errmsg = {});
+    // @return s.isOK()
+    static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
+    /**
+     * Helper for setting a writeConcernError field in the command result object if
+     * a writeConcern error occurs.
+     *
+     * @param result is the BSONObjBuilder for the command response. This function creates the
+     *               writeConcernError field for the response.
+     * @param awaitReplicationStatus is the status received from awaitReplication.
+     * @param wcResult is the writeConcernResult object that holds other write concern information.
+     *      This is primarily used for populating errInfo when a timeout occurs, and is populated
+     *      by waitForWriteConcern.
+     */
+    static void appendCommandWCStatus(BSONObjBuilder& result,
+                                      const Status& awaitReplicationStatus,
+                                      const WriteConcernResult& wcResult = WriteConcernResult());
+    /**
+     * Appends passthrough fields from a cmdObj to a given request.
+     */
+    static BSONObj appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
+                                           const BSONObj& request);
+    /**
+     * Returns a copy of 'cmdObj' with a majority writeConcern appended.
+     */
+    static BSONObj appendMajorityWriteConcern(const BSONObj& cmdObj);
+    /**
+     * Returns true if the provided argument is one that is handled by the command processing layer
+     * and should generally be ignored by individual command implementations. In particular,
+     * commands that fail on unrecognized arguments must not fail for any of these.
+     */
+    static bool isGenericArgument(StringData arg) {
+        // Not including "help" since we don't pass help requests through to the command parser.
+        // If that changes, it should be added. When you add to this list, consider whether you
+        // should also change the filterCommandRequestForPassthrough() function.
+        return arg == "$audit" ||                        //
+            arg == "$client" ||                          //
+            arg == "$configServerState" ||               //
+            arg == "$db" ||                              //
+            arg == "allowImplicitCollectionCreation" ||  //
+            arg == "$oplogQueryData" ||                  //
+            arg == "$queryOptions" ||                    //
+            arg == "$readPreference" ||                  //
+            arg == "$replData" ||                        //
+            arg == "$clusterTime" ||                     //
+            arg == "maxTimeMS" ||                        //
+            arg == "readConcern" ||                      //
+            arg == "shardVersion" ||                     //
+            arg == "tracking_info" ||                    //
+            arg == "writeConcern" ||                     //
+            arg == "lsid" ||                             //
+            arg == "txnNumber" ||                        //
+            false;  // These comments tell clang-format to keep this line-oriented.
+    }
+
+    /**
+     * This function checks if a command is a user management command by name.
+     */
+    static bool isUserManagementCommand(const std::string& name);
+
+    /**
+     * Rewrites cmdObj into a format safe to blindly forward to shards.
+     *
+     * This performs 2 transformations:
+     * 1) $readPreference fields are moved into a subobject called $queryOptions. This matches the
+     *    "wrapped" format historically used internally by mongos. Moving off of that format will be
+     *    done as SERVER-29091.
+     *
+     * 2) Filter out generic arguments that shouldn't be blindly passed to the shards.  This is
+     *    necessary because many mongos implementations of Command::run() just pass cmdObj through
+     *    directly to the shards. However, some of the generic arguments fields are automatically
+     *    appended in the egress layer. Removing them here ensures that they don't get duplicated.
+     *
+     * Ideally this function can be deleted once mongos run() implementations are more careful about
+     * what they send to the shards.
+     */
+    static BSONObj filterCommandRequestForPassthrough(const BSONObj& cmdObj);
+    static void filterCommandReplyForPassthrough(const BSONObj& reply, BSONObjBuilder* output);
+
+    /**
+     * Rewrites reply into a format safe to blindly forward from shards to clients.
+     *
+     * Ideally this function can be deleted once mongos run() implementations are more careful about
+     * what they return from the shards.
+     */
+    static BSONObj filterCommandReplyForPassthrough(const BSONObj& reply);
+
+    /**
+     * Returns true if this a request for the 'help' information associated with the command.
+     */
+    static bool isHelpRequest(const BSONElement& helpElem);
+
+    /**
+     * Runs a command directly and returns the result. Does not do any other work normally handled
+     * by command dispatch, such as checking auth, dealing with CurOp or waiting for write concern.
+     * It is illegal to call this if the command does not exist.
+     */
+    static BSONObj runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request);
+
+    static constexpr StringData kHelpFieldName = "help"_sd;
+};
+
 /**
  * Serves as a base for server commands. See the constructor for more details.
  */
@@ -280,19 +406,6 @@ public:
         _commandsFailed.increment();
     }
 
-    // The type of the first field in 'cmdObj' must be mongo::String. The first field is
-    // interpreted as a collection name.
-    static std::string parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj);
-
-    // The type of the first field in 'cmdObj' must be mongo::String or Symbol.
-    // The first field is interpreted as a collection name.
-    static NamespaceString parseNsCollectionRequired(const std::string& dbname,
-                                                     const BSONObj& cmdObj);
-    static NamespaceString parseNsOrUUID(OperationContext* opCtx,
-                                         const std::string& dbname,
-                                         const BSONObj& cmdObj);
-
-
     /**
      * Runs the command.
      *
@@ -301,36 +414,24 @@ public:
     bool publicRun(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder& result);
 
     /**
-     * Runs a command directly and returns the result. Does not do any other work normally handled
-     * by command dispatch, such as checking auth, dealing with CurOp or waiting for write concern.
-     * It is illegal to call this if the command does not exist.
+     * Generates a reply from the 'help' information associated with a command. The state of
+     * the passed ReplyBuilder will be in kOutputDocs after calling this method.
      */
-    static BSONObj runCommandDirectly(OperationContext* txn, const OpMsgRequest& request);
-
-    static Command* findCommand(StringData name);
-
-    // Helper for setting errmsg and ok field in command result object.
-    static void appendCommandStatus(BSONObjBuilder& result,
-                                    bool ok,
-                                    const std::string& errmsg = {});
-
-    // @return s.isOK()
-    static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
+    static void generateHelpResponse(OperationContext* opCtx,
+                                     rpc::ReplyBuilderInterface* replyBuilder,
+                                     const Command& command);
 
     /**
-     * Helper for setting a writeConcernError field in the command result object if
-     * a writeConcern error occurs.
+     * Checks to see if the client executing "opCtx" is authorized to run the given command with the
+     * given parameters on the given named database.
      *
-     * @param result is the BSONObjBuilder for the command response. This function creates the
-     *               writeConcernError field for the response.
-     * @param awaitReplicationStatus is the status received from awaitReplication.
-     * @param wcResult is the writeConcernResult object that holds other write concern information.
-     *      This is primarily used for populating errInfo when a timeout occurs, and is populated
-     *      by waitForWriteConcern.
+     * Returns Status::OK() if the command is authorized.  Most likely returns
+     * ErrorCodes::Unauthorized otherwise, but any return other than Status::OK implies not
+     * authorized.
      */
-    static void appendCommandWCStatus(BSONObjBuilder& result,
-                                      const Status& awaitReplicationStatus,
-                                      const WriteConcernResult& wcResult = WriteConcernResult());
+    static Status checkAuthorization(Command* c,
+                                     OperationContext* opCtx,
+                                     const OpMsgRequest& request);
 
     /**
      * If true, then testing commands are available. Defaults to false.
@@ -354,107 +455,10 @@ public:
      *         runGlobalInitializersOrDie(argc, argv, envp);
      *         ...
      *     }
+     *
+     * Note: variable is defined in test_commands_enabled.cpp as a dependency hack.
      */
     static bool testCommandsEnabled;
-
-    /**
-     * Returns true if this a request for the 'help' information associated with the command.
-     */
-    static bool isHelpRequest(const BSONElement& helpElem);
-
-    static const char kHelpFieldName[];
-
-    /**
-     * Generates a reply from the 'help' information associated with a command. The state of
-     * the passed ReplyBuilder will be in kOutputDocs after calling this method.
-     */
-    static void generateHelpResponse(OperationContext* opCtx,
-                                     rpc::ReplyBuilderInterface* replyBuilder,
-                                     const Command& command);
-
-    /**
-     * This function checks if a command is a user management command by name.
-     */
-    static bool isUserManagementCommand(const std::string& name);
-
-    /**
-     * Checks to see if the client executing "opCtx" is authorized to run the given command with the
-     * given parameters on the given named database.
-     *
-     * Returns Status::OK() if the command is authorized.  Most likely returns
-     * ErrorCodes::Unauthorized otherwise, but any return other than Status::OK implies not
-     * authorized.
-     */
-    static Status checkAuthorization(Command* c,
-                                     OperationContext* opCtx,
-                                     const OpMsgRequest& request);
-
-    /**
-     * Appends passthrough fields from a cmdObj to a given request.
-     */
-    static BSONObj appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
-                                           const BSONObj& request);
-
-    /**
-     * Returns a copy of 'cmdObj' with a majority writeConcern appended.
-     */
-    static BSONObj appendMajorityWriteConcern(const BSONObj& cmdObj);
-
-    /**
-     * Returns true if the provided argument is one that is handled by the command processing layer
-     * and should generally be ignored by individual command implementations. In particular,
-     * commands that fail on unrecognized arguments must not fail for any of these.
-     */
-    static bool isGenericArgument(StringData arg) {
-        // Not including "help" since we don't pass help requests through to the command parser.
-        // If that changes, it should be added. When you add to this list, consider whether you
-        // should also change the filterCommandRequestForPassthrough() function.
-        return arg == "$audit" ||                        //
-            arg == "$client" ||                          //
-            arg == "$configServerState" ||               //
-            arg == "$db" ||                              //
-            arg == "allowImplicitCollectionCreation" ||  //
-            arg == "$oplogQueryData" ||                  //
-            arg == "$queryOptions" ||                    //
-            arg == "$readPreference" ||                  //
-            arg == "$replData" ||                        //
-            arg == "$clusterTime" ||                     //
-            arg == "maxTimeMS" ||                        //
-            arg == "readConcern" ||                      //
-            arg == "shardVersion" ||                     //
-            arg == "tracking_info" ||                    //
-            arg == "writeConcern" ||                     //
-            arg == "lsid" ||                             //
-            arg == "txnNumber" ||                        //
-            false;  // These comments tell clang-format to keep this line-oriented.
-    }
-
-    /**
-     * Rewrites cmdObj into a format safe to blindly forward to shards.
-     *
-     * This performs 2 transformations:
-     * 1) $readPreference fields are moved into a subobject called $queryOptions. This matches the
-     *    "wrapped" format historically used internally by mongos. Moving off of that format will be
-     *    done as SERVER-29091.
-     *
-     * 2) Filter out generic arguments that shouldn't be blindly passed to the shards.  This is
-     *    necessary because many mongos implementations of Command::run() just pass cmdObj through
-     *    directly to the shards. However, some of the generic arguments fields are automatically
-     *    appended in the egress layer. Removing them here ensures that they don't get duplicated.
-     *
-     * Ideally this function can be deleted once mongos run() implementations are more careful about
-     * what they send to the shards.
-     */
-    static BSONObj filterCommandRequestForPassthrough(const BSONObj& cmdObj);
-
-    /**
-     * Rewrites reply into a format safe to blindly forward from shards to clients.
-     *
-     * Ideally this function can be deleted once mongos run() implementations are more careful about
-     * what they return from the shards.
-     */
-    static void filterCommandReplyForPassthrough(const BSONObj& reply, BSONObjBuilder* output);
-    static BSONObj filterCommandReplyForPassthrough(const BSONObj& reply);
 
 private:
     /**
@@ -573,11 +577,6 @@ class ErrmsgCommandDeprecated : public BasicCommand {
                            const BSONObj& cmdObj,
                            std::string& errmsg,
                            BSONObjBuilder& result) = 0;
-};
-
-// Struct as closed namespace. Nothing but statics.
-struct CommandHelpers {
-    static BSONObj runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request);
 };
 
 // See the 'globalCommandRegistry()' singleton accessor.

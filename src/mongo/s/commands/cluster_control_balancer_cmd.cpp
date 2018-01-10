@@ -91,7 +91,7 @@ public:
         uassertStatusOK(cmdResponse.commandStatus);
 
         // Append any return value from the response, which the config server returned
-        filterCommandReplyForPassthrough(cmdResponse.response, &result);
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
 
         return true;
     }

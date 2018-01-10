@@ -333,7 +333,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool adminOnly() const override {
@@ -404,7 +404,7 @@ public:
         }
 
         auto mergeStatus = mergeChunks(opCtx, NamespaceString(ns), minKey, maxKey, epoch);
-        return appendCommandStatus(result, mergeStatus);
+        return CommandHelpers::appendCommandStatus(result, mergeStatus);
     }
 
 } mergeChunksCmd;

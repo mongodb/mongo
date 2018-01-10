@@ -88,11 +88,11 @@ public:
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
-            Command::appendMajorityWriteConcern(
-                Command::appendPassthroughFields(cmdObj, BSON("_configsvrDropDatabase" << dbname))),
+            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
+                cmdObj, BSON("_configsvrDropDatabase" << dbname))),
             Shard::RetryPolicy::kIdempotent));
 
-        Command::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
         return true;
     }
 

@@ -242,7 +242,7 @@ public:
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        const NamespaceString fullNs = parseNsCollectionRequired(dbName, cmdObj);
+        const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
         Status allowedWriteStatus = userAllowedWriteNS(fullNs.ns());
         if (!allowedWriteStatus.isOK()) {
             return allowedWriteStatus;
@@ -330,16 +330,16 @@ public:
              BSONObjBuilder& result) override {
         // findAndModify command is not replicated directly.
         invariant(opCtx->writesAreReplicated());
-        const NamespaceString fullNs = parseNsCollectionRequired(dbName, cmdObj);
+        const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
         Status allowedWriteStatus = userAllowedWriteNS(fullNs.ns());
         if (!allowedWriteStatus.isOK()) {
-            return appendCommandStatus(result, allowedWriteStatus);
+            return CommandHelpers::appendCommandStatus(result, allowedWriteStatus);
         }
 
         StatusWith<FindAndModifyRequest> parseStatus =
             FindAndModifyRequest::parseFromBSON(NamespaceString(fullNs.ns()), cmdObj);
         if (!parseStatus.isOK()) {
-            return appendCommandStatus(result, parseStatus.getStatus());
+            return CommandHelpers::appendCommandStatus(result, parseStatus.getStatus());
         }
 
         const FindAndModifyRequest& args = parseStatus.getValue();
@@ -378,7 +378,7 @@ public:
                 ParsedDelete parsedDelete(opCtx, &request);
                 Status parsedDeleteStatus = parsedDelete.parseRequest();
                 if (!parsedDeleteStatus.isOK()) {
-                    appendCommandStatus(result, parsedDeleteStatus);
+                    CommandHelpers::appendCommandStatus(result, parsedDeleteStatus);
                     return false;
                 }
 
@@ -397,21 +397,21 @@ public:
 
                 Status isPrimary = checkCanAcceptWritesForDatabase(opCtx, nsString);
                 if (!isPrimary.isOK()) {
-                    appendCommandStatus(result, isPrimary);
+                    CommandHelpers::appendCommandStatus(result, isPrimary);
                     return false;
                 }
 
                 Collection* const collection = autoDb.getDb()->getCollection(opCtx, nsString);
                 if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
-                    appendCommandStatus(result,
-                                        {ErrorCodes::CommandNotSupportedOnView,
-                                         "findAndModify not supported on a view"});
+                    CommandHelpers::appendCommandStatus(result,
+                                                        {ErrorCodes::CommandNotSupportedOnView,
+                                                         "findAndModify not supported on a view"});
                     return false;
                 }
                 auto statusWithPlanExecutor =
                     getExecutorDelete(opCtx, opDebug, collection, &parsedDelete);
                 if (!statusWithPlanExecutor.isOK()) {
-                    appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+                    CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
                     return false;
                 }
                 const auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -424,7 +424,7 @@ public:
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
                     advanceExecutor(opCtx, exec.get(), args.isRemove());
                 if (!advanceStatus.isOK()) {
-                    appendCommandStatus(result, advanceStatus.getStatus());
+                    CommandHelpers::appendCommandStatus(result, advanceStatus.getStatus());
                     return false;
                 }
                 // Nothing after advancing the plan executor should throw a WriteConflictException,
@@ -463,7 +463,7 @@ public:
                 ParsedUpdate parsedUpdate(opCtx, &request);
                 Status parsedUpdateStatus = parsedUpdate.parseRequest();
                 if (!parsedUpdateStatus.isOK()) {
-                    appendCommandStatus(result, parsedUpdateStatus);
+                    CommandHelpers::appendCommandStatus(result, parsedUpdateStatus);
                     return false;
                 }
 
@@ -482,15 +482,15 @@ public:
 
                 Status isPrimary = checkCanAcceptWritesForDatabase(opCtx, nsString);
                 if (!isPrimary.isOK()) {
-                    appendCommandStatus(result, isPrimary);
+                    CommandHelpers::appendCommandStatus(result, isPrimary);
                     return false;
                 }
 
                 Collection* collection = autoDb.getDb()->getCollection(opCtx, nsString.ns());
                 if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
-                    appendCommandStatus(result,
-                                        {ErrorCodes::CommandNotSupportedOnView,
-                                         "findAndModify not supported on a view"});
+                    CommandHelpers::appendCommandStatus(result,
+                                                        {ErrorCodes::CommandNotSupportedOnView,
+                                                         "findAndModify not supported on a view"});
                     return false;
                 }
 
@@ -503,7 +503,7 @@ public:
                     collection = autoDb.getDb()->getCollection(opCtx, nsString);
                     Status isPrimaryAfterRelock = checkCanAcceptWritesForDatabase(opCtx, nsString);
                     if (!isPrimaryAfterRelock.isOK()) {
-                        appendCommandStatus(result, isPrimaryAfterRelock);
+                        CommandHelpers::appendCommandStatus(result, isPrimaryAfterRelock);
                         return false;
                     }
 
@@ -514,7 +514,7 @@ public:
                         Status createCollStatus =
                             userCreateNS(opCtx, autoDb.getDb(), nsString.ns(), BSONObj());
                         if (!createCollStatus.isOK()) {
-                            appendCommandStatus(result, createCollStatus);
+                            CommandHelpers::appendCommandStatus(result, createCollStatus);
                             return false;
                         }
                         wuow.commit();
@@ -527,7 +527,7 @@ public:
                 auto statusWithPlanExecutor =
                     getExecutorUpdate(opCtx, opDebug, collection, &parsedUpdate);
                 if (!statusWithPlanExecutor.isOK()) {
-                    appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+                    CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
                     return false;
                 }
                 const auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -540,7 +540,7 @@ public:
                 StatusWith<boost::optional<BSONObj>> advanceStatus =
                     advanceExecutor(opCtx, exec.get(), args.isRemove());
                 if (!advanceStatus.isOK()) {
-                    appendCommandStatus(result, advanceStatus.getStatus());
+                    CommandHelpers::appendCommandStatus(result, advanceStatus.getStatus());
                     return false;
                 }
                 // Nothing after advancing the plan executor should throw a WriteConflictException,

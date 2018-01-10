@@ -247,8 +247,12 @@ public:
         const HostOpTimeMap hostOpTimes(ClusterLastErrorInfo::get(cc())->getPrevHostOpTimes());
 
         std::vector<LegacyWCResponse> wcResponses;
-        auto status = enforceLegacyWriteConcern(
-            opCtx, dbname, filterCommandRequestForPassthrough(cmdObj), hostOpTimes, &wcResponses);
+        auto status =
+            enforceLegacyWriteConcern(opCtx,
+                                      dbname,
+                                      CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+                                      hostOpTimes,
+                                      &wcResponses);
 
         // Don't forget about our last hosts, reset the client info
         ClusterLastErrorInfo::get(cc())->disableForCommand();
@@ -308,7 +312,7 @@ public:
         if (numWCErrors == 1) {
             // Return the single write concern error we found, err should be set or not
             // from gle response
-            filterCommandReplyForPassthrough(lastErrResponse->gleResponse, &result);
+            CommandHelpers::filterCommandReplyForPassthrough(lastErrResponse->gleResponse, &result);
             return lastErrResponse->gleResponse["ok"].trueValue();
         } else {
             // Return a generic combined WC error message
@@ -318,7 +322,7 @@ public:
             // Need to always return err
             result.appendNull("err");
 
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::WriteConcernFailed, "multiple write concern errors occurred"));
         }

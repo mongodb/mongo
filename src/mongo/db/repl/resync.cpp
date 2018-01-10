@@ -84,7 +84,7 @@ public:
         if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
             // Resync is disabled in production on replica sets until it stabilizes (SERVER-27081).
             if (!Command::testCommandsEnabled) {
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result,
                     Status(ErrorCodes::OperationFailed,
                            "Replica sets do not support the resync command"));
@@ -96,16 +96,16 @@ public:
 
                 const MemberState memberState = replCoord->getMemberState();
                 if (memberState.startup()) {
-                    return appendCommandStatus(
+                    return CommandHelpers::appendCommandStatus(
                         result, Status(ErrorCodes::NotYetInitialized, "no replication yet active"));
                 }
                 if (memberState.primary()) {
-                    return appendCommandStatus(
+                    return CommandHelpers::appendCommandStatus(
                         result, Status(ErrorCodes::NotSecondary, "primaries cannot resync"));
                 }
                 auto status = replCoord->setFollowerMode(MemberState::RS_STARTUP2);
                 if (!status.isOK()) {
-                    return appendCommandStatus(
+                    return CommandHelpers::appendCommandStatus(
                         result,
                         Status(status.code(),
                                str::stream()

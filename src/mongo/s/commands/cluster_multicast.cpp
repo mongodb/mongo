@@ -132,7 +132,7 @@ public:
                 {
                     BSONObjBuilder subbob(bob.subobjStart(host.toString()));
 
-                    if (appendCommandStatus(subbob, response.status)) {
+                    if (CommandHelpers::appendCommandStatus(subbob, response.status)) {
                         subbob.append("data", response.data);
                         subbob.append("metadata", response.metadata);
                         if (response.elapsedMillis) {

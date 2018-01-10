@@ -91,7 +91,7 @@ public:
                            const BSONObj& cmdObj,
                            string& errmsg,
                            BSONObjBuilder& result) {
-        NamespaceString nss = parseNsCollectionRequired(db, cmdObj);
+        NamespaceString nss = CommandHelpers::parseNsCollectionRequired(db, cmdObj);
 
         repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
         if (replCoord->getMemberState().primary() && !cmdObj["force"].trueValue()) {
@@ -153,10 +153,10 @@ public:
         // If db/collection does not exist, short circuit and return.
         if (!collDB || !collection) {
             if (view)
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result, {ErrorCodes::CommandNotSupportedOnView, "can't compact a view"});
             else
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result, {ErrorCodes::NamespaceNotFound, "collection does not exist"});
         }
 
@@ -167,7 +167,7 @@ public:
 
         StatusWith<CompactStats> status = collection->compact(opCtx, &compactOptions);
         if (!status.isOK())
-            return appendCommandStatus(result, status.getStatus());
+            return CommandHelpers::appendCommandStatus(result, status.getStatus());
 
         if (status.getValue().corruptDocuments > 0)
             result.append("invalidObjects", status.getValue().corruptDocuments);

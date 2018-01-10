@@ -88,7 +88,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -122,7 +122,8 @@ public:
                                           << toString
                                           << "' because that shard does not exist");
             log() << msg;
-            return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
+            return CommandHelpers::appendCommandStatus(result,
+                                                       Status(ErrorCodes::ShardNotFound, msg));
         }
 
         const auto to = toStatus.getValue();

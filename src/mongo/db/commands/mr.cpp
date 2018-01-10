@@ -1395,7 +1395,7 @@ public:
         auto client = opCtx->getClient();
 
         if (client->isInDirectClient()) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation, "Cannot run mapReduce command from eval()"));
         }
@@ -1422,7 +1422,7 @@ public:
         BSONObjBuilder timingBuilder;
         State state(opCtx, config);
         if (!state.sourceExists()) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::NamespaceNotFound,
                        str::stream() << "namespace does not exist: " << config.nss.ns()));
@@ -1565,7 +1565,7 @@ public:
 
                         auto restoreStatus = exec->restoreState();
                         if (!restoreStatus.isOK()) {
-                            return appendCommandStatus(result, restoreStatus);
+                            return CommandHelpers::appendCommandStatus(result, restoreStatus);
                         }
 
                         reduceTime += t.micros();
@@ -1580,7 +1580,7 @@ public:
                 }
 
                 if (PlanExecutor::DEAD == execState || PlanExecutor::FAILURE == execState) {
-                    return appendCommandStatus(
+                    return CommandHelpers::appendCommandStatus(
                         result,
                         Status(ErrorCodes::OperationFailed,
                                str::stream() << "Executor error during mapReduce command: "
@@ -1712,7 +1712,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::CommandNotSupported,
                        str::stream() << "Can not execute mapReduce with output database " << dbname
@@ -1791,7 +1791,8 @@ public:
             auto outRoutingInfoStatus = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
                 opCtx, config.outputOptions.finalNamespace);
             if (!outRoutingInfoStatus.isOK()) {
-                return appendCommandStatus(result, outRoutingInfoStatus.getStatus());
+                return CommandHelpers::appendCommandStatus(result,
+                                                           outRoutingInfoStatus.getStatus());
             }
 
             if (auto cm = outRoutingInfoStatus.getValue().cm()) {

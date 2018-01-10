@@ -87,7 +87,7 @@ public:
                            const BSONObj& cmdObj,
                            string& errmsg,
                            BSONObjBuilder& result) {
-        const NamespaceString nss = parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
         if (!nss.isNormal()) {
             errmsg = "bad namespace name";
             return false;
@@ -109,8 +109,8 @@ public:
             return false;
         }
 
-        return appendCommandStatus(result,
-                                   collection->touch(opCtx, touch_data, touch_indexes, &result));
+        return CommandHelpers::appendCommandStatus(
+            result, collection->touch(opCtx, touch_data, touch_indexes, &result));
     }
 };
 static TouchCmd touchCmd;

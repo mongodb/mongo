@@ -630,16 +630,16 @@ public:
         auth::CreateOrUpdateUserArgs args;
         Status status = auth::parseCreateOrUpdateUserCommands(cmdObj, "createUser", dbname, &args);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (args.userName.getDB() == "local") {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result, Status(ErrorCodes::BadValue, "Cannot create users in the local database"));
         }
 
         if (!args.hasHashedPassword && args.userName.getDB() != "$external") {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue,
                        "Must provide a 'pwd' field for all user documents, except those"
@@ -647,7 +647,7 @@ public:
         }
 
         if ((args.hasHashedPassword) && args.userName.getDB() == "$external") {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue,
                        "Cannot set the password for users defined on the '$external' "
@@ -655,7 +655,7 @@ public:
         }
 
         if (!args.hasRoles) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue, "\"createUser\" command requires a \"roles\" array"));
         }
@@ -663,11 +663,12 @@ public:
 #ifdef MONGO_CONFIG_SSL
         if (args.userName.getDB() == "$external" && getSSLManager() &&
             getSSLManager()->getSSLConfiguration().isClusterMember(args.userName.getUser())) {
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::BadValue,
-                                              "Cannot create an x.509 user with a subjectname "
-                                              "that would be recognized as an internal "
-                                              "cluster member."));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(ErrorCodes::BadValue,
+                       "Cannot create an x.509 user with a subjectname "
+                       "that would be recognized as an internal "
+                       "cluster member."));
         }
 #endif
 
@@ -682,7 +683,7 @@ public:
         int authzVersion;
         status = authzManager->getAuthorizationVersion(opCtx, &authzVersion);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
@@ -712,14 +713,14 @@ public:
         V2UserDocumentParser parser;
         status = parser.checkValidUserDocument(userObj);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
 
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // Role existence has to be checked after acquiring the update lock
@@ -727,7 +728,7 @@ public:
             BSONObj ignored;
             status = authzManager->getRoleDescription(opCtx, args.roles[i], &ignored);
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
         }
 
@@ -738,7 +739,7 @@ public:
                              args.roles,
                              args.authenticationRestrictions);
         status = insertPrivilegeDocument(opCtx, userObj);
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
     virtual void redactForLogging(mutablebson::Document* cmdObj) {
@@ -776,19 +777,19 @@ public:
         auth::CreateOrUpdateUserArgs args;
         Status status = auth::parseCreateOrUpdateUserCommands(cmdObj, "updateUser", dbname, &args);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (!args.hasHashedPassword && !args.hasCustomData && !args.hasRoles &&
             !args.authenticationRestrictions) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue,
                        "Must specify at least one field to update in updateUser"));
         }
 
         if (args.hasHashedPassword && args.userName.getDB() == "$external") {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue,
                        "Cannot set the password for users defined on the '$external' "
@@ -819,7 +820,8 @@ public:
                 auto swParsedRestrictions =
                     parseAuthenticationRestriction(*args.authenticationRestrictions);
                 if (!swParsedRestrictions.isOK()) {
-                    return appendCommandStatus(result, swParsedRestrictions.getStatus());
+                    return CommandHelpers::appendCommandStatus(result,
+                                                               swParsedRestrictions.getStatus());
                 }
 
                 updateSetBuilder.append("authenticationRestrictions",
@@ -847,7 +849,7 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // Role existence has to be checked after acquiring the update lock
@@ -856,7 +858,7 @@ public:
                 BSONObj ignored;
                 status = authzManager->getRoleDescription(opCtx, args.roles[i], &ignored);
                 if (!status.isOK()) {
-                    return appendCommandStatus(result, status);
+                    return CommandHelpers::appendCommandStatus(result, status);
                 }
             }
         }
@@ -871,7 +873,7 @@ public:
         status = updatePrivilegeDocument(opCtx, args.userName, updateDocumentBuilder.done());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserByName(args.userName);
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
     virtual void redactForLogging(mutablebson::Document* cmdObj) {
@@ -909,7 +911,7 @@ public:
         UserName userName;
         Status status = auth::parseAndValidateDropUserCommand(cmdObj, dbname, &userName);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -917,7 +919,7 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         audit::logDropUser(Client::getCurrent(), userName);
@@ -932,11 +934,11 @@ public:
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserByName(userName);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (nMatched == 0) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::UserNotFound,
                        str::stream() << "User '" << userName.getFullName() << "' not found"));
@@ -975,7 +977,7 @@ public:
              BSONObjBuilder& result) {
         Status status = auth::parseAndValidateDropAllUsersFromDatabaseCommand(cmdObj, dbname);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
         stdx::lock_guard<stdx::mutex> lk(getAuthzDataMutex(serviceContext));
@@ -983,7 +985,7 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         audit::logDropAllUsersFromDatabase(Client::getCurrent(), dbname);
@@ -994,7 +996,7 @@ public:
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUsersFromDB(dbname);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         result.append("n", numRemoved);
@@ -1034,7 +1036,7 @@ public:
         Status status = auth::parseRolePossessionManipulationCommands(
             cmdObj, "grantRolesToUser", dbname, &userNameString, &roles);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1043,14 +1045,14 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         UserName userName(userNameString, dbname);
         unordered_set<RoleName> userRoles;
         status = getCurrentUserRoles(opCtx, authzManager, userName, &userRoles);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
@@ -1058,7 +1060,7 @@ public:
             BSONObj roleDoc;
             status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
 
             userRoles.insert(roleName);
@@ -1070,7 +1072,7 @@ public:
             opCtx, userName, BSON("$set" << BSON("roles" << newRolesBSONArray)));
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserByName(userName);
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
 } cmdGrantRolesToUser;
@@ -1106,7 +1108,7 @@ public:
         Status status = auth::parseRolePossessionManipulationCommands(
             cmdObj, "revokeRolesFromUser", dbname, &userNameString, &roles);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1115,14 +1117,14 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         UserName userName(userNameString, dbname);
         unordered_set<RoleName> userRoles;
         status = getCurrentUserRoles(opCtx, authzManager, userName, &userRoles);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
@@ -1130,7 +1132,7 @@ public:
             BSONObj roleDoc;
             status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
 
             userRoles.erase(roleName);
@@ -1142,7 +1144,7 @@ public:
             opCtx, userName, BSON("$set" << BSON("roles" << newRolesBSONArray)));
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserByName(userName);
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
 } cmdRevokeRolesFromUser;
@@ -1180,18 +1182,18 @@ public:
         auth::UsersInfoArgs args;
         Status status = auth::parseUsersInfoCommand(cmdObj, dbname, &args);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         status = requireReadableAuthSchema26Upgrade(opCtx, getGlobalAuthorizationManager());
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (args.allForDB &&
             (args.showPrivileges ||
              args.authenticationRestrictionsFormat == AuthenticationRestrictionsFormat::kShow)) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,
                        "Can only get privilege or restriction details on exact-match usersInfo "
@@ -1211,7 +1213,7 @@ public:
                     continue;
                 }
                 if (!status.isOK()) {
-                    return appendCommandStatus(result, status);
+                    return CommandHelpers::appendCommandStatus(result, status);
                 }
 
                 // getUserDescription always includes credentials and restrictions, which may need
@@ -1264,7 +1266,7 @@ public:
                                    projection.done(),
                                    [&](const BSONObj& obj) { usersArrayBuilder.append(obj); });
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
         }
         result.append("users", usersArrayBuilder.arr());
@@ -1302,40 +1304,40 @@ public:
         auth::CreateOrUpdateRoleArgs args;
         Status status = auth::parseCreateOrUpdateRoleCommands(cmdObj, "createRole", dbname, &args);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (args.roleName.getRole().empty()) {
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::BadValue, "Role name must be non-empty"));
+            return CommandHelpers::appendCommandStatus(
+                result, Status(ErrorCodes::BadValue, "Role name must be non-empty"));
         }
 
         if (args.roleName.getDB() == "local") {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result, Status(ErrorCodes::BadValue, "Cannot create roles in the local database"));
         }
 
         if (args.roleName.getDB() == "$external") {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue, "Cannot create roles in the $external database"));
         }
 
         if (RoleGraph::isBuiltinRole(args.roleName)) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue,
                        "Cannot create roles with the same name as a built-in role"));
         }
 
         if (!args.hasRoles) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue, "\"createRole\" command requires a \"roles\" array"));
         }
 
         if (!args.hasPrivileges) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue,
                        "\"createRole\" command requires a \"privileges\" array"));
@@ -1351,7 +1353,7 @@ public:
         BSONArray privileges;
         status = privilegeVectorToBSONArray(args.privileges, &privileges);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
         roleObjBuilder.append("privileges", privileges);
 
@@ -1368,18 +1370,18 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // Role existence has to be checked after acquiring the update lock
         status = checkOkayToGrantRolesToRole(opCtx, args.roleName, args.roles, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         status = checkOkayToGrantPrivilegesToRole(args.roleName, args.privileges);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         audit::logCreateRole(Client::getCurrent(),
@@ -1389,7 +1391,7 @@ public:
                              args.authenticationRestrictions);
 
         status = insertRoleDocument(opCtx, roleObjBuilder.done());
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
 } cmdCreateRole;
@@ -1423,11 +1425,11 @@ public:
         auth::CreateOrUpdateRoleArgs args;
         Status status = auth::parseCreateOrUpdateRoleCommands(cmdObj, "updateRole", dbname, &args);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (!args.hasPrivileges && !args.hasRoles && !args.authenticationRestrictions) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue,
                        "Must specify at least one field to update in updateRole"));
@@ -1440,7 +1442,7 @@ public:
             BSONArray privileges;
             status = privilegeVectorToBSONArray(args.privileges, &privileges);
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
             updateSetBuilder.append("privileges", privileges);
         }
@@ -1464,27 +1466,27 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // Role existence has to be checked after acquiring the update lock
         BSONObj ignored;
         status = authzManager->getRoleDescription(opCtx, args.roleName, &ignored);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (args.hasRoles) {
             status = checkOkayToGrantRolesToRole(opCtx, args.roleName, args.roles, authzManager);
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
         }
 
         if (args.hasPrivileges) {
             status = checkOkayToGrantPrivilegesToRole(args.roleName, args.privileges);
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
         }
 
@@ -1507,7 +1509,7 @@ public:
         status = updateRoleDocument(opCtx, args.roleName, updateDocumentBuilder.obj());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 } cmdUpdateRole;
 
@@ -1543,7 +1545,7 @@ public:
         Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
             cmdObj, "grantPrivilegesToRole", dbname, &roleName, &privilegesToAdd);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1552,11 +1554,11 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (RoleGraph::isBuiltinRole(roleName)) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::InvalidRoleModification,
                        str::stream() << roleName.getFullName()
@@ -1565,7 +1567,7 @@ public:
 
         status = checkOkayToGrantPrivilegesToRole(roleName, privilegesToAdd);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         BSONObj roleDoc;
@@ -1575,7 +1577,7 @@ public:
                                                   AuthenticationRestrictionsFormat::kOmit,
                                                   &roleDoc);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         PrivilegeVector privileges;
@@ -1583,7 +1585,7 @@ public:
                                                       &privileges);
 
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         for (PrivilegeVector::iterator it = privilegesToAdd.begin(); it != privilegesToAdd.end();
@@ -1596,16 +1598,16 @@ public:
         mutablebson::Element setElement = updateObj.makeElementObject("$set");
         status = updateObj.root().pushBack(setElement);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
         mutablebson::Element privilegesElement = updateObj.makeElementArray("privileges");
         status = setElement.pushBack(privilegesElement);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
         status = authzManager->getBSONForPrivileges(privileges, privilegesElement);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         BSONObjBuilder updateBSONBuilder;
@@ -1616,7 +1618,7 @@ public:
         status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
 } cmdGrantPrivilegesToRole;
@@ -1652,7 +1654,7 @@ public:
         Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
             cmdObj, "revokePrivilegesFromRole", dbname, &roleName, &privilegesToRemove);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1661,11 +1663,11 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (RoleGraph::isBuiltinRole(roleName)) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::InvalidRoleModification,
                        str::stream() << roleName.getFullName()
@@ -1679,14 +1681,14 @@ public:
                                                   AuthenticationRestrictionsFormat::kOmit,
                                                   &roleDoc);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         PrivilegeVector privileges;
         status = auth::parseAndValidatePrivilegeArray(BSONArray(roleDoc["privileges"].Obj()),
                                                       &privileges);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         for (PrivilegeVector::iterator itToRm = privilegesToRemove.begin();
@@ -1709,16 +1711,16 @@ public:
         mutablebson::Element setElement = updateObj.makeElementObject("$set");
         status = updateObj.root().pushBack(setElement);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
         mutablebson::Element privilegesElement = updateObj.makeElementArray("privileges");
         status = setElement.pushBack(privilegesElement);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
         status = authzManager->getBSONForPrivileges(privileges, privilegesElement);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         audit::logRevokePrivilegesFromRole(Client::getCurrent(), roleName, privilegesToRemove);
@@ -1728,7 +1730,7 @@ public:
         status = updateRoleDocument(opCtx, roleName, updateBSONBuilder.done());
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
 } cmdRevokePrivilegesFromRole;
@@ -1764,12 +1766,12 @@ public:
         Status status = auth::parseRolePossessionManipulationCommands(
             cmdObj, "grantRolesToRole", dbname, &roleNameString, &rolesToAdd);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         RoleName roleName(roleNameString, dbname);
         if (RoleGraph::isBuiltinRole(roleName)) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::InvalidRoleModification,
                        str::stream() << roleName.getFullName()
@@ -1782,20 +1784,20 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // Role existence has to be checked after acquiring the update lock
         BSONObj roleDoc;
         status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // Check for cycles
         status = checkOkayToGrantRolesToRole(opCtx, roleName, rolesToAdd, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // Add new roles to existing roles
@@ -1803,7 +1805,7 @@ public:
         status = auth::parseRoleNamesFromBSONArray(
             BSONArray(roleDoc["roles"].Obj()), roleName.getDB(), &directRoles);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
         for (vector<RoleName>::iterator it = rolesToAdd.begin(); it != rolesToAdd.end(); ++it) {
             const RoleName& roleToAdd = *it;
@@ -1817,7 +1819,7 @@ public:
             opCtx, roleName, BSON("$set" << BSON("roles" << rolesVectorToBSONArray(directRoles))));
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
 } cmdGrantRolesToRole;
@@ -1853,7 +1855,7 @@ public:
         Status status = auth::parseRolePossessionManipulationCommands(
             cmdObj, "revokeRolesFromRole", dbname, &roleNameString, &rolesToRemove);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1862,12 +1864,12 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         RoleName roleName(roleNameString, dbname);
         if (RoleGraph::isBuiltinRole(roleName)) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::InvalidRoleModification,
                        str::stream() << roleName.getFullName()
@@ -1877,14 +1879,14 @@ public:
         BSONObj roleDoc;
         status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         std::vector<RoleName> roles;
         status = auth::parseRoleNamesFromBSONArray(
             BSONArray(roleDoc["roles"].Obj()), roleName.getDB(), &roles);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         for (vector<RoleName>::const_iterator it = rolesToRemove.begin(); it != rolesToRemove.end();
@@ -1901,7 +1903,7 @@ public:
             opCtx, roleName, BSON("$set" << BSON("roles" << rolesVectorToBSONArray(roles))));
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 
 } cmdRevokeRolesFromRole;
@@ -1939,7 +1941,7 @@ public:
         RoleName roleName;
         Status status = auth::parseDropRoleCommand(cmdObj, dbname, &roleName);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1948,11 +1950,11 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (RoleGraph::isBuiltinRole(roleName)) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::InvalidRoleModification,
                        str::stream() << roleName.getFullName()
@@ -1962,7 +1964,7 @@ public:
         BSONObj roleDoc;
         status = authzManager->getRoleDescription(opCtx, roleName, &roleDoc);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // Remove this role from all users
@@ -1987,12 +1989,12 @@ public:
             ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError
                 ? ErrorCodes::UserModificationFailed
                 : status.code();
-            return appendCommandStatus(result,
-                                       Status(code,
-                                              str::stream() << "Failed to remove role "
-                                                            << roleName.getFullName()
-                                                            << " from all users: "
-                                                            << status.reason()));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(code,
+                       str::stream() << "Failed to remove role " << roleName.getFullName()
+                                     << " from all users: "
+                                     << status.reason()));
         }
 
         // Remove this role from all other roles
@@ -2016,7 +2018,7 @@ public:
             ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError
                 ? ErrorCodes::RoleModificationFailed
                 : status.code();
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(code,
                        str::stream() << "Removed role " << roleName.getFullName()
@@ -2035,7 +2037,7 @@ public:
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
         if (!status.isOK()) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(status.code(),
                        str::stream() << "Removed role " << roleName.getFullName()
@@ -2046,7 +2048,7 @@ public:
 
         dassert(nMatched == 0 || nMatched == 1);
         if (nMatched == 0) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::RoleNotFound,
                        str::stream() << "Role '" << roleName.getFullName() << "' not found"));
@@ -2090,7 +2092,7 @@ public:
              BSONObjBuilder& result) {
         Status status = auth::parseDropAllRolesFromDatabaseCommand(cmdObj, dbname);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
@@ -2099,7 +2101,7 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // Remove these roles from all users
@@ -2119,12 +2121,12 @@ public:
             ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError
                 ? ErrorCodes::UserModificationFailed
                 : status.code();
-            return appendCommandStatus(result,
-                                       Status(code,
-                                              str::stream() << "Failed to remove roles from \""
-                                                            << dbname
-                                                            << "\" db from all users: "
-                                                            << status.reason()));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(code,
+                       str::stream() << "Failed to remove roles from \"" << dbname
+                                     << "\" db from all users: "
+                                     << status.reason()));
         }
 
         // Remove these roles from all other roles
@@ -2145,12 +2147,12 @@ public:
             ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError
                 ? ErrorCodes::RoleModificationFailed
                 : status.code();
-            return appendCommandStatus(result,
-                                       Status(code,
-                                              str::stream() << "Failed to remove roles from \""
-                                                            << dbname
-                                                            << "\" db from all roles: "
-                                                            << status.reason()));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(code,
+                       str::stream() << "Failed to remove roles from \"" << dbname
+                                     << "\" db from all roles: "
+                                     << status.reason()));
         }
 
         audit::logDropAllRolesFromDatabase(Client::getCurrent(), dbname);
@@ -2160,7 +2162,7 @@ public:
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
         if (!status.isOK()) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(status.code(),
                        str::stream() << "Removed roles from \"" << dbname
@@ -2233,12 +2235,12 @@ public:
         auth::RolesInfoArgs args;
         Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &args);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         status = requireReadableAuthSchema26Upgrade(opCtx, getGlobalAuthorizationManager());
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (args.allForDB) {
@@ -2251,11 +2253,11 @@ public:
                 args.showBuiltinRoles,
                 &rolesDocs);
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
 
             if (args.privilegeFormat == PrivilegeFormat::kShowAsUserFragment) {
-                return appendCommandStatus(
+                return CommandHelpers::appendCommandStatus(
                     result,
                     Status(ErrorCodes::IllegalOperation,
                            "Cannot get user fragment for all roles in a database"));
@@ -2274,7 +2276,7 @@ public:
                 args.authenticationRestrictionsFormat,
                 &roleDetails);
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
 
             if (args.privilegeFormat == PrivilegeFormat::kShowAsUserFragment) {
@@ -2721,11 +2723,11 @@ public:
         auth::MergeAuthzCollectionsArgs args;
         Status status = auth::parseMergeAuthzCollectionsCommand(cmdObj, &args);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (args.usersCollName.empty() && args.rolesCollName.empty()) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::BadValue,
                        "Must provide at least one of \"tempUsersCollection\" and "
@@ -2738,14 +2740,14 @@ public:
         AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
         status = requireWritableAuthSchema28SCRAM(opCtx, authzManager);
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         if (!args.usersCollName.empty()) {
             Status status =
                 processUsers(opCtx, authzManager, args.usersCollName, args.db, args.drop);
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
         }
 
@@ -2753,7 +2755,7 @@ public:
             Status status =
                 processRoles(opCtx, authzManager, args.rolesCollName, args.db, args.drop);
             if (!status.isOK()) {
-                return appendCommandStatus(result, status);
+                return CommandHelpers::appendCommandStatus(result, status);
             }
         }
 

@@ -110,7 +110,7 @@ Status appendCursorResponseToCommandResult(const ShardId& shardId,
     }
 
     // Pass the results from the remote shard into our command response.
-    result->appendElementsUnique(Command::filterCommandReplyForPassthrough(cursorResponse));
+    result->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(cursorResponse));
     return getStatusFromCommandResult(result->asTempObj());
 }
 
@@ -322,7 +322,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                                                       liteParsedPipeline,
                                                                       std::move(pipeline),
                                                                       {});
-        Command::filterCommandReplyForPassthrough(cursorResponse, result);
+        CommandHelpers::filterCommandReplyForPassthrough(cursorResponse, result);
         return getStatusFromCommandResult(result->asTempObj());
     }
 
@@ -382,7 +382,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         // We don't need to storePossibleCursor or propagate writeConcern errors; an $out pipeline
         // can never run on mongoS. Filter the command response and return immediately.
-        Command::filterCommandReplyForPassthrough(cursorResponse, result);
+        CommandHelpers::filterCommandReplyForPassthrough(cursorResponse, result);
         return getStatusFromCommandResult(result->asTempObj());
     }
 
@@ -464,7 +464,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
 
     // Format the command for the shard. This adds the 'fromMongos' field, wraps the command as an
     // explain if necessary, and rewrites the result into a format safe to forward to shards.
-    cmdObj = Command::filterCommandRequestForPassthrough(
+    cmdObj = CommandHelpers::filterCommandRequestForPassthrough(
         PipelineS::createCommandForTargetedShards(aggRequest, cmdObj, nullptr));
 
     auto cmdResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
@@ -505,7 +505,7 @@ Status ClusterAggregate::aggPassthrough(OperationContext* opCtx,
         appendWriteConcernErrorToCmdResponse(shard->getId(), wcErrorElem, *out);
     }
 
-    out->appendElementsUnique(Command::filterCommandReplyForPassthrough(result));
+    out->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(result));
 
     BSONObj responseObj = out->asTempObj();
     if (ResolvedView::isResolvedViewErrorResponse(responseObj)) {

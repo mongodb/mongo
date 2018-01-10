@@ -62,7 +62,7 @@ void ShardServerTestFixture::expectFindOnConfigSendErrorCode(ErrorCodes::Error c
         ASSERT_EQ(request.target, kConfigHostAndPort);
         ASSERT_EQ(request.dbname, "config");
         BSONObjBuilder responseBuilder;
-        Command::appendCommandStatus(responseBuilder, Status(code, ""));
+        CommandHelpers::appendCommandStatus(responseBuilder, Status(code, ""));
         return responseBuilder.obj();
     });
 }

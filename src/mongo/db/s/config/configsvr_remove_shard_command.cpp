@@ -109,7 +109,8 @@ public:
             std::string msg(str::stream() << "Could not drop shard '" << target
                                           << "' because it does not exist");
             log() << msg;
-            return appendCommandStatus(result, Status(ErrorCodes::ShardNotFound, msg));
+            return CommandHelpers::appendCommandStatus(result,
+                                                       Status(ErrorCodes::ShardNotFound, msg));
         }
         const auto& shard = shardStatus.getValue();
 
@@ -156,7 +157,7 @@ public:
                     nullptr,
                     repl::ReadConcernLevel::kMajorityReadConcern);
                 if (!swChunks.isOK()) {
-                    return appendCommandStatus(result, swChunks.getStatus());
+                    return CommandHelpers::appendCommandStatus(result, swChunks.getStatus());
                 }
 
                 const auto& chunks = swChunks.getValue();

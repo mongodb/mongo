@@ -66,7 +66,7 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
         const auto fieldName = elt.fieldNameStringData();
 
         if (0 == idx++ || fieldName == "$all" || fieldName == "$ownOps" ||
-            Command::isGenericArgument(fieldName)) {
+            CommandHelpers::isGenericArgument(fieldName)) {
             continue;
         }
 
@@ -111,7 +111,7 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
     // Make any final custom additions to the response object.
     appendToResponse(&result);
 
-    return appendCommandStatus(result, Status::OK());
+    return CommandHelpers::appendCommandStatus(result, Status::OK());
 }
 
 }  // namespace mongo

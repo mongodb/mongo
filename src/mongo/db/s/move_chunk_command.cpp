@@ -103,7 +103,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
@@ -151,7 +151,7 @@ public:
             // and the 3.4 shard, which failed to set the ChunkTooBig status code.
             // TODO: Remove after 3.6 is released.
             result.appendBool("chunkTooBig", true);
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         uassertStatusOK(status);

@@ -87,7 +87,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool run(OperationContext* opCtx,
@@ -96,7 +96,7 @@ public:
              BSONObjBuilder& result) override {
 
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,
                        "_configsvrDropCollection can only be run on config servers"));

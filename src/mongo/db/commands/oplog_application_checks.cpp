@@ -76,7 +76,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
 
     if (opType == "c"_sd) {
         StringData commandName = o.firstElement().fieldNameStringData();
-        Command* commandInOplogEntry = Command::findCommand(commandName);
+        Command* commandInOplogEntry = CommandHelpers::findCommand(commandName);
         if (!commandInOplogEntry) {
             return Status(ErrorCodes::FailedToParse, "Unrecognized command in op");
         }

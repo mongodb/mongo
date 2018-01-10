@@ -159,7 +159,7 @@ private:
         GroupRequest groupRequest;
         Status parseRequestStatus = _parseRequest(dbname, cmdObj, &groupRequest);
         if (!parseRequestStatus.isOK()) {
-            return appendCommandStatus(result, parseRequestStatus);
+            return CommandHelpers::appendCommandStatus(result, parseRequestStatus);
         }
 
         AutoGetCollectionForReadCommand ctx(opCtx, groupRequest.ns);
@@ -168,7 +168,7 @@ private:
         auto statusWithPlanExecutor =
             getExecutorGroup(opCtx, coll, groupRequest, PlanExecutor::YIELD_AUTO);
         if (!statusWithPlanExecutor.isOK()) {
-            return appendCommandStatus(result, statusWithPlanExecutor.getStatus());
+            return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
 
         auto planExecutor = std::move(statusWithPlanExecutor.getValue());
@@ -186,13 +186,15 @@ private:
             invariant(PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state);
 
             if (WorkingSetCommon::isValidStatusMemberObject(retval)) {
-                return appendCommandStatus(result, WorkingSetCommon::getMemberObjectStatus(retval));
+                return CommandHelpers::appendCommandStatus(
+                    result, WorkingSetCommon::getMemberObjectStatus(retval));
             }
-            return appendCommandStatus(result,
-                                       Status(ErrorCodes::BadValue,
-                                              str::stream() << "error encountered during group "
-                                                            << "operation, executor returned "
-                                                            << PlanExecutor::statestr(state)));
+            return CommandHelpers::appendCommandStatus(
+                result,
+                Status(ErrorCodes::BadValue,
+                       str::stream() << "error encountered during group "
+                                     << "operation, executor returned "
+                                     << PlanExecutor::statestr(state)));
         }
 
         invariant(planExecutor->isEOF());

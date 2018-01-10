@@ -102,7 +102,7 @@ public:
         grid.shardRegistry()->getAllShardIds(&shardIds);
         shardIds.emplace_back(ShardRegistry::kConfigServerShardId);
 
-        auto filteredCmd = filterCommandRequestForPassthrough(cmdObj);
+        auto filteredCmd = CommandHelpers::filterCommandRequestForPassthrough(cmdObj);
 
         for (const ShardId& shardId : shardIds) {
             const auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);

@@ -75,7 +75,8 @@ public:
             BSONObj res;
 
             // Don't care about result from shards.
-            conn->runCommand(dbname, filterCommandRequestForPassthrough(cmdObj), res);
+            conn->runCommand(
+                dbname, CommandHelpers::filterCommandRequestForPassthrough(cmdObj), res);
             conn.done();
         }
 

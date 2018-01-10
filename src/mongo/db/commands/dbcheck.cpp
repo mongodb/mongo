@@ -155,7 +155,7 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
 
     // Get rid of generic command fields.
     for (const auto& elem : obj) {
-        if (!Command::isGenericArgument(elem.fieldNameStringData())) {
+        if (!CommandHelpers::isGenericArgument(elem.fieldNameStringData())) {
             builder.append(elem);
         }
     }

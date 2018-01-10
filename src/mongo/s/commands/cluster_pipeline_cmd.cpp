@@ -70,8 +70,8 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        return appendCommandStatus(result,
-                                   _runAggCommand(opCtx, dbname, cmdObj, boost::none, &result));
+        return CommandHelpers::appendCommandStatus(
+            result, _runAggCommand(opCtx, dbname, cmdObj, boost::none, &result));
     }
 
     Status explain(OperationContext* opCtx,

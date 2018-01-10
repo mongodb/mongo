@@ -82,7 +82,8 @@ public:
 
         if (serverGlobalParams.featureCompatibility.getVersion() !=
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            return appendCommandStatus(result, SessionsCommandFCV34Status(getName()));
+            return CommandHelpers::appendCommandStatus(result,
+                                                       SessionsCommandFCV34Status(getName()));
         }
 
         auto client = opCtx->getClient();
@@ -96,7 +97,7 @@ public:
         } catch (...) {
             auto status = exceptionToStatus();
 
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         lsCache->startSession(opCtx, record.get());

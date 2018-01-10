@@ -72,7 +72,8 @@ public:
         auto snapshotManager =
             getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager();
         if (!snapshotManager) {
-            return appendCommandStatus(result, {ErrorCodes::CommandNotSupported, ""});
+            return CommandHelpers::appendCommandStatus(result,
+                                                       {ErrorCodes::CommandNotSupported, ""});
         }
 
         Lock::GlobalLock lk(opCtx, MODE_IX, UINT_MAX);
@@ -82,7 +83,7 @@ public:
             const auto name = repl::ReplicationCoordinator::get(opCtx)->reserveSnapshotName(opCtx);
             result.append("name", static_cast<long long>(name.asULL()));
         }
-        return appendCommandStatus(result, status);
+        return CommandHelpers::appendCommandStatus(result, status);
     }
 };
 
@@ -118,7 +119,8 @@ public:
         auto snapshotManager =
             getGlobalServiceContext()->getGlobalStorageEngine()->getSnapshotManager();
         if (!snapshotManager) {
-            return appendCommandStatus(result, {ErrorCodes::CommandNotSupported, ""});
+            return CommandHelpers::appendCommandStatus(result,
+                                                       {ErrorCodes::CommandNotSupported, ""});
         }
 
         Lock::GlobalLock lk(opCtx, MODE_IX, UINT_MAX);

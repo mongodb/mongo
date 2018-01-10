@@ -80,7 +80,7 @@ public:
     }
 
     std::string parseNs(const string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsFullyQualified(dbname, cmdObj);
+        return CommandHelpers::CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -145,7 +145,7 @@ public:
                                                maxChunkSize,
                                                maxChunkSizeBytes);
         if (!statusWithSplitKeys.isOK()) {
-            return appendCommandStatus(result, statusWithSplitKeys.getStatus());
+            return CommandHelpers::appendCommandStatus(result, statusWithSplitKeys.getStatus());
         }
 
         result.append("splitKeys", statusWithSplitKeys.getValue());

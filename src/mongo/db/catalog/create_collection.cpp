@@ -72,7 +72,7 @@ Status createCollection(OperationContext* opCtx,
     BSONObjBuilder optionsBuilder;
     while (it.more()) {
         const auto elem = it.next();
-        if (!Command::isGenericArgument(elem.fieldNameStringData()))
+        if (!CommandHelpers::isGenericArgument(elem.fieldNameStringData()))
             optionsBuilder.append(elem);
         if (elem.fieldNameStringData() == "viewOn") {
             // Views don't have UUIDs so it should always be parsed for command.
@@ -119,7 +119,7 @@ Status createCollection(OperationContext* opCtx,
                         const BSONObj& cmdObj,
                         const BSONObj& idIndex) {
     return createCollection(opCtx,
-                            Command::parseNsCollectionRequired(dbName, cmdObj),
+                            CommandHelpers::parseNsCollectionRequired(dbName, cmdObj),
                             cmdObj,
                             idIndex,
                             CollectionOptions::parseForCommand);
@@ -132,7 +132,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const BSONObj& idIndex) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
-    const NamespaceString newCollName(Command::parseNsCollectionRequired(dbName, cmdObj));
+    const NamespaceString newCollName(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
     auto newCmd = cmdObj;
 
     auto* const serviceContext = opCtx->getServiceContext();

@@ -99,7 +99,7 @@ public:
              BSONObjBuilder& result) {
 
         if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-            return appendCommandStatus(
+            return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,
                        "_configsvrEnableSharding can only be run on config servers"));
@@ -113,9 +113,10 @@ public:
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
         if (dbname == NamespaceString::kAdminDb || dbname == NamespaceString::kLocalDb) {
-            return appendCommandStatus(result,
-                                       {ErrorCodes::InvalidOptions,
-                                        str::stream() << "can't shard " + dbname + " database"});
+            return CommandHelpers::appendCommandStatus(
+                result,
+                {ErrorCodes::InvalidOptions,
+                 str::stream() << "can't shard " + dbname + " database"});
         }
 
         uassert(ErrorCodes::InvalidOptions,

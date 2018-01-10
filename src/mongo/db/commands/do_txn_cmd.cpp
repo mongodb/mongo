@@ -163,7 +163,7 @@ public:
 
         auto status = OplogApplicationChecks::checkOperationArray(cmdObj.firstElement());
         if (!status.isOK()) {
-            return appendCommandStatus(result, status);
+            return CommandHelpers::appendCommandStatus(result, status);
         }
 
         // TODO (SERVER-30217): When a write concern is provided to the doTxn command, we
@@ -176,7 +176,8 @@ public:
         // was acknowledged. To fix this, we should wait for replication of the node’s last applied
         // OpTime if the last write operation was a no-op write.
 
-        auto doTxnStatus = appendCommandStatus(result, doTxn(opCtx, dbname, cmdObj, &result));
+        auto doTxnStatus =
+            CommandHelpers::appendCommandStatus(result, doTxn(opCtx, dbname, cmdObj, &result));
 
         return doTxnStatus;
     }

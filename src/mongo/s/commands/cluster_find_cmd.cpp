@@ -106,7 +106,7 @@ public:
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const final {
-        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
         // Parse the command BSON to a QueryRequest.
         bool isExplain = true;
         auto qr = QueryRequest::makeFromFindCommand(std::move(nss), cmdObj, isExplain);
@@ -142,7 +142,7 @@ public:
 
             auto status = ClusterAggregate::runAggregate(
                 opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, out);
-            appendCommandStatus(*out, status);
+            CommandHelpers::appendCommandStatus(*out, status);
             return status;
         }
 
@@ -156,12 +156,12 @@ public:
         // We count find command as a query op.
         globalOpCounters.gotQuery();
 
-        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
         const bool isExplain = false;
         auto qr = QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain);
         if (!qr.isOK()) {
-            return appendCommandStatus(result, qr.getStatus());
+            return CommandHelpers::appendCommandStatus(result, qr.getStatus());
         }
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -171,7 +171,7 @@ public:
                                                ExtensionsCallbackNoop(),
                                                MatchExpressionParser::kAllowAllSpecialFeatures);
         if (!cq.isOK()) {
-            return appendCommandStatus(result, cq.getStatus());
+            return CommandHelpers::appendCommandStatus(result, cq.getStatus());
         }
 
         // Do the work to generate the first batch of results. This blocks waiting to get responses
@@ -184,13 +184,14 @@ public:
             if (cursorId.getStatus() == ErrorCodes::CommandOnShardedViewNotSupportedOnMongod) {
                 auto aggCmdOnView = cq.getValue()->getQueryRequest().asAggregationCommand();
                 if (!aggCmdOnView.isOK()) {
-                    return appendCommandStatus(result, aggCmdOnView.getStatus());
+                    return CommandHelpers::appendCommandStatus(result, aggCmdOnView.getStatus());
                 }
 
                 auto aggRequestOnView =
                     AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue());
                 if (!aggRequestOnView.isOK()) {
-                    return appendCommandStatus(result, aggRequestOnView.getStatus());
+                    return CommandHelpers::appendCommandStatus(result,
+                                                               aggRequestOnView.getStatus());
                 }
 
                 auto resolvedView = ResolvedView::fromBSON(viewDefinition);
@@ -208,11 +209,11 @@ public:
 
                 auto status = ClusterAggregate::runAggregate(
                     opCtx, nsStruct, resolvedAggRequest, resolvedAggCmd, &result);
-                appendCommandStatus(result, status);
+                CommandHelpers::appendCommandStatus(result, status);
                 return status.isOK();
             }
 
-            return appendCommandStatus(result, cursorId.getStatus());
+            return CommandHelpers::appendCommandStatus(result, cursorId.getStatus());
         }
 
         // Build the response document.

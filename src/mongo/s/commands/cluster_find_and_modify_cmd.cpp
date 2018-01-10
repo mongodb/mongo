@@ -101,7 +101,7 @@ public:
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
         auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
@@ -152,7 +152,7 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
         // findAndModify should only be creating database if upsert is true, but this would require
         // that the parsing be pulled into this function.
@@ -196,7 +196,8 @@ private:
             std::vector<AsyncRequestsSender::Request> requests;
             requests.emplace_back(
                 shardId,
-                appendShardVersion(filterCommandRequestForPassthrough(cmdObj), shardVersion));
+                appendShardVersion(CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
+                                   shardVersion));
 
             AsyncRequestsSender ars(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
@@ -226,7 +227,8 @@ private:
             appendWriteConcernErrorToCmdResponse(shardId, wcErrorElem, *result);
         }
 
-        result->appendElementsUnique(filterCommandReplyForPassthrough(response.data));
+        result->appendElementsUnique(
+            CommandHelpers::filterCommandReplyForPassthrough(response.data));
     }
 
 } findAndModifyCmd;

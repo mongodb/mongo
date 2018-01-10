@@ -93,7 +93,7 @@ BSONObj fixForShards(const BSONObj& orig,
             b.append(e);
         } else if (fn == "out" || fn == "finalize" || fn == "writeConcern") {
             // We don't want to copy these
-        } else if (!Command::isGenericArgument(fn)) {
+        } else if (!CommandHelpers::isGenericArgument(fn)) {
             badShardedField = fn.toString();
             return BSONObj();
         }
@@ -160,7 +160,7 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return parseNsCollectionRequired(dbname, cmdObj).ns();
+        return CommandHelpers::parseNsCollectionRequired(dbname, cmdObj).ns();
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -283,7 +283,8 @@ public:
             ShardConnection conn(inputRoutingInfo.primary()->getConnString(), "");
 
             BSONObj res;
-            bool ok = conn->runCommand(dbname, filterCommandRequestForPassthrough(cmdObj), res);
+            bool ok = conn->runCommand(
+                dbname, CommandHelpers::filterCommandRequestForPassthrough(cmdObj), res);
             conn.done();
 
             if (auto wcErrorElem = res["writeConcernError"]) {
@@ -291,7 +292,7 @@ public:
                     inputRoutingInfo.primary()->getId(), wcErrorElem, result);
             }
 
-            result.appendElementsUnique(filterCommandReplyForPassthrough(res));
+            result.appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(res));
             return ok;
         }
 
@@ -493,7 +494,7 @@ public:
                 auto scopedDistLock = catalogClient->getDistLockManager()->lock(
                     opCtx, outputCollNss.ns(), "mr-post-process", kNoDistLockTimeout);
                 if (!scopedDistLock.isOK()) {
-                    return appendCommandStatus(result, scopedDistLock.getStatus());
+                    return CommandHelpers::appendCommandStatus(result, scopedDistLock.getStatus());
                 }
 
                 BSONObj finalCmdObj = finalCmd.obj();

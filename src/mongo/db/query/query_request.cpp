@@ -382,7 +382,7 @@ StatusWith<unique_ptr<QueryRequest>> QueryRequest::parseFromFindCommand(unique_p
                 return status;
             }
             qr->_replicationTerm = el._numberLong();
-        } else if (!Command::isGenericArgument(fieldName)) {
+        } else if (!CommandHelpers::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Failed to parse: " << cmdObj.toString() << ". "
                                         << "Unrecognized field '"
