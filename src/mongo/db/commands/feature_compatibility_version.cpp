@@ -409,13 +409,8 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
             spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
             return;
         case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34:
-            // It would be preferable to set 'incomingInternalClient.minWireVersion' and
-            // 'outgoing.minWireVersion' to LATEST_WIRE_VERSION - 1, but this is not possible due to
-            // a bug in 3.4, where if the receiving node says it supports wire version range
-            // [COMMANDS_ACCEPT_WRITE_CONCERN, SUPPORTS_OP_MSG], the initiating node will think it
-            // only supports OP_QUERY.
-            spec.incomingInternalClient.minWireVersion = RELEASE_2_4_AND_BEFORE;
-            spec.outgoing.minWireVersion = RELEASE_2_4_AND_BEFORE;
+            spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION - 1;
+            spec.outgoing.minWireVersion = LATEST_WIRE_VERSION - 1;
             return;
         case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior:
             // getVersion() does not return this value.

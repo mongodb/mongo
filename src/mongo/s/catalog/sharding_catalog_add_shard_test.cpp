@@ -140,7 +140,7 @@ protected:
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_BSONOBJ_EQ(request.cmdObj,
                               BSON("setFeatureCompatibilityVersion"
-                                   << "3.4"));
+                                   << "3.6"));
 
             return response;
         });
@@ -401,7 +401,7 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     });
 
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -486,7 +486,7 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     });
 
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -610,34 +610,6 @@ TEST_F(AddShardTest, AddMongosAsShard) {
     future.timed_get(kLongFutureTimeout);
 }
 
-// Attempt to add a pre-v3.4 mongod.
-TEST_F(AddShardTest, AddVersion32Shard) {
-    std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        stdx::make_unique<RemoteCommandTargeterMock>());
-    HostAndPort shardTarget("StandaloneHost:12345");
-    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
-    targeter->setFindHostReturnValue(shardTarget);
-
-    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
-    std::string expectedShardName = "StandaloneShard";
-
-    auto future = launchAsync([this, &expectedShardName, &shardTarget] {
-        Client::initThreadIfNotAlready();
-        auto status =
-            ShardingCatalogManager::get(operationContext())
-                ->addShard(
-                    operationContext(), &expectedShardName, ConnectionString(shardTarget), 100);
-        ASSERT_EQUALS(ErrorCodes::IncompatibleServerVersion, status);
-    });
-
-    // The maxWireVersion indicates that this is a v3.2 shard.
-    BSONObj commandResponse =
-        BSON("ok" << 1 << "ismaster" << true << "maxWireVersion" << WireVersion::FIND_COMMAND);
-    expectIsMaster(shardTarget, commandResponse);
-
-    future.timed_get(kLongFutureTimeout);
-}
-
 // A replica set name was found for the host but no name was provided with the host.
 TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
@@ -662,7 +634,7 @@ TEST_F(AddShardTest, AddReplicaSetShardAsStandalone) {
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "myOtherSet"
                                         << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
@@ -690,7 +662,7 @@ TEST_F(AddShardTest, AddStandaloneHostShardAsReplicaSet) {
     });
 
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
@@ -720,7 +692,7 @@ TEST_F(AddShardTest, ReplicaSetMistmatchedReplicaSetName) {
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "setName"
                                         << "myOtherSet"
                                         << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
@@ -753,7 +725,7 @@ TEST_F(AddShardTest, ShardIsCSRSConfigServer) {
                                         << "configsvr"
                                         << true
                                         << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
@@ -788,7 +760,7 @@ TEST_F(AddShardTest, ReplicaSetMissingHostsProvidedInSeedList) {
                                         << "hosts"
                                         << hosts.arr()
                                         << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
@@ -824,7 +796,7 @@ TEST_F(AddShardTest, AddShardWithNameConfigFails) {
                                         << "hosts"
                                         << hosts.arr()
                                         << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     future.timed_get(kLongFutureTimeout);
@@ -873,7 +845,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
                                         << "hosts"
                                         << hosts.arr()
                                         << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     expectListDatabases(shardTarget, {BSON("name" << existingDB.getName())});
@@ -920,7 +892,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
                                         << "hosts"
                                         << hosts.arr()
                                         << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -987,7 +959,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
                                         << "hosts"
                                         << hosts.arr()
                                         << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     // Get databases list from new shard
@@ -1063,7 +1035,7 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     });
 
     BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
-                                        << WireVersion::COMMANDS_ACCEPT_WRITE_CONCERN);
+                                        << WireVersion::LATEST_WIRE_VERSION);
     expectIsMaster(shardTarget, commandResponse);
 
     // Get databases list from new shard
