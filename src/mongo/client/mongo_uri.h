@@ -145,6 +145,8 @@ public:
         return _connectString.getServers();
     }
 
+    const boost::optional<std::string> getAppName() const;
+
     // If you are trying to clone a URI (including its options/auth information) for a single
     // server (say a member of a replica-set), you can pass in its HostAndPort information to
     // get a new URI with the same info, except type() will be MASTER and getServers() will

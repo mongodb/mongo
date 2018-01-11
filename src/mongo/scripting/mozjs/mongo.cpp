@@ -699,8 +699,9 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto statusWithHost = MongoURI::parse(host);
     auto cs = uassertStatusOK(statusWithHost);
 
+    boost::optional<std::string> appname = cs.getAppName();
     std::string errmsg;
-    std::unique_ptr<DBClientBase> conn(cs.connect("MongoDB Shell", errmsg));
+    std::unique_ptr<DBClientBase> conn(cs.connect(appname.value_or("MongoDB Shell"), errmsg));
 
     if (!conn.get()) {
         uasserted(ErrorCodes::InternalError, errmsg);
