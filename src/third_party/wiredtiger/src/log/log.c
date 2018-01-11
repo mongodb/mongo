@@ -1665,11 +1665,6 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	if (func == NULL)
 		return (0);
 
-	if (LF_ISSET(WT_LOGSCAN_RECOVER))
-		__wt_verbose(session, WT_VERB_LOG,
-		    "__wt_log_scan truncating to %" PRIu32 "/%" PRIu32,
-		    log->trunc_lsn.l.file, log->trunc_lsn.l.offset);
-
 	if (log != NULL) {
 		allocsize = log->allocsize;
 
@@ -1763,9 +1758,14 @@ advance:
 			/*
 			 * Truncate this log file before we move to the next.
 			 */
-			if (LF_ISSET(WT_LOGSCAN_RECOVER))
+			if (LF_ISSET(WT_LOGSCAN_RECOVER) &&
+			    __wt_log_cmp(&rd_lsn, &log->trunc_lsn) < 0) {
+				__wt_verbose(session, WT_VERB_LOG,
+				    "Truncate end of log %" PRIu32 "/%" PRIu32,
+				    rd_lsn.l.file, rd_lsn.l.offset);
 				WT_ERR(__log_truncate(session,
 				    &rd_lsn, WT_LOG_FILENAME, 1));
+			}
 			/*
 			 * If we had a partial record, we'll want to break
 			 * now after closing and truncating.  Although for now
