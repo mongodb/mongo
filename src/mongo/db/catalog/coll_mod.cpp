@@ -44,6 +44,7 @@
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -639,14 +640,17 @@ void updateUUIDSchemaVersion(OperationContext* opCtx, bool upgrade) {
         _updateDatabaseUUIDSchemaVersion(opCtx, dbName, dbToCollToUUID[dbName], upgrade);
     }
 
+    const auto& clientInfo = repl::ReplClientInfo::forClient(opCtx->getClient());
+    auto awaitOpTime = clientInfo.getLastOp();
+
     std::string upgradeStr = upgrade ? "upgrade" : "downgrade";
     log() << "Finished updating UUID schema version for " << upgradeStr
-          << ", waiting for all UUIDs to be committed.";
+          << ", waiting for all UUIDs to be committed at optime " << awaitOpTime << ".";
 
     const WriteConcernOptions writeConcern(WriteConcernOptions::kMajority,
                                            WriteConcernOptions::SyncMode::UNSET,
                                            /*timeout*/ INT_MAX);
-    repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpForClient(opCtx, writeConcern);
+    repl::getGlobalReplicationCoordinator()->awaitReplication(opCtx, awaitOpTime, writeConcern);
 }
 
 Status updateUUIDSchemaVersionNonReplicated(OperationContext* opCtx, bool upgrade) {
