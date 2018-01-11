@@ -63,7 +63,7 @@ public:
         user.reset(new User(UserName("spencer", "test")));
         adminUser.reset(new User(UserName("admin", "admin")));
 
-        credentials = BSON("SCRAM-SHA-1" << scram::generateCredentials(
+        credentials = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
                                "a", saslGlobalParams.scramIterationCount.load()));
     }
 };

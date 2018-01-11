@@ -67,14 +67,6 @@ if env.TargetOSIs('darwin', 'macOS'):
             'sha256_block',
         ])
 
-env.Library('scramauth',
-            ['mechanism_scram.cpp'],
-            LIBDEPS=['$BUILD_DIR/mongo/base',
-                     '$BUILD_DIR/mongo/base/secure_allocator',
-                     '$BUILD_DIR/mongo/util/secure_compare_memory',
-                     '$BUILD_DIR/mongo/util/secure_zero_memory',
-                     'sha_block_${MONGO_CRYPTO}'])
-
 env.CppUnitTest('sha1_block_test',
                 ['sha1_block_test.cpp'],
                 LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
@@ -82,3 +74,11 @@ env.CppUnitTest('sha1_block_test',
 env.CppUnitTest('sha256_block_test',
                 ['sha256_block_test.cpp'],
                 LIBDEPS=['sha_block_${MONGO_CRYPTO}'])
+
+env.CppUnitTest('mechanism_scram_test',
+                ['mechanism_scram_test.cpp'],
+                LIBDEPS_PRIVATE=[
+                    '$BUILD_DIR/mongo/base',
+                    '$BUILD_DIR/mongo/base/secure_allocator',
+                    'sha_block_${MONGO_CRYPTO}',
+                ])

@@ -49,7 +49,7 @@ BSONObj generateSCRAMUserDocument(StringData username, StringData password) {
     auto database = "test"_sd;
 
     std::string digested = createPasswordDigest(username, password);
-    BSONObj scramCred = scram::generateCredentials(digested, scramIterationCount);
+    auto scramCred = scram::SHA1Secrets::generateCredentials(digested, scramIterationCount);
     return BSON("_id" << (str::stream() << database << "." << username).operator StringData()
                       << AuthorizationManager::USER_NAME_FIELD_NAME
                       << username
@@ -498,7 +498,7 @@ TEST(SCRAMSHA1Cache, testGetFromEmptyCache) {
     std::vector<std::uint8_t> salt(saltStr.begin(), saltStr.end());
     HostAndPort host("localhost:27017");
 
-    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SCRAMPresecrets("aaa", salt, 10000)));
+    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000)));
 }
 
 
@@ -510,13 +510,13 @@ TEST(SCRAMSHA1Cache, testSetAndGet) {
     std::vector<std::uint8_t> badSalt(badSaltStr.begin(), badSaltStr.end());
     HostAndPort host("localhost:27017");
 
-    auto secret = scram::generateSecrets(scram::SCRAMPresecrets("aaa", salt, 10000));
-    cache.setCachedSecrets(host, scram::SCRAMPresecrets("aaa", salt, 10000), secret);
-    auto cachedSecret = cache.getCachedSecrets(host, scram::SCRAMPresecrets("aaa", salt, 10000));
+    auto secret = scram::SHA1Secrets(scram::SHA1Presecrets("aaa", salt, 10000));
+    cache.setCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000), secret);
+    auto cachedSecret = cache.getCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000));
     ASSERT_TRUE(cachedSecret);
-    ASSERT_TRUE(secret->clientKey == cachedSecret->clientKey);
-    ASSERT_TRUE(secret->serverKey == cachedSecret->serverKey);
-    ASSERT_TRUE(secret->storedKey == cachedSecret->storedKey);
+    ASSERT_TRUE(secret.clientKey() == cachedSecret.clientKey());
+    ASSERT_TRUE(secret.serverKey() == cachedSecret.serverKey());
+    ASSERT_TRUE(secret.storedKey() == cachedSecret.storedKey());
 }
 
 
@@ -528,14 +528,14 @@ TEST(SCRAMSHA1Cache, testSetAndGetWithDifferentParameters) {
     std::vector<std::uint8_t> badSalt(badSaltStr.begin(), badSaltStr.end());
     HostAndPort host("localhost:27017");
 
-    auto secret = scram::generateSecrets(scram::SCRAMPresecrets("aaa", salt, 10000));
-    cache.setCachedSecrets(host, scram::SCRAMPresecrets("aaa", salt, 10000), secret);
+    auto secret = scram::SHA1Secrets(scram::SHA1Presecrets("aaa", salt, 10000));
+    cache.setCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000), secret);
 
     ASSERT_FALSE(cache.getCachedSecrets(HostAndPort("localhost:27018"),
-                                        scram::SCRAMPresecrets("aaa", salt, 10000)));
-    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SCRAMPresecrets("aab", salt, 10000)));
-    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SCRAMPresecrets("aaa", badSalt, 10000)));
-    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SCRAMPresecrets("aaa", salt, 10001)));
+                                        scram::SHA1Presecrets("aaa", salt, 10000)));
+    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SHA1Presecrets("aab", salt, 10000)));
+    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SHA1Presecrets("aaa", badSalt, 10000)));
+    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10001)));
 }
 
 
@@ -545,17 +545,17 @@ TEST(SCRAMSHA1Cache, testSetAndReset) {
     std::vector<std::uint8_t> salt(saltStr.begin(), saltStr.end());
     HostAndPort host("localhost:27017");
 
-    auto secret = scram::generateSecrets(scram::SCRAMPresecrets("aaa", salt, 10000));
-    cache.setCachedSecrets(host, scram::SCRAMPresecrets("aaa", salt, 10000), secret);
-    auto newSecret = scram::generateSecrets(scram::SCRAMPresecrets("aab", salt, 10000));
-    cache.setCachedSecrets(host, scram::SCRAMPresecrets("aab", salt, 10000), newSecret);
+    scram::SHA1Secrets secret(scram::SHA1Presecrets("aaa", salt, 10000));
+    cache.setCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000), secret);
+    scram::SHA1Secrets newSecret(scram::SHA1Presecrets("aab", salt, 10000));
+    cache.setCachedSecrets(host, scram::SHA1Presecrets("aab", salt, 10000), newSecret);
 
-    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SCRAMPresecrets("aaa", salt, 10000)));
-    auto cachedSecret = cache.getCachedSecrets(host, scram::SCRAMPresecrets("aab", salt, 10000));
+    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000)));
+    auto cachedSecret = cache.getCachedSecrets(host, scram::SHA1Presecrets("aab", salt, 10000));
     ASSERT_TRUE(cachedSecret);
-    ASSERT_TRUE(newSecret->clientKey == cachedSecret->clientKey);
-    ASSERT_TRUE(newSecret->serverKey == cachedSecret->serverKey);
-    ASSERT_TRUE(newSecret->storedKey == cachedSecret->storedKey);
+    ASSERT_TRUE(newSecret.clientKey() == cachedSecret.clientKey());
+    ASSERT_TRUE(newSecret.serverKey() == cachedSecret.serverKey());
+    ASSERT_TRUE(newSecret.storedKey() == cachedSecret.storedKey());
 }
 
 }  // namespace mongo

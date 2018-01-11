@@ -68,20 +68,20 @@ public:
      * match those recorded for the hostname. Otherwise, no secrets
      * are returned.
      */
-    scram::SCRAMSecrets getCachedSecrets(const HostAndPort& target,
-                                         const scram::SCRAMPresecrets& presecrets) const;
+    scram::SHA1Secrets getCachedSecrets(const HostAndPort& target,
+                                        const scram::SHA1Presecrets& presecrets) const;
 
     /**
      * Records a set of precomputed SCRAMSecrets for the specified
      * host, along with the presecrets used to generate them.
      */
     void setCachedSecrets(HostAndPort target,
-                          scram::SCRAMPresecrets presecrets,
-                          scram::SCRAMSecrets secrets);
+                          scram::SHA1Presecrets presecrets,
+                          scram::SHA1Secrets secrets);
 
 private:
     mutable stdx::mutex _hostToSecretsMutex;
-    stdx::unordered_map<HostAndPort, std::pair<scram::SCRAMPresecrets, scram::SCRAMSecrets>>
+    stdx::unordered_map<HostAndPort, std::pair<scram::SHA1Presecrets, scram::SHA1Secrets>>
         _hostToSecrets;
 };
 

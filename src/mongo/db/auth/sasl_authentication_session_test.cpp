@@ -78,7 +78,7 @@ SaslConversation::SaslConversation(std::string mech)
         BSONObj()));
 
     const auto authHash = (mech == "SCRAM-SHA-1") ? "frim" : createPasswordDigest("andy", "frim");
-    const auto creds = BSON("SCRAM-SHA-1" << scram::generateCredentials(
+    const auto creds = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
                                 authHash, saslGlobalParams.scramIterationCount.load()));
 
     ASSERT_OK(authManagerExternalState->insert(&opCtx,

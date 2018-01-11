@@ -32,8 +32,8 @@
 
 namespace mongo {
 
-scram::SCRAMSecrets SCRAMSHA1ClientCache::getCachedSecrets(
-    const HostAndPort& target, const scram::SCRAMPresecrets& presecrets) const {
+scram::SHA1Secrets SCRAMSHA1ClientCache::getCachedSecrets(
+    const HostAndPort& target, const scram::SHA1Presecrets& presecrets) const {
     const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
 
     // Search the cache for a record associated with the host we're trying to connect to.
@@ -42,7 +42,7 @@ scram::SCRAMSecrets SCRAMSHA1ClientCache::getCachedSecrets(
         // Presecrets contain parameters provided by the server, which may change. If the
         // cached presecrets don't match the presecrets we have on hand, we must not return the
         // stale cached secrets. We'll need to rerun the SCRAM computation.
-        const scram::SCRAMPresecrets& foundPresecrets = foundSecret->second.first;
+        const scram::SHA1Presecrets& foundPresecrets = foundSecret->second.first;
         if (foundPresecrets == presecrets) {
             return foundSecret->second.second;
         }
@@ -51,8 +51,8 @@ scram::SCRAMSecrets SCRAMSHA1ClientCache::getCachedSecrets(
 }
 
 void SCRAMSHA1ClientCache::setCachedSecrets(HostAndPort target,
-                                            scram::SCRAMPresecrets presecrets,
-                                            scram::SCRAMSecrets secrets) {
+                                            scram::SHA1Presecrets presecrets,
+                                            scram::SHA1Secrets secrets) {
     const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
 
     decltype(_hostToSecrets)::iterator it;

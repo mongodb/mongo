@@ -698,7 +698,7 @@ public:
             credentialsBuilder.append("external", true);
         } else {
             // Add SCRAM credentials.
-            BSONObj scramCred = scram::generateCredentials(
+            BSONObj scramCred = scram::SHA1Secrets::generateCredentials(
                 args.hashedPassword, saslGlobalParams.scramIterationCount.load());
             credentialsBuilder.append("SCRAM-SHA-1", scramCred);
         }
@@ -808,7 +808,7 @@ public:
             BSONObjBuilder credentialsBuilder(updateSetBuilder.subobjStart("credentials"));
 
             // Add SCRAM credentials.
-            BSONObj scramCred = scram::generateCredentials(
+            BSONObj scramCred = scram::SHA1Secrets::generateCredentials(
                 args.hashedPassword, saslGlobalParams.scramIterationCount.load());
             credentialsBuilder.append("SCRAM-SHA-1", scramCred);
 

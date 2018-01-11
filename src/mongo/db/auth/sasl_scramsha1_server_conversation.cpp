@@ -277,24 +277,20 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_secondStep(const std::vector<
     // ClientKey := ClientSignature XOR ClientProof
     // ServerSignature := HMAC(ServerKey, AuthMessage)
     invariant(_creds.scram.isValid());
+    scram::SHA1Secrets secrets(
+        "", base64::decode(_creds.scram.storedKey), base64::decode(_creds.scram.serverKey));
 
-    if (!scram::verifyClientProof(
-            base64::decode(clientProof), base64::decode(_creds.scram.storedKey), _authMessage)) {
+    if (!secrets.verifyClientProof(_authMessage, base64::decode(clientProof))) {
         return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
                                 mongoutils::str::stream()
                                     << "SCRAM-SHA-1 authentication failed, storedKey mismatch");
     }
 
     // ServerSignature := HMAC(ServerKey, AuthMessage)
-    std::string decodedServerKey = base64::decode(_creds.scram.serverKey);
-    SHA1Block serverSignature =
-        SHA1Block::computeHmac(reinterpret_cast<const unsigned char*>(decodedServerKey.c_str()),
-                               decodedServerKey.size(),
-                               reinterpret_cast<const unsigned char*>(_authMessage.c_str()),
-                               _authMessage.size());
+    const auto serverSignature = secrets.generateServerSignature(_authMessage);
 
     StringBuilder sb;
-    sb << "v=" << serverSignature.toString();
+    sb << "v=" << serverSignature;
     *outputData = sb.str();
 
     return StatusWith<bool>(false);

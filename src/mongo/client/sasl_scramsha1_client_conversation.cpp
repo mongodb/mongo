@@ -179,7 +179,7 @@ StatusWith<bool> SaslSCRAMSHA1ClientConversation::_secondStep(const std::vector<
         return StatusWith<bool>(ex.toStatus());
     }
 
-    scram::SCRAMPresecrets presecrets(
+    scram::SHA1Presecrets presecrets(
         _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString(),
         std::vector<std::uint8_t>(decodedSalt.begin(), decodedSalt.end()),
         iterationCount);
@@ -191,16 +191,16 @@ StatusWith<bool> SaslSCRAMSHA1ClientConversation::_secondStep(const std::vector<
         _credentials = _clientCache->getCachedSecrets(targetHost.getValue(), presecrets);
 
         if (!_credentials) {
-            _credentials = scram::generateSecrets(presecrets);
+            _credentials = presecrets;
 
             _clientCache->setCachedSecrets(
                 std::move(targetHost.getValue()), std::move(presecrets), _credentials);
         }
     } else {
-        _credentials = scram::generateSecrets(presecrets);
+        _credentials = presecrets;
     }
 
-    std::string clientProof = scram::generateClientProof(_credentials, _authMessage);
+    std::string clientProof = _credentials.generateClientProof(_authMessage);
 
     StringBuilder sb;
     sb << "c=biws,r=" << nonce << ",p=" << clientProof;
@@ -241,7 +241,7 @@ StatusWith<bool> SaslSCRAMSHA1ClientConversation::_thirdStep(const std::vector<s
     }
 
     bool validServerSignature =
-        scram::verifyServerSignature(_credentials, _authMessage, input[0].substr(2));
+        _credentials.verifyServerSignature(_authMessage, base64::decode(input[0].substr(2)));
 
     if (!validServerSignature) {
         *outputData = "e=Invalid server signature";

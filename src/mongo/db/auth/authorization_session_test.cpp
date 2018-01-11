@@ -112,7 +112,7 @@ public:
         authzSession = stdx::make_unique<AuthorizationSessionForTest>(std::move(localSessionState));
         authzManager->setAuthEnabled(true);
 
-        credentials = BSON("SCRAM-SHA-1" << scram::generateCredentials(
+        credentials = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
                                "a", saslGlobalParams.scramIterationCount.load()));
     }
 };

@@ -82,7 +82,7 @@ private:
     std::string _authMessage;
 
     // Secrets and secrets cache
-    scram::SCRAMSecrets _credentials;
+    scram::SHA1Secrets _credentials;
     SCRAMSHA1ClientCache* const _clientCache;
 
     // client and server nonce concatenated
