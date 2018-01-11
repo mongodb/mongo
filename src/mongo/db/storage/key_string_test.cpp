@@ -1161,6 +1161,23 @@ TEST_F(KeyStringTest, RecordIds) {
     }
 }
 
+TEST_F(KeyStringTest, KeyWithTooManyTypeBitsCausesUassert) {
+    BSONObj obj;
+    {
+        BSONObjBuilder builder;
+        {
+            BSONArrayBuilder array(builder.subarrayStart("x"));
+            auto zero = BSON("" << 0.0);
+            for (int i = 0; i < 1016; i++)
+                array.append(zero.firstElement());
+        }
+
+        obj = builder.obj();
+    }
+    KeyString key(version);
+    ASSERT_THROWS_CODE(key.resetToKey(obj, ONE_ASCENDING), DBException, ErrorCodes::KeyTooLong);
+}
+
 namespace {
 const uint64_t kMinPerfMicros = 20 * 1000;
 const uint64_t kMinPerfSamples = 50 * 1000;
