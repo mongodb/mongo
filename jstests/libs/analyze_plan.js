@@ -2,6 +2,8 @@
 // plan. For instance, there are helpers for checking whether a plan is a collection
 // scan or whether the plan is covered (index only).
 
+load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+
 /**
  * Given the root stage of explain's JSON representation of a query plan ('root'), returns all
  * subdocuments whose stage is 'stage'. Returns an empty array if the plan does not have the
@@ -180,8 +182,18 @@ function aggPlanHasStage(root, stage) {
  * Given the root stage of explain's BSON representation of a query plan ('root'),
  * returns true if the plan has a stage called 'stage'.
  */
-function planHasStage(root, stage) {
-    return getPlanStage(root, stage) !== null;
+function planHasStage(db, root, stage) {
+    const matchingStages = getPlanStages(root, stage);
+
+    // If we are executing against a mongos, we may get more than one occurrence of the stage.
+    if (FixtureHelpers.isMongos(db)) {
+        return matchingStages.length >= 1;
+    } else {
+        assert.lt(matchingStages.length,
+                  2,
+                  `Expected to find 0 or 1 matching stages: ${tojson(matchingStages)}`);
+        return matchingStages.length === 1;
+    }
 }
 
 /**
@@ -190,32 +202,32 @@ function planHasStage(root, stage) {
  * Given the root stage of explain's BSON representation of a query plan ('root'),
  * returns true if the plan is index only. Otherwise returns false.
  */
-function isIndexOnly(root) {
-    return !planHasStage(root, "FETCH") && !planHasStage(root, "COLLSCAN");
+function isIndexOnly(db, root) {
+    return !planHasStage(db, root, "FETCH") && !planHasStage(db, root, "COLLSCAN");
 }
 
 /**
  * Returns true if the BSON representation of a plan rooted at 'root' is using
  * an index scan, and false otherwise.
  */
-function isIxscan(root) {
-    return planHasStage(root, "IXSCAN");
+function isIxscan(db, root) {
+    return planHasStage(db, root, "IXSCAN");
 }
 
 /**
  * Returns true if the BSON representation of a plan rooted at 'root' is using
  * the idhack fast path, and false otherwise.
  */
-function isIdhack(root) {
-    return planHasStage(root, "IDHACK");
+function isIdhack(db, root) {
+    return planHasStage(db, root, "IDHACK");
 }
 
 /**
  * Returns true if the BSON representation of a plan rooted at 'root' is using
  * a collection scan, and false otherwise.
  */
-function isCollscan(root) {
-    return planHasStage(root, "COLLSCAN");
+function isCollscan(db, root) {
+    return planHasStage(db, root, "COLLSCAN");
 }
 
 /**

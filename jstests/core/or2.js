@@ -47,7 +47,7 @@ doTest = function(index) {
     checkArrs([{_id: 0, x: 0, a: 1}], a1);
     if (index) {
         var explain = t.find({x: 0, $or: [{a: 1}]}).explain();
-        assert(isIxscan(explain.queryPlanner.winningPlan));
+        assert(isIxscan(db, explain.queryPlanner.winningPlan));
     }
 
     a1b2 = t.find({x: 1, $or: [{a: 1}, {b: 2}]}).toArray();
@@ -55,7 +55,7 @@ doTest = function(index) {
               a1b2);
     if (index) {
         var explain = t.find({x: 0, $or: [{a: 1}]}).explain();
-        assert(isIxscan(explain.queryPlanner.winningPlan));
+        assert(isIxscan(db, explain.queryPlanner.winningPlan));
     }
 
     /*

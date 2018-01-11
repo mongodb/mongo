@@ -32,7 +32,7 @@ load('jstests/libs/analyze_plan.js');
     var explained = coll.explain().aggregate(
         [{$match: {foo: {$gt: 0}}}, {$group: {_id: null, count: {$sum: 1}}}]);
 
-    assert(planHasStage(explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+    assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
 
     explained = coll.explain().aggregate([
         {$match: {foo: {$gt: 0}}},
@@ -40,13 +40,13 @@ load('jstests/libs/analyze_plan.js');
         {$group: {_id: null, count: {$sum: 1}}}
     ]);
 
-    assert(planHasStage(explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+    assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
 
     // Make sure a $count stage can use the COUNT_SCAN optimization.
     explained = coll.explain().aggregate([{$match: {foo: {$gt: 0}}}, {$count: "count"}]);
-    assert(planHasStage(explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+    assert(planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
 
     // A $match that is not a single range cannot use the COUNT_SCAN optimization.
     explained = coll.explain().aggregate([{$match: {foo: {$in: [0, 1]}}}, {$count: "count"}]);
-    assert(!planHasStage(explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
+    assert(!planHasStage(db, explained.stages[0].$cursor.queryPlanner.winningPlan, "COUNT_SCAN"));
 }());

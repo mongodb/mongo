@@ -13,11 +13,11 @@
 
     var explain = coll.explain().find().snapshot().finish();
     assert.commandWorked(explain);
-    assert(isIxscan(explain.queryPlanner.winningPlan));
+    assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
     explain = coll.find().snapshot().explain();
     assert.commandWorked(explain);
-    assert(isIxscan(explain.queryPlanner.winningPlan));
+    assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
     coll.drop();
 })();

@@ -14,7 +14,7 @@ coll.insert({_id: null});
 
 // Test equality with int value
 var plan = coll.find({_id: 1}, {_id: 1}).hint({_id: 1}).explain("executionStats");
-assert(isIndexOnly(plan.queryPlanner.winningPlan),
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
        "simple.id.1 - indexOnly should be true on covered query");
 assert.eq(0,
           plan.executionStats.totalDocsExamined,
@@ -22,7 +22,7 @@ assert.eq(0,
 
 // Test equality with string value
 var plan = coll.find({_id: "string"}, {_id: 1}).hint({_id: 1}).explain("executionStats");
-assert(isIndexOnly(plan.queryPlanner.winningPlan),
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
        "simple.id.2 - indexOnly should be true on covered query");
 assert.eq(0,
           plan.executionStats.totalDocsExamined,
@@ -30,7 +30,7 @@ assert.eq(0,
 
 // Test equality with int value on a dotted field
 var plan = coll.find({_id: {bar: 1}}, {_id: 1}).hint({_id: 1}).explain("executionStats");
-assert(isIndexOnly(plan.queryPlanner.winningPlan),
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
        "simple.id.3 - indexOnly should be true on covered query");
 assert.eq(0,
           plan.executionStats.totalDocsExamined,
@@ -38,7 +38,7 @@ assert.eq(0,
 
 // Test no query
 var plan = coll.find({}, {_id: 1}).hint({_id: 1}).explain("executionStats");
-assert(isIndexOnly(plan.queryPlanner.winningPlan),
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
        "simple.id.4 - indexOnly should be true on covered query");
 assert.eq(0,
           plan.executionStats.totalDocsExamined,
@@ -46,7 +46,7 @@ assert.eq(0,
 
 // Test range query
 var plan = coll.find({_id: {$gt: 2, $lt: 6}}, {_id: 1}).hint({_id: 1}).explain("executionStats");
-assert(isIndexOnly(plan.queryPlanner.winningPlan),
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
        "simple.id.5 - indexOnly should be true on covered query");
 assert.eq(0,
           plan.executionStats.totalDocsExamined,
@@ -54,7 +54,7 @@ assert.eq(0,
 
 // Test in query
 var plan = coll.find({_id: {$in: [5, 8]}}, {_id: 1}).hint({_id: 1}).explain("executionStats");
-assert(isIndexOnly(plan.queryPlanner.winningPlan),
+assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
        "simple.id.6 - indexOnly should be true on covered query");
 assert.eq(0,
           plan.executionStats.totalDocsExamined,

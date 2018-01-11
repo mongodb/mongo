@@ -1,4 +1,8 @@
-// @tags: [requires_getmore, requires_non_retryable_writes]
+// This test uses multiple batches to pause a cursors progress, so requires getMores. This test uses
+// a delete without a limit which is not retryable. It also makes assumptions about the order of
+// collection scans using the snapshot query option. This order can change when the collection is
+// sharded.
+// @tags: [requires_getmore, requires_non_retryable_writes, assumes_unsharded_collection]
 
 // Regression test for edge cases in which .snapshot() queries could historically miss documents or
 // return the same document twice.

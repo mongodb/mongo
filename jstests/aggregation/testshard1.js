@@ -243,7 +243,7 @@ for (var shardName in res.shards) {
     var res = shardDb.ts1.aggregate([{$match: {}}], {explain: true});
     printjson(res);
     assert.commandWorked(res);
-    assert(!planHasStage(res.stages[0].$cursor.queryPlanner.winningPlan, "SHARDING_FILTER"));
+    assert(!planHasStage(db, res.stages[0].$cursor.queryPlanner.winningPlan, "SHARDING_FILTER"));
 }());
 
 (function() {

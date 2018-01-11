@@ -222,10 +222,10 @@ assert.commandWorked(t.runCommand('planCacheSetFilter',
 // pattern.
 
 explain = t.find(queryAA).explain();
-assert(isIxscan(explain.queryPlanner.winningPlan), "Expected index scan: " + tojson(explain));
+assert(isIxscan(db, explain.queryPlanner.winningPlan), "Expected index scan: " + tojson(explain));
 
 explain = t.find(queryAA).collation(collationEN).explain();
-assert(isIxscan(explain.queryPlanner.winningPlan), "Expected index scan: " + tojson(explain));
+assert(isIxscan(db, explain.queryPlanner.winningPlan), "Expected index scan: " + tojson(explain));
 
 // Ensure that index names in planCacheSetFilter only select matching names.
 
@@ -233,7 +233,7 @@ assert.commandWorked(
     t.runCommand('planCacheSetFilter', {query: queryAA, collation: collationEN, indexes: ["a_1"]}));
 
 explain = t.find(queryAA).collation(collationEN).explain();
-assert(isCollscan(explain.queryPlanner.winningPlan), "Expected collscan: " + tojson(explain));
+assert(isCollscan(db, explain.queryPlanner.winningPlan), "Expected collscan: " + tojson(explain));
 
 //
 // Test that planCacheSetFilter and planCacheClearFilters allow queries containing $expr.

@@ -1,53 +1,63 @@
 // @tags: [does_not_support_stepdowns]
 
-t = db.mr5;
-t.drop();
+(function() {
+    "use strict";
 
-t.save({"partner": 1, "visits": 9});
-t.save({"partner": 2, "visits": 9});
-t.save({"partner": 1, "visits": 11});
-t.save({"partner": 1, "visits": 30});
-t.save({"partner": 2, "visits": 41});
-t.save({"partner": 2, "visits": 41});
+    load("jstests/aggregation/extras/utils.js");  // For resultsEq.
 
-m = function() {
-    emit(this.partner, {stats: [this.visits]});
-};
+    const t = db.mr5;
+    t.drop();
 
-r = function(k, v) {
-    var stats = [];
-    var total = 0;
-    for (var i = 0; i < v.length; i++) {
-        for (var j in v[i].stats) {
-            stats.push(v[i].stats[j]);
-            total += v[i].stats[j];
+    assert.writeOK(t.insert({"partner": 1, "visits": 9}));
+    assert.writeOK(t.insert({"partner": 2, "visits": 9}));
+    assert.writeOK(t.insert({"partner": 1, "visits": 11}));
+    assert.writeOK(t.insert({"partner": 1, "visits": 30}));
+    assert.writeOK(t.insert({"partner": 2, "visits": 41}));
+    assert.writeOK(t.insert({"partner": 2, "visits": 41}));
+
+    let mapper = function() {
+        emit(this.partner, {stats: [this.visits]});
+    };
+
+    const reducer = function(k, v) {
+        var stats = [];
+        var total = 0;
+        for (var i = 0; i < v.length; i++) {
+            for (var j in v[i].stats) {
+                stats.push(v[i].stats[j]);
+                total += v[i].stats[j];
+            }
         }
-    }
-    return {stats: stats, total: total};
-};
+        return {stats: stats, total: total};
+    };
 
-res = t.mapReduce(m, r, {out: "mr5_out", scope: {xx: 1}});
-// res.find().forEach( printjson )
+    let res = t.mapReduce(mapper, reducer, {out: "mr5_out", scope: {xx: 1}});
 
-z = res.convertToSingleObject();
-assert.eq(2, Object.keySet(z).length, "A1");
-assert.eq([9, 11, 30], z["1"].stats, "A2");
-assert.eq([9, 41, 41], z["2"].stats, "A3");
+    let resultAsObj = res.convertToSingleObject();
+    assert.eq(2,
+              Object.keySet(resultAsObj).length,
+              `Expected 2 keys ("1" and "2") in object ${tojson(resultAsObj)}`);
+    // Use resultsEq() to avoid any assumptions about order.
+    assert(resultsEq([9, 11, 30], resultAsObj["1"].stats));
+    assert(resultsEq([9, 41, 41], resultAsObj["2"].stats));
 
-res.drop();
+    res.drop();
 
-m = function() {
-    var x = "partner";
-    var y = "visits";
-    emit(this[x], {stats: [this[y]]});
-};
+    mapper = function() {
+        var x = "partner";
+        var y = "visits";
+        emit(this[x], {stats: [this[y]]});
+    };
 
-res = t.mapReduce(m, r, {out: "mr5_out", scope: {xx: 1}});
-// res.find().forEach( printjson )
+    res = t.mapReduce(mapper, reducer, {out: "mr5_out", scope: {xx: 1}});
 
-z = res.convertToSingleObject();
-assert.eq(2, Object.keySet(z).length, "B1");
-assert.eq([9, 11, 30], z["1"].stats, "B2");
-assert.eq([9, 41, 41], z["2"].stats, "B3");
+    resultAsObj = res.convertToSingleObject();
+    assert.eq(2,
+              Object.keySet(resultAsObj).length,
+              `Expected 2 keys ("1" and "2") in object ${tojson(resultAsObj)}`);
+    // Use resultsEq() to avoid any assumptions about order.
+    assert(resultsEq([9, 11, 30], resultAsObj["1"].stats));
+    assert(resultsEq([9, 41, 41], resultAsObj["2"].stats));
 
-res.drop();
+    res.drop();
+}());

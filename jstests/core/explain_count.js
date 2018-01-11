@@ -15,13 +15,17 @@ function checkCountExplain(explain, nCounted) {
     printjson(explain);
     var execStages = explain.executionStats.executionStages;
 
-    // If passed through mongos, then the root stage should be the mongos SINGLE_SHARD stage,
-    // with COUNT as its child. If explaining directly on the shard, then COUNT is the root
-    // stage.
-    if ("SINGLE_SHARD" == execStages.stage) {
-        var countStage = execStages.shards[0].executionStages;
-        assert.eq(countStage.stage, "COUNT", "root stage on shard is not COUNT");
-        assert.eq(countStage.nCounted, nCounted, "wrong count result");
+    // If passed through mongos, then the root stage should be the mongos SINGLE_SHARD stage or
+    // SHARD_MERGE stages, with COUNT as the root stage on each shard. If explaining directly on the
+    // shard, then COUNT is the root stage.
+    if ("SINGLE_SHARD" == execStages.stage || "SHARD_MERGE" == execStages.stage) {
+        let totalCounted = 0;
+        for (let shardExplain of execStages.shards) {
+            const countStage = shardExplain.executionStages;
+            assert.eq(countStage.stage, "COUNT", "root stage on shard is not COUNT");
+            totalCounted += countStage.nCounted;
+        }
+        assert.eq(totalCounted, nCounted, "wrong count result");
     } else {
         assert.eq(execStages.stage, "COUNT", "root stage is not COUNT");
         assert.eq(execStages.nCounted, nCounted, "wrong count result");

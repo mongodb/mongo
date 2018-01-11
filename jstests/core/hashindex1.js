@@ -42,7 +42,7 @@ assert.eq(t.find({a: 3.1}).hint(goodspec).toArray()[0].a, 3.1);
 
 // Make sure we're using the hashed index.
 var explain = t.find({a: 1}).explain();
-assert(isIxscan(explain.queryPlanner.winningPlan), "not using hashed index");
+assert(isIxscan(db, explain.queryPlanner.winningPlan), "not using hashed index");
 
 // SERVER-12222
 // printjson( t.find({a : {$gte : 3 , $lte : 3}}).explain() )
@@ -50,20 +50,20 @@ assert(isIxscan(explain.queryPlanner.winningPlan), "not using hashed index");
 //		cursorname ,
 //		"not using hashed cursor");
 var explain = t.find({c: 1}).explain();
-assert(!isIxscan(explain.queryPlanner.winningPlan), "using irrelevant hashed index");
+assert(!isIxscan(db, explain.queryPlanner.winningPlan), "using irrelevant hashed index");
 
 // Hash index used with a $in set membership predicate.
 var explain = t.find({a: {$in: [1, 2]}}).explain();
 printjson(explain);
-assert(isIxscan(explain.queryPlanner.winningPlan), "not using hashed index");
+assert(isIxscan(db, explain.queryPlanner.winningPlan), "not using hashed index");
 
 // Hash index used with a singleton $and predicate conjunction.
 var explain = t.find({$and: [{a: 1}]}).explain();
-assert(isIxscan(explain.queryPlanner.winningPlan), "not using hashed index");
+assert(isIxscan(db, explain.queryPlanner.winningPlan), "not using hashed index");
 
 // Hash index used with a non singleton $and predicate conjunction.
 var explain = t.find({$and: [{a: {$in: [1, 2]}}, {a: {$gt: 1}}]}).explain();
-assert(isIxscan(explain.queryPlanner.winningPlan), "not using hashed index");
+assert(isIxscan(db, explain.queryPlanner.winningPlan), "not using hashed index");
 
 // test creation of index based on hash of _id index
 var goodspec2 = {'_id': "hashed"};

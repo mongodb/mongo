@@ -148,7 +148,7 @@ load("jstests/libs/analyze_plan.js");
     assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
     assert.eq(getReadMajorityCursor().itcount(), 10);
     assert.eq(getReadMajorityAggCursor().itcount(), 10);
-    assert(isIxscan(getExplainPlan({version: 1})));
+    assert(isIxscan(db, getExplainPlan({version: 1})));
 
     // Dropping an index does bump the min snapshot.
     t.dropIndex({version: 1});

@@ -28,7 +28,7 @@
     // Collection doesn't exist.
     var explain = runDistinctExplain(coll, 'a', {});
     assert.commandWorked(explain);
-    assert(planHasStage(explain.queryPlanner.winningPlan, "EOF"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"));
 
     // Insert the data to perform distinct() on.
     for (var i = 0; i < 10; i++) {
@@ -50,7 +50,7 @@
     var explain = runDistinctExplain(coll, 'b', {});
     assert.commandWorked(explain);
     assert.eq(20, explain.executionStats.nReturned);
-    assert(isCollscan(explain.queryPlanner.winningPlan));
+    assert(isCollscan(db, explain.queryPlanner.winningPlan));
 
     assert.commandWorked(coll.createIndex({a: 1}));
 
@@ -58,8 +58,8 @@
     var explain = runDistinctExplain(coll, 'a', {});
     assert.commandWorked(explain);
     assert.eq(2, explain.executionStats.nReturned);
-    assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
-    assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 
     // Check that the DISTINCT_SCAN stage has the correct stats.
     var stage = getPlanStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN");
@@ -78,14 +78,14 @@
     var explain = runDistinctExplain(coll, 'a', {a: 1});
     assert.commandWorked(explain);
     assert.eq(1, explain.executionStats.nReturned);
-    assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
-    assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 
     assert.eq([1], coll.distinct('b', {a: 1}));
     var explain = runDistinctExplain(coll, 'b', {a: 1});
     assert.commandWorked(explain);
     assert.eq(1, explain.executionStats.nReturned);
-    assert(!planHasStage(explain.queryPlanner.winningPlan, "FETCH"));
-    assert(planHasStage(explain.queryPlanner.winningPlan, "PROJECTION"));
-    assert(planHasStage(explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
+    assert(!planHasStage(db, explain.queryPlanner.winningPlan, "FETCH"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "PROJECTION"));
+    assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 })();

@@ -19,13 +19,17 @@ function checkNWouldDelete(explain, nWouldDelete) {
     var executionStats = explain.executionStats;
     assert("executionStages" in executionStats);
 
-    // If passed through mongos, then DELETE should be below the SINGLE_SHARD mongos stage.
-    // Otherwise it is the root stage.
+    // If passed through mongos, then DELETE stage(s) should be below the SHARD_WRITE mongos stage.
+    // Otherwise the DELETE stage is the root stage.
     var execStages = executionStats.executionStages;
     if ("SHARD_WRITE" === execStages.stage) {
-        var deleteStage = execStages.shards[0].executionStages;
-        assert.eq(deleteStage.stage, "DELETE");
-        assert.eq(deleteStage.nWouldDelete, nWouldDelete);
+        let totalToBeDeletedAcrossAllShards = 0;
+        execStages.shards.forEach(function(shardExplain) {
+            const rootStageName = shardExplain.executionStages.stage;
+            assert.eq(rootStageName, "DELETE", tojson(execStages));
+            totalToBeDeletedAcrossAllShards += shardExplain.executionStages.nWouldDelete;
+        });
+        assert.eq(totalToBeDeletedAcrossAllShards, nWouldDelete);
     } else {
         assert.eq(execStages.stage, "DELETE");
         assert.eq(execStages.nWouldDelete, nWouldDelete);

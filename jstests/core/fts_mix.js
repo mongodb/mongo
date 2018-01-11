@@ -1,5 +1,6 @@
 
 load("jstests/libs/fts.js");
+load("jstests/aggregation/extras/utils.js");  // For resultsEq.
 
 // test collection
 tc = db.text_mix;
@@ -84,19 +85,19 @@ tc.dropIndexes();
 
 // now let's see about multiple fields, with specific weighting
 tc.ensureIndex({"title": "text", "text": "text"}, {weights: {"title": 10}});
-assert.eq([9, 7, 8], queryIDS(tc, "members physics"));
+assert(resultsEq([9, 7, 8], queryIDS(tc, "members physics")));
 
 tc.dropIndexes();
 
 // test all-1 weighting with "$**"
 tc.ensureIndex({"$**": "text"});
-assert.eq([2, 8, 7], queryIDS(tc, "family tea estate"));
+assert(resultsEq([2, 8, 7], queryIDS(tc, "family tea estate")));
 
 tc.dropIndexes();
 
 // non-1 weight on "$**" + other weight specified for some field
 tc.ensureIndex({"$**": "text"}, {weights: {"$**": 10, "text": 2}});
-assert.eq([7, 5], queryIDS(tc, "Olympic Games gold medal"));
+assert(resultsEq([7, 5], queryIDS(tc, "Olympic Games gold medal")));
 
 tc.dropIndexes();
 
@@ -111,12 +112,12 @@ tc.ensureIndex({"$**": "text"}, {weights: {"title": 10}});
 // tests stemming for basic plural case
 res = tc.find({"$text": {"$search": "member"}});
 res2 = tc.find({"$text": {"$search": "members"}});
-assert.eq(getIDS(res), getIDS(res2));
+assert(resultsEq(getIDS(res), getIDS(res2)));
 
 // "search" for something with potential 's bug.
 res = tc.find({"$text": {"$search": "magazine's"}});
 res2 = tc.find({"$text": {"$search": "magazine"}});
-assert.eq(getIDS(res), getIDS(res2));
+assert(resultsEq(getIDS(res), getIDS(res2)));
 
 // -------------------------------------------- LANGUAGE -------------------------------------------
 
@@ -152,13 +153,10 @@ assert.doesNotThrow(function() {
 // ensure limit limits results
 assert.eq([2], queryIDS(tc, "rural river dam", null, null, 1));
 
-// ensure top results are the same regardless of limit
-// make sure that this uses a case where it wouldn't be otherwise..
 res = tc.find({"$text": {"$search": "united kingdom british princes"}}).limit(1);
-res2 = tc.find({"$text": {"$search": "united kingdom british princes"}});
 assert.eq(1, res.length());
+res2 = tc.find({"$text": {"$search": "united kingdom british princes"}});
 assert.eq(4, res2.length());
-assert.eq(res[0]._id, res2[0]._id);
 
 // -------------------------------------------- PROJECTION -----------------------------------------
 
@@ -226,7 +224,3 @@ assert.eq([2], queryIDS(tc, "Mahim", {_id: {$lte: 4}}));
 
 // using regex conditional filtering
 assert.eq([9], queryIDS(tc, "members", {title: {$regex: /Phy.*/i}}));
-
-// -------------------------------------------------------------------------------------------------
-
-assert(tc.validate().valid);

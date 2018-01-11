@@ -40,11 +40,11 @@
         assert(explain.queryPlanner.hasOwnProperty("winningPlan"), tojson(explain));
         const winningPlan = explain.queryPlanner.winningPlan;
         if (isCovered) {
-            assert(isIndexOnly(winningPlan),
+            assert(isIndexOnly(db, winningPlan),
                    "Query " + tojson(query) + " with projection " + tojson(projection) +
                        " should have been covered, but got this plan: " + tojson(winningPlan));
         } else {
-            assert(!isIndexOnly(winningPlan),
+            assert(!isIndexOnly(db, winningPlan),
                    "Query " + tojson(query) + " with projection " + tojson(projection) +
                        " should not have been covered, but got this plan: " + tojson(winningPlan));
         }

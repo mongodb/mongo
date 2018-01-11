@@ -1,3 +1,8 @@
+// Tests the output of the multikey information in the explain output.
+//
+// This test examines the explain output to verify that certain indexes are multi-key, which may not
+// be the case on all shards.
+// @tags: [assumes_unsharded_collection]
 (function() {
     "use strict";
 
@@ -31,7 +36,7 @@
         var explain = db.runCommand({explain: testOptions.commandObj});
         assert.commandWorked(explain);
 
-        assert(planHasStage(explain.queryPlanner.winningPlan, testOptions.stage),
+        assert(planHasStage(db, explain.queryPlanner.winningPlan, testOptions.stage),
                "expected stage to be present: " + tojson(explain));
         return getPlanStage(explain.queryPlanner.winningPlan, testOptions.stage);
     }

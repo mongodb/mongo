@@ -14,13 +14,13 @@ var $config = extendWorkload($config, function($config, $super) {
         explainBasicDistinct: function(db, collName) {
             var res = db[collName].explain().distinct('i');
             assertAlways.commandWorked(res);
-            assertAlways(planHasStage(res.queryPlanner.winningPlan, 'COLLSCAN'));
+            assertAlways(planHasStage(db, res.queryPlanner.winningPlan, 'COLLSCAN'));
         },
         explainDistinctIndex: function(db, collName) {
             var res = db[collName].explain().distinct('_id');
             assertAlways.commandWorked(res);
-            assertAlways(planHasStage(res.queryPlanner.winningPlan, 'PROJECTION'));
-            assertAlways(planHasStage(res.queryPlanner.winningPlan, 'DISTINCT_SCAN'));
+            assertAlways(planHasStage(db, res.queryPlanner.winningPlan, 'PROJECTION'));
+            assertAlways(planHasStage(db, res.queryPlanner.winningPlan, 'DISTINCT_SCAN'));
         }
     },
                                    $super.states);

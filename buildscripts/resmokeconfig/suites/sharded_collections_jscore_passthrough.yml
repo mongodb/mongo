@@ -71,13 +71,28 @@ selector:
   - jstests/core/ns_length.js
   - jstests/core/views/*.js # Views tests aren't expected to work when collections are implicitly sharded.
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
-  # TODO: Remove after fixing SERVER-14324. mapReduce behaves unpredictably when the out
-  # collection is sharded on anything other than {_id: 1}.
+  # TODO: Remove after fixing SERVER-32555. executionStats.nReturned is incorrect for sharded
+  # queries with a limit or for distinct commands.
+  - jstests/core/distinct_index1.js
+  - jstests/core/explain1.js
+  - jstests/core/explain4.js
+  - jstests/core/sortk.js
+  # TODO: Remove after fixing SERVER-32563. The implementation of explain for the count command is
+  # incorrect on sharded collections.
+  - jstests/core/explain_count.js
+  # TODO: Remove after fixing SERVER-14324. mapReduce behaves unpredictably when the out collection
+  # is sharded on anything other than {_id: 1}.
   - jstests/core/mr_undef.js
+  # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
+  - jstests/core/expr_index_use.js
+  - jstests/core/optimized_match_explain.js
+  - jstests/core/sort_array.js
   # TODO: SERVER-16605
+  - jstests/core/mr_index.js
   - jstests/core/mr1.js
   - jstests/core/mr3.js
   - jstests/core/mr4.js
+  - jstests/core/mr5.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   # Tests tagged with the following will fail because they assume collections are not sharded.
@@ -98,6 +113,8 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
+    num_shards: 2
+    enable_balancer: false
     mongos_options:
       set_parameters:
         enableTestCommands: 1

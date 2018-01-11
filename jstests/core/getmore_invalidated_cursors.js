@@ -5,11 +5,12 @@
 (function() {
     'use strict';
 
+    load('jstests/libs/fixture_helpers.js');  // For FixtureHelpers.
+
     const testDB = db.getSiblingDB("getmore_invalidated_cursors");
     const coll = testDB.test;
 
     const nDocs = 100;
-    const batchSize = nDocs - 1;
 
     function setupCollection() {
         coll.drop();
@@ -24,6 +25,10 @@
     // Test that dropping the database between a find and a getMore will return an appropriate error
     // code and message.
     setupCollection();
+
+    // Make sure the batch size is small enough to ensure a getMore will need to be sent to at least
+    // one shard.
+    const batchSize = (nDocs / FixtureHelpers.numberOfShardsForCollection(coll)) - 1;
 
     const isShardedCollection = coll.stats().sharded;
     const shellReadMode = testDB.getMongo().readMode();

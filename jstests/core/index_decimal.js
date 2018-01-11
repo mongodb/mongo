@@ -38,7 +38,7 @@
     assert.eq(qres,
               [{x: NumberDecimal('0.10')}],
               'query for x equal to decimal 0.10 returns wrong value');
-    assert(isIndexOnly(qplan.queryPlanner.winningPlan),
+    assert(isIndexOnly(db, qplan.queryPlanner.winningPlan),
            'query on decimal should be covered: ' + tojson(qplan));
 
     // Check that queries for exact floating point numbers don't return nearby decimals.

@@ -1,4 +1,6 @@
-// @tags: [requires_non_retryable_writes]
+// This test expects a function stored in the system.js collection to be available for a map/reduce,
+// which may not be the case if it is implicitly sharded in a passthrough.
+// @tags: [requires_non_retryable_writes, assumes_unsharded_collection]
 
 var myDB = db.getSiblingDB("where4");
 

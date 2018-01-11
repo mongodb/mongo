@@ -34,7 +34,7 @@ load("jstests/libs/analyze_plan.js");  // For 'isIndexOnly'.
 
     // First make sure it's actually using a covered index scan.
     var explain = coll.explain().find({a: 2}, {_id: 0, a: 1});
-    assert(isIndexOnly(explain));
+    assert(isIndexOnly(db, explain));
 
     var updated = coll.findOne({a: 2}, {_id: 0, a: 1});
 

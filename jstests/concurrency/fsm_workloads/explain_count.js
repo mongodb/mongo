@@ -25,14 +25,14 @@ var $config = extendWorkload($config, function($config, $super) {
         explainBasicCount: function explainBasicCount(db, collName) {
             var res = db[collName].explain().count();
             assertAlways.commandWorked(res);
-            assertAlways(planHasStage(res.queryPlanner.winningPlan, 'COUNT'));
+            assertAlways(planHasStage(db, res.queryPlanner.winningPlan, 'COUNT'));
         },
         explainCountHint: function explainCountHint(db, collName) {
             assertWhenOwnColl(function() {
                 var res = db[collName].explain().find({i: this.nInserted / 2}).hint({i: 1}).count();
                 assertWhenOwnColl.commandWorked(res);
-                assertWhenOwnColl(planHasStage(res.queryPlanner.winningPlan, 'COUNT'));
-                assertWhenOwnColl(planHasStage(res.queryPlanner.winningPlan, 'COUNT_SCAN'));
+                assertWhenOwnColl(planHasStage(db, res.queryPlanner.winningPlan, 'COUNT'));
+                assertWhenOwnColl(planHasStage(db, res.queryPlanner.winningPlan, 'COUNT_SCAN'));
             });
         },
         explainCountNoSkipLimit: function explainCountNoSkipLimit(db, collName) {

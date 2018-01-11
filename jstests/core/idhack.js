@@ -31,23 +31,23 @@ var explain = t.find(query).explain(true);
 print("explain for " + tojson(query, "", true) + " = " + tojson(explain));
 assert.eq(1, explain.executionStats.nReturned, "D1");
 assert.eq(1, explain.executionStats.totalKeysExamined, "D2");
-assert(isIdhack(explain.queryPlanner.winningPlan), "D3");
+assert(isIdhack(db, explain.queryPlanner.winningPlan), "D3");
 
 // ID hack cannot be used with hint().
 t.ensureIndex({_id: 1, a: 1});
 var hintExplain = t.find(query).hint({_id: 1, a: 1}).explain();
 print("explain for hinted query = " + tojson(hintExplain));
-assert(!isIdhack(hintExplain.queryPlanner.winningPlan), "E1");
+assert(!isIdhack(db, hintExplain.queryPlanner.winningPlan), "E1");
 
 // ID hack cannot be used with skip().
 var skipExplain = t.find(query).skip(1).explain();
 print("explain for skip query = " + tojson(skipExplain));
-assert(!isIdhack(skipExplain.queryPlanner.winningPlan), "F1");
+assert(!isIdhack(db, skipExplain.queryPlanner.winningPlan), "F1");
 
 // Covered query returning _id field only can be handled by ID hack.
 var coveredExplain = t.find(query, {_id: 1}).explain();
 print("explain for covered query = " + tojson(coveredExplain));
-assert(isIdhack(coveredExplain.queryPlanner.winningPlan), "G1");
+assert(isIdhack(db, coveredExplain.queryPlanner.winningPlan), "G1");
 // Check doc from covered ID hack query.
 assert.eq({_id: {x: 2}}, t.findOne(query, {_id: 1}), "G2");
 

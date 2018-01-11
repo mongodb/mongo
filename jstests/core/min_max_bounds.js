@@ -3,6 +3,10 @@
  */
 (function() {
     'use strict';
+
+    load('jstests/libs/fixture_helpers.js');      // For FixtureHelpers.
+    load('jstests/aggregation/extras/utils.js');  // For resultsEq.
+
     var coll = db.query_bound_inclusion;
     coll.drop();
     assert.writeOK(coll.insert({a: 1, b: 1}));
@@ -25,8 +29,14 @@
 
     res = coll.find().min({a: 1}).max({a: 3}).toArray();
     assert.eq(res.length, 2);
-    assert.eq(res[0].a, 1);
-    assert.eq(res[1].a, 2);
+    if (FixtureHelpers.numberOfShardsForCollection(coll) === 1) {
+        assert.eq(res[0].a, 1);
+        assert.eq(res[1].a, 2);
+    } else {
+        // With more than one shard, we cannot assume the results will come back in order, since we
+        // did not request a sort.
+        assert(resultsEq(res.map((result) => result.a), [1, 2]));
+    }
 
     res = coll.find().min({a: 1}).max({a: 3}).sort({a: -1}).toArray();
     assert.eq(res.length, 2);
@@ -49,8 +59,14 @@
 
     res = coll.find().min({b: 3}).max({b: 1}).toArray();
     assert.eq(res.length, 2);
-    assert.eq(res[0].b, 3);
-    assert.eq(res[1].b, 2);
+    if (FixtureHelpers.numberOfShardsForCollection(coll) === 1) {
+        assert.eq(res[0].b, 3);
+        assert.eq(res[1].b, 2);
+    } else {
+        // With more than one shard, we cannot assume the results will come back in order, since we
+        // did not request a sort.
+        assert(resultsEq(res.map((result) => result.b), [3, 2]));
+    }
 
     res = coll.find().min({b: 3}).max({b: 1}).sort({b: 1}).toArray();
     assert.eq(res.length, 2);

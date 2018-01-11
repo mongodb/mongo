@@ -31,13 +31,17 @@
         const explain = db.runCommand({explain: command});
         assert.commandWorked(explain);
 
-        // Check that the query uses correct index bounds.
-        const ixscan = getPlanStage(explain.queryPlanner.winningPlan, 'IXSCAN');
-        assert.neq(ixscan, null, 'Plan unexpectedly missing IXSCAN stage: ' + tojson(explain));
-        assert.eq(ixscan.indexBounds._id,
-                  params.bounds,
-                  'Expected bounds of ' + tojson(params.bounds) + ' but got ' +
-                      tojson(ixscan.indexBounds._id));
+        // Check that the query uses correct index bounds. When run against a sharded cluster, there
+        // may be multiple index scan stages, but each should have the same index bounds.
+        const ixscans = getPlanStages(explain.queryPlanner.winningPlan, 'IXSCAN');
+        assert.gt(ixscans.length, 0, 'Plan unexpectedly missing IXSCAN stage: ' + tojson(explain));
+        for (let i = 0; i < ixscans.length; i++) {
+            const ixscan = ixscans[i];
+            assert.eq(ixscan.indexBounds._id,
+                      params.bounds,
+                      `Expected bounds of ${tojson(params.bounds)} but got ${
+                          tojson(ixscan.indexBounds._id)}. i=${i}, all output: ${tojson(explain)}`);
+        }
 
         // Check that the query regex matches expected strings.
         const results = db.runCommand(command);

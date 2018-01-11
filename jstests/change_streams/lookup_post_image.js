@@ -7,7 +7,7 @@
 
     load("jstests/libs/change_stream_util.js");
     load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-    load("jstests/libs/fixture_helpers.js");           // For awaitLastOpCommitted().
+    load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
     load("jstests/replsets/libs/two_phase_drops.js");  // For 'TwoPhaseDropCollectionTest'.
 
     let cst = new ChangeStreamTest(db);
@@ -110,7 +110,7 @@
     // If this test is running with secondary read preference, it's necessary for the remove
     // to propagate to all secondary nodes and be available for majority reads before we can
     // assume looking up the document will fail.
-    FixtureHelpers.awaitLastOpCommitted();
+    FixtureHelpers.awaitLastOpCommitted(db);
 
     latestChange = cst.getOneChange(cursor);
     assert.eq(latestChange.operationType, "update");
@@ -162,7 +162,7 @@
     // If this test is running with secondary read preference, it's necessary for the drop
     // to propagate to all secondary nodes and be available for majority reads before we can
     // assume looking up the document will fail.
-    FixtureHelpers.awaitLastOpCommitted();
+    FixtureHelpers.awaitLastOpCommitted(db);
 
     // Check the next $changeStream entry; this is the test document inserted above.
     latestChange = cst.getOneChange(cursor);

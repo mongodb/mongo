@@ -1,6 +1,8 @@
+// This test makes assumptions about the order of collection scans using the snapshot query option.
+// This order can change when the collection is sharded.
+// @tags: [assumes_unsharded_collection]
 t = db.find1;
 t.drop();
-
 lookAtDocumentMetrics = false;
 
 // QUERY MIGRATION

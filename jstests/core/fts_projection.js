@@ -114,10 +114,10 @@ assert.neq(-1,
 let explainOutput = t.find({$text: {$search: "textual content -irrelevant"}}, {
                          score: {$meta: "textScore"}
                      }).explain();
-assert(planHasStage(explainOutput.queryPlanner.winningPlan, "TEXT_OR"));
+assert(planHasStage(db, explainOutput.queryPlanner.winningPlan, "TEXT_OR"));
 
 explainOutput = t.find({$text: {$search: "textual content -irrelevant"}}).explain();
-assert(!planHasStage(explainOutput.queryPlanner.winningPlan, "TEXT_OR"));
+assert(!planHasStage(db, explainOutput.queryPlanner.winningPlan, "TEXT_OR"));
 
 // Scores should exist.
 assert.eq(results.length, 2);

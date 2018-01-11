@@ -1,4 +1,6 @@
 // test min / max query parameters
+load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
+load("jstests/aggregation/extras/utils.js");  // For resultsEq.
 
 addData = function() {
     t.save({a: 1, b: 1});
@@ -75,8 +77,14 @@ t.insert({a: 4});
 t.insert({a: 5});
 
 var cursor = t.find().min({a: 4});
-assert.eq(4, cursor.next()["a"]);
-assert.eq(5, cursor.next()["a"]);
+if (FixtureHelpers.numberOfShardsForCollection(t) === 1) {
+    assert.eq(4, cursor.next().a);
+    assert.eq(5, cursor.next().a);
+} else {
+    // With more than one shard, we cannot assume the results will come back in order, since we
+    // did not request a sort.
+    assert(resultsEq([cursor.next().a, cursor.next().a], [4, 5]));
+}
 assert(!cursor.hasNext());
 
 cursor = t.find().max({a: 4});
@@ -88,8 +96,14 @@ t.dropIndexes();
 t.ensureIndex({a: -1});
 
 cursor = t.find().min({a: 4});
-assert.eq(4, cursor.next()["a"]);
-assert.eq(3, cursor.next()["a"]);
+if (FixtureHelpers.numberOfShardsForCollection(t) === 1) {
+    assert.eq(4, cursor.next().a);
+    assert.eq(3, cursor.next().a);
+} else {
+    // With more than one shard, we cannot assume the results will come back in order, since we
+    // did not request a sort.
+    assert(resultsEq([cursor.next().a, cursor.next().a], [4, 3]));
+}
 assert(!cursor.hasNext());
 
 cursor = t.find().max({a: 4});

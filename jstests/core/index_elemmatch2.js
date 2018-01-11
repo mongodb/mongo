@@ -19,7 +19,7 @@
 
     function assertIndexResults(coll, query, useIndex, nReturned) {
         const explainPlan = coll.find(query).explain("executionStats");
-        assert.eq(isIxscan(explainPlan.queryPlanner.winningPlan), useIndex);
+        assert.eq(isIxscan(db, explainPlan.queryPlanner.winningPlan), useIndex);
         assert.eq(explainPlan.executionStats.nReturned, nReturned);
     }
 

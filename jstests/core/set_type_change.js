@@ -7,9 +7,6 @@
  * Tests that using the $set update modifier to change only the type of a field will actually update
  * the document, including any relevant indices.
  */
-
-load("jstests/libs/analyze_plan.js");  // For 'isIndexOnly'.
-
 (function() {
     "use strict";
 

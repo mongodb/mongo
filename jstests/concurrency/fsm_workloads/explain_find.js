@@ -16,7 +16,7 @@ var $config = extendWorkload($config, function($config, $super) {
         explainLimit: function explainLimit(db, collName) {
             var res = db[collName].find().limit(3).explain();
             assertAlways.commandWorked(res);
-            assertAlways(planHasStage(res.queryPlanner.winningPlan, 'LIMIT'));
+            assertAlways(planHasStage(db, res.queryPlanner.winningPlan, 'LIMIT'));
         },
         explainBatchSize: function explainBatchSize(db, collName) {
             var res = db[collName].find().batchSize(3).explain();
@@ -29,18 +29,18 @@ var $config = extendWorkload($config, function($config, $super) {
         explainSkip: function explainSkip(db, collName) {
             var res = db[collName].explain().find().skip(3).finish();
             assertAlways.commandWorked(res);
-            assertAlways(planHasStage(res.queryPlanner.winningPlan, 'SKIP'));
+            assertAlways(planHasStage(db, res.queryPlanner.winningPlan, 'SKIP'));
         },
         explainSort: function explainSort(db, collName) {
             var res = db[collName].find().sort({i: -1}).explain();
             assertAlways.commandWorked(res);
-            assertAlways(planHasStage(res.queryPlanner.winningPlan, 'SORT'));
+            assertAlways(planHasStage(db, res.queryPlanner.winningPlan, 'SORT'));
         },
         explainHint: function explainHint(db, collName) {
             assertWhenOwnColl(function() {
                 var res = db[collName].find().hint({j: 1}).explain();
                 assertWhenOwnColl.commandWorked(res);
-                assertWhenOwnColl(isIxscan(res.queryPlanner.winningPlan));
+                assertWhenOwnColl(isIxscan(db, res.queryPlanner.winningPlan));
             });
         },
         explainMaxTimeMS: function explainMaxTimeMS(db, collName) {
@@ -50,7 +50,7 @@ var $config = extendWorkload($config, function($config, $super) {
         explainSnapshot: function explainSnapshot(db, collName) {
             var res = db[collName].find().snapshot().explain();
             assertAlways.commandWorked(res);
-            assertWhenOwnColl(isIxscan(res.queryPlanner.winningPlan));
+            assertWhenOwnColl(isIxscan(db, res.queryPlanner.winningPlan));
         }
     },
                                    $super.states);

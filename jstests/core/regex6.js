@@ -1,4 +1,7 @@
 // contributed by Andrew Kempe
+// This test makes assertions about how many keys are examined during query execution, which can
+// change depending on whether/how many documents are filtered out by the SHARDING_FILTER stage.
+// @tags: [assumes_unsharded_collection]
 t = db.regex6;
 t.drop();
 

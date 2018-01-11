@@ -10,7 +10,7 @@
 
     function assertQueryCorrect(query, count) {
         var explain = coll.find(query).explain("executionStats");
-        assert(isCollscan(explain.queryPlanner.winningPlan),
+        assert(isCollscan(db, explain.queryPlanner.winningPlan),
                "expected bit test query plan to be COLLSCAN");
         assert.eq(count,
                   explain.executionStats.nReturned,
