@@ -71,6 +71,16 @@ TEST(Protocol, FailedNegotiation) {
 
 TEST(Protocol, parseProtocolSetFromIsMasterReply) {
     {
+        // MongoDB 3.8
+        auto mongod38 =
+            BSON("maxWireVersion" << static_cast<int>(WireVersion::REPLICA_SET_TRANSACTIONS)
+                                  << "minWireVersion"
+                                  << static_cast<int>(WireVersion::RELEASE_2_4_AND_BEFORE));
+
+        ASSERT_EQ(assertGet(parseProtocolSetFromIsMasterReply(mongod38)).protocolSet,
+                  supports::kAll);
+    }
+    {
         // MongoDB 3.6
         auto mongod36 =
             BSON("maxWireVersion" << static_cast<int>(WireVersion::SUPPORTS_OP_MSG)  //
