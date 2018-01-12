@@ -212,6 +212,9 @@ class Report(object):
             # order to be able to iterate it multiple times.
             entries = list(entries)
 
+        if not entries:
+            raise ValueError("Report cannot be created with no entries")
+
         self.start_date = min(entry.start_date for entry in entries)
         self.end_date = max(entry.end_date for entry in entries)
 
