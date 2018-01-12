@@ -41,12 +41,14 @@ namespace {
 
 /**
  * Sets the minimum allowed version for the cluster. If it is 3.4, then shards should not use 3.6
- * features.
+ * features. Similarly, if 3.6, shards will not use 4.0 features.
  *
  * Format:
  * {
  *   setFeatureCompatibilityVersion: <string version>
  * }
+ *
+ * TODO: update this comment when FCV 3.4 is removed (SERVER-32597).
  */
 class SetFeatureCompatibilityVersionCmd : public BasicCommand {
 public:
@@ -65,12 +67,13 @@ public:
     }
 
     virtual void help(std::stringstream& help) const {
+        // TODO: update this comment when FCV 3.4 is removed (SERVER-32597).
         help << "Set the API version for the cluster. If set to \""
              << FeatureCompatibilityVersionCommandParser::kVersion34
              << "\", then 3.6 features are disabled. If \""
              << FeatureCompatibilityVersionCommandParser::kVersion36
              << "\", then 3.6 features are enabled, and all nodes in the cluster must be version "
-                "3.6. See "
+             << "3.6. If \"4.0\", then 4.0 features are enabled. See "
              << feature_compatibility_version::kDochubLink << ".";
     }
 

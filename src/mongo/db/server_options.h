@@ -150,6 +150,9 @@ struct ServerGlobalParams {
          * The combination of the fields in the admin.system.version document in the format
          * (version, targetVersion) are represented by this enum and determine this node's behavior.
          *
+         * Features can be gated for specific versions, or ranges of versions above or below some
+         * minimum or maximum version, respectively.
+         *
          * The legal enum (and featureCompatiblityVersion document) states are:
          *
          * kFullyDowngradedTo34
@@ -176,13 +179,20 @@ struct ServerGlobalParams {
          *                 false, and getVersion() will return the default
          *                 (kFullyDowngradedTo34).
          *
+         * TODO: update this comment to 3.6/4.0 when FCV 3.4 is removed (SERVER-32597).
          */
         enum class Version {
-            kFullyDowngradedTo34,
-            kUpgradingTo36,
-            kFullyUpgradedTo36,
-            kDowngradingTo34,
-            kUnsetDefault34Behavior
+            // The order of these enums matter, higher upgrades having higher values, so that
+            // features can be active or inactive if the version is higher than some minimum or
+            // lower than some maximum, respectively.
+            kUnsetDefault34Behavior = 0,
+            kFullyDowngradedTo34 = 1,
+            kDowngradingTo34 = 2,
+            kUpgradingTo36 = 3,
+            kFullyUpgradedTo36 = 4,
+            kDowngradingTo36 = 5,
+            kUpgradingTo40 = 6,
+            kFullyUpgradedTo40 = 7,
         };
 
         /**
@@ -212,7 +222,7 @@ struct ServerGlobalParams {
 
         // This determines whether to give Collections UUIDs upon creation.
         const bool isSchemaVersion36() {
-            return (getVersion() == Version::kFullyUpgradedTo36 ||
+            return (getVersion() >= Version::kFullyUpgradedTo36 ||
                     getVersion() == Version::kUpgradingTo36);
         }
 

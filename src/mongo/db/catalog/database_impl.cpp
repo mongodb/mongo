@@ -781,7 +781,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     if (enableCollectionUUIDs && !optionsWithUUID.uuid &&
         serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
         auto coordinator = repl::ReplicationCoordinator::get(opCtx);
-        bool fullyUpgraded = serverGlobalParams.featureCompatibility.getVersion() ==
+        bool fullyUpgraded = serverGlobalParams.featureCompatibility.getVersion() >=
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36;
         bool canGenerateUUID =
             (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) ||
@@ -1047,7 +1047,7 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
         MatchExpressionParser::AllowedFeatureSet allowedFeatures =
             MatchExpressionParser::kBanAllSpecialFeatures;
         if (!serverGlobalParams.validateFeaturesAsMaster.load() ||
-            (serverGlobalParams.featureCompatibility.getVersion() ==
+            (serverGlobalParams.featureCompatibility.getVersion() >=
              ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
             // Note that we don't enforce this feature compatibility check when we are on
             // the secondary or on a backup instance, as indicated by !validateFeaturesAsMaster.

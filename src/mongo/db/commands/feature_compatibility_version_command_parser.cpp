@@ -43,8 +43,11 @@ constexpr StringData kVersion32 = "3.2"_sd;
 
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersion34;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersion36;
+constexpr StringData FeatureCompatibilityVersionCommandParser::kVersion40;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo36;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo34;
+constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo40;
+constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo36;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionUnset;
 
 StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(
@@ -96,10 +99,13 @@ StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersion
                               << "."};
     }
 
-    if (version != FeatureCompatibilityVersionCommandParser::kVersion36 &&
+    if (version != FeatureCompatibilityVersionCommandParser::kVersion40 &&
+        version != FeatureCompatibilityVersionCommandParser::kVersion36 &&
         version != FeatureCompatibilityVersionCommandParser::kVersion34) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Invalid command argument. Expected '"
+                              << FeatureCompatibilityVersionCommandParser::kVersion40
+                              << "', '"
                               << FeatureCompatibilityVersionCommandParser::kVersion36
                               << "' or '"
                               << FeatureCompatibilityVersionCommandParser::kVersion34

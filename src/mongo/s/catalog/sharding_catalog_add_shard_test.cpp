@@ -140,7 +140,7 @@ protected:
             ASSERT_EQ(request.dbname, "admin");
             ASSERT_BSONOBJ_EQ(request.cmdObj,
                               BSON("setFeatureCompatibilityVersion"
-                                   << "3.6"));
+                                   << "4.0"));
 
             return response;
         });

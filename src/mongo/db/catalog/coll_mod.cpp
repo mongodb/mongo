@@ -415,7 +415,7 @@ Status _collModInternal(OperationContext* opCtx,
             CollectionCatalogEntry* cce = coll->getCatalogEntry();
             cce->addUUID(opCtx, uuid.get(), coll);
         } else if (!uuid && coll->uuid() &&
-                   serverGlobalParams.featureCompatibility.getVersion() !=
+                   serverGlobalParams.featureCompatibility.getVersion() <
                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
             log() << "Removing UUID " << coll->uuid().get().toString() << " from collection "
                   << coll->ns();

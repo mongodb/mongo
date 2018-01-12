@@ -150,7 +150,7 @@ Status ParsedUpdate::parseUpdate() {
 
 Status ParsedUpdate::parseArrayFilters() {
     if (!_request->getArrayFilters().empty() &&
-        (serverGlobalParams.featureCompatibility.getVersion() !=
+        (serverGlobalParams.featureCompatibility.getVersion() <
          ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
         return Status(ErrorCodes::InvalidOptions,
                       str::stream()

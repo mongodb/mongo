@@ -343,11 +343,22 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                                 << connectionString.toString()
                                                 << " as a shard");
     }
-    if (serverGlobalParams.featureCompatibility.getVersion() ==
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
+    if (serverGlobalParams.featureCompatibility.getVersion() >
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+        // If FCV 4.0, or upgrading to / downgrading from, wire version must be LATEST.
+        invariant(maxWireVersion == WireVersion::LATEST_WIRE_VERSION);
+    } else if (serverGlobalParams.featureCompatibility.getVersion() >
+                   ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34 &&
+               serverGlobalParams.featureCompatibility.getVersion() <=
+                   ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+        // If FCV 3.6, or upgrading to / downgrading from, wire version must be v3.6
+        // LATEST_WIRE_VERSION or greater.
         invariant(maxWireVersion >= WireVersion::LATEST_WIRE_VERSION - 1);
     } else {
-        invariant(maxWireVersion >= WireVersion::LATEST_WIRE_VERSION);
+        // If FCV 3.4, wire version cannot be less than v3.4 LATEST_WIRE_VERSION.
+        invariant(serverGlobalParams.featureCompatibility.getVersion() ==
+                  ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
+        invariant(maxWireVersion >= WireVersion::LATEST_WIRE_VERSION - 2);
     }
 
     // Check whether there is a master. If there isn't, the replica set may not have been

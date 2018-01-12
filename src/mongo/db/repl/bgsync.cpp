@@ -649,7 +649,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     // Run a rollback algorithm that either uses UUIDs or does not use UUIDs depending on
     // the FCV. Since collection UUIDs were only added in 3.6, the 3.4 rollback algorithm
     // remains in place to maintain backwards compatibility.
-    if (serverGlobalParams.featureCompatibility.getVersion() ==
+    if (serverGlobalParams.featureCompatibility.getVersion() >=
         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
         // If the user is fully upgraded to FCV 3.6, use the "rollbackViaRefetch" method.
         log() << "Rollback using the 'rollbackViaRefetch' method because UUID support "

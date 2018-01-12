@@ -671,8 +671,8 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
     }
 
     auto version = fCVParseSW.getValue();
-    if (version != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34 &&
-        version != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+    if (version > ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34 &&
+        version < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(
             lock,
             Status(ErrorCodes::IncompatibleServerVersion,

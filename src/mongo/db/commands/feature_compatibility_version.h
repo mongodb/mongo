@@ -70,16 +70,22 @@ public:
 
     static StringData toString(ServerGlobalParams::FeatureCompatibility::Version version) {
         switch (version) {
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36:
-                return FeatureCompatibilityVersionCommandParser::kVersion36;
+            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior:
+                return FeatureCompatibilityVersionCommandParser::kVersionUnset;
             case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34:
                 return FeatureCompatibilityVersionCommandParser::kVersion34;
             case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36:
                 return FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo36;
             case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34:
                 return FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo34;
-            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior:
-                return FeatureCompatibilityVersionCommandParser::kVersionUnset;
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36:
+                return FeatureCompatibilityVersionCommandParser::kVersion36;
+            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
+                return FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo40;
+            case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo36:
+                return FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo36;
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
+                return FeatureCompatibilityVersionCommandParser::kVersion40;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -90,18 +96,32 @@ public:
      * compatibility version document to have 'version'=3.4, 'targetVersion'=3.6.
      * Should be called before schemas are modified.
      */
-    static void setTargetUpgrade(OperationContext* opCtx);
+    static void setTargetUpgrade_DEPRECATED(OperationContext* opCtx);
 
     /**
      * Records intent to perform a 3.6 -> 3.4 downgrade by updating the on-disk feature
      * compatibility version document to have 'version'=3.4, 'targetVersion'=3.4.
      * Should be called before schemas are modified.
      */
+    static void setTargetDowngrade_DEPRECATED(OperationContext* opCtx);
+
+    /**
+     * Records intent to perform a 3.6 -> 4.0 upgrade by updating the on-disk feature
+     * compatibility version document to have 'version'=3.6, 'targetVersion'=4.0.
+     * Should be called before schemas are modified.
+     */
+    static void setTargetUpgrade(OperationContext* opCtx);
+
+    /**
+     * Records intent to perform a 4.0 -> 3.6 downgrade by updating the on-disk feature
+     * compatibility version document to have 'version'=3.6, 'targetVersion'=3.6.
+     * Should be called before schemas are modified.
+     */
     static void setTargetDowngrade(OperationContext* opCtx);
 
     /**
-     * Records the completion of a 3.4 <-> 3.6 upgrade or downgrade by updating the on-disk
-     * feature compatibility version document to have 'version'=version and unsetting the
+     * Records the completion of a 3.4 <-> 3.6 or 3.6 <-> 4.0 upgrade or downgrade by updating the
+     * on-disk feature compatibility version document to have 'version'=version and unsetting the
      * 'targetVersion' field.
      * Should be called after schemas are modified.
      */

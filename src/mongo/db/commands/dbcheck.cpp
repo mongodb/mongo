@@ -550,7 +550,7 @@ public:
 
 private:
     bool _hasCorrectFCV(void) {
-        return serverGlobalParams.featureCompatibility.getVersion() ==
+        return serverGlobalParams.featureCompatibility.getVersion() >=
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36;
     }
 };

@@ -210,7 +210,7 @@ public:
             ServerGlobalParams::FeatureCompatibility::Version version =
                 serverGlobalParams.featureCompatibility.getVersion();
 
-            if (version == ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+            if (version >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
                 // All collections must have a UUID.
                 if (!opts.uuid) {
                     results.errors.push_back(str::stream() << "UUID missing on collection "

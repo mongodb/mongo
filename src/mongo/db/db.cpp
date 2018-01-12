@@ -576,6 +576,24 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                               << startupWarningsLog;
                         log() << "**          To fix this, use the setFeatureCompatibilityVersion "
                               << "command to resume downgrade to 3.4." << startupWarningsLog;
+                    } else if (version ==
+                               ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40) {
+                        log() << "** WARNING: A featureCompatibilityVersion upgrade did not "
+                              << "complete. " << startupWarningsLog;
+                        log() << "**          The current featureCompatibilityVersion is "
+                              << FeatureCompatibilityVersion::toString(version) << "."
+                              << startupWarningsLog;
+                        log() << "**          To fix this, use the setFeatureCompatibilityVersion "
+                              << "command to resume upgrade to 4.0." << startupWarningsLog;
+                    } else if (version == ServerGlobalParams::FeatureCompatibility::Version::
+                                              kDowngradingTo36) {
+                        log() << "** WARNING: A featureCompatibilityVersion downgrade did not "
+                              << "complete. " << startupWarningsLog;
+                        log() << "**          The current featureCompatibilityVersion is "
+                              << FeatureCompatibilityVersion::toString(version) << "."
+                              << startupWarningsLog;
+                        log() << "**          To fix this, use the setFeatureCompatibilityVersion "
+                              << "command to resume downgrade to 3.6." << startupWarningsLog;
                     }
                 }
             }
@@ -1250,7 +1268,7 @@ void shutdownTask() {
             opCtx = uniqueOpCtx.get();
         }
 
-        if (serverGlobalParams.featureCompatibility.getVersion() !=
+        if (serverGlobalParams.featureCompatibility.getVersion() <
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
             log(LogComponent::kReplication) << "shutdown: removing all drop-pending collections...";
             repl::DropPendingCollectionReaper::get(serviceContext)

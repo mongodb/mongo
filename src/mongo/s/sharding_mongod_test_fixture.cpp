@@ -149,7 +149,7 @@ void ShardingMongodTestFixture::setUp() {
     // Set the highest FCV because otherwise it defaults to the lower FCV. This way we default to
     // testing this release's code, not backwards compatibility code.
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
 }
 
 std::unique_ptr<ReplicationCoordinatorMock> ShardingMongodTestFixture::makeReplicationCoordinator(

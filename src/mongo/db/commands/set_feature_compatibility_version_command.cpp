@@ -131,16 +131,35 @@ public:
 
         const auto requestedVersion = uassertStatusOK(
             FeatureCompatibilityVersionCommandParser::extractVersionFromCommand(getName(), cmdObj));
+        ServerGlobalParams::FeatureCompatibility::Version actualVersion =
+            serverGlobalParams.featureCompatibility.getVersion();
 
-        if (requestedVersion == FeatureCompatibilityVersionCommandParser::kVersion36) {
+        if (requestedVersion == FeatureCompatibilityVersionCommandParser::kVersion40) {
             uassert(ErrorCodes::IllegalOperation,
-                    "cannot initiate featureCompatibilityVersion upgrade while a previous "
-                    "featureCompatibilityVersion downgrade has not completed",
-                    serverGlobalParams.featureCompatibility.getVersion() !=
+                    "cannot initiate featureCompatibilityVersion upgrade to 4.0 when in 3.4. "
+                    "Upgrade to featureCompatibility 3.6 before upgrading to 4.0.",
+                    actualVersion !=
+                        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
+            uassert(ErrorCodes::IllegalOperation,
+                    "cannot initiate featureCompatibilityVersion upgrade to 4.0 while a previous "
+                    "downgrade to 3.4 has not completed. Finish downgrade to 3.4, upgrade to 3.6, "
+                    "and then 4.0.",
+                    actualVersion !=
                         ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34);
+            uassert(ErrorCodes::IllegalOperation,
+                    "cannot initiate featureCompatibilityVersion upgrade to 4.0 while a previous "
+                    "upgrade to 3.6 has not completed. Finish upgrade to 3.6, then upgrade to 4.0.",
+                    actualVersion !=
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
+            uassert(ErrorCodes::IllegalOperation,
+                    "cannot initiate featureCompatibilityVersion upgrade to 4.0 while a previous "
+                    "featureCompatibilityVersion downgrade to 3.6 has not completed. Finish "
+                    "downgrade to 3.6, then upgrade to 4.0.",
+                    actualVersion !=
+                        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo36);
 
-            if (serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+            if (actualVersion ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
                 // Set the client's last opTime to the system last opTime so no-ops wait for
                 // writeConcern.
                 repl::ReplClientInfo::forClient(opCtx->getClient())
@@ -150,17 +169,8 @@ public:
 
             FeatureCompatibilityVersion::setTargetUpgrade(opCtx);
 
-            // First put UUIDs in the storage layer metadata. UUIDs will be generated for unsharded
-            // collections; shards will query the config server for sharded collection UUIDs.
-            // Remove after 3.4 -> 3.6 upgrade.
-            updateUUIDSchemaVersion(opCtx, /*upgrade*/ true);
-
             // If config server, upgrade shards *after* upgrading self.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                // Remove after 3.4 -> 3.6 upgrade.
-                ShardingCatalogManager::get(opCtx)->generateUUIDsForExistingShardedCollections(
-                    opCtx);
-
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx,
@@ -171,22 +181,116 @@ public:
                                      << requestedVersion)))));
             }
 
-            // Fail after adding UUIDs but before updating the FCV document.
-            if (MONGO_FAIL_POINT(featureCompatibilityUpgrade)) {
-                exitCleanly(EXIT_CLEAN);
+            FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
+        } else if (requestedVersion == FeatureCompatibilityVersionCommandParser::kVersion36) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "cannot initiate setting featureCompatibilityVersion to 3.6 while a previous "
+                    "featureCompatibilityVersion downgrade to 3.4 has not completed.",
+                    actualVersion !=
+                        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34);
+            uassert(ErrorCodes::IllegalOperation,
+                    "cannot initiate setting featureCompatibilityVersion to 3.6 while a previous "
+                    "featureCompatibilityVersion upgrade to 4.0 has not completed.",
+                    actualVersion !=
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40);
+
+            if (actualVersion ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+                // Set the client's last opTime to the system last opTime so no-ops wait for
+                // writeConcern.
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+                return true;
             }
 
-            FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
+            if (actualVersion ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40 ||
+                actualVersion ==
+                    ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo36) {
+                // Downgrading to 3.6.
+
+                FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
+
+                // If config server, downgrade shards *before* downgrading self
+                if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                    uassertStatusOK(
+                        ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
+                            opCtx,
+                            CommandHelpers::appendMajorityWriteConcern(
+                                CommandHelpers::appendPassthroughFields(
+                                    cmdObj,
+                                    BSON(FeatureCompatibilityVersion::kCommandName
+                                         << requestedVersion)))));
+                }
+
+                FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
+            } else {
+                // Upgrading to 3.6.
+
+                invariant(
+                    actualVersion ==
+                        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34 ||
+                    actualVersion ==
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
+
+                FeatureCompatibilityVersion::setTargetUpgrade_DEPRECATED(opCtx);
+
+                // First put UUIDs in the storage layer metadata. UUIDs will be generated for
+                // unsharded collections; shards will query the config server for sharded collection
+                // UUIDs. Remove after 3.4 -> 3.6 upgrade.
+                updateUUIDSchemaVersion(opCtx, /*upgrade*/ true);
+
+                // If config server, upgrade shards *after* upgrading self.
+                if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                    // Remove after 3.4 -> 3.6 upgrade.
+                    ShardingCatalogManager::get(opCtx)->generateUUIDsForExistingShardedCollections(
+                        opCtx);
+
+                    uassertStatusOK(
+                        ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
+                            opCtx,
+                            CommandHelpers::appendMajorityWriteConcern(
+                                CommandHelpers::appendPassthroughFields(
+                                    cmdObj,
+                                    BSON(FeatureCompatibilityVersion::kCommandName
+                                         << requestedVersion)))));
+                }
+
+                // Fail after adding UUIDs but before updating the FCV document.
+                if (MONGO_FAIL_POINT(featureCompatibilityUpgrade)) {
+                    exitCleanly(EXIT_CLEAN);
+                }
+
+                FeatureCompatibilityVersion::unsetTargetUpgradeOrDowngrade(opCtx, requestedVersion);
+            }
         } else {
             invariant(requestedVersion == FeatureCompatibilityVersionCommandParser::kVersion34);
 
             uassert(ErrorCodes::IllegalOperation,
-                    "cannot initiate featureCompatibilityVersion downgrade while a previous "
-                    "featureCompatibilityVersion upgrade has not completed",
-                    serverGlobalParams.featureCompatibility.getVersion() !=
+                    "cannot initiate featureCompatibilityVersion downgrade to 3.4 when in 4.0. "
+                    "Downgrade to featureCompatibility 3.6 before downgrading to 3.4",
+                    actualVersion !=
+                        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+            uassert(ErrorCodes::IllegalOperation,
+                    "cannot initiate featureCompatibilityVersion downgrade to 3.4 while a previous "
+                    "upgrade to 4.0 has not completed. Finish upgrade to 4.0, downgrade to 3.6, "
+                    "and then 3.4.",
+                    actualVersion !=
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40);
+            uassert(ErrorCodes::IllegalOperation,
+                    "cannot initiate featureCompatibilityVersion downgrade to 3.4 while a previous "
+                    "downgrade to 3.6 has not completed. Finish downgrade to 3.6, then downgrade "
+                    " to 3.4.",
+                    actualVersion !=
+                        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo36);
+            uassert(ErrorCodes::IllegalOperation,
+                    "cannot initiate featureCompatibilityVersion downgrade to 3.4 while a previous "
+                    "featureCompatibilityVersion upgrade to 3.6 has not completed. Finish upgrade "
+                    "to 3.6, then downgrade to 3.4.",
+                    actualVersion !=
                         ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36);
 
-            if (serverGlobalParams.featureCompatibility.getVersion() ==
+            if (actualVersion ==
                 ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
                 // Set the client's last opTime to the system last opTime so no-ops wait for
                 // writeConcern.
@@ -195,7 +299,7 @@ public:
                 return true;
             }
 
-            FeatureCompatibilityVersion::setTargetDowngrade(opCtx);
+            FeatureCompatibilityVersion::setTargetDowngrade_DEPRECATED(opCtx);
 
             // Fail after updating the FCV document but before removing UUIDs.
             if (MONGO_FAIL_POINT(featureCompatibilityDowngrade)) {

@@ -1,6 +1,8 @@
 // Tests that manipulating the featureCompatibilityVersion document in admin.system.version changes
 // the value of the featureCompatibilityVersion server parameter.
 
+// TODO: SERVER-32829 add 4.0 FCV test coverage.
+
 (function() {
     "use strict";
 
@@ -57,11 +59,6 @@
                               ErrorCodes.BadValue);
     checkFCV(adminDB, "3.6");
 
-    assert.writeErrorWithCode(adminDB.system.version.update({_id: "featureCompatibilityVersion"},
-                                                            {$set: {targetVersion: "3.6"}}),
-                              ErrorCodes.BadValue);
-    checkFCV(adminDB, "3.6");
-
     // Deleting the featureCompatibilityVersion document changes the featureCompatibilityVersion
     // server parameter to 3.4.
     removeFCVDocument(adminDB);
@@ -82,12 +79,6 @@
     assert.writeErrorWithCode(
         adminDB.system.version.insert(
             {_id: "featureCompatibilityVersion", version: "3.6", targetVersion: "3.4"}),
-        ErrorCodes.BadValue);
-    checkFCVDocumentMissing(adminDB);
-
-    assert.writeErrorWithCode(
-        adminDB.system.version.insert(
-            {_id: "featureCompatibilityVersion", version: "3.6", targetVersion: "3.6"}),
         ErrorCodes.BadValue);
     checkFCVDocumentMissing(adminDB);
 
