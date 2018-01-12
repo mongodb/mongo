@@ -53,9 +53,6 @@ public:
     // schema declarations
     //
 
-    static const BSONField<int> ok;
-    static const BSONField<int> errCode;
-    static const BSONField<std::string> errMessage;
     static const BSONField<long long> n;
     static const BSONField<long long> nModified;
     static const BSONField<std::vector<BatchedUpsertDetail*>> upsertDetails;
@@ -78,17 +75,20 @@ public:
     // individual field accessors
     //
 
-    void setOk(int ok);
-    int getOk() const;
-
-    void setErrCode(int errCode);
-    void unsetErrCode();
-    bool isErrCodeSet() const;
-    int getErrCode() const;
-
-    void setErrMessage(StringData errMessage);
-    bool isErrMessageSet() const;
-    const std::string& getErrMessage() const;
+    /**
+     * This group of getters/setters is only for the top-level command status. If you want to know
+     * if all writes succeeded, use toStatus() below which considers all of the ways that writes can
+     * fail.
+     */
+    void setStatus(Status status);
+    Status getTopLevelStatus() const {
+        dassert(_isStatusSet);
+        return _status;
+    }
+    bool getOk() const {
+        dassert(_isStatusSet);
+        return _status.isOK();
+    }
 
     void setNModified(long long n);
     void unsetNModified();
@@ -133,24 +133,16 @@ public:
     const WriteConcernErrorDetail* getWriteConcernError() const;
 
     /**
-     * Converts the specified command response into a status, based on its contents.
+     * Converts the specified command response into a status, based on all of its contents.
      */
     Status toStatus() const;
 
 private:
     // Convention: (M)andatory, (O)ptional
 
-    // (M)  0 if batch didn't get to be applied for any reason
-    int _ok;
-    bool _isOkSet;
-
-    // (O)  whether all items in the batch applied correctly
-    int _errCode;
-    bool _isErrCodeSet;
-
-    // (O)  whether all items in the batch applied correctly
-    std::string _errMessage;
-    bool _isErrMessageSet;
+    // (M) The top-level command status.
+    Status _status = Status::OK();
+    bool _isStatusSet;
 
     // (M)  number of documents affected
     long long _n;

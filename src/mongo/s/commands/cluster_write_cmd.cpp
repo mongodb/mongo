@@ -64,8 +64,7 @@ void batchErrorToLastError(const BatchedCommandRequest& request,
     if (!response.getOk()) {
         // Command-level error, all writes failed
         commandError.reset(new WriteErrorDetail);
-        commandError->setErrCode(response.getErrCode());
-        commandError->setErrMessage(response.getErrMessage());
+        commandError->setStatus(response.getTopLevelStatus());
 
         lastBatchError = commandError.get();
     } else if (response.isErrDetailsSet()) {
@@ -83,8 +82,8 @@ void batchErrorToLastError(const BatchedCommandRequest& request,
 
     // Record an error if one exists
     if (lastBatchError) {
-        const auto& errMsg = lastBatchError->getErrMessage();
-        error->setLastError(lastBatchError->getErrCode(),
+        const auto& errMsg = lastBatchError->toStatus().reason();
+        error->setLastError(lastBatchError->toStatus().code(),
                             errMsg.empty() ? "see code for details" : errMsg);
         return;
     }

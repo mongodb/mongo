@@ -86,24 +86,21 @@ write_ops::UpdateOpEntry buildUpdate(const BSONObj& query, const BSONObj& update
 
 void buildResponse(int n, BatchedCommandResponse* response) {
     response->clear();
-    response->setOk(true);
+    response->setStatus(Status::OK());
     response->setN(n);
     ASSERT(response->isValid(NULL));
 }
 
 void buildErrResponse(int code, const std::string& message, BatchedCommandResponse* response) {
     response->clear();
-    response->setOk(false);
     response->setN(0);
-    response->setErrCode(code);
-    response->setErrMessage(message);
+    response->setStatus({ErrorCodes::Error(code), message});
     ASSERT(response->isValid(NULL));
 }
 
 void addError(int code, const std::string& message, int index, BatchedCommandResponse* response) {
     std::unique_ptr<WriteErrorDetail> error(new WriteErrorDetail);
-    error->setErrCode(code);
-    error->setErrMessage(message);
+    error->setStatus({ErrorCodes::Error(code), message});
     error->setIndex(index);
 
     response->addToErrDetails(error.release());
@@ -111,8 +108,7 @@ void addError(int code, const std::string& message, int index, BatchedCommandRes
 
 void addWCError(BatchedCommandResponse* response) {
     std::unique_ptr<WriteConcernErrorDetail> error(new WriteConcernErrorDetail);
-    error->setErrCode(ErrorCodes::WriteConcernFailed);
-    error->setErrMessage("mock wc error");
+    error->setStatus({ErrorCodes::WriteConcernFailed, "mock wc error"});
 
     response->setWriteConcernError(error.release());
 }
@@ -195,9 +191,9 @@ TEST_F(BatchWriteOpTest, SingleError) {
 
     ASSERT(clientResponse.getOk());
     ASSERT_EQUALS(clientResponse.sizeErrDetails(), 1u);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrCode(), response.getErrCode());
-    ASSERT(clientResponse.getErrDetailsAt(0)->getErrMessage().find(response.getErrMessage()) !=
-           std::string::npos);
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().code(), response.toStatus().code());
+    ASSERT(clientResponse.getErrDetailsAt(0)->toStatus().reason().find(
+               response.toStatus().reason()) != std::string::npos);
     ASSERT_EQUALS(clientResponse.getN(), 0);
 }
 
@@ -830,10 +826,10 @@ TEST_F(BatchWriteOpTest, MultiOpSingleShardErrorUnordered) {
     ASSERT_EQUALS(clientResponse.getN(), 1);
     ASSERT(clientResponse.isErrDetailsSet());
     ASSERT_EQUALS(clientResponse.sizeErrDetails(), 1u);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrCode(),
-                  response.getErrDetailsAt(0)->getErrCode());
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrMessage(),
-                  response.getErrDetailsAt(0)->getErrMessage());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().code(),
+                  response.getErrDetailsAt(0)->toStatus().code());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().reason(),
+                  response.getErrDetailsAt(0)->toStatus().reason());
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getIndex(), 1);
 }
 
@@ -883,15 +879,15 @@ TEST_F(BatchWriteOpTest, MultiOpTwoShardErrorsUnordered) {
     ASSERT_EQUALS(clientResponse.getN(), 0);
     ASSERT(clientResponse.isErrDetailsSet());
     ASSERT_EQUALS(clientResponse.sizeErrDetails(), 2u);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrCode(),
-                  response.getErrDetailsAt(0)->getErrCode());
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrMessage(),
-                  response.getErrDetailsAt(0)->getErrMessage());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().code(),
+                  response.getErrDetailsAt(0)->toStatus().code());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().reason(),
+                  response.getErrDetailsAt(0)->toStatus().reason());
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getIndex(), 0);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->getErrCode(),
-                  response.getErrDetailsAt(0)->getErrCode());
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->getErrMessage(),
-                  response.getErrDetailsAt(0)->getErrMessage());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->toStatus().code(),
+                  response.getErrDetailsAt(0)->toStatus().code());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->toStatus().reason(),
+                  response.getErrDetailsAt(0)->toStatus().reason());
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->getIndex(), 1);
 }
 
@@ -950,10 +946,10 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorUnordered) {
     ASSERT_EQUALS(clientResponse.getN(), 3);
     ASSERT(clientResponse.isErrDetailsSet());
     ASSERT_EQUALS(clientResponse.sizeErrDetails(), 1u);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrCode(),
-                  response.getErrDetailsAt(0)->getErrCode());
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrMessage(),
-                  response.getErrDetailsAt(0)->getErrMessage());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().code(),
+                  response.getErrDetailsAt(0)->toStatus().code());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().reason(),
+                  response.getErrDetailsAt(0)->toStatus().reason());
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getIndex(), 1);
 }
 
@@ -1008,10 +1004,10 @@ TEST_F(BatchWriteOpTest, MultiOpPartialSingleShardErrorOrdered) {
     ASSERT_EQUALS(clientResponse.getN(), 1);
     ASSERT(clientResponse.isErrDetailsSet());
     ASSERT_EQUALS(clientResponse.sizeErrDetails(), 1u);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrCode(),
-                  response.getErrDetailsAt(0)->getErrCode());
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrMessage(),
-                  response.getErrDetailsAt(0)->getErrMessage());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().code(),
+                  response.getErrDetailsAt(0)->toStatus().code());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().reason(),
+                  response.getErrDetailsAt(0)->toStatus().reason());
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getIndex(), 0);
 }
 
@@ -1274,7 +1270,7 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchOrdered) {
     ASSERT(clientResponse.isErrDetailsSet());
     ASSERT_EQUALS(clientResponse.sizeErrDetails(), 1u);
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getIndex(), 1);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrCode(), response.getErrCode());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().code(), response.toStatus().code());
 }
 
 // Batch failure (ok : 0) reported in a multi-op batch (unordered). Expect this gets translated down
@@ -1329,9 +1325,9 @@ TEST_F(BatchWriteOpTest, MultiOpFailedBatchUnordered) {
     ASSERT(clientResponse.isErrDetailsSet());
     ASSERT_EQUALS(clientResponse.sizeErrDetails(), 2u);
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getIndex(), 1);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrCode(), response.getErrCode());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().code(), response.toStatus().code());
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->getIndex(), 2);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->getErrCode(), response.getErrCode());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->toStatus().code(), response.toStatus().code());
 }
 
 // Batch aborted (ordered). Expect this gets translated down into write error for first affected
@@ -1363,8 +1359,7 @@ TEST_F(BatchWriteOpTest, MultiOpAbortOrdered) {
     ASSERT(!batchOp.isFinished());
 
     WriteErrorDetail abortError;
-    abortError.setErrCode(ErrorCodes::UnknownError);
-    abortError.setErrMessage("mock abort");
+    abortError.setStatus({ErrorCodes::UnknownError, "mock abort"});
     batchOp.abortBatch(abortError);
     ASSERT(batchOp.isFinished());
 
@@ -1376,7 +1371,8 @@ TEST_F(BatchWriteOpTest, MultiOpAbortOrdered) {
     ASSERT(clientResponse.isErrDetailsSet());
     ASSERT_EQUALS(clientResponse.sizeErrDetails(), 1u);
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getIndex(), 1);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrCode(), abortError.getErrCode());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().code(),
+                  abortError.toStatus().code());
 }
 
 // Batch aborted (unordered). Expect this gets translated down into write errors for all affected
@@ -1402,8 +1398,7 @@ TEST_F(BatchWriteOpTest, MultiOpAbortUnordered) {
     BatchWriteOp batchOp(operationContext(), request);
 
     WriteErrorDetail abortError;
-    abortError.setErrCode(ErrorCodes::UnknownError);
-    abortError.setErrMessage("mock abort");
+    abortError.setStatus({ErrorCodes::UnknownError, "mock abort"});
     batchOp.abortBatch(abortError);
     ASSERT(batchOp.isFinished());
 
@@ -1415,9 +1410,11 @@ TEST_F(BatchWriteOpTest, MultiOpAbortUnordered) {
     ASSERT(clientResponse.isErrDetailsSet());
     ASSERT_EQUALS(clientResponse.sizeErrDetails(), 2u);
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getIndex(), 0);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->getErrCode(), abortError.getErrCode());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(0)->toStatus().code(),
+                  abortError.toStatus().code());
     ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->getIndex(), 1);
-    ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->getErrCode(), abortError.getErrCode());
+    ASSERT_EQUALS(clientResponse.getErrDetailsAt(1)->toStatus().code(),
+                  abortError.toStatus().code());
 }
 
 // Multi-op targeting test where each op goes to both shards and both return a write concern error

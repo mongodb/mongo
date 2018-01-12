@@ -85,13 +85,7 @@ Status SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
         BatchWriteExecStats stats;
 
         ClusterWriter::write(opCtx, request, &stats, &response);
-        if (response.getOk()) {
-            return Status::OK();
-        }
-
-        auto error = response.isErrCodeSet() ? ErrorCodes::Error(response.getErrCode())
-                                             : ErrorCodes::UnknownError;
-        return Status(error, response.getErrMessage());
+        return response.toStatus();
     };
 
     return doRefresh(kSessionsNamespaceString, sessions, send);
@@ -107,14 +101,7 @@ Status SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
         BatchWriteExecStats stats;
 
         ClusterWriter::write(opCtx, request, &stats, &response);
-
-        if (response.getOk()) {
-            return Status::OK();
-        }
-
-        auto error = response.isErrCodeSet() ? ErrorCodes::Error(response.getErrCode())
-                                             : ErrorCodes::UnknownError;
-        return Status(error, response.getErrMessage());
+        return response.toStatus();
     };
 
     return doRemove(kSessionsNamespaceString, sessions, send);

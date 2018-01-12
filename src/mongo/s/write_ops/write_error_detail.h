@@ -48,6 +48,7 @@ public:
 
     static const BSONField<int> index;
     static const BSONField<int> errCode;
+    static const BSONField<std::string> errCodeName;
     static const BSONField<BSONObj> errInfo;
     static const BSONField<std::string> errMessage;
 
@@ -78,17 +79,14 @@ public:
     bool isIndexSet() const;
     int getIndex() const;
 
-    void setErrCode(int errCode);
-    bool isErrCodeSet() const;
-    int getErrCode() const;
+    void setStatus(Status status) {
+        _status = std::move(status);
+    }
+    Status toStatus() const;
 
     void setErrInfo(const BSONObj& errInfo);
     bool isErrInfoSet() const;
     const BSONObj& getErrInfo() const;
-
-    void setErrMessage(StringData errMessage);
-    bool isErrMessageSet() const;
-    const std::string& getErrMessage() const;
 
 private:
     // Convention: (M)andatory, (O)ptional
@@ -97,17 +95,12 @@ private:
     int _index;
     bool _isIndexSet;
 
-    // (M)  whether all items in the batch applied correctly
-    int _errCode;
-    bool _isErrCodeSet;
+    // (M) The code and message of this error. Must be set to a non-OK status.
+    Status _status = Status::OK();
 
     // (O)  further details about the batch item error
     BSONObj _errInfo;
     bool _isErrInfoSet;
-
-    // (O)  user readable explanation about the batch item error
-    std::string _errMessage;
-    bool _isErrMessageSet;
 };
 
 }  // namespace mongo

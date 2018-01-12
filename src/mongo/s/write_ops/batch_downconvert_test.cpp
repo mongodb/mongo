@@ -62,8 +62,8 @@ TEST(GLEParsing, WriteErr) {
     GLEErrors errors;
     ASSERT_OK(extractGLEErrors(gleResponse, &errors));
     ASSERT(errors.writeError.get());
-    ASSERT_EQUALS(errors.writeError->getErrMessage(), "message");
-    ASSERT_EQUALS(errors.writeError->getErrCode(), 1000);
+    ASSERT_EQUALS(errors.writeError->toStatus().reason(), "message");
+    ASSERT_EQUALS(errors.writeError->toStatus().code(), 1000);
     ASSERT(!errors.wcError.get());
 }
 
@@ -74,8 +74,8 @@ TEST(GLEParsing, JournalFail) {
     ASSERT_OK(extractGLEErrors(gleResponse, &errors));
     ASSERT(!errors.writeError.get());
     ASSERT(errors.wcError.get());
-    ASSERT_EQUALS(errors.wcError->getErrMessage(), "message");
-    ASSERT_EQUALS(errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed);
+    ASSERT_EQUALS(errors.wcError->toStatus().reason(), "message");
+    ASSERT_EQUALS(errors.wcError->toStatus().code(), ErrorCodes::WriteConcernFailed);
 }
 
 TEST(GLEParsing, ReplErr) {
@@ -85,8 +85,8 @@ TEST(GLEParsing, ReplErr) {
     ASSERT_OK(extractGLEErrors(gleResponse, &errors));
     ASSERT(!errors.writeError.get());
     ASSERT(errors.wcError.get());
-    ASSERT_EQUALS(errors.wcError->getErrMessage(), "message");
-    ASSERT_EQUALS(errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed);
+    ASSERT_EQUALS(errors.wcError->toStatus().reason(), "message");
+    ASSERT_EQUALS(errors.wcError->toStatus().code(), ErrorCodes::WriteConcernFailed);
 }
 
 TEST(GLEParsing, ReplTimeoutErr) {
@@ -97,9 +97,10 @@ TEST(GLEParsing, ReplTimeoutErr) {
     ASSERT_OK(extractGLEErrors(gleResponse, &errors));
     ASSERT(!errors.writeError.get());
     ASSERT(errors.wcError.get());
-    ASSERT_EQUALS(errors.wcError->getErrMessage(), "message");
+    ASSERT_EQUALS(errors.wcError->toStatus().reason(),
+                  "message; Error details: { wtimeout: true }");
     ASSERT(errors.wcError->getErrInfo()["wtimeout"].trueValue());
-    ASSERT_EQUALS(errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed);
+    ASSERT_EQUALS(errors.wcError->toStatus().code(), ErrorCodes::WriteConcernFailed);
 }
 
 TEST(GLEParsing, GLEFail) {
@@ -130,8 +131,8 @@ TEST(GLEParsing, NotMasterGLEFail) {
     ASSERT_OK(extractGLEErrors(gleResponse, &errors));
     ASSERT(!errors.writeError.get());
     ASSERT(errors.wcError.get());
-    ASSERT_EQUALS(errors.wcError->getErrMessage(), "message");
-    ASSERT_EQUALS(errors.wcError->getErrCode(), 10990);
+    ASSERT_EQUALS(errors.wcError->toStatus().reason(), "message");
+    ASSERT_EQUALS(errors.wcError->toStatus().code(), 10990);
 }
 
 TEST(GLEParsing, WriteErrWithStats) {
@@ -140,8 +141,8 @@ TEST(GLEParsing, WriteErrWithStats) {
     GLEErrors errors;
     ASSERT_OK(extractGLEErrors(gleResponse, &errors));
     ASSERT(errors.writeError.get());
-    ASSERT_EQUALS(errors.writeError->getErrMessage(), "message");
-    ASSERT_EQUALS(errors.writeError->getErrCode(), 1000);
+    ASSERT_EQUALS(errors.writeError->toStatus().reason(), "message");
+    ASSERT_EQUALS(errors.writeError->toStatus().code(), 1000);
     ASSERT(!errors.wcError.get());
 }
 
@@ -154,9 +155,10 @@ TEST(GLEParsing, ReplTimeoutErrWithStats) {
     ASSERT_OK(extractGLEErrors(gleResponse, &errors));
     ASSERT(!errors.writeError.get());
     ASSERT(errors.wcError.get());
-    ASSERT_EQUALS(errors.wcError->getErrMessage(), "message");
+    ASSERT_EQUALS(errors.wcError->toStatus().reason(),
+                  "message; Error details: { wtimeout: true }");
     ASSERT(errors.wcError->getErrInfo()["wtimeout"].trueValue());
-    ASSERT_EQUALS(errors.wcError->getErrCode(), ErrorCodes::WriteConcernFailed);
+    ASSERT_EQUALS(errors.wcError->toStatus().code(), ErrorCodes::WriteConcernFailed);
 }
 
 //

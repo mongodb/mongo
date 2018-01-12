@@ -41,9 +41,8 @@ namespace {
 
 WriteErrorDetail buildError(int code, const BSONObj& info, const std::string& message) {
     WriteErrorDetail error;
-    error.setErrCode(code);
+    error.setStatus({ErrorCodes::Error(code), message});
     error.setErrInfo(info);
-    error.setErrMessage(message);
 
     return error;
 }
@@ -80,10 +79,10 @@ TEST(WriteOpTests, BasicError) {
 
     writeOp.setOpError(error);
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
-    ASSERT_EQUALS(writeOp.getOpError().getErrCode(), error.getErrCode());
+    ASSERT_EQUALS(writeOp.getOpError().toStatus().code(), error.toStatus().code());
     ASSERT_EQUALS(writeOp.getOpError().getErrInfo()["data"].Int(),
                   error.getErrInfo()["data"].Int());
-    ASSERT_EQUALS(writeOp.getOpError().getErrMessage(), error.getErrMessage());
+    ASSERT_EQUALS(writeOp.getOpError().toStatus().reason(), error.toStatus().reason());
 }
 
 TEST(WriteOpTests, TargetSingle) {
@@ -240,10 +239,10 @@ TEST(WriteOpTests, ErrorSingle) {
     writeOp.noteWriteError(*targeted.front(), error);
 
     ASSERT_EQUALS(writeOp.getWriteState(), WriteOpState_Error);
-    ASSERT_EQUALS(writeOp.getOpError().getErrCode(), error.getErrCode());
+    ASSERT_EQUALS(writeOp.getOpError().toStatus().code(), error.toStatus().code());
     ASSERT_EQUALS(writeOp.getOpError().getErrInfo()["data"].Int(),
                   error.getErrInfo()["data"].Int());
-    ASSERT_EQUALS(writeOp.getOpError().getErrMessage(), error.getErrMessage());
+    ASSERT_EQUALS(writeOp.getOpError().toStatus().reason(), error.toStatus().reason());
 }
 
 // Cancel single targeting test

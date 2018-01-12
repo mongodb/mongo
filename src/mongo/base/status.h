@@ -100,6 +100,15 @@ public:
     inline ~Status();
 
     /**
+     * Returns a new Status with the same data as this, but with the reason string replaced with
+     * newReason.  The new reason is not visible to any other Statuses that share the same ErrorInfo
+     * object.
+     *
+     * No-op when called on an OK status.
+     */
+    Status withReason(StringData newReason) const;
+
+    /**
      * Returns a new Status with the same data as this, but with the reason string prefixed with
      * reasonPrefix and our standard " :: caused by :: " separator. The new reason is not visible to
      * any other Statuses that share the same ErrorInfo object.

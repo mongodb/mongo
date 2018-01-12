@@ -65,6 +65,17 @@ TEST(Basic, Compare) {
     ASSERT_NE(errMax, Status::OK());
 }
 
+TEST(Basic, WithReason) {
+    const Status orig(ErrorCodes::MaxError, "error");
+
+    const auto copy = orig.withReason("reason");
+    ASSERT_EQ(copy.code(), ErrorCodes::MaxError);
+    ASSERT_EQ(copy.reason(), "reason");
+
+    ASSERT_EQ(orig.code(), ErrorCodes::MaxError);
+    ASSERT_EQ(orig.reason(), "error");
+}
+
 TEST(Basic, WithContext) {
     const Status orig(ErrorCodes::MaxError, "error");
 

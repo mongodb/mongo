@@ -156,7 +156,7 @@ Status enforceLegacyWriteConcern(OperationContext* opCtx,
         wcResponse.shardHost = response.shardHostAndPort->toString();
         wcResponse.gleResponse = gleResponse;
         if (errors.wcError.get()) {
-            wcResponse.errToReport = errors.wcError->getErrMessage();
+            wcResponse.errToReport = errors.wcError->toString();
         }
 
         legacyWCResponses->push_back(wcResponse);

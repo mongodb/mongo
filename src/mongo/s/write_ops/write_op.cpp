@@ -128,8 +128,6 @@ static void combineOpErrors(const vector<ChildWriteOp const*>& errOps, WriteErro
         return;
     }
 
-    error->setErrCode(ErrorCodes::MultipleErrorsOccurred);
-
     // Generate the multi-error message below
     stringstream msg;
     msg << "multiple errors for op : ";
@@ -140,13 +138,13 @@ static void combineOpErrors(const vector<ChildWriteOp const*>& errOps, WriteErro
         const ChildWriteOp* errOp = *it;
         if (it != errOps.begin())
             msg << " :: and :: ";
-        msg << errOp->error->getErrMessage();
+        msg << errOp->error->toStatus().reason();
         errB.append(errOp->error->toBSON());
     }
 
     error->setErrInfo(BSON("causedBy" << errB.arr()));
     error->setIndex(errOps.front()->error->getIndex());
-    error->setErrMessage(msg.str());
+    error->setStatus({ErrorCodes::MultipleErrorsOccurred, msg.str()});
 }
 
 /**
@@ -167,7 +165,7 @@ void WriteOp::_updateOpState() {
             childErrors.push_back(&childOp);
 
             // Any non-retry error aborts all
-            if (!isRetryErrCode(childOp.error->getErrCode())) {
+            if (!isRetryErrCode(childOp.error->toStatus().code())) {
                 isRetryError = false;
             }
         }

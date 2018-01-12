@@ -61,9 +61,7 @@ typedef OwnedPointerMap<ShardId, TargetedWriteBatch> OwnedShardBatchMap;
 
 WriteErrorDetail errorFromStatus(const Status& status) {
     WriteErrorDetail error;
-    error.setErrCode(status.code());
-    error.setErrMessage(status.reason());
-
+    error.setStatus(status);
     return error;
 }
 

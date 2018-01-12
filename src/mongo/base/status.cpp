@@ -98,8 +98,12 @@ Status::Status(ErrorCodes::Error code, StringData reason, const BSONObj& extraIn
 Status::Status(ErrorCodes::Error code, const mongoutils::str::stream& reason)
     : Status(code, std::string(reason)) {}
 
+Status Status::withReason(StringData newReason) const {
+    return isOK() ? OK() : Status(code(), newReason, _error->extra);
+}
+
 Status Status::withContext(StringData reasonPrefix) const {
-    return isOK() ? OK() : Status(code(), reasonPrefix + causedBy(reason()), _error->extra);
+    return isOK() ? OK() : withReason(reasonPrefix + causedBy(reason()));
 }
 
 std::ostream& operator<<(std::ostream& os, const Status& status) {

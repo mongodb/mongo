@@ -44,29 +44,35 @@ namespace {
 
 TEST(BatchedCommandResponse, Basic) {
     BSONArray writeErrorsArray = BSON_ARRAY(
-        BSON(WriteErrorDetail::index(0) << WriteErrorDetail::errCode(-2)
-                                        << WriteErrorDetail::errInfo(BSON("more info" << 1))
-                                        << WriteErrorDetail::errMessage("index 0 failed"))
-        << BSON(WriteErrorDetail::index(1) << WriteErrorDetail::errCode(-3)
-                                           << WriteErrorDetail::errInfo(BSON("more info" << 1))
-                                           << WriteErrorDetail::errMessage("index 1 failed too")));
+        BSON(WriteErrorDetail::index(0) << WriteErrorDetail::errCode(ErrorCodes::IndexNotFound)
+                                        << WriteErrorDetail::errCodeName("IndexNotFound")
+                                        << WriteErrorDetail::errMessage("index 0 failed")
+                                        << WriteErrorDetail::errInfo(BSON("more info" << 1)))
+        << BSON(WriteErrorDetail::index(1)
+                << WriteErrorDetail::errCode(ErrorCodes::InvalidNamespace)
+                << WriteErrorDetail::errCodeName("InvalidNamespace")
+                << WriteErrorDetail::errMessage("index 1 failed too")
+                << WriteErrorDetail::errInfo(BSON("more info" << 1))));
 
     BSONObj writeConcernError(
-        BSON("code" << 8 << "codeName" << ErrorCodes::errorString(ErrorCodes::Error(8)) << "errInfo"
-                    << BSON("a" << 1)
-                    << "errmsg"
-                    << "norepl"));
+        BSON("code" << 8 << "codeName" << ErrorCodes::errorString(ErrorCodes::Error(8)) << "errmsg"
+                    << "norepl"
+                    << "errInfo"
+                    << BSON("a" << 1)));
 
-    BSONObj origResponseObj = BSON(BatchedCommandResponse::ok(false)
-                                   << BatchedCommandResponse::errCode(-1)
-                                   << BatchedCommandResponse::errMessage("this batch didn't work")
-                                   << BatchedCommandResponse::n(0)
-                                   << "opTime"
-                                   << mongo::Timestamp(1ULL)
-                                   << BatchedCommandResponse::writeErrors()
-                                   << writeErrorsArray
-                                   << BatchedCommandResponse::writeConcernError()
-                                   << writeConcernError);
+    BSONObj origResponseObj = BSON("ok" << 0.0 << "errmsg"
+                                        << "this batch didn't work"
+                                        << "code"
+                                        << ErrorCodes::BadValue
+                                        << "codeName"
+                                        << "BadValue"
+                                        << BatchedCommandResponse::n(0)
+                                        << "opTime"
+                                        << mongo::Timestamp(1ULL)
+                                        << BatchedCommandResponse::writeErrors()
+                                        << writeErrorsArray
+                                        << BatchedCommandResponse::writeConcernError()
+                                        << writeConcernError);
 
     string errMsg;
     BatchedCommandResponse response;
@@ -74,8 +80,9 @@ TEST(BatchedCommandResponse, Basic) {
     ASSERT_TRUE(ok);
 
     BSONObj genResponseObj = response.toBSON();
-    ASSERT_EQUALS(0, genResponseObj.woCompare(origResponseObj)) << "parsed: " << genResponseObj
-                                                                << " original: " << origResponseObj;
+    ASSERT_EQUALS(0, genResponseObj.woCompare(origResponseObj))
+        << "\nparsed:   " << genResponseObj  //
+        << "\noriginal: " << origResponseObj;
 }
 
 TEST(BatchedCommandResponse, TooManySmallErrors) {
@@ -86,11 +93,11 @@ TEST(BatchedCommandResponse, TooManySmallErrors) {
     for (int i = 0; i < 100'000; i++) {
         auto errDetail = stdx::make_unique<WriteErrorDetail>();
         errDetail->setIndex(i);
-        errDetail->setErrCode(ErrorCodes::BadValue);
-        errDetail->setErrMessage(bigstr);
+        errDetail->setStatus({ErrorCodes::BadValue, bigstr});
         response.addToErrDetails(errDetail.release());
     }
 
+    response.setStatus(Status::OK());
     const auto bson = response.toBSON();
     ASSERT_LT(bson.objsize(), BSONObjMaxUserSize);
     const auto errDetails = bson["writeErrors"].Array();
@@ -118,11 +125,12 @@ TEST(BatchedCommandResponse, TooManyBigErrors) {
     for (int i = 0; i < 100'000; i++) {
         auto errDetail = stdx::make_unique<WriteErrorDetail>();
         errDetail->setIndex(i);
-        errDetail->setErrCode(ErrorCodes::BadValue);
-        errDetail->setErrMessage(i < 10 ? bigstr : smallstr);  // Don't waste too much RAM.
+        errDetail->setStatus({ErrorCodes::BadValue,          //
+                              i < 10 ? bigstr : smallstr});  // Don't waste too much RAM.
         response.addToErrDetails(errDetail.release());
     }
 
+    response.setStatus(Status::OK());
     const auto bson = response.toBSON();
     ASSERT_LT(bson.objsize(), BSONObjMaxUserSize);
     const auto errDetails = bson["writeErrors"].Array();

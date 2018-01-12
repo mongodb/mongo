@@ -57,9 +57,7 @@ const uint64_t kTooManySplitPoints = 4;
 
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
-    response->setErrCode(status.code());
-    response->setErrMessage(status.reason());
-    response->setOk(false);
+    response->setStatus(status);
     dassert(response->isValid(NULL));
 }
 

@@ -89,8 +89,7 @@ BSONObj upgradeWriteConcern(const BSONObj& origWriteConcern) {
 }
 
 void buildTargetError(const Status& errStatus, WriteErrorDetail* details) {
-    details->setErrCode(errStatus.code());
-    details->setErrMessage(errStatus.reason());
+    details->setStatus(errStatus);
 }
 
 /**
@@ -174,7 +173,7 @@ void trackErrors(const ShardEndpoint& endpoint,
                  const vector<WriteErrorDetail*> itemErrors,
                  TrackedErrors* trackedErrors) {
     for (const auto error : itemErrors) {
-        if (trackedErrors->isTracking(error->getErrCode())) {
+        if (trackedErrors->isTracking(error->toStatus().code())) {
             trackedErrors->addError(ShardError(endpoint, *error));
         }
     }
@@ -460,8 +459,7 @@ void BatchWriteOp::noteBatchResponse(const TargetedWriteBatch& targetedBatch,
                                      TrackedErrors* trackedErrors) {
     if (!response.getOk()) {
         WriteErrorDetail error;
-        error.setErrCode(response.getErrCode());
-        error.setErrMessage(response.getErrMessage());
+        error.setStatus(response.getTopLevelStatus());
 
         // Treat command errors exactly like other failures of the batch.
         //
@@ -573,7 +571,7 @@ void BatchWriteOp::noteBatchError(const TargetedWriteBatch& targetedBatch,
                                   const WriteErrorDetail& error) {
     // Treat errors to get a batch response as failures of the contained writes
     BatchedCommandResponse emulatedResponse;
-    emulatedResponse.setOk(true);
+    emulatedResponse.setStatus(Status::OK());
     emulatedResponse.setN(0);
 
     const int numErrors =
@@ -631,7 +629,7 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
     dassert(isFinished());
 
     // Result is OK
-    batchResp->setOk(true);
+    batchResp->setStatus(Status::OK());
 
     // For non-verbose, it's all we need.
     if (!_clientRequest.isVerboseWC()) {
@@ -676,23 +674,25 @@ void BatchWriteOp::buildClientResponse(BatchedCommandResponse* batchResp) {
         WriteConcernErrorDetail* error = new WriteConcernErrorDetail;
 
         // Generate the multi-error message below
-        StringBuilder msg;
-        if (_wcErrors.size() > 1) {
-            msg << "multiple errors reported : ";
-            error->setErrCode(ErrorCodes::WriteConcernFailed);
+        if (_wcErrors.size() == 1) {
+            auto status = _wcErrors.front().error.toStatus();
+            error->setStatus(
+                status.withReason(str::stream() << status.reason() << " at "
+                                                << _wcErrors.front().endpoint.shardName));
         } else {
-            error->setErrCode(_wcErrors.begin()->error.getErrCode());
-        }
+            StringBuilder msg;
+            msg << "multiple errors reported : ";
 
-        for (auto it = _wcErrors.begin(); it != _wcErrors.end(); ++it) {
-            const auto& wcError = *it;
-            if (it != _wcErrors.begin()) {
-                msg << " :: and :: ";
+            for (auto it = _wcErrors.begin(); it != _wcErrors.end(); ++it) {
+                const auto& wcError = *it;
+                if (it != _wcErrors.begin()) {
+                    msg << " :: and :: ";
+                }
+                msg << wcError.error.toStatus().toString() << " at " << wcError.endpoint.shardName;
             }
-            msg << wcError.error.getErrMessage() << " at " << wcError.endpoint.shardName;
-        }
 
-        error->setErrMessage(msg.str());
+            error->setStatus({ErrorCodes::WriteConcernFailed, msg.str()});
+        }
         batchResp->setWriteConcernError(error);
     }
 
@@ -801,7 +801,7 @@ bool TrackedErrors::isTracking(int errCode) const {
 }
 
 void TrackedErrors::addError(ShardError error) {
-    TrackedErrorMap::iterator seenIt = _errorMap.find(error.error.getErrCode());
+    TrackedErrorMap::iterator seenIt = _errorMap.find(error.error.toStatus().code());
     if (seenIt == _errorMap.end())
         return;
     seenIt->second.emplace_back(std::move(error));

@@ -58,23 +58,25 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
     if (err == "norepl" || err == "noreplset") {
         // Know this is legacy gle and the repl not enforced - write concern error in 2.4
         errors->wcError.reset(new WriteConcernErrorDetail);
-        errors->wcError->setErrCode(ErrorCodes::WriteConcernFailed);
+        std::string msg;
         if (!errMsg.empty()) {
-            errors->wcError->setErrMessage(errMsg);
+            msg = errMsg;
         } else if (!wNote.empty()) {
-            errors->wcError->setErrMessage(wNote);
+            msg = wNote;
         } else {
-            errors->wcError->setErrMessage(err);
+            msg = err;
         }
+        errors->wcError->setStatus({ErrorCodes::WriteConcernFailed, msg});
     } else if (timeout) {
         // Know there was no write error
         errors->wcError.reset(new WriteConcernErrorDetail);
-        errors->wcError->setErrCode(ErrorCodes::WriteConcernFailed);
+        std::string msg;
         if (!errMsg.empty()) {
-            errors->wcError->setErrMessage(errMsg);
+            msg = errMsg;
         } else {
-            errors->wcError->setErrMessage(err);
+            msg = err;
         }
+        errors->wcError->setStatus({ErrorCodes::WriteConcernFailed, msg});
         errors->wcError->setErrInfo(BSON("wtimeout" << true));
     } else if (code == 10990 /* no longer primary */
                ||
@@ -87,8 +89,7 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
                code == ErrorCodes::WriteConcernFailed || code == ErrorCodes::PrimarySteppedDown) {
         // Write concern errors that get returned as regular errors (result may not be ok: 1.0)
         errors->wcError.reset(new WriteConcernErrorDetail());
-        errors->wcError->setErrCode(ErrorCodes::Error(code));
-        errors->wcError->setErrMessage(errMsg);
+        errors->wcError->setStatus({ErrorCodes::Error(code), errMsg});
     } else if (!isOK) {
         //
         // !!! SOME GLE ERROR OCCURRED, UNKNOWN WRITE RESULT !!!
@@ -109,13 +110,11 @@ Status extractGLEErrors(const BSONObj& gleResponse, GLEErrors* errors) {
             writeErrorCode = ErrorCodes::DuplicateKey;
         }
 
-        errors->writeError->setErrCode(writeErrorCode);
-        errors->writeError->setErrMessage(err);
+        errors->writeError->setStatus({ErrorCodes::Error(writeErrorCode), err});
     } else if (!jNote.empty()) {
         // Know this is legacy gle and the journaling not enforced - write concern error in 2.4
         errors->wcError.reset(new WriteConcernErrorDetail);
-        errors->wcError->setErrCode(ErrorCodes::WriteConcernFailed);
-        errors->wcError->setErrMessage(jNote);
+        errors->wcError->setStatus({ErrorCodes::WriteConcernFailed, jNote});
     }
 
     return Status::OK();

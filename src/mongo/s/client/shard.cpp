@@ -84,9 +84,7 @@ Status Shard::CommandResponse::processBatchWriteResponse(
 
     if (!status.isOK()) {
         batchResponse->clear();
-        batchResponse->setErrCode(status.code());
-        batchResponse->setErrMessage(status.reason());
-        batchResponse->setOk(false);
+        batchResponse->setStatus(status);
     }
 
     return status;

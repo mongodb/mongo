@@ -347,7 +347,7 @@ void ShardingTestFixture::expectInserts(const NamespaceString& nss,
         }
 
         BatchedCommandResponse response;
-        response.setOk(true);
+        response.setStatus(Status::OK());
 
         return response.toBSON();
     });
@@ -421,7 +421,7 @@ void ShardingTestFixture::expectConfigCollectionInsert(const HostAndPort& config
         generatedOID.init(oidPiece);
 
         BatchedCommandResponse response;
-        response.setOk(true);
+        response.setStatus(Status::OK());
 
         return response.toBSON();
     });
@@ -463,7 +463,7 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
         ASSERT_BSONOBJ_EQ(coll.toBSON(), update.getU());
 
         BatchedCommandResponse response;
-        response.setOk(true);
+        response.setStatus(Status::OK());
         response.setNModified(1);
 
         return response.toBSON();

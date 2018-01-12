@@ -56,37 +56,30 @@ public:
     bool parseBSON(const BSONObj& source, std::string* errMsg);
     void clear();
     std::string toString() const;
-    Status toStatus() const;
 
     //
     // individual field accessors
     //
 
-    void setErrCode(ErrorCodes::Error code);
-    ErrorCodes::Error getErrCode() const;
+    void setStatus(Status status) {
+        _status = std::move(status);
+    }
+
+    Status toStatus() const;
 
     void setErrInfo(const BSONObj& errInfo);
     bool isErrInfoSet() const;
     const BSONObj& getErrInfo() const;
 
-    void setErrMessage(StringData errMessage);
-    bool isErrMessageSet() const;
-    const std::string& getErrMessage() const;
-
 private:
     // Convention: (M)andatory, (O)ptional
 
-    // (M)  error code for the write concern error.
-    ErrorCodes::Error _errCode;
-    bool _isErrCodeSet;
+    // (M)  error code and message. Must be set to a not OK status to be valid.
+    Status _status = Status::OK();
 
     // (O)  further details about the write concern error.
     BSONObj _errInfo;
     bool _isErrInfoSet;
-
-    // (O)  user readable explanation about the write concern error.
-    std::string _errMessage;
-    bool _isErrMessageSet;
 };
 
 }  // namespace mongo

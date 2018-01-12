@@ -60,10 +60,14 @@ void appendWriteConcernErrorToCmdResponse(const ShardId& shardId,
     std::string errMsg;
     auto wcErrorObj = wcErrorElem.Obj();
     if (!wcError.parseBSON(wcErrorObj, &errMsg)) {
-        wcError.setErrMessage("Failed to parse writeConcernError: " + wcErrorObj.toString() +
-                              ", Received error: " + errMsg);
+        wcError.clear();
+        wcError.setStatus({ErrorCodes::FailedToParse,
+                           "Failed to parse writeConcernError: " + wcErrorObj.toString() +
+                               ", Received error: " + errMsg});
     }
-    wcError.setErrMessage(wcError.getErrMessage() + " at " + shardId.toString());
+    auto status = wcError.toStatus();
+    wcError.setStatus(
+        status.withReason(str::stream() << status.reason() << " at " << shardId.toString()));
     responseBuilder.append("writeConcernError", wcError.toBSON());
 }
 

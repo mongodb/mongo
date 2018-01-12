@@ -186,8 +186,7 @@ void CommandHelpers::appendCommandWCStatus(BSONObjBuilder& result,
                                            const WriteConcernResult& wcResult) {
     if (!awaitReplicationStatus.isOK() && !result.hasField("writeConcernError")) {
         WriteConcernErrorDetail wcError;
-        wcError.setErrCode(awaitReplicationStatus.code());
-        wcError.setErrMessage(awaitReplicationStatus.reason());
+        wcError.setStatus(awaitReplicationStatus);
         if (wcResult.wTimedOut) {
             wcError.setErrInfo(BSON("wtimeout" << true));
         }

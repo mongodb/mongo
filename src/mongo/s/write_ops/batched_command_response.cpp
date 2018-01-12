@@ -31,8 +31,10 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/repl/bson_extract_optime.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -42,9 +44,6 @@ using std::string;
 
 using mongoutils::str::stream;
 
-const BSONField<int> BatchedCommandResponse::ok("ok");
-const BSONField<int> BatchedCommandResponse::errCode("code", ErrorCodes::UnknownError);
-const BSONField<string> BatchedCommandResponse::errMessage("errmsg");
 const BSONField<long long> BatchedCommandResponse::n("n", 0);
 const BSONField<long long> BatchedCommandResponse::nModified("nModified", 0);
 const BSONField<std::vector<BatchedUpsertDetail*>> BatchedCommandResponse::upsertDetails(
@@ -70,8 +69,8 @@ bool BatchedCommandResponse::isValid(std::string* errMsg) const {
     }
 
     // All the mandatory fields must be present.
-    if (!_isOkSet) {
-        *errMsg = stream() << "missing " << ok.name() << " field";
+    if (!_isStatusSet) {
+        *errMsg = stream() << "missing status fields";
         return false;
     }
 
@@ -81,14 +80,8 @@ bool BatchedCommandResponse::isValid(std::string* errMsg) const {
 BSONObj BatchedCommandResponse::toBSON() const {
     BSONObjBuilder builder;
 
-    if (_isOkSet)
-        builder.append(ok(), _ok);
-
-    if (_isErrCodeSet)
-        builder.append(errCode(), _errCode);
-
-    if (_isErrMessageSet)
-        builder.append(errMessage(), _errMessage);
+    invariant(_isStatusSet);
+    CommandHelpers::appendCommandStatus(builder, _status);
 
     if (_isNModifiedSet)
         builder.appendNumber(nModified(), _nModified);
@@ -138,15 +131,15 @@ BSONObj BatchedCommandResponse::toBSON() const {
             if (writeError->isIndexSet())
                 builder.append(WriteErrorDetail::index(), writeError->getIndex());
 
-            if (writeError->isErrCodeSet())
-                builder.append(WriteErrorDetail::errCode(), writeError->getErrCode());
+            auto status = writeError->toStatus();
+            builder.append(WriteErrorDetail::errCode(), status.code());
+            builder.append(WriteErrorDetail::errCodeName(), status.codeString());
+            builder.append(WriteErrorDetail::errMessage(), errorMessage(status.reason()));
+            if (auto extra = _status.extraInfo())
+                extra->serialize(&builder);  // TODO consider extra info size for truncation.
 
             if (writeError->isErrInfoSet())
                 builder.append(WriteErrorDetail::errInfo(), writeError->getErrInfo());
-
-            if (writeError->isErrMessageSet())
-                builder.append(WriteErrorDetail::errMessage(),
-                               errorMessage(writeError->getErrMessage()));
         }
         errDetailsBuilder.done();
     }
@@ -165,27 +158,14 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, string* errMsg) {
     if (!errMsg)
         errMsg = &dummy;
 
-    FieldParser::FieldState fieldState;
-    fieldState = FieldParser::extractNumber(source, ok, &_ok, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isOkSet = fieldState == FieldParser::FIELD_SET;
-
-    fieldState = FieldParser::extract(source, errCode, &_errCode, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isErrCodeSet = fieldState == FieldParser::FIELD_SET;
-
-    fieldState = FieldParser::extract(source, errMessage, &_errMessage, errMsg);
-    if (fieldState == FieldParser::FIELD_INVALID)
-        return false;
-    _isErrMessageSet = fieldState == FieldParser::FIELD_SET;
+    _status = getStatusFromCommandResult(source);
+    _isStatusSet = true;
 
     // We're using appendNumber on generation so we'll try a smaller type
     // (int) first and then fall back to the original type (long long).
     BSONField<int> fieldN(n());
     int tempN;
-    fieldState = FieldParser::extract(source, fieldN, &tempN, errMsg);
+    auto fieldState = FieldParser::extract(source, fieldN, &tempN, errMsg);
     if (fieldState == FieldParser::FIELD_INVALID) {
         // try falling back to a larger type
         fieldState = FieldParser::extract(source, n, &_n, errMsg);
@@ -257,14 +237,8 @@ bool BatchedCommandResponse::parseBSON(const BSONObj& source, string* errMsg) {
 }
 
 void BatchedCommandResponse::clear() {
-    _ok = false;
-    _isOkSet = false;
-
-    _errCode = 0;
-    _isErrCodeSet = false;
-
-    _errMessage.clear();
-    _isErrMessageSet = false;
+    _status = Status::OK();
+    _isStatusSet = false;
 
     _nModified = 0;
     _isNModifiedSet = false;
@@ -306,49 +280,9 @@ std::string BatchedCommandResponse::toString() const {
     return toBSON().toString();
 }
 
-void BatchedCommandResponse::setOk(int ok) {
-    _ok = ok;
-    _isOkSet = true;
-}
-
-int BatchedCommandResponse::getOk() const {
-    dassert(_isOkSet);
-    return _ok;
-}
-
-void BatchedCommandResponse::setErrCode(int errCode) {
-    _errCode = errCode;
-    _isErrCodeSet = true;
-}
-
-void BatchedCommandResponse::unsetErrCode() {
-    _isErrCodeSet = false;
-}
-
-bool BatchedCommandResponse::isErrCodeSet() const {
-    return _isErrCodeSet;
-}
-
-int BatchedCommandResponse::getErrCode() const {
-    if (_isErrCodeSet) {
-        return _errCode;
-    } else {
-        return errCode.getDefault();
-    }
-}
-
-void BatchedCommandResponse::setErrMessage(StringData errMessage) {
-    _errMessage = errMessage.toString();
-    _isErrMessageSet = true;
-}
-
-bool BatchedCommandResponse::isErrMessageSet() const {
-    return _isErrMessageSet;
-}
-
-const std::string& BatchedCommandResponse::getErrMessage() const {
-    dassert(_isErrMessageSet);
-    return _errMessage;
+void BatchedCommandResponse::setStatus(Status status) {
+    _status = std::move(status);
+    _isStatusSet = true;
 }
 
 void BatchedCommandResponse::setNModified(long long n) {
@@ -546,19 +480,15 @@ const WriteConcernErrorDetail* BatchedCommandResponse::getWriteConcernError() co
 
 Status BatchedCommandResponse::toStatus() const {
     if (!getOk()) {
-        return Status(ErrorCodes::Error(getErrCode()), getErrMessage());
+        return _status;
     }
 
     if (isErrDetailsSet()) {
-        const WriteErrorDetail* errDetail = getErrDetails().front();
-
-        return Status(ErrorCodes::Error(errDetail->getErrCode()), errDetail->getErrMessage());
+        return getErrDetails().front()->toStatus();
     }
 
     if (isWriteConcernErrorSet()) {
-        const WriteConcernErrorDetail* errDetail = getWriteConcernError();
-
-        return Status(ErrorCodes::Error(errDetail->getErrCode()), errDetail->getErrMessage());
+        return getWriteConcernError()->toStatus();
     }
 
     return Status::OK();

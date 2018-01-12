@@ -110,9 +110,7 @@ const NamespaceString kSettingsNamespace("config", "settings");
 
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();
-    response->setErrCode(status.code());
-    response->setErrMessage(status.reason());
-    response->setOk(false);
+    response->setStatus(status);
 }
 
 }  // namespace

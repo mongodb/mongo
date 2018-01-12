@@ -1122,7 +1122,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
         ASSERT_BSONOBJ_EQ(update.getU(), dbt.toBSON());
 
         BatchedCommandResponse response;
-        response.setOk(true);
+        response.setStatus(Status::OK());
         response.setNModified(1);
 
         return response.toBSON();
@@ -1150,9 +1150,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabaseExceededTimeLimit) {
         ASSERT_EQUALS(host1, request.target);
 
         BatchedCommandResponse response;
-        response.setOk(false);
-        response.setErrCode(ErrorCodes::ExceededTimeLimit);
-        response.setErrMessage("operation timed out");
+        response.setStatus({ErrorCodes::ExceededTimeLimit, "operation timed out"});
 
         return response.toBSON();
     });

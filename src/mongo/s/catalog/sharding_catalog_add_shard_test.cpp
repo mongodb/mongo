@@ -213,7 +213,7 @@ protected:
             }
 
             BatchedCommandResponse response;
-            response.setOk(true);
+            response.setStatus(Status::OK());
             response.setNModified(1);
 
             return response.toBSON();
