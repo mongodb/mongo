@@ -257,7 +257,7 @@ TEST_F(SCRAMSHA1Fixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
     });
     ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 2),
                                Status(ErrorCodes::BadValue,
-                                      "Server SCRAM-SHA-1 nonce does not match client nonce: r=")),
+                                      "Server SCRAM nonce does not match client nonce: r=")),
               runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
@@ -309,6 +309,7 @@ TEST_F(SCRAMSHA1Fixture, testClientStep2GivesBadProof) {
     ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 2),
                                Status(ErrorCodes::AuthenticationFailed,
                                       "SCRAM-SHA-1 authentication failed, storedKey mismatch")),
+
               runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
@@ -339,13 +340,12 @@ TEST_F(SCRAMSHA1Fixture, testServerStep2GivesBadVerifier) {
 
     auto result = runSteps(saslServerSession.get(), saslClientSession.get(), mutator);
 
-    ASSERT_EQ(
-        SCRAMStepsResult(
-            SaslTestState(SaslTestState::kClient, 3),
-            Status(ErrorCodes::BadValue,
-                   str::stream() << "Client failed to verify SCRAM-SHA-1 ServerSignature, received "
-                                 << encodedVerifier)),
-        result);
+    ASSERT_EQ(SCRAMStepsResult(
+                  SaslTestState(SaslTestState::kClient, 3),
+                  Status(ErrorCodes::BadValue,
+                         str::stream() << "Client failed to verify SCRAM ServerSignature, received "
+                                       << encodedVerifier)),
+              result);
 }
 
 

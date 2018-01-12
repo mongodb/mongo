@@ -84,7 +84,7 @@ saslClientSource = [
     'sasl_client_conversation.cpp',
     'sasl_client_session.cpp',
     'sasl_plain_client_conversation.cpp',
-    'sasl_scramsha1_client_conversation.cpp',
+    'sasl_scram_client_conversation.cpp',
 ]
 
 # Add in actual sasl dependencies if sasl is enabled, otherwise

@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
+#include "mongo/client/sasl_client_session.h"
 #include "mongo/client/scram_client_cache.h"
 #include "mongo/crypto/mechanism_scram.h"
 
@@ -43,24 +44,31 @@ namespace mongo {
 /**
  *  Client side authentication session for SASL PLAIN.
  */
-class SaslSCRAMSHA1ClientConversation : public SaslClientConversation {
-    MONGO_DISALLOW_COPYING(SaslSCRAMSHA1ClientConversation);
+class SaslSCRAMClientConversation : public SaslClientConversation {
+    MONGO_DISALLOW_COPYING(SaslSCRAMClientConversation);
 
 public:
-    /**
-     * Implements the client side of a SASL PLAIN mechanism session.
-     **/
-    SaslSCRAMSHA1ClientConversation(SaslClientSession* saslClientSession,
-                                    SCRAMSHA1ClientCache* clientCache);
+    using SaslClientConversation::SaslClientConversation;
 
     /**
-     * Takes one step in a SCRAM-SHA-1 conversation.
+     * Takes one step in a SCRAM conversation.
      *
      * @return !Status::OK() for failure. The boolean part indicates if the
      * authentication conversation is finished or not.
      *
      **/
-    virtual StatusWith<bool> step(StringData inputData, std::string* outputData);
+    StatusWith<bool> step(StringData inputData, std::string* outputData) override;
+
+    /**
+     * Initialize the Presecrets/Secrets and return signed client proof.
+     */
+    virtual std::string generateClientProof(const std::vector<std::uint8_t>& salt,
+                                            size_t iterationCount) = 0;
+
+    /**
+     * Verify the server's signature.
+     */
+    virtual bool verifyServerSignature(StringData sig) const = 0;
 
 private:
     /**
@@ -78,15 +86,55 @@ private:
      **/
     StatusWith<bool> _thirdStep(const std::vector<std::string>& input, std::string* outputData);
 
-    int _step;
+protected:
+    int _step{0};
     std::string _authMessage;
-
-    // Secrets and secrets cache
-    scram::SHA1Secrets _credentials;
-    SCRAMSHA1ClientCache* const _clientCache;
 
     // client and server nonce concatenated
     std::string _clientNonce;
 };
+
+template <typename HashBlock>
+class SaslSCRAMClientConversationImpl : public SaslSCRAMClientConversation {
+public:
+    SaslSCRAMClientConversationImpl(SaslClientSession* saslClientSession,
+                                    SCRAMClientCache<HashBlock>* clientCache)
+        : SaslSCRAMClientConversation(saslClientSession), _clientCache(clientCache) {}
+
+    std::string generateClientProof(const std::vector<std::uint8_t>& salt,
+                                    size_t iterationCount) final {
+        scram::Presecrets<HashBlock> presecrets(
+            _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString(),
+            salt,
+            iterationCount);
+
+        auto targetHost = HostAndPort::parse(
+            _saslClientSession->getParameter(SaslClientSession::parameterServiceHostAndPort));
+        if (targetHost.isOK()) {
+            _credentials = _clientCache->getCachedSecrets(targetHost.getValue(), presecrets);
+            if (!_credentials) {
+                _credentials = presecrets;
+
+                _clientCache->setCachedSecrets(
+                    std::move(targetHost.getValue()), std::move(presecrets), _credentials);
+            }
+        } else {
+            _credentials = presecrets;
+        }
+
+        return _credentials.generateClientProof(_authMessage);
+    }
+
+    bool verifyServerSignature(StringData sig) const final {
+        return _credentials.verifyServerSignature(_authMessage, sig);
+    }
+
+private:
+    // Secrets and secrets cache
+    scram::Secrets<HashBlock> _credentials;
+    SCRAMClientCache<HashBlock>* const _clientCache;
+};
+
+using SaslSCRAMSHA1ClientConversation = SaslSCRAMClientConversationImpl<SHA1Block>;
 
 }  // namespace mongo
