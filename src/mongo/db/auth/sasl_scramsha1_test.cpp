@@ -35,7 +35,7 @@
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/native_sasl_authentication_session.h"
-#include "mongo/db/auth/sasl_scramsha1_server_conversation.h"
+#include "mongo/db/auth/sasl_scram_server_conversation.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -279,10 +279,10 @@ TEST_F(SCRAMSHA1Fixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
         std::string::iterator nonceEnd = std::find(nonceBegin, clientMessage.end(), ',');
         clientMessage = clientMessage.replace(nonceBegin, nonceEnd, "r=");
     });
-    ASSERT_EQ(SCRAMStepsResult(
-                  SaslTestState(SaslTestState::kServer, 2),
-                  Status(ErrorCodes::BadValue, "Incorrect SCRAM-SHA-1 client|server nonce: r=")),
-              runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
+    ASSERT_EQ(
+        SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 2),
+                         Status(ErrorCodes::BadValue, "Incorrect SCRAM client|server nonce: r=")),
+        runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
 TEST_F(SCRAMSHA1Fixture, testClientStep2GivesBadProof) {
@@ -308,7 +308,7 @@ TEST_F(SCRAMSHA1Fixture, testClientStep2GivesBadProof) {
 
     ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 2),
                                Status(ErrorCodes::AuthenticationFailed,
-                                      "SCRAM-SHA-1 authentication failed, storedKey mismatch")),
+                                      "SCRAM authentication failed, storedKey mismatch")),
 
               runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
@@ -424,11 +424,10 @@ TEST_F(SCRAMSHA1Fixture, testSCRAMWithInvalidChannelBinding) {
         clientMessage.replace(clientMessage.begin(), clientMessage.begin() + 1, "v=illegalGarbage");
     });
 
-    ASSERT_EQ(
-        SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 1),
-                         Status(ErrorCodes::BadValue,
-                                "Incorrect SCRAM-SHA-1 client message prefix: v=illegalGarbage")),
-        runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
+    ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 1),
+                               Status(ErrorCodes::BadValue,
+                                      "Incorrect SCRAM client message prefix: v=illegalGarbage")),
+              runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
 TEST_F(SCRAMSHA1Fixture, testNULLInPassword) {
@@ -488,7 +487,7 @@ TEST_F(SCRAMSHA1Fixture, testIncorrectPassword) {
 
     ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 2),
                                Status(ErrorCodes::AuthenticationFailed,
-                                      "SCRAM-SHA-1 authentication failed, storedKey mismatch")),
+                                      "SCRAM authentication failed, storedKey mismatch")),
               runSteps(saslServerSession.get(), saslClientSession.get()));
 }
 

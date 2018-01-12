@@ -30,12 +30,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/sasl_scramsha1_server_conversation.h"
+#include "mongo/db/auth/sasl_scram_server_conversation.h"
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
-#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/platform/random.h"
@@ -50,19 +49,14 @@ namespace mongo {
 using std::unique_ptr;
 using std::string;
 
-SaslSCRAMSHA1ServerConversation::SaslSCRAMSHA1ServerConversation(
-    SaslAuthenticationSession* saslAuthSession)
-    : SaslServerConversation(saslAuthSession), _step(0), _authMessage(""), _nonce("") {}
-
-StatusWith<bool> SaslSCRAMSHA1ServerConversation::step(StringData inputData,
-                                                       std::string* outputData) {
+StatusWith<bool> SaslSCRAMServerConversation::step(StringData inputData, std::string* outputData) {
     std::vector<std::string> input = StringSplitter::split(inputData.toString(), ",");
     _step++;
 
     if (_step > 3 || _step <= 0) {
-        return StatusWith<bool>(
-            ErrorCodes::AuthenticationFailed,
-            mongoutils::str::stream() << "Invalid SCRAM-SHA-1 authentication step: " << _step);
+        return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
+                                mongoutils::str::stream() << "Invalid SCRAM authentication step: "
+                                                          << _step);
     }
     if (_step == 1) {
         return _firstStep(input, outputData);
@@ -94,8 +88,8 @@ static void decodeSCRAMUsername(std::string& user) {
  *
  * NOTE: we are ignoring the authorization ID part of the message
  */
-StatusWith<bool> SaslSCRAMSHA1ServerConversation::_firstStep(std::vector<string>& input,
-                                                             std::string* outputData) {
+StatusWith<bool> SaslSCRAMServerConversation::_firstStep(std::vector<string>& input,
+                                                         std::string* outputData) {
     std::string authzId = "";
 
     if (input.size() == 4) {
@@ -108,7 +102,7 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_firstStep(std::vector<string>
          */
         if (!str::startsWith(input[1], "a=") || input[1].size() < 3) {
             return StatusWith<bool>(ErrorCodes::BadValue,
-                                    mongoutils::str::stream() << "Incorrect SCRAM-SHA-1 authzid: "
+                                    mongoutils::str::stream() << "Incorrect SCRAM authzid: "
                                                               << input[1]);
         }
         authzId = input[1].substr(2);
@@ -119,7 +113,7 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_firstStep(std::vector<string>
         return StatusWith<bool>(
             ErrorCodes::BadValue,
             mongoutils::str::stream()
-                << "Incorrect number of arguments for first SCRAM-SHA-1 client message, got "
+                << "Incorrect number of arguments for first SCRAM client message, got "
                 << input.size()
                 << " expected 4");
     } else if (str::startsWith(input[0], "p=")) {
@@ -127,24 +121,23 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_firstStep(std::vector<string>
                                 mongoutils::str::stream()
                                     << "Server does not support channel binding");
     } else if (input[0] != "n" && input[0] != "y") {
-        return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream()
-                                    << "Incorrect SCRAM-SHA-1 client message prefix: "
-                                    << input[0]);
+        return StatusWith<bool>(
+            ErrorCodes::BadValue,
+            mongoutils::str::stream() << "Incorrect SCRAM client message prefix: " << input[0]);
     } else if (!str::startsWith(input[1], "n=") || input[1].size() < 3) {
         return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream() << "Incorrect SCRAM-SHA-1 user name: "
+                                mongoutils::str::stream() << "Incorrect SCRAM user name: "
                                                           << input[1]);
     } else if (!str::startsWith(input[2], "r=") || input[2].size() < 6) {
         return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream() << "Incorrect SCRAM-SHA-1 client nonce: "
+                                mongoutils::str::stream() << "Incorrect SCRAM client nonce: "
                                                           << input[2]);
     }
 
     _user = input[1].substr(2);
     if (!authzId.empty() && _user != authzId) {
         return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream() << "SCRAM-SHA-1 user name " << _user
+                                mongoutils::str::stream() << "SCRAM user name " << _user
                                                           << " does not match authzid "
                                                           << authzId);
     }
@@ -190,7 +183,7 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_firstStep(std::vector<string>
 
     if (!_creds.scram.isValid()) {
         return Status(ErrorCodes::AuthenticationFailed,
-                      "Unable to perform SCRAM-SHA-1 authentication for a user with missing "
+                      "Unable to perform SCRAM authentication for a user with missing "
                       "or invalid SCRAM credentials");
     }
 
@@ -229,26 +222,26 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_firstStep(std::vector<string>
  *
  * NOTE: we are ignoring the channel binding part of the message
 **/
-StatusWith<bool> SaslSCRAMSHA1ServerConversation::_secondStep(const std::vector<string>& input,
-                                                              std::string* outputData) {
+StatusWith<bool> SaslSCRAMServerConversation::_secondStep(const std::vector<string>& input,
+                                                          std::string* outputData) {
     if (input.size() != 3) {
         return StatusWith<bool>(
             ErrorCodes::BadValue,
             mongoutils::str::stream()
-                << "Incorrect number of arguments for second SCRAM-SHA-1 client message, got "
+                << "Incorrect number of arguments for second SCRAM client message, got "
                 << input.size()
                 << " expected 3");
     } else if (!str::startsWith(input[0], "c=") || input[0].size() < 3) {
-        return StatusWith<bool>(
-            ErrorCodes::BadValue,
-            mongoutils::str::stream() << "Incorrect SCRAM-SHA-1 channel binding: " << input[0]);
+        return StatusWith<bool>(ErrorCodes::BadValue,
+                                mongoutils::str::stream() << "Incorrect SCRAM channel binding: "
+                                                          << input[0]);
     } else if (!str::startsWith(input[1], "r=") || input[1].size() < 6) {
-        return StatusWith<bool>(
-            ErrorCodes::BadValue,
-            mongoutils::str::stream() << "Incorrect SCRAM-SHA-1 client|server nonce: " << input[1]);
+        return StatusWith<bool>(ErrorCodes::BadValue,
+                                mongoutils::str::stream() << "Incorrect SCRAM client|server nonce: "
+                                                          << input[1]);
     } else if (!str::startsWith(input[2], "p=") || input[2].size() < 3) {
         return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream() << "Incorrect SCRAM-SHA-1 ClientProof: "
+                                mongoutils::str::stream() << "Incorrect SCRAM ClientProof: "
                                                           << input[2]);
     }
 
@@ -261,7 +254,7 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_secondStep(const std::vector<
         return StatusWith<bool>(
             ErrorCodes::BadValue,
             mongoutils::str::stream()
-                << "Unmatched SCRAM-SHA-1 nonce received from client in second step, expected "
+                << "Unmatched SCRAM nonce received from client in second step, expected "
                 << _nonce
                 << " but received "
                 << nonce);
@@ -277,17 +270,15 @@ StatusWith<bool> SaslSCRAMSHA1ServerConversation::_secondStep(const std::vector<
     // ClientKey := ClientSignature XOR ClientProof
     // ServerSignature := HMAC(ServerKey, AuthMessage)
     invariant(_creds.scram.isValid());
-    scram::SHA1Secrets secrets(
-        "", base64::decode(_creds.scram.storedKey), base64::decode(_creds.scram.serverKey));
 
-    if (!secrets.verifyClientProof(_authMessage, base64::decode(clientProof))) {
+    if (!verifyClientProof(base64::decode(clientProof))) {
         return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
                                 mongoutils::str::stream()
-                                    << "SCRAM-SHA-1 authentication failed, storedKey mismatch");
+                                    << "SCRAM authentication failed, storedKey mismatch");
     }
 
     // ServerSignature := HMAC(ServerKey, AuthMessage)
-    const auto serverSignature = secrets.generateServerSignature(_authMessage);
+    const auto serverSignature = generateServerSignature();
 
     StringBuilder sb;
     sb << "v=" << serverSignature;

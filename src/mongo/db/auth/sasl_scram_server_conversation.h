@@ -34,22 +34,20 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/sasl_server_conversation.h"
 
 namespace mongo {
 /**
  *  Server side authentication session for SASL SCRAM-SHA-1.
  */
-class SaslSCRAMSHA1ServerConversation : public SaslServerConversation {
-    MONGO_DISALLOW_COPYING(SaslSCRAMSHA1ServerConversation);
+class SaslSCRAMServerConversation : public SaslServerConversation {
+    MONGO_DISALLOW_COPYING(SaslSCRAMServerConversation);
 
 public:
-    /**
-     * Implements the server side of a SASL SCRAM-SHA-1 mechanism session.
-     **/
-    explicit SaslSCRAMSHA1ServerConversation(SaslAuthenticationSession* saslAuthSession);
-
-    virtual ~SaslSCRAMSHA1ServerConversation(){};
+    explicit SaslSCRAMServerConversation(SaslAuthenticationSession* session)
+        : SaslServerConversation(session) {}
+    ~SaslSCRAMServerConversation() override = default;
 
     /**
      * Take one step in a SCRAM-SHA-1 conversation.
@@ -58,7 +56,17 @@ public:
      * authentication conversation is finished or not.
      *
      **/
-    virtual StatusWith<bool> step(StringData inputData, std::string* outputData);
+    StatusWith<bool> step(StringData inputData, std::string* outputData) override;
+
+    /**
+     * Verify proof submitted by authenticating client.
+     */
+    virtual bool verifyClientProof(StringData) = 0;
+
+    /**
+     * Generate a signature to prove ourselves.
+     */
+    virtual std::string generateServerSignature() const = 0;
 
 private:
     /**
@@ -71,12 +79,36 @@ private:
      **/
     StatusWith<bool> _secondStep(const std::vector<std::string>& input, std::string* outputData);
 
-    int _step;
+protected:
+    int _step{0};
     std::string _authMessage;
     User::CredentialData _creds;
 
     // client and server nonce concatenated
     std::string _nonce;
 };
+
+template <typename HashBlock>
+class SaslSCRAMServerConversationImpl : public SaslSCRAMServerConversation {
+public:
+    explicit SaslSCRAMServerConversationImpl(SaslAuthenticationSession* session)
+        : SaslSCRAMServerConversation(session) {}
+    ~SaslSCRAMServerConversationImpl() override = default;
+
+    bool verifyClientProof(StringData clientProof) final {
+        _credentials = scram::Secrets<HashBlock>(
+            "", base64::decode(_creds.scram.storedKey), base64::decode(_creds.scram.serverKey));
+        return _credentials.verifyClientProof(_authMessage, clientProof);
+    }
+
+    std::string generateServerSignature() const final {
+        return _credentials.generateServerSignature(_authMessage);
+    }
+
+private:
+    scram::Secrets<HashBlock> _credentials;
+};
+
+using SaslSCRAMSHA1ServerConversation = SaslSCRAMServerConversationImpl<SHA1Block>;
 
 }  // namespace mongo

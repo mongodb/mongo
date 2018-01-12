@@ -172,7 +172,7 @@ env.Library('saslauth',
              ['native_sasl_authentication_session.cpp',
              'sasl_authentication_session.cpp',
              'sasl_plain_server_conversation.cpp',
-             'sasl_scramsha1_server_conversation.cpp',
+             'sasl_scram_server_conversation.cpp',
              'sasl_server_conversation.cpp'],
              LIBDEPS=[
                 'authcore',

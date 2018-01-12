@@ -44,7 +44,7 @@
 #include "mongo/db/auth/authz_session_external_state_mock.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/sasl_plain_server_conversation.h"
-#include "mongo/db/auth/sasl_scramsha1_server_conversation.h"
+#include "mongo/db/auth/sasl_scram_server_conversation.h"
 #include "mongo/db/commands.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"

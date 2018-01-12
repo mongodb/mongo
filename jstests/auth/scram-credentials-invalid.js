@@ -35,7 +35,7 @@
 
         assert.soon(function() {
             const log = cat(mongod.fullOptions.logFile);
-            return /Unable to perform SCRAM-SHA-1 auth.* invalid SCRAM credentials/.test(log);
+            return /Unable to perform SCRAM auth.* invalid SCRAM credentials/.test(log);
         }, "No warning issued for invalid SCRAM-SHA-1 credendials doc", 30 * 1000, 5 * 1000);
     }
 
