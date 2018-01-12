@@ -281,6 +281,7 @@ env.Library(
         'collection',
         'database',
         'index_catalog',
+        'index_create',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/db_raii',

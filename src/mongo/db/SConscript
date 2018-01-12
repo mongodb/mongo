@@ -582,6 +582,7 @@ env.Library(
     ],
     LIBDEPS=[
         'db_raii',
+        'catalog/index_create',
         'catalog/index_key_validate',
         'concurrency/write_conflict_exception',
     ],
@@ -837,6 +838,7 @@ env.Library(
         'curop',
         'cursor_server_params',
         'db_raii',
+        'dbdirectclient',
         'exec/scoped_timer',
         'exec/working_set',
         'fts/base_fts',
