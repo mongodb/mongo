@@ -2897,6 +2897,10 @@ bool TopologyCoordinator::advanceLastCommittedOpTime(const OpTime& committedOpTi
     return true;
 }
 
+void TopologyCoordinator::resetLastCommittedOpTime() {
+    _lastCommittedOpTime = OpTime();
+}
+
 OpTime TopologyCoordinator::getLastCommittedOpTime() const {
     return _lastCommittedOpTime;
 }
@@ -2908,7 +2912,9 @@ bool TopologyCoordinator::canCompleteTransitionToPrimary(long long termWhenDrain
     }
     // Allow completing the transition to primary even when in the middle of a stepdown attempt,
     // in case the stepdown attempt fails.
-    if (_leaderMode != LeaderMode::kLeaderElect && _leaderMode != LeaderMode::kAttemptingStepDown) {
+    // Allow calling this function even if the node is already primary on PV upgrade.
+    if (_leaderMode != LeaderMode::kLeaderElect && _leaderMode != LeaderMode::kAttemptingStepDown &&
+        _leaderMode != LeaderMode::kMaster) {
         return false;
     }
 

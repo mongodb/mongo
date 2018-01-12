@@ -2376,10 +2376,6 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(opCtx.get(), newConfig, myIndex);
 
-    // On a reconfig we drop all snapshots so we don't mistakenely read from the wrong one.
-    // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
-    _dropAllSnapshots_inlock();
-
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(opCtx.get(), oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
@@ -2899,25 +2895,72 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
         // nodes in the set will contact us.
         _startHeartbeats_inlock();
     }
-    _updateLastCommittedOpTime_inlock();
 
-    // Set election id if we're primary.
-    if (oldConfig.isInitialized() && _memberState.primary()) {
+    /**
+     * Protocol Version upgrade and downgrade.
+     *
+     * Since PV upgrade resets its term to 0, in-memory states that involve terms should be
+     * reset on either PV downgrade or upgrade unless they can be updated in both PV0 and PV1 by
+     * data replication or heartbeats, like the last applied. Otherwise PV downgrade then upgrade
+     * will pollute the terms with higher terms from the first PV1.
+     *
+     * Here we reset those in-memory states including:
+     * - last committed optime
+     * - election id (reset for drivers' primary discovery)
+     * - first optime of term (used by primary)
+     * - optime used by snapshots
+     * - stable optime candidates.
+     *
+     * _replicationWaiterList and _opTimeWaiterList are used by awaitReplication() and awaitOptime()
+     * for write/read concerns. Because we are holding the global lock here, there should be no
+     * running client requests and these waiter lists should be empty. One exception I can think of
+     * is the target optime of catchup, which doesn't acquire the global lock. It's potentially
+     * problematic, but very rare.
+     */
+    if (oldConfig.isInitialized()) {
         if (oldConfig.getProtocolVersion() > newConfig.getProtocolVersion()) {
             // Downgrade
-            invariant(newConfig.getProtocolVersion() == 0);
-            _electionId = OID::gen();
-            auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
-            _topCoord->setElectionInfo(_electionId, ts);
+            // Reset last committed optime for all nodes. After this reset, the commit point will
+            // not move forward on secondaries since it's only maintained on primary in PV0 and
+            // never get propagated to secondaries.
+            _topCoord->resetLastCommittedOpTime();
+            // Set election id if we're primary.
+            if (_memberState.primary()) {
+                invariant(newConfig.getProtocolVersion() == 0);
+                _electionId = OID::gen();
+                auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
+                _topCoord->setElectionInfo(_electionId, ts);
+            }
         } else if (oldConfig.getProtocolVersion() < newConfig.getProtocolVersion()) {
             // Upgrade
-            invariant(newConfig.getProtocolVersion() == 1);
-            invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
-            _electionId = OID::fromTerm(_topCoord->getTerm());
-            auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
-            _topCoord->setElectionInfo(_electionId, ts);
+            if (_memberState.primary()) {
+                invariant(newConfig.getProtocolVersion() == 1);
+                // The term is only set to "uninitialized" at startup or in PV0.
+                invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
+                _electionId = OID::fromTerm(_topCoord->getTerm());
+                // Allow anything to commit, because, technically, this node is also the previous
+                // primary.
+                OpTime firstOpTimeOfTerm(Timestamp(), _topCoord->getTerm());
+                invariantOK(_topCoord->completeTransitionToPrimary(firstOpTimeOfTerm));
+                auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
+                _topCoord->setElectionInfo(_electionId, ts);
+            }
         }
     }
+
+    // Update commit point for the primary. Called by every reconfig because the config
+    // may change the definition of majority.
+    //
+    // On PV downgrade, commit point is probably still from PV1 but will advance to an OpTime with
+    // term -1 once any write gets committed in PV0.
+    _updateLastCommittedOpTime_inlock();
+
+    // On a reconfig we drop all snapshots so we don't mistakenly read from the wrong one.
+    // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
+    _dropAllSnapshots_inlock();
+    // Also clear all stable snapshots. This is critical for PV downgrade and then upgrade to make
+    // sure OpTimes before the downgrade don't interfere the second upgrade.
+    _stableOpTimeCandidates.clear();
 
     return action;
 }

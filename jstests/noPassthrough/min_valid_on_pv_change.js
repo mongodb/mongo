@@ -7,10 +7,14 @@
     load("jstests/replsets/rslib.js");
 
     var testName = "min_valid_on_pv_change";
-    var replTest = new ReplSetTest({name: testName, nodes: 3});
+    var replTest =
+        new ReplSetTest({name: testName, nodes: 3, nodeOptions: {enableMajorityReadConcern: ""}});
     var nodes = replTest.nodeList();
 
-    replTest.startSet();
+    if (!startSetIfSupportsReadMajority(replTest)) {
+        jsTest.log("skipping test since storage engine doesn't support committed reads");
+        return;
+    }
     var config = {
         "_id": testName,
         "members": [
@@ -21,12 +25,18 @@
     };
 
     // Set verbosity for replication on all nodes.
-    setLogVerbosity(replTest.nodes, {"replication": {"verbosity": 3}, "query": {"verbosity": 3}});
+    var logVerbosity = {
+        replication: {verbosity: 3},
+        query: {verbosity: 3},
+        command: {verbosity: 1}
+    };
+    setLogVerbosity(replTest.nodes, logVerbosity);
 
     replTest.initiate(config);
     var primary = replTest.getPrimary();
     var secondary = replTest.getSecondary();
-    var coll = primary.getCollection("test.foo");
+    var collNs = "test.foo";
+    var coll = primary.getCollection(collNs);
 
     function checkMinValidExistsOnPrimary(conn, expectedTerm) {
         var minValid = conn.getDB("local").replset.minvalid.findOne();
@@ -65,8 +75,23 @@
 
     jsTestLog("Restarting the secondary");
     replTest.restart(replTest.getSecondary());
+    setLogVerbosity([replTest.getSecondary()], logVerbosity);
     // Verify the secondary can find the sync source successfully and replicate the doc.
     assert.writeOK(
         coll.insert({a: 4}, {writeConcern: {w: 3}, wtimeout: ReplSetTest.kDefaultTimeoutMS}));
 
+    primary.setCausalConsistency(true);
+    // Check majority write works.
+    assert.writeOK(coll.insert(
+        {a: 5}, {writeConcern: {w: "majority"}, wtimeout: ReplSetTest.kDefaultTimeoutMS}));
+
+    // Check majority read works.
+    jsTestLog("Checking read concern on primary");
+    assert.eq(1, coll.count({a: 5}, {readConcern: "majority"}));
+
+    jsTestLog("Checking read concern on secondary");
+    var secondary = replTest.getSecondary();
+    secondary.setCausalConsistency(true);
+    secondary.setSlaveOk();
+    assert.eq(1, secondary.getCollection(collNs).count({a: 5}, {readConcern: "majority"}));
 })();
