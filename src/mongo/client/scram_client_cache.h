@@ -60,7 +60,12 @@ namespace mongo {
  * reauthentication.  This might be useful for mobile clients where
  * CPU usage is a concern."
  */
-class SCRAMSHA1ClientCache {
+template <typename HashBlock>
+class SCRAMClientCache {
+private:
+    using HostToSecretsPair = std::pair<scram::Presecrets<HashBlock>, scram::Secrets<HashBlock>>;
+    using HostToSecretsMap = stdx::unordered_map<HostAndPort, HostToSecretsPair>;
+
 public:
     /**
      * Returns precomputed SCRAMSecrets, if one has already been
@@ -68,21 +73,53 @@ public:
      * match those recorded for the hostname. Otherwise, no secrets
      * are returned.
      */
-    scram::SHA1Secrets getCachedSecrets(const HostAndPort& target,
-                                        const scram::SHA1Presecrets& presecrets) const;
+    scram::Secrets<HashBlock> getCachedSecrets(
+        const HostAndPort& target, const scram::Presecrets<HashBlock>& presecrets) const {
+        const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
+
+        // Search the cache for a record associated with the host we're trying to connect to.
+        auto foundSecret = _hostToSecrets.find(target);
+        if (foundSecret == _hostToSecrets.end()) {
+            return {};
+        }
+
+        // Presecrets contain parameters provided by the server, which may change. If the
+        // cached presecrets don't match the presecrets we have on hand, we must not return the
+        // stale cached secrets. We'll need to rerun the SCRAM computation.
+        const auto& foundPresecrets = foundSecret->second.first;
+        if (foundPresecrets == presecrets) {
+            return foundSecret->second.second;
+        } else {
+            return {};
+        }
+    }
 
     /**
      * Records a set of precomputed SCRAMSecrets for the specified
      * host, along with the presecrets used to generate them.
      */
     void setCachedSecrets(HostAndPort target,
-                          scram::SHA1Presecrets presecrets,
-                          scram::SHA1Secrets secrets);
+                          scram::Presecrets<HashBlock> presecrets,
+                          scram::Secrets<HashBlock> secrets) {
+        const stdx::lock_guard<stdx::mutex> lock(_hostToSecretsMutex);
+
+        typename HostToSecretsMap::iterator it;
+        bool insertionSuccessful;
+        auto cacheRecord = std::make_pair(std::move(presecrets), std::move(secrets));
+        // Insert the presecrets, and the secrets we computed for them into the cache
+        std::tie(it, insertionSuccessful) = _hostToSecrets.emplace(std::move(target), cacheRecord);
+        // If there was already a cache entry for the target HostAndPort, we should overwrite it.
+        // We have fresher presecrets and secrets.
+        if (!insertionSuccessful) {
+            it->second = std::move(cacheRecord);
+        }
+    }
 
 private:
     mutable stdx::mutex _hostToSecretsMutex;
-    stdx::unordered_map<HostAndPort, std::pair<scram::SHA1Presecrets, scram::SHA1Secrets>>
-        _hostToSecrets;
+    HostToSecretsMap _hostToSecrets;
 };
+
+using SCRAMSHA1ClientCache = SCRAMClientCache<SHA1Block>;
 
 }  // namespace mongo

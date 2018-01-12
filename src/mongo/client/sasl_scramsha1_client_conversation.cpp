@@ -34,7 +34,7 @@
 
 #include "mongo/base/parse_number.h"
 #include "mongo/client/sasl_client_session.h"
-#include "mongo/client/scram_sha1_client_cache.h"
+#include "mongo/client/scram_client_cache.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/mongoutils/str.h"

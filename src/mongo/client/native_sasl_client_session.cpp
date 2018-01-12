@@ -33,7 +33,7 @@
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_plain_client_conversation.h"
 #include "mongo/client/sasl_scramsha1_client_conversation.h"
-#include "mongo/client/scram_sha1_client_cache.h"
+#include "mongo/client/scram_client_cache.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

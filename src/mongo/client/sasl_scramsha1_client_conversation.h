@@ -35,11 +35,11 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
+#include "mongo/client/scram_client_cache.h"
 #include "mongo/crypto/mechanism_scram.h"
 
 namespace mongo {
 
-class SCRAMSHA1ClientCache;
 /**
  *  Client side authentication session for SASL PLAIN.
  */

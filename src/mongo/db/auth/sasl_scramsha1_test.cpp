@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/native_sasl_client_session.h"
-#include "mongo/client/scram_sha1_client_cache.h"
+#include "mongo/client/scram_client_cache.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
