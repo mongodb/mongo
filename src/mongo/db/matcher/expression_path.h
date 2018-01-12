@@ -86,11 +86,10 @@ public:
     void applyRename(const StringMap<std::string>& renameList) {
         FieldRef pathFieldRef(_path);
 
-        int renamesFound = 0;
+        size_t renamesFound = 0u;
         for (auto rename : renameList) {
             if (rename.first == _path) {
                 _rewrittenPath = rename.second;
-                setPath(_rewrittenPath);
 
                 ++renamesFound;
             }
@@ -104,14 +103,18 @@ public:
                 // Replace the chopped off components with the component names resulting from the
                 // rename.
                 _rewrittenPath = str::stream() << rename.second << "." << pathTail.toString();
-                setPath(_rewrittenPath);
 
                 ++renamesFound;
             }
         }
 
         // There should never be multiple applicable renames.
-        invariant(renamesFound <= 1);
+        invariant(renamesFound <= 1u);
+        if (renamesFound == 1u) {
+            // There is an applicable rename. Modify the path of this expression to use the new
+            // name.
+            setPath(_rewrittenPath);
+        }
     }
 
 protected:

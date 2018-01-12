@@ -1186,6 +1186,25 @@ TEST(SplitMatchExpression, ShouldMoveMaxLengthAcrossRename) {
     ASSERT_FALSE(splitExpr.second.get());
 }
 
+TEST(SplitMatchExpression, ShouldMoveIndependentPredicateWhenThereAreMultipleRenames) {
+    // Designed to reproduce SERVER-32690.
+    BSONObj matchPredicate = fromjson("{y: 3}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(matcher.getStatus());
+
+    StringMap<std::string> renames{{"y", "x"}, {"x", "x"}};
+    std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitExpr =
+        expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, renames);
+
+    ASSERT_TRUE(splitExpr.first.get());
+    BSONObjBuilder firstBob;
+    splitExpr.first->serialize(&firstBob);
+    ASSERT_BSONOBJ_EQ(firstBob.obj(), fromjson("{x: {$eq: 3}}"));
+
+    ASSERT_FALSE(splitExpr.second.get());
+}
+
 TEST(MapOverMatchExpression, DoesMapOverLogicalNodes) {
     BSONObj matchPredicate = fromjson("{a: {$not: {$eq: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
