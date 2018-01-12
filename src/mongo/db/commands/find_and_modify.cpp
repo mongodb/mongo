@@ -122,7 +122,7 @@ StatusWith<boost::optional<BSONObj>> advanceExecutor(OperationContext* opCtx,
         if (WorkingSetCommon::isValidStatusMemberObject(value)) {
             const Status errorStatus = WorkingSetCommon::getMemberObjectStatus(value);
             invariant(!errorStatus.isOK());
-            return {errorStatus.code(), errorStatus.reason()};
+            return errorStatus;
         }
         const std::string opstr = isRemove ? "delete" : "update";
         return {ErrorCodes::OperationFailed,

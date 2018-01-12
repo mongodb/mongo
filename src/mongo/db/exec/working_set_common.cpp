@@ -142,6 +142,9 @@ BSONObj WorkingSetCommon::buildMemberStatusObject(const Status& status) {
     bob.append("ok", status.isOK() ? 1.0 : 0.0);
     bob.append("code", status.code());
     bob.append("errmsg", status.reason());
+    if (auto extraInfo = status.extraInfo()) {
+        extraInfo->serialize(&bob);
+    }
 
     return bob.obj();
 }
@@ -160,8 +163,7 @@ WorkingSetID WorkingSetCommon::allocateStatusMember(WorkingSet* ws, const Status
 
 // static
 bool WorkingSetCommon::isValidStatusMemberObject(const BSONObj& obj) {
-    return obj.nFields() == 3 && obj.hasField("ok") && obj.hasField("code") &&
-        obj.hasField("errmsg");
+    return obj.hasField("ok") && obj["code"].type() == NumberInt && obj["errmsg"].type() == String;
 }
 
 // static
@@ -188,7 +190,9 @@ void WorkingSetCommon::getStatusMemberObject(const WorkingSet& ws,
 // static
 Status WorkingSetCommon::getMemberObjectStatus(const BSONObj& memberObj) {
     invariant(WorkingSetCommon::isValidStatusMemberObject(memberObj));
-    return Status(ErrorCodes::Error(memberObj["code"].numberInt()), memberObj["errmsg"]);
+    return Status(ErrorCodes::Error(memberObj["code"].numberInt()),
+                  memberObj["errmsg"].valueStringData(),
+                  memberObj);
 }
 
 // static
@@ -203,8 +207,7 @@ std::string WorkingSetCommon::toStatusString(const BSONObj& obj) {
         Status unknownStatus(ErrorCodes::UnknownError, "no details available");
         return unknownStatus.toString();
     }
-    Status status(ErrorCodes::Error(obj.getIntField("code")), obj.getStringField("errmsg"));
-    return status.toString();
+    return getMemberObjectStatus(obj).toString();
 }
 
 }  // namespace mongo

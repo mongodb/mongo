@@ -122,10 +122,8 @@ bool handleCursorCommand(OperationContext* opCtx,
         }
 
         if (PlanExecutor::ADVANCED != state) {
-            auto status = WorkingSetCommon::getMemberObjectStatus(next);
-            uasserted(status.code(),
-                      "PlanExecutor error during aggregation: " +
-                          WorkingSetCommon::toStatusString(next));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(next).withContext(
+                "PlanExecutor error during aggregation"));
         }
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
