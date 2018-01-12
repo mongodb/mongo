@@ -198,4 +198,17 @@
     ixscan = getAggPlanStage(explain, "IXSCAN");
     assert.neq(null, ixscan, tojson(explain));
     assert.eq({"a.b.c": 1}, ixscan.keyPattern, tojson(ixscan));
+
+    // Test multiple renames. Designed to reproduce SERVER-32690.
+    pipeline = [
+        {$_internalInhibitOptimization: {}},
+        {$project: {x: "$x", y: "$x"}},
+        {$match: {y: 1, w: 1}}
+    ];
+    assert.eq([], coll.aggregate(pipeline).toArray());
+    explain = coll.explain().aggregate(pipeline);
+    // We expect that the $match stage has been split into two, since one predicate has an
+    // applicable rename that allows swapping, while the other does not.
+    let matchStages = getAggPlanStages(explain, "$match");
+    assert.eq(2, matchStages.length);
 }());
