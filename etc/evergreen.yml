@@ -1349,12 +1349,12 @@ functions:
             cmds="$cmds; cygrunsrv --start curator_sys"
             cmds="$cmds; cygrunsrv --start curator_proc"
           else
-            cmds="$cmds; cmd=\"@reboot cd \$HOME && ${sudo} ./curator stat system >> ${monitor_system_file}\""
+            cmds="$cmds; cmd=\"@reboot cd \$HOME && $sudo ./curator stat system >> ${monitor_system_file}\""
             cmds="$cmds; (crontab -l ; echo \"\$cmd\") | crontab -"
-            cmds="$cmds; cmd=\"@reboot cd \$HOME && ${sudo} ./curator stat process-all >> ${monitor_proc_file}\""
+            cmds="$cmds; cmd=\"@reboot cd \$HOME && $sudo ./curator stat process-all >> ${monitor_proc_file}\""
             cmds="$cmds; (crontab -l ; echo \"\$cmd\") | crontab -"
             cmds="$cmds; crontab -l"
-            cmds="$cmds; { ${sudo} \$HOME/curator stat system --file ${monitor_system_file} > /dev/null 2>&1 & ${sudo} \$HOME/curator stat process-all --file ${monitor_proc_file} > /dev/null 2>&1 & } & disown"
+            cmds="$cmds; { $sudo \$HOME/curator stat system --file ${monitor_system_file} > /dev/null 2>&1 & $sudo \$HOME/curator stat process-all --file ${monitor_proc_file} > /dev/null 2>&1 & } & disown"
           fi
           ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
           ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/remote_operations.py \
