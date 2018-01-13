@@ -60,7 +60,6 @@ env.Library(
         'role_graph.cpp',
         'role_graph_update.cpp',
         'role_graph_builtin_roles.cpp',
-        'sasl_mechanism_advertiser.cpp',
         'user.cpp',
         'user_document_parser.cpp',
         'user_management_commands_parser.cpp',
@@ -147,7 +146,6 @@ env.Library('authservercommon',
                 '$BUILD_DIR/mongo/db/commands/core',
                 'authcommon',
                 'authcore',
-                'authmocks',
                 'authorization_manager_global',
                 'saslauth',
                 'security_file',
@@ -170,14 +168,13 @@ env.Library('sasl_options',
 )
 
 env.Library('saslauth',
-             ['native_sasl_authentication_session.cpp',
-             'sasl_authentication_session.cpp',
-             'sasl_plain_server_conversation.cpp',
-             'sasl_scram_server_conversation.cpp',
-             'sasl_server_conversation.cpp'],
+            [
+                'sasl_mechanism_registry.cpp',
+                'sasl_plain_server_conversation.cpp',
+                'sasl_scram_server_conversation.cpp',
+            ],
              LIBDEPS=[
                 'authcore',
-                'authmocks', # Wat?
                 'sasl_options',
                 '$BUILD_DIR/mongo/base/secure_allocator',
                 '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
@@ -185,6 +182,16 @@ env.Library('saslauth',
                 '$BUILD_DIR/mongo/util/net/network',
              ],
 )
+
+env.CppUnitTest(target='sasl_mechanism_registry_test',
+                source=[
+                    'sasl_mechanism_registry_test.cpp',
+                ],
+                LIBDEPS=[
+                    'authmocks',
+                    'saslauth',
+                    '$BUILD_DIR/mongo/db/service_context_noop_init',
+                ])
 
 env.Library('authmongod',
             ['authz_manager_external_state_d.cpp',
@@ -226,22 +233,22 @@ env.Library(
 )
 
 env.CppUnitTest('action_set_test', 'action_set_test.cpp',
-                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+                LIBDEPS=['authcore', 'authmocks'])
 env.CppUnitTest('privilege_parser_test', 'privilege_parser_test.cpp',
-                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+                LIBDEPS=['authcore', 'authmocks'])
 env.CppUnitTest('role_graph_test', 'role_graph_test.cpp',
-                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+                LIBDEPS=['authcore', 'authmocks'])
 env.CppUnitTest('user_document_parser_test', 'user_document_parser_test.cpp',
-                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+                LIBDEPS=['authcore', 'authmocks'])
 env.CppUnitTest('user_set_test', 'user_set_test.cpp',
-                LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+                LIBDEPS=['authcore', 'authmocks'])
 env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
                 LIBDEPS=[
                     '$BUILD_DIR/mongo/transport/transport_layer_common',
                     '$BUILD_DIR/mongo/transport/transport_layer_mock',
                     'authcore',
-                    'authmocks',
-                    'saslauth'])
+                    'authmocks'
+                ])
 
 env.Library(
     target='authorization_session_for_test',
@@ -300,8 +307,10 @@ env.CppUnitTest(
         'sasl_scram_test.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        'authmocks',
         'saslauth',
         '$BUILD_DIR/mongo/client/sasl_client',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
     ],
 )
 

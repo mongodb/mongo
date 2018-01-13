@@ -30,23 +30,21 @@
 #include <memory>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/auth/sasl_mechanism_registry.h"
 
 namespace mongo {
 
 class Client;
 
 /**
- * Abstract type representing an ongoing authentication session.
- *
- * An example subclass is MongoAuthenticationSession.
+ * Type representing an ongoing authentication session.
  */
 class AuthenticationSession {
     MONGO_DISALLOW_COPYING(AuthenticationSession);
 
 public:
-    enum SessionType {
-        SESSION_TYPE_SASL  // SASL authentication mechanism.
-    };
+    explicit AuthenticationSession(std::unique_ptr<ServerMechanismBase> mech)
+        : _mech(std::move(mech)) {}
 
     /**
      * Sets the authentication session for the given "client" to "newSession".
@@ -58,21 +56,17 @@ public:
      */
     static void swap(Client* client, std::unique_ptr<AuthenticationSession>& other);
 
-    virtual ~AuthenticationSession() = default;
-
     /**
      * Return an identifer of the type of session, so that a caller can safely cast it and
      * extract the type-specific data stored within.
      */
-    SessionType getType() const {
-        return _sessionType;
+    ServerMechanismBase& getMechanism() const {
+        invariant(_mech);
+        return *_mech;
     }
 
-protected:
-    explicit AuthenticationSession(SessionType sessionType) : _sessionType(sessionType) {}
-
 private:
-    const SessionType _sessionType;
+    std::unique_ptr<ServerMechanismBase> _mech;
 };
 
 }  // namespace mongo

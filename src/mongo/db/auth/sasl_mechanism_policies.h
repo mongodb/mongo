@@ -1,5 +1,5 @@
-/*
- *    Copyright (C) 2014 10gen, Inc.
+/**
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,43 +28,51 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/auth/authentication_session.h"
-#include "mongo/db/auth/sasl_authentication_session.h"
-#include "mongo/db/auth/sasl_server_conversation.h"
+#include "mongo/crypto/sha_block.h"
+#include "mongo/db/auth/sasl_mechanism_registry.h"
 
 namespace mongo {
 
-/**
- * Authentication session data for the server side of SASL authentication.
- */
-class NativeSaslAuthenticationSession : public SaslAuthenticationSession {
-    MONGO_DISALLOW_COPYING(NativeSaslAuthenticationSession);
-
-public:
-    explicit NativeSaslAuthenticationSession(AuthorizationSession* authSession);
-    virtual ~NativeSaslAuthenticationSession();
-
-    virtual Status start(StringData authenticationDatabase,
-                         StringData mechanism,
-                         StringData serviceName,
-                         StringData serviceHostname,
-                         int64_t conversationId,
-                         bool autoAuthorize);
-
-    virtual Status step(StringData inputData, std::string* outputData);
-
-    virtual std::string getPrincipalId() const;
-
-    virtual const char* getMechanism() const;
-
-private:
-    std::string _mechanism;
-    std::unique_ptr<SaslServerConversation> _saslConversation;
+struct PLAINPolicy {
+    static constexpr StringData getName() {
+        return "PLAIN"_sd;
+    }
+    static SecurityPropertySet getProperties() {
+        return SecurityPropertySet{};
+    }
 };
+
+struct SCRAMSHA1Policy {
+    using HashBlock = SHA1Block;
+
+    static constexpr StringData getName() {
+        return "SCRAM-SHA-1"_sd;
+    }
+    static SecurityPropertySet getProperties() {
+        return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
+    }
+};
+
+struct SCRAMSHA256Policy {
+    using HashBlock = SHA256Block;
+
+    static constexpr StringData getName() {
+        return "SCRAM-SHA-256"_sd;
+    }
+    static SecurityPropertySet getProperties() {
+        return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
+    }
+};
+
+struct GSSAPIPolicy {
+    static constexpr StringData getName() {
+        return "GSSAPI"_sd;
+    }
+    static SecurityPropertySet getProperties() {
+        return SecurityPropertySet{SecurityProperty::kNoPlainText, SecurityProperty::kMutualAuth};
+    }
+};
+
+
 }  // namespace mongo

@@ -33,7 +33,7 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
-#include "mongo/db/auth/sasl_mechanism_advertiser.h"
+#include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
@@ -400,7 +400,8 @@ public:
                 .serverNegotiate(cmdObj, &result);
         }
 
-        SASLMechanismAdvertiser::advertise(opCtx, cmdObj, &result);
+        auto& saslMechanismRegistry = SASLServerMechanismRegistry::get(opCtx->getServiceContext());
+        saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, cmdObj, &result);
 
         return true;
     }

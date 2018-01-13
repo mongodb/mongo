@@ -12,7 +12,7 @@
         function checkMechs(userid, mechs) {
             const res =
                 assert.commandWorked(db.runCommand({isMaster: 1, saslSupportedMechs: userid}));
-            assert.eq(mechs, res.saslSupportedMechs, tojson(res));
+            assert.eq(mechs.sort(), res.saslSupportedMechs.sort(), tojson(res));
         }
 
         // Make users.
@@ -22,10 +22,14 @@
             {createUser: "IX", pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-256"]}));
 
         // Internal users should support scram methods.
-        checkMechs("admin.user", ["SCRAM-SHA-1", "SCRAM-SHA-256"]);
+        checkMechs("admin.user", ["SCRAM-SHA-256", "SCRAM-SHA-1"]);
 
-        // External users should support PLAIN, but not scram methods.
-        checkMechs("$external.user", ["PLAIN"]);
+        // External users on enterprise should support PLAIN, but not scram methods.
+        if (assert.commandWorked(db.runCommand({buildInfo: 1})).modules.includes("enterprise")) {
+            checkMechs("$external.user", ["PLAIN"]);
+        } else {
+            checkMechs("$external.user", []);
+        }
 
         // Check non-normalized name finds normalized user.
         const IXchar = "\u2168";

@@ -35,7 +35,14 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
+#include "mongo/base/disallow_copying.h"
+#include "mongo/base/init.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
+#include "mongo/db/auth/sasl_mechanism_policies.h"
+#include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
@@ -46,26 +53,25 @@
 
 namespace mongo {
 
-using std::unique_ptr;
-using std::string;
 
-StatusWith<bool> SaslSCRAMServerConversation::step(StringData inputData, std::string* outputData) {
+template <typename Policy>
+StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::stepImpl(
+    OperationContext* opCtx, StringData inputData) {
     _step++;
 
     if (_step > 3 || _step <= 0) {
         return Status(ErrorCodes::AuthenticationFailed,
                       str::stream() << "Invalid SCRAM authentication step: " << _step);
     }
+
     if (_step == 1) {
-        return _firstStep(inputData, outputData);
+        return _firstStep(opCtx, inputData);
     }
     if (_step == 2) {
-        return _secondStep(inputData, outputData);
+        return _secondStep(opCtx, inputData);
     }
 
-    *outputData = "";
-
-    return true;
+    return std::make_tuple(true, std::string{});
 }
 
 /*
@@ -86,8 +92,9 @@ static void decodeSCRAMUsername(std::string& user) {
  *
  * NOTE: we are ignoring the authorization ID part of the message
  */
-StatusWith<bool> SaslSCRAMServerConversation::_firstStep(StringData inputData,
-                                                         std::string* outputData) {
+template <typename Policy>
+StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_firstStep(
+    OperationContext* opCtx, StringData inputData) {
     const auto badCount = [](int got) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
@@ -104,7 +111,7 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(StringData inputData,
      * client-first-message := gs2-header client-first-message-bare
      */
     const auto gs2_cbind_comma = inputData.find(',');
-    if (gs2_cbind_comma == string::npos) {
+    if (gs2_cbind_comma == std::string::npos) {
         return badCount(1);
     }
     const auto gs2_cbind_flag = inputData.substr(0, gs2_cbind_comma);
@@ -118,7 +125,7 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(StringData inputData,
     }
 
     const auto gs2_header_comma = inputData.find(',', gs2_cbind_comma + 1);
-    if (gs2_header_comma == string::npos) {
+    if (gs2_header_comma == std::string::npos) {
         return badCount(2);
     }
     auto authzId = inputData.substr(gs2_cbind_comma + 1, gs2_header_comma - (gs2_cbind_comma + 1));
@@ -155,18 +162,19 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(StringData inputData,
         return Status(ErrorCodes::BadValue,
                       str::stream() << "Invalid SCRAM user name: " << input[0]);
     }
-    _user = input[0].substr(2);
-    decodeSCRAMUsername(_user);
+    ServerMechanismBase::_principalName = input[0].substr(2);
+    decodeSCRAMUsername(ServerMechanismBase::_principalName);
 
-    auto swUser = saslPrep(_user);
+    auto swUser = saslPrep(ServerMechanismBase::ServerMechanismBase::_principalName);
     if (!swUser.isOK()) {
         return swUser.getStatus();
     }
-    _user = std::move(swUser.getValue());
+    ServerMechanismBase::ServerMechanismBase::_principalName = std::move(swUser.getValue());
 
-    if (!authzId.empty() && _user != authzId) {
+    if (!authzId.empty() && ServerMechanismBase::_principalName != authzId) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "SCRAM user name " << _user << " does not match authzid "
+                      str::stream() << "SCRAM user name " << ServerMechanismBase::_principalName
+                                    << " does not match authzid "
                                     << authzId);
     }
 
@@ -180,7 +188,8 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(StringData inputData,
     // SERVER-16534, SCRAM-SHA-1 must be enabled for authenticating the internal user, so that
     // cluster members may communicate with each other. Hence ignore disabled auth mechanism
     // for the internal user.
-    UserName user(_user, _saslAuthSession->getAuthenticationDatabase());
+    UserName user(ServerMechanismBase::ServerMechanismBase::_principalName,
+                  ServerMechanismBase::getAuthenticationDatabase());
     if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
         user != internalSecurity.user->getName()) {
         return Status(ErrorCodes::BadValue, "SCRAM-SHA-1 authentication is disabled");
@@ -188,20 +197,21 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(StringData inputData,
 
     // The authentication database is also the source database for the user.
     User* userObj;
-    Status status =
-        _saslAuthSession->getAuthorizationSession()->getAuthorizationManager().acquireUser(
-            _saslAuthSession->getOpCtxt(), user, &userObj);
+    auto authManager = AuthorizationManager::get(opCtx->getServiceContext());
 
+    Status status = authManager->acquireUser(opCtx, user, &userObj);
     if (!status.isOK()) {
         return status;
     }
 
-    _creds = userObj->getCredentials();
+    User::CredentialData credentials = userObj->getCredentials();
     UserName userName = userObj->getName();
 
-    _saslAuthSession->getAuthorizationSession()->getAuthorizationManager().releaseUser(userObj);
+    authManager->releaseUser(userObj);
 
-    if (!initAndValidateCredentials()) {
+    _scramCredentials = credentials.scram<HashBlock>();
+
+    if (!_scramCredentials.isValid()) {
         // Check for authentication attempts of the __system user on
         // systems started without a keyfile.
         if (userName == internalSecurity.user->getName()) {
@@ -215,12 +225,16 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(StringData inputData,
         }
     }
 
+    _secrets = scram::Secrets<HashBlock>("",
+                                         base64::decode(_scramCredentials.storedKey),
+                                         base64::decode(_scramCredentials.serverKey));
+
     // Generate server-first-message
     // Create text-based nonce as base64 encoding of a binary blob of length multiple of 3
     const int nonceLenQWords = 3;
     uint64_t binaryNonce[nonceLenQWords];
 
-    unique_ptr<SecureRandom> sr(SecureRandom::create());
+    std::unique_ptr<SecureRandom> sr(SecureRandom::create());
 
     binaryNonce[0] = sr->nextInt64();
     binaryNonce[1] = sr->nextInt64();
@@ -229,13 +243,14 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(StringData inputData,
     _nonce =
         clientNonce + base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));
     StringBuilder sb;
-    sb << "r=" << _nonce << ",s=" << getSalt() << ",i=" << getIterationCount();
-    *outputData = sb.str();
+    sb << "r=" << _nonce << ",s=" << _scramCredentials.salt
+       << ",i=" << _scramCredentials.iterationCount;
+    std::string outputData = sb.str();
 
     // add client-first-message-bare and server-first-message to _authMessage
-    _authMessage = client_first_message_bare.toString() + "," + *outputData;
+    _authMessage = client_first_message_bare.toString() + "," + outputData;
 
-    return false;
+    return std::make_tuple(false, std::move(outputData));
 }
 
 /**
@@ -250,8 +265,9 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(StringData inputData,
  *
  * NOTE: we are ignoring the channel binding part of the message
 **/
-StatusWith<bool> SaslSCRAMServerConversation::_secondStep(StringData inputData,
-                                                          std::string* outputData) {
+template <typename Policy>
+StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_secondStep(
+    OperationContext* opCtx, StringData inputData) {
     const auto badCount = [](int got) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
@@ -265,7 +281,7 @@ StatusWith<bool> SaslSCRAMServerConversation::_secondStep(StringData inputData,
      * client-final-message := client-final-message-without-proof ',' proof
      */
     const auto last_comma = inputData.rfind(',');
-    if (last_comma == string::npos) {
+    if (last_comma == std::string::npos) {
         return badCount(1);
     }
 
@@ -315,18 +331,26 @@ StatusWith<bool> SaslSCRAMServerConversation::_secondStep(StringData inputData,
     // ClientSignature := HMAC(StoredKey, AuthMessage)
     // ClientKey := ClientSignature XOR ClientProof
     // ServerSignature := HMAC(ServerKey, AuthMessage)
-    invariant(initAndValidateCredentials());
 
-    if (!verifyClientProof(base64::decode(proof.toString()))) {
+    if (!_secrets.verifyClientProof(_authMessage, base64::decode(proof.toString()))) {
         return Status(ErrorCodes::AuthenticationFailed,
                       "SCRAM authentication failed, storedKey mismatch");
     }
 
     StringBuilder sb;
     // ServerSignature := HMAC(ServerKey, AuthMessage)
-    sb << "v=" << generateServerSignature();
-    *outputData = sb.str();
+    sb << "v=" << _secrets.generateServerSignature(_authMessage);
 
-    return false;
+    return std::make_tuple(false, sb.str());
 }
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(SASLSCRAMServerMechanism,
+                                     ("CreateSASLServerMechanismRegistry"))
+(::mongo::InitializerContext* context) {
+    auto& registry = SASLServerMechanismRegistry::get(getGlobalServiceContext());
+    registry.registerFactory<SCRAMSHA1ServerFactory>();
+    registry.registerFactory<SCRAMSHA256ServerFactory>();
+    return Status::OK();
+}
+
 }  // namespace mongo
