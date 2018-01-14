@@ -1,5 +1,6 @@
 // Certain commands should be run-able from arbiters under localhost, but not from
 // any other nodes in the replset.
+// @tags: [requires_replication]
 
 var name = "arbiter_localhost_test";
 var key = "jstests/libs/key1";

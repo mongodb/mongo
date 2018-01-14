@@ -1,5 +1,6 @@
 /*
  * Tests that resource pattern matching rules work as expected.
+ * @tags: [requires_replication, requires_sharding]
  */
 
 function setup_users(granter) {

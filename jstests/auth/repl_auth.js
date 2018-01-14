@@ -1,6 +1,7 @@
 /**
  * Test that the replica set connections to the secondaries will have the right auth credentials
  * even when these connections are shared within the same connection pool.
+ * @tags: [requires_replication]
  */
 
 var NUM_NODES = 3;

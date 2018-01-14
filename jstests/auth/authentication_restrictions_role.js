@@ -1,5 +1,6 @@
 /**
  * This test checks that authentication restrictions can be set on roles and respected.
+ * @tags: [requires_replication, requires_sharding]
  */
 
 (function() {

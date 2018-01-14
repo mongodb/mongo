@@ -32,6 +32,7 @@
  * First, it sets up a 1-node replicaset and adds some roles.
  * Then, it adds a second node to the replicaset, and verifies that the roles sync correctly.
  * Then, it runs a variety of operations on the primary, and ensures that they replicate correctly.
+ * @tags: [requires_replication]
  */
 
 (function() {

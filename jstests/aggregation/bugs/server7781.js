@@ -1,4 +1,5 @@
 // SERVER-7781 $geoNear pipeline stage
+// @tags: [requires_sharding]
 (function() {
     'use strict';
 

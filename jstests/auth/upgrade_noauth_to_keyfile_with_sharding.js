@@ -1,5 +1,6 @@
 // Tests access control upgrade on a sharded cluster
 // The purpose is to verify the connectivity between mongos, config server, and the shards
+// @tags: [requires_sharding]
 
 load('jstests/ssl/libs/ssl_helpers.js');
 

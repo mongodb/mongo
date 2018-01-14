@@ -1,5 +1,6 @@
 /**
  * Tests some practical use cases of the $facet stage.
+ * @tags: [requires_sharding]
  */
 (function() {
     "use strict";

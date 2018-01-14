@@ -2913,6 +2913,15 @@ tasks:
       run_multiple_jobs: false
 
 - <<: *task_template
+  name: disk_mobile
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=disk_mobile --storageEngine=mobile
+      run_multiple_jobs: false
+
+- <<: *task_template
   name: disk_wiredtiger
   commands:
   - func: "do setup"
@@ -8177,6 +8186,51 @@ buildvariants:
   - name: tool
   - name: update_fuzzer
   - name: update_fuzzer_replication
+
+- name: enterprise-rhel-62-64-bit-mobile
+  display_name: Enterprise RHEL 6.2 (mobile)
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
+    test_flags: --storageEngine=mobile --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_sharding,requires_replication
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    use_scons_cache: true
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
+  - name: aggregation
+  - name: aggregation_auth
+  - name: aggregation_facet_unwind_passthrough
+  - name: auth
+  - name: auth_audit
+  - name: disk_mobile
+  - name: failpoints
+  - name: failpoints_auth
+  - name: integration_tests_standalone
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_decimal
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_op_query
+  - name: jsonSchema
+  - name: aggregation_fuzzer
+  - name: rlp
+  - name: sasl
+  - name: session_jscore_passthrough
+  - name: snmp
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
