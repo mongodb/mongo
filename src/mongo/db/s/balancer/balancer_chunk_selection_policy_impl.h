@@ -69,7 +69,8 @@ private:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ShardStatisticsVector& shardStats,
-        bool aggressiveBalanceHint);
+        bool aggressiveBalanceHint,
+        std::set<ShardId>* usedShards);
 
     // Source for obtaining cluster statistics. Not owned and must not be destroyed before the
     // policy object is destroyed.
