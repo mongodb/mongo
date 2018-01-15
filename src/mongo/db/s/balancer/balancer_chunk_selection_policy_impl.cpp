@@ -32,7 +32,6 @@
 
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy_impl.h"
 
-#include <set>
 #include <vector>
 
 #include "mongo/base/status_with.h"
@@ -257,6 +256,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     }
 
     MigrateInfoVector candidateChunks;
+    std::set<ShardId> usedShards;
 
     for (const auto& coll : collections) {
         if (coll.getDropped()) {
@@ -270,8 +270,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
             continue;
         }
 
-        auto candidatesStatus =
-            _getMigrateCandidatesForCollection(opCtx, nss, shardStats, aggressiveBalanceHint);
+        auto candidatesStatus = _getMigrateCandidatesForCollection(
+            opCtx, nss, shardStats, aggressiveBalanceHint, &usedShards);
         if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
             // Namespace got dropped before we managed to get to it, so just skip it
             continue;
@@ -413,7 +413,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ShardStatisticsVector& shardStats,
-    bool aggressiveBalanceHint) {
+    bool aggressiveBalanceHint,
+    std::set<ShardId>* usedShards) {
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
     if (!routingInfoStatus.isOK()) {
@@ -470,7 +471,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::_getMigrateCandi
         }
     }
 
-    return BalancerPolicy::balance(shardStats, distribution, aggressiveBalanceHint);
+    return BalancerPolicy::balance(shardStats, distribution, aggressiveBalanceHint, usedShards);
 }
 
 }  // namespace mongo
