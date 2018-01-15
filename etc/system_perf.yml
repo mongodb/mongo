@@ -292,8 +292,17 @@ tasks:
           then
             echo "Fetching JS test DB correctness checks from directory jstests"
             cp -a jstests/* mongodb/jstests
+
+            echo "Now adding our own special run_validate_collections.js wrapper"
+            mv mongodb/jstests/hooks/run_validate_collections.js mongodb/jstests/hooks/run_validate_collections.actual.js
+
+            cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
+            print("NOTE: run_validate_collections.js will skip the oplog!");
+            TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
+            load('jstests/hooks/run_validate_collections.actual.js');
+          EOF
           fi
-          tar cvf mongodb.tar mongodb
+          tar cf mongodb.tar mongodb
           gzip mongodb.tar
     - command: s3.put
       params:
