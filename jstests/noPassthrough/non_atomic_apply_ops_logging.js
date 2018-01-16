@@ -1,5 +1,6 @@
 // SERVER-28594 Ensure non-atomic ops are individually logged in applyOps
 // and atomic ops are collectively logged in applyOps.
+// @tags: [requires_replication]
 (function() {
     "use strict";
 

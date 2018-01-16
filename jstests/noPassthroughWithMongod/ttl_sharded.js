@@ -4,6 +4,7 @@
  *  - Checks that both shards have TTL index, and docs get deleted on both shards.
  *  - Run the collMod command to update the expireAfterSeconds field. Check that more docs get
  *    deleted.
+ *  @tags: [requires_sharding]
  */
 
 // start up a new sharded cluster

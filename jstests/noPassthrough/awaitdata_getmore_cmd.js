@@ -1,4 +1,5 @@
 // Test the awaitData flag for the find/getMore commands.
+// @tags: [requires_replication]
 (function() {
     'use strict';
 

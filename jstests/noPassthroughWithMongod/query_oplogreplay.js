@@ -1,4 +1,5 @@
 // Test queries that set the OplogReplay flag.
+// @tags: [requires_replication]
 
 (function() {
     "use strict";

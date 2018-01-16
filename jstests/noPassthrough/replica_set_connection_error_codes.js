@@ -1,6 +1,7 @@
 /**
  * Tests that DBClientRS performs re-targeting when it sees an ErrorCodes.NotMaster error response
  * from a command even if "not master" doesn't appear in the message.
+ * @tags: [requires_replication]
  */
 (function() {
     "use strict";

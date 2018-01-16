@@ -3,6 +3,7 @@
  *          Check that the correct # of docs age out.
  *  Part 2: Add a new member to the set. Check that it also gets the correct # of docs.
  *  Part 3: Change the TTL expireAfterSeconds field and check successful propogation to secondary.
+ *  @tags: [requires_replication]
  */
 
 load("jstests/replsets/rslib.js");

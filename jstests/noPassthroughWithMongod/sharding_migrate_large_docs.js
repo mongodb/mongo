@@ -1,5 +1,6 @@
 //
 // Tests migration behavior of large documents
+// @tags: [requires_sharding]
 //
 
 var st = new ShardingTest({shards: 2, mongos: 1});

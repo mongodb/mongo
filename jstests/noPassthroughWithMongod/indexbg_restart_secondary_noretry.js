@@ -4,7 +4,7 @@
  * It should *not* build an index on the secondary on restart.
  */
 
-// @tags: [requires_persistence, requires_journaling]
+// @tags: [requires_persistence, requires_journaling, requires_replication]
 (function() {
     'use strict';
 

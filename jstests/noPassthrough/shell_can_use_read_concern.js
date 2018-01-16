@@ -1,6 +1,7 @@
 /**
  * Tests that read operations executed through the mongo shell's API are specify afterClusterTime
  * when causal consistency is enabled.
+ * @tags: [requires_replication]
  */
 (function() {
     "use strict";

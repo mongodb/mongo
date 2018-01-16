@@ -1,3 +1,4 @@
+// @tags: [requires_replication, requires_sharding]
 (function() {
     'use strict';
 

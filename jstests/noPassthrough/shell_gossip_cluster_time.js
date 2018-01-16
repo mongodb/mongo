@@ -1,6 +1,7 @@
 /**
  * Tests that the mongo shell gossips the greater of the client's clusterTime and the session's
  * clusterTime.
+ * @tags: [requires_replication]
  */
 (function() {
     "use strict";

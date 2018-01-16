@@ -1,6 +1,7 @@
 /**
  * Tests that the auto_retry_on_network_error.js override automatically retries commands on network
  * errors for commands run under a session.
+ * @tags: [requires_replication]
  */
 (function() {
     "use strict";

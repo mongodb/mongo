@@ -1,3 +1,5 @@
+// @tags: [requires_replication, requires_sharding]
+
 var name = "sharding_rs_arb1";
 var replTest = new ReplSetTest({name: name, nodes: 3});
 replTest.startSet();

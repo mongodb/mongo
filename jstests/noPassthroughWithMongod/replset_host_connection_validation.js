@@ -1,4 +1,6 @@
 // Test --host with a replica set.
+// @tags: [requires_replication]
+
 (function() {
     'use strict';
 

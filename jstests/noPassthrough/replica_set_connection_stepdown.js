@@ -1,6 +1,7 @@
 /**
  * Tests that DBClientRS doesn't do any re-targeting on replica set member state changes until it
  * sees a "not master" error response from a command.
+ * @tags: [requires_replication]
  */
 (function() {
     "use strict";

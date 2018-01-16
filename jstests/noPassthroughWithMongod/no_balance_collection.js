@@ -1,4 +1,5 @@
 // Tests whether the noBalance flag disables balancing for collections
+// @tags: [requires_sharding]
 
 var st = new ShardingTest({shards: 2, mongos: 1});
 

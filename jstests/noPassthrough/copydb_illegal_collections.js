@@ -2,6 +2,7 @@
  * This test creates a replica set and tries copying the local database. It expects an error on
  * the `copydb` command when it runs across an illegal namespace to copy, e.g:
  * `local.system.replset` -> `db2.system.replset`.
+ * @tags: [requires_replication]
  */
 (function() {
     "use strict";
