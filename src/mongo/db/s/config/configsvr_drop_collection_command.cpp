@@ -36,6 +36,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
@@ -151,7 +152,7 @@ public:
                 opCtx, dbStatus.getValue().value.getPrimary(), nss, &result);
         } else {
             uassertStatusOK(collStatus);
-            uassertStatusOK(catalogClient->dropCollection(opCtx, nss));
+            uassertStatusOK(ShardingCatalogManager::get(opCtx)->dropCollection(opCtx, nss));
         }
 
         return true;

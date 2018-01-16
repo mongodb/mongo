@@ -33,7 +33,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
@@ -114,7 +114,7 @@ public:
         ON_BLOCK_EXIT([&] { Client::destroy(); });
         Client::initThreadIfNotAlready("Test");
         auto opCtx = cc().makeOperationContext();
-        return catalogClient()->dropCollection(opCtx.get(), dropNS());
+        return ShardingCatalogManager::get(opCtx.get())->dropCollection(opCtx.get(), dropNS());
     }
 
     const NamespaceString& dropNS() const {

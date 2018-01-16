@@ -92,11 +92,6 @@ StatusWith<std::vector<CollectionType>> ShardingCatalogClientMock::getCollection
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-Status ShardingCatalogClientMock::dropCollection(OperationContext* opCtx,
-                                                 const NamespaceString& ns) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
-}
-
 StatusWith<std::vector<std::string>> ShardingCatalogClientMock::getDatabasesForShard(
     OperationContext* opCtx, const ShardId& shardName) {
     return {ErrorCodes::InternalError, "Method not implemented"};

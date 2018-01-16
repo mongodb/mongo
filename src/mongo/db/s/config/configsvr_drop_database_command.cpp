@@ -146,7 +146,7 @@ public:
         for (const auto& nss : catalogManager->getAllShardedCollectionsForDb(opCtx, dbname)) {
             auto collDistLock = uassertStatusOK(catalogClient->getDistLockManager()->lock(
                 opCtx, nss.ns(), "dropCollection", DistLockManager::kDefaultLockTimeout));
-            uassertStatusOK(catalogClient->dropCollection(opCtx, nss));
+            uassertStatusOK(catalogManager->dropCollection(opCtx, nss));
         }
 
         // Drop the database from the primary shard first.

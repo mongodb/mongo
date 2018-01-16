@@ -163,15 +163,6 @@ public:
         repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
-     * Drops the specified collection from the collection metadata store.
-     *
-     * Returns Status::OK if successful or any error code indicating the failure. These are
-     * some of the known failures:
-     *  - NamespaceNotFound - collection does not exist
-     */
-    virtual Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) = 0;
-
-    /**
      * Retrieves all databases for a shard.
      *
      * Returns a !OK status if an error occurs.

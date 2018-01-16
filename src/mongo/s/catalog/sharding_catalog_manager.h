@@ -223,6 +223,16 @@ public:
     //
 
     /**
+     * Drops the specified collection from the collection metadata store.
+     *
+     * Returns Status::OK if successful or any error code indicating the failure. These are
+     * some of the known failures:
+     *  - NamespaceNotFound - collection does not exist
+     */
+    Status dropCollection(OperationContext* opCtx, const NamespaceString& ns);
+
+
+    /**
      * Shards a collection. Assumes that the database is enabled for sharding.
      *
      * @param ns: namespace of collection to shard
@@ -246,6 +256,7 @@ public:
                          const std::vector<BSONObj>& initPoints,
                          const bool distributeInitialChunks,
                          const ShardId& dbPrimaryShardId);
+
 
     /**
      * Iterates through each entry in config.collections that does not have a UUID, generates a UUID

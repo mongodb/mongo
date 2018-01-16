@@ -102,8 +102,6 @@ public:
         repl::OpTime* optime,
         repl::ReadConcernLevel readConcernLevel) override;
 
-    Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) override;
-
     StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
                                                               const ShardId& shardName) override;
 
