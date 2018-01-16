@@ -546,7 +546,7 @@
             }
         ]
     }));
-    assert.eq(res.code, 50659);
+    assert.eq(res.code, 40682);
 
     // When we explicitly specify {$v: 1}, we should get 'UpdateNode' update semantics, and $set
     // operations get performed in lexicographic order.

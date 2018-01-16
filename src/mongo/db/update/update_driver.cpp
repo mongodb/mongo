@@ -69,7 +69,7 @@ StatusWith<UpdateSemantics> updateSemanticsFromElement(BSONElement element) {
 
     // As of 3.7, we only support one version of the update language.
     if (updateSemantics != static_cast<int>(UpdateSemantics::kUpdateNode)) {
-        return {ErrorCodes::Error(50659),
+        return {ErrorCodes::Error(40682),
                 str::stream() << "Unrecognized value for '$v' (UpdateSemantics) field: "
                               << updateSemantics};
     }
