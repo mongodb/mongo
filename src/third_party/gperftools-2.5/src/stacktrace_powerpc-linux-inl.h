@@ -52,7 +52,6 @@
 #elif defined(HAVE_UCONTEXT_H)
 #include <ucontext.h>  // for ucontext_t
 #endif
-typedef ucontext ucontext_t;
 
 // PowerPC64 Little Endian follows BE wrt. backchain, condition register,
 // and LR save area, so no need to adjust the reading struct.
