@@ -99,12 +99,7 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
                                    shardId.toString(),
                                    collectionVersion.epoch());
 
-    if (!status.isOK()) {
-        return {status.getStatus().code(),
-                str::stream() << "split failed due to " << status.getStatus().reason()};
-    }
-
-    return status.getStatus();
+    return status.getStatus().withContext("split failed");
 }
 
 /**

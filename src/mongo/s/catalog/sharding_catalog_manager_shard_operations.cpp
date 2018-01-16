@@ -213,9 +213,8 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
     const auto existingShards = Grid::get(opCtx)->catalogClient()->getAllShards(
         opCtx, repl::ReadConcernLevel::kLocalReadConcern);
     if (!existingShards.isOK()) {
-        return Status(existingShards.getStatus().code(),
-                      str::stream() << "Failed to load existing shards during addShard"
-                                    << causedBy(existingShards.getStatus().reason()));
+        return existingShards.getStatus().withContext(
+            "Failed to load existing shards during addShard");
     }
 
     // Now check if this shard already exists - if it already exists *with the same options* then
@@ -307,10 +306,10 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     auto swCommandResponse =
         _runCommandForAddShard(opCtx, targeter.get(), "admin", BSON("isMaster" << 1));
     if (swCommandResponse.getStatus() == ErrorCodes::IncompatibleServerVersion) {
-        return {swCommandResponse.getStatus().code(),
-                str::stream() << "Cannot add " << connectionString.toString()
-                              << " as a shard because its binary version is not compatible with "
-                                 "the cluster's featureCompatibilityVersion."};
+        return swCommandResponse.getStatus().withReason(
+            str::stream() << "Cannot add " << connectionString.toString()
+                          << " as a shard because its binary version is not compatible with "
+                             "the cluster's featureCompatibilityVersion.");
     } else if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }
@@ -318,11 +317,9 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     // Check for a command response error
     auto resIsMasterStatus = std::move(swCommandResponse.getValue().commandStatus);
     if (!resIsMasterStatus.isOK()) {
-        return {resIsMasterStatus.code(),
-                str::stream() << "Error running isMaster against "
-                              << targeter->connectionString().toString()
-                              << ": "
-                              << causedBy(resIsMasterStatus)};
+        return resIsMasterStatus.withContext(str::stream()
+                                             << "Error running isMaster against "
+                                             << targeter->connectionString().toString());
     }
 
     auto resIsMaster = std::move(swCommandResponse.getValue().response);
@@ -341,12 +338,10 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     long long maxWireVersion;
     Status status = bsonExtractIntegerField(resIsMaster, "maxWireVersion", &maxWireVersion);
     if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "isMaster returned invalid 'maxWireVersion' "
-                                    << "field when attempting to add "
-                                    << connectionString.toString()
-                                    << " as a shard: "
-                                    << status.reason());
+        return status.withContext(str::stream() << "isMaster returned invalid 'maxWireVersion' "
+                                                << "field when attempting to add "
+                                                << connectionString.toString()
+                                                << " as a shard");
     }
     if (serverGlobalParams.featureCompatibility.getVersion() ==
         ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
@@ -360,12 +355,10 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     bool isMaster;
     status = bsonExtractBooleanField(resIsMaster, "ismaster", &isMaster);
     if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "isMaster returned invalid 'ismaster' "
-                                    << "field when attempting to add "
-                                    << connectionString.toString()
-                                    << " as a shard: "
-                                    << status.reason());
+        return status.withContext(str::stream() << "isMaster returned invalid 'ismaster' "
+                                                << "field when attempting to add "
+                                                << connectionString.toString()
+                                                << " as a shard");
     }
     if (!isMaster) {
         return {ErrorCodes::NotMaster,
@@ -626,12 +619,9 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     auto res = _dropSessionsCollection(opCtx, targeter);
 
     if (!res.isOK()) {
-        return Status(
-            res.code(),
-            str::stream()
-                << "can't add shard with a local copy of config.system.sessions due to "
-                << res.reason()
-                << ", please drop this collection from the shard manually and try again.");
+        return res.withContext(
+            "can't add shard with a local copy of config.system.sessions, please drop this "
+            "collection from the shard manually and try again.");
     }
 
     // If a name for a shard wasn't provided, generate one

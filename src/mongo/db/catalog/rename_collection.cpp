@@ -236,13 +236,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
     auto tmpNameResult =
         targetDB->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.renameCollection");
     if (!tmpNameResult.isOK()) {
-        return Status(tmpNameResult.getStatus().code(),
-                      str::stream() << "Cannot generate temporary collection name to rename "
-                                    << source.ns()
-                                    << " to "
-                                    << target.ns()
-                                    << ": "
-                                    << tmpNameResult.getStatus().reason());
+        return tmpNameResult.getStatus().withContext(
+            str::stream() << "Cannot generate temporary collection name to rename " << source.ns()
+                          << " to "
+                          << target.ns());
     }
     const auto& tmpName = tmpNameResult.getValue();
 

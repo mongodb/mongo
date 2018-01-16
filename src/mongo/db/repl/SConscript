@@ -1047,6 +1047,7 @@ env.Library('replica_set_messages',
                 '$BUILD_DIR/mongo/db/server_options_core',
                 '$BUILD_DIR/mongo/transport/transport_layer_common',
                 '$BUILD_DIR/mongo/util/net/network',
+                '$BUILD_DIR/mongo/rpc/command_status',
                 'optime',
                 'read_concern_args',
             ])

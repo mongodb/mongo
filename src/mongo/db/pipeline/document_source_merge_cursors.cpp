@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
 
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
 
@@ -140,11 +141,9 @@ void DocumentSourceMergeCursors::start() {
 Document DocumentSourceMergeCursors::nextSafeFrom(DBClientCursor* cursor) {
     const BSONObj next = cursor->next();
     if (next.hasField("$err")) {
-        const int code = next.hasField("code") ? next["code"].numberInt() : 17029;
-        uasserted(code,
-                  str::stream() << "Received error in response from " << cursor->originalHost()
-                                << ": "
-                                << next);
+        uassertStatusOKWithContext(getStatusFromCommandResult(next),
+                                   str::stream() << "Received error in response from "
+                                                 << cursor->originalHost());
     }
     return Document::fromBsonWithMetaData(next);
 }

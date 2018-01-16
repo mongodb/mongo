@@ -655,10 +655,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // Standard aggregations swallow 'NamespaceNotFound' and return an empty cursor with id 0 in
         // the event that the database does not exist. For $changeStream aggregations, however, we
         // throw the exception in all error cases, including that of a non-existent database.
-        uassert(executionNsRoutingInfoStatus.getStatus().code(),
-                str::stream() << "failed to open $changeStream: "
-                              << executionNsRoutingInfoStatus.getStatus().reason(),
-                !liteParsedPipeline.hasChangeStream());
+        if (liteParsedPipeline.hasChangeStream()) {
+            uassertStatusOKWithContext(executionNsRoutingInfoStatus.getStatus(),
+                                       "failed to open $changeStream");
+        }
         appendEmptyResultSet(
             *result, executionNsRoutingInfoStatus.getStatus(), namespaces.requestedNss.ns());
         return Status::OK();

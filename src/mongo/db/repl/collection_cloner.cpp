@@ -304,13 +304,9 @@ void CollectionCloner::_countCallback(
     }
 
     if (!args.response.status.isOK()) {
-        _finishCallback({args.response.status.code(),
-                         str::stream() << "During count call on collection '" << _sourceNss.ns()
-                                       << "' from "
-                                       << _source.toString()
-                                       << ", there was an error '"
-                                       << args.response.status.reason()
-                                       << "'"});
+        _finishCallback(args.response.status.withContext(
+            str::stream() << "Count call failed on collection '" << _sourceNss.ns() << "' from "
+                          << _source.toString()));
         return;
     }
 
@@ -320,27 +316,20 @@ void CollectionCloner::_countCallback(
         // Querying by a non-existing collection by UUID returns an error. Treat same as
         // behavior of find by namespace and use count == 0.
     } else if (!commandStatus.isOK()) {
-        _finishCallback({commandStatus.code(),
-                         str::stream() << "During count call on collection '" << _sourceNss.ns()
-                                       << "' from "
-                                       << _source.toString()
-                                       << ", there was a command error '"
-                                       << commandStatus.reason()
-                                       << "'"});
+        _finishCallback(commandStatus.withContext(
+            str::stream() << "Count call failed on collection '" << _sourceNss.ns() << "' from "
+                          << _source.toString()));
         return;
     } else {
         auto countStatus = bsonExtractIntegerField(
             args.response.data, kCountResponseDocumentCountFieldName, &count);
         if (!countStatus.isOK()) {
-            _finishCallback({countStatus.code(),
-                             str::stream()
-                                 << "There was an error parsing document count from count "
-                                    "command result on collection "
-                                 << _sourceNss.ns()
-                                 << " from "
-                                 << _source.toString()
-                                 << ": "
-                                 << countStatus.reason()});
+            _finishCallback(countStatus.withContext(
+                str::stream() << "There was an error parsing document count from count "
+                                 "command result on collection "
+                              << _sourceNss.ns()
+                              << " from "
+                              << _source.toString()));
             return;
         }
     }
@@ -391,14 +380,8 @@ void CollectionCloner::_listIndexesCallback(const Fetcher::QueryResponseStatus& 
         return;
     };
     if (!fetchResult.isOK()) {
-        Status newStatus{fetchResult.getStatus().code(),
-                         str::stream() << "During listIndexes call on collection '"
-                                       << _sourceNss.ns()
-                                       << "' there was an error '"
-                                       << fetchResult.getStatus().reason()
-                                       << "'"};
-
-        _finishCallback(newStatus);
+        _finishCallback(fetchResult.getStatus().withContext(
+            str::stream() << "listIndexes call failed on collection '" << _sourceNss.ns() << "'"));
         return;
     }
 
@@ -553,14 +536,10 @@ Status CollectionCloner::_parseCursorResponse(BSONObj response,
         case Find: {
             StatusWith<CursorResponse> findResponse = CursorResponse::parseFromBSON(response);
             if (!findResponse.isOK()) {
-                Status errorStatus{findResponse.getStatus().code(),
-                                   str::stream()
-                                       << "While parsing the 'find' query against collection '"
-                                       << _sourceNss.ns()
-                                       << "' there was an error '"
-                                       << findResponse.getStatus().reason()
-                                       << "'"};
-                return errorStatus;
+                return findResponse.getStatus().withContext(
+                    str::stream() << "Error parsing the 'find' query against collection '"
+                                  << _sourceNss.ns()
+                                  << "'");
             }
             cursors->push_back(std::move(findResponse.getValue()));
             break;
@@ -619,12 +598,8 @@ void CollectionCloner::_establishCollectionCursorsCallback(const RemoteCommandCa
         return;
     }
     if (!commandStatus.isOK()) {
-        Status newStatus{commandStatus.code(),
-                         str::stream() << "While querying collection '" << _sourceNss.ns()
-                                       << "' there was an error '"
-                                       << commandStatus.reason()
-                                       << "'"};
-        _finishCallback(commandStatus);
+        _finishCallback(commandStatus.withContext(
+            str::stream() << "Error querying collection '" << _sourceNss.ns() << "'"));
         return;
     }
 
@@ -743,11 +718,8 @@ void CollectionCloner::_handleARMResultsCallback(
     if (!cbd.status.isOK()) {
         // Wait for active inserts to complete.
         waitForDbWorker();
-        Status newStatus{cbd.status.code(),
-                         str::stream() << "While querying collection '" << _sourceNss.ns()
-                                       << "' there was an error '"
-                                       << cbd.status.reason()
-                                       << "'"};
+        Status newStatus = cbd.status.withContext(str::stream() << "Error querying collection '"
+                                                                << _sourceNss.ns());
         setResultAndCancelRemainingWork(onCompletionGuard, cbd.status);
         return;
     }
@@ -781,11 +753,8 @@ void CollectionCloner::_handleARMResultsCallback(
         _insertDocumentsCallback(cbd, lastBatch, onCompletionGuard);
     });
     if (!scheduleResult.isOK()) {
-        Status newStatus{scheduleResult.getStatus().code(),
-                         str::stream() << "While cloning collection '" << _sourceNss.ns()
-                                       << "' there was an error '"
-                                       << scheduleResult.getStatus().reason()
-                                       << "'"};
+        Status newStatus = scheduleResult.getStatus().withContext(
+            str::stream() << "Error cloning collection '" << _sourceNss.ns() << "'");
         setResultAndCancelRemainingWork(onCompletionGuard, scheduleResult.getStatus());
         return;
     }

@@ -424,9 +424,8 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
                 "$expr is not allowed in the query predicate for an upsert"};
     }
     if (!cq.isOK()) {
-        return {cq.getStatus().code(),
-                str::stream() << "Could not parse update query " << updateDoc.getQ()
-                              << causedBy(cq.getStatus())};
+        return cq.getStatus().withContext(str::stream() << "Could not parse update query "
+                                                        << updateDoc.getQ());
     }
 
     // Single (non-multi) updates must target a single shard or be exact-ID.
@@ -498,9 +497,8 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetDelete(
                                            ExtensionsCallbackNoop(),
                                            MatchExpressionParser::kAllowAllSpecialFeatures);
     if (!cq.isOK()) {
-        return Status(cq.getStatus().code(),
-                      str::stream() << "Could not parse delete query " << deleteDoc.getQ()
-                                    << causedBy(cq.getStatus()));
+        return cq.getStatus().withContext(str::stream() << "Could not parse delete query "
+                                                        << deleteDoc.getQ());
     }
 
     // Single deletes must target a single shard or be exact-ID.

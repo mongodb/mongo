@@ -177,10 +177,11 @@ Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefiniti
         // will also return the set of involved namespaces.
         auto pipelineStatus = _validatePipeline_inlock(opCtx, viewDef);
         if (!pipelineStatus.isOK()) {
-            uassert(pipelineStatus.getStatus().code(),
-                    str::stream() << "Invalid pipeline for view " << viewDef.name().ns() << "; "
-                                  << pipelineStatus.getStatus().reason(),
-                    !needsValidation);
+            if (needsValidation) {
+                uassertStatusOKWithContext(pipelineStatus.getStatus(),
+                                           str::stream() << "Invalid pipeline for view "
+                                                         << viewDef.name().ns());
+            }
             return pipelineStatus.getStatus();
         }
 

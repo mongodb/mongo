@@ -207,10 +207,8 @@ public:
             shardSubTotal.doneFast();
             // Add error context so that you can see on which shard failed as well as details
             // about that error.
-            auto errorWithContext = Status(status.code(),
-                                           str::stream() << "failed on: " << response.shardId
-                                                         << causedBy(status.reason()));
-            return CommandHelpers::appendCommandStatus(result, errorWithContext);
+            return CommandHelpers::appendCommandStatus(
+                result, status.withContext(str::stream() << "failed on: " << response.shardId));
         }
 
         shardSubTotal.doneFast();

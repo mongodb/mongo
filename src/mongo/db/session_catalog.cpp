@@ -134,11 +134,11 @@ void SessionCatalog::onStepUp(OperationContext* opCtx) {
         return;
     }
 
-    uasserted(status.code(),
-              str::stream() << "Failed to create the "
-                            << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                            << " collection due to "
-                            << status.reason());
+    uassertStatusOKWithContext(status,
+                               str::stream()
+                                   << "Failed to create the "
+                                   << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                                   << " collection");
 }
 
 ScopedCheckedOutSession SessionCatalog::checkOutSession(OperationContext* opCtx) {

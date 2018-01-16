@@ -187,8 +187,7 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
                 if (option.fieldNameStringData() == "storageEngine") {
                     Status status = checkStorageEngineOptions(option);
                     if (!status.isOK()) {
-                        return {status.code(),
-                                str::stream() << "In indexOptionDefaults: " << status.reason()};
+                        return status.withContext("Error in indexOptionDefaults");
                     }
                 } else {
                     // Return an error on first unrecognized field.

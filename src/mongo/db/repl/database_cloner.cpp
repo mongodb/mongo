@@ -271,13 +271,10 @@ void DatabaseCloner::_listCollectionsCallback(const StatusWith<Fetcher::QueryRes
                                               Fetcher::NextAction* nextAction,
                                               BSONObjBuilder* getMoreBob) {
     if (!result.isOK()) {
-        _finishCallback({result.getStatus().code(),
-                         str::stream() << "While issuing listCollections on db '" << _dbname
-                                       << "' (host:"
-                                       << _source.toString()
-                                       << ") there was an error '"
-                                       << result.getStatus().reason()
-                                       << "'"});
+        _finishCallback(result.getStatus().withContext(
+            str::stream() << "Error issuing listCollections on db '" << _dbname << "' (host:"
+                          << _source.toString()
+                          << ")"));
         return;
     }
 
@@ -438,11 +435,8 @@ void DatabaseCloner::_collectionClonerCallback(const Status& status, const Names
 
     UniqueLock lk(_mutex);
     if (!status.isOK()) {
-        newStatus = {status.code(),
-                     str::stream() << "While cloning collection '" << nss.toString()
-                                   << "' there was an error '"
-                                   << status.reason()
-                                   << "'"};
+        newStatus = status.withContext(
+            str::stream() << "Error cloning collection '" << nss.toString() << "'");
         _failedNamespaces.push_back({newStatus, nss});
     }
     ++_stats.clonedCollections;

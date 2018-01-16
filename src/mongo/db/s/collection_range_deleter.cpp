@@ -188,10 +188,8 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
                 stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
                 css->_metadataManager->_clearAllCleanups(
                     scopedLock,
-                    {e.code(),
-                     str::stream() << "cannot push startRangeDeletion record to Op Log,"
-                                      " abandoning scheduled range deletions: "
-                                   << e.what()});
+                    e.toStatus("cannot push startRangeDeletion record to Op Log,"
+                               " abandoning scheduled range deletions"));
                 return boost::none;
             }
         }

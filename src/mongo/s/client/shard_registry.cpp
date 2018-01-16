@@ -377,17 +377,12 @@ void ShardRegistry::replicaSetChangeConfigServerUpdateHook(const std::string& se
 ////////////// ShardRegistryData //////////////////
 
 ShardRegistryData::ShardRegistryData(OperationContext* opCtx, ShardFactory* shardFactory) {
-    auto shardsStatus =
-        grid.catalogClient()->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto shardsAndOpTime = uassertStatusOKWithContext(
+        grid.catalogClient()->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern),
+        "could not get updated shard list from config server");
 
-    if (!shardsStatus.isOK()) {
-        uasserted(shardsStatus.getStatus().code(),
-                  str::stream() << "could not get updated shard list from config server due to "
-                                << shardsStatus.getStatus().reason());
-    }
-
-    auto shards = std::move(shardsStatus.getValue().value);
-    auto reloadOpTime = std::move(shardsStatus.getValue().opTime);
+    auto shards = std::move(shardsAndOpTime.value);
+    auto reloadOpTime = std::move(shardsAndOpTime.opTime);
 
     LOG(1) << "found " << shards.size()
            << " shards listed on config server(s) with lastVisibleOpTime: "

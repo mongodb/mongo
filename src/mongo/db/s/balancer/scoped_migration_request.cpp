@@ -115,13 +115,11 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
                     BSONObj(),
                     boost::none);
             if (!statusWithMigrationQueryResult.isOK()) {
-                return {statusWithMigrationQueryResult.getStatus().code(),
-                        str::stream()
-                            << "Failed to verify whether conflicting migration is in "
-                            << "progress for migration '"
-                            << redact(migrateInfo.toString())
-                            << "' while trying to query config.migrations."
-                            << causedBy(redact(statusWithMigrationQueryResult.getStatus()))};
+                return statusWithMigrationQueryResult.getStatus().withContext(
+                    str::stream() << "Failed to verify whether conflicting migration is in "
+                                  << "progress for migration '"
+                                  << redact(migrateInfo.toString())
+                                  << "' while trying to query config.migrations.");
             }
             if (statusWithMigrationQueryResult.getValue().docs.empty()) {
                 // The document that caused the DuplicateKey error is no longer in the collection,
@@ -133,14 +131,13 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
             BSONObj activeMigrationBSON = statusWithMigrationQueryResult.getValue().docs.front();
             auto statusWithActiveMigration = MigrationType::fromBSON(activeMigrationBSON);
             if (!statusWithActiveMigration.isOK()) {
-                return {statusWithActiveMigration.getStatus().code(),
-                        str::stream() << "Failed to verify whether conflicting migration is in "
-                                      << "progress for migration '"
-                                      << redact(migrateInfo.toString())
-                                      << "' while trying to parse active migration document '"
-                                      << redact(activeMigrationBSON.toString())
-                                      << "'."
-                                      << causedBy(redact(statusWithActiveMigration.getStatus()))};
+                return statusWithActiveMigration.getStatus().withContext(
+                    str::stream() << "Failed to verify whether conflicting migration is in "
+                                  << "progress for migration '"
+                                  << redact(migrateInfo.toString())
+                                  << "' while trying to parse active migration document '"
+                                  << redact(activeMigrationBSON.toString())
+                                  << "'.");
             }
 
             MigrateInfo activeMigrateInfo = statusWithActiveMigration.getValue().toMigrateInfo();

@@ -100,11 +100,15 @@ void AsyncSecureStream::_handleConnect(asio::ip::tcp::resolver::iterator iter) {
 void AsyncSecureStream::_handleHandshake(std::error_code ec, const std::string& hostName) {
     auto certStatus =
         getSSLManager()->parseAndValidatePeerCertificate(_stream.native_handle(), hostName);
-    if (!certStatus.isOK()) {
+    if (certStatus.isOK()) {
+        _userHandler(make_error_code(ErrorCodes::OK));
+    } else {
         warning() << "Failed to validate peer certificate during SSL handshake: "
                   << certStatus.getStatus();
+        // We aren't able to propagate error extra info through here so make sure we only use a code
+        // that won't have any.
+        _userHandler(make_error_code(ErrorCodes::SSLHandshakeFailed));
     }
-    _userHandler(make_error_code(certStatus.getStatus().code()));
 }
 
 void AsyncSecureStream::cancel() {

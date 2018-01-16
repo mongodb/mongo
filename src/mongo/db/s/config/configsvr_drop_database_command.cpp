@@ -168,12 +168,8 @@ public:
                                                  DatabaseType::ConfigNS,
                                                  BSON(DatabaseType::name(dbname)),
                                                  ShardingCatalogClient::kMajorityWriteConcern);
-        if (!status.isOK()) {
-            uassertStatusOK({status.code(),
-                             str::stream() << "Could not remove database '" << dbname
-                                           << "' from metadata due to "
-                                           << status.reason()});
-        }
+        uassertStatusOKWithContext(
+            status, str::stream() << "Could not remove database '" << dbname << "' from metadata");
 
         catalogClient
             ->logChange(opCtx,

@@ -503,10 +503,9 @@ bool Pipeline::requiredToRunOnMongos() const {
             // Verify that the remainder of this pipeline can run on mongoS.
             auto mongosRunStatus = _pipelineCanRunOnMongoS();
 
-            uassert(mongosRunStatus.code(),
-                    str::stream() << stage->getSourceName() << " must run on mongoS, but "
-                                  << mongosRunStatus.reason(),
-                    mongosRunStatus.isOK());
+            uassertStatusOKWithContext(mongosRunStatus,
+                                       str::stream() << stage->getSourceName()
+                                                     << " must run on mongoS, but cannot");
 
             return true;
         }

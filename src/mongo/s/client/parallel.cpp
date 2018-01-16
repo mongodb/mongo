@@ -68,8 +68,7 @@ void throwCursorError(DBClientCursor* cursor) {
     verify(cursor);
 
     if (cursor->hasResultFlag(ResultFlag_ErrSet)) {
-        BSONObj o = cursor->next();
-        uasserted(o["code"].numberInt(), o["$err"].str());
+        uassertStatusOK(getStatusFromCommandResult(cursor->next()));
     }
 }
 

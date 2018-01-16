@@ -263,11 +263,9 @@ Status CollectionShardingState::waitForClean(OperationContext* opCtx,
 
         Status result = stillScheduled->waitStatus(opCtx);
         if (!result.isOK()) {
-            return {result.code(),
-                    str::stream() << "Failed to delete orphaned " << nss.ns() << " range "
-                                  << orphanRange.toString()
-                                  << " due to "
-                                  << result.reason()};
+            return result.withContext(str::stream() << "Failed to delete orphaned " << nss.ns()
+                                                    << " range "
+                                                    << orphanRange.toString());
         }
     }
 

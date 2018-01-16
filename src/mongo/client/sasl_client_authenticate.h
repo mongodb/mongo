@@ -95,9 +95,6 @@ extern const char* const saslContinueCommandName;
 /// connection all privileges associated with the user after successful authentication.
 extern const char* const saslCommandAutoAuthorizeFieldName;
 
-/// Name of the field contain the status code in responses from the server.
-extern const char* const saslCommandCodeFieldName;
-
 /// Name of the field containing the conversation identifier in server respones and saslContinue
 /// commands.
 extern const char* const saslCommandConversationIdFieldName;
@@ -105,9 +102,6 @@ extern const char* const saslCommandConversationIdFieldName;
 /// Name of the field that indicates whether or not the server believes authentication has
 /// completed successfully.
 extern const char* const saslCommandDoneFieldName;
-
-/// Field in which  to store error messages associated with non-success return codes.
-extern const char* const saslCommandErrmsgFieldName;
 
 /// Name of parameter to saslStart command indiciating the client's desired sasl mechanism.
 extern const char* const saslCommandMechanismFieldName;

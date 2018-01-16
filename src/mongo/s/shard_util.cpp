@@ -204,7 +204,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
 
     if (!status.isOK()) {
         log() << "Split chunk " << redact(cmdObj) << " failed" << causedBy(redact(status));
-        return {status.code(), str::stream() << "split failed due to " << status.toString()};
+        return status.withContext("split failed");
     }
 
     BSONElement shouldMigrateElement;

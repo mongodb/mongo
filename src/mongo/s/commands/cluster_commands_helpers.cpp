@@ -338,6 +338,12 @@ bool appendRawResponses(OperationContext* opCtx,
         if (commonErrCode > 0) {
             output->append("code", commonErrCode);
             output->append("codeName", ErrorCodes::errorString(ErrorCodes::Error(commonErrCode)));
+            if (errors.size() == 1) {
+                // Only propagate extra info if there was a single error object.
+                if (auto extraInfo = errors.begin()->second.extraInfo()) {
+                    extraInfo->serialize(output);
+                }
+            }
         }
         return false;
     }
@@ -427,9 +433,7 @@ StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, Stri
         return dbStatus;
     }
 
-    return {dbStatus.getStatus().code(),
-            str::stream() << "Database " << dbName << " not found due to "
-                          << dbStatus.getStatus().reason()};
+    return dbStatus.getStatus().withContext(str::stream() << "Database " << dbName << " not found");
 }
 
 }  // namespace mongo

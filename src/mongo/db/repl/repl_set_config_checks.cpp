@@ -275,10 +275,8 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
 
     status = newConfig.checkIfWriteConcernCanBeSatisfied(newConfig.getDefaultWriteConcern());
     if (!status.isOK()) {
-        return StatusWith<int>(
-            status.code(),
-            str::stream() << "Found invalid default write concern in 'getLastErrorDefaults' field"
-                          << causedBy(status.reason()));
+        return status.withContext(
+            "Found invalid default write concern in 'getLastErrorDefaults' field");
     }
 
     status = validateArbiterPriorities(newConfig);
@@ -307,10 +305,8 @@ StatusWith<int> validateConfigForReconfig(ReplicationCoordinatorExternalState* e
 
     status = newConfig.checkIfWriteConcernCanBeSatisfied(newConfig.getDefaultWriteConcern());
     if (!status.isOK()) {
-        return StatusWith<int>(
-            status.code(),
-            str::stream() << "Found invalid default write concern in 'getLastErrorDefaults' field"
-                          << causedBy(status.reason()));
+        return status.withContext(
+            "Found invalid default write concern in 'getLastErrorDefaults' field");
     }
 
     status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);

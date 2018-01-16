@@ -271,7 +271,7 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
             errorMsg << ". " << error;
         }
         errorMsg << ".";
-        return {status.code(), errorMsg.str()};
+        return status.withReason(errorMsg.stringData());
     }
     return Status::OK();
 }

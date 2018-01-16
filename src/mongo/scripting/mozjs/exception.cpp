@@ -131,8 +131,8 @@ Status JSErrorReportToStatus(JSContext* cx,
 }
 
 void throwCurrentJSException(JSContext* cx, ErrorCodes::Error altCode, StringData altReason) {
-    auto status = currentJSExceptionToStatus(cx, altCode, altReason);
-    uasserted(status.code(), status.reason());
+    uassertStatusOK(currentJSExceptionToStatus(cx, altCode, altReason));
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace mozjs

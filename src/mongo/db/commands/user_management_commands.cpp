@@ -87,6 +87,12 @@ namespace {
 // Used to obtain mutex that guards modifications to persistent authorization data
 const auto getAuthzDataMutex = ServiceContext::declareDecoration<stdx::mutex>();
 
+Status useDefaultCode(const Status& status, ErrorCodes::Error defaultCode) {
+    if (status.code() != ErrorCodes::UnknownError)
+        return status;
+    return Status(defaultCode, status.reason());
+}
+
 BSONArray roleSetToBSONArray(const unordered_set<RoleName>& roles) {
     BSONArrayBuilder rolesArrayBuilder;
     for (unordered_set<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
@@ -1986,15 +1992,11 @@ public:
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
         if (!status.isOK()) {
-            ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError
-                ? ErrorCodes::UserModificationFailed
-                : status.code();
             return CommandHelpers::appendCommandStatus(
                 result,
-                Status(code,
-                       str::stream() << "Failed to remove role " << roleName.getFullName()
-                                     << " from all users: "
-                                     << status.reason()));
+                useDefaultCode(status, ErrorCodes::UserModificationFailed)
+                    .withContext(str::stream() << "Failed to remove role " << roleName.getFullName()
+                                               << " from all users"));
         }
 
         // Remove this role from all other roles
@@ -2015,15 +2017,12 @@ public:
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
         if (!status.isOK()) {
-            ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError
-                ? ErrorCodes::RoleModificationFailed
-                : status.code();
             return CommandHelpers::appendCommandStatus(
                 result,
-                Status(code,
-                       str::stream() << "Removed role " << roleName.getFullName()
-                                     << " from all users but failed to remove from all roles: "
-                                     << status.reason()));
+                useDefaultCode(status, ErrorCodes::RoleModificationFailed)
+                    .withContext(
+                        str::stream() << "Removed role " << roleName.getFullName()
+                                      << " from all users but failed to remove from all roles"));
         }
 
         audit::logDropRole(Client::getCurrent(), roleName);
@@ -2039,11 +2038,10 @@ public:
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatus(
                 result,
-                Status(status.code(),
-                       str::stream() << "Removed role " << roleName.getFullName()
-                                     << " from all users and roles but failed to actually delete"
-                                        " the role itself: "
-                                     << status.reason()));
+                status.withContext(
+                    str::stream() << "Removed role " << roleName.getFullName()
+                                  << " from all users and roles but failed to actually delete"
+                                     " the role itself"));
         }
 
         dassert(nMatched == 0 || nMatched == 1);
@@ -2118,15 +2116,11 @@ public:
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
         if (!status.isOK()) {
-            ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError
-                ? ErrorCodes::UserModificationFailed
-                : status.code();
             return CommandHelpers::appendCommandStatus(
                 result,
-                Status(code,
-                       str::stream() << "Failed to remove roles from \"" << dbname
-                                     << "\" db from all users: "
-                                     << status.reason()));
+                useDefaultCode(status, ErrorCodes::UserModificationFailed)
+                    .withContext(str::stream() << "Failed to remove roles from \"" << dbname
+                                               << "\" db from all users"));
         }
 
         // Remove these roles from all other roles
@@ -2144,15 +2138,11 @@ public:
         // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
         authzManager->invalidateUserCache();
         if (!status.isOK()) {
-            ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError
-                ? ErrorCodes::RoleModificationFailed
-                : status.code();
             return CommandHelpers::appendCommandStatus(
                 result,
-                Status(code,
-                       str::stream() << "Failed to remove roles from \"" << dbname
-                                     << "\" db from all roles: "
-                                     << status.reason()));
+                useDefaultCode(status, ErrorCodes::RoleModificationFailed)
+                    .withContext(str::stream() << "Failed to remove roles from \"" << dbname
+                                               << "\" db from all roles"));
         }
 
         audit::logDropAllRolesFromDatabase(Client::getCurrent(), dbname);
@@ -2164,12 +2154,11 @@ public:
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatus(
                 result,
-                Status(status.code(),
-                       str::stream() << "Removed roles from \"" << dbname
-                                     << "\" db "
-                                        " from all users and roles but failed to actually delete"
-                                        " those roles themselves: "
-                                     << status.reason()));
+                status.withContext(
+                    str::stream() << "Removed roles from \"" << dbname
+                                  << "\" db "
+                                     " from all users and roles but failed to actually delete"
+                                     " those roles themselves"));
         }
 
         result.append("n", nMatched);

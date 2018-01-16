@@ -161,18 +161,11 @@ Status ClusterExplain::validateShardResults(const vector<Strategy::CommandResult
     // Check that the result from each shard has a true value for "ok" and has
     // the expected "queryPlanner" field.
     for (size_t i = 0; i < shardResults.size(); i++) {
-        if (!shardResults[i].result["ok"].trueValue()) {
-            // Try to pass up the error code from the shard.
-            ErrorCodes::Error error = ErrorCodes::OperationFailed;
-            if (shardResults[i].result["code"].isNumber()) {
-                error = ErrorCodes::Error(shardResults[i].result["code"].numberInt());
-            }
-
-            return Status(error,
-                          str::stream() << "Explain command on shard "
-                                        << shardResults[i].target.toString()
-                                        << " failed, caused by: "
-                                        << shardResults[i].result);
+        auto status = getStatusFromCommandResult(shardResults[i].result);
+        if (!status.isOK()) {
+            return status.withContext(str::stream() << "Explain command on shard "
+                                                    << shardResults[i].target.toString()
+                                                    << " failed");
         }
 
         if (Object != shardResults[i].result["queryPlanner"].type()) {

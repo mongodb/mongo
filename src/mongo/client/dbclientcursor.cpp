@@ -392,11 +392,7 @@ BSONObj DBClientCursor::nextSafe() {
     // Only convert legacy errors ($err) to exceptions. Otherwise, just return the response and the
     // caller will interpret it as a command error.
     if (wasError && strcmp(o.firstElementFieldName(), "$err") == 0) {
-        auto code = o["code"].numberInt();
-        if (!code) {
-            code = ErrorCodes::UnknownError;
-        }
-        uasserted(code, o.firstElement().str());
+        uassertStatusOK(getStatusFromCommandResult(o));
     }
 
     return o;

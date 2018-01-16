@@ -497,11 +497,9 @@ void MigrationManager::_schedule(WithLock lock,
                 DistLockManager::kSingleLockAttemptTimeout);
 
         if (!statusWithDistLockHandle.isOK()) {
-            migration.completionNotification->set(
-                Status(statusWithDistLockHandle.getStatus().code(),
-                       stream() << "Could not acquire collection lock for " << nss.ns()
-                                << " to migrate chunks, due to "
-                                << statusWithDistLockHandle.getStatus().reason()));
+            migration.completionNotification->set(statusWithDistLockHandle.getStatus().withContext(
+                stream() << "Could not acquire collection lock for " << nss.ns()
+                         << " to migrate chunks"));
             return;
         }
 

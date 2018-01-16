@@ -269,11 +269,8 @@ public:
             // NoSuchKey means the user did not supply a mode.
             return CommandHelpers::appendCommandStatus(
                 result,
-                Status(status.code(),
-                       str::stream() << "Could not parse out "
-                                     << ApplyOps::kOplogApplicationModeFieldName
-                                     << ": "
-                                     << status.reason()));
+                status.withContext(str::stream() << "Could not parse out "
+                                                 << ApplyOps::kOplogApplicationModeFieldName));
         }
 
         auto applyOpsStatus = CommandHelpers::appendCommandStatus(

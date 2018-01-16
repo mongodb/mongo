@@ -135,7 +135,8 @@ Status getFirstWriteErrorStatusFromCommandResult(const BSONObj& cmdResponse) {
     auto firstWriteErrorObj = firstWriteErrorElem.Obj();
 
     return Status(ErrorCodes::Error(firstWriteErrorObj["code"].Int()),
-                  firstWriteErrorObj["errmsg"].String());
+                  firstWriteErrorObj["errmsg"].String(),
+                  firstWriteErrorObj);
 }
 
 Status getStatusFromWriteCommandReply(const BSONObj& cmdResponse) {

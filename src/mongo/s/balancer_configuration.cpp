@@ -94,9 +94,7 @@ Status BalancerConfiguration::setBalancerMode(OperationContext* opCtx,
     }
 
     if (!updateStatus.isOK() && (getBalancerMode() != mode)) {
-        return {updateStatus.getStatus().code(),
-                str::stream() << "Failed to update balancer configuration due to "
-                              << updateStatus.getStatus().reason()};
+        return updateStatus.getStatus().withContext("Failed to update balancer configuration");
     }
 
     return Status::OK();
@@ -135,25 +133,19 @@ Status BalancerConfiguration::refreshAndCheck(OperationContext* opCtx) {
     // Balancer configuration
     Status balancerSettingsStatus = _refreshBalancerSettings(opCtx);
     if (!balancerSettingsStatus.isOK()) {
-        return {balancerSettingsStatus.code(),
-                str::stream() << "Failed to refresh the balancer settings due to "
-                              << balancerSettingsStatus.toString()};
+        return balancerSettingsStatus.withContext("Failed to refresh the balancer settings");
     }
 
     // Chunk size settings
     Status chunkSizeStatus = _refreshChunkSizeSettings(opCtx);
     if (!chunkSizeStatus.isOK()) {
-        return {chunkSizeStatus.code(),
-                str::stream() << "Failed to refresh the chunk sizes settings due to "
-                              << chunkSizeStatus.toString()};
+        return chunkSizeStatus.withContext("Failed to refresh the chunk sizes settings");
     }
 
     // AutoSplit settings
     Status autoSplitStatus = _refreshAutoSplitSettings(opCtx);
     if (!autoSplitStatus.isOK()) {
-        return {autoSplitStatus.code(),
-                str::stream() << "Failed to refresh the autoSplit settings due to "
-                              << autoSplitStatus.toString()};
+        return autoSplitStatus.withContext("Failed to refresh the autoSplit settings");
     }
 
     return Status::OK();

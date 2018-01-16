@@ -155,13 +155,7 @@ Status ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
                                         coll.toBSON(),
                                         upsert,
                                         ShardingCatalogClient::kMajorityWriteConcern);
-    if (!status.isOK()) {
-        return {status.getStatus().code(),
-                str::stream() << "Collection metadata write failed due to "
-                              << status.getStatus().reason()};
-    }
-
-    return Status::OK();
+    return status.getStatus().withContext(str::stream() << "Collection metadata write failed");
 }
 
 Status ShardingCatalogClientImpl::updateDatabase(OperationContext* opCtx,
@@ -175,13 +169,7 @@ Status ShardingCatalogClientImpl::updateDatabase(OperationContext* opCtx,
                                        db.toBSON(),
                                        true,
                                        ShardingCatalogClient::kMajorityWriteConcern);
-    if (!status.isOK()) {
-        return {status.getStatus().code(),
-                str::stream() << "Database metadata write failed due to "
-                              << status.getStatus().reason()};
-    }
-
-    return Status::OK();
+    return status.getStatus().withContext(str::stream() << "Database metadata write failed");
 }
 
 Status ShardingCatalogClientImpl::logAction(OperationContext* opCtx,
@@ -296,10 +284,8 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
         result = _fetchDatabaseMetadata(
             opCtx, dbName, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, readConcernLevel);
         if (!result.isOK() && (result != ErrorCodes::NamespaceNotFound)) {
-            return {result.getStatus().code(),
-                    str::stream() << "Could not confirm non-existence of database " << dbName
-                                  << " due to "
-                                  << result.getStatus().reason()};
+            return result.getStatus().withContext(
+                str::stream() << "Could not confirm non-existence of database " << dbName);
         }
     }
 
@@ -477,18 +463,14 @@ StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     BSONObj versionDoc = queryResults.front();
     auto versionTypeResult = VersionType::fromBSON(versionDoc);
     if (!versionTypeResult.isOK()) {
-        return {versionTypeResult.getStatus().code(),
-                str::stream() << "Unable to parse config.version document " << versionDoc
-                              << " due to "
-                              << versionTypeResult.getStatus().reason()};
+        return versionTypeResult.getStatus().withContext(
+            str::stream() << "Unable to parse config.version document " << versionDoc);
     }
 
     auto validationStatus = versionTypeResult.getValue().validate();
     if (!validationStatus.isOK()) {
-        return Status(validationStatus.code(),
-                      str::stream() << "Unable to validate config.version document " << versionDoc
-                                    << " due to "
-                                    << validationStatus.reason());
+        return Status(validationStatus.withContext(
+            str::stream() << "Unable to validate config.version document " << versionDoc));
     }
 
     return versionTypeResult.getValue();
@@ -541,9 +523,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
                                               sort,
                                               longLimit);
     if (!findStatus.isOK()) {
-        return {findStatus.getStatus().code(),
-                str::stream() << "Failed to load chunks due to "
-                              << findStatus.getStatus().reason()};
+        return findStatus.getStatus().withContext("Failed to load chunks");
     }
 
     const auto& chunkDocsOpTimePair = findStatus.getValue();
@@ -552,10 +532,8 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
     for (const BSONObj& obj : chunkDocsOpTimePair.value) {
         auto chunkRes = ChunkType::fromConfigBSON(obj);
         if (!chunkRes.isOK()) {
-            return {chunkRes.getStatus().code(),
-                    stream() << "Failed to parse chunk with id " << obj[ChunkType::name()]
-                             << " due to "
-                             << chunkRes.getStatus().reason()};
+            return chunkRes.getStatus().withContext(stream() << "Failed to parse chunk with id "
+                                                             << obj[ChunkType::name()]);
         }
 
         chunks.push_back(chunkRes.getValue());
@@ -578,8 +556,7 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
                                               BSON(TagsType::min() << 1),
                                               boost::none);  // no limit
     if (!findStatus.isOK()) {
-        return {findStatus.getStatus().code(),
-                str::stream() << "Failed to load tags due to " << findStatus.getStatus().reason()};
+        return findStatus.getStatus().withContext("Failed to load tags");
     }
 
     const auto& tagDocsOpTimePair = findStatus.getValue();
@@ -588,10 +565,8 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
     for (const BSONObj& obj : tagDocsOpTimePair.value) {
         auto tagRes = TagsType::fromBSON(obj);
         if (!tagRes.isOK()) {
-            return {tagRes.getStatus().code(),
-                    str::stream() << "Failed to parse tag with id " << obj[TagsType::tag()]
-                                  << " due to "
-                                  << tagRes.getStatus().toString()};
+            return tagRes.getStatus().withContext(str::stream() << "Failed to parse tag with id "
+                                                                << obj[TagsType::tag()]);
         }
 
         tags.push_back(tagRes.getValue());
@@ -617,16 +592,14 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::
     for (const BSONObj& doc : findStatus.getValue().value) {
         auto shardRes = ShardType::fromBSON(doc);
         if (!shardRes.isOK()) {
-            return {shardRes.getStatus().code(),
-                    stream() << "Failed to parse shard document " << doc << " due to "
-                             << shardRes.getStatus().reason()};
+            return shardRes.getStatus().withContext(stream() << "Failed to parse shard document "
+                                                             << doc);
         }
 
         Status validateStatus = shardRes.getValue().validate();
         if (!validateStatus.isOK()) {
-            return {validateStatus.code(),
-                    stream() << "Failed to validate shard document " << doc << " due to "
-                             << validateStatus.reason()};
+            return validateStatus.withContext(stream() << "Failed to validate shard document "
+                                                       << doc);
         }
 
         shards.push_back(shardRes.getValue());

@@ -170,10 +170,8 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
 
         return statusWithCollectionEntry.getValue();
     } catch (const DBException& ex) {
-        return {ex.toStatus().code(),
-                str::stream() << "Failed to read the '" << nss.ns()
-                              << "' entry locally from config.collections"
-                              << causedBy(ex.toStatus())};
+        return ex.toStatus(str::stream() << "Failed to read the '" << nss.ns()
+                                         << "' entry locally from config.collections");
     }
 }
 
@@ -248,10 +246,8 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
             BSONObj document = cursor->nextSafe().getOwned();
             auto statusWithChunk = ChunkType::fromShardBSON(document, epoch);
             if (!statusWithChunk.isOK()) {
-                return {statusWithChunk.getStatus().code(),
-                        str::stream() << "Failed to parse chunk '" << document.toString()
-                                      << "' due to "
-                                      << statusWithChunk.getStatus().reason()};
+                return statusWithChunk.getStatus().withContext(
+                    str::stream() << "Failed to parse chunk '" << document.toString() << "'");
             }
 
             chunks.push_back(std::move(statusWithChunk.getValue()));

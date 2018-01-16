@@ -323,11 +323,11 @@ TEST_F(AbstractAsyncComponentTest,
     auto newStatus =
         component.checkForShutdownAndConvertStatus_forTest(statusToCallbackArgs(status), "mytask");
     ASSERT_EQUALS(status.code(), newStatus.code());
-    ASSERT_EQUALS("mytask: " + status.reason(), newStatus.reason());
+    ASSERT_EQUALS("mytask :: caused by :: " + status.reason(), newStatus.reason());
 
     newStatus = component.checkForShutdownAndConvertStatus_forTest(status, "mytask");
     ASSERT_EQUALS(status.code(), newStatus.code());
-    ASSERT_EQUALS("mytask: " + status.reason(), newStatus.reason());
+    ASSERT_EQUALS("mytask :: caused by :: " + status.reason(), newStatus.reason());
 }
 
 TEST_F(AbstractAsyncComponentTest, CheckForShutdownAndConvertStatusPassesThroughSuccessfulStatus) {

@@ -38,6 +38,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bson_extract_optime.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -49,8 +50,6 @@ namespace {
 const std::string kConfigFieldName = "config";
 const std::string kConfigVersionFieldName = "v";
 const std::string kElectionTimeFieldName = "electionTime";
-const std::string kErrMsgFieldName = "errmsg";
-const std::string kErrorCodeFieldName = "code";
 const std::string kHasDataFieldName = "hasData";
 const std::string kHasStateDisagreementFieldName = "stateDisagreement";
 const std::string kHbMessageFieldName = "hbmsg";
@@ -158,18 +157,11 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc, long long term) 
         _setName = replSetNameElement.String();
     }
 
-    if (_setName.empty() && !doc[kOkFieldName].trueValue()) {
-        std::string errMsg = doc[kErrMsgFieldName].str();
-
-        BSONElement errCodeElem = doc[kErrorCodeFieldName];
-        if (errCodeElem.ok()) {
-            if (!errCodeElem.isNumber())
-                return Status(ErrorCodes::BadValue, "Error code is not a number!");
-
-            int errorCode = errCodeElem.numberInt();
-            return Status(ErrorCodes::Error(errorCode), errMsg);
+    if (_setName.empty()) {
+        auto status = getStatusFromCommandResult(doc);
+        if (!status.isOK()) {
+            return status;
         }
-        return Status(ErrorCodes::UnknownError, errMsg);
     }
 
     const BSONElement hasDataElement = doc[kHasDataFieldName];

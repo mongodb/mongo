@@ -594,13 +594,7 @@ void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallAr
         BSONObj command = commandBuilder.obj();
 
         bool ok = conn->runCommand("admin", command, inputObj);
-
-        ErrorCodes::Error code = ErrorCodes::Error(inputObj[saslCommandCodeFieldName].numberInt());
-
-        if (!ok || code != ErrorCodes::OK) {
-            if (code == ErrorCodes::OK)
-                code = ErrorCodes::UnknownError;
-
+        if (!ok) {
             ValueReader(cx, args.rval()).fromBSON(inputObj, nullptr, true);
             return;
         }

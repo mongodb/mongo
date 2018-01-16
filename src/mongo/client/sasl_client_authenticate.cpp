@@ -46,10 +46,8 @@ void (*saslClientAuthenticate)(auth::RunCommandHook runCommand,
 const char* const saslStartCommandName = "saslStart";
 const char* const saslContinueCommandName = "saslContinue";
 const char* const saslCommandAutoAuthorizeFieldName = "autoAuthorize";
-const char* const saslCommandCodeFieldName = "code";
 const char* const saslCommandConversationIdFieldName = "conversationId";
 const char* const saslCommandDoneFieldName = "done";
-const char* const saslCommandErrmsgFieldName = "errmsg";
 const char* const saslCommandMechanismFieldName = "mechanism";
 const char* const saslCommandMechanismListFieldName = "supportedMechanisms";
 const char* const saslCommandPasswordFieldName = "pwd";

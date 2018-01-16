@@ -110,7 +110,7 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
         } else if (status == ErrorCodes::NoSuchKey) {
             // Sharding key can only be missing if the collection is dropped
             if (!coll.getDropped()) {
-                return {status.code(),
+                return {ErrorCodes::NoSuchKey,
                         str::stream() << "Shard key for collection " << coll._fullNs->ns()
                                       << " is missing, but the collection is not marked as "
                                          "dropped. This is an indication of corrupted sharding "

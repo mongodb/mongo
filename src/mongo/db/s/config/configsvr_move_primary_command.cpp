@@ -170,12 +170,12 @@ public:
         const auto toShard = [&]() {
             auto toShardStatus = shardRegistry->getShard(opCtx, to);
             if (!toShardStatus.isOK()) {
-                const std::string msg(
+                log() << "Could not move database '" << dbname << "' to shard '" << to
+                      << causedBy(toShardStatus.getStatus());
+                uassertStatusOKWithContext(
+                    toShardStatus.getStatus(),
                     str::stream() << "Could not move database '" << dbname << "' to shard '" << to
-                                  << "' due to "
-                                  << toShardStatus.getStatus().reason());
-                log() << msg;
-                uasserted(toShardStatus.getStatus().code(), msg);
+                                  << "'");
             }
 
             return toShardStatus.getValue();

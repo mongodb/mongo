@@ -179,9 +179,11 @@ Status enforceLegacyWriteConcern(OperationContext* opCtx,
         }
     }
 
-    return Status(failedStatuses.size() == 1u ? failedStatuses.front().code()
-                                              : ErrorCodes::MultipleErrorsOccurred,
-                  builder.str());
+    if (failedStatuses.size() == 1u) {
+        return failedStatuses.front();
+    } else {
+        return Status(ErrorCodes::MultipleErrorsOccurred, builder.str());
+    }
 }
 
 

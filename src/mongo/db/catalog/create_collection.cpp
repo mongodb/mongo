@@ -188,13 +188,11 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                     auto tmpNameResult =
                         db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.create");
                     if (!tmpNameResult.isOK()) {
-                        return Result(Status(tmpNameResult.getStatus().code(),
-                                             str::stream() << "Cannot generate temporary "
-                                                              "collection namespace for applyOps "
-                                                              "create command: collection: "
-                                                           << newCollName.ns()
-                                                           << ". error: "
-                                                           << tmpNameResult.getStatus().reason()));
+                        return Result(tmpNameResult.getStatus().withContext(
+                            str::stream() << "Cannot generate temporary "
+                                             "collection namespace for applyOps "
+                                             "create command: collection: "
+                                          << newCollName.ns()));
                     }
                     const auto& tmpName = tmpNameResult.getValue();
                     // It is ok to log this because this doesn't happen very frequently.

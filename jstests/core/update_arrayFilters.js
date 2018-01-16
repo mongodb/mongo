@@ -644,11 +644,12 @@
 
         res = coll.update({_id: 0}, {$set: {"a.$[I]": 1}}, {arrayFilters: [{"I": 0}]});
         assert.writeErrorWithCode(res, ErrorCodes.BadValue);
-        assert.neq(
-            -1,
-            res.getWriteError().errmsg.indexOf(
-                "Error parsing array filter: The top-level field name must be an alphanumeric string beginning with a lowercase letter, found 'I'"),
-            "update failed for a reason other than bad array filter identifier");
+        assert(res.getWriteError().errmsg.startsWith("Error parsing array filter") &&
+                   res.getWriteError().errmsg.endsWith(
+                       "The top-level field name must be an alphanumeric " +
+                       "string beginning with a lowercase letter, found 'I'"),
+               "update failed for a reason other than bad array filter identifier: " +
+                   tojson(res.getWriteError()));
 
         assert.writeOK(coll.insert({_id: 0, a: [0], b: [{j: 0}]}));
         res = coll.update(

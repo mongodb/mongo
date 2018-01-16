@@ -144,10 +144,10 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
     auto scopedDistLock = Grid::get(opCtx)->catalogClient()->getDistLockManager()->lock(
         opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
     if (!scopedDistLock.isOK()) {
-        errmsg = str::stream() << "could not acquire collection lock for " << nss.toString()
-                               << " to split chunk " << chunkRange.toString() << " "
-                               << causedBy(scopedDistLock.getStatus());
-        return {scopedDistLock.getStatus().code(), errmsg};
+        return scopedDistLock.getStatus().withContext(
+            str::stream() << "could not acquire collection lock for " << nss.toString()
+                          << " to split chunk "
+                          << chunkRange.toString());
     }
 
     // If the shard key is hashed, then we must make sure that the split points are of type
@@ -220,7 +220,7 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(OperationContext* opCtx,
                     << refreshStatus.toString();
 
                 warning() << redact(errmsg);
-                return {errorStatus.code(), errmsg};
+                return errorStatus.withReason(errmsg);
             }
         }
 

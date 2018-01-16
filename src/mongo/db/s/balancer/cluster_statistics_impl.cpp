@@ -128,11 +128,9 @@ StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationCon
         if (!shardSizeStatus.isOK()) {
             const auto& status = shardSizeStatus.getStatus();
 
-            return {status.code(),
-                    str::stream() << "Unable to obtain shard utilization information for "
-                                  << shard.getName()
-                                  << " due to "
-                                  << status.reason()};
+            return status.withContext(str::stream()
+                                      << "Unable to obtain shard utilization information for "
+                                      << shard.getName());
         }
 
         string mongoDVersion;

@@ -151,9 +151,10 @@ void MozJSImplScope::_reportError(JSContext* cx, const char* message, JSErrorRep
             log() << exceptionMsg << ":" << dbe.toString() << ":" << message;
         }
 
-        scope->_status = Status(
-            JSErrorReportToStatus(cx, report, ErrorCodes::JSInterpreterFailure, message).code(),
-            exceptionMsg);
+        // TODO SERVER-32239 is this right?
+        scope->_status =
+            JSErrorReportToStatus(cx, report, ErrorCodes::JSInterpreterFailure, message)
+                .withReason(exceptionMsg);
     }
 }
 

@@ -716,12 +716,10 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
                 return;
             }
 
-            fassertFailedWithStatus(40184,
-                                    Status(status.code(),
-                                           str::stream()
-                                               << "Failed to initialize config database on config "
-                                                  "server's first transition to primary"
-                                               << causedBy(status)));
+            fassertFailedWithStatus(
+                40184,
+                status.withContext("Failed to initialize config database on config server's "
+                                   "first transition to primary"));
         }
 
         if (status.isOK()) {

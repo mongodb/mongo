@@ -89,13 +89,12 @@ Status mergeChunks(OperationContext* opCtx,
         opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
 
     if (!scopedDistLock.isOK()) {
-        std::string errmsg = stream() << "could not acquire collection lock for " << nss.ns()
-                                      << " to merge chunks in [" << redact(minKey) << ", "
-                                      << redact(maxKey) << ")"
-                                      << causedBy(scopedDistLock.getStatus());
+        std::string context = stream() << "could not acquire collection lock for " << nss.ns()
+                                       << " to merge chunks in [" << redact(minKey) << ", "
+                                       << redact(maxKey) << ")";
 
-        warning() << errmsg;
-        return Status(scopedDistLock.getStatus().code(), errmsg);
+        warning() << context << causedBy(scopedDistLock.getStatus());
+        return scopedDistLock.getStatus().withContext(context);
     }
 
     auto const shardingState = ShardingState::get(opCtx);
@@ -107,12 +106,11 @@ Status mergeChunks(OperationContext* opCtx,
     ChunkVersion unusedShardVersion;
     Status refreshStatus = shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion);
     if (!refreshStatus.isOK()) {
-        std::string errmsg = str::stream()
-            << "could not merge chunks, failed to refresh metadata for " << nss.ns()
-            << causedBy(redact(refreshStatus));
+        std::string context = str::stream()
+            << "could not merge chunks, failed to refresh metadata for " << nss.ns();
 
-        warning() << errmsg;
-        return Status(refreshStatus.code(), errmsg);
+        warning() << context << causedBy(redact(refreshStatus));
+        return refreshStatus.withContext(context);
     }
 
     const auto metadata = [&] {
@@ -272,12 +270,11 @@ Status mergeChunks(OperationContext* opCtx,
         refreshStatus = shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion);
 
         if (!refreshStatus.isOK()) {
-            std::string errmsg = str::stream() << "failed to refresh metadata for merge chunk ["
-                                               << redact(minKey) << "," << redact(maxKey) << ") "
-                                               << redact(refreshStatus);
+            std::string context = str::stream() << "failed to refresh metadata for merge chunk ["
+                                                << redact(minKey) << "," << redact(maxKey) << ") ";
 
-            warning() << errmsg;
-            return Status(refreshStatus.code(), errmsg);
+            warning() << context << redact(refreshStatus);
+            return refreshStatus.withContext(context);
         }
     }
 
@@ -300,13 +297,9 @@ Status mergeChunks(OperationContext* opCtx,
         LOG(1) << "mergeChunk [" << redact(minKey) << "," << redact(maxKey)
                << ") has already been committed.";
     } else if (!commandStatus.isOK()) {
-        std::string errmsg = str::stream() << "Failed to commit chunk merge"
-                                           << causedBy(redact(commandStatus));
-        return Status(commandStatus.code(), errmsg);
+        return commandStatus.withContext("Failed to commit chunk merge");
     } else if (!writeConcernStatus.isOK()) {
-        std::string errmsg = str::stream() << "Failed to commit chunk merge"
-                                           << causedBy(redact(writeConcernStatus));
-        return Status(writeConcernStatus.code(), errmsg);
+        return writeConcernStatus.withContext("Failed to commit chunk merge");
     }
 
     return Status::OK();

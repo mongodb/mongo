@@ -85,10 +85,8 @@ StatusWith<DistributionStatus> createCollectionDistributionStatus(
     const auto swCollectionTags =
         Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, chunkMgr->getns());
     if (!swCollectionTags.isOK()) {
-        return {swCollectionTags.getStatus().code(),
-                str::stream() << "Unable to load tags for collection " << chunkMgr->getns()
-                              << " due to "
-                              << swCollectionTags.getStatus().toString()};
+        return swCollectionTags.getStatus().withContext(
+            str::stream() << "Unable to load tags for collection " << chunkMgr->getns());
     }
     const auto& collectionTags = swCollectionTags.getValue();
 

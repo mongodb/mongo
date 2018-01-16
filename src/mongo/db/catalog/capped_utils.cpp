@@ -278,11 +278,10 @@ mongo::Status mongo::convertToCapped(OperationContext* opCtx,
     auto tmpNameResult =
         db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.convertToCapped." + shortSource);
     if (!tmpNameResult.isOK()) {
-        return Status(tmpNameResult.getStatus().code(),
-                      str::stream() << "Cannot generate temporary collection namespace to convert "
-                                    << collectionName.ns()
-                                    << " to a capped collection: "
-                                    << tmpNameResult.getStatus().reason());
+        return tmpNameResult.getStatus().withContext(
+            str::stream() << "Cannot generate temporary collection namespace to convert "
+                          << collectionName.ns()
+                          << " to a capped collection");
     }
     const auto& longTmpName = tmpNameResult.getValue();
     const auto shortTmpName = longTmpName.coll().toString();

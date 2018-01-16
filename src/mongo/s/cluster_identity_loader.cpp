@@ -98,9 +98,7 @@ StatusWith<OID> ClusterIdentityLoader::_fetchClusterIdFromConfig(
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto loadResult = catalogClient->getConfigVersion(opCtx, readConcernLevel);
     if (!loadResult.isOK()) {
-        return Status(loadResult.getStatus().code(),
-                      str::stream() << "Error loading clusterID"
-                                    << causedBy(loadResult.getStatus().reason()));
+        return loadResult.getStatus().withContext("Error loading clusterID");
     }
     return loadResult.getValue().getClusterId();
 }

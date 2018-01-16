@@ -210,10 +210,8 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
     long long seconds;
     auto status = parseNumberFromString(opTimeStr.substr(0, incrementSeparatorIndex), &seconds);
     if (!status.isOK()) {
-        return Status(
-            status.code(),
-            str::stream() << "Invalid timestamp seconds in drop-pending namespace: " << _ns << ": "
-                          << status.reason());
+        return status.withContext(
+            str::stream() << "Invalid timestamp seconds in drop-pending namespace: " << _ns);
     }
 
     unsigned int increment;
@@ -222,19 +220,15 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
                                                termSeparatorIndex - (incrementSeparatorIndex + 1)),
                               &increment);
     if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "Invalid timestamp increment in drop-pending namespace: "
-                                    << _ns
-                                    << ": "
-                                    << status.reason());
+        return status.withContext(
+            str::stream() << "Invalid timestamp increment in drop-pending namespace: " << _ns);
     }
 
     long long term;
     status = mongo::parseNumberFromString(opTimeStr.substr(termSeparatorIndex + 1), &term);
     if (!status.isOK()) {
-        return Status(status.code(),
-                      str::stream() << "Invalid term in drop-pending namespace: " << _ns << ": "
-                                    << status.reason());
+        return status.withContext(str::stream() << "Invalid term in drop-pending namespace: "
+                                                << _ns);
     }
 
     return repl::OpTime(Timestamp(Seconds(seconds), increment), term);

@@ -160,11 +160,7 @@ Status AbstractAsyncComponent::_checkForShutdownAndConvertStatus_inlock(
                       str::stream() << message << ": " << _componentName << " is shutting down");
     }
 
-    if (!status.isOK()) {
-        return Status(status.code(), message + ": " + status.reason());
-    }
-
-    return Status::OK();
+    return status.withContext(message);
 }
 
 Status AbstractAsyncComponent::_scheduleWorkAndSaveHandle_inlock(
@@ -179,9 +175,7 @@ Status AbstractAsyncComponent::_scheduleWorkAndSaveHandle_inlock(
     }
     auto result = _executor->scheduleWork(work);
     if (!result.isOK()) {
-        return Status(result.getStatus().code(),
-                      str::stream() << "failed to schedule work " << name << ": "
-                                    << result.getStatus().reason());
+        return result.getStatus().withContext(str::stream() << "failed to schedule work " << name);
     }
     *handle = result.getValue();
     return Status::OK();
@@ -202,10 +196,8 @@ Status AbstractAsyncComponent::_scheduleWorkAtAndSaveHandle_inlock(
     }
     auto result = _executor->scheduleWorkAt(when, work);
     if (!result.isOK()) {
-        return Status(
-            result.getStatus().code(),
-            str::stream() << "failed to schedule work " << name << " at " << when.toString() << ": "
-                          << result.getStatus().reason());
+        return result.getStatus().withContext(
+            str::stream() << "failed to schedule work " << name << " at " << when.toString());
     }
     *handle = result.getValue();
     return Status::OK();

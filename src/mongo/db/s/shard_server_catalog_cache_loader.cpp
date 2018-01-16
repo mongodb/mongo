@@ -660,10 +660,9 @@ Status ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleTask(
     OperationContext* opCtx, const NamespaceString& nss, Task task) {
     Status linearizableReadStatus = waitForLinearizableReadConcern(opCtx);
     if (!linearizableReadStatus.isOK()) {
-        return {linearizableReadStatus.code(),
-                str::stream() << "Unable to schedule routing table update because this is not the"
-                              << " majority primary and may not have the latest data. Error: "
-                              << linearizableReadStatus.reason()};
+        return linearizableReadStatus.withContext(
+            "Unable to schedule routing table update because this is not the majority primary and "
+            "may not have the latest data.");
     }
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -747,31 +746,22 @@ void ShardServerCatalogCacheLoader::_updatePersistedMetadata(OperationContext* o
     // Check if this is a drop task
     if (task.dropped) {
         // The namespace was dropped. The persisted metadata for the collection must be cleared.
-        Status status = dropChunksAndDeleteCollectionsEntry(opCtx, nss);
-        uassert(status.code(),
-                str::stream() << "Failed to clear persisted chunk metadata for collection '"
-                              << nss.ns()
-                              << "' due to '"
-                              << status.reason()
-                              << "'. Will be retried.",
-                status.isOK());
+        uassertStatusOKWithContext(
+            dropChunksAndDeleteCollectionsEntry(opCtx, nss),
+            str::stream() << "Failed to clear persisted chunk metadata for collection '" << nss.ns()
+                          << "'. Will be retried.");
         return;
     }
 
-    Status status =
-        persistCollectionAndChangedChunks(opCtx, nss, task.collectionAndChangedChunks.get());
-
-    uassert(status.code(),
-            str::stream() << "Failed to update the persisted chunk metadata for collection '"
-                          << nss.ns()
-                          << "' from '"
-                          << task.minQueryVersion.toString()
-                          << "' to '"
-                          << task.maxQueryVersion.toString()
-                          << "' due to '"
-                          << status.reason()
-                          << "'. Will be retried.",
-            status.isOK());
+    uassertStatusOKWithContext(
+        persistCollectionAndChangedChunks(opCtx, nss, task.collectionAndChangedChunks.get()),
+        str::stream() << "Failed to update the persisted chunk metadata for collection '"
+                      << nss.ns()
+                      << "' from '"
+                      << task.minQueryVersion.toString()
+                      << "' to '"
+                      << task.maxQueryVersion.toString()
+                      << "'. Will be retried.");
 
     LOG(1) << "Successfully updated persisted chunk metadata for collection '" << nss << "' from '"
            << task.minQueryVersion << "' to collection version '" << task.maxQueryVersion << "'.";

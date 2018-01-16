@@ -149,12 +149,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         auto const shardingState = ShardingState::get(opCtx);
 
         ChunkVersion unusedShardVersion;
-        Status refreshStatus =
-            shardingState->refreshMetadataNow(opCtx, getNss(), &unusedShardVersion);
-        uassert(refreshStatus.code(),
-                str::stream() << "cannot start migrate of chunk " << _args.toString() << " due to "
-                              << refreshStatus.reason(),
-                refreshStatus.isOK());
+        uassertStatusOKWithContext(
+            shardingState->refreshMetadataNow(opCtx, getNss(), &unusedShardVersion),
+            str::stream() << "cannot start migrate of chunk " << _args.toString());
     }
 
     // Snapshot the committed metadata from the time the migration starts
@@ -201,12 +198,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     chunkToMove.setMin(_args.getMinKey());
     chunkToMove.setMax(_args.getMaxKey());
 
-    Status chunkValidateStatus = collectionMetadata->checkChunkIsValid(chunkToMove);
-    uassert(chunkValidateStatus.code(),
-            str::stream() << "Unable to move chunk with arguments '" << redact(_args.toString())
-                          << "' due to error "
-                          << redact(chunkValidateStatus.reason()),
-            chunkValidateStatus.isOK());
+    uassertStatusOKWithContext(collectionMetadata->checkChunkIsValid(chunkToMove),
+                               str::stream() << "Unable to move chunk with arguments '"
+                                             << redact(_args.toString()));
 
     _collectionEpoch = collectionVersion.epoch();
     _collectionUuid = std::get<1>(collectionMetadataAndUUID);
@@ -363,8 +357,7 @@ Status MigrationSourceManager::commitChunkOnRecipient(OperationContext* opCtx) {
     }
 
     if (!commitCloneStatus.isOK()) {
-        return {commitCloneStatus.code(),
-                str::stream() << "commit clone failed due to " << commitCloneStatus.toString()};
+        return commitCloneStatus.withContext("commit clone failed");
     }
 
     _state = kCloneCompleted;
@@ -474,13 +467,12 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
         fassertStatusOK(
             40137,
-            {status.code(),
-             str::stream() << "Failed to commit migration for chunk " << _args.toString()
-                           << " due to "
-                           << redact(migrationCommitStatus)
-                           << ". Updating the optime with a write before refreshing the "
-                           << "metadata also failed with "
-                           << redact(status)});
+            status.withContext(
+                str::stream() << "Failed to commit migration for chunk " << _args.toString()
+                              << " due to "
+                              << redact(migrationCommitStatus)
+                              << ". Updating the optime with a write before refreshing the "
+                              << "metadata also failed"));
     }
 
     // Do a best effort attempt to incrementally refresh the metadata before leaving the critical
@@ -503,13 +495,11 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         // migrationCommitStatus may be OK or an error. The migration is considered a success at
         // this point if the commit succeeded. The metadata refresh either occurred or the metadata
         // was safely cleared.
-        return {migrationCommitStatus.code(),
-                str::stream() << "Orphaned range not cleaned up. Failed to refresh metadata after"
-                                 " migration commit due to '"
-                              << refreshStatus.toString()
-                              << "', and commit failed due to '"
-                              << migrationCommitStatus.toString()
-                              << "'"};
+        return migrationCommitStatus.withContext(
+            str::stream() << "Orphaned range not cleaned up. Failed to refresh metadata after"
+                             " migration commit due to '"
+                          << refreshStatus.toString()
+                          << "' after commit failed");
     }
 
     auto refreshedMetadata = [&] {
@@ -526,9 +516,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
     if (refreshedMetadata->keyBelongsToMe(_args.getMinKey())) {
         // The chunk modification was not applied, so report the original error
-        return {migrationCommitStatus.code(),
-                str::stream() << "Chunk move was not successful due to "
-                              << migrationCommitStatus.reason()};
+        return migrationCommitStatus.withContext("Chunk move was not successful");
     }
 
     // Migration succeeded

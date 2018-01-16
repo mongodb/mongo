@@ -66,9 +66,8 @@ const char kMaxKey[] = "max";
 Status extractObject(const BSONObj& obj, const std::string& fieldName, BSONElement* bsonElement) {
     Status elementStatus = bsonExtractTypedField(obj, fieldName, Object, bsonElement);
     if (!elementStatus.isOK()) {
-        return {elementStatus.code(),
-                str::stream() << "The field '" << fieldName << "' cannot be parsed due to "
-                              << elementStatus.reason()};
+        return elementStatus.withContext(str::stream() << "The field '" << fieldName
+                                                       << "' cannot be parsed");
     }
 
     if (bsonElement->Obj().isEmpty()) {

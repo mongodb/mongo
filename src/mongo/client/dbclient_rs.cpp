@@ -449,12 +449,9 @@ void DBClientReplicaSet::_auth(const BSONObj& params) {
                 throw;
             }
 
-            const Status status = ex.toStatus();
-            lastNodeStatus = {status.code(),
-                              str::stream() << "can't authenticate against replica set node "
-                                            << _lastSlaveOkHost
-                                            << ": "
-                                            << status.reason()};
+            lastNodeStatus =
+                ex.toStatus(str::stream() << "can't authenticate against replica set node "
+                                          << _lastSlaveOkHost);
             _invalidateLastSlaveOkCache(lastNodeStatus);
         }
     }
@@ -464,7 +461,7 @@ void DBClientReplicaSet::_auth(const BSONObj& params) {
         assertMsgB << "Failed to authenticate, no good nodes in " << _getMonitor()->getName();
         uasserted(ErrorCodes::NodeNotFound, assertMsgB.str());
     } else {
-        uasserted(lastNodeStatus.code(), lastNodeStatus.reason());
+        uassertStatusOK(lastNodeStatus);
     }
 }
 
@@ -1006,10 +1003,8 @@ bool DBClientReplicaSet::call(Message& toSend,
                         *actualServer = "";
 
                     const Status status = ex.toStatus();
-                    _invalidateLastSlaveOkCache(
-                        {status.code(),
-                         str::stream() << "can't call replica set node " << _lastSlaveOkHost << ": "
-                                       << status.reason()});
+                    _invalidateLastSlaveOkCache(status.withContext(
+                        str::stream() << "can't call replica set node " << _lastSlaveOkHost));
                 }
             }
 

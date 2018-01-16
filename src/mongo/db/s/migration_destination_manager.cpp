@@ -1071,10 +1071,9 @@ CollectionShardingState::CleanupNotification MigrationDestinationManager::_noteP
     // Start clearing any leftovers that would be in the new chunk
     auto notification = css->beginReceive(range);
     if (notification.ready() && !notification.waitStatus(opCtx).isOK()) {
-        return Status{notification.waitStatus(opCtx).code(),
-                      str::stream() << "Collection " << nss.ns() << " range " << range.toString()
-                                    << " migration aborted: "
-                                    << notification.waitStatus(opCtx).reason()};
+        return notification.waitStatus(opCtx).withContext(
+            str::stream() << "Collection " << nss.ns() << " range " << range.toString()
+                          << " migration aborted");
     }
     return notification;
 }

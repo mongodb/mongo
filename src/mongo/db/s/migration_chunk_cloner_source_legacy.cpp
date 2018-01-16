@@ -266,10 +266,8 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
         auto responseStatus = _callRecipient(
             createRequestWithSessionId(kRecvChunkStatus, _args.getNss(), _sessionId));
         if (!responseStatus.isOK()) {
-            return {responseStatus.getStatus().code(),
-                    str::stream()
-                        << "Failed to contact recipient shard to monitor data transfer due to "
-                        << responseStatus.getStatus().toString()};
+            return responseStatus.getStatus().withContext(
+                "Failed to contact recipient shard to monitor data transfer");
         }
 
         const BSONObj& res = responseStatus.getValue();

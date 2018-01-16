@@ -212,15 +212,9 @@ void asyncSaslConversation(auth::RunCommandHook runCommand,
             }
 
             auto serverResponse = response.data.getOwned();
-            auto code = getStatusFromCommandResult(serverResponse).code();
-
-            // Server versions 2.3.2 and earlier may return "ok: 1" with a non-zero
-            // "code" field, indicating a failure.  Subsequent versions should
-            // return "ok: 0" on failure with a non-zero "code" field to indicate specific
-            // failure. In all versions, either (ok: 1, code: > 0) or (ok: 0, code optional)
-            // indicate failure.
-            if (code != ErrorCodes::OK) {
-                return handler({code, serverResponse[saslCommandErrmsgFieldName].str()});
+            auto status = getStatusFromCommandResult(serverResponse);
+            if (!status.isOK()) {
+                return handler(status);
             }
 
             // Exit if we have finished

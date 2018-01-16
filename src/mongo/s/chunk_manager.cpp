@@ -272,9 +272,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
                           NULL /* collator */);
     plannerParams.indices.push_back(indexEntry);
 
-    auto statusWithSolutions = QueryPlanner::plan(canonicalQuery, plannerParams);
-    uassertStatusOK(statusWithSolutions.getStatus());
-    auto solutions = std::move(statusWithSolutions.getValue());
+    auto solutions = uassertStatusOK(QueryPlanner::plan(canonicalQuery, plannerParams));
 
     IndexBounds bounds;
 

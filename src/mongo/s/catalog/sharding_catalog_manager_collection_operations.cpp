@@ -272,9 +272,8 @@ Status ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Nam
             Shard::RetryPolicy::kIdempotent);
 
         if (!swDropResult.isOK()) {
-            return {swDropResult.getStatus().code(),
-                    str::stream() << swDropResult.getStatus().reason() << " at "
-                                  << shardEntry.getName()};
+            return swDropResult.getStatus().withContext(
+                str::stream() << "Error dropping collection on shard " << shardEntry.getName());
         }
 
         auto& dropResult = swDropResult.getValue();

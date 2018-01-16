@@ -107,10 +107,8 @@ public:
                 if (!status.isOK()) {
                     return CommandHelpers::appendCommandStatus(
                         result,
-                        Status(status.code(),
-                               str::stream()
-                                   << "Failed to transition to STARTUP2 state to perform resync: "
-                                   << status.reason()));
+                        status.withContext(
+                            "Failed to transition to STARTUP2 state to perform resync"));
                 }
             }
             uassertStatusOKWithLocation(replCoord->resyncData(opCtx, waitForResync), "resync", 0);

@@ -277,11 +277,8 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
 
     Status validationStatus = shardIdentity.validate();
     if (!validationStatus.isOK()) {
-        return Status(
-            validationStatus.code(),
-            str::stream()
-                << "Invalid shard identity document found when initializing sharding state: "
-                << validationStatus.reason());
+        return validationStatus.withContext(
+            "Invalid shard identity document found when initializing sharding state");
     }
 
     log() << "initializing sharding state with: " << shardIdentity;
