@@ -69,8 +69,8 @@ enum class DNSQueryType { kSRV = DNS_TYPE_SRV, kTXT = DNS_TYPE_TEXT, kAddress = 
  */
 class ResourceRecord {
 public:
-    explicit ResourceRecord(std::shared_ptr<DNS_RECORDA> initialRecord)
-        : _record(std::move(initialRecord)) {}
+    explicit ResourceRecord(std::string service, std::shared_ptr<DNS_RECORDA> initialRecord)
+        : _service(std::move(service)), _record(std::move(initialRecord)) {}
     explicit ResourceRecord() = default;
 
     /**
@@ -146,7 +146,8 @@ void freeDnsRecord(PDNS_RECORDA record) {
  */
 class DNSResponse {
 public:
-    explicit DNSResponse(PDNS_RECORDA initialResults) : _results(initialResults, freeDnsRecord) {}
+    explicit DNSResponse(std::string service, PDNS_RECORDA initialResults)
+        : _service(std::move(service)), _results(initialResults, freeDnsRecord) {}
 
     class iterator : public std::iterator<std::forward_iterator_tag, ResourceRecord> {
     public:
@@ -190,8 +191,8 @@ public:
     private:
         friend DNSResponse;
 
-        explicit iterator(std::shared_ptr<DNS_RECORDA> initialRecord)
-            : _record(std::move(initialRecord)) {}
+        explicit iterator(std::string service, std::shared_ptr<DNS_RECORDA> initialRecord)
+            : _service(std::move(service)), _record(std::move(initialRecord)) {}
 
         void _advance() {
             this->_record = {this->_record, this->_record->pNext};
@@ -202,21 +203,22 @@ public:
             if (this->_ready) {
                 return;
             }
-            this->_storage = ResourceRecord{this->_record};
+            this->_storage = ResourceRecord{this->_service, this->_record};
             this->_ready = true;
         }
 
         std::shared_ptr<DNS_RECORDA> _record;
+        std::string _service;
         ResourceRecord _storage;
         bool _ready = false;
     };
 
     iterator begin() const {
-        return iterator{this->_results};
+        return iterator{this->_service, this->_results};
     }
 
     iterator end() const {
-        return iterator{nullptr};
+        return iterator{this->_service, nullptr};
     }
 
     std::size_t size() const {
@@ -224,6 +226,7 @@ public:
     }
 
 private:
+    std::string _service;
     std::shared_ptr<std::remove_pointer<PDNS_RECORDA>::type> _results;
 };
 
@@ -247,7 +250,7 @@ public:
             uasserted(ErrorCodes::DNSHostNotFound,
                       "Failed to look up service \""s + "\":"s + errnoWithDescription(ec));
         }
-        return DNSResponse{queryResults};
+        return DNSResponse{service, queryResults};
     }
 };
 }  // namespace

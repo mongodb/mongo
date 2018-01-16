@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -663,11 +663,11 @@ __evict_pass(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	cache = conn->cache;
 	txn_global = &conn->txn_global;
+	time_prev = 0;			/* [-Wconditional-uninitialized] */
 
 	/* Track whether pages are being evicted and progress is made. */
 	eviction_progress = cache->eviction_progress;
 	prev_oldest_id = txn_global->oldest_id;
-	time_now = time_prev = 0;
 
 	/* Evict pages from the cache. */
 	for (loop = 0; cache->pass_intr == 0; loop++) {
@@ -741,7 +741,7 @@ __evict_pass(WT_SESSION_IMPL *session)
 		 * transactions and writing updates to the lookaside table.
 		 */
 		if (eviction_progress == cache->eviction_progress) {
-			if (WT_TSCDIFF_MS(session, time_now, time_prev) >= 20 &&
+			if (WT_TSCDIFF_MS(time_now, time_prev) >= 20 &&
 			    F_ISSET(cache, WT_CACHE_EVICT_CLEAN_HARD |
 			    WT_CACHE_EVICT_DIRTY_HARD)) {
 				if (cache->evict_aggressive_score < 100)
@@ -781,12 +781,11 @@ __evict_pass(WT_SESSION_IMPL *session)
 			__wt_verbose(session, WT_VERB_EVICTSERVER,
 			    "%s", "unable to reach eviction goal");
 			break;
-		} else {
-			if (cache->evict_aggressive_score > 0)
-				--cache->evict_aggressive_score;
-			loop = 0;
-			eviction_progress = cache->eviction_progress;
 		}
+		if (cache->evict_aggressive_score > 0)
+			--cache->evict_aggressive_score;
+		loop = 0;
+		eviction_progress = cache->eviction_progress;
 	}
 	return (0);
 }
@@ -2313,7 +2312,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
 		time_stop = __wt_rdtsc(session);
 		WT_STAT_CONN_INCRV(session,
 		    application_evict_time,
-		    WT_TSCDIFF_US(session, time_stop, time_start));
+		    WT_TSCDIFF_US(time_stop, time_start));
 	}
 	WT_TRACK_OP_END(session);
 	return (ret);
@@ -2429,7 +2428,7 @@ err:	if (timer) {
 		time_stop = __wt_rdtsc(session);
 		WT_STAT_CONN_INCRV(session,
 		    application_cache_time,
-		    WT_TSCDIFF_US(session, time_stop, time_start));
+		    WT_TSCDIFF_US(time_stop, time_start));
 	}
 
 done:	WT_TRACK_OP_END(session);

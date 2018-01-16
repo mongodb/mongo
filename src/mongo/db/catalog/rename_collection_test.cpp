@@ -382,6 +382,20 @@ TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseD
                   renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
 }
 
+TEST_F(RenameCollectionTest,
+       RenameCollectionReturnsNamespaceNotFoundIfSourceCollectionIsDropPending) {
+    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
+    auto dropPendingNss = _sourceNss.makeDropPendingNamespace(dropOpTime);
+
+    _createCollection(_opCtx.get(), dropPendingNss);
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  renameCollection(_opCtx.get(), dropPendingNss, _targetNss, {}));
+
+    // Source collections stays in drop-pending state.
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
+}
+
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNotMasterIfNotPrimary) {
     _createCollection(_opCtx.get(), _sourceNss);
     ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
@@ -439,6 +453,43 @@ TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseWithUuid) {
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
     ASSERT_NOT_EQUALS(options.uuid, _getCollectionUuid(_opCtx.get(), _targetNssDifferentDb));
+}
+
+TEST_F(RenameCollectionTest,
+       RenameCollectionForApplyOpsReturnsNamespaceNotFoundIfSourceCollectionIsDropPending) {
+    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
+    auto dropPendingNss = _sourceNss.makeDropPendingNamespace(dropOpTime);
+    _createCollection(_opCtx.get(), dropPendingNss);
+
+    auto dbName = _sourceNss.db().toString();
+    auto cmd = BSON("renameCollection" << dropPendingNss.ns() << "to" << _targetNss.ns());
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  renameCollectionForApplyOps(_opCtx.get(), dbName, {}, cmd, {}));
+
+    // Source collections stays in drop-pending state.
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
+}
+
+TEST_F(
+    RenameCollectionTest,
+    RenameCollectionForApplyOpsReturnsNamespaceNotFoundIfTargetUuidRefersToDropPendingCollection) {
+    repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
+    auto dropPendingNss = _sourceNss.makeDropPendingNamespace(dropOpTime);
+    auto options = _makeCollectionOptionsWithUuid();
+    _createCollection(_opCtx.get(), dropPendingNss, options);
+
+    auto dbName = _sourceNss.db().toString();
+    NamespaceString ignoredSourceNss(dbName, "ignored");
+    auto uuidDoc = options.uuid->toBSON();
+    auto cmd = BSON("renameCollection" << ignoredSourceNss.ns() << "to" << _targetNss.ns());
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
+                  renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["uuid"], cmd, {}));
+
+    // Source collections stays in drop-pending state.
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), _targetNss));
+    ASSERT_FALSE(_collectionExists(_opCtx.get(), ignoredSourceNss));
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), dropPendingNss));
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseWithTargetUuid) {

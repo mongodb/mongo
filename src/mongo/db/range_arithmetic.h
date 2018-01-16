@@ -28,12 +28,8 @@
 
 #pragma once
 
-#include <map>
-#include <string>
-
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 

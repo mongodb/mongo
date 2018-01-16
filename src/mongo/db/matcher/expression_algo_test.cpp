@@ -709,6 +709,22 @@ TEST(ExpressionAlgoIsSubsetOf, NonMatchingCollationsNoStringComparison) {
     ASSERT_TRUE(expression::isSubsetOf(lhs.get(), rhs.get()));
 }
 
+TEST(ExpressionAlgoIsSubsetOf, InternalExprEqIsSubsetOfNothing) {
+    ParsedMatchExpression exprEq("{a: {$_internalExprEq: 0}}");
+    ParsedMatchExpression regularEq("{a: {$eq: 0}}");
+    {
+        ParsedMatchExpression rhs("{a: {$gte: 0}}");
+        ASSERT_FALSE(expression::isSubsetOf(exprEq.get(), rhs.get()));
+        ASSERT_TRUE(expression::isSubsetOf(regularEq.get(), rhs.get()));
+    }
+
+    {
+        ParsedMatchExpression rhs("{a: {$lte: 0}}");
+        ASSERT_FALSE(expression::isSubsetOf(exprEq.get(), rhs.get()));
+        ASSERT_TRUE(expression::isSubsetOf(regularEq.get(), rhs.get()));
+    }
+}
+
 TEST(IsIndependent, AndIsIndependentOnlyIfChildrenAre) {
     BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {b: 1}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

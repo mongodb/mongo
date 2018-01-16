@@ -52,7 +52,6 @@ class OperationContext;
 //
 // Only kOk and kNeedsUseUUID are valid for 'doTxn'.  All are valid for 'applyOps'.
 enum class OplogApplicationValidity { kOk, kNeedsUseUUID, kNeedsForceAndUseUUID, kNeedsSuperuser };
-enum class OplogApplicationCommand { kApplyOpsCmd, kDoTxnCmd };
 
 // OplogApplicationChecks contains helper functions for checking the applyOps and doTxn commands.
 class OplogApplicationChecks {
@@ -63,8 +62,7 @@ public:
     static Status checkAuthForCommand(OperationContext* opCtx,
                                       const std::string& dbname,
                                       const BSONObj& cmdObj,
-                                      OplogApplicationValidity validity,
-                                      OplogApplicationCommand command);
+                                      OplogApplicationValidity validity);
 
     /**
      * Checks that 'opsElement' is an array and all elements of the array are valid operations.
@@ -82,7 +80,6 @@ private:
                                               const std::string& dbname,
                                               const BSONObj& oplogEntry,
                                               AuthorizationSession* authSession,
-                                              OplogApplicationCommand command,
                                               bool alwaysUpsert);
     /**
      * Returns OK if 'e' contains a valid operation.

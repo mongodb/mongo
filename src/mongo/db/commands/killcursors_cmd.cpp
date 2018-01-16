@@ -51,14 +51,7 @@ private:
     Status _checkAuth(Client* client, const NamespaceString& nss, CursorId id) const final {
         auto opCtx = client->getOperationContext();
         const auto check = [client, opCtx, id](CursorManager* manager) {
-            auto ccPin = manager->pinCursor(opCtx, id, CursorManager::kNoCheckSession);
-            if (!ccPin.isOK()) {
-                return ccPin.getStatus();
-            }
-
-            const auto* cursor = ccPin.getValue().getCursor();
-            AuthorizationSession* as = AuthorizationSession::get(client);
-            return as->checkAuthForKillCursors(cursor->nss(), cursor->getAuthenticatedUsers());
+            return manager->checkAuthForKillCursors(opCtx, id);
         };
 
         return CursorManager::withCursorManager(opCtx, id, nss, check);
@@ -80,7 +73,7 @@ private:
 
         return CursorManager::withCursorManager(
             opCtx, id, nss, [opCtx, id](CursorManager* manager) {
-                return manager->eraseCursor(opCtx, id, true /* shouldAudit */);
+                return manager->killCursor(opCtx, id, true /* shouldAudit */);
             });
     }
 } killCursorsCmd;

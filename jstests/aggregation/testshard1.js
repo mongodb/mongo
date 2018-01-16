@@ -1,3 +1,4 @@
+// @tags: [requires_sharding]
 load('jstests/aggregation/extras/utils.js');
 load('jstests/libs/analyze_plan.js');  // For planHasStage.
 

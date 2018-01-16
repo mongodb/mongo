@@ -340,8 +340,7 @@ void CollectionShardingState::onUpdateOp(OperationContext* opCtx,
 
 auto CollectionShardingState::makeDeleteState(BSONObj const& doc) -> DeleteState {
     return {getMetadata().extractDocumentKey(doc).getOwned(),
-            _sourceMgr && _sourceMgr->getCloner()->isDocumentInMigratingChunk(doc),
-            /*aboutToDeleteCalled*/ false};
+            _sourceMgr && _sourceMgr->getCloner()->isDocumentInMigratingChunk(doc)};
 }
 
 void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
@@ -603,8 +602,7 @@ uint64_t CollectionShardingState::_incrementChunkOnInsertOrUpdate(OperationConte
     // Use the shard key to locate the chunk into which the document was updated, and increment the
     // number of bytes tracked for the chunk. Note that we can assume the simple collation, because
     // shard keys do not support non-simple collations.
-    std::shared_ptr<Chunk> chunk = cm->findIntersectingChunkWithSimpleCollation(shardKey);
-    invariant(chunk);
+    auto chunk = cm->findIntersectingChunkWithSimpleCollation(shardKey);
     chunk->addBytesWritten(dataWritten);
 
     // If the chunk becomes too large, then we call the ChunkSplitter to schedule a split. Then, we
@@ -613,6 +611,7 @@ uint64_t CollectionShardingState::_incrementChunkOnInsertOrUpdate(OperationConte
         // TODO: call ChunkSplitter here
         chunk->clearBytesWritten();
     }
+
     return chunk->getBytesWritten();
 }
 

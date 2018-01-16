@@ -141,7 +141,9 @@ public:
      *  - NamespaceNotFound - collection does not exist
      */
     virtual StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
-        OperationContext* opCtx, const std::string& collNs) = 0;
+        OperationContext* opCtx,
+        const std::string& collNs,
+        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Retrieves all collections undera specified database (or in the system).
@@ -154,9 +156,11 @@ public:
      *
      * Returns the set of collections, or a !OK status if an error occurs.
      */
-    virtual StatusWith<std::vector<CollectionType>> getCollections(OperationContext* opCtx,
-                                                                   const std::string* dbName,
-                                                                   repl::OpTime* optime) = 0;
+    virtual StatusWith<std::vector<CollectionType>> getCollections(
+        OperationContext* opCtx,
+        const std::string* dbName,
+        repl::OpTime* optime,
+        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
      * Drops the specified collection from the collection metadata store.

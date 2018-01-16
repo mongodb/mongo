@@ -51,15 +51,20 @@ def render_template(template_path, **kw):
 
     template = Template.compile(
             file=template_path,
-            compilerSettings=dict(directiveStartToken="//#",directiveEndToken="//#"),
+            compilerSettings=dict(
+                directiveStartToken="//#",
+                directiveEndToken="//#",
+                commentStartToken="//##"
+            ),
             baseclass=dict,
             useCache=False)
     return str(template(**kw))
 
 class ErrorCode:
-    def __init__(self, name, code):
+    def __init__(self, name, code, extra=None):
         self.name = name
         self.code = code
+        self.extra = extra
         self.categories = []
 
 class ErrorClass:

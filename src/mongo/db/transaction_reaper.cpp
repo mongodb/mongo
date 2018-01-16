@@ -229,13 +229,13 @@ public:
         if (!(_cm || _primary)) {
             auto routingInfo =
                 uassertStatusOK(Grid::get(_opCtx)->catalogCache()->getCollectionRoutingInfo(
-                    _opCtx, SessionsCollection::kSessionsFullNS));
+                    _opCtx, NamespaceString(SessionsCollection::kSessionsFullNS)));
             _cm = routingInfo.cm();
             _primary = routingInfo.primary();
         }
         ShardId shardId;
         if (_cm) {
-            auto chunk = _cm->findIntersectingChunkWithSimpleCollation(lsid.toBSON());
+            const auto chunk = _cm->findIntersectingChunkWithSimpleCollation(lsid.toBSON());
             shardId = chunk->getShardId();
         } else {
             shardId = _primary->getId();

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -25,13 +25,13 @@ static int __log_write_internal(
  *	Write a text message to the log.
  */
 int
-__wt_log_printf(WT_SESSION_IMPL *session, const char *fmt, ...)
+__wt_log_printf(WT_SESSION_IMPL *session, const char *format, ...)
 {
 	WT_DECL_RET;
 	va_list ap;
 
-	va_start(ap, fmt);
-	ret = __wt_log_vprintf(session, fmt, ap);
+	va_start(ap, format);
+	ret = __wt_log_vprintf(session, format, ap);
 	va_end(ap);
 	return (ret);
 }
@@ -77,6 +77,28 @@ __log_get_files(WT_SESSION_IMPL *session,
 	if (log_path == NULL)
 		log_path = "";
 	return (__wt_fs_directory_list(
+	    session, log_path, file_prefix, filesp, countp));
+}
+
+/*
+ * __log_get_files_single --
+ *	Retrieve a single log-related file of the given prefix type.
+ */
+static int
+__log_get_files_single(WT_SESSION_IMPL *session,
+    const char *file_prefix, char ***filesp, u_int *countp)
+{
+	WT_CONNECTION_IMPL *conn;
+	const char *log_path;
+
+	*countp = 0;
+	*filesp = NULL;
+
+	conn = S2C(session);
+	log_path = conn->log_path;
+	if (log_path == NULL)
+		log_path = "";
+	return (__wt_fs_directory_list_single(
 	    session, log_path, file_prefix, filesp, countp));
 }
 
@@ -266,7 +288,6 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 
 	log = S2C(session)->log;
 	log_fh = NULL;
-	time_start = time_stop = 0;
 
 	/*
 	 * We need to wait for the previous log file to get written
@@ -293,8 +314,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 		time_start = __wt_rdtsc(session);
 		WT_ERR(__wt_fsync(session, log->log_dir_fh, true));
 		time_stop = __wt_rdtsc(session);
-		fsync_duration_usecs = WT_TSCDIFF_US(session,
-		    time_stop, time_start);
+		fsync_duration_usecs = WT_TSCDIFF_US(time_stop, time_start);
 		log->sync_dir_lsn = *min_lsn;
 		WT_STAT_CONN_INCR(session, log_sync_dir);
 		WT_STAT_CONN_INCRV(session,
@@ -317,8 +337,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
 		time_start = __wt_rdtsc(session);
 		WT_ERR(__wt_fsync(session, log_fh, true));
 		time_stop = __wt_rdtsc(session);
-		fsync_duration_usecs = WT_TSCDIFF_US(session,
-		    time_stop, time_start);
+		fsync_duration_usecs = WT_TSCDIFF_US(time_stop, time_start);
 		log->sync_lsn = *min_lsn;
 		WT_STAT_CONN_INCR(session, log_sync);
 		WT_STAT_CONN_INCRV(session,
@@ -1020,13 +1039,12 @@ __log_alloc_prealloc(WT_SESSION_IMPL *session, uint32_t to_num)
 	conn = S2C(session);
 	log = conn->log;
 	logfiles = NULL;
-	WT_ERR(__log_get_files(session, WT_LOG_PREPNAME, &logfiles, &logcount));
+	WT_ERR(__log_get_files_single(
+	    session, WT_LOG_PREPNAME, &logfiles, &logcount));
 	if (logcount == 0)
 		return (WT_NOTFOUND);
 
-	/*
-	 * We have a file to use.  Just use the first one.
-	 */
+	/* We have a file to use. */
 	WT_ERR(__wt_log_extract_lognum(session, logfiles[0], &from_num));
 
 	WT_ERR(__wt_scr_alloc(session, 0, &from_path));
@@ -1722,7 +1740,6 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 	conn = S2C(session);
 	log = conn->log;
 	locked = false;
-	time_start = time_stop = 0;
 	if (freep != NULL)
 		*freep = 1;
 	release_buffered = WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
@@ -1830,8 +1847,8 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 			time_start = __wt_rdtsc(session);
 			WT_ERR(__wt_fsync(session, log->log_dir_fh, true));
 			time_stop = __wt_rdtsc(session);
-			fsync_duration_usecs = WT_TSCDIFF_US(session,
-			    time_stop, time_start);
+			fsync_duration_usecs =
+			    WT_TSCDIFF_US(time_stop, time_start);
 			log->sync_dir_lsn = sync_lsn;
 			WT_STAT_CONN_INCR(session, log_sync_dir);
 			WT_STAT_CONN_INCRV(session,
@@ -1852,8 +1869,8 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 			time_start = __wt_rdtsc(session);
 			WT_ERR(__wt_fsync(session, log->log_fh, true));
 			time_stop = __wt_rdtsc(session);
-			fsync_duration_usecs = WT_TSCDIFF_US(session,
-			    time_stop, time_start);
+			fsync_duration_usecs =
+			    WT_TSCDIFF_US(time_stop, time_start);
 			WT_STAT_CONN_INCRV(session,
 			    log_sync_duration, fsync_duration_usecs);
 			log->sync_lsn = sync_lsn;

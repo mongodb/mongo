@@ -205,22 +205,23 @@ void ClusterWriter::write(OperationContext* opCtx,
                 return;
             }
 
-            std::vector<std::unique_ptr<ShardEndpoint>> endpoints;
-            auto targetStatus = targeter.targetCollection(&endpoints);
-            if (!targetStatus.isOK()) {
-                toBatchError({targetStatus.code(),
+            auto swEndpoints = targeter.targetCollection();
+            if (!swEndpoints.isOK()) {
+                toBatchError({swEndpoints.getStatus().code(),
                               str::stream() << "unable to target"
                                             << (request.isInsertIndexRequest() ? " index" : "")
                                             << " write op for collection "
                                             << request.getTargetingNS().ns()
-                                            << causedBy(targetStatus)},
+                                            << causedBy(swEndpoints.getStatus())},
                              response);
                 return;
             }
 
+            const auto& endpoints = swEndpoints.getValue();
+
             // Handle sharded config server writes differently.
             if (std::any_of(endpoints.begin(), endpoints.end(), [](const auto& it) {
-                    return it->shardName == ShardRegistry::kConfigServerShardId;
+                    return it.shardName == ShardRegistry::kConfigServerShardId;
                 })) {
                 // There should be no namespaces that partially target config servers.
                 invariant(endpoints.size() == 1);

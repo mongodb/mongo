@@ -5,8 +5,8 @@
 
 var authzErrorCode = 13;
 var hasAuthzError = function(result) {
-    assert(result.hasWriteError());
-    assert.eq(authzErrorCode, result.getWriteError().code);
+    assert(result instanceof WriteCommandError);
+    assert.eq(authzErrorCode, result.code);
 };
 
 var st = new ShardingTest({
@@ -107,7 +107,7 @@ db3.auth('spencer', 'pwd');
     // s1/db2 should update its cache in 10 seconds.
     assert.soon(function() {
         var res = db2.foo.update({}, {$inc: {a: 1}});
-        if (res.hasWriteError()) {
+        if (res instanceof WriteCommandError) {
             return false;
         }
         return db2.foo.findOne().a == 3;
@@ -133,7 +133,7 @@ db3.auth('spencer', 'pwd');
     // s1/db2 should update its cache in 10 seconds.
     assert.soon(function() {
         var res = db2.foo.update({}, {$inc: {a: 1}});
-        return res.hasWriteError() && res.getWriteError().code == authzErrorCode;
+        return res instanceof WriteCommandError && res.code == authzErrorCode;
     }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
 
     // We manually invalidate the cache on s1/db3.
@@ -155,7 +155,7 @@ db3.auth('spencer', 'pwd');
 
     // s1/db2 should update its cache in 10 seconds.
     assert.soon(function() {
-        return !db2.foo.update({}, {$inc: {a: 1}}).hasWriteError();
+        return !(db2.foo.update({}, {$inc: {a: 1}}) instanceof WriteCommandError);
     }, "Mongos did not update its user cache after 10 seconds", 10 * 1000);
 
     // We manually invalidate the cache on s1/db3.

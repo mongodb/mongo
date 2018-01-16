@@ -386,7 +386,6 @@ public:
      * Returns event handle that we can use to wait for the operation to complete.
      * When the operation is complete (waitForEvent() returns), 'updateResult' will be set
      * to a status telling if the term increased or a stepdown was triggered.
-
      */
     executor::TaskExecutor::EventHandle updateTerm_forTest(
         long long term, TopologyCoordinator::UpdateTermResult* updateResult);
@@ -1342,6 +1341,10 @@ private:
     // This variable must be written immediately after _term, and thus its value can lag.
     // Reading this value does not require the replication coordinator mutex to be locked.
     AtomicInt64 _termShadow;  // (S)
+
+    // When we decide to step down due to hearing about a higher term, we remember the term we heard
+    // here so we can update our term to match as part of finishing stepdown.
+    boost::optional<long long> _pendingTermUpdateDuringStepDown;  // (M)
 };
 
 }  // namespace repl

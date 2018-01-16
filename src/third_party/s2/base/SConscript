@@ -7,7 +7,7 @@ env = env.Clone()
 env.Append(CCFLAGS=['-Isrc/third_party/s2'])
 
 env.Library(
-    "base",
+    "base_s2",
     [ 
 	"int128.cc",
 	"logging.cc",

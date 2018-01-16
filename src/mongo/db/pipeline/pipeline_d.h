@@ -95,8 +95,8 @@ public:
             const std::vector<BSONObj>& rawPipeline,
             const boost::intrusive_ptr<ExpressionContext>& expCtx,
             const MakePipelineOptions opts = MakePipelineOptions{}) final;
-        Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                            Pipeline* pipeline) final;
+        StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> attachCursorSourceToPipeline(
+            const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final;
         std::vector<BSONObj> getCurrentOps(OperationContext* opCtx,
                                            CurrentOpConnectionsMode connMode,
                                            CurrentOpUserMode userMode,

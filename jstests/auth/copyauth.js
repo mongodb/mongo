@@ -32,6 +32,7 @@ var baseName = "jstests_clone_copyauth";
  * Member functions:
  *
  * stop() - stop and cleanup whatever nodes the helper spawned when it was created.
+ * @tags: [requires_replication, requires_sharding]
  */
 function ClusterSpawnHelper(clusterType, startWithAuth, startWithTransitionToAuth) {
     var singleNodeConfig = {};

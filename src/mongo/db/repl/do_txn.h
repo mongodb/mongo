@@ -36,7 +36,6 @@ class OperationContext;
 class DoTxn {
 public:
     static constexpr StringData kPreconditionFieldName = "preCondition"_sd;
-    static constexpr StringData kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;
 };
 
 /**
@@ -52,7 +51,6 @@ public:
 Status doTxn(OperationContext* opCtx,
              const std::string& dbName,
              const BSONObj& doTxnCmd,
-             repl::OplogApplication::Mode oplogApplicationMode,
              BSONObjBuilder* result);
 
 }  // namespace mongo

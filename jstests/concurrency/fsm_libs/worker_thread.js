@@ -85,6 +85,20 @@ var workerThread = (function() {
             }
 
             if (Cluster.isReplication(args.clusterOptions)) {
+                if (args.clusterOptions.hasOwnProperty('sharded') &&
+                    args.clusterOptions.sharded.hasOwnProperty('stepdownOptions') &&
+                    args.clusterOptions.sharded.stepdownOptions.shardStepdown) {
+                    const newOptions = {
+                        alwaysInjectTransactionNumber: true,
+                        defaultReadConcernLevel: "majority",
+                        logRetryAttempts: true,
+                        overrideRetryAttempts: 3
+                    };
+                    Object.assign(TestData, newOptions);
+
+                    load('jstests/libs/override_methods/auto_retry_on_network_error.js');
+                }
+
                 // Operations that run after a "dropDatabase" command has been issued may fail with
                 // a "DatabaseDropPending" error response if they would create a new collection on
                 // that database while we're waiting for a majority of nodes in the replica set to

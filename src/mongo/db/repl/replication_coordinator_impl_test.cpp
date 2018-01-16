@@ -1467,13 +1467,8 @@ TEST_F(ReplCoordTest, NodeChangesTermAndStepsDownWhenAndOnlyWhenUpdateTermSuppli
     // higher term, step down and change term
     executor::TaskExecutor::CallbackHandle cbHandle;
     ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(opCtx.get(), 2).code());
-    // Term hasn't been incremented yet, as we need another try to update it after stepdown.
-    ASSERT_EQUALS(1, getReplCoord()->getTerm());
-    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-
-    // Now update term should actually update the term, as stepdown is complete.
-    ASSERT_EQUALS(ErrorCodes::StaleTerm, getReplCoord()->updateTerm(opCtx.get(), 2).code());
     ASSERT_EQUALS(2, getReplCoord()->getTerm());
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 }
 
 TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreThanOnce) {
@@ -1512,41 +1507,24 @@ TEST_F(ReplCoordTest, ConcurrentStepDownShouldNotSignalTheSameFinishEventMoreTha
 
     TopologyCoordinator::UpdateTermResult termUpdated2;
     auto updateTermEvh2 = getReplCoord()->updateTerm_forTest(2, &termUpdated2);
+    ASSERT(termUpdated2 == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
     ASSERT(updateTermEvh2.isValid());
 
     TopologyCoordinator::UpdateTermResult termUpdated3;
     auto updateTermEvh3 = getReplCoord()->updateTerm_forTest(3, &termUpdated3);
-    ASSERT(updateTermEvh3.isValid());
+    ASSERT(termUpdated3 == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
+    // Although term 3 can trigger stepdown, a stepdown has already been scheduled,
+    // so no other stepdown can be scheduled again. Term 3 will be remembered and
+    // installed once stepdown finishes.
+    ASSERT(!updateTermEvh3.isValid());
 
     // Unblock the tasks for updateTerm and _stepDownFinish.
     globalExclusiveLock.reset();
 
-    // Both _updateTerm_incallback tasks should be scheduled.
+    // Wait stepdown to finish and term 3 to be installed.
     replExec->waitForEvent(updateTermEvh2);
-    ASSERT(termUpdated2 == TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
-
-    replExec->waitForEvent(updateTermEvh3);
-    if (termUpdated3 == TopologyCoordinator::UpdateTermResult::kTriggerStepDown) {
-        // Term hasn't updated yet.
-        ASSERT_EQUALS(1, getReplCoord()->getTerm());
-
-        // Update term event handles will wait for potential stepdown.
-        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-
-        TopologyCoordinator::UpdateTermResult termUpdated4;
-        auto updateTermEvh4 = getReplCoord()->updateTerm_forTest(3, &termUpdated4);
-        ASSERT(updateTermEvh4.isValid());
-        replExec->waitForEvent(updateTermEvh4);
-        ASSERT(termUpdated4 == TopologyCoordinator::UpdateTermResult::kUpdatedTerm);
-        ASSERT_EQUALS(3, getReplCoord()->getTerm());
-    } else {
-        // Term already updated.
-        ASSERT(termUpdated3 == TopologyCoordinator::UpdateTermResult::kUpdatedTerm);
-        ASSERT_EQUALS(3, getReplCoord()->getTerm());
-
-        // Update term event handles will wait for potential stepdown.
-        ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
-    }
+    ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
+    ASSERT_EQUALS(3, getReplCoord()->getTerm());
 }
 
 TEST_F(ReplCoordTest, DrainCompletionMidStepDown) {
@@ -5145,7 +5123,7 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
     // Become PRIMARY.
     simulateSuccessfulV1Election();
 
-    // Keep two nodes alive.
+    // Keep two nodes alive via UpdatePosition.
     UpdatePositionArgs args1;
     ASSERT_OK(
         args1.initialize(BSON(UpdatePositionArgs::kCommandFieldName
@@ -5167,12 +5145,38 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
                                                     << startingOpTime.toBSON()
                                                     << UpdatePositionArgs::kDurableOpTimeFieldName
                                                     << startingOpTime.toBSON())))));
+    const Date_t startDate = getNet()->now();
+    getNet()->enterNetwork();
+    getNet()->runUntil(startDate + Milliseconds(100));
     ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args1, 0));
 
     // Confirm that the node remains PRIMARY after the other two nodes are marked DOWN.
-    const Date_t startDate = getNet()->now();
+    getNet()->runUntil(startDate + Milliseconds(2080));
+    getNet()->exitNetwork();
+    ASSERT_EQUALS(MemberState::RS_PRIMARY, getReplCoord()->getMemberState().s);
+
+    // Keep the same two nodes alive via v1 heartbeat.
+    ReplSetHeartbeatArgsV1 hbArgs;
+    hbArgs.setSetName("mySet");
+    hbArgs.setConfigVersion(2);
+    hbArgs.setSenderId(1);
+    hbArgs.setSenderHost(HostAndPort("node2", 12345));
+    hbArgs.setTerm(0);
+    ReplSetHeartbeatResponse hbResp;
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+    hbArgs.setSenderId(2);
+    hbArgs.setSenderHost(HostAndPort("node3", 12345));
+    ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
+
+    // Confirm that the node remains PRIMARY after the timeout from the UpdatePosition expires.
     getNet()->enterNetwork();
-    getNet()->runUntil(startDate + Milliseconds(1980));
+    const Date_t endDate = startDate + Milliseconds(2200);
+    while (getNet()->now() < endDate) {
+        getNet()->runUntil(endDate);
+        if (getNet()->now() < endDate) {
+            getNet()->blackHole(getNet()->getNextReadyRequest());
+        }
+    }
     getNet()->exitNetwork();
     ASSERT_EQUALS(MemberState::RS_PRIMARY, getReplCoord()->getMemberState().s);
 
@@ -5192,22 +5196,20 @@ TEST_F(ReplCoordTest, StepDownWhenHandleLivenessTimeoutMarksAMajorityOfVotingNod
                                                  << startingOpTime.toBSON())))));
     ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(args2, 0));
 
-    ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setSetName("mySet");
     hbArgs.setConfigVersion(2);
     hbArgs.setSenderId(1);
     hbArgs.setSenderHost(HostAndPort("node2", 12345));
     hbArgs.setTerm(0);
-    ReplSetHeartbeatResponse hbResp;
     ASSERT_OK(getReplCoord()->processHeartbeatV1(hbArgs, &hbResp));
 
     // Confirm that the node relinquishes PRIMARY after only one node is left UP.
     const Date_t startDate1 = getNet()->now();
-    const Date_t endDate = startDate1 + Milliseconds(1980);
+    const Date_t endDate1 = startDate1 + Milliseconds(1980);
     getNet()->enterNetwork();
-    while (getNet()->now() < endDate) {
-        getNet()->runUntil(endDate);
-        if (getNet()->now() < endDate) {
+    while (getNet()->now() < endDate1) {
+        getNet()->runUntil(endDate1);
+        if (getNet()->now() < endDate1) {
             getNet()->blackHole(getNet()->getNextReadyRequest());
         }
     }

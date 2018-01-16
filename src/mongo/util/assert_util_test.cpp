@@ -36,6 +36,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace {
@@ -146,6 +147,65 @@ TEST(AssertUtils, UassertNumericCode) {
     ASSERT_NOT_CATCHES(19999, ExceptionForCat<ErrorCategory::Interruption>);
 }
 
+TEST(AssertUtils, UassertStatusOKPreservesExtraInfo) {
+    const auto status = Status(ErrorExtraInfoExample(123), "");
+
+    try {
+        uassertStatusOK(status);
+    } catch (const DBException& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+    }
+
+    try {
+        uassertStatusOK(status);
+    } catch (const ExceptionFor<ErrorCodes::ForTestingErrorExtraInfo>& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+        ASSERT_EQ(ex->data, 123);
+    }
+}
+
+TEST(AssertUtils, UassertTypedExtraInfoWorks) {
+    try {
+        uasserted(ErrorExtraInfoExample(123), "");
+    } catch (const DBException& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+    }
+
+    try {
+        uassert(ErrorExtraInfoExample(123), "", false);
+    } catch (const ExceptionFor<ErrorCodes::ForTestingErrorExtraInfo>& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+        ASSERT_EQ(ex->data, 123);
+    }
+}
+
+TEST(AssertUtils, MassertTypedExtraInfoWorks) {
+    try {
+        msgasserted(ErrorExtraInfoExample(123), "");
+    } catch (const DBException& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+    }
+
+    try {
+        massert(ErrorExtraInfoExample(123), "", false);
+    } catch (const ExceptionFor<ErrorCodes::ForTestingErrorExtraInfo>& ex) {
+        ASSERT(ex.extraInfo());
+        ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
+        ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
+        ASSERT_EQ(ex->data, 123);
+    }
+}
+
 // uassert and its friends
 DEATH_TEST(UassertionTerminationTest, uassert, "Terminating with uassert") {
     uassert(40204, "Terminating with uassert", false);
@@ -217,6 +277,30 @@ DEATH_TEST(MassertionTerminationTest, massertStatusOK, "Terminating with massert
 
 DEATH_TEST(MassertionTerminationTest, msgasserted, "Terminating with msgasserted") {
     msgasserted(40215, "Terminating with msgasserted");
+}
+
+// invariant and its friends
+DEATH_TEST(InvariantTerminationTest, invariant, "Invariant failure false " __FILE__) {
+    invariant(false);
+}
+
+DEATH_TEST(InvariantTerminationTest, invariantOK, "Terminating with invariantOK") {
+    invariantOK(Status(ErrorCodes::InternalError, "Terminating with invariantOK"));
+}
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantWithStringLiteralMsg,
+           "Terminating with string literal invariant message") {
+    const char* msg = "Terminating with string literal invariant message";
+    invariant(false, msg);
+}
+
+DEATH_TEST(InvariantTerminationTest,
+           invariantWithStdStringMsg,
+           "Terminating with std::string invariant message: 12345") {
+    const std::string msg = str::stream() << "Terminating with std::string invariant message: "
+                                          << 12345;
+    invariant(false, msg);
 }
 
 }  // namespace

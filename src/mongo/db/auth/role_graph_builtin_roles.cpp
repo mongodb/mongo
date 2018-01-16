@@ -248,7 +248,8 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::listSessions  // clusterMonitor gets this also
         << ActionType::listShards  // clusterMonitor gets this also
         << ActionType::flushRouterConfig  // hostManager gets this also
-        << ActionType::cleanupOrphaned;
+        << ActionType::cleanupOrphaned
+        << ActionType::setFeatureCompatibilityVersion;
 
     clusterManagerRoleDatabaseActions
         << ActionType::splitChunk
@@ -475,13 +476,6 @@ void addClusterManagerPrivileges(PrivilegeVector* privileges) {
         privileges, Privilege(ResourcePattern::forDatabaseName("config"), writeActions));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forDatabaseName("local"), writeActions));
-
-    // Fake collection used for setFeatureCompatibilityVersion permissions.
-    Privilege::addPrivilegeToPrivilegeVector(
-        privileges,
-        Privilege(ResourcePattern::forExactNamespace(
-                      NamespaceString("$setFeatureCompatibilityVersion", "version")),
-                  writeActions));
 }
 
 void addClusterAdminPrivileges(PrivilegeVector* privileges) {

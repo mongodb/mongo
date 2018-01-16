@@ -81,6 +81,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/sync_tail.h"
+#include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -388,8 +389,8 @@ void _logOpsInner(OperationContext* opCtx,
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (nss.size() && replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
         !replCoord->canAcceptWritesFor(opCtx, nss)) {
-        severe() << "logOp() but can't accept write to collection " << nss.ns();
-        fassertFailed(17405);
+        uasserted(17405,
+                  str::stream() << "logOp() but can't accept write to collection " << nss.ns());
     }
 
     // we jump through a bunch of hoops here to avoid copying the obj buffer twice --
@@ -1190,9 +1191,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     !fieldO.Obj().isEmpty() && !fieldTs.Obj().isEmpty() && !fieldT.Obj().isEmpty());
 
             std::vector<InsertStatement> insertObjs;
-            auto fieldOIt = fieldO.Obj().begin();
-            auto fieldTsIt = fieldTs.Obj().begin();
-            auto fieldTIt = fieldT.Obj().begin();
+            auto fieldOIt = BSONObjIterator(fieldO.Obj());
+            auto fieldTsIt = BSONObjIterator(fieldTs.Obj());
+            auto fieldTIt = BSONObjIterator(fieldT.Obj());
 
             while (true) {
                 auto oElem = fieldOIt.next();
@@ -1547,8 +1548,40 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    bool done = false;
+    const bool assignCommandTimestamp = [opCtx] {
+        const auto replMode = ReplicationCoordinator::get(opCtx)->getReplicationMode();
+        if (opCtx->writesAreReplicated()) {
+            // We do not assign timestamps on replicated writes since they will get their oplog
+            // timestamp once they are logged.
+            return false;
+        } else {
+            switch (replMode) {
+                case ReplicationCoordinator::modeReplSet: {
+                    // The 'applyOps' command never logs 'applyOps' oplog entries with nested
+                    // command operations, so this code will never be run from inside the 'applyOps'
+                    // command on secondaries. Thus, the timestamps in the command oplog
+                    // entries are always real timestamps from this oplog and we should
+                    // timestamp our writes with them.
+                    return true;
+                }
+                case ReplicationCoordinator::modeNone: {
+                    // We do not assign timestamps on standalones.
+                    return false;
+                }
+                case ReplicationCoordinator::modeMasterSlave: {
+                    // Master-slave does not support timestamps so we do not assign a timestamp.
+                    return false;
+                }
+            }
+            MONGO_UNREACHABLE;
+        }
+    }();
+    invariant(!assignCommandTimestamp || !opTime.isNull(),
+              str::stream() << "Oplog entry did not have 'ts' field when expected: " << redact(op));
 
+    const Timestamp writeTime = (assignCommandTimestamp ? opTime.getTimestamp() : Timestamp());
+
+    bool done = false;
     while (!done) {
         auto op = opsMap.find(o.firstElementFieldName());
         if (op == opsMap.end()) {
@@ -1559,6 +1592,9 @@ Status applyCommand_inlock(OperationContext* opCtx,
         ApplyOpMetadata curOpToApply = op->second;
         Status status = Status::OK();
         try {
+            // If 'writeTime' is not null, any writes in this scope will be given 'writeTime' as
+            // their timestamp at commit.
+            TimestampBlock tsBlock(opCtx, writeTime);
             status = curOpToApply.applyFunc(opCtx, nss.ns().c_str(), fieldUI, o, opTime, mode);
         } catch (...) {
             status = exceptionToStatus();

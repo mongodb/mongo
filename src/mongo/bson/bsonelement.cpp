@@ -590,159 +590,78 @@ BSONElement BSONElement::operator[](StringData field) const {
     return o[field];
 }
 
-int BSONElement::size(int maxLen) const {
-    if (totalSize >= 0)
-        return totalSize;
-
-    int remain = maxLen - fieldNameSize() - 1;
-
-    int x = 0;
-    switch (type()) {
-        case EOO:
-        case Undefined:
-        case jstNULL:
-        case MaxKey:
-        case MinKey:
-            break;
-        case mongo::Bool:
-            x = 1;
-            break;
-        case NumberInt:
-            x = 4;
-            break;
-        case bsonTimestamp:
-        case mongo::Date:
-        case NumberDouble:
-        case NumberLong:
-            x = 8;
-            break;
-        case NumberDecimal:
-            x = 16;
-            break;
-        case jstOID:
-            x = OID::kOIDSize;
-            break;
-        case Symbol:
-        case Code:
-        case mongo::String:
-            massert(
-                10313, "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3);
-            x = valuestrsize() + 4;
-            break;
-        case CodeWScope:
-            massert(
-                10314, "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3);
-            x = objsize();
-            break;
-
-        case DBRef:
-            massert(
-                10315, "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3);
-            x = valuestrsize() + 4 + 12;
-            break;
-        case Object:
-        case mongo::Array:
-            massert(
-                10316, "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3);
-            x = objsize();
-            break;
-        case BinData:
-            massert(
-                10317, "Insufficient bytes to calculate element size", maxLen == -1 || remain > 3);
-            x = valuestrsize() + 4 + 1 /*subtype*/;
-            break;
-        case RegEx: {
-            const char* p = value();
-            size_t len1 = (maxLen == -1) ? strlen(p) : strnlen(p, remain);
-            massert(10318, "Invalid regex string", maxLen == -1 || len1 < size_t(remain));
-            p = p + len1 + 1;
-            size_t len2;
-            if (maxLen == -1)
-                len2 = strlen(p);
-            else {
-                size_t x = remain - len1 - 1;
-                verify(x <= 0x7fffffff);
-                len2 = strnlen(p, x);
-                massert(10319, "Invalid regex options string", len2 < x);
-            }
-            x = (int)(len1 + 1 + len2 + 1);
-        } break;
-        default: {
-            StringBuilder ss;
-            ss << "BSONElement: bad type " << (int)type();
-            std::string msg = ss.str();
-            massert(13655, msg.c_str(), false);
-        }
-    }
-    totalSize = x + fieldNameSize() + 1;  // BSONType
-
-    return totalSize;
+namespace {
+NOINLINE_DECL void msgAssertedBadType[[noreturn]](int8_t type) {
+    msgasserted(10320, str::stream() << "BSONElement: bad type " << (int)type);
 }
+}  // namespace
+int BSONElement::computeSize() const {
+    enum SizeStyle : uint8_t {
+        kFixed,         // Total size is a fixed amount + key length.
+        kIntPlusFixed,  // Like Fixed, but also add in the int32 immediately following the key.
+        kRegEx,         // Handled specially.
+    };
+    struct SizeInfo {
+        uint8_t style : 2;
+        uint8_t bytes : 6;  // Includes type byte. Excludes field name and variable lengths.
+    };
+    MONGO_STATIC_ASSERT(sizeof(SizeInfo) == 1);
 
-int BSONElement::size() const {
-    if (totalSize >= 0)
-        return totalSize;
+    // This table should take 20 bytes. Align to next power of 2 to avoid splitting across cache
+    // lines unnecessarily.
+    static constexpr SizeInfo kSizeInfoTable alignas(32)[] = {
+        {SizeStyle::kFixed, 1},          // EOO
+        {SizeStyle::kFixed, 9},          // NumberDouble
+        {SizeStyle::kIntPlusFixed, 5},   // String
+        {SizeStyle::kIntPlusFixed, 1},   // Object
+        {SizeStyle::kIntPlusFixed, 1},   // Array
+        {SizeStyle::kIntPlusFixed, 6},   // BinData
+        {SizeStyle::kFixed, 1},          // Undefined
+        {SizeStyle::kFixed, 13},         // OID
+        {SizeStyle::kFixed, 2},          // Bool
+        {SizeStyle::kFixed, 9},          // Date
+        {SizeStyle::kFixed, 1},          // Null
+        {SizeStyle::kRegEx},             // Regex
+        {SizeStyle::kIntPlusFixed, 17},  // DBRef
+        {SizeStyle::kIntPlusFixed, 5},   // Code
+        {SizeStyle::kIntPlusFixed, 5},   // Symbol
+        {SizeStyle::kIntPlusFixed, 1},   // CodeWScope
+        {SizeStyle::kFixed, 5},          // Int
+        {SizeStyle::kFixed, 9},          // Timestamp
+        {SizeStyle::kFixed, 9},          // Long
+        {SizeStyle::kFixed, 17},         // Decimal
+    };
+    MONGO_STATIC_ASSERT((sizeof(kSizeInfoTable) / sizeof(kSizeInfoTable[0])) == JSTypeMax + 1);
 
-    int x = 0;
-    switch (type()) {
-        case EOO:
-        case Undefined:
-        case jstNULL:
-        case MaxKey:
-        case MinKey:
-            break;
-        case mongo::Bool:
-            x = 1;
-            break;
-        case NumberInt:
-            x = 4;
-            break;
-        case bsonTimestamp:
-        case mongo::Date:
-        case NumberDouble:
-        case NumberLong:
-            x = 8;
-            break;
-        case NumberDecimal:
-            x = 16;
-            break;
-        case jstOID:
-            x = OID::kOIDSize;
-            break;
-        case Symbol:
-        case Code:
-        case mongo::String:
-            x = valuestrsize() + 4;
-            break;
-        case DBRef:
-            x = valuestrsize() + 4 + 12;
-            break;
-        case CodeWScope:
-        case Object:
-        case mongo::Array:
-            x = objsize();
-            break;
-        case BinData:
-            x = valuestrsize() + 4 + 1 /*subtype*/;
-            break;
-        case RegEx: {
-            const char* p = value();
-            size_t len1 = strlen(p);
-            p = p + len1 + 1;
-            size_t len2;
-            len2 = strlen(p);
-            x = (int)(len1 + 1 + len2 + 1);
-        } break;
-        default: {
-            StringBuilder ss;
-            ss << "BSONElement: bad type " << (int)type();
-            std::string msg = ss.str();
-            massert(10320, msg.c_str(), false);
+    // This is the start of the runtime code for this function. Everything above happens at compile
+    // time. This function attempts to push complex handling of unlikely events out-of-line to
+    // ensure that the common cases never need to spill any registers (at least on x64 with
+    // gcc-5.4), which reduces the function call overhead.
+    int8_t type = *data;
+    if (MONGO_unlikely(type < 0 || type > JSTypeMax)) {
+        if (MONGO_unlikely(type != MinKey && type != MaxKey)) {
+            msgAssertedBadType(type);
         }
-    }
-    totalSize = x + fieldNameSize() + 1;  // BSONType
 
-    return totalSize;
+        // MinKey and MaxKey should be treated the same as Null
+        type = jstNULL;
+    }
+
+    const auto sizeInfo = kSizeInfoTable[type];
+    if (sizeInfo.style == SizeStyle::kFixed)
+        return sizeInfo.bytes + fieldNameSize();
+    if (MONGO_likely(sizeInfo.style == SizeStyle::kIntPlusFixed))
+        return sizeInfo.bytes + fieldNameSize() + valuestrsize();
+
+    return [this, type]() NOINLINE_DECL {
+        // Regex is two c-strings back-to-back.
+        invariant(type == BSONType::RegEx);
+        const char* p = value();
+        size_t len1 = strlen(p);
+        p = p + len1 + 1;
+        size_t len2 = strlen(p);
+        return (len1 + 1 + len2 + 1) + fieldNameSize() + 1;
+    }();
 }
 
 std::string BSONElement::toString(bool includeFieldName, bool full) const {

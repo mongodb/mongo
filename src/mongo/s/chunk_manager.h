@@ -31,6 +31,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
@@ -48,7 +49,7 @@ struct QuerySolutionNode;
 class OperationContext;
 
 // Ordered map from the max for each chunk to an entry describing the chunk
-using ChunkMap = BSONObjIndexedMap<std::shared_ptr<Chunk>>;
+using ChunkMap = std::map<std::string, std::shared_ptr<Chunk>>;
 
 // Map from a shard is to the max chunk version on that shard
 using ShardVersionMap = std::map<ShardId, ChunkVersion>;
@@ -169,6 +170,25 @@ public:
     }
 
     /**
+     * Returns true if a document with the given "shardKey" is owned by the shard with the given
+     * "shardId" in this routing table. If "shardKey" is empty returns false. If "shardKey" is not a
+     * valid shard key, the behaviour is undefined.
+     */
+    bool keyBelongsToShard(const BSONObj& shardKey, const ShardId& shardId) const;
+
+    /**
+     * Returns true if any chunk owned by the shard with the given "shardId" overlaps "range".
+     */
+    bool rangeOverlapsShard(const ChunkRange& range, const ShardId& shardId) const;
+
+    /**
+     * Given a shardKey, returns the first chunk which is owned by shardId and overlaps or sorts
+     * after that shardKey. The returned iterator range always contains one or zero entries. If zero
+     * entries are returned, this means no such chunk exists.
+     */
+    ConstRangeOfChunks getNextChunkOnShard(const BSONObj& shardKey, const ShardId& shardId) const;
+
+    /**
      * Given a shard key (or a prefix) that has been extracted from a document, returns the chunk
      * that contains that key.
      *
@@ -256,9 +276,10 @@ private:
 
         ChunkRange range;
         ShardId shardId;
+        std::string ksMax;
     };
 
-    using ChunkRangeMap = BSONObjIndexedMap<ShardAndChunkRange>;
+    using ChunkRangeMap = std::vector<ShardAndChunkRange>;
 
     /**
      * Contains different transformations of the chunk map for efficient querying
@@ -277,15 +298,24 @@ private:
     /**
      * Does a single pass over the chunkMap and constructs the ChunkMapViews object.
      */
-    static ChunkMapViews _constructChunkMapViews(const OID& epoch, const ChunkMap& chunkMap);
+    static ChunkMapViews _constructChunkMapViews(const OID& epoch,
+                                                 const ChunkMap& chunkMap,
+                                                 Ordering shardKeyOrdering);
 
     ChunkManager(NamespaceString nss,
-                 boost::optional<UUID>,
+                 boost::optional<UUID> uuid,
                  KeyPattern shardKeyPattern,
                  std::unique_ptr<CollatorInterface> defaultCollator,
                  bool unique,
                  ChunkMap chunkMap,
                  ChunkVersion collectionVersion);
+
+    std::string _extractKeyString(const BSONObj& shardKeyValue) const;
+
+    ChunkRangeMap::const_iterator _rangeMapUpperBound(const BSONObj& key) const;
+
+    std::pair<ChunkRangeMap::const_iterator, ChunkRangeMap::const_iterator> _overlappingRanges(
+        const BSONObj& min, const BSONObj& max, bool isMaxInclusive) const;
 
     // The shard versioning mechanism hinges on keeping track of the number of times we reload
     // ChunkManagers.
@@ -299,6 +329,8 @@ private:
 
     // The key pattern used to shard the collection
     const ShardKeyPattern _shardKeyPattern;
+
+    const Ordering _shardKeyOrdering;
 
     // Default collation to use for routing data queries for this collection
     const std::unique_ptr<CollatorInterface> _defaultCollator;

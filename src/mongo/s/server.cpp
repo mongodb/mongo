@@ -238,9 +238,6 @@ static void cleanupTask() {
             tl->shutdown();
         }
 
-        // Shut down the global dbclient pool so callers stop waiting for connections.
-        shardConnectionPool.shutdown();
-
         // Shutdown the Service Entry Point and its sessions and give it a grace period to complete.
         if (auto sep = serviceContext->getServiceEntryPoint()) {
             if (!sep->shutdown(Seconds(10))) {
@@ -591,6 +588,8 @@ int mongoSMain(int argc, char* argv[], char** envp) {
         severe(LogComponent::kDefault) << "Failed global initialization: " << status;
         quickExit(EXIT_FAILURE);
     }
+
+    ErrorExtraInfo::invariantHaveAllParsers();
 
     startupConfigActions(std::vector<std::string>(argv, argv + argc));
     cmdline_utils::censorArgvArray(argc, argv);

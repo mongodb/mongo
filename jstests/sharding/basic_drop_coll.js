@@ -1,6 +1,6 @@
 /**
  * Basic test from the drop collection command on a sharded cluster that verifies collections are
- * cleanuped up properly.
+ * cleaned up properly.
  */
 (function() {
     "use strict";
@@ -34,6 +34,7 @@
 
     var configDB = st.s.getDB('config');
     var collDoc = configDB.collections.findOne({_id: 'test.user'});
+
     assert(!collDoc.dropped);
 
     assert.eq(2, configDB.chunks.count({ns: 'test.user'}));
@@ -43,7 +44,15 @@
     assert.eq(null, st.d0.getDB('test').user.findOne());
     assert.eq(null, st.d1.getDB('test').user.findOne());
 
-    collDoc = configDB.collections.findOne({_id: 'test.user'});
+    // Call drop again to verify that the command is idempotent.
+    assert.commandWorked(testDB.runCommand({drop: 'user'}));
+
+    // Check for the collection with majority RC to verify that the write to remove the collection
+    // document from the catalog has propagated to the majority snapshot.
+    var findColl = configDB.runCommand(
+        {find: 'collections', filter: {_id: 'test.user'}, readConcern: {'level': 'majority'}});
+    collDoc = findColl.cursor.firstBatch[0];
+
     assert(collDoc.dropped);
 
     assert.eq(0, configDB.chunks.count({ns: 'test.user'}));

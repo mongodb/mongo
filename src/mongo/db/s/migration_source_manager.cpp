@@ -164,7 +164,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                 "cannot move chunks for a collection that doesn't exist",
                 autoColl.getCollection());
 
-        UUID collectionUUID;
+        boost::optional<UUID> collectionUUID;
         if (autoColl.getCollection()->uuid()) {
             collectionUUID = autoColl.getCollection()->uuid().value();
         }
@@ -671,6 +671,10 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
     // The cleanup operations below are potentially blocking or acquire other locks, so perform them
     // outside of the collection X lock
 
+    if (cloneDriver) {
+        cloneDriver->cancelClone(opCtx);
+    }
+
     if (_state == kCriticalSection || _state == kCloneCompleted) {
         // NOTE: The order of the operations below is important and the comments explain the
         // reasoning behind it
@@ -689,10 +693,6 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
         // Clear the 'minOpTime recovery' document so that the next time a node from this shard
         // becomes a primary, it won't have to recover the config server optime.
         ShardingStateRecovery::endMetadataOp(opCtx);
-    }
-
-    if (cloneDriver) {
-        cloneDriver->cancelClone(opCtx);
     }
 
     _state = kDone;

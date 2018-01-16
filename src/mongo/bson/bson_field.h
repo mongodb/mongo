@@ -29,6 +29,8 @@
 
 #include <string>
 
+#include <boost/optional.hpp>
+
 #include "mongo/bson/bsonobj.h"
 
 namespace mongo {
@@ -88,10 +90,9 @@ private:
 template <typename T>
 class BSONField {
 public:
-    BSONField(const std::string& name) : _name(name), _defaultSet(false) {}
+    BSONField(const std::string& name) : _name(name) {}
 
-    BSONField(const std::string& name, const T& defaultVal)
-        : _name(name), _default(defaultVal), _defaultSet(true) {}
+    BSONField(const std::string& name, const T& defaultVal) : _name(name), _default(defaultVal) {}
 
     BSONFieldValue<T> make(const T& t) const {
         return BSONFieldValue<T>(_name, t);
@@ -106,11 +107,11 @@ public:
     }
 
     const T& getDefault() const {
-        return _default;
+        return *_default;
     }
 
     bool hasDefault() const {
-        return _defaultSet;
+        return bool(_default);
     }
 
     std::string operator()() const {
@@ -133,8 +134,7 @@ public:
 
 private:
     std::string _name;
-    T _default;
-    bool _defaultSet;
+    boost::optional<T> _default;
 };
 
 }  // namespace mongo

@@ -52,7 +52,7 @@ BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames)
     invariant(replace.nFields() == fieldNames.nFields());
 
     BSONObjBuilder bob;
-    BSONObjIterator iter = fieldNames.begin();
+    auto iter = fieldNames.begin();
 
     for (const BSONElement& el : replace) {
         bob.appendAs(el, (*iter++).fieldNameStringData());
@@ -157,7 +157,6 @@ void CountScan::doRestoreState() {
         _cursor->restore();
 
     // This can change during yielding.
-    // TODO this isn't sufficient. See SERVER-17678.
     _shouldDedup = _descriptor->isMultikey(getOpCtx());
 }
 

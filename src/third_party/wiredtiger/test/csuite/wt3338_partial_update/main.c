@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -253,21 +253,21 @@ static int nruns = 1000;
  *	Run some tests.
  */
 static void
-modify_run(WT_ITEM *local, WT_ITEM *library, bool verbose)
+modify_run(WT_CURSOR *cursor, WT_ITEM *local, bool verbose)
 {
 	int i, j;
 
 	for (i = 0; i < nruns; ++i) {
-		modify_init(local, library);
+		modify_init(local, &cursor->value);
 
 		for (j = 0; j < 1000; ++j) {
 			modify_build();
 
 			slow_apply_api(local);
 			testutil_check(__wt_modify_apply_api(
-			    NULL, library, entries, nentries));
+			    NULL, cursor, entries, nentries));
 
-			diff(local, library);
+			diff(local, &cursor->value);
 		}
 		if (verbose) {
 			printf("%d (%d%%)\r", i, (i * 100) / nruns);
@@ -282,7 +282,8 @@ int
 main(int argc, char *argv[])
 {
 	TEST_OPTS *opts, _opts;
-	WT_ITEM *library, _library, *local, _local;
+	WT_CURSOR *cursor, _cursor;
+	WT_ITEM *local, _local;
 
 	if (testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
 		nruns = 10000;
@@ -300,17 +301,18 @@ main(int argc, char *argv[])
 	/* Set up replacement information. */
 	modify_repl_init();
 
-	/* Allocate a pair of buffers. */
+	/* We need two items, one of them hooked into fake cursor. */
 	local = &_local;
 	memset(&_local, 0, sizeof(_local));
-	library = &_library;
-	memset(&_library, 0, sizeof(_library));
+	cursor = &_cursor;
+	memset(&_cursor, 0, sizeof(_cursor));
+	cursor->value_format = "u";
 
 	/* Run the test. */
-	modify_run(local, library, opts->verbose);
+	modify_run(cursor, local, opts->verbose);
 
 	__wt_buf_free(NULL, local);
-	__wt_buf_free(NULL, library);
+	__wt_buf_free(NULL, &cursor->value);
 
 	testutil_cleanup(opts);
 	return (EXIT_SUCCESS);

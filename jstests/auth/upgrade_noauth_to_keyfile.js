@@ -2,7 +2,7 @@
  * This test checks the upgrade path from noauth to keyFile.
  *
  * This test requires users to persist across a restart.
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, requires_replication]
  */
 
 load('jstests/multiVersion/libs/multi_rs.js');

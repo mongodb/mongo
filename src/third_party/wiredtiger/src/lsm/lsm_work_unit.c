@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -326,6 +326,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	bool flush_set, release_dhandle;
 
 	flush_set = release_dhandle = false;
+	WT_NOT_READ(flush_set);
 
 	/*
 	 * If the chunk is already checkpointed, make sure it is also evicted.
@@ -338,9 +339,10 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		    ret = __lsm_discard_handle(session, chunk->uri, NULL));
 		if (ret == 0)
 			chunk->evicted = 1;
-		else if (ret == EBUSY)
+		else if (ret == EBUSY) {
 			ret = 0;
-		else
+			WT_NOT_READ(ret);
+		} else
 			WT_RET_MSG(session, ret, "discard handle");
 	}
 	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {

@@ -136,8 +136,8 @@ struct SockAddr {
     bool isAnonymousUNIXSocket() const;
 
     bool operator==(const SockAddr& r) const;
-
     bool operator!=(const SockAddr& r) const;
+    bool operator<(const SockAddr& r) const;
 
     const sockaddr* raw() const {
         return (sockaddr*)&sa;

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -720,6 +720,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 
 	/* Start making real changes to the tree, errors are fatal. */
 	complete = WT_ERR_PANIC;
+	WT_NOT_READ(complete);
 
 	/* Encourage a race */
 	__page_split_timing_stress(session,
@@ -1475,6 +1476,12 @@ __split_multi_inmem(
 			/* Search the page. */
 			WT_ERR(__wt_row_search(
 			    session, key, ref, &cbt, true, true));
+
+			/*
+			 * Birthmarks should only be applied to on-page values.
+			 */
+			WT_ASSERT(session, cbt.compare == 0 ||
+			    upd->type != WT_UPDATE_BIRTHMARK);
 
 			/* Apply the modification. */
 			WT_ERR(__wt_row_modify(session,
@@ -2260,6 +2267,7 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 
 	/* Swap the new page into place. */
 	ref->page = new->page;
+
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 
 	__wt_free(session, new);

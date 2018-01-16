@@ -79,21 +79,40 @@ public:
 };
 
 /**
- * EQ, LTE, LT, GT, GTE subclass from ComparisonMatchExpression.
+ * Base class for comparison-like match expression nodes. This includes both the comparison nodes in
+ * the match language ($eq, $gt, $gte, $lt, and $lte), as well as internal comparison nodes like
+ * $_internalExprEq.
  */
-class ComparisonMatchExpression : public LeafMatchExpression {
+class ComparisonMatchExpressionBase : public LeafMatchExpression {
 public:
-    explicit ComparisonMatchExpression(MatchType type, StringData path, const BSONElement& rhs);
+    static bool isEquality(MatchType matchType) {
+        switch (matchType) {
+            case MatchExpression::EQ:
+            case MatchExpression::INTERNAL_EXPR_EQ:
+                return true;
+            default:
+                return false;
+        }
+    }
 
-    virtual ~ComparisonMatchExpression() {}
+    ComparisonMatchExpressionBase(MatchType type,
+                                  StringData path,
+                                  const BSONElement& rhs,
+                                  ElementPath::LeafArrayBehavior,
+                                  ElementPath::NonLeafArrayBehavior);
 
-    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
+    virtual ~ComparisonMatchExpressionBase() = default;
 
     virtual void debugString(StringBuilder& debug, int level = 0) const;
 
     virtual void serialize(BSONObjBuilder* out) const;
 
     virtual bool equivalent(const MatchExpression* other) const;
+
+    /**
+     * Returns the name of this MatchExpression.
+     */
+    virtual StringData name() const = 0;
 
     const BSONElement& getData() const {
         return _rhs;
@@ -103,6 +122,30 @@ public:
         return _collator;
     }
 
+protected:
+    /**
+     * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
+     */
+    void _doSetCollator(const CollatorInterface* collator) final {
+        _collator = collator;
+    }
+
+    BSONElement _rhs;
+
+    // Collator used to compare elements. By default, simple binary comparison will be used.
+    const CollatorInterface* _collator = nullptr;
+
+private:
+    ExpressionOptimizerFunc getOptimizer() const final {
+        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
+    }
+};
+
+/**
+ * EQ, LTE, LT, GT, GTE subclass from ComparisonMatchExpression.
+ */
+class ComparisonMatchExpression : public ComparisonMatchExpressionBase {
+public:
     /**
      * Returns true if the MatchExpression is a ComparisonMatchExpression.
      */
@@ -119,29 +162,23 @@ public:
         }
     }
 
-protected:
-    /**
-     * 'collator' must outlive the ComparisonMatchExpression and any clones made of it.
-     */
-    virtual void _doSetCollator(const CollatorInterface* collator) {
-        _collator = collator;
-    }
+    ComparisonMatchExpression(MatchType type, StringData path, const BSONElement& rhs);
 
-    BSONElement _rhs;
+    virtual ~ComparisonMatchExpression() = default;
 
-    // Collator used to compare elements. By default, simple binary comparison will be used.
-    const CollatorInterface* _collator = nullptr;
-
-private:
-    ExpressionOptimizerFunc getOptimizer() const final {
-        return [](std::unique_ptr<MatchExpression> expression) { return expression; };
-    }
+    bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 };
 
-class EqualityMatchExpression : public ComparisonMatchExpression {
+class EqualityMatchExpression final : public ComparisonMatchExpression {
 public:
+    static constexpr StringData kName = "$eq"_sd;
+
     EqualityMatchExpression(StringData path, const BSONElement& rhs)
         : ComparisonMatchExpression(EQ, path, rhs) {}
+
+    StringData name() const final {
+        return kName;
+    }
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
@@ -154,10 +191,16 @@ public:
     }
 };
 
-class LTEMatchExpression : public ComparisonMatchExpression {
+class LTEMatchExpression final : public ComparisonMatchExpression {
 public:
+    static constexpr StringData kName = "$lte"_sd;
+
     LTEMatchExpression(StringData path, const BSONElement& rhs)
         : ComparisonMatchExpression(LTE, path, rhs) {}
+
+    StringData name() const final {
+        return kName;
+    }
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
@@ -170,10 +213,16 @@ public:
     }
 };
 
-class LTMatchExpression : public ComparisonMatchExpression {
+class LTMatchExpression final : public ComparisonMatchExpression {
 public:
+    static constexpr StringData kName = "$lt"_sd;
+
     LTMatchExpression(StringData path, const BSONElement& rhs)
         : ComparisonMatchExpression(LT, path, rhs) {}
+
+    StringData name() const final {
+        return kName;
+    }
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
@@ -186,10 +235,16 @@ public:
     }
 };
 
-class GTMatchExpression : public ComparisonMatchExpression {
+class GTMatchExpression final : public ComparisonMatchExpression {
 public:
+    static constexpr StringData kName = "$gt"_sd;
+
     GTMatchExpression(StringData path, const BSONElement& rhs)
         : ComparisonMatchExpression(GT, path, rhs) {}
+
+    StringData name() const final {
+        return kName;
+    }
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =
@@ -202,10 +257,16 @@ public:
     }
 };
 
-class GTEMatchExpression : public ComparisonMatchExpression {
+class GTEMatchExpression final : public ComparisonMatchExpression {
 public:
+    static constexpr StringData kName = "$gte"_sd;
+
     GTEMatchExpression(StringData path, const BSONElement& rhs)
         : ComparisonMatchExpression(GTE, path, rhs) {}
+
+    StringData name() const final {
+        return kName;
+    }
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ComparisonMatchExpression> e =

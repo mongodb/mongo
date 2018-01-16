@@ -245,6 +245,9 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     ast_struct.immutable = struct.immutable
     ast_struct.inline_chained_structs = struct.inline_chained_structs
     ast_struct.generate_comparison_operators = struct.generate_comparison_operators
+    ast_struct.cpp_name = struct.name
+    if struct.cpp_name:
+        ast_struct.cpp_name = struct.cpp_name
 
     # Validate naming restrictions
     if ast_struct.name.startswith("array<"):
@@ -334,6 +337,71 @@ def _inject_hidden_command_fields(command):
     command.fields.append(db_field)
 
 
+def _bind_command_type(ctxt, parsed_spec, command):
+    # type: (errors.ParserContext, syntax.IDLSpec, syntax.Command) -> ast.Field
+    """Bind the type field in a command as the first field."""
+    # pylint: disable=too-many-branches,too-many-statements
+    ast_field = ast.Field(command.file_name, command.line, command.column)
+    ast_field.name = command.name
+    ast_field.description = command.description
+    ast_field.optional = False
+    ast_field.supports_doc_sequence = False
+    ast_field.serialize_op_msg_request_only = False
+    ast_field.constructed = False
+
+    ast_field.cpp_name = "CommandParameter"
+
+    # Validate naming restrictions
+    if ast_field.name.startswith("array<"):
+        ctxt.add_array_not_valid_error(ast_field, "field", ast_field.name)
+
+    # Resolve the command type as a field
+    syntax_symbol = parsed_spec.symbols.resolve_field_type(ctxt, command, command.name,
+                                                           command.type)
+    if syntax_symbol is None:
+        return None
+
+    if isinstance(syntax_symbol, syntax.Command):
+        ctxt.add_bad_command_as_field_error(ast_field, command.type)
+        return None
+
+    assert not isinstance(syntax_symbol, syntax.Enum)
+
+    # If the field type is an array, mark the AST version as such.
+    if syntax.parse_array_type(command.type):
+        ast_field.array = True
+
+    # Copy over only the needed information if this a struct or a type
+    if isinstance(syntax_symbol, syntax.Struct):
+        struct = cast(syntax.Struct, syntax_symbol)
+        cpp_name = struct.name
+        if struct.cpp_name:
+            cpp_name = struct.cpp_name
+        ast_field.struct_type = common.qualify_cpp_name(struct.cpp_namespace, cpp_name)
+        ast_field.bson_serialization_type = ["object"]
+
+        _validate_field_of_type_struct(ctxt, ast_field)
+    else:
+        # Produce the union of type information for the type and this field.
+        idltype = cast(syntax.Type, syntax_symbol)
+
+        # Copy over the type fields first
+        ast_field.cpp_type = idltype.cpp_type
+        ast_field.bson_serialization_type = idltype.bson_serialization_type
+        ast_field.bindata_subtype = idltype.bindata_subtype
+        ast_field.serializer = _normalize_method_name(idltype.cpp_type, idltype.serializer)
+        ast_field.deserializer = _normalize_method_name(idltype.cpp_type, idltype.deserializer)
+        ast_field.default = idltype.default
+
+        # Validate merged type
+        _validate_type_properties(ctxt, ast_field, "command.type")
+
+        # Validate merged type
+        _validate_field_properties(ctxt, ast_field)
+
+    return ast_field
+
+
 def _bind_command(ctxt, parsed_spec, command):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Command) -> ast.Command
     """
@@ -352,6 +420,9 @@ def _bind_command(ctxt, parsed_spec, command):
 
     ast_command.namespace = command.namespace
 
+    if command.type:
+        ast_command.command_field = _bind_command_type(ctxt, parsed_spec, command)
+
     if [field for field in ast_command.fields if field.name == ast_command.name]:
         ctxt.add_bad_command_name_duplicates_field(ast_command, ast_command.name)
 
@@ -368,7 +439,7 @@ def _validate_ignored_field(ctxt, field):
 
 
 def _validate_field_of_type_struct(ctxt, field):
-    # type: (errors.ParserContext, syntax.Field) -> None
+    # type: (errors.ParserContext, Union[syntax.Field, ast.Field]) -> None
     """Validate that for fields with a type of struct, no other properties are set."""
     if field.default is not None:
         ctxt.add_struct_field_must_be_empty_error(field, field.name, "default")
@@ -494,7 +565,10 @@ def _bind_field(ctxt, parsed_spec, field):
     # Copy over only the needed information if this a struct or a type
     if isinstance(syntax_symbol, syntax.Struct):
         struct = cast(syntax.Struct, syntax_symbol)
-        ast_field.struct_type = common.qualify_cpp_name(struct.cpp_namespace, struct.name)
+        cpp_name = struct.name
+        if struct.cpp_name:
+            cpp_name = struct.cpp_name
+        ast_field.struct_type = common.qualify_cpp_name(struct.cpp_namespace, cpp_name)
         ast_field.bson_serialization_type = ["object"]
 
         _validate_field_of_type_struct(ctxt, field)
@@ -597,7 +671,10 @@ def _bind_chained_struct(ctxt, parsed_spec, ast_struct, chained_struct):
     ast_chained_field.name = struct.name
     ast_chained_field.cpp_name = chained_struct.cpp_name
     ast_chained_field.description = struct.description
-    ast_chained_field.struct_type = struct.name
+    cpp_name = struct.name
+    if struct.cpp_name:
+        cpp_name = struct.cpp_name
+    ast_chained_field.struct_type = cpp_name
     ast_chained_field.bson_serialization_type = ["object"]
 
     ast_chained_field.chained = True

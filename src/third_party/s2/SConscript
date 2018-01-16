@@ -53,7 +53,7 @@ env.Library( "s2",
 	"s2regioncoverer.cc",
 	"s2regionintersection.cc",
 	"s2regionunion.cc",
-    ], LIBDEPS=['$BUILD_DIR/third_party/s2/base/base',
+    ], LIBDEPS=['$BUILD_DIR/third_party/s2/base/base_s2',
 		'$BUILD_DIR/third_party/s2/strings/strings',
 		'$BUILD_DIR/third_party/s2/util/coding/coding',
 		'$BUILD_DIR/third_party/s2/util/math/math'])

@@ -33,5 +33,6 @@
 namespace mongo {
 
 const char ClusterClientCursorParams::kSortKeyField[] = "$sortKey";
+const BSONObj ClusterClientCursorParams::kWholeSortKeySortPattern = BSON(kSortKeyField << 1);
 
 }  // namespace mongo

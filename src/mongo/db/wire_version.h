@@ -70,9 +70,12 @@ enum WireVersion {
     // Supports the new OP_MSG wireprotocol (3.6+).
     SUPPORTS_OP_MSG = 6,
 
+    // Supports replica set transactions (3.8+).
+    REPLICA_SET_TRANSACTIONS = 7,
+
     // Set this to the highest value in this enum - it will be the default maxWireVersion for
     // the WireSpec values.
-    LATEST_WIRE_VERSION = SUPPORTS_OP_MSG,
+    LATEST_WIRE_VERSION = REPLICA_SET_TRANSACTIONS,
 };
 
 /**

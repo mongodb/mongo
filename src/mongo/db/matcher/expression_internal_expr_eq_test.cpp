@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -164,10 +165,12 @@ TEST(InternalExprEqMatchExpression, ComparisonRespectsNewCollationAfterCallingSe
 }
 
 TEST(InternalExprEqMatchExpression, CorrectlyMatchesArrayElement) {
-    BSONObj operand = BSON("a" << BSON_ARRAY("b" << 5));
+    BSONObj operand = BSON("a.b" << 5);
 
     InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
                                      operand.firstElement());
+    ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSON("b" << 5))));
+    ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSON("b" << 6))));
     ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSON_ARRAY("b" << 5))));
     ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSON_ARRAY("b" << BSON_ARRAY(5)))));
     ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSON_ARRAY(5 << "b"))));
@@ -194,19 +197,6 @@ TEST(InternalExprEqMatchExpression, CorrectlyMatchesNullElement) {
     ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSONNULL)));
     ASSERT_FALSE(eq.matchesBSON(BSONObj()));
     ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSONUndefined)));
-    ASSERT_FALSE(eq.matchesBSON(BSON("a" << 4)));
-    ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2))));
-}
-
-TEST(InternalExprEqMatchExpression, CorrectlyMatchesUndefined) {
-    BSONObj operand = fromjson("{a: undefined}");
-
-    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
-                                     operand.firstElement());
-    // Expression equality to undefined should match literal undefined and missing, but not null.
-    ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSONUndefined)));
-    ASSERT_TRUE(eq.matchesBSON(BSONObj()));
-    ASSERT_FALSE(eq.matchesBSON(BSON("a" << BSONNULL)));
     ASSERT_FALSE(eq.matchesBSON(BSON("a" << 4)));
     ASSERT_TRUE(eq.matchesBSON(BSON("a" << BSON_ARRAY(1 << 2))));
 }
@@ -307,6 +297,26 @@ TEST(InternalExprEqMatchExpression, EquivalentToClone) {
 
     auto clone = eq.getMatchExpression()->shallowClone();
     ASSERT_TRUE(eq.getMatchExpression()->equivalent(clone.get()));
+}
+
+DEATH_TEST(InternalExprEqMatchExpression,
+           CannotCompareToArray,
+           "Invariant failure _rhs.type() != BSONType::Array") {
+    auto operand = BSON("a" << BSON_ARRAY(1 << 2));
+    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
+                                     operand.firstElement());
+}
+
+DEATH_TEST(InternalExprEqMatchExpression,
+           CannotCompareToUndefined,
+           "Invariant failure _rhs.type() != BSONType::Undefined") {
+    auto operand = BSON("a" << BSONUndefined);
+    InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
+                                     operand.firstElement());
+}
+
+DEATH_TEST(InternalExprEqMatchExpression, CannotCompareToMissing, "Invariant failure _rhs") {
+    InternalExprEqMatchExpression eq("a"_sd, BSONElement());
 }
 }  // namespace
 }  // namespace mongo

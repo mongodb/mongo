@@ -251,7 +251,7 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
         Command::appendCommandStatus(
             builder,
             {ErrorCodes::CommandNotFound, str::stream() << "no such cmd: " << commandName});
-        Command::unknownCommands.increment();
+        globalCommandRegistry()->incrementUnknownCommands();
         return;
     }
 

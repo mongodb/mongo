@@ -138,6 +138,12 @@ var Cluster = function(options) {
         assert(options.setupFunctions.mongos.every(f => (typeof f === 'function')),
                'Expected setupFunctions.mongos to be an array of functions');
 
+        options.setupFunctions.config = options.setupFunctions.config || [];
+        assert(Array.isArray(options.setupFunctions.config),
+               'Expected setupFunctions.config to be an array');
+        assert(options.setupFunctions.config.every(f => (typeof f === 'function')),
+               'Expected setupFunctions.config to be an array of functions');
+
         options.teardownFunctions = options.teardownFunctions || {};
         assert.eq('object', typeof options.teardownFunctions);
 
@@ -157,6 +163,12 @@ var Cluster = function(options) {
                'Expected teardownFunctions.mongos to be an array');
         assert(options.teardownFunctions.mongos.every(f => (typeof f === 'function')),
                'Expected teardownFunctions.mongos to be an array of functions');
+
+        options.teardownFunctions.config = options.teardownFunctions.config || [];
+        assert(Array.isArray(options.teardownFunctions.config),
+               'Expected teardownFunctions.config to be an array');
+        assert(options.teardownFunctions.config.every(f => (typeof f === 'function')),
+               'Expected teardownFunctions.config to be an array of functions');
 
         assert(!options.masterSlave || !options.replication.enabled,
                "Both 'masterSlave' and " + "'replication.enabled' cannot be true");
@@ -234,7 +246,14 @@ var Cluster = function(options) {
             this.teardown = function teardown() {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
                 options.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
+                options.teardownFunctions.config.forEach(this.executeOnConfigNodes);
 
+                // Skip checking uuids in teardown if performing continuous stepdowns. The override
+                // uses cached connections and expects to run commands against primaries, which is
+                // not compatible with stepdowns.
+                if (this.shouldPerformContinuousStepdowns()) {
+                    TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+                }
                 st.stop();
             };
 
@@ -244,7 +263,7 @@ var Cluster = function(options) {
                 };
 
                 this.stopContinuousFailover = function() {
-                    st.stopContinuousFailover({waitForPrimary: true});
+                    st.stopContinuousFailover({waitForPrimary: true, waitForMongosRetarget: true});
                 };
             }
 
@@ -328,6 +347,7 @@ var Cluster = function(options) {
         clusterStartTime = new Date();
 
         options.setupFunctions.mongod.forEach(this.executeOnMongodNodes);
+        options.setupFunctions.config.forEach(this.executeOnConfigNodes);
         if (options.sharded) {
             options.setupFunctions.mongos.forEach(this.executeOnMongosNodes);
         }
@@ -362,6 +382,27 @@ var Cluster = function(options) {
         });
     };
 
+    this.executeOnConfigNodes = function executeOnConfigNodes(fn) {
+        assert(initialized, 'cluster must be initialized first');
+
+        if (!fn || typeof(fn) !== 'function' || fn.length !== 1) {
+            throw new Error('config function must be a function that takes a db as an argument');
+        }
+
+        var configs = [];
+        var config = st.c0;
+        var i = 0;
+        while (config) {
+            configs.push(config);
+            ++i;
+            config = st['c' + i];
+        }
+
+        configs.forEach(function(conn) {
+            fn(conn.getDB('admin'));
+        });
+    };
+
     this.teardown = function teardown() {
         assert(initialized, 'cluster must be initialized first');
         options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
@@ -393,6 +434,34 @@ var Cluster = function(options) {
     this.shardCollection = function shardCollection() {
         assert(initialized, 'cluster must be initialized first');
         assert(this.isSharded(), 'cluster is not sharded');
+
+        // If we are continuously stepping down shards, the config server may have stale view of the
+        // cluster, so retry on retryable errors, e.g. NotMaster.
+        if (this.shouldPerformContinuousStepdowns()) {
+            assert.soon(() => {
+                try {
+                    st.shardColl.apply(st, arguments);
+                    return true;
+                } catch (e) {
+                    // The shardCollection command requires the config server primary to call
+                    // listCollections and listIndexes on shards before sharding the collection,
+                    // both of which can fail with a retryable error if the config server's view of
+                    // the cluster is stale. This is safe to retry because no actual work has been
+                    // done.
+                    //
+                    // TODO SERVER-30949: Remove this try catch block once listCollections and
+                    // listIndexes automatically retry on NotMaster errors.
+                    if (e.code === 18630 ||  // listCollections failure
+                        e.code === 18631) {  // listIndexes failure
+                        print("Caught retryable error from shardCollection, retrying: " +
+                              tojson(e));
+                        return false;
+                    }
+                    throw e;
+                }
+            });
+        }
+
         st.shardColl.apply(st, arguments);
     };
 
@@ -634,6 +703,11 @@ var Cluster = function(options) {
     this.isSteppingDownConfigServers = function isSteppingDownConfigServers() {
         return this.shouldPerformContinuousStepdowns() &&
             options.sharded.stepdownOptions.configStepdown;
+    };
+
+    this.isSteppingDownShards = function isSteppingDownShards() {
+        return this.shouldPerformContinuousStepdowns() &&
+            options.sharded.stepdownOptions.shardStepdown;
     };
 };
 

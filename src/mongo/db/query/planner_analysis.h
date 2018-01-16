@@ -64,21 +64,17 @@ public:
      * In brief: performs sort and covering analysis.
      *
      * The solution rooted at 'solnRoot' provides data for the query, whether through some
-     * configuration of indices or through a collection scan.  Additional stages may be required
-     * to perform sorting, projection, or other operations that are independent of the source
-     * of the data.  These stages are added atop 'solnRoot'.
+     * configuration of indices or through a collection scan.  Additional stages may be required to
+     * perform sorting, projection, or other operations that are independent of the source of the
+     * data.  These stages are added atop 'solnRoot'.
      *
-     * 'taggedRoot' is a copy of the parse tree.  Nodes in 'solnRoot' may point into it.
-     *
-     * Takes ownership of 'solnRoot' and 'taggedRoot'.
-     *
-     * Returns NULL if a solution cannot be constructed given the requirements in 'params'.
-     *
-     * Caller owns the returned QuerySolution.
+     * Returns a null pointer if a solution cannot be constructed given the requirements in
+     * 'params'.
      */
-    static QuerySolution* analyzeDataAccess(const CanonicalQuery& query,
-                                            const QueryPlannerParams& params,
-                                            std::unique_ptr<QuerySolutionNode> solnRoot);
+    static std::unique_ptr<QuerySolution> analyzeDataAccess(
+        const CanonicalQuery& query,
+        const QueryPlannerParams& params,
+        std::unique_ptr<QuerySolutionNode> solnRoot);
 
     /**
      * Sort the results, if there is a sort required.

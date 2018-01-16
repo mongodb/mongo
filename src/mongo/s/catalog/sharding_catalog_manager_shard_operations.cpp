@@ -306,7 +306,12 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     const ConnectionString& connectionString) {
     auto swCommandResponse =
         _runCommandForAddShard(opCtx, targeter.get(), "admin", BSON("isMaster" << 1));
-    if (!swCommandResponse.isOK()) {
+    if (swCommandResponse.getStatus() == ErrorCodes::IncompatibleServerVersion) {
+        return {swCommandResponse.getStatus().code(),
+                str::stream() << "Cannot add " << connectionString.toString()
+                              << " as a shard because its binary version is not compatible with "
+                                 "the cluster's featureCompatibilityVersion."};
+    } else if (!swCommandResponse.isOK()) {
         return swCommandResponse.getStatus();
     }
 
@@ -328,8 +333,11 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
         return {ErrorCodes::IllegalOperation, "cannot add a mongos as a shard"};
     }
 
-    // Fail if the node being added's binary version is lower than the cluster's
-    // featureCompatibilityVersion.
+    // Extract the maxWireVersion so we can verify that the node being added has a binary version
+    // greater than or equal to the cluster's featureCompatibilityVersion. We expect an incompatible
+    // binary node to be unable to communicate, returning an IncompatibleServerVersion error,
+    // because of our internal wire version protocol. So we can safely invariant here that the node
+    // is compatible.
     long long maxWireVersion;
     Status status = bsonExtractIntegerField(resIsMaster, "maxWireVersion", &maxWireVersion);
     if (!status.isOK()) {
@@ -340,16 +348,11 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                     << " as a shard: "
                                     << status.reason());
     }
-    if (((serverGlobalParams.featureCompatibility.getVersion() ==
-          ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) &&
-         maxWireVersion < WireVersion::LATEST_WIRE_VERSION) ||
-        ((serverGlobalParams.featureCompatibility.getVersion() !=
-          ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) &&
-         maxWireVersion < WireVersion::LATEST_WIRE_VERSION - 1)) {
-        return {ErrorCodes::IncompatibleServerVersion,
-                str::stream() << "Cannot add " << connectionString.toString()
-                              << " as a shard because its binary version is not compatible with "
-                                 "the cluster's featureCompatibilityVersion."};
+    if (serverGlobalParams.featureCompatibility.getVersion() ==
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
+        invariant(maxWireVersion >= WireVersion::LATEST_WIRE_VERSION - 1);
+    } else {
+        invariant(maxWireVersion >= WireVersion::LATEST_WIRE_VERSION);
     }
 
     // Check whether there is a master. If there isn't, the replica set may not have been

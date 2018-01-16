@@ -157,7 +157,7 @@ request = {
     writeConcern: {wtimeout: 1},
     ordered: false
 };
-result = assert.commandWorked(coll.runCommand(request));
+result = assert.commandWorkedIgnoringWriteErrors(coll.runCommand(request));
 assert.eq(1, result.n);
 assert.eq(result.writeErrors.length, 1);
 assert.eq(result.writeErrors[0].index, 1);

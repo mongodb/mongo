@@ -77,12 +77,12 @@
     // Ensure dropping the `config.transactions` collection breaks the retryable writes feature, but
     // doesn't crash the server
     assert(config.transactions.drop());
-    var res = assert.commandWorked(db.runCommand(cmdObj2));
+    var res = assert.commandWorkedIgnoringWriteErrors(db.runCommand(cmdObj2));
     assert.eq(0, res.nModified);
     assert.eq(1, db.user.find({_id: 1}).toArray()[0].x);
 
     assert(config.dropDatabase());
-    res = assert.commandWorked(db.runCommand(cmdObj2));
+    res = assert.commandWorkedIgnoringWriteErrors(db.runCommand(cmdObj2));
     assert.eq(0, res.nModified);
     assert.eq(1, db.user.find({_id: 1}).toArray()[0].x);
 

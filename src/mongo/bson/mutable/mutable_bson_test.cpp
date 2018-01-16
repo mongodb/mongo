@@ -1456,7 +1456,7 @@ TEST(Document, SetValueBSONElementFieldNameHandling) {
 
     static const char inJson2[] = "{ b : 5 }";
     mongo::BSONObj inObj2 = mongo::fromjson(inJson2);
-    mongo::BSONObjIterator iterator = inObj2.begin();
+    mongo::BSONObjIterator iterator(inObj2);
 
     ASSERT_TRUE(iterator.more());
     const mongo::BSONElement b = iterator.next();

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -97,7 +97,7 @@ __wt_schema_colcheck(WT_SESSION_IMPL *session,
 	WT_RET(__pack_init(session, &pack, key_format));
 	for (kcols = 0; (ret = __pack_next(&pack, &pv)) == 0; kcols++)
 		;
-	WT_RET_TEST(ret != WT_NOTFOUND, ret);
+	WT_RET_NOTFOUND_OK(ret);
 
 	WT_RET(__pack_init(session, &pack, value_format));
 	for (vcols = 0; (ret = __pack_next(&pack, &pv)) == 0; vcols++)

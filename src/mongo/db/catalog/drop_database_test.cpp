@@ -334,7 +334,7 @@ void _testDropDatabaseResetsDropPendingStateIfAwaitReplicationFails(OperationCon
 
 TEST_F(DropDatabaseTest,
        DropDatabaseResetsDropPendingStateIfAwaitReplicationFailsAndDatabaseIsPresent) {
-    // Update ReplicationCoordinatorMock so that awaitReplicationOfLastOpForClient() fails.
+    // Update ReplicationCoordinatorMock so that awaitReplication() fails.
     _replCoord->setAwaitReplicationReturnValueFunction([](const repl::OpTime&) {
         return repl::ReplicationCoordinator::StatusAndDuration(
             Status(ErrorCodes::WriteConcernFailed, ""), Milliseconds(0));
@@ -345,7 +345,7 @@ TEST_F(DropDatabaseTest,
 
 TEST_F(DropDatabaseTest,
        DropDatabaseResetsDropPendingStateIfAwaitReplicationFailsAndDatabaseIsMissing) {
-    // Update ReplicationCoordinatorMock so that awaitReplicationOfLastOpForClient() fails.
+    // Update ReplicationCoordinatorMock so that awaitReplication() fails.
     _replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime&) {
         _removeDatabaseFromCatalog(_opCtx.get(), _nss.db());
         return repl::ReplicationCoordinator::StatusAndDuration(
@@ -359,10 +359,11 @@ TEST_F(DropDatabaseTest,
        DropDatabaseReleasesLocksWhileCallingAwaitReplicationIfCalledWhileHoldingGlobalLock) {
     // The applyOps command holds the global lock while calling dropDatabase().
     // dropDatabase() should detect this and release the global lock temporarily if it needs to call
-    // ReplicationCoordinator::awaitReplicationOfLastOpForClient().
+    // ReplicationCoordinator::awaitReplication().
     bool isAwaitReplicationCalled = false;
     _replCoord->setAwaitReplicationReturnValueFunction([&, this](const repl::OpTime& opTime) {
         isAwaitReplicationCalled = true;
+        // This test does not set the client's last optime.
         ASSERT_EQUALS(opTime, repl::OpTime());
         ASSERT_FALSE(_opCtx->lockState()->isW());
         ASSERT_FALSE(_opCtx->lockState()->isDbLockedForMode(_nss.db(), MODE_X));
@@ -407,7 +408,7 @@ TEST_F(DropDatabaseTest,
 
 TEST_F(DropDatabaseTest,
        DropDatabaseReturnsNamespaceNotFoundIfDatabaseIsRemovedAfterCollectionsDropsAreReplicated) {
-    // Update ReplicationCoordinatorMock so that awaitReplicationOfLastOpForClient() fails.
+    // Update ReplicationCoordinatorMock so that awaitReplication() fails.
     _replCoord->setAwaitReplicationReturnValueFunction([this](const repl::OpTime&) {
         _removeDatabaseFromCatalog(_opCtx.get(), _nss.db());
         return repl::ReplicationCoordinator::StatusAndDuration(Status::OK(), Milliseconds(0));
@@ -447,7 +448,11 @@ TEST_F(DropDatabaseTest,
                                 << " because we transitioned from PRIMARY to SECONDARY"
                                 << " while waiting for 1 pending collection drop(s).");
 
-    ASSERT_TRUE(AutoGetDb(_opCtx.get(), _nss.db(), MODE_X).getDb());
+    // Check drop-pending flag in Database after dropDatabase() fails.
+    AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+    auto db = autoDb.getDb();
+    ASSERT_TRUE(db);
+    ASSERT_FALSE(db->isDropPending(_opCtx.get()));
 }
 
 }  // namespace

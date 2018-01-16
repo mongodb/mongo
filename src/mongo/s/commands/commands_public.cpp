@@ -1451,6 +1451,11 @@ public:
     }
 } fileMD5Cmd;
 
+/**
+ * The geoNear command is deprecated. Users should prefer the $near query operator, the $nearSphere
+ * query operator, or the $geoNear aggregation stage. See
+ * http://dochub.mongodb.org/core/geoNear-deprecation for more detail.
+ */
 class Geo2dFindNearCmd : public PublicGridCommand {
 public:
     Geo2dFindNearCmd() : PublicGridCommand("geoNear") {}
@@ -1475,6 +1480,13 @@ public:
              const string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        RARELY {
+            warning() << "Support for the geoNear command has been deprecated. Please plan to "
+                         "rewrite geoNear commands using the $near query operator, the $nearSphere "
+                         "query operator, or the $geoNear aggregation stage. See "
+                         "http://dochub.mongodb.org/core/geoNear-deprecation.";
+        }
+
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
 
 

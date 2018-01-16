@@ -57,52 +57,8 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         coll = db[collName];
     }
 
+    // Commands in 'commands' will accept any valid writeConcern.
     var commands = [];
-
-    // Drop an unsharded database.
-    commands.push({
-        req: {dropDatabase: 1},
-        setupFunc: function() {
-            coll.insert({type: 'oak'});
-            db.pine_needles.insert({type: 'pine'});
-            // As of SERVER-29277, dropping a database with any replicated collections requires a
-            // majority of nodes to be able to complete the drop. Since this test case may run with
-            // less than a majority of nodes available, we empty out the database in the "setup"
-            // phase to allow the dropDatabase command to always run to completion.
-            db.pine_needles.drop();
-            coll.drop();
-        },
-        confirmFunc: function() {
-            assert.isnull(db.getMongo().getDBNames().find(dbName => dbName == db.getName()));
-        },
-        requiresMajority: false,
-        runsOnShards: true,
-        failsOnShards: true,
-        admin: false
-    });
-
-    // Drop a sharded database.
-    commands.push({
-        req: {dropDatabase: 1},
-        setupFunc: function() {
-            shardCollectionWithChunks(st, coll);
-            coll.insert({type: 'oak', x: 11});
-            db.pine_needles.insert({type: 'pine'});
-            // As of SERVER-29277, dropping a database with any replicated collections requires a
-            // majority of nodes to be able to complete the drop. Since this test case may run with
-            // less than a majority of nodes available, we empty out the database in the "setup"
-            // phase to allow the dropDatabase command to always run to completion.
-            db.pine_needles.drop();
-            coll.drop();
-        },
-        confirmFunc: function() {
-            assert.isnull(db.getMongo().getDBNames().find(dbName => dbName == db.getName()));
-        },
-        requiresMajority: false,
-        runsOnShards: true,
-        failsOnShards: true,
-        admin: false
-    });
 
     commands.push({
         req: {createUser: 'username', pwd: 'password', roles: jsTest.basicUserRoles},
@@ -144,24 +100,6 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         failsOnShards: false,
         admin: false
     });
-
-    // Sharded dropCollection should return a normal error.
-    commands.push({
-        req: {drop: collName},
-        setupFunc: function() {
-            shardCollectionWithChunks(st, coll);
-        },
-        confirmFunc: function() {
-            assert.eq(coll.count(), 0);
-        },
-        requiresMajority: false,
-        runsOnShards: true,
-        failsOnShards: true,
-        admin: false
-    });
-
-    // Config server commands require w: majority writeConcerns.
-    var invalidWriteConcerns = [{w: 'invalid'}, {w: 2}];
 
     function testInvalidWriteConcern(wc, cmd) {
         if (wc.w === 2 && !cmd.requiresMajority) {
@@ -223,12 +161,12 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         }
     }
 
-    function testMajorityWriteConcern(cmd) {
+    function testValidWriteConcern(wc, cmd) {
         var req = cmd.req;
         var setupFunc = cmd.setupFunc;
         var confirmFunc = cmd.confirmFunc;
 
-        req.writeConcern = {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS};
+        req.writeConcern = wc;
         jsTest.log("Testing " + tojson(req));
 
         dropTestData();
@@ -267,11 +205,16 @@ load('jstests/multiVersion/libs/auth_helpers.js');
                    tojson(res));
     }
 
+    var majorityWC = {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS};
+
+    // Config server commands require w: majority writeConcerns.
+    var nonMajorityWCs = [{w: 'invalid'}, {w: 2}];
+
     commands.forEach(function(cmd) {
-        invalidWriteConcerns.forEach(function(wc) {
+        nonMajorityWCs.forEach(function(wc) {
             testInvalidWriteConcern(wc, cmd);
         });
-        testMajorityWriteConcern(cmd);
+        testValidWriteConcern(majorityWC, cmd);
     });
 
 })();

@@ -47,53 +47,17 @@ bool InternalExprEqMatchExpression::matchesSingleElement(const BSONElement& elem
         return true;
     }
 
-    if (elem.canonicalType() != _rhsElem.canonicalType()) {
+    if (elem.canonicalType() != _rhs.canonicalType()) {
         return false;
     }
 
     auto comp = BSONElement::compareElements(
-        elem, _rhsElem, BSONElement::ComparisonRules::kConsiderFieldName, _collator);
+        elem, _rhs, BSONElement::ComparisonRules::kConsiderFieldName, _collator);
     return comp == 0;
 }
 
-void InternalExprEqMatchExpression::debugString(StringBuilder& debug, int level) const {
-    _debugAddSpace(debug, level);
-    debug << path() << " " << kName << " " << _rhsElem.toString(false);
-
-    auto td = getTag();
-    if (td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-
-    debug << "\n";
-}
-
-void InternalExprEqMatchExpression::serialize(BSONObjBuilder* builder) const {
-    BSONObjBuilder exprObj(builder->subobjStart(path()));
-    exprObj.appendAs(_rhsElem, kName);
-    exprObj.doneFast();
-}
-
-bool InternalExprEqMatchExpression::equivalent(const MatchExpression* other) const {
-    if (other->matchType() != matchType()) {
-        return false;
-    }
-
-    const InternalExprEqMatchExpression* realOther =
-        static_cast<const InternalExprEqMatchExpression*>(other);
-
-    if (!CollatorInterface::collatorsMatch(_collator, realOther->_collator)) {
-        return false;
-    }
-
-    constexpr StringData::ComparatorInterface* stringComparator = nullptr;
-    BSONElementComparator eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, stringComparator);
-    return path() == realOther->path() && eltCmp.evaluate(_rhsElem == realOther->_rhsElem);
-}
-
 std::unique_ptr<MatchExpression> InternalExprEqMatchExpression::shallowClone() const {
-    auto clone = stdx::make_unique<InternalExprEqMatchExpression>(path(), _rhsElem);
+    auto clone = stdx::make_unique<InternalExprEqMatchExpression>(path(), _rhs);
     clone->setCollator(_collator);
     if (getTag()) {
         clone->setTag(getTag()->clone());

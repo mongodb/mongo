@@ -229,12 +229,13 @@ Status TransportLayerASIO::setup() {
     if (_sslMode() != SSLParams::SSLMode_disabled) {
         _sslContext = stdx::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
-        const auto sslManager = getSSLManager();
-        sslManager
-            ->initSSLContext(_sslContext->native_handle(),
-                             sslParams,
-                             SSLManagerInterface::ConnectionDirection::kOutgoing)
-            .transitional_ignore();
+        Status status =
+            getSSLManager()->initSSLContext(_sslContext->native_handle(),
+                                            sslParams,
+                                            SSLManagerInterface::ConnectionDirection::kIncoming);
+        if (!status.isOK()) {
+            return status;
+        }
     }
 #endif
 

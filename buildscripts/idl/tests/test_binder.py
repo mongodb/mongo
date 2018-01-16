@@ -57,6 +57,8 @@ def indent_text(count, unindented_text):
 class TestBinder(testcase.IDLTestcase):
     """Test cases for the IDL binder."""
 
+    # pylint: disable=too-many-public-methods
+
     def test_empty(self):
         # type: () -> None
         """Test an empty document works."""
@@ -1528,6 +1530,67 @@ class TestBinder(testcase.IDLTestcase):
                             type: array<string>
                             supports_doc_sequence: true
             """), idl.errors.ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_OBJECT)
+
+    def test_command_type_positive(self):
+        # type: () -> None
+        """Positive command custom type test cases."""
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+        """)
+
+        # string
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                strict: true
+                namespace: type
+                type: string
+                fields:
+                    field1: string
+            """))
+
+        # array of string
+        self.assert_bind(test_preamble + textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                strict: true
+                namespace: type
+                type: array<string>
+                fields:
+                    field1: string
+            """))
+
+    def test_command_type_negative(self):
+        # type: () -> None
+        """Negative command type test cases."""
+        test_preamble = textwrap.dedent("""
+        types:
+            string:
+                description: foo
+                cpp_type: foo
+                bson_serialization_type: string
+                serializer: foo
+                deserializer: foo
+        """)
+
+        # supports_doc_sequence must be a bool
+        self.assert_bind_fail(test_preamble + textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: type
+                type: int
+                fields:
+                    field1: string
+            """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
 
 
 if __name__ == '__main__':

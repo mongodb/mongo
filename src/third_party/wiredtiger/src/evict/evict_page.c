@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -88,7 +88,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 		if (too_big) {
 			WT_STAT_CONN_INCR(session, cache_eviction_force);
 			WT_STAT_CONN_INCRV(session, cache_eviction_force_time,
-			    WT_TSCDIFF_US(session, time_stop, time_start));
+			    WT_TSCDIFF_US(time_stop, time_start));
 		} else {
 			/*
 			 * If the page isn't too big, we are evicting it because
@@ -98,12 +98,12 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 			WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
 			WT_STAT_CONN_INCRV(session,
 			    cache_eviction_force_delete_time,
-			    WT_TSCDIFF_US(session, time_stop, time_start));
+			    WT_TSCDIFF_US(time_stop, time_start));
 		}
 	} else {
 		WT_STAT_CONN_INCR(session, cache_eviction_force_fail);
 		WT_STAT_CONN_INCRV(session, cache_eviction_force_fail_time,
-		    WT_TSCDIFF_US(session, time_stop, time_start));
+		    WT_TSCDIFF_US(time_stop, time_start));
 	}
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);

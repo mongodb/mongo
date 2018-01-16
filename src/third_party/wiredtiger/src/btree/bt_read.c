@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -386,7 +386,7 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 		time_stop = __wt_rdtsc(session);
 		WT_STAT_CONN_INCR(session, cache_read_app_count);
 		WT_STAT_CONN_INCRV(session, cache_read_app_time,
-		    WT_TSCDIFF_US(session, time_stop, time_start));
+		    WT_TSCDIFF_US(time_stop, time_start));
 	}
 
 	/*
@@ -680,6 +680,7 @@ read:			/*
 				/* If forced eviction fails, stall. */
 				if (ret == EBUSY) {
 					ret = 0;
+					WT_NOT_READ(ret);
 					WT_STAT_CONN_INCR(session,
 					    page_forcible_evict_blocked);
 					stalled = true;

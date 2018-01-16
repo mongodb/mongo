@@ -38,7 +38,6 @@
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_asio.h"
-#include "mongo/transport/transport_layer_legacy.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
 #include <limits>
@@ -128,30 +127,25 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
     const ServerGlobalParams* config, ServiceContext* ctx) {
     std::unique_ptr<TransportLayer> transportLayer;
     auto sep = ctx->getServiceEntryPoint();
-    if (config->transportLayer == "asio") {
-        transport::TransportLayerASIO::Options opts(config);
-        if (config->serviceExecutor == "adaptive") {
-            opts.transportMode = transport::Mode::kAsynchronous;
-        } else if (config->serviceExecutor == "synchronous") {
-            opts.transportMode = transport::Mode::kSynchronous;
-        } else {
-            MONGO_UNREACHABLE;
-        }
 
-        auto transportLayerASIO = stdx::make_unique<transport::TransportLayerASIO>(opts, sep);
+    transport::TransportLayerASIO::Options opts(config);
+    if (config->serviceExecutor == "adaptive") {
+        opts.transportMode = transport::Mode::kAsynchronous;
+    } else if (config->serviceExecutor == "synchronous") {
+        opts.transportMode = transport::Mode::kSynchronous;
+    } else {
+        MONGO_UNREACHABLE;
+    }
 
-        if (config->serviceExecutor == "adaptive") {
-            ctx->setServiceExecutor(stdx::make_unique<ServiceExecutorAdaptive>(
-                ctx, transportLayerASIO->getIOContext()));
-        } else if (config->serviceExecutor == "synchronous") {
-            ctx->setServiceExecutor(stdx::make_unique<ServiceExecutorSynchronous>(ctx));
-        }
-        transportLayer = std::move(transportLayerASIO);
-    } else if (serverGlobalParams.transportLayer == "legacy") {
-        transport::TransportLayerLegacy::Options opts(config);
-        transportLayer = stdx::make_unique<transport::TransportLayerLegacy>(opts, sep);
+    auto transportLayerASIO = stdx::make_unique<transport::TransportLayerASIO>(opts, sep);
+
+    if (config->serviceExecutor == "adaptive") {
+        ctx->setServiceExecutor(
+            stdx::make_unique<ServiceExecutorAdaptive>(ctx, transportLayerASIO->getIOContext()));
+    } else if (config->serviceExecutor == "synchronous") {
         ctx->setServiceExecutor(stdx::make_unique<ServiceExecutorSynchronous>(ctx));
     }
+    transportLayer = std::move(transportLayerASIO);
 
     std::vector<std::unique_ptr<TransportLayer>> retVector;
     retVector.emplace_back(std::move(transportLayer));

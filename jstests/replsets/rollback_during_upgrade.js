@@ -88,7 +88,7 @@
     }));
 
     // ----------------- Begins running operations only on the sync source node ---------------
-    rollbackTest.transitionToSyncSourceOperations();
+    rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
     // Fake giving the collections UUIDs to simulate an upgrade on the sync source.
     // The rollback test fixture only has two data bearing nodes so we cannot run an upgrade using
@@ -103,8 +103,8 @@
     }));
 
     // ----------------- Allows rollback to occur and checks for consistency ------------------
-    rollbackTest.transitionToSteadyStateOperations({waitForRollback: true});
-
+    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+    rollbackTest.transitionToSteadyStateOperations();
     waitForUpgradeToFinish();
 
     rollbackTest.stop();

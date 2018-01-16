@@ -49,11 +49,10 @@
     let rollbackNode = rollbackTest.transitionToRollbackOperations();
     RollbackOps(rollbackNode);
 
-    // No sync source ops.
-    rollbackTest.transitionToSyncSourceOperations();
-
     // Wait for rollback to finish.
-    rollbackTest.transitionToSteadyStateOperations({waitForRollback: true});
+    rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
+    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+    rollbackTest.transitionToSteadyStateOperations();
 
     rollbackTest.stop();
 })();

@@ -270,7 +270,7 @@ public:
                      BSONObjBuilder& result) {
         // sort the commands before building the result BSON
         std::vector<Command*> commands;
-        for (const auto command : allCommands()) {
+        for (const auto command : globalCommandRegistry()->allCommands()) {
             // don't show oldnames
             if (command.first == command.second->getName())
                 commands.push_back(command.second);

@@ -40,7 +40,7 @@ namespace {
 
 class FsyncCommand : public ErrmsgCommandDeprecated {
 public:
-    FsyncCommand() : ErrmsgCommandDeprecated("fsync", "fsync") {}
+    FsyncCommand() : ErrmsgCommandDeprecated("fsync") {}
 
     virtual bool slaveOk() const {
         return true;

@@ -70,15 +70,12 @@ using stdx::make_unique;
 
 static const NamespaceString nss("unittests.QueryStageMultiPlan");
 
-/**
- * Create query solution.
- */
-QuerySolution* createQuerySolution() {
-    unique_ptr<QuerySolution> soln(new QuerySolution());
-    soln->cacheData.reset(new SolutionCacheData());
+std::unique_ptr<QuerySolution> createQuerySolution() {
+    auto soln = stdx::make_unique<QuerySolution>();
+    soln->cacheData = stdx::make_unique<SolutionCacheData>();
     soln->cacheData->solnType = SolutionCacheData::COLLSCAN_SOLN;
-    soln->cacheData->tree.reset(new PlanCacheIndexTree());
-    return soln.release();
+    soln->cacheData->tree = stdx::make_unique<PlanCacheIndexTree>();
+    return soln;
 }
 
 class QueryStageMultiPlanTest : public unittest::Test {
@@ -247,9 +244,9 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
 
     // Plan.
-    vector<QuerySolution*> solutions;
-    Status status = QueryPlanner::plan(*cq, plannerParams, &solutions);
-    ASSERT(status.isOK());
+    auto statusWithSolutions = QueryPlanner::plan(*cq, plannerParams);
+    ASSERT_OK(statusWithSolutions.getStatus());
+    auto solutions = std::move(statusWithSolutions.getValue());
 
     // We expect a plan using index {a: 1} and plan using index {b: 1} and
     // an index intersection plan.
@@ -262,8 +259,8 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
     for (size_t i = 0; i < solutions.size(); ++i) {
         PlanStage* root;
         ASSERT(StageBuilder::build(_opCtx.get(), collection, *cq, *solutions[i], ws.get(), &root));
-        // Takes ownership of 'solutions[i]' and 'root'.
-        mps->addPlan(solutions[i], root, ws.get());
+        // Takes ownership of 'root'.
+        mps->addPlan(std::move(solutions[i]), root, ws.get());
     }
 
     // This sets a backup plan.
@@ -349,10 +346,8 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
         make_unique<MultiPlanStage>(_opCtx.get(), ctx.getCollection(), cq.get());
 
     // Put each plan into the MultiPlanStage. Takes ownership of 'firstPlan' and 'secondPlan'.
-    auto firstSoln = stdx::make_unique<QuerySolution>();
-    auto secondSoln = stdx::make_unique<QuerySolution>();
-    mps->addPlan(firstSoln.release(), firstPlan.release(), ws.get());
-    mps->addPlan(secondSoln.release(), secondPlan.release(), ws.get());
+    mps->addPlan(stdx::make_unique<QuerySolution>(), firstPlan.release(), ws.get());
+    mps->addPlan(stdx::make_unique<QuerySolution>(), secondPlan.release(), ws.get());
 
     // Making a PlanExecutor chooses the best plan.
     auto exec = uassertStatusOK(PlanExecutor::make(

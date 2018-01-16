@@ -83,6 +83,10 @@ public:
 
     Status setTimestamp(Timestamp timestamp) override;
 
+    void setCommitTimestamp(Timestamp timestamp) override;
+    void clearCommitTimestamp() override;
+    Timestamp getCommitTimestamp() override;
+
     Status selectSnapshot(Timestamp timestamp) override;
 
     void* writingPtr(void* data, size_t len) override;
@@ -146,6 +150,7 @@ private:
     bool _inUnitOfWork;
     bool _active;
     bool _isTimestamped = false;
+    Timestamp _commitTimestamp;
     uint64_t _mySnapshotId;
     bool _readFromMajorityCommittedSnapshot = false;
     Timestamp _majorityCommittedSnapshot;

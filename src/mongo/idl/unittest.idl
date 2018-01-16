@@ -586,3 +586,33 @@ commands:
         fields:
             field3:
                 type: int
+
+    CommandTypeStringCommand:
+        description: Command with custom type string
+        namespace: type
+        type: string
+        fields:
+            field1: int
+
+    CommandTypeArrayObjectCommand:
+        description: Command with just an array of object parameter
+        namespace: type
+        type: array<object>
+
+    CommandTypeStructCommand:
+        description: Command with just a struct parameter
+        namespace: type
+        type: one_string
+
+    CommandTypeArrayStructCommand:
+        description: Command with just an array of struct parameter
+        namespace: type
+        type: array<one_string>
+
+    _underscore_command:
+        description: Command with custom type string
+        namespace: type
+        type: string
+        cpp_name: WellNamedCommand
+        fields:
+            field1: int

@@ -54,7 +54,7 @@ public:
         help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 

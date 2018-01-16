@@ -1,5 +1,6 @@
 // Test copyDatabase command inside a sharded cluster with and without auth.  Tests with auth are
 // currently disabled due to SERVER-13080.
+// @tags: [requires_sharding]
 
 var baseName = "jstests_clone_copyauth_between_shards";
 

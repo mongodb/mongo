@@ -105,8 +105,13 @@ public:
         return Decoration<T>(getRegistry()->declareDecoration<T>());
     }
 
+    template <typename T>
+    static Decoration<T> declareDecorationWithOwner() {
+        return Decoration<T>(getRegistry()->declareDecorationWithOwner<T, D>());
+    }
+
 protected:
-    Decorable() : _decorations(getRegistry()) {}
+    Decorable() : _decorations(getRegistry(), this) {}
     ~Decorable() = default;
 
 private:

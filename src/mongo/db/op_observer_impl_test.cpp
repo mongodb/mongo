@@ -242,12 +242,12 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
 TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
-    opCtx->releaseLockState();
-    opCtx->setLockState(stdx::make_unique<LockerNoop>());
     NamespaceString nss = {"test", "coll"};
-    opObserver.aboutToDelete(opCtx.get(), nss, {});
+    AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+    WriteUnitOfWork wunit(opCtx.get());
+    opObserver.aboutToDelete(opCtx.get(), nss, BSON("_id" << 1));
     opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
-    opObserver.aboutToDelete(opCtx.get(), nss, {});
+    opObserver.aboutToDelete(opCtx.get(), nss, BSON("_id" << 1));
     opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
 }
 

@@ -348,8 +348,8 @@ var {
                     if (numRetries > 0) {
                         if (!res.ok && isRetryableCode(res.code)) {
                             // Don't decrement retries, because the command returned before the
-                            // connection was closed, so a subsequent attempt will receive a
-                            // network error (or NotMaster error) and need to retry.
+                            // connection was closed, so a subsequent attempt will receive a network
+                            // error (or NotMaster error) and need to retry.
                             if (jsTest.options().logRetryAttempts) {
                                 print("=-=-=-= Retrying failed response with retryable code: " +
                                       res.code + ", for command: " + cmdName +

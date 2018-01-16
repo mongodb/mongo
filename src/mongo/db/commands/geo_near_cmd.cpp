@@ -62,6 +62,11 @@ namespace mongo {
 using std::unique_ptr;
 using std::stringstream;
 
+/**
+ * The geoNear command is deprecated. Users should prefer the $near query operator, the $nearSphere
+ * query operator, or the $geoNear aggregation stage. See
+ * http://dochub.mongodb.org/core/geoNear-deprecation for more detail.
+ */
 class Geo2dFindNearCmd : public ErrmsgCommandDeprecated {
 public:
     Geo2dFindNearCmd() : ErrmsgCommandDeprecated("geoNear") {}
@@ -104,6 +109,15 @@ public:
                    const BSONObj& cmdObj,
                    string& errmsg,
                    BSONObjBuilder& result) {
+        // Do not log the deprecation warning when in a direct client, since the $geoNear
+        // aggregation stage runs the geoNear command in a direct client.
+        RARELY if (!opCtx->getClient()->isInDirectClient()) {
+            warning() << "Support for the geoNear command has been deprecated. Please plan to "
+                         "rewrite geoNear commands using the $near query operator, the $nearSphere "
+                         "query operator, or the $geoNear aggregation stage. See "
+                         "http://dochub.mongodb.org/core/geoNear-deprecation.";
+        }
+
         if (!cmdObj["start"].eoo()) {
             errmsg = "using deprecated 'start' argument to geoNear";
             return false;

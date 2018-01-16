@@ -1,6 +1,7 @@
 /**
  * Test that user modifications on replica set primaries
  * will invalidate cached user credentials on secondaries
+ * @tags: [requires_replication]
  */
 
 var NUM_NODES = 3;

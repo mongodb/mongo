@@ -483,10 +483,15 @@ public:
 
     std::string toString() const;
 
+    const std::string& getStacktrace() const {
+        return _stacktrace;
+    }
+
 private:
     std::string _file;
     unsigned _line;
     std::string _message;
+    std::string _stacktrace;
 };
 
 class TestAssertionFailure {

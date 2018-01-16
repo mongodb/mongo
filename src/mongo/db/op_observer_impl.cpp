@@ -417,7 +417,6 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
     auto& deleteState = getDeleteState(opCtx);
     auto* css = CollectionShardingState::get(opCtx, nss.ns());
     deleteState = css->makeDeleteState(doc);
-    deleteState.aboutToDeleteCalled = true;
 }
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,
@@ -427,12 +426,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               bool fromMigrate,
                               const boost::optional<BSONObj>& deletedDoc) {
     auto& deleteState = getDeleteState(opCtx);
-    invariant(deleteState.aboutToDeleteCalled);
-    deleteState.aboutToDeleteCalled = false;
-
-    if (deleteState.documentKey.isEmpty()) {
-        return;
-    }
+    invariant(!deleteState.documentKey.isEmpty());
 
     Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
     const auto opTime = replLogDelete(opCtx, nss, uuid, session, stmtId, fromMigrate, deletedDoc);

@@ -511,14 +511,14 @@ public:
         }
 
         if (opts.attachCursorSource) {
-            uassertStatusOK(attachCursorSourceToPipeline(expCtx, pipeline.getValue().get()));
+            pipeline = attachCursorSourceToPipeline(expCtx, pipeline.getValue().release());
         }
 
         return pipeline;
     }
 
-    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        Pipeline* pipeline) final {
+    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
         while (_removeLeadingQueryStages && !pipeline->getSources().empty()) {
             if (pipeline->popFrontWithCriteria("$match") ||
                 pipeline->popFrontWithCriteria("$sort") ||
@@ -529,7 +529,7 @@ public:
         }
 
         pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
-        return Status::OK();
+        return std::unique_ptr<Pipeline, PipelineDeleter>(pipeline, PipelineDeleter(expCtx->opCtx));
     }
 
 private:
@@ -753,8 +753,9 @@ TEST_F(DocumentSourceLookUpTest,
     auto expectedPipe = fromjson(
         str::stream() << "[{mock: {}}, {$match: {x:{$eq: 1}}}, {$sort: {sortKey: {x: 1}}}, "
                       << sequentialCacheStageObj()
-                      << ", {$facet: {facetPipe: [{$group: {_id: '$_id'}}, {$match: {$expr: {$eq: "
-                         "['$_id', {$const: 5}]}}}]}}]");
+                      << ", {$facet: {facetPipe: [{$group: {_id: '$_id'}}, {$match: {$and: "
+                         "[{_id: {$_internalExprEq: 5}}, {$expr: {$eq: "
+                         "['$_id', {$const: 5}]}}]}}]}}]");
 
     ASSERT_VALUE_EQ(Value(subPipeline->writeExplainOps(kExplain)), Value(BSONArray(expectedPipe)));
 }
@@ -791,7 +792,8 @@ TEST_F(DocumentSourceLookUpTest, ExprEmbeddedInMatchExpressionShouldBeOptimized)
     BSONObjBuilder builder;
     matchSource.getMatchExpression()->serialize(&builder);
     auto serializedMatch = builder.obj();
-    auto expectedMatch = fromjson("{$expr: {$eq: ['$_id', {$const: 5}]}}");
+    auto expectedMatch =
+        fromjson("{$and: [{_id: {$_internalExprEq: 5}}, {$expr: {$eq: ['$_id', {$const: 5}]}}]}");
 
     ASSERT_VALUE_EQ(Value(serializedMatch), Value(expectedMatch));
 }

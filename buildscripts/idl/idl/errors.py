@@ -85,6 +85,7 @@ ERROR_ID_COMMAND_DUPLICATES_FIELD = "ID0048"
 ERROR_ID_IS_NODE_VALID_INT = "ID0049"
 ERROR_ID_IS_NODE_VALID_NON_NEGATIVE_INT = "ID0050"
 ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER = "ID0051"
+ERROR_ID_IS_COMMAND_TYPE_EXTRANEOUS = "ID0052"
 
 
 class IDLError(Exception):
@@ -657,6 +658,15 @@ class ParserContext(object):
             location, ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER,
             ("Struct '%s' cannot have two fields with the same comparison_order value '%d'.") %
             (struct_name, comparison_order))
+
+    def add_extranous_command_type(self, location, command_name):
+        # type: (common.SourceLocation, unicode) -> None
+        """Add an error about commands having type when not needed."""
+        # pylint: disable=invalid-name
+        self._add_error(
+            location, ERROR_ID_IS_COMMAND_TYPE_EXTRANEOUS,
+            ("Command '%s' cannot have a 'type' property unless namespace equals 'type'.") %
+            (command_name))
 
 
 def _assert_unique_error_messages():

@@ -242,8 +242,12 @@ void ReplicationCoordinatorExternalStateImpl::startSteadyStateReplication(
     _applierThread->startup();
     log() << "Starting replication reporter thread";
     invariant(!_syncSourceFeedbackThread);
-    _syncSourceFeedbackThread = stdx::make_unique<stdx::thread>([this, replCoord] {
-        _syncSourceFeedback.run(_taskExecutor.get(), _bgSync.get(), replCoord);
+    // Get the pointer while holding the lock so that _stopDataReplication_inlock() won't
+    // leave the unique pointer empty if the _syncSourceFeedbackThread's function starts
+    // after _stopDataReplication_inlock's move.
+    auto bgSyncPtr = _bgSync.get();
+    _syncSourceFeedbackThread = stdx::make_unique<stdx::thread>([this, bgSyncPtr, replCoord] {
+        _syncSourceFeedback.run(_taskExecutor.get(), bgSyncPtr, replCoord);
     });
 }
 
@@ -263,6 +267,8 @@ void ReplicationCoordinatorExternalStateImpl::_stopDataReplication_inlock(Operat
     auto oldApplier = std::move(_applierThread);
     lock->unlock();
 
+    // _syncSourceFeedbackThread should be joined before _bgSync's shutdown because it has
+    // a pointer of _bgSync.
     if (oldSSF) {
         log() << "Stopping replication reporter thread";
         _syncSourceFeedback.shutdown();
@@ -406,12 +412,18 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
         // Set UUIDs for all non-replicated collections. This is necessary for independent replica
         // sets and config server replica sets started with no data files because collections in
         // local are created prior to the featureCompatibilityVersion being set to 3.6, so the
-        // collections are not created with UUIDs. This is not an issue for shard servers because
-        // the config server sends a setFeatureCompatibilityVersion command with the
-        // featureCompatibilityVersion equal to the cluster's featureCompatibilityVersion during
-        // addShard, which will add UUIDs to all collections that do not already have them. Here,
-        // we add UUIDs to the non-replicated collections on the primary. We add them on the
-        // secondaries during InitialSync.
+        // collections are not created with UUIDs. We exclude ShardServers when adding UUIDs to
+        // non-replicated collections on the primary because ShardServers are started up by default
+        // with featureCompatibilityVersion 3.4, so we don't want to assign UUIDs to them until the
+        // cluster's featureCompatibilityVersion is explicitly set to 3.6 by the config server. The
+        // below UUID addition for non-replicated collections only occurs on the primary; UUIDs are
+        // added to non-replicated collections on secondaries during InitialSync. When the config
+        // server sets the featureCompatibilityVersion to 3.6, the shard primary will add UUIDs to
+        // all the collections that need them. One special case here is if a shard is already in
+        // featureCompatibilityVersion 3.6 and a new node is started up with --shardsvr and added to
+        // that shard, the new node will still start up with featureCompatibilityVersion 3.4 and
+        // need to have UUIDs added to each collection. These UUIDs are added during InitialSync,
+        // because the new node is a secondary.
         if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
             FeatureCompatibilityVersion::isCleanStartUp()) {
             auto schemaStatus = updateUUIDSchemaVersionNonReplicated(opCtx, true);

@@ -35,6 +35,7 @@
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -43,13 +44,28 @@ const NamespaceString kNss("TestDB", "TestColl");
 
 class ChunkManagerQueryTest : public CatalogCacheTestFixture {
 protected:
+    void runGetShardIdsForRangeTest(const BSONObj& shardKey,
+                                    bool unique,
+                                    const std::vector<BSONObj>& splitPoints,
+                                    const BSONObj& min,
+                                    const BSONObj& max,
+                                    const std::set<ShardId>& expectedShardIds) {
+        const ShardKeyPattern shardKeyPattern(shardKey);
+        auto chunkManager = makeChunkManager(kNss, shardKeyPattern, nullptr, false, splitPoints);
+
+        std::set<ShardId> shardIds;
+        chunkManager->getShardIdsForRange(min, max, &shardIds);
+
+        _assertShardIdsMatch(expectedShardIds, shardIds);
+    }
+
     void runQueryTest(const BSONObj& shardKey,
                       std::unique_ptr<CollatorInterface> defaultCollator,
                       bool unique,
                       const std::vector<BSONObj>& splitPoints,
                       const BSONObj& query,
                       const BSONObj& queryCollation,
-                      const std::set<ShardId> expectedShardIds) {
+                      const std::set<ShardId>& expectedShardIds) {
         const ShardKeyPattern shardKeyPattern(shardKey);
         auto chunkManager =
             makeChunkManager(kNss, shardKeyPattern, std::move(defaultCollator), false, splitPoints);
@@ -57,19 +73,52 @@ protected:
         std::set<ShardId> shardIds;
         chunkManager->getShardIdsForQuery(operationContext(), query, queryCollation, &shardIds);
 
+        _assertShardIdsMatch(expectedShardIds, shardIds);
+    }
+
+private:
+    static void _assertShardIdsMatch(const std::set<ShardId>& expectedShardIds,
+                                     const std::set<ShardId>& actualShardIds) {
         BSONArrayBuilder expectedBuilder;
         for (const auto& shardId : expectedShardIds) {
             expectedBuilder << shardId;
         }
 
         BSONArrayBuilder actualBuilder;
-        for (const auto& shardId : shardIds) {
+        for (const auto& shardId : actualShardIds) {
             actualBuilder << shardId;
         }
 
         ASSERT_BSONOBJ_EQ(expectedBuilder.arr(), actualBuilder.arr());
     }
 };
+
+TEST_F(ChunkManagerQueryTest, GetShardIdsForRangeMinAndMaxAreInclusive) {
+    runGetShardIdsForRangeTest(BSON("a" << 1),
+                               false,
+                               {BSON("a" << -100), BSON("a" << 0), BSON("a" << 100)},
+                               BSON("a" << -100),
+                               BSON("a" << 0),
+                               {ShardId("1"), ShardId("2")});
+}
+
+TEST_F(ChunkManagerQueryTest, GetShardIdsForRangeMinAndMaxAreTheSameAtFirstChunkMaxBoundary) {
+    runGetShardIdsForRangeTest(BSON("a" << 1),
+                               false,
+                               {BSON("a" << -100), BSON("a" << 0), BSON("a" << 100)},
+                               BSON("a" << -100),
+                               BSON("a" << -100),
+                               {ShardId("1")});
+}
+
+TEST_F(ChunkManagerQueryTest, GetShardIdsForRangeMinAndMaxAreTheSameAtLastChunkMinBoundary) {
+    runGetShardIdsForRangeTest(BSON("a" << 1),
+                               false,
+                               {BSON("a" << -100), BSON("a" << 0), BSON("a" << 100)},
+                               BSON("a" << 100),
+                               BSON("a" << 100),
+                               {ShardId("3")});
+}
 
 TEST_F(ChunkManagerQueryTest, EmptyQuerySingleShard) {
     runQueryTest(BSON("a" << 1), nullptr, false, {}, BSONObj(), BSONObj(), {ShardId("0")});

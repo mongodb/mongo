@@ -57,43 +57,6 @@ env.CppUnitTest(
     ]
 )
 
-env.Library(
-    target='query',
-    source=[
-        "explain.cpp",
-        "get_executor.cpp",
-        "find.cpp",
-        "plan_executor.cpp",
-        "plan_ranker.cpp",
-        "plan_yield_policy.cpp",
-        "query_yield.cpp",
-        "stage_builder.cpp",
-    ],
-    LIBDEPS=[
-        "internal_plans",
-        "query_common",
-        "query_planner",
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/catalog/database',
-        '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        '$BUILD_DIR/mongo/db/catalog/index_catalog_entry',
-        "$BUILD_DIR/mongo/db/curop",
-        "$BUILD_DIR/mongo/db/exec/exec",
-        "$BUILD_DIR/mongo/db/repl/repl_coordinator_interface",
-        "$BUILD_DIR/mongo/db/s/sharding",
-        "$BUILD_DIR/mongo/db/storage/oplog_hack",
-        "$BUILD_DIR/mongo/util/elapsed_tracker",
-        "$BUILD_DIR/mongo/db/matcher/expressions_mongod_only",
-        #'$BUILD_DIR/mongo/db/clientcursor', # CYCLE
-        #'$BUILD_DIR/mongo/db/write_ops', # CYCLE
-        #'$BUILD_DIR/mongo/db/catalog/catalog', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-04-06): See `CYCLE` tags above.
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
-    ],
-)
-
 # Shared mongod/mongos query code.
 env.Library(
     target="query_common",
@@ -152,8 +115,8 @@ env.CppUnitTest(
         "get_executor_test.cpp"
     ],
     LIBDEPS=[
-        "query",
         "query_test_service_context",
+        "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/dbtests/mocklib",
     ],
@@ -217,23 +180,6 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
         'command_request_response',
     ]
-)
-
-env.Library(
-    target="internal_plans",
-    source=[
-        "internal_plans.cpp"
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/exec/exec',
-        '$BUILD_DIR/mongo/db/exec/working_set',
-        #'$BUILD_DIR/mongo/db/query/query', # CYCLE
-    ],
-    LIBDEPS_TAGS=[
-        # TODO(ADAM, 2017-01-09): See `CYCLE` tags above
-        'illegal_cyclic_or_unresolved_dependencies_whitelisted',
-    ],
 )
 
 env.Library(
@@ -449,8 +395,8 @@ env.CppUnitTest(
         "query_planner_text_test.cpp"
     ],
     LIBDEPS=[
-        "query",
         "query_planner_test_fixture",
+        "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/serveronly",
         "$BUILD_DIR/mongo/dbtests/mocklib",
     ],

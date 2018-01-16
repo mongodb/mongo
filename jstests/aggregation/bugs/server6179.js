@@ -1,4 +1,5 @@
 // SERVER-6179: support for two $groups in sharded agg
+// @tags: [requires_sharding]
 (function() {
     'use strict';
 

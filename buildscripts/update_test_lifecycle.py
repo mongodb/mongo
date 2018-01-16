@@ -382,9 +382,14 @@ def update_tags(lifecycle_tags, config, report, tests):
                                + datetime.timedelta(days=1))
         reliable_entries = [entry for entry in grouped_entries
                             if entry.start_date >= reliable_start_date]
-        reliable_report = tf.Report(reliable_entries)
-        reliable_combinations = {_test_combination_from_entry(entry, components)
-                                 for entry in reliable_entries}
+        if reliable_entries:
+            reliable_report = tf.Report(reliable_entries)
+            reliable_combinations = {_test_combination_from_entry(entry, components)
+                                     for entry in reliable_entries}
+            reliable_summaries = reliable_report.summarize_by(components)
+        else:
+            reliable_combinations = set()
+            reliable_summaries = []
 
         # Create the unreliable report.
         # Filter out any test executions from prior to 'config.unreliable_time_period'.
@@ -397,11 +402,15 @@ def update_tags(lifecycle_tags, config, report, tests):
             if (entry.start_date >= unreliable_start_date and
                 _test_combination_from_entry(entry, components) in reliable_combinations)
         ]
-        unreliable_report = tf.Report(unreliable_entries)
+        if unreliable_entries:
+            unreliable_report = tf.Report(unreliable_entries)
+            unreliable_summaries = unreliable_report.summarize_by(components)
+        else:
+            unreliable_summaries = []
 
         # Update the tags using the unreliable report.
         update_lifecycle(lifecycle_tags,
-                         unreliable_report.summarize_by(components),
+                         unreliable_summaries,
                          unreliable_test,
                          True,
                          rates.unacceptable,
@@ -409,7 +418,7 @@ def update_tags(lifecycle_tags, config, report, tests):
 
         # Update the tags using the reliable report.
         update_lifecycle(lifecycle_tags,
-                         reliable_report.summarize_by(components),
+                         reliable_summaries,
                          reliable_test,
                          False,
                          rates.acceptable,
@@ -1167,6 +1176,8 @@ def main():
             LOGGER.warning("No tasks found for tests %s, skipping this group.", tests)
             continue
         history_data = test_history_source.get_history_data(tests, tasks)
+        if not history_data:
+            continue
         report = tf.Report(history_data)
         update_tags(lifecycle_tags_file.changelog_lifecycle, config, report, tests)
 

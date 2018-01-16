@@ -218,7 +218,7 @@ public:
     MockMongoInterface(deque<DocumentSource::GetNextResult> mockResults)
         : _mockResults(std::move(mockResults)) {}
 
-    bool isSharded(OperationContext* opCtx, const NamespaceString& ns) final {
+    bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final {
         return false;
     }
 
@@ -236,16 +236,16 @@ public:
         }
 
         if (opts.attachCursorSource) {
-            uassertStatusOK(attachCursorSourceToPipeline(expCtx, pipeline.getValue().get()));
+            pipeline = attachCursorSourceToPipeline(expCtx, pipeline.getValue().release());
         }
 
         return pipeline;
     }
 
-    Status attachCursorSourceToPipeline(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                        Pipeline* pipeline) final {
+    StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> attachCursorSourceToPipeline(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* pipeline) final {
         pipeline->addInitialSource(DocumentSourceMock::create(_mockResults));
-        return Status::OK();
+        return std::unique_ptr<Pipeline, PipelineDeleter>(pipeline, PipelineDeleter(expCtx->opCtx));
     }
 
 private:

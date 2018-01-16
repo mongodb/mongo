@@ -31,6 +31,8 @@
 #include "mongo/platform/basic.h"
 
 #include <iterator>
+#include <set>
+#include <vector>
 
 #include "mongo/util/net/sockaddr.h"
 
@@ -177,7 +179,7 @@ std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family
         return {};
     }
 
-    std::vector<SockAddr> ret;
+    std::set<SockAddr> ret;
     struct sockaddr_storage storage;
     memset(&storage, 0, sizeof(storage));
     for (const auto* addrs = addrErr.second.get(); addrs; addrs = addrs->ai_next) {
@@ -186,9 +188,9 @@ std::vector<SockAddr> SockAddr::createAll(StringData target, int port, sa_family
         // SockAddr constructor below can copy the entire buffer
         // without over-running addrinfo's storage
         memcpy(&storage, addrs->ai_addr, addrs->ai_addrlen);
-        ret.emplace_back(storage, addrs->ai_addrlen);
+        ret.emplace(storage, addrs->ai_addrlen);
     }
-    return ret;
+    return std::vector<SockAddr>(ret.begin(), ret.end());
 }
 
 SockAddr::SockAddr(struct sockaddr_storage& other, socklen_t size)
@@ -321,6 +323,46 @@ bool SockAddr::operator==(const SockAddr& r) const {
 
 bool SockAddr::operator!=(const SockAddr& r) const {
     return !(*this == r);
+}
+
+bool SockAddr::operator<(const SockAddr& r) const {
+    // Address family first
+    if (getType() < r.getType()) {
+        return true;
+    }
+    if (getType() > r.getType()) {
+        return false;
+    }
+
+    // Address second
+    int cmp;
+    switch (getType()) {
+        case AF_INET: {
+            const auto laddr = ntohl(as<sockaddr_in>().sin_addr.s_addr);
+            const auto raddr = ntohl(r.as<sockaddr_in>().sin_addr.s_addr);
+            cmp = (laddr < raddr) ? -1 : (laddr > raddr) ? 1 : 0;
+            break;
+        }
+        case AF_INET6:
+            cmp = memcmp(as<sockaddr_in6>().sin6_addr.s6_addr,
+                         r.as<sockaddr_in6>().sin6_addr.s6_addr,
+                         sizeof(in6_addr));
+            break;
+        case AF_UNIX:
+            cmp = strcmp(as<sockaddr_un>().sun_path, r.as<sockaddr_un>().sun_path);
+            break;
+        default:
+            massert(SOCK_FAMILY_UNKNOWN_ERROR, "unsupported address family", false);
+    }
+    if (cmp < 0) {
+        return true;
+    }
+    if (cmp > 0) {
+        return false;
+    }
+
+    // All else equal, compare port
+    return getPort() < r.getPort();
 }
 
 }  // namespace mongo

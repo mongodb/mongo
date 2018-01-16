@@ -1,6 +1,8 @@
 /**
- * Checks that issuing a metadata command 1) through mongos or 2) directly against the config server
- * with a non-majority writeConcern fails.
+ * Checks that:
+ * 1) Issuing a metadata command through a mongos with any write concern succeeds (because we
+ * convert it up to majority WC),
+ * 2) Issuing a metadata command directly to a config server with non-majority write concern fails.
  */
 (function() {
     'use strict';
@@ -10,7 +12,8 @@
     const ns = dbName + "." + collName;
     const newShardName = "newShard";
 
-    const unacceptableWriteConcerns = [
+    // Commands sent directly to the config server should fail with WC < majority.
+    const unacceptableWCsForConfig = [
         {writeConcern: {w: 0}},
         {writeConcern: {w: 1}},
         {writeConcern: {w: 2}},
@@ -19,11 +22,24 @@
         // writeConcern{w: "majority", j: "false"}},
     ];
 
-    const acceptableWriteConcerns = [
+    // Unspecified WC and WC majority should succeed.
+    const acceptableWCsForConfig = [
         {},
         {writeConcern: {w: "majority"}},
-        {writeConcern: {w: "majority", j: true}},
-        {writeConcern: {w: "majority", j: true, wtimeout: 15000}},
+        {writeConcern: {w: "majority", wtimeout: 15000}},
+    ];
+
+    // Any write concern can be sent to a mongos, because mongos will upconvert it to majority.
+    const unacceptableWCsForMongos = [];
+    const acceptableWCsForMongos = [
+        {},
+        {writeConcern: {w: 0}},
+        {writeConcern: {w: 0, wtimeout: 15000}},
+        {writeConcern: {w: 1}},
+        {writeConcern: {w: 2}},
+        {writeConcern: {w: 3}},
+        {writeConcern: {w: "majority"}},
+        {writeConcern: {w: "majority", wtimeout: 15000}},
     ];
 
     const setupFuncs = {
@@ -58,96 +74,120 @@
         },
     };
 
-    function checkCommand(conn, command, setupFunc, cleanupFunc) {
-        unacceptableWriteConcerns.forEach(function(writeConcern) {
+    function checkCommand(
+        conn, command, unacceptableWCs, acceptableWCs, adminCommand, setupFunc, cleanupFunc) {
+        unacceptableWCs.forEach(function(writeConcern) {
             jsTest.log("testing " + tojson(command) + " with writeConcern " + tojson(writeConcern) +
                        " against " + conn + ", expecting the command to fail");
             setupFunc();
             let commandWithWriteConcern = {};
             Object.assign(commandWithWriteConcern, command, writeConcern);
-            assert.commandFailedWithCode(conn.adminCommand(commandWithWriteConcern),
-                                         ErrorCodes.InvalidOptions);
+            if (adminCommand) {
+                assert.commandFailedWithCode(conn.adminCommand(commandWithWriteConcern),
+                                             ErrorCodes.InvalidOptions);
+            } else {
+                assert.commandFailedWithCode(conn.runCommand(commandWithWriteConcern),
+                                             ErrorCodes.InvalidOptions);
+            }
             cleanupFunc();
         });
 
-        acceptableWriteConcerns.forEach(function(writeConcern) {
+        acceptableWCs.forEach(function(writeConcern) {
             jsTest.log("testing " + tojson(command) + " with writeConcern " + tojson(writeConcern) +
                        " against " + conn + ", expecting the command to succeed");
             setupFunc();
             let commandWithWriteConcern = {};
             Object.assign(commandWithWriteConcern, command, writeConcern);
-            assert.commandWorked(conn.adminCommand(commandWithWriteConcern));
+            if (adminCommand) {
+                assert.commandWorked(conn.adminCommand(commandWithWriteConcern));
+            } else {
+                assert.commandWorked(conn.runCommand(commandWithWriteConcern));
+            }
             cleanupFunc();
         });
+    }
+
+    function checkCommandMongos(command, setupFunc, cleanupFunc) {
+        checkCommand(st.s,
+                     command,
+                     unacceptableWCsForMongos,
+                     acceptableWCsForMongos,
+                     true,
+                     setupFunc,
+                     cleanupFunc);
+    }
+
+    function checkCommandConfigSvr(command, setupFunc, cleanupFunc) {
+        checkCommand(st.configRS.getPrimary(),
+                     command,
+                     unacceptableWCsForConfig,
+                     acceptableWCsForConfig,
+                     true,
+                     setupFunc,
+                     cleanupFunc);
     }
 
     var st = new ShardingTest({shards: 1});
 
     // enableSharding
-
-    checkCommand(st.s, {enableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
-
-    checkCommand(st.configRS.getPrimary(),
-                 {_configsvrEnableSharding: dbName},
-                 setupFuncs.noop,
-                 cleanupFuncs.dropDatabase);
+    checkCommandMongos({enableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
+    checkCommandConfigSvr(
+        {_configsvrEnableSharding: dbName}, setupFuncs.noop, cleanupFuncs.dropDatabase);
 
     // movePrimary
-
-    checkCommand(st.s,
-                 {movePrimary: dbName, to: st.shard0.name},
-                 setupFuncs.createDatabase,
-                 cleanupFuncs.dropDatabase);
-
-    checkCommand(st.configRS.getPrimary(),
-                 {_configsvrMovePrimary: dbName, to: st.shard0.name},
-                 setupFuncs.createDatabase,
-                 cleanupFuncs.dropDatabase);
+    checkCommandMongos({movePrimary: dbName, to: st.shard0.name},
+                       setupFuncs.createDatabase,
+                       cleanupFuncs.dropDatabase);
+    checkCommandConfigSvr({_configsvrMovePrimary: dbName, to: st.shard0.name},
+                          setupFuncs.createDatabase,
+                          cleanupFuncs.dropDatabase);
 
     // shardCollection
-
-    checkCommand(st.s,
-                 {shardCollection: ns, key: {_id: 1}},
-                 setupFuncs.enableSharding,
-                 cleanupFuncs.dropDatabase);
-
-    checkCommand(st.configRS.getPrimary(),
-                 {_configsvrShardCollection: ns, key: {_id: 1}},
-                 setupFuncs.enableSharding,
-                 cleanupFuncs.dropDatabase);
+    checkCommandMongos(
+        {shardCollection: ns, key: {_id: 1}}, setupFuncs.enableSharding, cleanupFuncs.dropDatabase);
+    checkCommandConfigSvr({_configsvrShardCollection: ns, key: {_id: 1}},
+                          setupFuncs.enableSharding,
+                          cleanupFuncs.dropDatabase);
 
     // createDatabase
-
     // Don't check createDatabase against mongos: there is no createDatabase command exposed on
     // mongos; a database is created implicitly when a collection in it is created.
-
-    checkCommand(st.configRS.getPrimary(),
-                 {_configsvrCreateDatabase: dbName, to: st.shard0.name},
-                 setupFuncs.noop,
-                 cleanupFuncs.dropDatabase);
+    checkCommandConfigSvr({_configsvrCreateDatabase: dbName, to: st.shard0.name},
+                          setupFuncs.noop,
+                          cleanupFuncs.dropDatabase);
 
     // addShard
-
     var newShard = MongoRunner.runMongod({shardsvr: ""});
-
-    checkCommand(st.s,
-                 {addShard: newShard.name, name: newShardName},
-                 setupFuncs.noop,
-                 cleanupFuncs.removeShardIfExists);
-
-    checkCommand(st.configRS.getPrimary(),
-                 {_configsvrAddShard: newShard.name, name: newShardName},
-                 setupFuncs.noop,
-                 cleanupFuncs.removeShardIfExists);
+    checkCommandMongos({addShard: newShard.name, name: newShardName},
+                       setupFuncs.noop,
+                       cleanupFuncs.removeShardIfExists);
+    checkCommandConfigSvr({_configsvrAddShard: newShard.name, name: newShardName},
+                          setupFuncs.noop,
+                          cleanupFuncs.removeShardIfExists);
 
     // removeShard
+    checkCommandMongos({removeShard: newShardName}, setupFuncs.addShard, cleanupFuncs.noop);
+    checkCommandConfigSvr(
+        {_configsvrRemoveShard: newShardName}, setupFuncs.addShard, cleanupFuncs.noop);
 
-    checkCommand(st.s, {removeShard: newShardName}, setupFuncs.addShard, cleanupFuncs.noop);
+    // dropCollection
+    checkCommandMongos({drop: ns}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
+    checkCommandConfigSvr(
+        {_configsvrDropCollection: ns}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
 
-    checkCommand(st.configRS.getPrimary(),
-                 {_configsvrRemoveShard: newShardName},
-                 setupFuncs.addShard,
-                 cleanupFuncs.noop);
+    // dropDatabase
+
+    // We can't use the checkCommandMongos wrapper because we need a connection to the test
+    // database.
+    checkCommand(st.s.getDB(dbName),
+                 {dropDatabase: 1},
+                 unacceptableWCsForMongos,
+                 acceptableWCsForMongos,
+                 false,
+                 setupFuncs.createDatabase,
+                 cleanupFuncs.dropDatabase);
+    checkCommandConfigSvr(
+        {_configsvrDropDatabase: dbName}, setupFuncs.createDatabase, cleanupFuncs.dropDatabase);
 
     st.stop();
 })();

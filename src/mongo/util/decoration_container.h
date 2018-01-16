@@ -87,7 +87,7 @@ public:
      * have any declareDecoration() calls made on it while a DecorationContainer dependent on it
      * is in scope.
      */
-    explicit DecorationContainer(const DecorationRegistry* registry);
+    explicit DecorationContainer(const DecorationRegistry* registry, void* owner);
     ~DecorationContainer();
 
     /**

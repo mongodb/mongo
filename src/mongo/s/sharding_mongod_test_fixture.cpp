@@ -145,6 +145,11 @@ void ShardingMongodTestFixture::setUp() {
     service->setOpObserver(stdx::make_unique<OpObserverImpl>());
     repl::setOplogCollectionName();
     repl::createOplog(_opCtx.get());
+
+    // Set the highest FCV because otherwise it defaults to the lower FCV. This way we default to
+    // testing this release's code, not backwards compatibility code.
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
 }
 
 std::unique_ptr<ReplicationCoordinatorMock> ShardingMongodTestFixture::makeReplicationCoordinator(

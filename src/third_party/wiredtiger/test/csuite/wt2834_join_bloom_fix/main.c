@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -67,11 +67,15 @@ main(int argc, char *argv[])
 	memset(opts, 0, sizeof(*opts));
 	testutil_check(testutil_parse_opts(argc, argv, opts));
 	testutil_make_work_dir(opts->home);
+	testutil_progress(opts, "start");
 
 	testutil_check(wiredtiger_open(opts->home, NULL,
 	    "create,cache_size=250M", &opts->conn));
+	testutil_progress(opts, "wiredtiger_open");
 	testutil_check(
 	    opts->conn->open_session(opts->conn, NULL, NULL, &session));
+	testutil_progress(opts, "sessions opened");
+
 	/*
 	 * Note: repeated primary key 'id' as 'id2'.  This makes
 	 * it easier to dump an index and know which record we're
@@ -97,6 +101,7 @@ main(int argc, char *argv[])
 	testutil_check(session->create(session, balanceuri,
 	    "columns=(balance)"));
 	testutil_check(session->create(session, flaguri, "columns=(flag)"));
+	testutil_progress(opts, "setup complete");
 
 	/*
 	 * Insert a single record with all items we are search for,
@@ -110,7 +115,9 @@ main(int argc, char *argv[])
 	testutil_check(maincur->close(maincur));
 	testutil_check(session->close(session, NULL));
 
+	testutil_progress(opts, "populate start");
 	populate(opts);
+	testutil_progress(opts, "populate end");
 
 	testutil_check(opts->conn->open_session(
 	    opts->conn, NULL, NULL, &session));
@@ -159,10 +166,11 @@ main(int argc, char *argv[])
 	testutil_assert(ret == WT_NOTFOUND);
 	testutil_assert(count == 0);
 
+	testutil_progress(opts, "cleanup starting");
+#if 0
 	testutil_cleanup(opts);
-	/* NOTREACHED */
-
-	return (0);
+#endif
+	return (EXIT_SUCCESS);
 }
 
 void

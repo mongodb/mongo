@@ -78,20 +78,22 @@ long long ClientCursor::totalOpen() {
 ClientCursor::ClientCursor(ClientCursorParams params,
                            CursorManager* cursorManager,
                            CursorId cursorId,
-                           boost::optional<LogicalSessionId> lsid,
+                           OperationContext* operationUsingCursor,
                            Date_t now)
     : _cursorid(cursorId),
       _nss(std::move(params.nss)),
       _authenticatedUsers(std::move(params.authenticatedUsers)),
-      _lsid(std::move(lsid)),
+      _lsid(operationUsingCursor->getLogicalSessionId()),
       _isReadCommitted(params.isReadCommitted),
       _cursorManager(cursorManager),
       _originatingCommand(params.originatingCommandObj),
       _queryOptions(params.queryOptions),
       _exec(std::move(params.exec)),
+      _operationUsingCursor(operationUsingCursor),
       _lastUseDate(now) {
     invariant(_cursorManager);
     invariant(_exec);
+    invariant(_operationUsingCursor);
 
     cursorStatsOpen.increment();
 
@@ -104,7 +106,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
 
 ClientCursor::~ClientCursor() {
     // Cursors must be unpinned and deregistered from their cursor manager before being deleted.
-    invariant(!_isPinned);
+    invariant(!_operationUsingCursor);
     invariant(_disposed);
 
     cursorStatsOpen.decrement();
@@ -150,7 +152,7 @@ void ClientCursor::updateSlaveLocation(OperationContext* opCtx) {
 ClientCursorPin::ClientCursorPin(OperationContext* opCtx, ClientCursor* cursor)
     : _opCtx(opCtx), _cursor(cursor) {
     invariant(_cursor);
-    invariant(_cursor->_isPinned);
+    invariant(_cursor->_operationUsingCursor);
     invariant(_cursor->_cursorManager);
     invariant(!_cursor->_disposed);
 
@@ -166,7 +168,7 @@ ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
     // The pinned cursor is being transferred to us from another pin. The 'other' pin must have a
     // pinned cursor.
     invariant(other._cursor);
-    invariant(other._cursor->_isPinned);
+    invariant(other._cursor->_operationUsingCursor);
 
     // Be sure to set the 'other' pin's cursor to null in order to transfer ownership to ourself.
     other._cursor = nullptr;
@@ -182,7 +184,7 @@ ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
     // pinned cursor, and we must not have a cursor.
     invariant(!_cursor);
     invariant(other._cursor);
-    invariant(other._cursor->_isPinned);
+    invariant(other._cursor->_operationUsingCursor);
 
     // Copy the cursor pointer to ourselves, but also be sure to set the 'other' pin's cursor to
     // null so that it no longer has the cursor pinned.
@@ -211,7 +213,7 @@ void ClientCursorPin::release() {
         _opCtx->lockState()->isCollectionLockedForMode(_cursor->_nss.ns(), MODE_IS);
     dassert(isLocked || _cursor->_cursorManager->isGlobalManager());
 
-    invariant(_cursor->_isPinned);
+    invariant(_cursor->_operationUsingCursor);
 
     if (_cursor->getExecutor()->isMarkedAsKilled()) {
         // The ClientCursor was killed while we had it.  Therefore, it is our responsibility to
@@ -228,7 +230,7 @@ void ClientCursorPin::release() {
 
 void ClientCursorPin::deleteUnderlying() {
     invariant(_cursor);
-    invariant(_cursor->_isPinned);
+    invariant(_cursor->_operationUsingCursor);
     // Note the following subtleties of this method's implementation:
     // - We must unpin the cursor before destruction, since it is an error to delete a pinned
     //   cursor.
@@ -250,7 +252,7 @@ void ClientCursorPin::deleteUnderlying() {
 
     // Make sure the cursor is disposed and unpinned before being destroyed.
     _cursor->dispose(_opCtx);
-    _cursor->_isPinned = false;
+    _cursor->_operationUsingCursor = nullptr;
     delete _cursor;
 
     cursorStatsOpenPinned.decrement();

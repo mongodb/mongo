@@ -61,7 +61,7 @@
 
     jsTestLog("Ensure that writes start failing with NotMaster errors");
     assert.soonNoExcept(function() {
-        assert.writeErrorWithCode(primary.getDB(name).foo.insert({x: 2}), ErrorCodes.NotMaster);
+        assert.commandFailedWithCode(primary.getDB(name).foo.insert({x: 2}), ErrorCodes.NotMaster);
         return true;
     });
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -651,6 +651,7 @@ __wt_os_win(WT_SESSION_IMPL *session)
 
 	/* Initialize the Windows jump table. */
 	file_system->fs_directory_list = __wt_win_directory_list;
+	file_system->fs_directory_list_single = __wt_win_directory_list_single;
 	file_system->fs_directory_list_free = __wt_win_directory_list_free;
 	file_system->fs_exist = __win_fs_exist;
 	file_system->fs_open_file = __win_open_file;

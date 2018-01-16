@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -56,11 +56,16 @@ __wt_modify_pack(WT_SESSION_IMPL *session,
  *	Apply a single modify structure change to the buffer.
  */
 static int
-__modify_apply_one(WT_SESSION_IMPL *session, WT_ITEM *value,
+__modify_apply_one(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
     size_t data_size, size_t offset, size_t size, const uint8_t *data)
 {
+	WT_ITEM *value;
 	size_t len;
 	uint8_t *from, *to;
+	bool sformat;
+
+	value = &cursor->value;
+	sformat = cursor->value_format[0] == 'S';
 
 	/*
 	 * Grow the buffer to the maximum size we'll need. This is pessimistic
@@ -89,15 +94,26 @@ __modify_apply_one(WT_SESSION_IMPL *session, WT_ITEM *value,
 	}
 
 	/*
+	 * Decrement the size to discard the trailing nul (done after growing
+	 * the buffer to ensure it can be restored without further checking).
+	 */
+	if (sformat)
+		--value->size;
+
+	/*
 	 * If appending bytes past the end of the value, initialize gap bytes
 	 * and copy the new bytes into place.
 	 */
 	if (value->size <= offset) {
 		if (value->size < offset)
-			memset((uint8_t *)value->data +
-			    value->size, 0, offset - value->size);
+			memset((uint8_t *)value->data + value->size,
+			    sformat ? ' ' : 0, offset - value->size);
 		memmove((uint8_t *)value->data + offset, data, data_size);
 		value->size = offset + data_size;
+
+		/* Restore the trailing nul. */
+		if (sformat)
+			((char *)value->data)[value->size++] = '\0';
 		return (0);
 	}
 
@@ -149,6 +165,10 @@ __modify_apply_one(WT_SESSION_IMPL *session, WT_ITEM *value,
 		 value->size += (data_size - size);
 	}
 
+	/* Restore the trailing nul. */
+	if (sformat)
+		((char *)value->data)[value->size++] = '\0';
+
 	return (0);
 }
 
@@ -158,14 +178,14 @@ __modify_apply_one(WT_SESSION_IMPL *session, WT_ITEM *value,
  * interface.
  */
 int
-__wt_modify_apply_api(
-    WT_SESSION_IMPL *session, WT_ITEM *value, WT_MODIFY *entries, int nentries)
+__wt_modify_apply_api(WT_SESSION_IMPL *session,
+    WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
     WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	int i;
 
 	for (i = 0; i < nentries; ++i)
-		WT_RET(__modify_apply_one(session, value, entries[i].data.size,
+		WT_RET(__modify_apply_one(session, cursor, entries[i].data.size,
 		    entries[i].offset, entries[i].size, entries[i].data.data));
 
 	return (0);
@@ -176,7 +196,8 @@ __wt_modify_apply_api(
  *	Apply a single set of WT_MODIFY changes to a buffer.
  */
 int
-__wt_modify_apply(WT_SESSION_IMPL *session, WT_ITEM *value, const void *modify)
+__wt_modify_apply(
+    WT_SESSION_IMPL *session, WT_CURSOR *cursor, const void *modify)
 {
 	size_t data_size, nentries, offset, size;
 	const size_t *p;
@@ -198,7 +219,7 @@ __wt_modify_apply(WT_SESSION_IMPL *session, WT_ITEM *value, const void *modify)
 		memcpy(&offset, p++, sizeof(size_t));
 		memcpy(&size, p++, sizeof(size_t));
 		WT_RET(__modify_apply_one(
-		    session, value, data_size, offset, size, data));
+		    session, cursor, data_size, offset, size, data));
 	}
 
 	return (0);

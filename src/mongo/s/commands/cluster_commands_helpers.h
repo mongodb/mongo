@@ -150,16 +150,6 @@ int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& 
 bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::string& ns);
 
 /**
- * Returns the set of collections for the specified database, which have been marked as sharded.
- * Goes directly to the config server's metadata, without checking the local cache so it should not
- * be used in frequently called code paths.
- *
- * Throws exception on errors.
- */
-std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
-                                                           StringData dbName);
-
-/**
  * Abstracts the common pattern of refreshing a collection and checking if it is sharded used across
  * multiple commands.
  */

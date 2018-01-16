@@ -63,7 +63,8 @@ SocketException::SocketException(Type t,
                                  const std::string& server,
                                  int code,
                                  const std::string& extra)
-    : DBException(code, std::string("socket exception [") + getStringType(t) + "] for " + server),
+    : DBException(Status(ErrorCodes::Error(code),
+                         std::string("socket exception [") + getStringType(t) + "] for " + server)),
       _type(t),
       _server(server),
       _extra(extra) {}

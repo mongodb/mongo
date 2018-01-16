@@ -32,6 +32,7 @@
 
 #include "mongo/db/matcher/rewrite_expr.h"
 
+#include "mongo/db/matcher/expression_internal_expr_eq.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/util/log.h"
@@ -54,9 +55,7 @@ RewriteExpr::RewriteResult RewriteExpr::rewrite(const boost::intrusive_ptr<Expre
         LOG(5) << "Post-rewrite/post-optimized MatchExpression: " << matchExpression->toString();
     }
 
-    return {std::move(matchExpression),
-            std::move(rewriteExpr._matchExprStringStorage),
-            std::move(rewriteExpr._matchExprElemStorage)};
+    return {std::move(matchExpression), std::move(rewriteExpr._matchExprElemStorage)};
 }
 
 std::unique_ptr<MatchExpression> RewriteExpr::_rewriteExpression(
@@ -68,8 +67,6 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteExpression(
         return _rewriteOrExpression(expr);
     } else if (auto expr = dynamic_cast<ExpressionCompare*>(currExprNode.get())) {
         return _rewriteComparisonExpression(expr);
-    } else if (auto expr = dynamic_cast<ExpressionIn*>(currExprNode.get())) {
-        return _rewriteInExpression(expr);
     }
 
     return nullptr;
@@ -114,61 +111,13 @@ std::unique_ptr<MatchExpression> RewriteExpr::_rewriteOrExpression(
     return nullptr;
 }
 
-std::unique_ptr<MatchExpression> RewriteExpr::_rewriteInExpression(
-    const boost::intrusive_ptr<ExpressionIn>& currExprNode) {
-
-    if (!_isValidMatchIn(currExprNode)) {
-        return nullptr;
-    }
-
-    const auto& operandList = currExprNode->getOperandList();
-    ExpressionFieldPath* lhsExpression = dynamic_cast<ExpressionFieldPath*>(operandList[0].get());
-    BSONArrayBuilder arrBuilder;
-
-    if (ExpressionArray* rhsArray = dynamic_cast<ExpressionArray*>(operandList[1].get())) {
-        for (auto&& item : rhsArray->getOperandList()) {
-            auto exprConst = dynamic_cast<ExpressionConstant*>(item.get());
-            arrBuilder << exprConst->getValue();
-        }
-    } else {
-        auto exprConst = dynamic_cast<ExpressionConstant*>(operandList[1].get());
-        invariant(exprConst);
-
-        auto valueArr = exprConst->getValue();
-        invariant(valueArr.isArray());
-
-        for (auto val : valueArr.getArray()) {
-            arrBuilder << val;
-        }
-    }
-
-    _matchExprStringStorage.push_back(lhsExpression->getFieldPath().tail().fullPath());
-    const auto& fieldPath = _matchExprStringStorage.back();
-
-    BSONObj inValues = arrBuilder.obj();
-    _matchExprElemStorage.push_back(inValues);
-    std::vector<BSONElement> elementList;
-    inValues.elems(elementList);
-
-    auto matchInExpr = stdx::make_unique<InMatchExpression>(fieldPath);
-    matchInExpr->setCollator(_collator);
-    uassertStatusOK(matchInExpr->setEqualities(elementList));
-
-    return std::move(matchInExpr);
-}
-
 std::unique_ptr<MatchExpression> RewriteExpr::_rewriteComparisonExpression(
-    const boost::intrusive_ptr<ExpressionCompare>& currExprNode) {
+    const boost::intrusive_ptr<ExpressionCompare>& expr) {
 
-    if (!_isValidMatchComparison(currExprNode)) {
+    if (!_canRewriteComparison(expr)) {
         return nullptr;
     }
 
-    return _buildComparisonMatchExpression(currExprNode);
-}
-
-std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
-    const boost::intrusive_ptr<ExpressionCompare>& expr) {
     const auto& operandList = expr->getOperandList();
     invariant(operandList.size() == 2);
 
@@ -176,8 +125,7 @@ std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
     ExpressionConstant* rhs{nullptr};
     CmpOp cmpOperator = expr->getOp();
 
-    // Build left-hand and right-hand MatchExpression components and modify the operator if
-    // required.
+    // Extract left-hand side and right-hand side MatchExpression components.
     if ((lhs = dynamic_cast<ExpressionFieldPath*>(operandList[0].get()))) {
         rhs = dynamic_cast<ExpressionConstant*>(operandList[1].get());
         invariant(rhs);
@@ -185,26 +133,6 @@ std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
         lhs = dynamic_cast<ExpressionFieldPath*>(operandList[1].get());
         rhs = dynamic_cast<ExpressionConstant*>(operandList[0].get());
         invariant(lhs && rhs);
-
-        // When converting an Expression that has a field path on the RHS we will need to move to
-        // the LHS. This may require an inversion of the operator used as well.
-        // For example:  {$gt: [3, '$foo']} => {foo: {$lt: 3}}
-        switch (cmpOperator) {
-            case ExpressionCompare::CmpOp::GT:
-                cmpOperator = CmpOp::LT;
-                break;
-            case ExpressionCompare::CmpOp::GTE:
-                cmpOperator = CmpOp::LTE;
-                break;
-            case ExpressionCompare::CmpOp::LT:
-                cmpOperator = CmpOp::GT;
-                break;
-            case ExpressionCompare::CmpOp::LTE:
-                cmpOperator = CmpOp::GTE;
-                break;
-            default:  // No need to convert EQ or NE. CMP is not valid for rewrite.
-                break;
-        }
     }
 
     // Build argument for ComparisonMatchExpression.
@@ -219,96 +147,20 @@ std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
 
 std::unique_ptr<MatchExpression> RewriteExpr::_buildComparisonMatchExpression(
     ExpressionCompare::CmpOp comparisonOp, BSONElement fieldAndValue) {
+    invariant(comparisonOp == ExpressionCompare::EQ);
 
-    std::unique_ptr<ComparisonMatchExpression> compMatchExpr;
-    std::unique_ptr<NotMatchExpression> notMatchExpr;
+    auto eqMatchExpr =
+        stdx::make_unique<InternalExprEqMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
+    eqMatchExpr->setCollator(_collator);
 
-    switch (comparisonOp) {
-        case ExpressionCompare::EQ: {
-            compMatchExpr = stdx::make_unique<EqualityMatchExpression>(fieldAndValue.fieldName(),
-                                                                       fieldAndValue);
-            break;
-        }
-        case ExpressionCompare::NE: {
-            compMatchExpr = stdx::make_unique<EqualityMatchExpression>(fieldAndValue.fieldName(),
-                                                                       fieldAndValue);
-            notMatchExpr = stdx::make_unique<NotMatchExpression>(compMatchExpr.release());
-            break;
-        }
-        case ExpressionCompare::GT: {
-            compMatchExpr =
-                stdx::make_unique<GTMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
-            break;
-        }
-        case ExpressionCompare::GTE: {
-            compMatchExpr =
-                stdx::make_unique<GTEMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
-            break;
-        }
-        case ExpressionCompare::LT: {
-            compMatchExpr =
-                stdx::make_unique<LTMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
-            break;
-        }
-        case ExpressionCompare::LTE: {
-            compMatchExpr =
-                stdx::make_unique<LTEMatchExpression>(fieldAndValue.fieldName(), fieldAndValue);
-            break;
-        }
-        default:
-            MONGO_UNREACHABLE;
-    }
-
-    if (notMatchExpr) {
-        notMatchExpr->setCollator(_collator);
-        return std::move(notMatchExpr);
-    }
-
-    compMatchExpr->setCollator(_collator);
-    return std::move(compMatchExpr);
+    return std::move(eqMatchExpr);
 }
 
-bool RewriteExpr::_isValidFieldPath(const FieldPath& fieldPath) const {
-    // We can only rewrite field paths that contain ROOT plus a field path of length 1. Expression
-    // and MatchExpression treat dotted paths in a different manner and will not produce the same
-    // results.
-    return fieldPath.getPathLength() == 2;
-}
-
-bool RewriteExpr::_isValidMatchIn(const boost::intrusive_ptr<ExpressionIn>& expr) const {
-    const auto& operandList = expr->getOperandList();
-
-    auto fieldPathExpr = dynamic_cast<ExpressionFieldPath*>(operandList[0].get());
-    if (!fieldPathExpr || !fieldPathExpr->isRootFieldPath()) {
-        // A left-hand-side local document field path is required to translate to match.
-        return false;
-    }
-
-    if (!_isValidFieldPath(fieldPathExpr->getFieldPath())) {
-        return false;
-    }
-
-    if (ExpressionArray* rhsArray = dynamic_cast<ExpressionArray*>(operandList[1].get())) {
-        for (auto&& item : rhsArray->getOperandList()) {
-            if (!dynamic_cast<ExpressionConstant*>(item.get())) {
-                // All array values must be constant.
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    if (ExpressionConstant* constArr = dynamic_cast<ExpressionConstant*>(operandList[1].get())) {
-        return constArr->getValue().isArray();
-    }
-
-    return false;
-}
-
-bool RewriteExpr::_isValidMatchComparison(
+bool RewriteExpr::_canRewriteComparison(
     const boost::intrusive_ptr<ExpressionCompare>& expression) const {
-    if (expression->getOp() == ExpressionCompare::CMP) {
+
+    // Currently we only rewrite $eq expressions.
+    if (expression->getOp() != ExpressionCompare::EQ) {
         return false;
     }
 
@@ -327,12 +179,17 @@ bool RewriteExpr::_isValidMatchComparison(
                 return false;
             }
 
-            if (!_isValidFieldPath(exprFieldPath->getFieldPath())) {
-                return false;
-            }
-
             hasFieldPath = true;
-        } else if (!dynamic_cast<ExpressionConstant*>(operand.get())) {
+        } else if (auto exprConst = dynamic_cast<ExpressionConstant*>(operand.get())) {
+            switch (exprConst->getValue().getType()) {
+                case BSONType::Array:
+                case BSONType::EOO:
+                case BSONType::Undefined:
+                    return false;
+                default:
+                    break;
+            }
+        } else {
             return false;
         }
     }

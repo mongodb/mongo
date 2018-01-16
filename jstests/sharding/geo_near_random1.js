@@ -38,7 +38,7 @@
 
     printShardingSizes();
 
-    var opts = {sharded: true};
+    var opts = {};
     test.testPt([0, 0], opts);
     test.testPt(test.mkPt(), opts);
     test.testPt(test.mkPt(), opts);

@@ -65,6 +65,9 @@ struct ClusterClientCursorParams {
     // order, it requests a sortKey meta-projection using this field name.
     static const char kSortKeyField[];
 
+    // The expected sort key pattern when 'compareWholeSortKey' is true.
+    static const BSONObj kWholeSortKeySortPattern;
+
     struct RemoteCursor {
         RemoteCursor(ShardId shardId, HostAndPort hostAndPort, CursorResponse cursorResponse)
             : shardId(std::move(shardId)),
@@ -104,6 +107,11 @@ struct ClusterClientCursorParams {
 
     // The sort specification. Leave empty if there is no sort.
     BSONObj sort;
+
+    // When 'compareWholeSortKey' is true, $sortKey is a scalar value, rather than an object. We
+    // extract the sort key {$sortKey: <value>}. The sort key pattern is verified to be {$sortKey:
+    // 1}.
+    bool compareWholeSortKey = false;
 
     // The number of results to skip. Optional. Should not be forwarded to the remote hosts in
     // 'cmdObj'.

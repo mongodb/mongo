@@ -44,7 +44,6 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
                                                            const std::string& dbname,
                                                            const BSONObj& oplogEntry,
                                                            AuthorizationSession* authSession,
-                                                           OplogApplicationCommand command,
                                                            bool alwaysUpsert) {
     BSONElement opTypeElem = oplogEntry["op"];
     checkBSONType(BSONType::String, opTypeElem);
@@ -76,12 +75,9 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
     BSONObj o = oElem.Obj();
 
     if (opType == "c"_sd) {
-        if (command == OplogApplicationCommand::kDoTxnCmd) {
-            return Status(ErrorCodes::IllegalOperation, "Commands cannot be applied via doTxn.");
-        }
         StringData commandName = o.firstElement().fieldNameStringData();
-        Command* command = Command::findCommand(commandName);
-        if (!command) {
+        Command* commandInOplogEntry = Command::findCommand(commandName);
+        if (!commandInOplogEntry) {
             return Status(ErrorCodes::FailedToParse, "Unrecognized command in op");
         }
 
@@ -94,7 +90,7 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         }
 
         return Command::checkAuthorization(
-            command, opCtx, OpMsgRequest::fromDBAndBody(dbNameForAuthCheck, o));
+            commandInOplogEntry, opCtx, OpMsgRequest::fromDBAndBody(dbNameForAuthCheck, o));
     }
 
     if (opType == "i"_sd) {
@@ -195,8 +191,7 @@ Status OplogApplicationChecks::checkOperation(const BSONElement& e) {
 Status OplogApplicationChecks::checkAuthForCommand(OperationContext* opCtx,
                                                    const std::string& dbname,
                                                    const BSONObj& cmdObj,
-                                                   OplogApplicationValidity validity,
-                                                   OplogApplicationCommand command) {
+                                                   OplogApplicationValidity validity) {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
     if (validity == OplogApplicationValidity::kNeedsSuperuser) {
         std::vector<Privilege> universalPrivileges;
@@ -234,12 +229,7 @@ Status OplogApplicationChecks::checkAuthForCommand(OperationContext* opCtx,
     for (const BSONElement& e : cmdObj.firstElement().Array()) {
         checkBSONType(BSONType::Object, e);
         Status status = OplogApplicationChecks::checkOperationAuthorization(
-            opCtx,
-            dbname,
-            e.Obj(),
-            authSession,
-            OplogApplicationCommand::kApplyOpsCmd,
-            alwaysUpsert);
+            opCtx, dbname, e.Obj(), authSession, alwaysUpsert);
         if (!status.isOK()) {
             return status;
         }

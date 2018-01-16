@@ -85,6 +85,24 @@ TEST_F(QueryPlannerTest, EqualityIndexScanWithTrailingFields) {
     assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {x: 1, y: 1}}}}}");
 }
 
+TEST_F(QueryPlannerTest, ExprEqCanUseIndex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a" << 1));
+    runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: {pattern: {a: 1}, bounds: {a: "
+        "[[1,1,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ExprEqCannotUseMultikeyFieldOfIndex) {
+    MultikeyPaths multikeyPaths{{0U}};
+    addIndex(BSON("a.b" << 1), multikeyPaths);
+    runQuery(fromjson("{'a.b': {$_internalExprEq: 1}}"));
+    assertNumSolutions(1U);
+    assertSolutionExists("{cscan: {dir: 1, filter: {'a.b': {$_internalExprEq: 1}}}}");
+}
+
 // $eq can use a hashed index because it looks for values of type regex;
 // it doesn't evaluate the regex itself.
 TEST_F(QueryPlannerTest, EqCanUseHashedIndexWithRegex) {
@@ -92,6 +110,28 @@ TEST_F(QueryPlannerTest, EqCanUseHashedIndexWithRegex) {
                   << "hashed"));
     runQuery(fromjson("{a: {$eq: /abc/}}"));
     ASSERT_EQUALS(getNumSolutions(), 2U);
+}
+
+TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a"
+                  << "hashed"));
+    runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$_internalExprEq: 1}}, node: {ixscan: {filter: null, pattern: {a: "
+        "'hashed'}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ExprEqCanUseHashedIndexWithRegex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(BSON("a"
+                  << "hashed"));
+    runQuery(fromjson("{a: {$_internalExprEq: /abc/}}"));
+    ASSERT_EQUALS(getNumSolutions(), 1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$_internalExprEq: /abc/}}, node: {ixscan: {filter: null, pattern: "
+        "{a: 'hashed'}}}}}");
 }
 
 //
@@ -2481,6 +2521,28 @@ TEST_F(QueryPlannerTest, SparseIndexForQuery) {
         "{filter: null, pattern: {a: 1}}}}}");
 }
 
+TEST_F(QueryPlannerTest, ExprEqCanUseSparseIndex) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(fromjson("{a: 1}"), false, true);
+    runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: null, node: {ixscan: "
+        "{filter: null, pattern: {a: 1}, bounds: {a: [[1,1,true,true]]}}}}}");
+}
+
+TEST_F(QueryPlannerTest, ExprEqCanUseSparseIndexForEqualityToNull) {
+    params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
+    addIndex(fromjson("{a: 1}"), false, true);
+    runQuery(fromjson("{a: {$_internalExprEq: null}}"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{fetch: {filter: {a: {$_internalExprEq: null}}, node: {ixscan: "
+        "{filter: null, pattern: {a: 1}, bounds: {a: [[null,null,true,true]]}}}}}");
+}
+
 //
 // Regex
 //
@@ -3310,20 +3372,26 @@ TEST_F(QueryPlannerTest, IntersectManySelfIntersections) {
         "{ixscan: {filter: null, pattern: {a:1}}}]}}}}");  // 10
 }
 
-TEST_F(QueryPlannerTest, IntersectSubtreeNodes) {
+TEST_F(QueryPlannerTest, CannotIntersectSubnodes) {
     params.options = QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::INDEX_INTERSECTION;
     addIndex(BSON("a" << 1));
     addIndex(BSON("b" << 1));
     addIndex(BSON("c" << 1));
     addIndex(BSON("d" << 1));
 
-    runQuery(fromjson("{$or: [{a: 1}, {b: 1}], $or: [{c:1}, {d:1}]}"));
+    runQuery(fromjson("{$or: [{a: 1}, {b: 1}], $or: [{c: 1}, {d: 1}]}"));
+
+    assertNumSolutions(2U);
     assertSolutionExists(
-        "{fetch: {filter: null, node: {andHash: {nodes: ["
-        "{or: {nodes: [{ixscan:{filter:null, pattern:{a:1}}},"
-        "{ixscan:{filter:null, pattern:{b:1}}}]}},"
-        "{or: {nodes: [{ixscan:{filter:null, pattern:{c:1}}},"
-        "{ixscan:{filter:null, pattern:{d:1}}}]}}]}}}}");
+        "{fetch: {filter: {$or: [{c: 1}, {d: 1}]}, node: {or: {nodes: ["
+        "{ixscan: {filter: null, pattern: {a: 1}}},"
+        "{ixscan: {filter: null, pattern: {b: 1}}}"
+        "]}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$or: [{a: 1}, {b: 1}]}, node: {or: {nodes: ["
+        "{ixscan: {filter: null, pattern: {c: 1}}},"
+        "{ixscan: {filter: null, pattern: {d: 1}}}"
+        "]}}}}");
 }
 
 TEST_F(QueryPlannerTest, IntersectSubtreeAndPred) {
@@ -4254,13 +4322,9 @@ TEST_F(QueryPlannerTest, KeyPatternOverflowsInt) {
 //
 
 TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
-    PlanCacheIndexTree* indexTree;
-
     // Null match expression.
     std::vector<IndexEntry> relevantIndices;
-    Status s = QueryPlanner::cacheDataFromTaggedTree(NULL, relevantIndices, &indexTree);
-    ASSERT_NOT_OK(s);
-    ASSERT(NULL == indexTree);
+    ASSERT_NOT_OK(QueryPlanner::cacheDataFromTaggedTree(NULL, relevantIndices).getStatus());
 
     // No relevant index matching the index tag.
     relevantIndices.push_back(IndexEntry(BSON("a" << 1)));
@@ -4272,9 +4336,8 @@ TEST_F(QueryPlannerTest, CacheDataFromTaggedTreeFailsOnBadInput) {
     std::unique_ptr<CanonicalQuery> scopedCq = std::move(statusWithCQ.getValue());
     scopedCq->root()->setTag(new IndexTag(1));
 
-    s = QueryPlanner::cacheDataFromTaggedTree(scopedCq->root(), relevantIndices, &indexTree);
-    ASSERT_NOT_OK(s);
-    ASSERT(NULL == indexTree);
+    ASSERT_NOT_OK(
+        QueryPlanner::cacheDataFromTaggedTree(scopedCq->root(), relevantIndices).getStatus());
 }
 
 TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
@@ -5002,6 +5065,57 @@ TEST_F(QueryPlannerTest, ContainedOrNotPredicateIsLeadingFieldInBothBranchesInde
         "false, true]], c: [['MinKey', 'MaxKey', true, true]]}}}"
         "]}}}}");
     assertSolutionExists("{cscan: {dir: 1}}}}");
+}
+
+TEST_F(QueryPlannerTest, MultipleContainedOrWithIndexIntersectionEnabled) {
+    params.options = QueryPlannerParams::INCLUDE_COLLSCAN | QueryPlannerParams::INDEX_INTERSECTION;
+    addIndex(BSON("a" << 1));
+    addIndex(BSON("b" << 1 << "a" << 1));
+    addIndex(BSON("c" << 1));
+    addIndex(BSON("d" << 1 << "a" << 1));
+    addIndex(BSON("e" << 1));
+
+    runQuery(fromjson("{$and: [{a: 5}, {$or: [{b: 6}, {c: 7}]}, {$or: [{d: 8}, {e: 9}]}]}"));
+
+    assertNumSolutions(6U);
+
+    // Non-ixisect solutions.
+    assertSolutionExists(
+        "{fetch: {filter: {$or: [{d: 8}, {e: 9}], a: 5}, node: {or: {nodes: ["
+        "{ixscan: {filter: null, pattern: {b: 1, a: 1},"
+        "bounds: {b: [[6,6,true,true]], a: [[5,5,true,true]]}}},"
+        "{ixscan: {filter: null, pattern: {c: 1}, bounds: {c: [[7,7,true,true]]}}}"
+        "]}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$or: [{b: 6}, {c: 7}], a: 5}, node: {or: {nodes: ["
+        "{ixscan: {filter: null, pattern: {d: 1, a: 1},"
+        "bounds: {d: [[8,8,true,true]], a: [[5,5,true,true]]}}},"
+        "{ixscan: {filter: null, pattern: {e: 1}, bounds: {e: [[9,9,true,true]]}}}"
+        "]}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$and: [{$or: [{b: 6}, {c: 7}]}, {$or: [{d: 8}, {e: 9}]}]}, node: "
+        "{ixscan: {filter: null, pattern: {a: 1}, bounds: {a: [[5,5,true,true]]}}}}}");
+    assertSolutionExists("{cscan: {dir: 1}}}}");
+
+    // Ixisect solutions.
+    assertSolutionExists(
+        "{fetch: {filter: {$or: [{d: 8}, {e: 9}]}, node: {andHash: {nodes: ["
+        "{or: {nodes: ["
+        "{ixscan: {filter: null, pattern: {b: 1, a: 1},"
+        "bounds: {b: [[6,6,true,true]], a: [[5,5,true,true]]}}},"
+        "{ixscan: {filter: null, pattern: {c: 1}, bounds: {c: [[7,7,true,true]]}}}"
+        "]}},"
+        "{ixscan: {filter: null, pattern: {a: 1}, bounds: {a: [[5,5,true,true]]}}}"
+        "]}}}}");
+    assertSolutionExists(
+        "{fetch: {filter: {$or: [{b: 6}, {c: 7}]}, node: {andHash: {nodes: ["
+        "{or: {nodes: ["
+        "{ixscan: {filter: null, pattern: {d: 1, a: 1},"
+        "bounds: {d: [[8,8,true,true]], a: [[5,5,true,true]]}}},"
+        "{ixscan: {filter: null, pattern: {e: 1}, bounds: {e: [[9,9,true,true]]}}}"
+        "]}},"
+        "{ixscan: {filter: null, pattern: {a: 1}, bounds: {a: [[5,5,true,true]]}}}"
+        "]}}}}");
 }
 
 TEST_F(QueryPlannerTest, ContainedOrMultikeyCannotCombineLeadingFields) {

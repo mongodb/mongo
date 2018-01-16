@@ -108,10 +108,10 @@ TEST(DecorableTest, SimpleDecoration) {
     const auto dd3 = registry.declareDecoration<int>();
 
     {
-        DecorationContainer decorable1(&registry);
+        DecorationContainer decorable1(&registry, nullptr);
         ASSERT_EQ(2, numConstructedAs);
         ASSERT_EQ(0, numDestructedAs);
-        DecorationContainer decorable2(&registry);
+        DecorationContainer decorable2(&registry, nullptr);
         ASSERT_EQ(4, numConstructedAs);
         ASSERT_EQ(0, numDestructedAs);
 
@@ -144,7 +144,7 @@ TEST(DecorableTest, ThrowingConstructor) {
     registry.declareDecoration<A>();
 
     try {
-        DecorationContainer d(&registry);
+        DecorationContainer d(&registry, nullptr);
     } catch (const AssertionException& ex) {
         ASSERT_EQ(ErrorCodes::Unauthorized, ex.code());
     }
@@ -158,7 +158,7 @@ TEST(DecorableTest, Alignment) {
     const auto firstInt = registry.declareDecoration<int>();
     const auto secondChar = registry.declareDecoration<int>();
     const auto secondInt = registry.declareDecoration<int>();
-    DecorationContainer d(&registry);
+    DecorationContainer d(&registry, nullptr);
     ASSERT_EQ(0U,
               reinterpret_cast<uintptr_t>(&d.getDecoration(firstChar)) %
                   std::alignment_of<char>::value);
@@ -171,6 +171,21 @@ TEST(DecorableTest, Alignment) {
     ASSERT_EQ(0U,
               reinterpret_cast<uintptr_t>(&d.getDecoration(secondInt)) %
                   std::alignment_of<int>::value);
+}
+
+
+class MyDecorable : public Decorable<MyDecorable> {};
+
+class ClassWithOwnerPtr {
+public:
+    ClassWithOwnerPtr(MyDecorable* decorable) : owner(decorable) {}
+    MyDecorable* owner;
+};
+
+TEST(DecorableTest, DecorationWithOwner) {
+    const auto get = MyDecorable::declareDecorationWithOwner<ClassWithOwnerPtr>();
+    MyDecorable decorable;
+    invariant(get(decorable).owner == &decorable);
 }
 
 }  // namespace

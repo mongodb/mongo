@@ -254,6 +254,7 @@ jsTestOptions = function() {
                 TestData.hasOwnProperty("skipValidationOnNamespaceNotFound")
                 ? TestData.skipValidationOnNamespaceNotFound
                 : true,
+            skipValidationNamespaces: TestData.skipValidationNamespaces || [],
             skipCheckingUUIDsConsistentAcrossCluster:
                 TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,

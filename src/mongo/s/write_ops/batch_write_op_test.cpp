@@ -42,30 +42,23 @@ namespace {
 void initTargeterFullRange(const NamespaceString& nss,
                            const ShardEndpoint& endpoint,
                            MockNSTargeter* targeter) {
-    std::vector<MockRange*> mockRanges;
-    mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << MAXKEY)));
-    targeter->init(mockRanges);
+    targeter->init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << MAXKEY))});
 }
 
 void initTargeterSplitRange(const NamespaceString& nss,
                             const ShardEndpoint& endpointA,
                             const ShardEndpoint& endpointB,
                             MockNSTargeter* targeter) {
-    std::vector<MockRange*> mockRanges;
-    mockRanges.push_back(new MockRange(endpointA, nss, BSON("x" << MINKEY), BSON("x" << 0)));
-    mockRanges.push_back(new MockRange(endpointB, nss, BSON("x" << 0), BSON("x" << MAXKEY)));
-    targeter->init(mockRanges);
+    targeter->init(nss,
+                   {MockRange(endpointA, BSON("x" << MINKEY), BSON("x" << 0)),
+                    MockRange(endpointB, BSON("x" << 0), BSON("x" << MAXKEY))});
 }
 
 void initTargeterHalfRange(const NamespaceString& nss,
                            const ShardEndpoint& endpoint,
                            MockNSTargeter* targeter) {
-    std::vector<MockRange*> mockRanges;
-    mockRanges.push_back(new MockRange(endpoint, nss, BSON("x" << MINKEY), BSON("x" << 0)));
-
-    // x >= 0 values untargetable
-
-    targeter->init(mockRanges);
+    // x >= 0 values are untargetable
+    targeter->init(nss, {MockRange(endpoint, BSON("x" << MINKEY), BSON("x" << 0))});
 }
 
 write_ops::DeleteOpEntry buildDelete(const BSONObj& query, bool multi) {

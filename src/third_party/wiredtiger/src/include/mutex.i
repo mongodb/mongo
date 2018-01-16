@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -304,12 +304,10 @@ __wt_spin_lock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 		stats[session->stat_bucket][t->stat_count_off]++;
 		if (F_ISSET(session, WT_SESSION_INTERNAL))
 			stats[session->stat_bucket][t->stat_int_usecs_off] +=
-			    (int64_t)WT_TSCDIFF_US(
-			    session, time_stop, time_start);
+			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
 		else
 			stats[session->stat_bucket][t->stat_app_usecs_off] +=
-			    (int64_t)WT_TSCDIFF_US(
-			    session, time_stop, time_start);
+			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
 	} else
 		__wt_spin_lock(session, t);
 }

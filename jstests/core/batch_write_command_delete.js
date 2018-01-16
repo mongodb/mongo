@@ -166,7 +166,7 @@ request = {
     ordered: true
 };
 result = coll.runCommand(request);
-assert.commandWorked(result);
+assert.commandWorkedIgnoringWriteErrors(result);
 assert.eq(1, result.n);
 assert(result.writeErrors != null);
 assert.eq(1, result.writeErrors.length);
@@ -187,7 +187,7 @@ request = {
     ordered: false
 };
 result = coll.runCommand(request);
-assert.commandWorked(result);
+assert.commandWorkedIgnoringWriteErrors(result);
 assert.eq(1, result.n);
 assert.eq(2, result.writeErrors.length);
 

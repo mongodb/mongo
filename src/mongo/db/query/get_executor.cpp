@@ -251,7 +251,6 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     invariant(canonicalQuery);
 
     unique_ptr<PlanStage> root;
-    unique_ptr<QuerySolution> querySolution;
 
     // This can happen as we're called by internal clients as well.
     if (NULL == collection) {
@@ -259,8 +258,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         LOG(2) << "Collection " << ns << " does not exist."
                << " Using EOF plan: " << redact(canonicalQuery->toStringShort());
         root = make_unique<EOFStage>(opCtx);
-        return PrepareExecutionResult(
-            std::move(canonicalQuery), std::move(querySolution), std::move(root));
+        return PrepareExecutionResult(std::move(canonicalQuery), nullptr, std::move(root));
     }
 
     // Fill out the planning params.  We use these for both cached solutions and non-cached.
@@ -324,8 +322,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
             root = make_unique<ProjectionStage>(opCtx, params, ws, root.release());
         }
 
-        return PrepareExecutionResult(
-            std::move(canonicalQuery), std::move(querySolution), std::move(root));
+        return PrepareExecutionResult(std::move(canonicalQuery), nullptr, std::move(root));
     }
 
     // Tailable: If the query requests tailable the collection must be capped.
@@ -343,16 +340,18 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
         collection->infoCache()->getPlanCache()->get(*canonicalQuery, &rawCS).isOK()) {
         // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
         unique_ptr<CachedSolution> cs(rawCS);
-        QuerySolution* qs;
-        Status status = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs, &qs);
+        auto statusWithQs = QueryPlanner::planFromCache(*canonicalQuery, plannerParams, *cs);
 
-        if (status.isOK()) {
-            if ((plannerParams.options & QueryPlannerParams::IS_COUNT) && turnIxscanIntoCount(qs)) {
+        if (statusWithQs.isOK()) {
+            auto querySolution = std::move(statusWithQs.getValue());
+            if ((plannerParams.options & QueryPlannerParams::IS_COUNT) &&
+                turnIxscanIntoCount(querySolution.get())) {
                 LOG(2) << "Using fast count: " << redact(canonicalQuery->toStringShort());
             }
 
             PlanStage* rawRoot;
-            verify(StageBuilder::build(opCtx, collection, *canonicalQuery, *qs, ws, &rawRoot));
+            verify(StageBuilder::build(
+                opCtx, collection, *canonicalQuery, *querySolution, ws, &rawRoot));
 
             // Add a CachedPlanStage on top of the previous root.
             //
@@ -365,7 +364,6 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                                                 plannerParams,
                                                 cs->decisionWorks,
                                                 rawRoot);
-            querySolution.reset(qs);
             return PrepareExecutionResult(
                 std::move(canonicalQuery), std::move(querySolution), std::move(root));
         }
@@ -377,17 +375,16 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
 
         root =
             make_unique<SubplanStage>(opCtx, collection, ws, plannerParams, canonicalQuery.get());
-        return PrepareExecutionResult(
-            std::move(canonicalQuery), std::move(querySolution), std::move(root));
+        return PrepareExecutionResult(std::move(canonicalQuery), nullptr, std::move(root));
     }
 
-    vector<QuerySolution*> solutions;
-    Status status = QueryPlanner::plan(*canonicalQuery, plannerParams, &solutions);
-    if (!status.isOK()) {
+    auto statusWithSolutions = QueryPlanner::plan(*canonicalQuery, plannerParams);
+    if (!statusWithSolutions.isOK()) {
         return Status(ErrorCodes::BadValue,
                       "error processing query: " + canonicalQuery->toString() +
-                          " planner returned error: " + status.reason());
+                          " planner returned error: " + statusWithSolutions.getStatus().reason());
     }
+    auto solutions = std::move(statusWithSolutions.getValue());
 
     // We cannot figure out how to answer the query.  Perhaps it requires an index
     // we do not have?
@@ -400,14 +397,7 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
     // See if one of our solutions is a fast count hack in disguise.
     if (plannerParams.options & QueryPlannerParams::IS_COUNT) {
         for (size_t i = 0; i < solutions.size(); ++i) {
-            if (turnIxscanIntoCount(solutions[i])) {
-                // Great, we can use solutions[i].  Clean up the other QuerySolution(s).
-                for (size_t j = 0; j < solutions.size(); ++j) {
-                    if (j != i) {
-                        delete solutions[j];
-                    }
-                }
-
+            if (turnIxscanIntoCount(solutions[i].get())) {
                 // We're not going to cache anything that's fast count.
                 PlanStage* rawRoot;
                 verify(StageBuilder::build(
@@ -417,9 +407,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                 LOG(2) << "Using fast count: " << redact(canonicalQuery->toStringShort())
                        << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
 
-                querySolution.reset(solutions[i]);
                 return PrepareExecutionResult(
-                    std::move(canonicalQuery), std::move(querySolution), std::move(root));
+                    std::move(canonicalQuery), std::move(solutions[i]), std::move(root));
             }
         }
     }
@@ -435,9 +424,8 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
                << redact(canonicalQuery->toStringShort())
                << ", planSummary: " << redact(Explain::getPlanSummary(root.get()));
 
-        querySolution.reset(solutions[0]);
         return PrepareExecutionResult(
-            std::move(canonicalQuery), std::move(querySolution), std::move(root));
+            std::move(canonicalQuery), std::move(solutions[0]), std::move(root));
     } else {
         // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
         // and so on. The working set will be shared by all candidate plans.
@@ -453,13 +441,12 @@ StatusWith<PrepareExecutionResult> prepareExecution(OperationContext* opCtx,
             verify(StageBuilder::build(
                 opCtx, collection, *canonicalQuery, *solutions[ix], ws, &nextPlanRoot));
 
-            // Owns none of the arguments
-            multiPlanStage->addPlan(solutions[ix], nextPlanRoot, ws);
+            // Takes ownership of 'nextPlanRoot'.
+            multiPlanStage->addPlan(std::move(solutions[ix]), nextPlanRoot, ws);
         }
 
         root = std::move(multiPlanStage);
-        return PrepareExecutionResult(
-            std::move(canonicalQuery), std::move(querySolution), std::move(root));
+        return PrepareExecutionResult(std::move(canonicalQuery), nullptr, std::move(root));
     }
 }
 
@@ -1577,8 +1564,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
 
         QueryPlannerParams params;
 
-        unique_ptr<QuerySolution> soln(
-            QueryPlannerAnalysis::analyzeDataAccess(*cq, params, std::move(solnRoot)));
+        auto soln = QueryPlannerAnalysis::analyzeDataAccess(*cq, params, std::move(solnRoot));
         invariant(soln);
 
         unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
@@ -1599,25 +1585,18 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     }
 
     // See if we can answer the query in a fast-distinct compatible fashion.
-    vector<QuerySolution*> solutions;
-    Status status = QueryPlanner::plan(*cq, plannerParams, &solutions);
-    if (!status.isOK()) {
+    auto statusWithSolutions = QueryPlanner::plan(*cq, plannerParams);
+    if (!statusWithSolutions.isOK()) {
         return getExecutor(opCtx, collection, std::move(cq), yieldPolicy);
     }
+    auto solutions = std::move(statusWithSolutions.getValue());
 
     // We look for a solution that has an ixscan we can turn into a distinctixscan
     for (size_t i = 0; i < solutions.size(); ++i) {
-        if (turnIxscanIntoDistinctIxscan(solutions[i], parsedDistinct->getKey())) {
-            // Great, we can use solutions[i].  Clean up the other QuerySolution(s).
-            for (size_t j = 0; j < solutions.size(); ++j) {
-                if (j != i) {
-                    delete solutions[j];
-                }
-            }
-
+        if (turnIxscanIntoDistinctIxscan(solutions[i].get(), parsedDistinct->getKey())) {
             // Build and return the SSR over solutions[i].
             unique_ptr<WorkingSet> ws = make_unique<WorkingSet>();
-            unique_ptr<QuerySolution> currentSolution(solutions[i]);
+            unique_ptr<QuerySolution> currentSolution = std::move(solutions[i]);
             PlanStage* rawRoot;
             verify(
                 StageBuilder::build(opCtx, collection, *cq, *currentSolution, ws.get(), &rawRoot));
@@ -1637,12 +1616,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
     }
 
     // If we're here, the planner made a soln with the restricted index set but we couldn't
-    // translate any of them into a distinct-compatible soln.  So, delete the solutions and just
-    // go through normal planning.
-    for (size_t i = 0; i < solutions.size(); ++i) {
-        delete solutions[i];
-    }
-
+    // translate any of them into a distinct-compatible soln. Just go through normal planning.
     return getExecutor(opCtx, collection, parsedDistinct->releaseQuery(), yieldPolicy);
 }
 

@@ -1,5 +1,6 @@
 /**
  * This test checks that authentication restrictions can be set and respected.
+ * @tags: [requires_sharding, requires_replication]
  */
 
 (function() {

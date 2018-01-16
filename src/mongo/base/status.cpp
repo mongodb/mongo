@@ -25,7 +25,11 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kControl
+
 #include "mongo/base/status.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 #include <ostream>
@@ -33,28 +37,69 @@
 
 namespace mongo {
 
-Status::ErrorInfo::ErrorInfo(ErrorCodes::Error aCode, std::string aReason)
-    : code(aCode), reason(std::move(aReason)) {}
+Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code,
+                             StringData reason,
+                             std::shared_ptr<const ErrorExtraInfo> extra)
+    : code(code), reason(reason.toString()), extra(std::move(extra)) {}
 
-Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error c, std::string r) {
-    if (c == ErrorCodes::OK)
+Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error code,
+                                             StringData reason,
+                                             std::shared_ptr<const ErrorExtraInfo> extra) {
+    if (code == ErrorCodes::OK)
         return nullptr;
-    return new ErrorInfo(c, std::move(r));
+    if (extra) {
+        // The public API prevents getting in to this state.
+        invariant(ErrorCodes::shouldHaveExtraInfo(code));
+    } else if (ErrorCodes::shouldHaveExtraInfo(code)) {
+        // This is possible if code calls a 2-argument Status constructor with a code that should
+        // have extra info.
+        if (kDebugBuild) {
+            // Make it easier to find this issue by fatally failing in debug builds.
+            severe() << "Code " << code << " is supposed to have extra info";
+            fassertFailed(40680);
+        }
+
+        // In release builds, replace the error code. This maintains the invariant that all Statuses
+        // for a code that is supposed to hold extra info hold correctly-typed extra info, without
+        // crashing the server.
+        return new ErrorInfo{ErrorCodes::Error(40671),
+                             str::stream() << "Missing required extra info for error code " << code,
+                             std::move(extra)};
+    }
+    return new ErrorInfo{code, reason, std::move(extra)};
 }
 
-Status::Status(ErrorCodes::Error code, std::string reason)
-    : _error(ErrorInfo::create(code, std::move(reason))) {
+
+Status::Status(ErrorCodes::Error code,
+               StringData reason,
+               std::shared_ptr<const ErrorExtraInfo> extra)
+    : _error(ErrorInfo::create(code, reason, std::move(extra))) {
     ref(_error);
 }
 
-Status::Status(ErrorCodes::Error code, const char* reason) : Status(code, std::string(reason)) {}
-Status::Status(ErrorCodes::Error code, StringData reason) : Status(code, reason.toString()) {}
+Status::Status(ErrorCodes::Error code, const std::string& reason) : Status(code, reason, nullptr) {}
+Status::Status(ErrorCodes::Error code, const char* reason)
+    : Status(code, StringData(reason), nullptr) {}
+Status::Status(ErrorCodes::Error code, StringData reason) : Status(code, reason, nullptr) {}
+
+Status::Status(ErrorCodes::Error code, StringData reason, const BSONObj& extraInfoHolder)
+    : Status(OK()) {
+    if (auto parser = ErrorExtraInfo::parserFor(code)) {
+        try {
+            *this = Status(code, reason, parser(extraInfoHolder));
+        } catch (const DBException& ex) {
+            *this = ex.toStatus(str::stream() << "Error parsing extra info for " << code);
+        }
+    } else {
+        *this = Status(code, reason);
+    }
+}
 
 Status::Status(ErrorCodes::Error code, const mongoutils::str::stream& reason)
     : Status(code, std::string(reason)) {}
 
 Status Status::withContext(StringData reasonPrefix) const {
-    return isOK() ? Status::OK() : Status(code(), reasonPrefix + causedBy(reason()));
+    return isOK() ? OK() : Status(code(), reasonPrefix + causedBy(reason()), _error->extra);
 }
 
 std::ostream& operator<<(std::ostream& os, const Status& status) {
@@ -62,10 +107,26 @@ std::ostream& operator<<(std::ostream& os, const Status& status) {
 }
 
 std::string Status::toString() const {
-    std::ostringstream ss;
+    StringBuilder ss;
     ss << codeString();
-    if (!isOK())
+    if (!isOK()) {
+        try {
+            if (auto extra = extraInfo()) {
+                BSONObjBuilder bob;
+                extra->serialize(&bob);
+                ss << bob.obj();
+            }
+        } catch (const DBException&) {
+            // This really shouldn't happen but it would be really annoying if it broke error
+            // logging in production.
+            if (kDebugBuild) {
+                severe() << "Error serializing extra info for " << code()
+                         << " in Status::toString()";
+                std::terminate();
+            }
+        }
         ss << ": " << reason();
+    }
     return ss.str();
 }
 

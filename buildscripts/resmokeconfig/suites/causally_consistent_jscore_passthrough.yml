@@ -142,6 +142,11 @@ selector:
   - jstests/core/rename7.js
   # getMore is not causally consistent if collection is dropped
   - jstests/core/drop3.js
+  # The following tests fail because of divergent dropCollection behavior between standalones and
+  # sharded clusters. These tests expect a second drop command to error, whereas in sharded clusters
+  # we expect a second drop to return status OK.
+  - jstests/core/drop.js
+  - jstests/core/explain_upsert.js
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
 
@@ -182,5 +187,10 @@ executor:
           tracking: 0
         numInitialSyncAttempts: 1
     num_rs_nodes_per_shard: 2
+    # TODO SERVER-32572 remove voting_secondaries: true
+    shard_options:
+      voting_secondaries: true
+    configsvr_options:
+      voting_secondaries: true
     enable_sharding:
     - test

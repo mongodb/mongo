@@ -91,12 +91,16 @@ public:
         const std::string& dbName,
         repl::ReadConcernLevel readConcernLevel) override;
 
-    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(OperationContext* opCtx,
-                                                               const std::string& collNs) override;
+    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
+        OperationContext* opCtx,
+        const std::string& collNs,
+        repl::ReadConcernLevel readConcernLevel) override;
 
-    StatusWith<std::vector<CollectionType>> getCollections(OperationContext* opCtx,
-                                                           const std::string* dbName,
-                                                           repl::OpTime* optime) override;
+    StatusWith<std::vector<CollectionType>> getCollections(
+        OperationContext* opCtx,
+        const std::string* dbName,
+        repl::OpTime* optime,
+        repl::ReadConcernLevel readConcernLevel) override;
 
     Status dropCollection(OperationContext* opCtx, const NamespaceString& ns) override;
 

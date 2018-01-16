@@ -255,6 +255,21 @@ public:
      */
     void generateUUIDsForExistingShardedCollections(OperationContext* opCtx);
 
+
+    /**
+     * Returns the set of collections for the specified database, which have been marked as sharded.
+     * Goes directly to the config server's metadata, without checking the local cache so it should
+     * not be used in frequently called code paths.
+     *
+     * Throws exception on errors.
+     *
+     * TODO SERVER-32366: Make this an anonymous helper function in
+     * sharding_catalog_manager_database_operations.cpp since it will no longer need to be
+     * called outside of the ShardingCatalogManager.
+     */
+    std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
+                                                               StringData dbName);
+
     //
     // Shard Operations
     //

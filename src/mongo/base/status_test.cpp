@@ -33,6 +33,9 @@
 #include <boost/exception/exception.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/config.h"
+#include "mongo/db/json.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -263,6 +266,55 @@ TEST(Transformers, ExceptionToStatus) {
     ASSERT_EQUALS(fromBoostExcept, ErrorCodes::UnknownError);
     // Reason should include that it was a boost::exception
     ASSERT_TRUE(fromBoostExcept.reason().find("boost::exception") != std::string::npos);
+}
+
+// TODO enable this once the next ErrorExtraInfo subclass is registered
+#if false
+DEATH_TEST(ErrorExtraInfo, InvariantAllRegistered, "Invariant failure parser_for::") {
+    ErrorExtraInfo::invariantHaveAllParsers();
+}
+#else
+TEST(ErrorExtraInfo, MakeSureInvariantAllRegisteredGetsEnabled) {
+    // This will be the first "real" use of ErrorExtraInfo, and it won't be linked into this test.
+    // This just exists to ensure that once that work is done, the above test gets enabled.
+    invariant(
+        !ErrorCodes::shouldHaveExtraInfo(ErrorCodes::CommandOnShardedViewNotSupportedOnMongod));
+}
+#endif
+
+#ifdef MONGO_CONFIG_DEBUG_BUILD
+DEATH_TEST(ErrorExtraInfo, DassertShouldHaveExtraInfo, "Fatal Assertion 40680") {
+    Status(ErrorCodes::ForTestingErrorExtraInfo, "");
+}
+#else
+TEST(ErrorExtraInfo, ConvertCodeOnMissingExtraInfo) {
+    auto status = Status(ErrorCodes::ForTestingErrorExtraInfo, "");
+    ASSERT_EQ(status, ErrorCodes::duplicateCodeForTest(40671));
+}
+#endif
+
+TEST(ErrorExtraInfo, TypedConstructorWorks) {
+    const auto status = Status(ErrorExtraInfoExample(123), "");
+    ASSERT_EQ(status, ErrorCodes::ForTestingErrorExtraInfo);
+    ASSERT(status.extraInfo());
+    ASSERT(status.extraInfo<ErrorExtraInfoExample>());
+    ASSERT_EQ(status.extraInfo<ErrorExtraInfoExample>()->data, 123);
+}
+
+TEST(ErrorExtraInfo, StatusWhenParserThrows) {
+    auto status = Status(ErrorCodes::ForTestingErrorExtraInfo, "", fromjson("{data: 123}"));
+    ASSERT_EQ(status, ErrorCodes::duplicateCodeForTest(40681));
+    ASSERT(!status.extraInfo());
+    ASSERT(!status.extraInfo<ErrorExtraInfoExample>());
+}
+
+TEST(ErrorExtraInfo, StatusParserWorks) {
+    ErrorExtraInfoExample::EnableParserForTest whenInScope;
+    auto status = Status(ErrorCodes::ForTestingErrorExtraInfo, "", fromjson("{data: 123}"));
+    ASSERT_EQ(status, ErrorCodes::ForTestingErrorExtraInfo);
+    ASSERT(status.extraInfo());
+    ASSERT(status.extraInfo<ErrorExtraInfoExample>());
+    ASSERT_EQ(status.extraInfo<ErrorExtraInfoExample>()->data, 123);
 }
 
 }  // namespace

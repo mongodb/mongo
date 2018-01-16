@@ -6,8 +6,8 @@ function runAllUserManagementCommandsTests(conn, writeConcern) {
     'use strict';
 
     var hasAuthzError = function(result) {
-        assert(result.hasWriteError());
-        assert.eq(ErrorCodes.Unauthorized, result.getWriteError().code);
+        assert(result instanceof WriteCommandError);
+        assert.eq(ErrorCodes.Unauthorized, result.code);
     };
 
     conn.getDB('admin').createUser({user: 'admin', pwd: 'pwd', roles: ['root']}, writeConcern);

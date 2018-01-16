@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -104,7 +104,8 @@ __wt_cursor_modify_notsup(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 	if (cursor->value_format != NULL && strlen(cursor->value_format) != 0) {
 		session = (WT_SESSION_IMPL *)cursor->session;
 		WT_RET_MSG(session, ENOTSUP,
-		    "WT_CURSOR.modify only supported for 'u' value formats");
+		    "WT_CURSOR.modify only supported for 'S' and 'u' value "
+		    "formats");
 	}
 	return (__wt_cursor_notsup(cursor));
 }
@@ -633,8 +634,7 @@ __cursor_modify(WT_CURSOR *cursor, WT_MODIFY *entries, int nentries)
 
 	/* Get the current value, apply the modifications. */
 	WT_ERR(cursor->search(cursor));
-	WT_ERR(__wt_modify_apply_api(
-	    session, &cursor->value, entries, nentries));
+	WT_ERR(__wt_modify_apply_api(session, cursor, entries, nentries));
 
 	/* We know both key and value are set, "overwrite" doesn't matter. */
 	ret = cursor->update(cursor);
@@ -821,10 +821,11 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		F_SET(cursor, WT_CURSTD_RAW);
 
 	/*
-	 * WT_CURSOR.modify supported on 'u' value formats, but may have been
-	 * already initialized (file cursors have a faster implementation).
+	 * WT_CURSOR.modify supported on 'S' and 'u' value formats, but may have
+	 * been already initialized (file cursors have a faster implementation).
 	 */
-	if (WT_STREQ(cursor->value_format, "u") &&
+	if ((WT_STREQ(cursor->value_format, "S") ||
+	    WT_STREQ(cursor->value_format, "u")) &&
 	    cursor->modify == __wt_cursor_modify_notsup)
 		cursor->modify = __cursor_modify;
 

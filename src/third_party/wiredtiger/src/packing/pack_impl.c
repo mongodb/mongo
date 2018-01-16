@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -25,9 +25,7 @@ __wt_struct_check(WT_SESSION_IMPL *session,
 	WT_RET(__pack_initn(session, &pack, fmt, len));
 	for (fields = 0; (ret = __pack_next(&pack, &pv)) == 0; fields++)
 		;
-
-	if (ret != WT_NOTFOUND)
-		return (ret);
+	WT_RET_NOTFOUND_OK(ret);
 
 	if (fixedp != NULL && fixed_lenp != NULL) {
 		if (fields == 0) {
@@ -58,13 +56,13 @@ __wt_struct_confchk(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *v)
  *	Calculate the size of a packed byte string.
  */
 int
-__wt_struct_size(WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, ...)
+__wt_struct_size(WT_SESSION_IMPL *session, size_t *lenp, const char *fmt, ...)
 {
 	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	ret = __wt_struct_sizev(session, sizep, fmt, ap);
+	ret = __wt_struct_sizev(session, lenp, fmt, ap);
 	va_end(ap);
 
 	return (ret);
@@ -76,13 +74,13 @@ __wt_struct_size(WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, ...)
  */
 int
 __wt_struct_pack(WT_SESSION_IMPL *session,
-    void *buffer, size_t size, const char *fmt, ...)
+    void *buffer, size_t len, const char *fmt, ...)
 {
 	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	ret = __wt_struct_packv(session, buffer, size, fmt, ap);
+	ret = __wt_struct_packv(session, buffer, len, fmt, ap);
 	va_end(ap);
 
 	return (ret);
@@ -94,13 +92,13 @@ __wt_struct_pack(WT_SESSION_IMPL *session,
  */
 int
 __wt_struct_unpack(WT_SESSION_IMPL *session,
-    const void *buffer, size_t size, const char *fmt, ...)
+    const void *buffer, size_t len, const char *fmt, ...)
 {
 	WT_DECL_RET;
 	va_list ap;
 
 	va_start(ap, fmt);
-	ret = __wt_struct_unpackv(session, buffer, size, fmt, ap);
+	ret = __wt_struct_unpackv(session, buffer, len, fmt, ap);
 	va_end(ap);
 
 	return (ret);

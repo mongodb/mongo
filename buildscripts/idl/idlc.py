@@ -51,6 +51,11 @@ def main():
         action='store_true',
         help='only print out a list of dependent imports')
 
+    parser.add_argument(
+        '--target_arch',
+        type=str,
+        help="IDL target archiecture (amd64, s390x). defaults to current machine")
+
     args = parser.parse_args()
 
     if args.verbose:
@@ -60,6 +65,7 @@ def main():
 
     compiler_args.input_file = args.file
     compiler_args.import_directories = args.include
+    compiler_args.target_arch = args.target_arch
 
     compiler_args.output_source = args.output
     compiler_args.output_header = args.header

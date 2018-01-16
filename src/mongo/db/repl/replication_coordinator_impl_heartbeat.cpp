@@ -39,7 +39,6 @@
 #include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
-#include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
@@ -403,6 +402,14 @@ void ReplicationCoordinatorImpl::_stepDownFinish(
 
     _topCoord->finishUnconditionalStepDown();
     const auto action = _updateMemberStateFromTopologyCoordinator_inlock(opCtx.get());
+    if (_pendingTermUpdateDuringStepDown) {
+        TopologyCoordinator::UpdateTermResult result;
+        _updateTerm_inlock(*_pendingTermUpdateDuringStepDown, &result);
+        // We've just stepped down due to the "term", so it's impossible to step down again
+        // for the same term.
+        invariant(result != TopologyCoordinator::UpdateTermResult::kTriggerStepDown);
+        _pendingTermUpdateDuringStepDown = boost::none;
+    }
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
     _replExecutor->signalEvent(finishedEvent);

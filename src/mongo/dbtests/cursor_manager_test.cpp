@@ -259,19 +259,53 @@ TEST_F(CursorManagerTest, InvalidatePinnedCursor) {
 }
 
 /**
- * Test that an attempt to kill a pinned cursor fails and produces an appropriate assertion.
+ * Test that an attempt to kill a pinned cursor succeeds.
  */
-TEST_F(CursorManagerTest, ShouldNotBeAbleToKillPinnedCursor) {
+TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursor) {
     CursorManager* cursorManager = useCursorManager();
+    const bool shouldAudit = false;
+    OperationContext* const pinningOpCtx = _opCtx.get();
 
     auto cursorPin = cursorManager->registerCursor(
-        _opCtx.get(), {makeFakePlanExecutor(), kTestNss, {}, false, BSONObj()});
+        pinningOpCtx, {makeFakePlanExecutor(), kTestNss, {}, false, BSONObj()});
+
+    auto cursorId = cursorPin.getCursor()->cursorid();
+    ASSERT_OK(cursorManager->killCursor(_opCtx.get(), cursorId, shouldAudit));
+
+    // The original operation should have been interrupted since the cursor was pinned.
+    ASSERT_EQ(pinningOpCtx->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
+}
+
+/**
+ * Test that an attempt to kill a pinned cursor succeeds with more than one client.
+ */
+TEST_F(CursorManagerTest, ShouldBeAbleToKillPinnedCursorMultiClient) {
+    CursorManager* cursorManager = useCursorManager();
+    const bool shouldAudit = false;
+    OperationContext* const pinningOpCtx = _opCtx.get();
+
+    // Pin the cursor from one client.
+    auto cursorPin = cursorManager->registerCursor(
+        pinningOpCtx, {makeFakePlanExecutor(), kTestNss, {}, false, BSONObj()});
 
     auto cursorId = cursorPin.getCursor()->cursorid();
 
-    const bool shouldAudit = false;
-    ASSERT_EQ(cursorManager->eraseCursor(_opCtx.get(), cursorId, shouldAudit),
-              ErrorCodes::OperationFailed);
+    // Set up another client to kill the cursor.
+    auto killCursorClientOwned = getGlobalServiceContext()->makeClient("killCursorClient");
+    // Keep around a raw pointer for when we transfer ownership of killingClientOwned to the global
+    // current client.
+    Client* killCursorClient = killCursorClientOwned.get();
+
+    // Need to swap the current client in order to make an operation context.
+    auto pinningClient = Client::releaseCurrent();
+    Client::setCurrent(std::move(killCursorClientOwned));
+
+    auto killCursorOpCtx = killCursorClient->makeOperationContext();
+    invariant(killCursorOpCtx);
+    ASSERT_OK(cursorManager->killCursor(killCursorOpCtx.get(), cursorId, shouldAudit));
+
+    // The original operation should have been interrupted since the cursor was pinned.
+    ASSERT_EQ(pinningOpCtx->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
 }
 
 /**
@@ -488,7 +522,7 @@ TEST_F(CursorManagerTestCustomOpCtx, OneCursorWithASession) {
 
     // Remove the cursor from the manager.
     pinned.release();
-    ASSERT_OK(useCursorManager()->eraseCursor(opCtx.get(), cursorId, false));
+    ASSERT_OK(useCursorManager()->killCursor(opCtx.get(), cursorId, false));
 
     // There should be no more cursor entries by session id.
     LogicalSessionIdSet sessions;
@@ -524,7 +558,7 @@ TEST_F(CursorManagerTestCustomOpCtx, MultipleCursorsWithSameSession) {
 
     // Remove one cursor from the manager.
     pinned.release();
-    ASSERT_OK(useCursorManager()->eraseCursor(opCtx.get(), cursorId1, false));
+    ASSERT_OK(useCursorManager()->killCursor(opCtx.get(), cursorId1, false));
 
     // Should still be able to retrieve the session.
     lsids.clear();

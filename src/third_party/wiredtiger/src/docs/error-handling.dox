@@ -87,10 +87,11 @@ standard API.
 Note that ::wiredtiger_strerror is not thread-safe.
 
 @m_if{c}
-@section error_handling_event Error handling using the WT_EVENT_HANDLER
+@section event_message_handling Message handling using the WT_EVENT_HANDLER
 
-Specific error handling can be configured by passing an implementation
-of WT_EVENT_HANDLER to ::wiredtiger_open or WT_CONNECTION::open_session.
+Specific error and other message handling can be configured by passing an
+implementation of WT_EVENT_HANDLER to ::wiredtiger_open or
+WT_CONNECTION::open_session.
 
 For example, both informational and error messages might be passed to an
 application-specific logging function that added a timestamp and logged

@@ -204,8 +204,10 @@ void _dateToCtimeString(Date_t date, DateStringBuffer* result) {
     ctime_r(&t, result->data);
 #endif
     char* milliSecStr = result->data + ctimeSubstrLen;
-    snprintf(
-        milliSecStr, millisSubstrLen + 1, ".%03d", static_cast<int32_t>(date.asInt64() % 1000));
+    snprintf(milliSecStr,
+             millisSubstrLen + 1,
+             ".%03u",
+             static_cast<unsigned>(date.toMillisSinceEpoch() % 1000));
     result->size = ctimeSubstrLen + millisSubstrLen;
 }
 }  // namespace

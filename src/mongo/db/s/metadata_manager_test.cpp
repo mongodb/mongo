@@ -114,7 +114,8 @@ protected:
         invariant(!rangeMapOverlaps(metadata.getChunks(), minKey, maxKey));
 
         auto cm = metadata.getChunkManager();
-        auto chunkToSplit = cm->findIntersectingChunkWithSimpleCollation(minKey);
+
+        const auto chunkToSplit = cm->findIntersectingChunkWithSimpleCollation(minKey);
         ASSERT(SimpleBSONObjComparator::kInstance.evaluate(maxKey <= chunkToSplit->getMax()))
             << "maxKey == " << maxKey
             << " and chunkToSplit->getMax() == " << chunkToSplit->getMax();

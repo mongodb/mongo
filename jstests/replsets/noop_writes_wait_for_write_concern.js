@@ -190,7 +190,7 @@
             assert.writeOK(coll.insert({_id: 1}));
         },
         confirmFunc: function(res) {
-            assert.commandWorked(res);
+            assert.commandWorkedIgnoringWriteErrors(res);
             assert.eq(res.n, 0);
             assert.eq(res.writeErrors[0].code, ErrorCodes.DuplicateKey);
             assert.eq(coll.count({_id: 1}), 1);

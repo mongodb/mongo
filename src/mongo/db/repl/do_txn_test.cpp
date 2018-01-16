@@ -136,11 +136,10 @@ Status getStatusFromDoTxnResult(const BSONObj& result) {
 
 TEST_F(DoTxnTest, AtomicDoTxnWithNoOpsReturnsSuccess) {
     auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
     BSONObjBuilder resultBuilder;
     auto cmdObj = BSON("doTxn" << BSONArray());
     auto expectedCmdObj = BSON("applyOps" << BSONArray());
-    ASSERT_OK(doTxn(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+    ASSERT_OK(doTxn(opCtx.get(), "test", cmdObj, &resultBuilder));
     ASSERT_BSONOBJ_EQ(expectedCmdObj, _opObserver->onApplyOpsCmdObj);
 }
 
@@ -185,13 +184,11 @@ BSONObj makeApplyOpsWithInsertOperation(const NamespaceString& nss,
 
 TEST_F(DoTxnTest, AtomicDoTxnInsertIntoNonexistentCollectionReturnsNamespaceNotFoundInResult) {
     auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
     NamespaceString nss("test.t");
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeDoTxnWithInsertOperation(nss, boost::none, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_EQUALS(ErrorCodes::UnknownError,
-                  doTxn(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+    ASSERT_EQUALS(ErrorCodes::UnknownError, doTxn(opCtx.get(), "test", cmdObj, &resultBuilder));
     auto result = resultBuilder.obj();
     auto status = getStatusFromDoTxnResult(result);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
@@ -199,7 +196,6 @@ TEST_F(DoTxnTest, AtomicDoTxnInsertIntoNonexistentCollectionReturnsNamespaceNotF
 
 TEST_F(DoTxnTest, AtomicDoTxnInsertIntoCollectionWithoutUuid) {
     auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
     NamespaceString nss("test.t");
 
     // Collection has no uuid.
@@ -210,13 +206,12 @@ TEST_F(DoTxnTest, AtomicDoTxnInsertIntoCollectionWithoutUuid) {
     auto cmdObj = makeDoTxnWithInsertOperation(nss, boost::none, documentToInsert);
     auto expectedCmdObj = makeApplyOpsWithInsertOperation(nss, boost::none, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_OK(doTxn(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+    ASSERT_OK(doTxn(opCtx.get(), "test", cmdObj, &resultBuilder));
     ASSERT_BSONOBJ_EQ(expectedCmdObj, _opObserver->onApplyOpsCmdObj);
 }
 
 TEST_F(DoTxnTest, AtomicDoTxnInsertWithUuidIntoCollectionWithUuid) {
     auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
     NamespaceString nss("test.t");
 
     auto uuid = UUID::gen();
@@ -229,13 +224,12 @@ TEST_F(DoTxnTest, AtomicDoTxnInsertWithUuidIntoCollectionWithUuid) {
     auto cmdObj = makeDoTxnWithInsertOperation(nss, uuid, documentToInsert);
     auto expectedCmdObj = makeApplyOpsWithInsertOperation(nss, uuid, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_OK(doTxn(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+    ASSERT_OK(doTxn(opCtx.get(), "test", cmdObj, &resultBuilder));
     ASSERT_BSONOBJ_EQ(expectedCmdObj, _opObserver->onApplyOpsCmdObj);
 }
 
 TEST_F(DoTxnTest, AtomicDoTxnInsertWithUuidIntoCollectionWithoutUuid) {
     auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
     NamespaceString nss("test.t");
 
     auto uuid = UUID::gen();
@@ -249,8 +243,7 @@ TEST_F(DoTxnTest, AtomicDoTxnInsertWithUuidIntoCollectionWithoutUuid) {
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeDoTxnWithInsertOperation(nss, uuid, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_EQUALS(ErrorCodes::UnknownError,
-                  doTxn(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+    ASSERT_EQUALS(ErrorCodes::UnknownError, doTxn(opCtx.get(), "test", cmdObj, &resultBuilder));
     auto result = resultBuilder.obj();
     auto status = getStatusFromDoTxnResult(result);
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
@@ -258,7 +251,6 @@ TEST_F(DoTxnTest, AtomicDoTxnInsertWithUuidIntoCollectionWithoutUuid) {
 
 TEST_F(DoTxnTest, AtomicDoTxnInsertWithoutUuidIntoCollectionWithUuid) {
     auto opCtx = cc().makeOperationContext();
-    auto mode = OplogApplication::Mode::kApplyOpsCmd;
     NamespaceString nss("test.t");
 
     auto uuid = UUID::gen();
@@ -270,57 +262,12 @@ TEST_F(DoTxnTest, AtomicDoTxnInsertWithoutUuidIntoCollectionWithUuid) {
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeDoTxnWithInsertOperation(nss, boost::none, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_OK(doTxn(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
+    ASSERT_OK(doTxn(opCtx.get(), "test", cmdObj, &resultBuilder));
 
     // Insert operation provided by caller did not contain collection uuid but doTxn() should add
     // the uuid to the oplog entry.
     auto expectedCmdObj = makeApplyOpsWithInsertOperation(nss, uuid, documentToInsert);
     ASSERT_BSONOBJ_EQ(expectedCmdObj, _opObserver->onApplyOpsCmdObj);
-}
-
-TEST_F(DoTxnTest, DoTxnPropagatesOplogApplicationMode) {
-    auto opCtx = cc().makeOperationContext();
-
-    // Increase log component verbosity to check for op application messages.
-    logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogComponent::kReplication,
-                                                        logger::LogSeverity::Debug(3));
-
-    // Test that the 'doTxn' function passes the oplog application mode through correctly to the
-    // underlying op application functions.
-    NamespaceString nss("test.coll");
-    auto uuid = UUID::gen();
-
-    // Create a collection for us to insert documents into.
-    CollectionOptions collectionOptions;
-    collectionOptions.uuid = uuid;
-    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, collectionOptions));
-
-    BSONObjBuilder resultBuilder;
-
-    // Make sure the oplog application mode is passed through via 'doTxn' correctly.
-    startCapturingLogMessages();
-
-    auto docToInsert0 = BSON("_id" << 0);
-    auto cmdObj = makeDoTxnWithInsertOperation(nss, uuid, docToInsert0);
-
-    ASSERT_OK(doTxn(opCtx.get(),
-                    nss.coll().toString(),
-                    cmdObj,
-                    OplogApplication::Mode::kInitialSync,
-                    &resultBuilder));
-    ASSERT_EQUALS(1, countLogLinesContaining("oplog application mode: InitialSync"));
-
-    auto docToInsert1 = BSON("_id" << 1);
-    cmdObj = makeDoTxnWithInsertOperation(nss, uuid, docToInsert1);
-
-    ASSERT_OK(doTxn(opCtx.get(),
-                    nss.coll().toString(),
-                    cmdObj,
-                    OplogApplication::Mode::kSecondary,
-                    &resultBuilder));
-    ASSERT_EQUALS(1, countLogLinesContaining("oplog application mode: Secondary"));
-
-    stopCapturingLogMessages();
 }
 
 }  // namespace

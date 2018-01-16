@@ -87,16 +87,15 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
         last = ret;
     }
 
-    if (!opts.sharded) {
-        last = last.map(function(x) {
-            return x.obj;
-        });
+    last = last.map(function(x) {
+        return x.obj;
+    });
 
-        var query = {loc: {}};
-        query.loc[opts.sphere ? '$nearSphere' : '$near'] = pt;
-        var near = this.t.find(query).limit(opts.nToTest).toArray();
+    var query = {loc: {}};
+    query.loc[opts.sphere ? '$nearSphere' : '$near'] = pt;
+    var near = this.t.find(query).limit(opts.nToTest).toArray();
 
-        this.assertIsPrefix(last, near);
-        assert.eq(last, near);
-    }
+    // Test that a query using $near/$nearSphere with a limit of 'nToTest' returns the same points
+    // (in order) as the geoNear command with num=nToTest.
+    assert.eq(last, near);
 };

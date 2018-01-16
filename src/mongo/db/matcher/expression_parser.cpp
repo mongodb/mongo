@@ -1410,6 +1410,8 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                         const ExtensionsCallback* extensionsCallback,
                                         MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                                         DocumentParseLevel currentLevel) {
+    invariant(e);
+
     if ("$eq"_sd == e.fieldNameStringData()) {
         return parseComparison(
             name, stdx::make_unique<EqualityMatchExpression>(name, e), e, expCtx, allowedFeatures);
@@ -1566,6 +1568,13 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                            str::stream() << "near must be first in: " << context)};
 
         case PathAcceptingKeyword::INTERNAL_EXPR_EQ: {
+            if (e.type() == BSONType::Undefined || e.type() == BSONType::Array) {
+                return {Status(ErrorCodes::BadValue,
+                               str::stream() << InternalExprEqMatchExpression::kName
+                                             << " cannot be used to compare to type: "
+                                             << typeName(e.type()))};
+            }
+
             auto exprEqExpr = stdx::make_unique<InternalExprEqMatchExpression>(name, e);
             exprEqExpr->setCollator(expCtx->getCollator());
             return {std::move(exprEqExpr)};
@@ -1652,7 +1661,7 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                   << " must be an array");
             }
             auto elemMatchObj = e.embeddedObject();
-            auto iter = elemMatchObj.begin();
+            auto iter = BSONObjIterator(elemMatchObj);
             if (!iter.more()) {
                 return Status(ErrorCodes::FailedToParse,
                               str::stream()

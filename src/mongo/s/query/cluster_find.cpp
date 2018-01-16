@@ -44,6 +44,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/getmore_request.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/catalog_cache.h"
@@ -65,6 +66,8 @@ namespace {
 
 static const BSONObj kSortKeyMetaProjection = BSON("$meta"
                                                    << "sortKey");
+static const BSONObj kGeoNearDistanceMetaProjection = BSON("$meta"
+                                                           << "geoNearDistance");
 
 // We must allow some amount of overhead per result document, since when we make a cursor response
 // the documents are elements of a BSONArray. The overhead is 1 byte/doc for the type + 1 byte/doc
@@ -76,7 +79,8 @@ static const int kPerDocumentOverheadBytesUpperBound = 10;
  * Given the QueryRequest 'qr' being executed by mongos, returns a copy of the query which is
  * suitable for forwarding to the targeted hosts.
  */
-StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(const QueryRequest& qr) {
+StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
+    const QueryRequest& qr, bool appendGeoNearDistanceProjection) {
     // If there is a limit, we forward the sum of the limit and the skip.
     boost::optional<long long> newLimit;
     if (qr.getLimit()) {
@@ -132,6 +136,15 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(const QueryReq
         BSONObjBuilder projectionBuilder;
         projectionBuilder.appendElements(qr.getProj());
         projectionBuilder.append(ClusterClientCursorParams::kSortKeyField, kSortKeyMetaProjection);
+        newProjection = projectionBuilder.obj();
+    }
+
+    if (appendGeoNearDistanceProjection) {
+        invariant(qr.getSort().isEmpty());
+        BSONObjBuilder projectionBuilder;
+        projectionBuilder.appendElements(qr.getProj());
+        projectionBuilder.append(ClusterClientCursorParams::kSortKeyField,
+                                 kGeoNearDistanceMetaProjection);
         newProjection = projectionBuilder.obj();
     }
 
@@ -208,10 +221,23 @@ StatusWith<CursorId> runQueryWithoutRetrying(OperationContext* opCtx,
         params.sort = FindCommon::transformSortSpec(query.getQueryRequest().getSort());
     }
 
+    bool appendGeoNearDistanceProjection = false;
+    if (query.getQueryRequest().getSort().isEmpty() &&
+        QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
+        // There is no specified sort, and there is a GEO_NEAR node. This means we should merge sort
+        // by the geoNearDistance. Request the projection {$sortKey: <geoNearDistance>} from the
+        // shards. Indicate to the AsyncResultsMerger that it should extract the sort key
+        // {"$sortKey": <geoNearDistance>} and sort by the order {"$sortKey": 1}.
+        params.sort = ClusterClientCursorParams::kWholeSortKeySortPattern;
+        params.compareWholeSortKey = true;
+        appendGeoNearDistanceProjection = true;
+    }
+
     // Tailable cursors can't have a sort, which should have already been validated.
     invariant(params.sort.isEmpty() || !query.getQueryRequest().isTailable());
 
-    const auto qrToForward = transformQueryForShards(query.getQueryRequest());
+    const auto qrToForward =
+        transformQueryForShards(query.getQueryRequest(), appendGeoNearDistanceProjection);
     if (!qrToForward.isOK()) {
         return qrToForward.getStatus();
     }

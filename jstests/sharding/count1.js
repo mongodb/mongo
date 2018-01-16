@@ -1,6 +1,7 @@
 (function() {
+    'use strict';
 
-    var s = new ShardingTest({name: "count1", shards: 2});
+    var s = new ShardingTest({shards: 2});
     var db = s.getDB("test");
 
     // ************** Test Set #1 *************
@@ -32,8 +33,8 @@
     s.ensurePrimaryShard('test', 'shard0001');
     s.adminCommand({shardcollection: "test.foo", key: {name: 1}});
 
-    primary = s.getPrimaryShard("test").getDB("test");
-    secondary = s.getOther(primary).getDB("test");
+    var primary = s.getPrimaryShard("test").getDB("test");
+    var secondary = s.getOther(primary).getDB("test");
 
     assert.eq(1, s.config.chunks.count({"ns": "test.foo"}), "sanity check A");
 
@@ -47,9 +48,9 @@
     assert.eq(6, db.foo.find().count(), "basic count");
 
     // part 2
-    s.adminCommand({split: "test.foo", middle: {name: "allan"}});
-    s.adminCommand({split: "test.foo", middle: {name: "sara"}});
-    s.adminCommand({split: "test.foo", middle: {name: "eliot"}});
+    assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {name: "allan"}}));
+    assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {name: "sara"}}));
+    assert.commandWorked(s.s0.adminCommand({split: "test.foo", middle: {name: "eliot"}}));
 
     // MINKEY->allan,bob->eliot,joe,mark->sara,MAXKEY
 
@@ -60,12 +61,12 @@
     assert.eq(6, db.foo.find().sort({name: 1}).count(), "basic count after split sorted ");
 
     // part 4
-    s.adminCommand({
-        movechunk: "test.foo",
+    assert.commandWorked(s.s0.adminCommand({
+        moveChunk: "test.foo",
         find: {name: "eliot"},
         to: secondary.getMongo().name,
         _waitForDelete: true
-    });
+    }));
 
     assert.eq(3, primary.foo.find().toArray().length, "primary count");
     assert.eq(3, secondary.foo.find().toArray().length, "secondary count");
@@ -151,7 +152,7 @@
     assert.eq("joe,mark", nameString(db.foo.find().sort({_id: 1}).skip(3).limit(2)), "LSE3");
 
     // part 6
-    for (i = 0; i < 10; i++) {
+    for (var i = 0; i < 10; i++) {
         db.foo.save({_id: 7 + i, name: "zzz" + i});
     }
 
@@ -177,5 +178,4 @@
     assert(negSkipLimitResult.errmsg.length > 0, "no error msg for negative skip");
 
     s.stop();
-
 })();
