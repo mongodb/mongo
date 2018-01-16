@@ -16,7 +16,7 @@
 
     let testDB = rst.getPrimary().startSession({retryWrites: true}).getDatabase("test");
 
-    assert.writeErrorWithCode(
+    assert.commandFailedWithCode(
         testDB.foo.insert({x: 1}),
         ErrorCodes.IllegalOperation,
         "expected command with txnNumber to fail without document-level locking");
@@ -27,7 +27,7 @@
 
     testDB = st.s.startSession({retryWrites: true}).getDatabase("test");
 
-    assert.writeErrorWithCode(
+    assert.commandFailedWithCode(
         testDB.foo.insert({x: 1}),
         ErrorCodes.IllegalOperation,
         "expected command with txnNumber to fail without document-level locking");
