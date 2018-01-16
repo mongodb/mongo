@@ -768,6 +768,15 @@ ExitCode _initAndListen(int listenPort) {
         }
     }
 
+    // Disallow running WiredTiger with --nojournal in a replica set
+    if (storageGlobalParams.engine == "wiredTiger" && !storageGlobalParams.dur &&
+        replSettings.usingReplSets()) {
+        log() << "Runnning wiredTiger without journaling in a replica set is not "
+              << "supported. Make sure you are not using --nojournal and that "
+              << "storage.journal.enabled is not set to 'false'.";
+        exitCleanly(EXIT_BADOPTIONS);
+    }
+
     logMongodStartupWarnings(storageGlobalParams, serverGlobalParams, serviceContext);
 
     {
