@@ -36,7 +36,8 @@ if conf.CheckFunc("sync_file_range"):
         "HAVE_SYNC_FILE_RANGE"
     ])
 
-if conf.CheckCHeader('x86intrin.h'):
+# GCC 8+ includes x86intrin.h in non-x64 versions of the compiler so limit the check to x64.
+if env['TARGET_ARCH'] == 'x86_64' and conf.CheckCHeader('x86intrin.h'):
     conf.env.Append(CPPDEFINES=[
         "HAVE_X86INTRIN_H"
     ])
