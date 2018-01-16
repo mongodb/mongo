@@ -283,8 +283,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
 
     if (!_cache->isServing()) {
         // The cache has either been abandoned or has not yet been built. Attach a cursor.
-        pipeline = uassertStatusOK(pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
-            _fromExpCtx, pipeline.release()));
+        uassertStatusOK(pExpCtx->mongoProcessInterface->attachCursorSourceToPipeline(
+            _fromExpCtx, pipeline.get()));
     }
 
     // If the cache has been abandoned, release it.
@@ -612,39 +612,6 @@ void DocumentSourceLookUp::initializeIntrospectionPipeline() {
     uassert(ErrorCodes::IllegalOperation,
             "$changeStream is not allowed within a $lookup foreign pipeline",
             sources.empty() || !sources.front()->constraints().isChangeStreamStage());
-}
-
-DocumentSource::StageConstraints DocumentSourceLookUp::constraints(
-    Pipeline::SplitState pipeState) const {
-
-    const bool mayUseDisk = wasConstructedWithPipelineSyntax() &&
-        std::any_of(_parsedIntrospectionPipeline->getSources().begin(),
-                    _parsedIntrospectionPipeline->getSources().end(),
-                    [](const auto& source) {
-                        return source->constraints().diskRequirement ==
-                            DiskUseRequirement::kWritesTmpData;
-                    });
-
-    // If executing on mongos and the foreign collection is sharded, then this stage can run on
-    // mongos.
-    HostTypeRequirement hostReq;
-    if (pExpCtx->inMongos) {
-        hostReq = pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _fromNs)
-            ? HostTypeRequirement::kMongoS
-            : HostTypeRequirement::kPrimaryShard;
-    } else {
-        hostReq = HostTypeRequirement::kPrimaryShard;
-    }
-
-    StageConstraints constraints(StreamType::kStreaming,
-                                 PositionRequirement::kNone,
-                                 hostReq,
-                                 mayUseDisk ? DiskUseRequirement::kWritesTmpData
-                                            : DiskUseRequirement::kNoDiskUse,
-                                 FacetRequirement::kAllowed);
-
-    constraints.canSwapWithMatch = true;
-    return constraints;
 }
 
 void DocumentSourceLookUp::serializeToArray(

@@ -115,13 +115,6 @@ public:
 
     boost::optional<ReadPreferenceSetting> getReadPreference() const final;
 
-    /**
-     * Constructs the pipeline of MergerPlanStages which will be used to answer the query.
-     */
-    static std::unique_ptr<RouterExecStage> buildMergerPlan(OperationContext* opCtx,
-                                                            executor::TaskExecutor* executor,
-                                                            ClusterClientCursorParams* params);
-
 public:
     /** private for tests */
     /**
@@ -140,6 +133,13 @@ public:
                             boost::optional<LogicalSessionId> lsid);
 
 private:
+    /**
+     * Constructs the pipeline of MergerPlanStages which will be used to answer the query.
+     */
+    std::unique_ptr<RouterExecStage> buildMergerPlan(OperationContext* opCtx,
+                                                     executor::TaskExecutor* executor,
+                                                     ClusterClientCursorParams* params);
+
     ClusterClientCursorParams _params;
 
     // Number of documents already returned by next().

@@ -96,7 +96,25 @@ public:
      */
     GetModPathsReturn getModifiedPaths() const final;
 
-    StageConstraints constraints(Pipeline::SplitState pipeState) const final;
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        const bool mayUseDisk = wasConstructedWithPipelineSyntax() &&
+            std::any_of(_parsedIntrospectionPipeline->getSources().begin(),
+                        _parsedIntrospectionPipeline->getSources().end(),
+                        [](const auto& source) {
+                            return source->constraints().diskRequirement ==
+                                DiskUseRequirement::kWritesTmpData;
+                        });
+
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kNone,
+                                     HostTypeRequirement::kPrimaryShard,
+                                     mayUseDisk ? DiskUseRequirement::kWritesTmpData
+                                                : DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kAllowed);
+
+        constraints.canSwapWithMatch = true;
+        return constraints;
+    }
 
     GetDepsReturn getDependencies(DepsTracker* deps) const final;
 
