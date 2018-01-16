@@ -683,9 +683,7 @@ void execCommandDatabase(OperationContext* opCtx,
         if (!opCtx->getClient()->isInDirectClient() &&
             readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
             (iAmPrimary ||
-             ((serverGlobalParams.featureCompatibility.getVersion() ==
-               ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) &&
-              (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime())))) {
+             (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
             oss.initializeShardVersion(NamespaceString(command->parseNs(dbname, request.body)),
                                        shardVersionFieldIdx);
 

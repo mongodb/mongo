@@ -71,7 +71,6 @@
         _configsvrMovePrimary: {skip: "primary only"},
         _configsvrRemoveShardFromZone: {skip: "primary only"},
         _configsvrShardCollection: {skip: "primary only"},
-        _configsvrSetFeatureCompatibilityVersion: {skip: "primary only"},
         _configsvrUpdateZoneKeyRange: {skip: "primary only"},
         _flushRoutingTableCacheUpdates: {skip: "does not return user data"},
         _getUserCacheGeneration: {skip: "does not return user data"},

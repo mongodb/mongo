@@ -602,11 +602,6 @@ void MigrationSourceManager::cleanupOnError(OperationContext* opCtx) {
 
 void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
     OperationContext* opCtx, const ScopedCollectionMetadata& metadata) {
-    // Change streams are only supported in 3.6 and above
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)
-        return;
-
     // If this is not the first donation, there is nothing to be done
     if (metadata->getChunkManager()->getVersion(_args.getToShardId()).isSet())
         return;
