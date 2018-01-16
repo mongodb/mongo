@@ -518,21 +518,12 @@ class TestHistory(object):
         Returns a ReportEntry() tuple representing the 'test_result' dictionary.
         """
 
-        def parse_date(date_str):
-            """
-            Returns a datetime.date() instance representing the specified yyyy-mm-dd date string.
-
-            Note that any time component of 'date_str', including the timezone, is ignored.
-            """
-
-            return datetime.datetime.strptime(date_str.split("T")[0], "%Y-%m-%d").date()
-
         # For individual test executions, we intentionally use the "start_time" of the test as both
         # its 'start_date' and 'end_date' to avoid complicating how the test history is potentially
         # summarized by time. By the time the test has started, the Evergreen task has already been
         # assigned to a particular machine and is using a specific set of binaries, so there's
         # unlikely to be a significance to when the test actually finishes.
-        start_date = end_date = parse_date(test_result["start_time"])
+        start_date = end_date = _parse_date(test_result["start_time"])
 
         return ReportEntry(
             test=self._normalize_test_file(test_result["test_file"]),
@@ -598,6 +589,17 @@ class TestHistory(object):
             "testStatuses": ",".join(test_statuses),
             "variants": ",".join(self._variants),
         }
+
+
+def _parse_date(date_str):
+    """
+    Returns a datetime.date instance representing the specified yyyy-mm-dd date string.
+
+    Note that any time component of 'date_str', including the timezone, is ignored.
+    """
+    # We do not use strptime() because it is not thread safe (https://bugs.python.org/issue7980).
+    year, month, day = date_str.split("T")[0].split("-")
+    return datetime.date(int(year), int(month), int(day))
 
 
 class JSONResponseError(Exception):
@@ -697,7 +699,7 @@ def main():
         try:
             setattr(options,
                     option_dest,
-                    datetime.datetime.strptime(option_value, "%Y-%m-%d").date())
+                    _parse_date(option_value))
         except ValueError:
             parser.print_help(file=sys.stderr)
             print(file=sys.stderr)
