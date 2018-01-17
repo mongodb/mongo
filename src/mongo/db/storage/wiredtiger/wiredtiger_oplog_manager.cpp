@@ -177,7 +177,10 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
 
         const uint64_t newTimestamp = _fetchAllCommittedValue(sessionCache->conn());
 
-        if (newTimestamp == _oplogReadTimestamp.load()) {
+        // The newTimestamp may actually go backward during secondary batch application,
+        // where we commit data file changes separately from oplog changes, so ignore
+        // a non-incrementing timestamp.
+        if (newTimestamp <= _oplogReadTimestamp.load()) {
             LOG(2) << "no new oplog entries were made visible: " << newTimestamp;
             continue;
         }
