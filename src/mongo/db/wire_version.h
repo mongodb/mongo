@@ -76,6 +76,9 @@ enum WireVersion {
     // Set this to the highest value in this enum - it will be the default maxWireVersion for
     // the WireSpec values.
     LATEST_WIRE_VERSION = REPLICA_SET_TRANSACTIONS,
+
+    // This is used in testing to masquerade as a future binary version node.
+    FUTURE_WIRE_VERSION_FOR_TESTING = 1 << 20,
 };
 
 /**

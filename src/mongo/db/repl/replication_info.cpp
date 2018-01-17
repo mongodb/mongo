@@ -58,6 +58,7 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/map_util.h"
 
 namespace mongo {
@@ -68,6 +69,12 @@ using std::string;
 using std::stringstream;
 
 namespace repl {
+
+namespace {
+
+MONGO_FP_DECLARE(impersonateFullyUpgradedFutureVersion);
+
+}  // namespace
 
 void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int level) {
     ReplicationCoordinator* replCoord = ReplicationCoordinator::get(opCtx);
@@ -365,7 +372,10 @@ public:
         result.appendDate("localTime", jsTime());
         result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
 
-        if (internalClientElement) {
+        if (MONGO_FAIL_POINT(impersonateFullyUpgradedFutureVersion)) {
+            result.append("minWireVersion", WireVersion::FUTURE_WIRE_VERSION_FOR_TESTING);
+            result.append("maxWireVersion", WireVersion::FUTURE_WIRE_VERSION_FOR_TESTING);
+        } else if (internalClientElement) {
             result.append("minWireVersion",
                           WireSpec::instance().incomingInternalClient.minWireVersion);
             result.append("maxWireVersion",

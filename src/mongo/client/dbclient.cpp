@@ -60,6 +60,7 @@
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -67,6 +68,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message_port.h"
 #include "mongo/util/net/socket_exception.h"
@@ -91,6 +93,8 @@ using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 
 namespace {
+
+MONGO_FP_DECLARE(turnOffDBClientIncompatibleWithUpgradedServerCheck);
 
 #ifdef MONGO_CONFIG_SSL
 static SimpleMutex s_mtx;
@@ -890,6 +894,16 @@ Status DBClientConnection::connect(const HostAndPort& serverAddress, StringData 
     auto validateStatus =
         rpc::validateWireVersion(WireSpec::instance().outgoing, swProtocolSet.getValue().version);
     if (!validateStatus.isOK()) {
+        if (mongo::isMongos() && validateStatus == ErrorCodes::IncompatibleWithUpgradedServer &&
+            !MONGO_FAIL_POINT(turnOffDBClientIncompatibleWithUpgradedServerCheck)) {
+            severe() << "This mongos server must be upgraded. It is attempting to communicate with "
+                        "an upgraded cluster with which it is incompatible. Error: '"
+                     << validateStatus.toString()
+                     << "' Crashing in order to bring attention to the incompatibility, rather "
+                        "than erroring endlessly.";
+            fassertNoTrace(50709, false);
+        }
+
         warning() << "remote host has incompatible wire version: " << validateStatus;
 
         return validateStatus;

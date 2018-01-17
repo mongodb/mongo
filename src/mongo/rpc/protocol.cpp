@@ -211,16 +211,14 @@ Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo s
     // We assert the invariant that min < max above.
     if (!(client.minWireVersion <= server.maxWireVersion &&
           client.maxWireVersion >= server.minWireVersion)) {
-        return Status(ErrorCodes::IncompatibleServerVersion,
-                      str::stream() << "Server min and max wire version are incompatible ("
-                                    << server.minWireVersion
-                                    << ","
-                                    << server.maxWireVersion
-                                    << ") with client min wire version ("
-                                    << client.minWireVersion
-                                    << ","
-                                    << client.maxWireVersion
-                                    << ")");
+        std::string errmsg = str::stream()
+            << "Server min and max wire version (" << server.minWireVersion << ","
+            << server.maxWireVersion << ") is incompatible with client min wire version ("
+            << client.minWireVersion << "," << client.maxWireVersion << ").";
+        if (client.maxWireVersion < server.minWireVersion) {
+            return Status(ErrorCodes::IncompatibleWithUpgradedServer, errmsg);
+        }
+        return Status(ErrorCodes::IncompatibleServerVersion, errmsg);
     }
 
     return Status::OK();

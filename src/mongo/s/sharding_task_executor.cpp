@@ -43,6 +43,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -145,9 +146,20 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
         }
 
         if (!args.response.isOK()) {
+            if (isMongos() && args.response.status == ErrorCodes::IncompatibleWithUpgradedServer) {
+                severe()
+                    << "This mongos server must be upgraded. It is attempting to communicate with "
+                       "an upgraded cluster with which it is incompatible. Error: '"
+                    << args.response.status.toString()
+                    << "' Crashing in order to bring attention to the incompatibility, rather "
+                       "than erroring endlessly.";
+                fassertNoTrace(50710, false);
+            }
+
             if (shard) {
                 shard->updateReplSetMonitor(args.request.target, args.response.status);
             }
+
             LOG(1) << "Error processing the remote request, not updating operationTime or gLE";
             return;
         }
