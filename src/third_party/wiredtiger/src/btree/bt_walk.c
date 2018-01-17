@@ -470,7 +470,8 @@ restart:	/*
 				 * fast-path some common cases.
 				 */
 				if (LF_ISSET(WT_READ_NO_WAIT) &&
-				    ref->state != WT_REF_MEM)
+				    ref->state != WT_REF_MEM &&
+				    ref->state != WT_REF_LIMBO)
 					break;
 
 				/* Skip lookaside pages if not requested. */
@@ -663,8 +664,8 @@ __wt_tree_walk_count(WT_SESSION_IMPL *session,
 int
 __wt_tree_walk_custom_skip(
     WT_SESSION_IMPL *session, WT_REF **refp,
-   int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool *),
-   void *func_cookie, uint32_t flags)
+    int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool *),
+    void *func_cookie, uint32_t flags)
 {
 	return (__tree_walk_internal(
 	    session, refp, NULL, skip_func, func_cookie, flags));

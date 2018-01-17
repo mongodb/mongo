@@ -237,7 +237,7 @@ stall:			__wt_cond_wait(session,
 	}
 
 	if (set_stats)
-		time_start = __wt_rdtsc(session);
+		time_start = __wt_clock(session);
 	/* Wait for our group to start. */
 	for (pause_cnt = 0; ticket != l->u.s.current; pause_cnt++) {
 		if (pause_cnt < 1000)
@@ -252,13 +252,13 @@ stall:			__wt_cond_wait(session,
 		}
 	}
 	if (set_stats) {
-		time_stop = __wt_rdtsc(session);
+		time_stop = __wt_clock(session);
 		if (F_ISSET(session, WT_SESSION_INTERNAL))
 			stats[session->stat_bucket][l->stat_int_usecs_off] +=
-			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
+			    (int64_t)WT_CLOCKDIFF_US(time_stop, time_start);
 		else
 			stats[session->stat_bucket][l->stat_app_usecs_off] +=
-			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
+			    (int64_t)WT_CLOCKDIFF_US(time_stop, time_start);
 	}
 
 	/*
@@ -407,7 +407,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 	 * we have the lock.
 	 */
 	if (set_stats)
-		time_start = __wt_rdtsc(session);
+		time_start = __wt_clock(session);
 	for (pause_cnt = 0, old.u.v = l->u.v;
 	    ticket != old.u.s.current || old.u.s.readers_active != 0;
 	    pause_cnt++, old.u.v = l->u.v) {
@@ -423,13 +423,13 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
 		}
 	}
 	if (set_stats) {
-		time_stop = __wt_rdtsc(session);
+		time_stop = __wt_clock(session);
 		if (F_ISSET(session, WT_SESSION_INTERNAL))
 			stats[session->stat_bucket][l->stat_int_usecs_off] +=
-			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
+			    (int64_t)WT_CLOCKDIFF_US(time_stop, time_start);
 		else
 			stats[session->stat_bucket][l->stat_app_usecs_off] +=
-			    (int64_t)WT_TSCDIFF_US(time_stop, time_start);
+			    (int64_t)WT_CLOCKDIFF_US(time_stop, time_start);
 	}
 
 	/*

@@ -158,6 +158,39 @@ class test_shared_cache01(wttest.WiredTigerTestCase):
             self.add_records(sess, 0, nops)
         self.closeConnections()
 
+    # Opening a connection with absolute values for eviction config should fail
+    def test_shared_cache_absolute_evict_config(self):
+        nops = 1000
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.openConnections(['WT_TEST1', 'WT_TEST2'],
+            pool_opts = ',shared_cache=(name=pool,size=50M,reserve=20M),'
+            'eviction_target=10M,'), '/Shared cache configuration requires a '
+            'percentage value for eviction target/')
+
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.openConnections(['WT_TEST1', 'WT_TEST2'],
+            pool_opts = ',shared_cache=(name=pool,size=50M,reserve=20M),'
+            'eviction_trigger=10M,'), '/Shared cache configuration requires a '
+            'percentage value for eviction trigger/')
+
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.openConnections(['WT_TEST1', 'WT_TEST2'],
+            pool_opts = ',shared_cache=(name=pool,size=50M,reserve=20M),'
+            'eviction_dirty_target=10M,'), '/Shared cache configuration '
+            'requires a percentage value for eviction dirty target/')
+
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.openConnections(['WT_TEST1', 'WT_TEST2'],
+            pool_opts = ',shared_cache=(name=pool,size=50M,reserve=20M),'
+            'eviction_dirty_trigger=10M,'), '/Shared cache configuration '
+            'requires a percentage value for eviction dirty trigger/')
+
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.openConnections(['WT_TEST1', 'WT_TEST2'],
+            pool_opts = ',shared_cache=(name=pool,size=50M,reserve=20M),'
+            'eviction_checkpoint_target=10M,'), '/Shared cache configuration '
+            'requires a percentage value for eviction checkpoint target/')
+
     # Test verbose output
     @unittest.skip("Verbose output handling")
     def test_shared_cache_verbose(self):

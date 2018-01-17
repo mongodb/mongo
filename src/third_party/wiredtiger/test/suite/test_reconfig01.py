@@ -75,6 +75,13 @@ class test_reconfig01(wttest.WiredTigerTestCase):
         self.conn.reconfigure("eviction=(threads_min=2)")
         # Set min and max the same.
         self.conn.reconfigure("eviction=(threads_min=6,threads_max=6)")
+        # Set target and trigger with an absolute value.
+        self.conn.reconfigure("eviction_target=50M,eviction_trigger=100M")
+        # Set dirty target and trigger with an absolute value
+        self.conn.reconfigure("eviction_dirty_target=20M,"
+                              "eviction_dirty_trigger=40M")
+        # Set eviction checkpoint target with an absolute value
+        self.conn.reconfigure("eviction_checkpoint_target=50M")
 
     def test_reconfig_lsm_manager(self):
         # We create and populate a tiny LSM so that we can start off with

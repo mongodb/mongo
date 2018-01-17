@@ -72,10 +72,10 @@ __global_calibrate_ticks(void)
 	for (tries = 0; tries < 3; ++tries) {
 		/* This needs to be CPU intensive and large enough. */
 		__wt_epoch(NULL, &start);
-		tsc_start = __wt_rdtsc(NULL);
+		tsc_start = __wt_rdtsc();
 		for (i = 0; i < 100 * WT_MILLION; i++)
 			;
-		tsc_stop = __wt_rdtsc(NULL);
+		tsc_stop = __wt_rdtsc();
 		__wt_epoch(NULL, &stop);
 		diff_nsec = WT_TIMEDIFF_NS(stop, start);
 		diff_tsc = tsc_stop - tsc_start;

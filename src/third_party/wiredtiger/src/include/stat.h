@@ -420,6 +420,8 @@ struct __wt_connection_stats {
 	int64_t cache_eviction_pages_queued_oldest;
 	int64_t cache_read;
 	int64_t cache_read_lookaside;
+	int64_t cache_read_lookaside_skipped;
+	int64_t cache_read_lookaside_delay;
 	int64_t cache_pages_requested;
 	int64_t cache_eviction_pages_seen;
 	int64_t cache_eviction_fail;

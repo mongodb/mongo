@@ -162,5 +162,35 @@ class test_shared_cache02(wttest.WiredTigerTestCase):
 
         self.closeConnections()
 
+    # Test reconfigure with absolute value for eviction config fails
+    def test_shared_cache_reconfig04(self):
+        nops = 1000
+        self.openConnections(['WT_TEST1', 'WT_TEST2'],
+            pool_opts = ',shared_cache=(name=pool,size=50M,reserve=20M),')
+
+        for sess in self.sessions:
+            sess.create(self.uri, "key_format=S,value_format=S")
+            self.add_records(sess, 0, nops)
+
+        connection = self.conns[0]
+        # Reconfiguring with absolute value of eviction trigger should fail.
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: connection.reconfigure("shared_cache=(name=pool,"
+            "size=20M,reserve=10M),eviction_trigger=10M"),'/Shared cache '
+            'configuration requires a percentage value for eviction trigger/')
+
+        connection = self.conns[1]
+        # Reconfiguring with absolute value for eviction target should fail.
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: connection.reconfigure("shared_cache=(name=pool,"
+            "size=20M,reserve=10M),eviction_target=10M"),'/Shared cache '
+            'configuration requires a percentage value for eviction target/')
+
+        # Reconfigure with percentage value for eviction target passes
+        self.conns[0].reconfigure("shared_cache=(name=pool,reserve=20M),"
+            "eviction_target=50")
+
+        self.closeConnections()
+
 if __name__ == '__main__':
     wttest.run()

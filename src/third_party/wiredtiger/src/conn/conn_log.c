@@ -949,11 +949,11 @@ __log_server(void *arg)
 		}
 
 		/* Wait until the next event. */
-		time_start = __wt_rdtsc(session);
+		time_start = __wt_clock(session);
 		__wt_cond_auto_wait_signal(
 		    session, conn->log_cond, did_work, NULL, &signalled);
-		time_stop = __wt_rdtsc(session);
-		timediff = WT_TSCDIFF_MS(time_stop, time_start);
+		time_stop = __wt_clock(session);
+		timediff = WT_CLOCKDIFF_MS(time_stop, time_start);
 	}
 
 	if (0) {

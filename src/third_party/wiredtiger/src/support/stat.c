@@ -832,6 +832,8 @@ static const char * const __stats_connection_desc[] = {
 	"cache: pages queued for urgent eviction during walk",
 	"cache: pages read into cache",
 	"cache: pages read into cache requiring lookaside entries",
+	"cache: pages read into cache skipping older lookaside entries",
+	"cache: pages read into cache with skipped lookaside entries needed later",
 	"cache: pages requested from the cache",
 	"cache: pages seen by eviction walk",
 	"cache: pages selected for eviction unable to be evicted",
@@ -1210,6 +1212,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_pages_queued_oldest = 0;
 	stats->cache_read = 0;
 	stats->cache_read_lookaside = 0;
+	stats->cache_read_lookaside_skipped = 0;
+	stats->cache_read_lookaside_delay = 0;
 	stats->cache_pages_requested = 0;
 	stats->cache_eviction_pages_seen = 0;
 	stats->cache_eviction_fail = 0;
@@ -1624,6 +1628,10 @@ __wt_stat_connection_aggregate(
 	    WT_STAT_READ(from, cache_eviction_pages_queued_oldest);
 	to->cache_read += WT_STAT_READ(from, cache_read);
 	to->cache_read_lookaside += WT_STAT_READ(from, cache_read_lookaside);
+	to->cache_read_lookaside_skipped +=
+	    WT_STAT_READ(from, cache_read_lookaside_skipped);
+	to->cache_read_lookaside_delay +=
+	    WT_STAT_READ(from, cache_read_lookaside_delay);
 	to->cache_pages_requested +=
 	    WT_STAT_READ(from, cache_pages_requested);
 	to->cache_eviction_pages_seen +=

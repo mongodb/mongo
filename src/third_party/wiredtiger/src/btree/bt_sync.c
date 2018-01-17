@@ -138,7 +138,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	saved_pinned_id = WT_SESSION_TXN_STATE(session)->pinned_id;
 	timer = WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT);
 	if (timer)
-		time_start = __wt_rdtsc(session);
+		time_start = __wt_clock(session);
 
 	switch (syncop) {
 	case WT_SYNC_WRITE_LEAVES:
@@ -330,7 +330,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 	}
 
 	if (timer) {
-		time_stop = __wt_rdtsc(session);
+		time_stop = __wt_clock(session);
 		__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "__sync_file WT_SYNC_%s wrote: %" PRIu64
 		    " leaf pages (%" PRIu64 "B), %" PRIu64
@@ -338,7 +338,7 @@ __sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 		    syncop == WT_SYNC_WRITE_LEAVES ?
 		    "WRITE_LEAVES" : "CHECKPOINT",
 		    leaf_pages, leaf_bytes, internal_pages, internal_bytes,
-		    WT_TSCDIFF_MS(time_stop, time_start));
+		    WT_CLOCKDIFF_MS(time_stop, time_start));
 	}
 
 err:	/* On error, clear any left-over tree walk. */

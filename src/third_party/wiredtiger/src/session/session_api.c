@@ -1467,7 +1467,9 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	txn = &session->txn;
 	if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0)
 		WT_ERR_MSG(session, EINVAL,
-		    "failed transaction requires rollback");
+		    "failed transaction requires rollback%s%s",
+		    txn->rollback_reason == NULL ? "" : ": ",
+		    txn->rollback_reason == NULL ? "" : txn->rollback_reason);
 
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);
@@ -1628,14 +1630,14 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	 * Keep checking the LSNs until we find it is stable or we reach
 	 * our timeout, or there's some other reason to quit.
 	 */
-	time_start = __wt_rdtsc(session);
+	time_start = __wt_clock(session);
 	while (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
 		if (!__transaction_sync_run_chk(session))
 			WT_ERR(ETIMEDOUT);
 
 		__wt_cond_signal(session, conn->log_file_cond);
-		time_stop = __wt_rdtsc(session);
-		waited_ms = WT_TSCDIFF_MS(time_stop, time_start);
+		time_stop = __wt_clock(session);
+		waited_ms = WT_CLOCKDIFF_MS(time_stop, time_start);
 		if (waited_ms < timeout_ms) {
 			remaining_usec = (timeout_ms - waited_ms) * WT_THOUSAND;
 			__wt_cond_wait(session, log->log_sync_cond,

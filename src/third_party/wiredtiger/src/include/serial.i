@@ -157,9 +157,10 @@ __wt_col_append_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
     size_t new_ins_size, uint64_t *recnop, u_int skipdepth, bool exclusive)
 {
 	WT_DECL_RET;
-	WT_INSERT *new_ins = *new_insp;
+	WT_INSERT *new_ins;
 
 	/* Clear references to memory we now own and must free on error. */
+	new_ins = *new_insp;
 	*new_insp = NULL;
 
 	/* Check for page write generation wrap. */
@@ -206,11 +207,12 @@ __wt_insert_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
     size_t new_ins_size, u_int skipdepth, bool exclusive)
 {
 	WT_DECL_RET;
-	WT_INSERT *new_ins = *new_insp;
+	WT_INSERT *new_ins;
 	u_int i;
 	bool simple;
 
 	/* Clear references to memory we now own and must free on error. */
+	new_ins = *new_insp;
 	*new_insp = NULL;
 
 	/* Check for page write generation wrap. */
@@ -262,11 +264,13 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
     WT_UPDATE **srch_upd, WT_UPDATE **updp, size_t upd_size, bool exclusive)
 {
 	WT_DECL_RET;
-	WT_UPDATE *obsolete, *upd = *updp;
+	WT_UPDATE *obsolete, *upd;
 	wt_timestamp_t *obsolete_timestamp;
+	size_t size;
 	uint64_t txn;
 
 	/* Clear references to memory we now own and must free on error. */
+	upd = *updp;
 	*updp = NULL;
 
 	/* Check for page write generation wrap. */
@@ -329,9 +333,20 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_PAGE *page,
 		return (0);
 
 	obsolete = __wt_update_obsolete_check(session, page, upd->next);
+
+	/*
+	 * Decrement the dirty byte count while holding the page lock, else we
+	 * can race with checkpoints cleaning a page.
+	 */
+	for (size = 0, upd = obsolete; upd != NULL; upd = upd->next)
+		size += WT_UPDATE_MEMSIZE(upd);
+	if (size != 0)
+		__wt_cache_page_inmem_decr(session, page, size);
+
 	WT_PAGE_UNLOCK(session, page);
+
 	if (obsolete != NULL)
-		__wt_update_obsolete_free(session, page, obsolete);
+		__wt_free_update_list(session, obsolete);
 
 	return (0);
 }

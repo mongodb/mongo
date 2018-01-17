@@ -51,7 +51,7 @@ struct __wt_optrack_record {
 	WT_OPTRACK_RECORD *__tr;					\
 	__tr = &((s)->optrack_buf[					\
 	    (s)->optrackbuf_ptr % WT_OPTRACK_MAXRECS]);			\
-	__tr->op_timestamp = __wt_rdtsc(s);				\
+	__tr->op_timestamp = __wt_clock(s);				\
 	__tr->op_id = __func_id;					\
 	__tr->op_type = optype;						\
 									\

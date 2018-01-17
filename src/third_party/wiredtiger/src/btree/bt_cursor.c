@@ -58,8 +58,10 @@ static inline bool
 __cursor_page_pinned(WT_CURSOR_BTREE *cbt)
 {
 	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
 
 	cursor = &cbt->iface;
+	session = (WT_SESSION_IMPL *)cursor->session;
 
 	/*
 	 * Check the page active flag, asserting the page reference with any
@@ -84,6 +86,14 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt)
 	 * release pages grown too large).
 	 */
 	if (cbt->ref->page->read_gen == WT_READGEN_OLDEST)
+		return (false);
+
+	/*
+	 * If we are doing an update, we need a page with history.  Release the
+	 * page so we get it again with history if required.
+	 */
+	if (F_ISSET(&session->txn, WT_TXN_UPDATE) &&
+	    cbt->ref->state != WT_REF_MEM)
 		return (false);
 
 	return (true);

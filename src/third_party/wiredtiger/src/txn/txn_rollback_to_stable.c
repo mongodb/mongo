@@ -251,22 +251,6 @@ __txn_abort_newer_updates(
 }
 
 /*
- * __txn_rollback_to_stable_custom_skip --
- *	Return if custom rollback requires we read this page.
- */
-static int
-__txn_rollback_to_stable_custom_skip(
-    WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool *skipp)
-{
-	WT_UNUSED(context);
-	WT_UNUSED(session);
-
-	/* Review all pages that are in memory. */
-	*skipp = !(ref->state == WT_REF_MEM || ref->state == WT_REF_DELETED);
-	return (0);
-}
-
-/*
  * __txn_rollback_to_stable_btree_walk --
  *	Called for each open handle - choose to either skip or wipe the commits
  */
@@ -275,22 +259,24 @@ __txn_rollback_to_stable_btree_walk(
     WT_SESSION_IMPL *session, wt_timestamp_t *rollback_timestamp)
 {
 	WT_DECL_RET;
-	WT_PAGE *page;
 	WT_REF *ref;
 
 	/* Walk the tree, marking commits aborted where appropriate. */
 	ref = NULL;
-	while ((ret = __wt_tree_walk_custom_skip(session, &ref,
-	    __txn_rollback_to_stable_custom_skip,
-	    NULL, WT_READ_NO_EVICT)) == 0 && ref != NULL) {
-		page = ref->page;
+	while ((ret = __wt_tree_walk(session, &ref,
+	    WT_READ_CACHE | WT_READ_LOOKASIDE | WT_READ_NO_EVICT)) == 0 &&
+	    ref != NULL) {
+		if (ref->page_las != NULL &&
+		    __wt_timestamp_cmp(rollback_timestamp,
+		    &ref->page_las->onpage_timestamp) < 0)
+			ref->page_las->invalid = true;
 
 		/* Review deleted page saved to the ref */
 		if (ref->page_del != NULL && __wt_timestamp_cmp(
 		    rollback_timestamp, &ref->page_del->timestamp) < 0)
 			__wt_delete_page_rollback(session, ref);
 
-		if (!__wt_page_is_modified(page))
+		if (!__wt_page_is_modified(ref->page))
 			continue;
 
 		WT_RET(__txn_abort_newer_updates(

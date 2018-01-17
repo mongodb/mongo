@@ -368,7 +368,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	}
 	timer = !F_ISSET(session, WT_SESSION_INTERNAL);
 	if (timer)
-		time_start = __wt_rdtsc(session);
+		time_start = __wt_clock(session);
 
 	/* Call the block manager to write the block. */
 	WT_ERR(checkpoint ?
@@ -378,10 +378,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 
 	/* Update some statistics now that the write is done */
 	if (timer) {
-		time_stop = __wt_rdtsc(session);
+		time_stop = __wt_clock(session);
 		WT_STAT_CONN_INCR(session, cache_write_app_count);
 		WT_STAT_CONN_INCRV(session, cache_write_app_time,
-		    WT_TSCDIFF_US(time_stop, time_start));
+		    WT_CLOCKDIFF_US(time_stop, time_start));
 	}
 
 	WT_STAT_CONN_INCR(session, cache_write);

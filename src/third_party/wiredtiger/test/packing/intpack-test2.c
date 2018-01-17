@@ -38,6 +38,12 @@ main(void)
 
 	memset(buf, 0xff, sizeof(buf));	/* -Werror=maybe-uninitialized */
 
+	/*
+	 * Required on some systems to pull in parts of the library
+	 * for which we have data references.
+	 */
+	testutil_check(__wt_library_init());
+
 	for (i = 1; i < 1LL << 60; i <<= 1) {
 		end = buf;
 		testutil_check(

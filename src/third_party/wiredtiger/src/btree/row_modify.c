@@ -61,6 +61,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	upd = upd_arg;
 	logged = false;
 
+	/* We're going to modify the page, we should have loaded history. */
+	WT_ASSERT(session, cbt->ref->state != WT_REF_LIMBO);
+
 	/* If we don't yet have a modify structure, we'll need one. */
 	WT_RET(__wt_page_modify_init(session, page));
 	mod = page->modify;
@@ -356,25 +359,4 @@ __wt_update_obsolete_check(
 	}
 
 	return (NULL);
-}
-
-/*
- * __wt_update_obsolete_free --
- *	Free an obsolete update list.
- */
-void
-__wt_update_obsolete_free(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd)
-{
-	WT_UPDATE *next;
-	size_t size;
-
-	/* Free a WT_UPDATE list. */
-	for (size = 0; upd != NULL; upd = next) {
-		next = upd->next;
-		size += WT_UPDATE_MEMSIZE(upd);
-		__wt_free(session, upd);
-	}
-	if (size != 0)
-		__wt_cache_page_inmem_decr(session, page, size);
 }

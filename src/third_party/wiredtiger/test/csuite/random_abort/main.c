@@ -391,9 +391,13 @@ main(int argc, char *argv[])
 		 */
 		for (last_key = UINT64_MAX;; ++count, last_key = key) {
 			ret = fscanf(fp, "%" SCNu64 "\n", &key);
-			if (ret != EOF && ret != 1)
-				testutil_die(errno, "fscanf");
-			if (ret == EOF)
+			/*
+			 * Consider anything other than clear success in
+			 * getting the key to be EOF. We've seen file system
+			 * issues where the file ends with zeroes on a 4K
+			 * boundary and does not return EOF but a ret of zero.
+			 */
+			if (ret != 1)
 				break;
 			/*
 			 * If we're unlucky, the last line may be a partially

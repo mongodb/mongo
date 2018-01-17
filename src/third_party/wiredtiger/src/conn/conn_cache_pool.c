@@ -572,8 +572,8 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 	WT_CACHE *cache;
 	WT_CACHE_POOL *cp;
 	WT_CONNECTION_IMPL *entry;
+	double pct_full;
 	uint64_t adjustment, highest_percentile, pressure, reserved, smallest;
-	u_int pct_full;
 	bool busy, decrease_ok, grow, pool_full;
 
 	*adjustedp = false;
@@ -581,7 +581,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 	cp = __wt_process.cache_pool;
 	grow = false;
 	pool_full = cp->currently_used >= cp->size;
-	pct_full = 0;
+	pct_full = 0.0;
 	/* Highest as a percentage, avoid 0 */
 	highest_percentile = (highest / 100) + 1;
 
@@ -613,7 +613,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		    entry->default_session, false, true, &pct_full);
 
 		__wt_verbose(session, WT_VERB_SHARED_CACHE,
-		    "\t%5" PRIu64 ", %3" PRIu64 ", %2" PRIu32 ", %d, %2u",
+		    "\t%5" PRIu64 ", %3" PRIu64 ", %2" PRIu32 ", %d, %2.3f",
 		    entry->cache_size >> 20, pressure, cache->cp_skip_count,
 		    busy, pct_full);
 
@@ -676,8 +676,9 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 			 * potentially a negative feedback loop in the
 			 * balance algorithm.
 			 */
-			smallest = (100 * __wt_cache_bytes_inuse(cache)) /
-			    cache->eviction_trigger;
+			smallest =
+			    (uint64_t)((100 * __wt_cache_bytes_inuse(cache)) /
+			    cache->eviction_trigger);
 			if (entry->cache_size > smallest)
 				adjustment = WT_MIN(cp->chunk,
 				    (entry->cache_size - smallest) / 2);

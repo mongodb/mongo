@@ -259,6 +259,8 @@ struct __wt_txn {
 	WT_ITEM		*ckpt_snapshot;
 	bool		full_ckpt;
 
+	const char *rollback_reason;		/* If rollback, the reason */
+
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define	WT_TXN_AUTOCOMMIT	0x0001u
 #define	WT_TXN_ERROR		0x0002u
@@ -274,6 +276,7 @@ struct __wt_txn {
 #define	WT_TXN_SYNC_SET		0x0800u
 #define	WT_TXN_TS_COMMIT_ALWAYS	0x1000u
 #define	WT_TXN_TS_COMMIT_NEVER	0x2000u
+#define	WT_TXN_UPDATE	        0x4000u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };

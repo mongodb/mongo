@@ -58,6 +58,12 @@ check(const char *fmt, ...)
 int
 main(void)
 {
+	/*
+	 * Required on some systems to pull in parts of the library
+	 * for which we have data references.
+	 */
+	testutil_check(__wt_library_init());
+
 	check("iii", 0, 101, -99);
 	check("3i", 0, 101, -99);
 	check("iS", 42, "forty two");

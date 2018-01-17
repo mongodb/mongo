@@ -341,7 +341,8 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 	char hex_timestamp[9]; /* Enough for disabled string */
 #endif
 	uint64_t ckpt_gen_current, ckpt_gen_last;
-	uint32_t btree_id, pct_dirty, pct_full;
+	uint32_t btree_id;
+	double pct_dirty, pct_full;
 
 	btree_id = S2BT(session)->id;
 
@@ -379,8 +380,8 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 		    "file ID %" PRIu32 ", page ID %" PRIu64 ". "
 		    "Max txn ID %" PRIu64 ", min timestamp %s, skewed %s. "
 		    "Entries now in lookaside file: %" PRId64 ", "
-		    "cache dirty: %" PRIu32 "%% , "
-		    "cache use: %" PRIu32 "%%",
+		    "cache dirty: %2.3f%% , "
+		    "cache use: %2.3f%%",
 		    btree_id, multi->page_las.las_pageid,
 		    multi->page_las.las_max_txn,
 		    hex_timestamp,

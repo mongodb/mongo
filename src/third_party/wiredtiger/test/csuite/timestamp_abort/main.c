@@ -655,7 +655,8 @@ main(int argc, char *argv[])
 	    "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && "
 	    "cp -p WiredTigerLog.* ../%s.SAVE",
 	     home, home, home));
-	(void)system(buf);
+	if ((status = system(buf)) < 0)
+		testutil_die(status, "system: %s", buf);
 	printf("Open database, run recovery and verify content\n");
 
 	/*

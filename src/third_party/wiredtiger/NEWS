@@ -1,6 +1,35 @@
 Ticket reference tags refer to tickets in the MongoDB JIRA tracking system:
 https://jira.mongodb.org
 
+WiredTiger release 3.0.0, 2018-01-08
+------------------------------------
+
+See the upgrading documentation for details of API and behavior changes.
+
+Significant changes:
+* WT-3039	Change the log file format to record a previous LSN record
+* WT-3181	Add support for application defined transaction IDs via a mechanism called timestamps.
+* WT-3310	Add support to WT_SESSION::alter to change table log setting
+* WT-3389	Restructure page split code to hold a split generation for the entire operation.
+* WT-3406	Fix a bug in reconciliation so that it ignores concurrent updates.
+* WT-3418	Fix a block manager race in tree close/open
+* WT-3435	Improvements to the cache overflow mechanism aka lookaside
+* WT-3437	Improvements to auto tuning of number of eviction workers
+* WT-3440	Add a log record when starting a checkpoint.
+* WT-3461	Avoid hangs when system clocks move backwards by using CLOCK_MONOTONIC for pthread_cond_timedwait if possible.
+* WT-3490	Fix a bug in WT_CURSOR.modify unaligned size_t access.
+* WT-3495	Fix a bug so we don't ftruncate if log cursors are open
+* WT-3497	Improve logging message when hitting the configured session limits
+* WT-3537	Split pages in memory when nothing can be written
+* WT-3556	Remove wtstats support
+* WT-3681	Change recovery so that it doesn't truncate the last log file
+* WT-3683	Allow eviction of clean pages with history when cache is stuck
+* WT-3710	Get a page-level lock to ensure page splits are single threaded
+* WT-3752	Allow trimming of obsolete modify updates.
+
+See JIRA changelog for a full listing:
+https://jira.mongodb.org/projects/WT/versions/18401
+
 WiredTiger release 2.9.3, 2017-06-27
 ------------------------------------
 

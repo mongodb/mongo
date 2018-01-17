@@ -196,11 +196,11 @@ __curfile_search(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, search, cbt->btree);
 	WT_ERR(__cursor_checkkey(cursor));
 
-	time_start = __wt_rdtsc(session);
+	time_start = __wt_clock(session);
 	WT_ERR(__wt_btcur_search(cbt));
-	time_stop = __wt_rdtsc(session);
+	time_stop = __wt_clock(session);
 	 __wt_stat_usecs_hist_incr_opread(session,
-	    WT_TSCDIFF_US(time_stop, time_start));
+	    WT_CLOCKDIFF_US(time_stop, time_start));
 
 	/* Search maintains a position, key and value. */
 	WT_ASSERT(session,
@@ -227,11 +227,11 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
 	WT_ERR(__cursor_checkkey(cursor));
 
-	time_start = __wt_rdtsc(session);
+	time_start = __wt_clock(session);
 	WT_ERR(__wt_btcur_search_near(cbt, exact));
-	time_stop = __wt_rdtsc(session);
+	time_stop = __wt_clock(session);
 	__wt_stat_usecs_hist_incr_opread(session,
-	    WT_TSCDIFF_US(time_stop, time_start));
+	    WT_CLOCKDIFF_US(time_stop, time_start));
 
 	/* Search-near maintains a position, key and value. */
 	WT_ASSERT(session,
@@ -261,11 +261,11 @@ __curfile_insert(WT_CURSOR *cursor)
 		WT_ERR(__cursor_checkkey(cursor));
 	WT_ERR(__cursor_checkvalue(cursor));
 
-	time_start = __wt_rdtsc(session);
+	time_start = __wt_clock(session);
 	WT_ERR(__wt_btcur_insert(cbt));
-	time_stop = __wt_rdtsc(session);
+	time_stop = __wt_clock(session);
 	__wt_stat_usecs_hist_incr_opwrite(session,
-	    WT_TSCDIFF_US(time_stop, time_start));
+	    WT_CLOCKDIFF_US(time_stop, time_start));
 
 	/*
 	 * Insert maintains no position, key or value (except for column-store
@@ -362,11 +362,11 @@ __curfile_update(WT_CURSOR *cursor)
 	WT_ERR(__cursor_checkkey(cursor));
 	WT_ERR(__cursor_checkvalue(cursor));
 
-	time_start = __wt_rdtsc(session);
+	time_start = __wt_clock(session);
 	WT_ERR(__wt_btcur_update(cbt));
-	time_stop = __wt_rdtsc(session);
+	time_stop = __wt_clock(session);
 	__wt_stat_usecs_hist_incr_opwrite(session,
-	    WT_TSCDIFF_US(time_stop, time_start));
+	    WT_CLOCKDIFF_US(time_stop, time_start));
 
 	/* Update maintains a position, key and value. */
 	WT_ASSERT(session,
@@ -394,11 +394,11 @@ __curfile_remove(WT_CURSOR *cursor)
 	CURSOR_REMOVE_API_CALL(cursor, session, cbt->btree);
 	WT_ERR(__cursor_checkkey(cursor));
 
-	time_start = __wt_rdtsc(session);
+	time_start = __wt_clock(session);
 	WT_ERR(__wt_btcur_remove(cbt));
-	time_stop = __wt_rdtsc(session);
+	time_stop = __wt_clock(session);
 	__wt_stat_usecs_hist_incr_opwrite(session,
-	    WT_TSCDIFF_US(time_stop, time_start));
+	    WT_CLOCKDIFF_US(time_stop, time_start));
 
 	/*
 	 * Remove with a search-key is fire-and-forget, no position and no key.

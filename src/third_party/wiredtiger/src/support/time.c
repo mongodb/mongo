@@ -73,13 +73,13 @@ __wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
 }
 
 /*
- * __wt_tsc_to_nsec --
- *	Convert from rdtsc ticks to nanoseconds.
+ * __wt_clock_to_nsec --
+ *	Convert from clock ticks to nanoseconds.
  */
 uint64_t
-__wt_tsc_to_nsec(uint64_t end, uint64_t begin)
+__wt_clock_to_nsec(uint64_t end, uint64_t begin)
 {
-	double tsc_diff;
+	double clock_diff;
 
 	/*
 	 * If the ticks were reset, consider it an invalid check and just
@@ -88,20 +88,6 @@ __wt_tsc_to_nsec(uint64_t end, uint64_t begin)
 	 */
 	if (end < begin)
 		return (0);
-	tsc_diff = (double)(end - begin);
-	return ((uint64_t)(tsc_diff / __wt_process.tsc_nsec_ratio));
-}
-
-/*
- * __wt_tsc_get_expensive_timestamp --
- *       Obtain a timestamp via a system call on platforms where obtaining it
- *       directly from the hardware register is not supported.
- */
-uint64_t
-__wt_tsc_get_expensive_timestamp(WT_SESSION_IMPL *session)
-{
-	struct timespec tsp;
-
-	__wt_epoch(session, &tsp);
-	return ((uint64_t)(tsp.tv_sec * WT_BILLION + tsp.tv_nsec));
+	clock_diff = (double)(end - begin);
+	return ((uint64_t)(clock_diff / __wt_process.tsc_nsec_ratio));
 }

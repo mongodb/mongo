@@ -16,14 +16,13 @@ static void __free_skip_array(
 		WT_SESSION_IMPL *, WT_INSERT_HEAD **, uint32_t, bool);
 static void __free_skip_list(WT_SESSION_IMPL *, WT_INSERT *, bool);
 static void __free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t, bool);
-static void __page_out_int(WT_SESSION_IMPL *, WT_PAGE **, bool);
 
 /*
- * __wt_ref_out_int --
+ * __wt_ref_out --
  *	Discard an in-memory page, freeing all memory associated with it.
  */
 void
-__wt_ref_out_int(WT_SESSION_IMPL *session, WT_REF *ref, bool rewrite)
+__wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	/*
 	 * A version of the page-out function that allows us to make additional
@@ -57,25 +56,15 @@ __wt_ref_out_int(WT_SESSION_IMPL *session, WT_REF *ref, bool rewrite)
 	}
 #endif
 
-	__page_out_int(session, &ref->page, rewrite);
+	__wt_page_out(session, &ref->page);
 }
 
 /*
- * __wt_ref_out --
+ * __wt_page_out --
  *	Discard an in-memory page, freeing all memory associated with it.
  */
 void
-__wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	__wt_ref_out_int(session, ref, false);
-}
-
-/*
- * __page_out_int --
- *	Discard an in-memory page, freeing all memory associated with it.
- */
-static void
-__page_out_int(WT_SESSION_IMPL *session, WT_PAGE **pagep, bool rewrite)
+__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
@@ -113,7 +102,7 @@ __page_out_int(WT_SESSION_IMPL *session, WT_PAGE **pagep, bool rewrite)
 	}
 
 	/* Update the cache's information. */
-	__wt_cache_page_evict(session, page, rewrite);
+	__wt_cache_page_evict(session, page);
 
 	dsk = (WT_PAGE_HEADER *)page->dsk;
 	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
@@ -155,16 +144,6 @@ __page_out_int(WT_SESSION_IMPL *session, WT_PAGE **pagep, bool rewrite)
 		__wt_overwrite_and_free_len(session, dsk, dsk->mem_size);
 
 	__wt_overwrite_and_free(session, page);
-}
-
-/*
- * __wt_page_out --
- *	Discard an in-memory page, freeing all memory associated with it.
- */
-void
-__wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
-{
-	__page_out_int(session, pagep, false);
 }
 
 /*
@@ -310,20 +289,12 @@ __wt_free_ref(
 		break;
 	}
 
-	/*
-	 * Free any address allocation; if there's no linked WT_REF page, it
-	 * must be allocated.
-	 */
+	/* Free any address allocation. */
 	__wt_ref_addr_free(session, ref);
 
-	/*
-	 * Free any lookaside or page-deleted information.  We only expect a
-	 * lookaside structure for lookaside references, but can see
-	 * page-deleted information in other cases (such as WT_REF_MEM).
-	 */
-	if (ref->state == WT_REF_LOOKASIDE)
-		__wt_free(session, ref->page_las);
-	else if (ref->page_del != NULL) {
+	/* Free any lookaside or page-deleted information. */
+	__wt_free(session, ref->page_las);
+	if (ref->page_del != NULL) {
 		__wt_free(session, ref->page_del->update_list);
 		__wt_free(session, ref->page_del);
 	}

@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_timestamp04.py
-#   Timestamps: Test that rollback_to_stable obeys expected visibility rules
+#   Timestamps: Test that rollback_to_stable obeys expected visibility rules.
 #
 
 from suite_subprocess import suite_subprocess
@@ -49,7 +49,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         ('V2', dict(conn_config=',log=(enabled)', using_log=True)),
     ]
 
-    # Minimum cache_size requirement of lsm is 31MB
+    # Minimum cache_size requirement of lsm is 31MB.
     types = [
         ('col_fix', dict(empty=1, cacheSize='cache_size=20MB', extra_config=',key_format=r,value_format=8t')),
         ('col_var', dict(empty=0, cacheSize='cache_size=20MB', extra_config=',key_format=r')),
@@ -68,14 +68,12 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         cur = session.open_cursor(tablename, None)
         if missing == False:
             actual = dict((k, v) for k, v in cur if v != 0)
-            if prn == True:
-                print "CHECK : Expected"
-                print expected
-                print "CHECK : Actual"
-                print actual
+            if actual != expected:
+                print "missing: ", sorted(set(expected) - set(actual))
+                print "extras: ", sorted(set(actual) - set(expected))
             self.assertTrue(actual == expected)
 
-        # Search for the expected items as well as iterating
+        # Search for the expected items as well as iterating.
         for k, v in expected.iteritems():
             if missing == False:
                 self.assertEqual(cur[k], v, "for key " + str(k))
@@ -114,7 +112,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.ConnectionOpen(self.cacheSize)
         # Configure small page sizes to ensure eviction comes through and we
-        # have a somewhat complex tree
+        # have a somewhat complex tree.
         config_default = 'key_format=i,value_format=i,memory_page_max=32k,leaf_page_max=8k,internal_page_max=8k'
         config_nolog   = ',log=(enabled=false)'
         #
@@ -133,7 +131,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create(self.table_nots_nolog, config_default + config_nolog + self.extra_config)
         cur_nots_nolog = self.session.open_cursor(self.table_nots_nolog)
 
-        # Insert keys each with timestamp=key, in some order
+        # Insert keys each with timestamp=key, in some order.
         key_range = 10000
         keys = range(1, key_range + 1)
 
@@ -168,41 +166,41 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn.rollback_to_stable()
 
         # Check that we see the inserted value (i.e. 1) for all the keys in
-        # non-timestamp tables
+        # non-timestamp tables.
         self.check(self.session, 'read_timestamp=' + latest_ts,
             self.table_nots_log, dict((k, 1) for k in keys[:]))
         self.check(self.session, 'read_timestamp=' + latest_ts,
             self.table_nots_nolog, dict((k, 1) for k in keys[:]))
 
         # For non-logged tables the behavior is consistent across connections
-        # with or without log enabled
+        # with or without log enabled.
         # Check that we see the inserted value (i.e. 1) for the keys in a
-        # timestamp table till the stable_timestamp only.
+        # timestamped table until the stable_timestamp only.
         self.check(self.session, 'read_timestamp=' + latest_ts,
             self.table_ts_nolog, dict((k, 1) for k in keys[:(key_range / 2)]))
         self.check(self.session, 'read_timestamp=' + latest_ts,
             self.table_ts_nolog, dict((k, 1) for k in keys[(key_range / 2 + 1):]), missing=True)
 
-        # For logged tables behavior changes for rollback_to_stable based on
+        # For logged tables, the behavior of rollback_to_stable changes based on
         # whether connection level logging is enabled or not.
         if self.using_log == True:
-            # When log is enabled, none of the keys will be rolled back.
-            # Check that we see all the keys
+            # When the log is enabled, none of the keys will be rolled back.
+            # Check that we see all the keys.
             self.check(self.session, 'read_timestamp=' + latest_ts,
                 self.table_ts_log, dict((k, 1) for k in keys[:]))
         else:
-            # When log is disabled, keys will be rolled back till stable_timestamp
-            # Check that we see the insertions are rolled back in timestamp tables
-            # till the stable_timestamp
+            # When the log is disabled, the keys will be rolled back until stable_timestamp.
+            # Check that we see the insertions are rolled back in timestamped tables
+            # until the stable_timestamp.
             self.check(self.session, 'read_timestamp=' + latest_ts,
                 self.table_ts_log, dict((k, 1) for k in keys[:(key_range / 2)]))
             self.check(self.session, 'read_timestamp=' + latest_ts,
                 self.table_ts_log, dict((k, 1) for k in keys[(key_range / 2 + 1):]), missing=True)
 
-        # Bump the oldest timestamp, we're not going back...
+        # Bump the oldest timestamp, we're not going back.
         self.conn.set_timestamp('oldest_timestamp=' + stable_ts)
 
-        # Update the values again in preparation for rolling back more
+        # Update the values again in preparation for rolling back more.
         for k in keys:
             cur_nots_log[k] = 2
             cur_nots_nolog[k] = 2
@@ -212,7 +210,7 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(k + key_range))
 
         # Scenario: 3
-        # Check that we see all values updated (i.e 2) in all tables
+        # Check that we see all values updated (i.e 2) in all tables.
         latest_ts = timestamp_str(2 * key_range)
         self.check(self.session, 'read_timestamp=' + latest_ts,
             self.table_nots_log, dict((k, 2) for k in keys[:]))
@@ -225,20 +223,20 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Scenario: 4
         # Advance the stable_timestamp by a quarter range and rollback.
-        # three-quarter timestamps will be rolled back.
+        # Three-fourths of the later timestamps will be rolled back.
         stable_ts = timestamp_str(key_range + key_range / 4)
         self.conn.set_timestamp('stable_timestamp=' + stable_ts)
         self.conn.rollback_to_stable()
 
         # Check that we see the updated value (i.e. 2) for all the keys in
-        # non-timestamp tables
+        # non-timestamped tables.
         self.check(self.session, 'read_timestamp=' + latest_ts,
             self.table_nots_log, dict((k, 2) for k in keys[:]))
         self.check(self.session, 'read_timestamp=' + latest_ts,
             self.table_nots_nolog, dict((k, 2) for k in keys[:]))
         # For non-logged tables the behavior is consistent across connections
-        # with or without log enabled
-        # Check that we see only half key ranges in timestamp tables. we see
+        # with or without log enabled.
+        # Check that we see only half key ranges in timestamp tables. We see
         # the updated value (i.e. 2) for the first quarter keys and old values
         # (i.e. 1) for the second quarter keys.
         self.check(self.session, 'read_timestamp=' + latest_ts,
@@ -251,12 +249,12 @@ class test_timestamp04(wttest.WiredTigerTestCase, suite_subprocess):
         # whether connection level logging is enabled or not.
         if self.using_log == True:
             # When log is enabled, none of the keys will be rolled back.
-            # Check that we see all the keys
+            # Check that we see all the keys.
             self.check(self.session, 'read_timestamp=' + latest_ts,
                 self.table_ts_log, dict((k, 2) for k in keys[:]))
         else:
-            # When log is disabled, keys will be rolled back till stable_timestamp
-            # Check that we see only half key ranges in timestamp tables. we see
+            # When log is disabled, keys will be rolled back until the stable_timestamp.
+            # Check that we see only half the key ranges in timestamped tables. We see
             # the updated value (i.e. 2) for the first quarter keys and old values
             # (i.e. 1) for the second quarter keys.
             self.check(self.session, 'read_timestamp=' + latest_ts,

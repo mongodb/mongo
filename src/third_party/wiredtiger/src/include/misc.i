@@ -34,9 +34,7 @@ __wt_hex(int c)
  *      Get a timestamp from CPU registers.
  */
 static inline uint64_t
-__wt_rdtsc(WT_SESSION_IMPL *session) {
-	if (__wt_process.use_epochtime)
-		return (__wt_tsc_get_expensive_timestamp(session));
+__wt_rdtsc(void) {
 #if defined (__i386)
 	{
 	uint64_t x;
@@ -52,8 +50,26 @@ __wt_rdtsc(WT_SESSION_IMPL *session) {
 	return ((d << 32) | a);
 	}
 #else
-	return (__wt_tsc_get_expensive_timestamp(session));
+	return (0);
 #endif
+}
+
+/*
+ * __wt_clock --
+ *       Obtain a timestamp via either a CPU register or via a system call on
+ *       platforms where obtaining it directly from the hardware register is
+ *       not supported.
+ */
+static inline uint64_t
+__wt_clock(WT_SESSION_IMPL *session)
+{
+	struct timespec tsp;
+
+	if (__wt_process.use_epochtime) {
+		__wt_epoch(session, &tsp);
+		return ((uint64_t)(tsp.tv_sec * WT_BILLION + tsp.tv_nsec));
+	}
+	return (__wt_rdtsc());
 }
 
 /*

@@ -232,12 +232,14 @@ struct __wt_ovfl_reuse {
  *	Related information for on-disk pages with lookaside entries.
  */
 struct __wt_page_lookaside {
-	uint64_t las_pageid;			/* Page ID in lookaside */
-	uint64_t las_max_txn;			/* Maximum transaction ID in
-						   lookaside */
-	WT_DECL_TIMESTAMP(min_timestamp)	/* Min timestamp in lookaside */
-	WT_DECL_TIMESTAMP(onpage_timestamp)	/* Max timestamp on page */
-	bool las_skew_newest;			/* On-page skewed to newest */
+	uint64_t las_pageid;		/* Page ID in lookaside */
+	uint64_t las_max_txn;		/* Max transaction ID in lookaside */
+	WT_DECL_TIMESTAMP(min_timestamp)/* Min timestamp in lookaside */
+					/* Max timestamp on page */
+	WT_DECL_TIMESTAMP(onpage_timestamp)
+	bool eviction_to_lookaside;	/* Revert to lookaside on eviction */
+	bool las_skew_newest;		/* On-page skewed to newest */
+	bool invalid;			/* History is required correct reads */
 };
 
 /*
@@ -643,8 +645,8 @@ struct __wt_page {
 #define	WT_PAGE_DISK_ALLOC	0x02u	/* Disk image in allocated memory */
 #define	WT_PAGE_DISK_MAPPED	0x04u	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08u	/* Page is on the LRU queue */
-#define	WT_PAGE_OVERFLOW_KEYS	0x10u	/* Page has overflow keys */
-#define	WT_PAGE_READ_NO_EVICT	0x20u	/* Page read with eviction disabled */
+#define	WT_PAGE_EVICT_NO_PROGRESS 0x10u	/* Eviction doesn't count as progress */
+#define	WT_PAGE_OVERFLOW_KEYS	0x20u	/* Page has overflow keys */
 #define	WT_PAGE_SPLIT_INSERT	0x40u	/* A leaf page was split for append */
 #define	WT_PAGE_UPDATE_IGNORE	0x80u	/* Ignore updates on page discard */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
@@ -721,6 +723,10 @@ struct __wt_page {
  *	row-store leaf pages without reading them if they don't reference
  *	overflow items.
  *
+ * WT_REF_LIMBO:
+ *	The page image has been loaded into memory but there is additional
+ *	history in the lookaside table that has not been applied.
+ *
  * WT_REF_LOCKED:
  *	Locked for exclusive access.  In eviction, this page or a parent has
  *	been selected for eviction; once hazard pointers are checked, the page
@@ -794,11 +800,12 @@ struct __wt_ref {
 
 #define	WT_REF_DISK	 0		/* Page is on disk */
 #define	WT_REF_DELETED	 1		/* Page is on disk, but deleted */
-#define	WT_REF_LOCKED	 2		/* Page locked for exclusive access */
-#define	WT_REF_LOOKASIDE 3		/* Page is on disk with lookaside */
-#define	WT_REF_MEM	 4		/* Page is in cache and valid */
-#define	WT_REF_READING	 5		/* Page being read */
-#define	WT_REF_SPLIT	 6		/* Parent page split (WT_REF dead) */
+#define	WT_REF_LIMBO	 2		/* Page is in cache without history */
+#define	WT_REF_LOCKED	 3		/* Page locked for exclusive access */
+#define	WT_REF_LOOKASIDE 4		/* Page is on disk with lookaside */
+#define	WT_REF_MEM	 5		/* Page is in cache and valid */
+#define	WT_REF_READING	 6		/* Page being read */
+#define	WT_REF_SPLIT	 7		/* Parent page split (WT_REF dead) */
 	volatile uint32_t state;	/* Page state */
 
 	/*
@@ -820,16 +827,14 @@ struct __wt_ref {
 #undef	ref_ikey
 #define	ref_ikey	key.ikey
 
-	union {
-		WT_PAGE_DELETED	*page_del;	/* Deleted page information */
-		WT_PAGE_LOOKASIDE *page_las;	/* Lookaside information */
-	};
+	WT_PAGE_DELETED	  *page_del;	/* Deleted page information */
+	WT_PAGE_LOOKASIDE *page_las;	/* Lookaside information */
 };
 /*
  * WT_REF_SIZE is the expected structure size -- we verify the build to ensure
  * the compiler hasn't inserted padding which would break the world.
  */
-#define	WT_REF_SIZE	48
+#define	WT_REF_SIZE	56
 
 /*
  * WT_ROW --

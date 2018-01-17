@@ -45,6 +45,12 @@ test_value(int64_t val)
 	sinput = val;
 	soutput = 0;	/* -Werror=maybe-uninitialized */
 
+	/*
+	 * Required on some systems to pull in parts of the library
+	 * for which we have data references.
+	 */
+	testutil_check(__wt_library_init());
+
 	p = buf;
 	testutil_check(__wt_vpack_int(&p, sizeof(buf), sinput));
 	used_len = (size_t)(p - buf);

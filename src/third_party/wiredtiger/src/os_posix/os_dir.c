@@ -71,14 +71,12 @@ __directory_list_worker(WT_FILE_SYSTEM *file_system,
 	*dirlistp = entries;
 	*countp = count;
 
-err:	if (dirp != NULL) {
-		WT_SYSCALL(closedir(dirp), tret);
-		if (tret != 0) {
-			__wt_err(session, tret,
-			    "%s: directory-list: closedir", directory);
-			if (ret == 0)
-				ret = tret;
-		}
+err:	WT_SYSCALL(closedir(dirp), tret);
+	if (tret != 0) {
+		__wt_err(session, tret,
+		    "%s: directory-list: closedir", directory);
+		if (ret == 0)
+			ret = tret;
 	}
 
 	if (ret == 0)

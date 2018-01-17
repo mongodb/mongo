@@ -81,25 +81,33 @@
 
 /* An API call wrapped in a transaction if necessary. */
 #define	TXN_API_CALL(s, h, n, bt, config, cfg) do {			\
-	bool __autotxn = false;						\
+	bool __autotxn = false, __update = false;			\
 	API_CALL(s, h, n, bt, config, cfg);				\
 	__wt_txn_timestamp_flags(s);					\
 	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
-		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT)
+		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT);			\
+	__update = !F_ISSET(&(s)->txn, WT_TXN_UPDATE);			\
+	if (__update)							\
+		F_SET(&(s)->txn, WT_TXN_UPDATE);			\
 
 /* An API call wrapped in a transaction if necessary. */
 #define	TXN_API_CALL_NOCONF(s, h, n, dh) do {				\
-	bool __autotxn = false;						\
+	bool __autotxn = false, __update = false;			\
 	API_CALL_NOCONF(s, h, n, dh);					\
 	__wt_txn_timestamp_flags(s);					\
 	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
-		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT)
+		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT);			\
+	__update = !F_ISSET(&(s)->txn, WT_TXN_UPDATE);			\
+	if (__update)							\
+		F_SET(&(s)->txn, WT_TXN_UPDATE);			\
 
 /* End a transactional API call, optional retry on deadlock. */
 #define	TXN_API_END_RETRY(s, ret, retry)				\
 	API_END(s, ret);						\
+	if (__update)							\
+		F_CLR(&(s)->txn, WT_TXN_UPDATE);			\
 	if (__autotxn) {						\
 		if (F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT))		\
 			F_CLR(&(s)->txn, WT_TXN_AUTOCOMMIT);		\

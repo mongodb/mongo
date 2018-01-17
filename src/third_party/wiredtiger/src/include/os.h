@@ -65,14 +65,14 @@
 #define	WT_TIMEDIFF_SEC(end, begin)					\
 	(WT_TIMEDIFF_NS((end), (begin)) / WT_BILLION)
 
-#define	WT_TSCDIFF_NS(end, begin)					\
-	(__wt_tsc_to_nsec(end, begin))
-#define	WT_TSCDIFF_US(end, begin)					\
-	(WT_TSCDIFF_NS(end, begin) / WT_THOUSAND)
-#define	WT_TSCDIFF_MS(end, begin)					\
-	(WT_TSCDIFF_NS(end, begin) / WT_MILLION)
-#define	WT_TSCDIFF_SEC(end, begin)					\
-	(WT_TSCDIFF_NS(end, begin) / WT_BILLION)
+#define	WT_CLOCKDIFF_NS(end, begin)					\
+	(__wt_clock_to_nsec(end, begin))
+#define	WT_CLOCKDIFF_US(end, begin)					\
+	(WT_CLOCKDIFF_NS(end, begin) / WT_THOUSAND)
+#define	WT_CLOCKDIFF_MS(end, begin)					\
+	(WT_CLOCKDIFF_NS(end, begin) / WT_MILLION)
+#define	WT_CLOCKDIFF_SEC(end, begin)					\
+	(WT_CLOCKDIFF_NS(end, begin) / WT_BILLION)
 
 #define	WT_TIMECMP(t1, t2)						\
 	((t1).tv_sec < (t2).tv_sec ? -1 :				\

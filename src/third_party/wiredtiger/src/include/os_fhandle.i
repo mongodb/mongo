@@ -109,14 +109,14 @@ __wt_read(
 
 	WT_STAT_CONN_INCR_ATOMIC(session, thread_read_active);
 	WT_STAT_CONN_INCR(session, read_io);
-	time_start = __wt_rdtsc(session);
+	time_start = __wt_clock(session);
 
 	ret = fh->handle->fh_read(
 	    fh->handle, (WT_SESSION *)session, offset, len, buf);
 
-	time_stop = __wt_rdtsc(session);
+	time_stop = __wt_clock(session);
 	__wt_stat_msecs_hist_incr_fsread(session,
-	    WT_TSCDIFF_MS(time_stop, time_start));
+	    WT_CLOCKDIFF_MS(time_stop, time_start));
 	WT_STAT_CONN_DECR_ATOMIC(session, thread_read_active);
 	return (ret);
 }
@@ -188,14 +188,14 @@ __wt_write(WT_SESSION_IMPL *session,
 
 	WT_STAT_CONN_INCR(session, write_io);
 	WT_STAT_CONN_INCR_ATOMIC(session, thread_write_active);
-	time_start = __wt_rdtsc(session);
+	time_start = __wt_clock(session);
 
 	ret = fh->handle->fh_write(
 	    fh->handle, (WT_SESSION *)session, offset, len, buf);
 
-	time_stop = __wt_rdtsc(session);
+	time_stop = __wt_clock(session);
 	__wt_stat_msecs_hist_incr_fswrite(session,
-	    WT_TSCDIFF_MS(time_stop, time_start));
+	    WT_CLOCKDIFF_MS(time_stop, time_start));
 	WT_STAT_CONN_DECR_ATOMIC(session, thread_write_active);
 	return (ret);
 }

@@ -382,11 +382,11 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	cache = conn->cache;
 
 	/* Give up if scrubbing is disabled. */
-	if (cache->eviction_checkpoint_target == 0 ||
+	if (cache->eviction_checkpoint_target < DBL_EPSILON ||
 	    cache->eviction_checkpoint_target >= cache->eviction_dirty_trigger)
 		return;
 
-	time_last = time_start = __wt_rdtsc(session);
+	time_last = time_start = __wt_clock(session);
 	bytes_written_last = 0;
 	bytes_written_start = cache->bytes_written;
 	cache_size = conn->cache_size;
@@ -436,7 +436,7 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 	for (;;) {
 		current_dirty =
 		    (100.0 * __wt_cache_dirty_leaf_inuse(cache)) / cache_size;
-		if (current_dirty <= (double)cache->eviction_checkpoint_target)
+		if (current_dirty <= cache->eviction_checkpoint_target)
 			break;
 
 		/*
@@ -447,8 +447,8 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 			break;
 
 		__wt_sleep(0, stepdown_us / 10);
-		time_stop = __wt_rdtsc(session);
-		current_us = WT_TSCDIFF_US(time_stop, time_last);
+		time_stop = __wt_clock(session);
+		current_us = WT_CLOCKDIFF_US(time_stop, time_last);
 		bytes_written_total =
 		    cache->bytes_written - bytes_written_start;
 
@@ -502,11 +502,11 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
 		    WT_MAX(cache->eviction_dirty_target, current_dirty - delta);
 		WT_STAT_CONN_SET(session, txn_checkpoint_scrub_target,
 		    cache->eviction_scrub_limit);
-		time_last = __wt_rdtsc(session);
+		time_last = __wt_clock(session);
 	}
 
-	time_stop = __wt_rdtsc(session);
-	total_ms = WT_TSCDIFF_MS(time_stop, time_start);
+	time_stop = __wt_clock(session);
+	total_ms = WT_CLOCKDIFF_MS(time_stop, time_start);
 	WT_STAT_CONN_SET(session, txn_checkpoint_scrub_time, total_ms);
 }
 
@@ -880,10 +880,10 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
 	 * lazy checkpoints, but we don't support them yet).
 	 */
-	time_start = __wt_rdtsc(session);
+	time_start = __wt_clock(session);
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
-	time_stop = __wt_rdtsc(session);
-	fsync_duration_usecs = WT_TSCDIFF_US(time_stop, time_start);
+	time_stop = __wt_clock(session);
+	fsync_duration_usecs = WT_CLOCKDIFF_US(time_stop, time_start);
 	WT_STAT_CONN_INCR(session, txn_checkpoint_fsync_post);
 	WT_STAT_CONN_SET(session,
 	    txn_checkpoint_fsync_post_duration, fsync_duration_usecs);
