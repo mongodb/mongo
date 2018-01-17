@@ -403,9 +403,9 @@ SSLPeerInfo Socket::doSSLHandshake(const char* firstBytes, int len) {
         return SSLPeerInfo();
     fassert(16506, _fd != INVALID_SOCKET);
     if (_sslConnection.get()) {
-        throw SocketException(SocketException::RECV_ERROR,
-                              "Attempt to call SSL_accept on already secure Socket from " +
-                                  remoteString());
+        throwSocketError(SocketErrorKind::RECV_ERROR,
+                         "Attempt to call SSL_accept on already secure Socket from " +
+                             remoteString());
     }
     _sslConnection.reset(_sslManager->accept(this, firstBytes, len));
     return _sslManager->parseAndValidatePeerCertificateDeprecated(_sslConnection.get(), "");
@@ -698,18 +698,18 @@ void Socket::handleSendError(int ret, const char* context) {
     if ((mongo_errno == EAGAIN || mongo_errno == EWOULDBLOCK) && _timeout != 0) {
 #endif
         LOG(_logLevel) << "Socket " << context << " send() timed out " << remoteString();
-        throw SocketException(SocketException::SEND_TIMEOUT, remoteString());
+        throwSocketError(SocketErrorKind::SEND_TIMEOUT, remoteString());
     } else if (mongo_errno != EINTR) {
         LOG(_logLevel) << "Socket " << context << " send() " << errnoWithDescription(mongo_errno)
                        << ' ' << remoteString();
-        throw SocketException(SocketException::SEND_ERROR, remoteString());
+        throwSocketError(SocketErrorKind::SEND_ERROR, remoteString());
     }
 }
 
 void Socket::handleRecvError(int ret, int len) {
     if (ret == 0) {
         LOG(3) << "Socket recv() conn closed? " << remoteString();
-        throw SocketException(SocketException::CLOSED, remoteString());
+        throwSocketError(SocketErrorKind::CLOSED, remoteString());
     }
 
 // ret < 0
@@ -732,11 +732,11 @@ void Socket::handleRecvError(int ret, int len) {
 #endif
         // this is a timeout
         LOG(_logLevel) << "Socket recv() timeout  " << remoteString();
-        throw SocketException(SocketException::RECV_TIMEOUT, remoteString());
+        throwSocketError(SocketErrorKind::RECV_TIMEOUT, remoteString());
     }
 
     LOG(_logLevel) << "Socket recv() " << errnoWithDescription(e) << " " << remoteString();
-    throw SocketException(SocketException::RECV_ERROR, remoteString());
+    throwSocketError(SocketErrorKind::RECV_ERROR, remoteString());
 }
 
 void Socket::setTimeout(double secs) {

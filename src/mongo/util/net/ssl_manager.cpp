@@ -420,7 +420,7 @@ private:
 
     /**
      * Given an error code from an SSL-type IO function, logs an
-     * appropriate message and throws a SocketException.
+     * appropriate message and throws a NetworkException.
      */
     MONGO_COMPILER_NORETURN void _handleSSLError(int code, int ret);
 
@@ -587,7 +587,7 @@ SSLConnection::SSLConnection(SSL_CTX* context, Socket* sock, const char* initial
         int toBIO = BIO_write(networkBIO, initialBytes, len);
         if (toBIO != len) {
             LOG(3) << "Failed to write initial network data to the SSL BIO layer";
-            throw SocketException(SocketException::RECV_ERROR, socket->remoteString());
+            throwSocketError(SocketErrorKind::RECV_ERROR, socket->remoteString());
         }
     }
 }
@@ -1266,7 +1266,7 @@ void SSLManager::_flushNetworkBIO(SSLConnection* conn) {
         int toBIO = BIO_write(conn->networkBIO, buffer, numRead);
         if (toBIO != numRead) {
             LOG(3) << "Failed to write network data to the SSL BIO layer";
-            throw SocketException(SocketException::RECV_ERROR, conn->socket->remoteString());
+            throwSocketError(SocketErrorKind::RECV_ERROR, conn->socket->remoteString());
         }
     }
 }
@@ -1432,10 +1432,9 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
 SSLPeerInfo SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConnection* conn,
                                                                   const std::string& remoteHost) {
     auto swPeerSubjectName = parseAndValidatePeerCertificate(conn->ssl, remoteHost);
-    // We can't use uassertStatusOK here because we need to throw a SocketException.
+    // We can't use uassertStatusOK here because we need to throw a NetworkException.
     if (!swPeerSubjectName.isOK()) {
-        throw SocketException(SocketException::CONNECT_ERROR,
-                              swPeerSubjectName.getStatus().reason());
+        throwSocketError(SocketErrorKind::CONNECT_ERROR, swPeerSubjectName.getStatus().reason());
     }
     return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
 }
@@ -1607,7 +1606,7 @@ void SSLManager::_handleSSLError(int code, int ret) {
             error() << "unrecognized SSL error";
             break;
     }
-    throw SocketException(SocketException::CONNECT_ERROR, "");
+    throwSocketError(SocketErrorKind::CONNECT_ERROR, "");
 }
 }  // namespace mongo
 

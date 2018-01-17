@@ -1101,7 +1101,7 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const OplogEntry& oplog
                           << "sync source, attempt " << retryCount << " of " << retryMax << endl;
                 continue;  // try again
             }
-        } catch (const SocketException&) {
+        } catch (const NetworkException&) {
             warning() << "network problem detected while connecting to the "
                       << "sync source, attempt " << retryCount << " of " << retryMax << endl;
             continue;  // try again
@@ -1128,7 +1128,7 @@ BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const OplogEntry& oplog
                 // If a UUID exists for the command object, find the document by UUID.
                 missingObj = missingObjReader.findOneByUUID(dbname.toString(), *uuid, query);
             }
-        } catch (const SocketException&) {
+        } catch (const NetworkException&) {
             warning() << "network problem detected while fetching a missing document from the "
                       << "sync source, attempt " << retryCount << " of " << retryMax << endl;
             continue;  // try again

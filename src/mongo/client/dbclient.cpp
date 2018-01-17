@@ -1037,7 +1037,7 @@ void DBClientConnection::_checkConnection() {
         return;
 
     if (!autoReconnect)
-        throw SocketException(SocketException::FAILED_STATE, toString());
+        throwSocketError(SocketErrorKind::FAILED_STATE, toString());
 
     // Don't hammer reconnects, backoff if needed
     autoReconnectBackoff.nextSleepMillis();
@@ -1052,7 +1052,7 @@ void DBClientConnection::_checkConnection() {
         if (connectStatus == ErrorCodes::IncompatibleCatalogManager) {
             uassertStatusOK(connectStatus);  // Will always throw
         } else {
-            throw SocketException(SocketException::CONNECT_ERROR, connectStatus.reason());
+            throwSocketError(SocketErrorKind::CONNECT_ERROR, connectStatus.reason());
         }
     }
 
@@ -1377,8 +1377,9 @@ void DBClientConnection::say(Message& toSend, bool isRetry, string* actualServer
         auto swm = _compressorManager.compressMessage(toSend);
         uassertStatusOK(swm.getStatus());
         port().say(swm.getValue());
-    } catch (SocketException&) {
+    } catch (const DBException&) {
         _failed = true;
+        _port->shutdown();
         throw;
     }
 }

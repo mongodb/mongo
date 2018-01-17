@@ -268,7 +268,7 @@ TEST_F(SocketFailPointTest, TestSend) {
     ASSERT_TRUE(tryRecv());
     {
         const ScopedFailPointEnabler enabled(*_failPoint);
-        ASSERT_THROWS(trySend(), SocketException);
+        ASSERT_THROWS(trySend(), NetworkException);
     }
     // Channel should be working again
     ASSERT_TRUE(trySend());
@@ -280,7 +280,7 @@ TEST_F(SocketFailPointTest, TestSendVector) {
     ASSERT_TRUE(tryRecv());
     {
         const ScopedFailPointEnabler enabled(*_failPoint);
-        ASSERT_THROWS(trySendVector(), SocketException);
+        ASSERT_THROWS(trySendVector(), NetworkException);
     }
     ASSERT_TRUE(trySendVector());
     ASSERT_TRUE(tryRecv());
@@ -292,7 +292,7 @@ TEST_F(SocketFailPointTest, TestRecv) {
     {
         ASSERT_TRUE(trySend());  // data for recv
         const ScopedFailPointEnabler enabled(*_failPoint);
-        ASSERT_THROWS(tryRecv(), SocketException);
+        ASSERT_THROWS(tryRecv(), NetworkException);
     }
     ASSERT_TRUE(trySend());  // data for recv
     ASSERT_TRUE(tryRecv());
@@ -305,7 +305,7 @@ TEST_F(SocketFailPointTest, TestFailedSendsDontSend) {
         ASSERT_TRUE(trySend());  // queue 1 byte
         const ScopedFailPointEnabler enabled(*_failPoint);
         // Fail to queue another byte
-        ASSERT_THROWS(trySend(), SocketException);
+        ASSERT_THROWS(trySend(), NetworkException);
     }
     // Failed byte should not have been transmitted.
     ASSERT_EQUALS(size_t(1), countRecvable(2));
@@ -319,7 +319,7 @@ TEST_F(SocketFailPointTest, TestFailedVectorSendsDontSend) {
         ASSERT_TRUE(trySend());  // queue 1 byte
         const ScopedFailPointEnabler enabled(*_failPoint);
         // Fail to queue another byte
-        ASSERT_THROWS(trySendVector(), SocketException);
+        ASSERT_THROWS(trySendVector(), NetworkException);
     }
     // Failed byte should not have been transmitted.
     ASSERT_EQUALS(size_t(1), countRecvable(2));
@@ -332,7 +332,7 @@ TEST_F(SocketFailPointTest, TestFailedRecvsDontRecv) {
         ASSERT_TRUE(trySend());
         const ScopedFailPointEnabler enabled(*_failPoint);
         // Fail to recv that byte
-        ASSERT_THROWS(tryRecv(), SocketException);
+        ASSERT_THROWS(tryRecv(), NetworkException);
     }
     // Failed byte should still be queued to recv.
     ASSERT_EQUALS(size_t(1), countRecvable(1));

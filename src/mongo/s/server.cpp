@@ -599,8 +599,6 @@ int mongoSMain(int argc, char* argv[], char** envp) {
     try {
         int exitCode = _main();
         return exitCode;
-    } catch (const SocketException& e) {
-        error() << "uncaught SocketException in mongos main: " << redact(e);
     } catch (const DBException& e) {
         error() << "uncaught DBException in mongos main: " << redact(e);
     } catch (const std::exception& e) {

@@ -535,14 +535,14 @@ TEST(MockDBClientConnTest, Shutdown) {
         server.shutdown();
         ASSERT(!server.isRunning());
 
-        ASSERT_THROWS(conn.query("test.user"), mongo::SocketException);
+        ASSERT_THROWS(conn.query("test.user"), mongo::NetworkException);
     }
 
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
         ASSERT_THROWS(conn.runCommand("test.user", BSON("serverStatus" << 1), response),
-                      mongo::SocketException);
+                      mongo::NetworkException);
     }
 
     ASSERT_EQUALS(0U, server.getQueryCount());
@@ -562,11 +562,11 @@ TEST(MockDBClientConnTest, Restart) {
     conn1.runCommand("test.user", BSON("serverStatus" << 1), response);
 
     server.shutdown();
-    ASSERT_THROWS(conn1.query("test.user"), mongo::SocketException);
+    ASSERT_THROWS(conn1.query("test.user"), mongo::NetworkException);
 
     // New connections shouldn't work either
     MockDBClientConnection conn2(&server);
-    ASSERT_THROWS(conn2.query("test.user"), mongo::SocketException);
+    ASSERT_THROWS(conn2.query("test.user"), mongo::NetworkException);
 
     ASSERT_EQUALS(1U, server.getQueryCount());
     ASSERT_EQUALS(1U, server.getCmdCount());
@@ -580,8 +580,8 @@ TEST(MockDBClientConnTest, Restart) {
     }
 
     // Old connections still shouldn't work
-    ASSERT_THROWS(conn1.query("test.user"), mongo::SocketException);
-    ASSERT_THROWS(conn2.query("test.user"), mongo::SocketException);
+    ASSERT_THROWS(conn1.query("test.user"), mongo::NetworkException);
+    ASSERT_THROWS(conn2.query("test.user"), mongo::NetworkException);
 
     ASSERT_EQUALS(2U, server.getQueryCount());
     ASSERT_EQUALS(1U, server.getCmdCount());

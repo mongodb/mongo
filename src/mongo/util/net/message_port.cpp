@@ -172,11 +172,8 @@ bool MessagingPort::recv(Message& m) {
         m.setData(std::move(buf));
         return true;
 
-    } catch (const SocketException& e) {
-        logger::LogSeverity severity = _psock->getLogLevel();
-        if (!e.shouldPrint())
-            severity = severity.lessSevere();
-        LOG(severity) << "SocketException: remote: " << remote() << " error: " << e;
+    } catch (const NetworkException& e) {
+        LOG(_psock->getLogLevel()) << "NetworkException: remote: " << remote() << " error: " << e;
         m.reset();
         return false;
     }

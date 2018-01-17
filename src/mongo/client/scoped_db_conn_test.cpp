@@ -424,7 +424,7 @@ TEST_F(DummyServerFixture, ScopedDbConnectionWithTimeout) {
 
     log() << "Testing ConnectionString timeouts";
     start = Date_t::now();
-    ASSERT_THROWS(ScopedDbConnection conn2(TARGET_HOST, overrideTimeout.count()), SocketException);
+    ASSERT_THROWS(ScopedDbConnection conn2(TARGET_HOST, overrideTimeout.count()), NetworkException);
     end = Date_t::now();
     // We add 100 milliseconds here because on some platforms the connection might timeout after
     // 997ms instead of >= 1000ms.
@@ -461,7 +461,7 @@ TEST_F(DummyServerFixture, InvalidateBadConnInPool) {
 
     try {
         conn2->query("test.user", Query());
-    } catch (const SocketException&) {
+    } catch (const NetworkException&) {
     }
 
     getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->setMode(FailPoint::off);
@@ -481,7 +481,7 @@ TEST_F(DummyServerFixture, DontReturnKnownBadConnToPool) {
 
     try {
         conn3->query("test.user", Query());
-    } catch (const SocketException&) {
+    } catch (const NetworkException&) {
     }
 
     getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->setMode(FailPoint::off);
@@ -510,7 +510,7 @@ TEST_F(DummyServerFixture, InvalidateBadConnEvenWhenPoolIsFull) {
 
     try {
         conn2->query("test.user", Query());
-    } catch (const SocketException&) {
+    } catch (const NetworkException&) {
     }
 
     getGlobalFailPointRegistry()->getFailPoint("throwSockExcep")->setMode(FailPoint::off);

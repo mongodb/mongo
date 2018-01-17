@@ -36,21 +36,21 @@ namespace mongo {
 
 namespace {
 
-std::string getStringType(SocketException::Type t) {
-    switch (t) {
-        case SocketException::Type::CLOSED:
+std::string getStringType(SocketErrorKind kind) {
+    switch (kind) {
+        case SocketErrorKind::CLOSED:
             return "CLOSED";
-        case SocketException::Type::RECV_ERROR:
+        case SocketErrorKind::RECV_ERROR:
             return "RECV_ERROR";
-        case SocketException::Type::SEND_ERROR:
+        case SocketErrorKind::SEND_ERROR:
             return "SEND_ERROR";
-        case SocketException::Type::RECV_TIMEOUT:
+        case SocketErrorKind::RECV_TIMEOUT:
             return "RECV_TIMEOUT";
-        case SocketException::Type::SEND_TIMEOUT:
+        case SocketErrorKind::SEND_TIMEOUT:
             return "SEND_TIMEOUT";
-        case SocketException::Type::FAILED_STATE:
+        case SocketErrorKind::FAILED_STATE:
             return "FAILED_STATE";
-        case SocketException::Type::CONNECT_ERROR:
+        case SocketErrorKind::CONNECT_ERROR:
             return "CONNECT_ERROR";
         default:
             return "UNKNOWN";  // should never happen
@@ -59,32 +59,18 @@ std::string getStringType(SocketException::Type t) {
 
 }  // namespace
 
-SocketException::SocketException(Type t,
-                                 const std::string& server,
-                                 int code,
-                                 const std::string& extra)
-    : DBException(Status(ErrorCodes::Error(code),
-                         std::string("socket exception [") + getStringType(t) + "] for " + server)),
-      _type(t),
-      _server(server),
-      _extra(extra) {}
+Status makeSocketError(SocketErrorKind kind, const std::string& server, const std::string& extra) {
+    StringBuilder ss;
+    ss << "socket exception [" << getStringType(kind) << "]";
 
+    if (!server.empty())
+        ss << " server [" << server << "]";
 
-bool SocketException::shouldPrint() const {
-    return _type != CLOSED;
+    if (!extra.empty())
+        ss << ' ' << extra;
+
+    return Status(ErrorCodes::SocketException, ss.str());
 }
 
-std::string SocketException::toString() const {
-    std::stringstream ss;
-    ss << codeString() << " socket exception [" << getStringType(_type) << "] ";
-
-    if (_server.size())
-        ss << "server [" << _server << "] ";
-
-    if (_extra.size())
-        ss << _extra;
-
-    return ss.str();
-}
 
 }  // namespace mongo

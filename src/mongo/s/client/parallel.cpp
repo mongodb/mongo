@@ -393,9 +393,9 @@ void ParallelSortClusteredCursor::setupVersionAndHandleSlaveOk(
         }
     } catch (const DBException& dbExcep) {
         auto errCode = dbExcep.code();
-        if (allowShardVersionFailure && (ErrorCodes::isNotMasterError(errCode) ||
-                                         errCode == ErrorCodes::FailedToSatisfyReadPreference ||
-                                         errCode == ErrorCodes::SocketException)) {
+        if (allowShardVersionFailure &&
+            (ErrorCodes::isNotMasterError(errCode) || ErrorCodes::isNetworkError(errCode) ||
+             errCode == ErrorCodes::FailedToSatisfyReadPreference)) {
             // It's okay if we don't set the version when talking to a secondary, we can
             // be stale in any case.
 
@@ -629,7 +629,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
             // Restart with new chunk manager
             startInit(opCtx);
             return;
-        } catch (SocketException& e) {
+        } catch (NetworkException& e) {
             warning() << "socket exception when initializing on " << shardId
                       << ", current connection state is " << mdata.toBSON() << causedBy(redact(e));
             mdata.errored = true;
@@ -774,7 +774,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
             // Fully clear this cursor, as it needs to be re-established
             mdata.cleanup(true);
             continue;
-        } catch (SocketException& e) {
+        } catch (NetworkException& e) {
             warning() << "socket exception when finishing on " << shardId
                       << ", current connection state is " << mdata.toBSON() << causedBy(redact(e));
             mdata.errored = true;
@@ -1018,7 +1018,7 @@ void ParallelSortClusteredCursor::_oldInit() {
 
             try {
                 _cursors[i].get()->initLazy(!firstPass);
-            } catch (SocketException& e) {
+            } catch (NetworkException& e) {
                 socketExs.push_back(e.what() + errLoc);
                 _cursors[i].reset(NULL, NULL);
                 conns[i]->done();
@@ -1077,7 +1077,7 @@ void ParallelSortClusteredCursor::_oldInit() {
                 _cursors[i].reset(NULL, NULL);
                 conns[i]->done();
                 continue;
-            } catch (SocketException& e) {
+            } catch (NetworkException& e) {
                 socketExs.push_back(e.what() + errLoc);
                 _cursors[i].reset(NULL, NULL);
                 conns[i]->done();

@@ -67,7 +67,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWit
 
     try {
         return {_remoteServer->runCommand(_remoteServerInstanceID, request), this};
-    } catch (const mongo::SocketException&) {
+    } catch (const mongo::DBException&) {
         _isFailed = true;
         throw;
     }
@@ -96,7 +96,7 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(const strin
         std::unique_ptr<mongo::DBClientCursor> cursor;
         cursor.reset(new MockDBClientCursor(this, result));
         return cursor;
-    } catch (const mongo::SocketException&) {
+    } catch (const mongo::DBException&) {
         _isFailed = true;
         throw;
     }

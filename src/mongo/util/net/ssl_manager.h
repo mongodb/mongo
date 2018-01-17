@@ -114,25 +114,25 @@ public:
 
     /**
      * Initiates a TLS connection.
-     * Throws SocketException on failure.
+     * Throws NetworkException on failure.
      * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
      */
     virtual SSLConnection* connect(Socket* socket) = 0;
 
     /**
      * Waits for the other side to initiate a TLS connection.
-     * Throws SocketException on failure.
+     * Throws NetworkException on failure.
      * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
      */
     virtual SSLConnection* accept(Socket* socket, const char* initialBytes, int len) = 0;
 
     /**
      * Fetches a peer certificate and validates it if it exists
-     * Throws SocketException on failure
+     * Throws NetworkException on failure
      * @return a std::string containing the certificate's subject name.
      *
      * This version of parseAndValidatePeerCertificate is deprecated because it throws a
-     * SocketException upon failure. New code should prefer the version that returns
+     * NetworkException upon failure. New code should prefer the version that returns
      * a StatusWith instead.
      */
     virtual SSLPeerInfo parseAndValidatePeerCertificateDeprecated(

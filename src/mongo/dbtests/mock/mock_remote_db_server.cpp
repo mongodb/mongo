@@ -232,7 +232,7 @@ void MockRemoteDBServer::checkIfUp(InstanceID id) const {
     scoped_spinlock sLock(_lock);
 
     if (!_isRunning || id < _instanceID) {
-        throw mongo::SocketException(mongo::SocketException::CLOSED, _hostAndPort);
+        throwSocketError(mongo::SocketErrorKind::CLOSED, _hostAndPort);
     }
 }
 }

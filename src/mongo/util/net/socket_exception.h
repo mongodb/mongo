@@ -33,38 +33,30 @@
 #include <string>
 
 namespace mongo {
+enum class SocketErrorKind {
+    CLOSED,
+    RECV_ERROR,
+    SEND_ERROR,
+    RECV_TIMEOUT,
+    SEND_TIMEOUT,
+    FAILED_STATE,
+    CONNECT_ERROR
+};
 
 /**
- * A special class of DBException thrown by Sockets.
+ * Returns a Status with ErrorCodes::SocketException with a correctly formed message.
  */
-class SocketException final : public DBException {
-public:
-    const enum Type {
-        CLOSED,
-        RECV_ERROR,
-        SEND_ERROR,
-        RECV_TIMEOUT,
-        SEND_TIMEOUT,
-        FAILED_STATE,
-        CONNECT_ERROR
-    } _type;
+Status makeSocketError(SocketErrorKind kind,
+                       const std::string& server,
+                       const std::string& extra = "");
 
-    SocketException(Type t,
-                    const std::string& server,
-                    int code = ErrorCodes::SocketException,
-                    const std::string& extra = "");
+// Using a macro to preserve file/line info from call site.
+#define throwSocketError(...)                          \
+    do {                                               \
+        uassertStatusOK(makeSocketError(__VA_ARGS__)); \
+        MONGO_UNREACHABLE;                             \
+    } while (false)
 
-    ~SocketException() throw() override {}
-
-    bool shouldPrint() const;
-
-    std::string toString() const override;
-
-private:
-    void defineOnlyInFinalSubclassToPreventSlicing() final {}
-
-    std::string _server;
-    std::string _extra;
-};
+using NetworkException = ExceptionForCat<ErrorCategory::NetworkError>;
 
 }  // namespace mongo

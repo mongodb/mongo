@@ -279,10 +279,8 @@ DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
     string errmsg;
     c = cs.connect(StringData(), errmsg, socketTimeout).release();
     if (!c)
-        throw SocketException(SocketException::CONNECT_ERROR,
-                              host,
-                              11002,
-                              str::stream() << _name << " error: " << errmsg);
+        throwSocketError(
+            SocketErrorKind::CONNECT_ERROR, host, str::stream() << _name << " error: " << errmsg);
 
     return _finishCreate(host, socketTimeout, c);
 }

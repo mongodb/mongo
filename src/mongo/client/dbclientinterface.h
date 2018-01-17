@@ -1043,7 +1043,7 @@ public:
         return _compressorManager;
     }
 
-    // throws SocketException if in failed state and not reconnecting or if waiting to reconnect
+    // throws a NetworkException if in failed state and not reconnecting or if waiting to reconnect
     void checkConnection() override {
         if (_failed)
             _checkConnection();
