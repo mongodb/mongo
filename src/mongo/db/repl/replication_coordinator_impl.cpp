@@ -3358,8 +3358,6 @@ Timestamp ReplicationCoordinatorImpl::reserveSnapshotName(OperationContext* opCt
         // All snapshots are the same for a standalone node.
         reservedName = Timestamp();
     }
-    // This was just in case the snapshot name was different from the lastOp in the client.
-    ReplClientInfo::forClient(opCtx->getClient()).setLastSnapshot(reservedName);
     return reservedName;
 }
 

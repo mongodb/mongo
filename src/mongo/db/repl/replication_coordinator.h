@@ -803,9 +803,8 @@ public:
      * after.
      *
      * This method will not take any locks or attempt to access storage using the passed-in
-     * OperationContext. It will only be used to track reserved SnapshotNames by each operation so
-     * that awaitReplicationOfLastOpForClient() can correctly wait for the reserved snapshot to be
-     * visible.
+     * OperationContext. It will only be used to return reserved SnapshotNames by each operation so
+     * callers can correctly wait for the reserved snapshot to be visible.
      *
      * A null OperationContext can be used in cases where the snapshot to wait for should not be
      * adjusted.

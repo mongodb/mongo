@@ -56,13 +56,6 @@ public:
         _lastOp = OpTime();
     }
 
-    void setLastSnapshot(Timestamp name) {
-        _lastSnapshot = name;
-    }
-    Timestamp getLastSnapshot() const {
-        return _lastSnapshot;
-    }
-
     // Only used for master/slave
     void setRemoteID(OID rid) {
         _remoteId = rid;
@@ -82,7 +75,6 @@ private:
     static const long long kUninitializedTerm = -1;
 
     OpTime _lastOp = OpTime();
-    Timestamp _lastSnapshot;
     OID _remoteId = OID();
 };
 
