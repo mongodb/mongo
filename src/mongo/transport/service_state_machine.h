@@ -221,9 +221,9 @@ private:
     ServiceContext* const _serviceContext;
 
     transport::SessionHandle _sessionHandle;
+    const std::string _threadName;
     ServiceContext::UniqueClient _dbClient;
     const Client* _dbClientPtr;
-    const std::string _threadName;
     stdx::function<void()> _cleanupHook;
 
     bool _inExhaust = false;

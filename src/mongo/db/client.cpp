@@ -104,16 +104,11 @@ Client::Client(std::string desc, ServiceContext* serviceContext, transport::Sess
     : _serviceContext(serviceContext),
       _session(std::move(session)),
       _desc(std::move(desc)),
-      _threadId(stdx::this_thread::get_id()),
       _connectionId(_session ? _session->id() : 0),
       _prng(generateSeed(_desc)) {}
 
 void Client::reportState(BSONObjBuilder& builder) {
     builder.append("desc", desc());
-
-    std::stringstream ss;
-    ss << _threadId;
-    builder.append("threadId", ss.str());
 
     if (_connectionId) {
         builder.appendNumber("connectionId", _connectionId);
