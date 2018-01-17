@@ -85,7 +85,6 @@ selector:
   - jstests/sharding/time_zone_info_mongos.js
   - jstests/sharding/uuid_propagated_to_config_server_on_shardCollection.js
   - jstests/sharding/uuid_propagated_to_recipient_shard_on_recvChunkStart.js
-  - jstests/sharding/uuid_propagated_to_shards_on_setFCV_3_6.js
   - jstests/sharding/write_transactions_during_migration.js
   - jstests/sharding/json_schema.js
   - jstests/sharding/current_op_no_shards.js
