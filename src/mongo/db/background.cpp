@@ -147,6 +147,13 @@ void BackgroundOperation::assertNoBgOpInProgForNs(StringData ns) {
             !inProgForNs(ns));
 }
 
+void BackgroundOperation::awaitNoBgOpInProgForDbs(std::vector<StringData> dbs) {
+    stdx::unique_lock<stdx::mutex> lk(m);
+    for (auto db : dbs) {
+        awaitNoBgOps(lk, &dbsInProg, db);
+    }
+}
+
 void BackgroundOperation::awaitNoBgOpInProgForDb(StringData db) {
     stdx::unique_lock<stdx::mutex> lk(m);
     awaitNoBgOps(lk, &dbsInProg, db);
