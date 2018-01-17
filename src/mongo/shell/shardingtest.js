@@ -1341,7 +1341,7 @@ var ShardingTest = function(params) {
     const configRS = this.configRS;
     if (_hasNewFeatureCompatibilityVersion() && _isMixedVersionCluster()) {
         function setFeatureCompatibilityVersion() {
-            assert.commandWorked(csrsPrimary.adminCommand({setFeatureCompatibilityVersion: '3.4'}));
+            assert.commandWorked(csrsPrimary.adminCommand({setFeatureCompatibilityVersion: '3.6'}));
 
             // Wait for the new featureCompatibilityVersion to propagate to all nodes in the CSRS
             // to ensure that older versions of mongos can successfully connect.

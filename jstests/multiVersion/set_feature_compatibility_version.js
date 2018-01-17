@@ -253,9 +253,7 @@ TestData.skipCheckDBHashes = true;
     assert.neq(
         null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
-    // TODO: update this to use 'lastStableFCV' when SERVER-32597 bumps the --shardsvr default to
-    // 3.6.
-    checkFCV(adminDB, "3.4");
+    checkFCV(adminDB, lastStableFCV);
     MongoRunner.stopMongod(conn);
 
     // Check that start up without --repair fails if there is non-local DB data and either the admin
@@ -277,16 +275,12 @@ TestData.skipCheckDBHashes = true;
     assert.neq(null,
                conn,
                "mongod was unable to start up with version=" + latest + " and existing data files");
-    // FCV is 3.4 and targetVersion is 3.6 because the admin.system.version collection was restored
-    // without a UUID.
+    // FCV is 3.4 and targetVersion is 3.6 because the admin database needed to be restored.
     // TODO: update this code and comment when SERVER-32597 bumps the FCV defaults.
     adminDB = conn.getDB("admin");
     assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.4");
     assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).targetVersion,
               lastStableFCV);
-    let adminInfos = adminDB.getCollectionInfos();
-    assert(!adminInfos[0].info.uuid,
-           "Expected collection with infos " + tojson(adminInfos) + " to not have a UUID.");
     MongoRunner.stopMongod(conn);
 
     // --repair can be used to restore a missing featureCompatibilityVersion document to an existing
@@ -502,11 +496,7 @@ TestData.skipCheckDBHashes = true;
     latestShard.startSet();
     latestShard.initiate();
     let latestShardPrimaryAdminDB = latestShard.getPrimary().getDB("admin");
-    // TODO: update these FCV checks to 'lastStableFCV' when SERVER-32597 bumps the default FCV.
-    checkFCV(latestShardPrimaryAdminDB, "3.4");
-    // TODO: remove this setFCV command when SERVER-32597 bumps the shard FCV default.
-    assert.commandWorked(
-        latestShardPrimaryAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    checkFCV(latestShardPrimaryAdminDB, lastStableFCV);
     assert.commandWorked(mongosAdminDB.runCommand({addShard: latestShard.getURL()}));
     checkFCV(latestShardPrimaryAdminDB, lastStableFCV);
 
@@ -526,11 +516,7 @@ TestData.skipCheckDBHashes = true;
     st = new ShardingTest({shards: 0, other: {mongosOptions: {binVersion: lastStable}}});
     mongosAdminDB = st.s.getDB("admin");
     configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
-    // TODO: update this to 'lastStableFCV' when SERVER-32597 updates the FCV defaults.
-    checkFCV(configPrimaryAdminDB, "3.4");
-
-    // TODO: remove this when SERVER-32597 updates the FCV defaults.
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    checkFCV(configPrimaryAdminDB, lastStableFCV);
 
     // Adding a 'lastStable' binary shard to a cluster with 'lastStableFCV' succeeds.
     let lastStableShard = new ReplSetTest({
@@ -541,9 +527,6 @@ TestData.skipCheckDBHashes = true;
     });
     lastStableShard.startSet();
     lastStableShard.initiate();
-    // TODO: remove this setFCV call when SERVER-32597 updates the FCV defaults.
-    lastStableShard.getPrimary().getDB("admin").runCommand(
-        {setFeatureCompatibilityVersion: lastStableFCV});
     assert.commandWorked(mongosAdminDB.runCommand({addShard: lastStableShard.getURL()}));
     checkFCV(lastStableShard.getPrimary().getDB("admin"), lastStableFCV);
 

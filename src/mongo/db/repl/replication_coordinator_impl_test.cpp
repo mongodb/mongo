@@ -335,6 +335,7 @@ TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);
     hbArgs.setTerm(0);
+    hbArgs.setHeartbeatVersion(1);
 
     Status status(ErrorCodes::InternalError, "Not set");
     stdx::thread prsiThread([&] { doReplSetInitiate(getReplCoord(), &status); });
@@ -367,6 +368,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);
     hbArgs.setTerm(0);
+    hbArgs.setHeartbeatVersion(1);
 
     auto appliedTS = Timestamp(3, 3);
     getReplCoord()->setMyLastAppliedOpTime(OpTime(appliedTS, 1));

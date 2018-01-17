@@ -70,7 +70,7 @@ public:
 
     static StringData toString(ServerGlobalParams::FeatureCompatibility::Version version) {
         switch (version) {
-            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior:
+            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior:
                 return FeatureCompatibilityVersionCommandParser::kVersionUnset;
             case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34:
                 return FeatureCompatibilityVersionCommandParser::kVersion34;

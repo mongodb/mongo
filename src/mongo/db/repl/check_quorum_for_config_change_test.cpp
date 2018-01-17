@@ -208,6 +208,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSeveralDownNodes) {
 const BSONObj makeHeartbeatRequest(const ReplSetConfig& rsConfig, int myConfigIndex) {
     const MemberConfig& myConfig = rsConfig.getMemberAt(myConfigIndex);
     ReplSetHeartbeatArgsV1 hbArgs;
+    hbArgs.setHeartbeatVersion(1);
     hbArgs.setSetName(rsConfig.getReplSetName());
     hbArgs.setConfigVersion(rsConfig.getConfigVersion());
     if (rsConfig.getConfigVersion() == 1) {

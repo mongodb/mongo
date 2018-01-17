@@ -42,6 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
@@ -97,7 +98,9 @@ void DatabaseTest::setUp() {
 
     // Set up OpObserver so that Database will append actual oplog entries to the oplog using
     // repl::logOp(). repl::logOp() will also store the oplog entry's optime in ReplClientInfo.
-    service->setOpObserver(stdx::make_unique<OpObserverImpl>());
+    OpObserverRegistry* opObserverRegistry =
+        dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
+    opObserverRegistry->addObserver(stdx::make_unique<OpObserverImpl>());
 
     _nss = NamespaceString("test.foo");
 }

@@ -440,13 +440,6 @@ TEST_F(RenameCollectionTest, IndexNameTooLongForTemporaryCollectionForRenameAcro
                   renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
 }
 
-TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseWithoutUuid) {
-    _createCollection(_opCtx.get(), _sourceNss);
-    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNssDifferentDb, {}));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss));
-    ASSERT_FALSE(_getCollectionOptions(_opCtx.get(), _targetNssDifferentDb).uuid);
-}
-
 TEST_F(RenameCollectionTest, RenameCollectionAcrossDatabaseWithUuid) {
     auto options = _makeCollectionOptionsWithUuid();
     _createCollection(_opCtx.get(), _sourceNss, options);

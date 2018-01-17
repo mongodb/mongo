@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
 #include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
@@ -143,9 +144,11 @@ void DropDatabaseTest::setUp() {
     ASSERT_OK(_replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
     // Use OpObserverMock to track notifications for collection and database drops.
-    auto opObserver = stdx::make_unique<OpObserverMock>();
-    _opObserver = opObserver.get();
-    service->setOpObserver(std::move(opObserver));
+    OpObserverRegistry* opObserverRegistry =
+        dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
+    auto mockObserver = stdx::make_unique<OpObserverMock>();
+    _opObserver = mockObserver.get();
+    opObserverRegistry->addObserver(std::move(mockObserver));
 
     _nss = NamespaceString("test.foo");
 }

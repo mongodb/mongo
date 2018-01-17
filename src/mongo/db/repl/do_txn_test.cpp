@@ -194,22 +194,6 @@ TEST_F(DoTxnTest, AtomicDoTxnInsertIntoNonexistentCollectionReturnsNamespaceNotF
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status);
 }
 
-TEST_F(DoTxnTest, AtomicDoTxnInsertIntoCollectionWithoutUuid) {
-    auto opCtx = cc().makeOperationContext();
-    NamespaceString nss("test.t");
-
-    // Collection has no uuid.
-    CollectionOptions collectionOptions;
-    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, collectionOptions));
-
-    auto documentToInsert = BSON("_id" << 0);
-    auto cmdObj = makeDoTxnWithInsertOperation(nss, boost::none, documentToInsert);
-    auto expectedCmdObj = makeApplyOpsWithInsertOperation(nss, boost::none, documentToInsert);
-    BSONObjBuilder resultBuilder;
-    ASSERT_OK(doTxn(opCtx.get(), "test", cmdObj, &resultBuilder));
-    ASSERT_BSONOBJ_EQ(expectedCmdObj, _opObserver->onApplyOpsCmdObj);
-}
-
 TEST_F(DoTxnTest, AtomicDoTxnInsertWithUuidIntoCollectionWithUuid) {
     auto opCtx = cc().makeOperationContext();
     NamespaceString nss("test.t");
@@ -228,20 +212,22 @@ TEST_F(DoTxnTest, AtomicDoTxnInsertWithUuidIntoCollectionWithUuid) {
     ASSERT_BSONOBJ_EQ(expectedCmdObj, _opObserver->onApplyOpsCmdObj);
 }
 
-TEST_F(DoTxnTest, AtomicDoTxnInsertWithUuidIntoCollectionWithoutUuid) {
+TEST_F(DoTxnTest, AtomicDoTxnInsertWithUuidIntoCollectionWithOtherUuid) {
     auto opCtx = cc().makeOperationContext();
     NamespaceString nss("test.t");
 
-    auto uuid = UUID::gen();
+    auto doTxnUuid = UUID::gen();
 
-    // Collection has no uuid.
+    // Collection has a different UUID.
     CollectionOptions collectionOptions;
+    collectionOptions.uuid = UUID::gen();
+    ASSERT_NOT_EQUALS(doTxnUuid, collectionOptions.uuid);
     ASSERT_OK(_storage->createCollection(opCtx.get(), nss, collectionOptions));
 
     // The doTxn returns a NamespaceNotFound error because of the failed UUID lookup
     // even though a collection exists with the same namespace as the insert operation.
     auto documentToInsert = BSON("_id" << 0);
-    auto cmdObj = makeDoTxnWithInsertOperation(nss, uuid, documentToInsert);
+    auto cmdObj = makeDoTxnWithInsertOperation(nss, doTxnUuid, documentToInsert);
     BSONObjBuilder resultBuilder;
     ASSERT_EQUALS(ErrorCodes::UnknownError, doTxn(opCtx.get(), "test", cmdObj, &resultBuilder));
     auto result = resultBuilder.obj();

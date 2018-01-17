@@ -173,11 +173,11 @@ struct ServerGlobalParams {
          *             entries use the 3.4 format, but existing entries may have
          *             either the 3.4 or 3.6 format
          *
-         * kUnsetDefault34Behavior
+         * kUnsetDefault36Behavior
          * (Unset, Unset): This is the case on startup before the fCV document is
          *                 loaded into memory. isVersionInitialized() will return
          *                 false, and getVersion() will return the default
-         *                 (kFullyDowngradedTo34).
+         *                 (kFullyUpgradedTo36).
          *
          * TODO: update this comment to 3.6/4.0 when FCV 3.4 is removed (SERVER-32597).
          */
@@ -185,7 +185,7 @@ struct ServerGlobalParams {
             // The order of these enums matter, higher upgrades having higher values, so that
             // features can be active or inactive if the version is higher than some minimum or
             // lower than some maximum, respectively.
-            kUnsetDefault34Behavior = 0,
+            kUnsetDefault36Behavior = 0,
             kFullyDowngradedTo34 = 1,
             kDowngradingTo34 = 2,
             kUpgradingTo36 = 3,
@@ -200,7 +200,7 @@ struct ServerGlobalParams {
          * exposes the actual state of the featureCompatibilityVersion if it is uninitialized.
          */
         const bool isVersionInitialized() const {
-            return _version.load() != Version::kUnsetDefault34Behavior;
+            return _version.load() != Version::kUnsetDefault36Behavior;
         }
 
         /**
@@ -209,11 +209,11 @@ struct ServerGlobalParams {
          */
         const Version getVersion() const {
             Version v = _version.load();
-            return (v == Version::kUnsetDefault34Behavior) ? Version::kFullyDowngradedTo34 : v;
+            return (v == Version::kUnsetDefault36Behavior) ? Version::kFullyUpgradedTo36 : v;
         }
 
         void reset() {
-            _version.store(Version::kFullyDowngradedTo34);
+            _version.store(Version::kUnsetDefault36Behavior);
         }
 
         void setVersion(Version version) {
@@ -227,7 +227,7 @@ struct ServerGlobalParams {
         }
 
     private:
-        AtomicWord<Version> _version{Version::kUnsetDefault34Behavior};
+        AtomicWord<Version> _version{Version::kUnsetDefault36Behavior};
 
     } featureCompatibility;
 
