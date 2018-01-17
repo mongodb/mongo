@@ -139,6 +139,14 @@ add_option('ssl',
     nargs=0
 )
 
+add_option('ssl-provider',
+    choices=['auto', 'openssl', 'native'],
+    default='auto',
+    help='Select the SSL engine to use',
+    nargs=1,
+    type='choice',
+)
+
 add_option('mmapv1',
     choices=['auto', 'on', 'off'],
     default='auto',
@@ -2690,19 +2698,8 @@ def doConfigure(myenv):
 
     libdeps.setup_conftests(conf)
 
-    def addOpenSslLibraryToDistArchive(file_name):
-        openssl_bin_path = os.path.normpath(env['WINDOWS_OPENSSL_BIN'].lower())
-        full_file_name = os.path.join(openssl_bin_path, file_name)
-        if os.path.exists(full_file_name):
-            env.Append(ARCHIVE_ADDITIONS=[full_file_name])
-            env.Append(ARCHIVE_ADDITION_DIR_MAP={
-                    openssl_bin_path: "bin"
-                    })
-            return True
-        else:
-            return False
-
-    if has_option( "ssl" ):
+    ### --ssl and --ssl-provider checks
+    def checkOpenSSL(conf):
         sslLibName = "ssl"
         cryptoLibName = "crypto"
         if conf.env.TargetOSIs('windows'):
@@ -2710,6 +2707,18 @@ def doConfigure(myenv):
             cryptoLibName = "libeay32"
 
             # Add the SSL binaries to the zip file distribution
+            def addOpenSslLibraryToDistArchive(file_name):
+                openssl_bin_path = os.path.normpath(env['WINDOWS_OPENSSL_BIN'].lower())
+                full_file_name = os.path.join(openssl_bin_path, file_name)
+                if os.path.exists(full_file_name):
+                    env.Append(ARCHIVE_ADDITIONS=[full_file_name])
+                    env.Append(ARCHIVE_ADDITION_DIR_MAP={
+                            openssl_bin_path: "bin"
+                            })
+                    return True
+                else:
+                    return False
+
             files = ['ssleay32.dll', 'libeay32.dll']
             for extra_file in files:
                 if not addOpenSslLibraryToDistArchive(extra_file):
@@ -2798,9 +2807,6 @@ def doConfigure(myenv):
             maybeIssueDarwinSSLAdvice(conf.env)
             conf.env.ConfError("SSL is enabled, but is unavailable")
 
-        env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
-        env.Append( MONGO_CRYPTO=["openssl"] )
-
         if conf.CheckDeclaration(
             "FIPS_mode_set",
             includes="""
@@ -2815,7 +2821,6 @@ def doConfigure(myenv):
                 #include <openssl/asn1.h>
             """):
             conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAVE_ASN1_ANY_DEFINITIONS')
-
 
         def CheckOpenSSL_EC_DH(context):
             compile_test_body = textwrap.dedent("""
@@ -2837,8 +2842,35 @@ def doConfigure(myenv):
         if conf.CheckOpenSSL_EC_DH():
             conf.env.SetConfigHeaderDefine('MONGO_CONFIG_HAS_SSL_SET_ECDH_AUTO')
 
-    else:
-        env.Append( MONGO_CRYPTO=["tom"] )
+    ssl_provider = get_option("ssl-provider")
+    if ssl_provider == 'auto':
+        if conf.env.TargetOSIs('windows', 'darwin', 'macOS'):
+            ssl_provider = 'native'
+        else:
+            ssl_provider = 'openssl'
+
+    if ssl_provider == 'native':
+        if conf.env.TargetOSIs('windows'):
+            # TODO: Implement native crypto for windows
+            ssl_provider = 'openssl'
+        elif conf.env.TargetOSIs('darwin', 'macOS'):
+            # TODO: Implement native crypto for apple
+            ssl_provider = 'openssl'
+
+    if ssl_provider == 'openssl':
+        if has_option("ssl"):
+            checkOpenSSL(conf)
+            # Working OpenSSL available, use it.
+            env.Append( MONGO_CRYPTO=["openssl"] )
+        else:
+            # If we don't need an SSL build, we can get by with TomCrypt.
+            env.Append( MONGO_CRYPTO=["tom"] )
+
+    if has_option( "ssl" ):
+        # Either crypto engine is native,
+        # or it's OpenSSL and has been checked to be working.
+        env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
+
 
     if use_system_version_of_library("pcre"):
         conf.FindSysLibDep("pcre", ["pcre"])
