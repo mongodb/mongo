@@ -230,9 +230,6 @@ private:
     // Description for the client (e.g. conn8)
     const std::string _desc;
 
-    // OS id of the thread, which owns this client
-    const stdx::thread::id _threadId;
-
     // > 0 for things "conn", 0 otherwise
     const ConnectionId _connectionId;
 
