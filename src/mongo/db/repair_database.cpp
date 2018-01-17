@@ -275,7 +275,7 @@ Status repairDatabase(OperationContext* opCtx,
             // using majority readConcern level can only use the collections after their repaired
             // versions are in the committed view.
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            auto snapshotName = replCoord->reserveSnapshotName(opCtx);
+            auto snapshotName = replCoord->getMinimumVisibleSnapshot(opCtx);
 
             for (auto&& collection : *db) {
                 collection->setMinimumVisibleSnapshot(snapshotName);

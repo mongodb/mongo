@@ -298,7 +298,7 @@ public:
 
     virtual Status updateTerm(OperationContext* opCtx, long long term) override;
 
-    virtual Timestamp reserveSnapshotName(OperationContext* opCtx) override;
+    virtual Timestamp getMinimumVisibleSnapshot(OperationContext* opCtx) override;
 
     virtual OpTime getCurrentCommittedSnapshotOpTime() const override;
 

@@ -797,7 +797,7 @@ public:
     virtual Status updateTerm(OperationContext* opCtx, long long term) = 0;
 
     /**
-     * Reserves a unique SnapshotName.
+     * Returns the minimum visible snapshot for this operation.
      *
      * This name is guaranteed to compare > all names reserved before and < all names reserved
      * after.
@@ -809,7 +809,7 @@ public:
      * A null OperationContext can be used in cases where the snapshot to wait for should not be
      * adjusted.
      */
-    virtual Timestamp reserveSnapshotName(OperationContext* opCtx) = 0;
+    virtual Timestamp getMinimumVisibleSnapshot(OperationContext* opCtx) = 0;
 
     /**
      * Blocks until either the current committed snapshot is at least as high as 'untilSnapshot',

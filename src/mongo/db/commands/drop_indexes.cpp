@@ -218,7 +218,7 @@ public:
         // tries to read in the intermediate state where all indexes are newer than the current
         // snapshot so are unable to be used.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        auto snapshotName = replCoord->reserveSnapshotName(opCtx);
+        auto snapshotName = replCoord->getMinimumVisibleSnapshot(opCtx);
         collection->setMinimumVisibleSnapshot(snapshotName);
 
         result.append("nIndexes", static_cast<int>(indexInfoObjs.getValue().size()));

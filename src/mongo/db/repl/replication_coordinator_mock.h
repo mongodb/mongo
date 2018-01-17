@@ -244,7 +244,7 @@ public:
 
     virtual Status updateTerm(OperationContext* opCtx, long long term);
 
-    virtual Timestamp reserveSnapshotName(OperationContext* opCtx);
+    virtual Timestamp getMinimumVisibleSnapshot(OperationContext* opCtx) override;
 
     virtual void dropAllSnapshots() override;
 

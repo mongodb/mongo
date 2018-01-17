@@ -118,7 +118,7 @@ public:
 
         // Ban reading from this collection on committed reads on snapshots before now.
         auto replCoord = repl::ReplicationCoordinator::get(_opCtx);
-        auto snapshotName = replCoord->reserveSnapshotName(_opCtx);
+        auto snapshotName = replCoord->getMinimumVisibleSnapshot(_opCtx);
         it->second->setMinimumVisibleSnapshot(snapshotName);
     }
 
