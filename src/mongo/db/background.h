@@ -65,11 +65,12 @@ public:
     /**
      * Waits until there are no background operations in progress for all databases in the given
      * list. This function assumes that while it is executing, no new background jobs are started on
-     * any of the given databases, and that none of the given databases are deleted.
+     * any of the given databases.
      *
      * @param dbs the list of all databases on which to wait for background operations to complete.
     */
     static void awaitNoBgOpInProgForDbs(std::vector<StringData> dbs);
+
     static void awaitNoBgOpInProgForDb(StringData db);
     static void awaitNoBgOpInProgForNs(StringData ns);
     static void dump(std::ostream&);
