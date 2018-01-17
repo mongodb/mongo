@@ -1423,7 +1423,7 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
     Timer timer;
     WriteConcernOptions fixedWriteConcern = populateUnsetWriteConcernOptionsSyncMode(writeConcern);
     stdx::unique_lock<stdx::mutex> lock(_mutex);
-    auto status = _awaitReplication_inlock(&lock, opCtx, opTime, Timestamp(), fixedWriteConcern);
+    auto status = _awaitReplication_inlock(&lock, opCtx, opTime, fixedWriteConcern);
     return {std::move(status), duration_cast<Milliseconds>(timer.elapsed())};
 }
 
@@ -1431,7 +1431,6 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     stdx::unique_lock<stdx::mutex>* lock,
     OperationContext* opCtx,
     const OpTime& opTime,
-    Timestamp minSnapshot,
     const WriteConcernOptions& writeConcern) {
 
     // We should never wait for replication if we are holding any locks, because this can
@@ -1452,7 +1451,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
         return Status::OK();
     }
 
-    if (opTime.isNull() && minSnapshot == Timestamp()) {
+    if (opTime.isNull()) {
         // If waiting for the empty optime, always say it's been replicated.
         return Status::OK();
     }
@@ -1513,7 +1512,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     stdx::condition_variable condVar;
     ThreadWaiter waiter(opTime, &writeConcern, &condVar);
     WaiterGuard guard(&_replicationWaiterList, &waiter);
-    while (!_doneWaitingForReplication_inlock(opTime, minSnapshot, writeConcern)) {
+    while (!_doneWaitingForReplication_inlock(opTime, {}, writeConcern)) {
 
         if (_inShutdown) {
             return {ErrorCodes::ShutdownInProgress, "Replication is being shut down"};
@@ -1531,7 +1530,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
                 _topCoord->fillMemberData(&progress);
                 log() << "Replication for failed WC: " << writeConcern.toBSON()
                       << ", waitInfo: " << waiter << ", opID: " << opCtx->getOpID()
-                      << ", minSnapshot: " << minSnapshot << ", progress: " << progress.done();
+                      << ", progress: " << progress.done();
             }
             return {ErrorCodes::WriteConcernFailed, "waiting for replication timed out"};
         }

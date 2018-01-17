@@ -614,7 +614,6 @@ private:
     Status _awaitReplication_inlock(stdx::unique_lock<stdx::mutex>* lock,
                                     OperationContext* opCtx,
                                     const OpTime& opTime,
-                                    Timestamp minSnapshot,
                                     const WriteConcernOptions& writeConcern);
 
     /**
