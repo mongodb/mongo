@@ -1427,18 +1427,6 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
     return {std::move(status), duration_cast<Milliseconds>(timer.elapsed())};
 }
 
-ReplicationCoordinator::StatusAndDuration
-ReplicationCoordinatorImpl::awaitReplicationOfLastOpForClient(
-    OperationContext* opCtx, const WriteConcernOptions& writeConcern) {
-    Timer timer;
-    WriteConcernOptions fixedWriteConcern = populateUnsetWriteConcernOptionsSyncMode(writeConcern);
-    stdx::unique_lock<stdx::mutex> lock(_mutex);
-    const auto& clientInfo = ReplClientInfo::forClient(opCtx->getClient());
-    auto status = _awaitReplication_inlock(
-        &lock, opCtx, clientInfo.getLastOp(), clientInfo.getLastSnapshot(), fixedWriteConcern);
-    return {std::move(status), duration_cast<Milliseconds>(timer.elapsed())};
-}
-
 Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     stdx::unique_lock<stdx::mutex>* lock,
     OperationContext* opCtx,

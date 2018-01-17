@@ -199,13 +199,6 @@ public:
                                                const WriteConcernOptions& writeConcern) = 0;
 
     /**
-     * Like awaitReplication(), above, but waits for the replication of the last operation
-     * performed on the client associated with "opCtx".
-     */
-    virtual StatusAndDuration awaitReplicationOfLastOpForClient(
-        OperationContext* opCtx, const WriteConcernOptions& writeConcern) = 0;
-
-    /**
      * Causes this node to relinquish being primary for at least 'stepdownTime'.  If 'force' is
      * false, before doing so it will wait for 'waitTime' for one other node to be within 10
      * seconds of this node's optime before stepping down. Returns a Status with the code

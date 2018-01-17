@@ -85,9 +85,6 @@ public:
     virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
         OperationContext* opCtx, const OpTime& opTime, const WriteConcernOptions& writeConcern);
 
-    virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpForClient(
-        OperationContext* opCtx, const WriteConcernOptions& writeConcern);
-
     virtual Status stepDown(OperationContext* opCtx,
                             bool force,
                             const Milliseconds& waitTime,
@@ -272,10 +269,8 @@ public:
     void setGetConfigReturnValue(ReplSetConfig returnValue);
 
     /**
-     * Sets the function to generate the return value for calls to awaitReplication() and
-     * awaitReplicationOfLastOpForClient().
-     * 'opTime' is the optime passed to awaitReplication() and set to null when called from
-     * awaitReplicationOfLastOpForClient().
+     * Sets the function to generate the return value for calls to awaitReplication().
+     * 'opTime' is the optime passed to awaitReplication().
      */
     using AwaitReplicationReturnValueFunction = stdx::function<StatusAndDuration(const OpTime&)>;
     void setAwaitReplicationReturnValueFunction(
