@@ -162,10 +162,6 @@ std::unique_ptr<ShardingCatalogClient> ConfigServerTestFixture::makeShardingCata
     return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
 }
 
-std::unique_ptr<CatalogCache> ConfigServerTestFixture::makeCatalogCache() {
-    return stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(getServiceContext()));
-}
-
 std::unique_ptr<BalancerConfiguration> ConfigServerTestFixture::makeBalancerConfiguration() {
     return stdx::make_unique<BalancerConfiguration>();
 }

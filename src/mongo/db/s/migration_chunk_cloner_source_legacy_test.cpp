@@ -32,12 +32,11 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/sharding_mongod_test_fixture.h"
+#include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -64,22 +63,16 @@ const ConnectionString kRecipientConnStr =
                                      HostAndPort("RecipientHost2:1234"),
                                      HostAndPort("RecipientHost3:1234")});
 
-class MigrationChunkClonerSourceLegacyTest : public ShardingMongodTestFixture {
+class MigrationChunkClonerSourceLegacyTest : public ShardServerTestFixture {
 protected:
     void setUp() override {
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-        ShardingMongodTestFixture::setUp();
+        ShardServerTestFixture::setUp();
 
         // TODO: SERVER-26919 set the flag on the mock repl coordinator just for the window where it
         // actually needs to bypass the op observer.
         replicationCoordinator()->alwaysAllowWrites(true);
 
-        ASSERT_OK(initializeGlobalShardingStateForMongodForTest(kConfigConnStr));
-
         _client.emplace(operationContext());
-
-        RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter())
-            ->setConnectionStringReturnValue(kConfigConnStr);
 
         {
             auto donorShard = assertGet(
@@ -103,7 +96,7 @@ protected:
     void tearDown() override {
         _client.reset();
 
-        ShardingMongodTestFixture::tearDown();
+        ShardServerTestFixture::tearDown();
     }
 
     /**

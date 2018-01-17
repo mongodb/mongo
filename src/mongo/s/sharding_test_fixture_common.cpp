@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,51 +26,16 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/s/sharding_test_fixture_common.h"
 
 namespace mongo {
 
-/**
- * Test fixture class for tests that use either the "ephemeralForTest" or "devnull" storage engines.
- */
-class ServiceContextMongoDTest : public unittest::Test {
-public:
-    /**
-     * Initializes global storage engine.
-     */
-    void setUp() override;
+constexpr Seconds ShardingTestFixtureCommon::kFutureTimeout;
 
-    /**
-     * Clear all databases.
-     */
-    void tearDown() override;
+ShardingTestFixtureCommon::ShardingTestFixtureCommon() = default;
 
-    /**
-     * Returns a service context, which is only valid for this instance of the test.
-     * Must not be called before setUp or after tearDown.
-     */
-    ServiceContext* getServiceContext();
-
-private:
-    /**
-     * Unused implementation of test function. This allows us to instantiate
-     * ServiceContextMongoDTest on its own without the need to inherit from it in a test.
-     * This supports using ServiceContextMongoDTest inside another test fixture and works around the
-     * limitation that tests cannot inherit from multiple test fixtures.
-     *
-     * It is an error to call this implementation of _doTest() directly.
-     */
-    void _doTest() override;
-
-    /**
-     * Drops all databases. Call this before global ReplicationCoordinator is destroyed -- it is
-     * used to drop the databases.
-     */
-    void _dropAllDBs(OperationContext* opCtx);
-};
+ShardingTestFixtureCommon::~ShardingTestFixtureCommon() = default;
 
 }  // namespace mongo

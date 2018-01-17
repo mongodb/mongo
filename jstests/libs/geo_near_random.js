@@ -1,13 +1,14 @@
-GeoNearRandomTest = function(name) {
+GeoNearRandomTest = function(name, dbToUse) {
     this.name = name;
-    this.t = db[name];
+    this.db = (dbToUse || db);
+    this.t = this.db[name];
     this.nPts = 0;
 
-    // reset state
+    // Reset state
     this.t.drop();
     Random.srand(1234);
 
-    print("starting test: " + name);
+    print("Starting getNear test: " + name);
 };
 
 GeoNearRandomTest.prototype.mkPt = function mkPt(scale, indexBounds) {
@@ -67,11 +68,11 @@ GeoNearRandomTest.prototype.testPt = function(pt, opts) {
 
     var cmd = {geoNear: this.t.getName(), near: pt, num: 1, spherical: opts.sphere};
 
-    var last = db.runCommand(cmd).results;
+    var last = this.db.runCommand(cmd).results;
     for (var i = 2; i <= opts.nToTest; i++) {
         // print(i); // uncomment to watch status
         cmd.num = i;
-        var ret = db.runCommand(cmd).results;
+        var ret = this.db.runCommand(cmd).results;
 
         try {
             this.assertIsPrefix(last, ret);

@@ -42,7 +42,6 @@
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
-
 namespace {
 
 const HostAndPort kConfigHostAndPort("dummy", 123);
@@ -55,16 +54,6 @@ ShardServerTestFixture::~ShardServerTestFixture() = default;
 
 std::shared_ptr<RemoteCommandTargeterMock> ShardServerTestFixture::configTargeterMock() {
     return RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
-}
-
-void ShardServerTestFixture::expectFindOnConfigSendErrorCode(ErrorCodes::Error code) {
-    onCommand([&, code](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, kConfigHostAndPort);
-        ASSERT_EQ(request.dbname, "config");
-        BSONObjBuilder responseBuilder;
-        CommandHelpers::appendCommandStatus(responseBuilder, Status(code, ""));
-        return responseBuilder.obj();
-    });
 }
 
 void ShardServerTestFixture::setUp() {
@@ -107,10 +96,6 @@ std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatal
     std::unique_ptr<DistLockManager> distLockManager) {
     invariant(distLockManager);
     return stdx::make_unique<ShardingCatalogClientImpl>(std::move(distLockManager));
-}
-
-std::unique_ptr<CatalogCache> ShardServerTestFixture::makeCatalogCache() {
-    return stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(getServiceContext()));
 }
 
 }  // namespace mongo

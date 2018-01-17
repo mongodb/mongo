@@ -28,12 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/sharding_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 
 #include <algorithm>
 #include <vector>
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
@@ -69,7 +68,6 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/mock_session.h"
-#include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/tick_source_mock.h"
@@ -83,49 +81,44 @@ using executor::RemoteCommandResponse;
 using executor::ShardingTaskExecutor;
 using unittest::assertGet;
 
-using std::string;
-using std::vector;
-using unittest::assertGet;
-
 namespace {
+
 std::unique_ptr<ShardingTaskExecutor> makeShardingTestExecutor(
     std::unique_ptr<NetworkInterfaceMock> net) {
     auto testExecutor = makeThreadPoolTestExecutor(std::move(net));
     return stdx::make_unique<ShardingTaskExecutor>(std::move(testExecutor));
 }
-}
+
+}  // namespace
 
 ShardingTestFixture::ShardingTestFixture() = default;
 
 ShardingTestFixture::~ShardingTestFixture() = default;
 
-const Seconds ShardingTestFixture::kFutureTimeout{5};
-
 void ShardingTestFixture::setUp() {
+    auto const service = serviceContext();
+
+    // Configure the service context
+    service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
+    service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
+    service->setTickSource(stdx::make_unique<TickSourceMock>());
+
     {
-        auto service = stdx::make_unique<ServiceContextNoop>();
-        service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
-        service->setPreciseClockSource(stdx::make_unique<ClockSourceMock>());
-        service->setTickSource(stdx::make_unique<TickSourceMock>());
         auto tlMock = stdx::make_unique<transport::TransportLayerMock>();
         _transportLayer = tlMock.get();
+        ASSERT_OK(_transportLayer->start());
         service->setTransportLayer(std::move(tlMock));
-        _transportLayer->start().transitional_ignore();
-
-        // Set the newly created service context to be the current global context so that tests,
-        // which invoke code still referencing getGlobalServiceContext will work properly.
-        setGlobalServiceContext(std::move(service));
     }
 
-    CollatorFactoryInterface::set(serviceContext(), stdx::make_unique<CollatorFactoryMock>());
+    CollatorFactoryInterface::set(service, stdx::make_unique<CollatorFactoryMock>());
     _transportSession = transport::MockSession::create(_transportLayer);
-    _client = serviceContext()->makeClient("ShardingTestFixture", _transportSession);
+    _client = service->makeClient("ShardingTestFixture", _transportSession);
     _opCtx = _client->makeOperationContext();
 
     // Set up executor pool used for most operations.
     auto fixedNet = stdx::make_unique<executor::NetworkInterfaceMock>();
     fixedNet->setEgressMetadataHook(
-        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext()));
+        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(service));
     _mockNetwork = fixedNet.get();
     auto fixedExec = makeShardingTestExecutor(std::move(fixedNet));
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(fixedExec.get(), _mockNetwork);
@@ -133,7 +126,7 @@ void ShardingTestFixture::setUp() {
 
     auto netForPool = stdx::make_unique<executor::NetworkInterfaceMock>();
     netForPool->setEgressMetadataHook(
-        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(serviceContext()));
+        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(service));
     auto _mockNetworkForPool = netForPool.get();
     auto execForPool = makeShardingTestExecutor(std::move(netForPool));
     _networkTestEnvForPool =
@@ -186,15 +179,15 @@ void ShardingTestFixture::setUp() {
     auto shardRegistry(stdx::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
     executorPool->startup();
 
-    CatalogCacheLoader::set(serviceContext(), stdx::make_unique<ConfigServerCatalogCacheLoader>());
+    CatalogCacheLoader::set(service, stdx::make_unique<ConfigServerCatalogCacheLoader>());
 
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
     Grid::get(operationContext())
         ->init(std::move(catalogClient),
-               stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(serviceContext())),
+               stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(service)),
                std::move(shardRegistry),
-               stdx::make_unique<ClusterCursorManager>(serviceContext()->getPreciseClockSource()),
+               stdx::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),
                stdx::make_unique<BalancerConfiguration>(),
                std::move(executorPool),
                _mockNetwork);
@@ -239,12 +232,6 @@ RemoteCommandTargeterMock* ShardingTestFixture::configTargeter() const {
     invariant(_configTargeter);
 
     return _configTargeter;
-}
-
-executor::NetworkInterfaceMock* ShardingTestFixture::network() const {
-    invariant(_mockNetwork);
-
-    return _mockNetwork;
 }
 
 executor::TaskExecutor* ShardingTestFixture::executor() const {
@@ -316,7 +303,7 @@ void ShardingTestFixture::expectGetShards(const std::vector<ShardType>& shards) 
 
         checkReadConcern(request.cmdObj, Timestamp(0, 0), repl::OpTime::kUninitializedTerm);
 
-        vector<BSONObj> shardsToReturn;
+        std::vector<BSONObj> shardsToReturn;
 
         std::transform(shards.begin(),
                        shards.end(),
@@ -498,7 +485,7 @@ void ShardingTestFixture::expectCount(const HostAndPort& configHost,
                                       const StatusWith<long long>& response) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQUALS(configHost, request.target);
-        string cmdName = request.cmdObj.firstElement().fieldName();
+        const std::string cmdName(request.cmdObj.firstElement().fieldName());
         ASSERT_EQUALS("count", cmdName);
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
         ASSERT_EQUALS(expectedNs.toString(), nss.toString());

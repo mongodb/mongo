@@ -48,24 +48,9 @@
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {
-
-std::unique_ptr<ServiceContextNoop> makeTestServiceContext() {
-    auto service = stdx::make_unique<ServiceContextNoop>();
-    service->setFastClockSource(stdx::make_unique<ClockSourceMock>());
-    service->setTickSource(stdx::make_unique<TickSourceMock>());
-    return service;
-}
-
 namespace {
+
 using boost::intrusive_ptr;
-
-static const char* const ns = "unittests.document_source_sample_tests";
-
-// Stub to avoid including the server environment library.
-MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
-    setGlobalServiceContext(makeTestServiceContext());
-    return Status::OK();
-}
 
 class SampleBasics : public AggregationContextFixture {
 public:

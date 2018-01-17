@@ -37,7 +37,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/sharding_test_fixture.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 

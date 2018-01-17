@@ -1519,8 +1519,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'keys_collection_document',
-        '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
     ],
 )
 
@@ -1562,10 +1560,9 @@ env.CppUnitTest(
         'logical_time_validator_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/config_server_test_fixture',
         'keys_collection_manager',
         'logical_time_validator',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
-        '$BUILD_DIR/mongo/s/coreshard',
     ],
 )
 
@@ -1605,32 +1602,10 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='keys_collection_cache_test',
-    source=[
-        'keys_collection_cache_test.cpp',
-    ],
-    LIBDEPS=[
-        'keys_collection_manager',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
-        '$BUILD_DIR/mongo/s/coreshard',
-    ],
-)
-
-env.CppUnitTest(
-    target='key_generator_update_test',
-    source=[
-        'key_generator_update_test.cpp',
-    ],
-    LIBDEPS=[
-        'keys_collection_manager',
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
-        '$BUILD_DIR/mongo/s/coreshard',
-    ],
-)
-
-env.CppUnitTest(
     target='keys_collection_manager_sharding_test',
     source=[
+        'key_generator_update_test.cpp',
+        'keys_collection_cache_test.cpp',
         'keys_collection_manager_sharding_test.cpp',
     ],
     LIBDEPS=[

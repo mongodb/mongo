@@ -49,13 +49,12 @@
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/sharding_mongod_test_fixture.h"
+#include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
 namespace {
 
 using executor::RemoteCommandRequest;
@@ -113,16 +112,12 @@ repl::OplogEntry extractInnerOplog(const repl::OplogEntry& oplog) {
     return oplogStatus.getValue();
 }
 
-class SessionCatalogMigrationDestinationTest : public ShardingMongodTestFixture {
+class SessionCatalogMigrationDestinationTest : public ShardServerTestFixture {
 public:
     void setUp() override {
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-        ShardingMongodTestFixture::setUp();
+        ShardServerTestFixture::setUp();
 
-        ASSERT_OK(initializeGlobalShardingStateForMongodForTest(kConfigConnStr));
-
-        RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter())
-            ->setConnectionStringReturnValue(kConfigConnStr);
+        _migrationId = MigrationSessionId::generate("donor", "recipient");
 
         {
             auto donorShard = assertGet(
@@ -133,8 +128,6 @@ public:
                 ->setFindHostReturnValue(kDonorConnStr.getServers()[0]);
         }
 
-        _migrationId = MigrationSessionId::generate("donor", "recipient");
-
         SessionCatalog::create(getServiceContext());
         SessionCatalog::get(getServiceContext())->onStepUp(operationContext());
         LogicalSessionCache::set(getServiceContext(), stdx::make_unique<LogicalSessionCacheNoop>());
@@ -142,7 +135,7 @@ public:
 
     void tearDown() override {
         SessionCatalog::reset_forTest(getServiceContext());
-        ShardingMongodTestFixture::tearDown();
+        ShardServerTestFixture::tearDown();
     }
 
     void returnOplog(const std::vector<OplogEntry>& oplogList) {

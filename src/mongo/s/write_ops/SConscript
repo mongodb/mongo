@@ -31,11 +31,8 @@ env.Library(
         'write_op.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/s/async_requests_sender',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
-        '$BUILD_DIR/mongo/s/coreshard',
         'batch_write_types',
     ],
 )
@@ -70,8 +67,8 @@ env.CppUnitTest(
         'write_op_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/s/sharding_test_fixture',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'cluster_write_op',
     ]
 )

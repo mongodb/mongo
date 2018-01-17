@@ -32,21 +32,14 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/metadata_manager.h"
-#include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
 
-class BalancerConfiguration;
-class BSONObj;
-class BSONObjBuilder;
-struct ChunkVersion;
-class CollectionMetadata;
 class MigrationSourceManager;
 class OperationContext;
-class Timestamp;
 
 /**
  * Contains all sharding-related runtime state for a given collection. One such object is assigned
@@ -229,8 +222,6 @@ public:
                     const BSONObj& insertedDoc,
                     const repl::OpTime& opTime);
     void onUpdateOp(OperationContext* opCtx,
-                    const BSONObj& query,
-                    const BSONObj& update,
                     const BSONObj& updatedDoc,
                     const repl::OpTime& opTime,
                     const repl::OpTime& prePostImageOpTime);
@@ -238,51 +229,8 @@ public:
                     const DeleteState& deleteState,
                     const repl::OpTime& opTime,
                     const repl::OpTime& preImageOpTime);
-    void onDropCollection(OperationContext* opCtx, const NamespaceString& collectionName);
 
 private:
-    /**
-     * This runs on updates to the shard's persisted cache of the config server's
-     * config.collections collection.
-     *
-     * If an update occurs to the 'lastRefreshedCollectionVersion' field, registers a task on the
-     * opCtx -- to run after writes from the oplog are committed and visible to reads -- to notify
-     * the catalog cache loader of a new collection version and clear the routing table so the next
-     * caller with routing information will provoke a routing table refresh. When
-     * 'lastRefreshedCollectionVersion' is in 'update', it means that a chunk metadata refresh
-     * finished being applied to the collection's locally persisted metadata store.
-     *
-     * If an update occurs to the 'enterCriticalSectionSignal' field, simply clear the routing table
-     * immediately. This will provoke the next secondary caller to refresh through the primary,
-     * blocking behind the critical section.
-     *
-     * query - BSON with an _id that identifies which collections entry is being updated.
-     * update - the update being applied to the collections entry.
-     * updatedDoc - the document identified by 'query' with the 'update' applied.
-     *
-     * This only runs on secondaries.
-     * The global exclusive lock is expected to be held by the caller.
-     */
-    void _onConfigCollectionsUpdateOp(OperationContext* opCtx,
-                                      const BSONObj& query,
-                                      const BSONObj& update,
-                                      const BSONObj& updatedDoc);
-
-    /**
-     * Invalidates the in-memory routing table cache when a collection is dropped, so the next
-     * caller with routing information will provoke a routing table refresh and see the drop.
-     *
-     * Registers a task on the opCtx -- to run after writes from the oplog are committed and visible
-     * to reads.
-     *
-     * query - BSON with an _id field that identifies which collections entry is being updated.
-     *
-     * This only runs on secondaries.
-     * The global exclusive lock is expected to be held by the caller.
-     */
-    void _onConfigDeleteInvalidateCachedMetadataAndNotify(OperationContext* opCtx,
-                                                          const BSONObj& query);
-
     /**
      * Checks whether the shard version of the operation matches that of the collection.
      *
@@ -300,23 +248,6 @@ private:
                               std::string* errmsg,
                               ChunkVersion* expectedShardVersion,
                               ChunkVersion* actualShardVersion);
-
-    /**
-     * If the collection is sharded, finds the chunk that contains the specified document, and
-     * increments the size tracked for that chunk by the specified amount of data written, in
-     * bytes. Returns the number of total bytes on that chunk, after the data is written.
-     */
-    uint64_t _incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
-                                             const BSONObj& document,
-                                             long dataWritten);
-
-    /**
-     * Returns true if the total number of bytes on the specified chunk nears the max size of
-     * a shard.
-     */
-    bool _shouldSplitChunk(OperationContext* opCtx,
-                           const ShardKeyPattern& shardKeyPattern,
-                           const Chunk& chunk);
 
     // Namespace this state belongs to.
     const NamespaceString _nss;

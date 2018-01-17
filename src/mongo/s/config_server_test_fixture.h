@@ -163,8 +163,6 @@ protected:
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override;
 
-    std::unique_ptr<CatalogCache> makeCatalogCache() override;
-
     std::unique_ptr<ClusterCursorManager> makeClusterCursorManager() override;
 
     std::unique_ptr<BalancerConfiguration> makeBalancerConfiguration() override;

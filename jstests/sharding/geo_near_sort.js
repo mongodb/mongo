@@ -1,6 +1,6 @@
 // Tests that the sort specification is obeyed when the query contains $near/$nearSphere.
 (function() {
-    "use strict";
+    'use strict';
 
     const st = new ShardingTest({shards: 2});
     const db = st.getDB("test");

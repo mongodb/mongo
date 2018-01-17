@@ -36,9 +36,9 @@ namespace mongo {
 class RemoteCommandTargeterMock;
 
 /**
- * Test fixture for shard components, as opposed to config or mongos components.
- * Has a mock network and ephemeral storage engine provided by ShardingMongodTestFixture,
- * additionally sets up mock dist lock catalog and manager with a real catalog client.
+ * Test fixture for shard components, as opposed to config or mongos components. Provides a mock
+ * network and ephemeral storage engine via ShardingMongodTestFixture. Additionally sets up mock
+ * dist lock catalog and manager with a real catalog client.
  */
 class ShardServerTestFixture : public ShardingMongodTestFixture {
 public:
@@ -56,13 +56,7 @@ public:
      */
     std::shared_ptr<RemoteCommandTargeterMock> configTargeterMock();
 
-    void expectFindOnConfigSendErrorCode(ErrorCodes::Error code);
-
 protected:
-    /**
-     * Sets up a ClusterRole::ShardServer replica set with a real catalog client and mock dist lock
-     * catalog and manager.
-     */
     void setUp() override;
 
     void tearDown() override;
@@ -83,8 +77,6 @@ protected:
      */
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient(
         std::unique_ptr<DistLockManager> distLockManager) override;
-
-    std::unique_ptr<CatalogCache> makeCatalogCache() override;
 };
 
 }  // namespace mongo

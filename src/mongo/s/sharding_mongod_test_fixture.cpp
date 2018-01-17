@@ -36,6 +36,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -49,11 +50,11 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/s/config_server_op_observer.h"
+#include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -90,15 +91,9 @@ using repl::ReplicationCoordinatorMock;
 using repl::ReplSettings;
 using unittest::assertGet;
 
-using std::string;
-using std::vector;
-using unittest::assertGet;
-
 ShardingMongodTestFixture::ShardingMongodTestFixture() = default;
 
 ShardingMongodTestFixture::~ShardingMongodTestFixture() = default;
-
-const Seconds ShardingMongodTestFixture::kFutureTimeout{5};
 
 void ShardingMongodTestFixture::setUp() {
     ServiceContextMongoDTest::setUp();
@@ -119,10 +114,9 @@ void ShardingMongodTestFixture::setUp() {
         serversBob.append(BSON("host" << _servers[i].toString() << "_id" << static_cast<int>(i)));
     }
     repl::ReplSetConfig replSetConfig;
-    replSetConfig
-        .initialize(BSON("_id" << _setName << "protocolVersion" << 1 << "version" << 3 << "members"
-                               << serversBob.arr()))
-        .transitional_ignore();
+    ASSERT_OK(replSetConfig.initialize(
+        BSON("_id" << _setName << "protocolVersion" << 1 << "version" << 3 << "members"
+                   << serversBob.arr())));
     replCoordPtr->setGetConfigReturnValue(replSetConfig);
 
     repl::ReplicationCoordinator::set(service, std::move(replCoordPtr));
@@ -137,15 +131,16 @@ void ShardingMongodTestFixture::setUp() {
                                       storagePtr.get(),
                                       stdx::make_unique<repl::ReplicationConsistencyMarkersMock>(),
                                       stdx::make_unique<repl::ReplicationRecoveryMock>()));
-    repl::ReplicationProcess::get(_opCtx.get())
-        ->initializeRollbackID(_opCtx.get())
-        .transitional_ignore();
+
+    ASSERT_OK(repl::ReplicationProcess::get(_opCtx.get())->initializeRollbackID(_opCtx.get()));
 
     repl::StorageInterface::set(service, std::move(storagePtr));
 
     auto makeOpObserver = [&] {
         auto opObserver = stdx::make_unique<OpObserverRegistry>();
         opObserver->addObserver(stdx::make_unique<OpObserverImpl>());
+        opObserver->addObserver(stdx::make_unique<ConfigServerOpObserver>());
+        opObserver->addObserver(stdx::make_unique<ShardServerOpObserver>());
         return opObserver;
     };
     service->setOpObserver(makeOpObserver());
@@ -250,10 +245,6 @@ std::unique_ptr<ShardingCatalogClient> ShardingMongodTestFixture::makeShardingCa
     return nullptr;
 }
 
-std::unique_ptr<CatalogCache> ShardingMongodTestFixture::makeCatalogCache() {
-    return nullptr;
-}
-
 std::unique_ptr<ClusterCursorManager> ShardingMongodTestFixture::makeClusterCursorManager() {
     return nullptr;
 }
@@ -283,7 +274,7 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
 
     auto const grid = Grid::get(operationContext());
     grid->init(makeShardingCatalogClient(std::move(distLockManagerPtr)),
-               makeCatalogCache(),
+               stdx::make_unique<CatalogCache>(CatalogCacheLoader::get(getServiceContext())),
                makeShardRegistry(configConnStr),
                makeClusterCursorManager(),
                makeBalancerConfiguration(),
@@ -302,7 +293,7 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
 }
 
 void ShardingMongodTestFixture::tearDown() {
-    // Only shut down components that were actually initialized and not already shut down.
+    ReplicaSetMonitor::cleanup();
 
     if (Grid::get(operationContext())->getExecutorPool() && !_executorPoolShutDown) {
         Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
@@ -349,11 +340,6 @@ void ShardingMongodTestFixture::shutdownExecutorPool() {
     invariant(!_executorPoolShutDown);
     executorPool()->shutdownAndJoin();
     _executorPoolShutDown = true;
-}
-
-executor::NetworkInterfaceMock* ShardingMongodTestFixture::network() const {
-    invariant(_mockNetwork);
-    return _mockNetwork;
 }
 
 executor::TaskExecutor* ShardingMongodTestFixture::executor() const {

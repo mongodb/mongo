@@ -28,12 +28,7 @@
 
 #pragma once
 
-#include <utility>
-
-#include "mongo/db/service_context.h"
-#include "mongo/executor/network_test_env.h"
-#include "mongo/transport/session.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/s/sharding_test_fixture_common.h"
 
 namespace mongo {
 
@@ -44,42 +39,25 @@ class ShardingCatalogClientImpl;
 struct ChunkVersion;
 class CollectionType;
 class DistLockManagerMock;
-class NamespaceString;
-class ShardFactoryMock;
 class RemoteCommandTargeterFactoryMock;
 class RemoteCommandTargeterMock;
 class ShardRegistry;
 class ShardType;
-template <typename T>
-class StatusWith;
-
-namespace executor {
-class NetworkInterfaceMock;
-class TaskExecutor;
-}  // namespace executor
 
 namespace transport {
 class TransportLayerMock;
-}  // namepsace transport
+}  // namespace transport
 
 /**
  * Sets up the mocked out objects for testing the replica-set backed catalog manager and catalog
  * client.
  */
-class ShardingTestFixture : public mongo::unittest::Test {
+class ShardingTestFixture : public unittest::Test, public ShardingTestFixtureCommon {
 public:
     ShardingTestFixture();
     ~ShardingTestFixture();
 
 protected:
-    static const Seconds kFutureTimeout;
-
-    template <typename Lambda>
-    executor::NetworkTestEnv::FutureHandle<typename std::result_of<Lambda()>::type> launchAsync(
-        Lambda&& func) const {
-        return _networkTestEnv->launchAsync(std::forward<Lambda>(func));
-    }
-
     ShardingCatalogClient* catalogClient() const;
 
     /**
@@ -92,8 +70,6 @@ protected:
     RemoteCommandTargeterFactoryMock* targeterFactory() const;
 
     RemoteCommandTargeterMock* configTargeter() const;
-
-    executor::NetworkInterfaceMock* network() const;
 
     executor::TaskExecutor* executor() const;
 
@@ -226,9 +202,7 @@ private:
     RemoteCommandTargeterMock* _configTargeter;
 
     // For the Grid's fixed executor.
-    executor::NetworkInterfaceMock* _mockNetwork;
     executor::TaskExecutor* _executor;
-    std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
 
     // For the Grid's arbitrary executor in its executorPool.
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnvForPool;

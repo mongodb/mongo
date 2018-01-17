@@ -25,10 +25,12 @@ env.Library(
     target='sharding_runtime_d',
     source=[
         'chunk_splitter.cpp',
+        'config_server_op_observer.cpp',
         'implicit_create_collection.cpp',
         'migration_destination_manager.cpp',
         'session_catalog_migration_destination.cpp',
         'shard_filtering_metadata_refresh.cpp',
+        'shard_server_op_observer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/db_raii',
@@ -158,7 +160,6 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
-        '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/util/version_impl',
         'balancer',
     ]

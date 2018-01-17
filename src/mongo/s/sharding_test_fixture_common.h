@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2015 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -30,47 +30,50 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/s/grid.h"
+#include "mongo/transport/session.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
+namespace executor {
+class NetworkInterfaceMock;
+class TaskExecutor;
+}  // namespace executor
+
 /**
- * Test fixture class for tests that use either the "ephemeralForTest" or "devnull" storage engines.
+ * Contains common functionality and tools, which apply to both mongos and mongod unit-tests.
  */
-class ServiceContextMongoDTest : public unittest::Test {
+class ShardingTestFixtureCommon {
 public:
-    /**
-     * Initializes global storage engine.
-     */
-    void setUp() override;
+    static constexpr Seconds kFutureTimeout{5};
 
-    /**
-     * Clear all databases.
-     */
-    void tearDown() override;
+    ShardingTestFixtureCommon();
+    ~ShardingTestFixtureCommon();
 
-    /**
-     * Returns a service context, which is only valid for this instance of the test.
-     * Must not be called before setUp or after tearDown.
-     */
-    ServiceContext* getServiceContext();
+    template <typename Lambda>
+    executor::NetworkTestEnv::FutureHandle<typename std::result_of<Lambda()>::type> launchAsync(
+        Lambda&& func) const {
+        return _networkTestEnv->launchAsync(std::forward<Lambda>(func));
+    }
 
-private:
-    /**
-     * Unused implementation of test function. This allows us to instantiate
-     * ServiceContextMongoDTest on its own without the need to inherit from it in a test.
-     * This supports using ServiceContextMongoDTest inside another test fixture and works around the
-     * limitation that tests cannot inherit from multiple test fixtures.
-     *
-     * It is an error to call this implementation of _doTest() directly.
-     */
-    void _doTest() override;
+    executor::NetworkInterfaceMock* network() const {
+        invariant(_mockNetwork);
+        return _mockNetwork;
+    }
 
-    /**
-     * Drops all databases. Call this before global ReplicationCoordinator is destroyed -- it is
-     * used to drop the databases.
-     */
-    void _dropAllDBs(OperationContext* opCtx);
+protected:
+    // Since a NetworkInterface is a private member of a TaskExecutor, we store a raw pointer to the
+    // fixed TaskExecutor's NetworkInterface here.
+    //
+    // TODO(Esha): Currently, some fine-grained synchronization of the network and task executor is
+    // outside of NetworkTestEnv's capabilities. If all control of the network is done through
+    // _networkTestEnv, storing this raw pointer is not necessary.
+    executor::NetworkInterfaceMock* _mockNetwork{nullptr};
+
+    // Allows for processing tasks through the NetworkInterfaceMock/ThreadPoolMock subsystem
+    std::unique_ptr<executor::NetworkTestEnv> _networkTestEnv;
 };
 
 }  // namespace mongo

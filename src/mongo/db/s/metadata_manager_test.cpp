@@ -31,7 +31,6 @@
 #include <boost/optional.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
@@ -42,11 +41,10 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/sharding_mongod_test_fixture.h"
+#include "mongo/s/shard_server_test_fixture.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -59,27 +57,15 @@ using unittest::assertGet;
 
 const NamespaceString kNss("TestDB", "TestColl");
 const std::string kPattern = "key";
-const BSONObj kShardKeyPatternBSON{BSON(kPattern << 1)};
-const KeyPattern kShardKeyPattern{kShardKeyPatternBSON};
+const KeyPattern kShardKeyPattern(BSON(kPattern << 1));
 const std::string kThisShard{"thisShard"};
 const std::string kOtherShard{"otherShard"};
-const HostAndPort dummyHost("dummy", 123);
 
-class MetadataManagerTest : public ShardingMongodTestFixture {
+class MetadataManagerTest : public ShardServerTestFixture {
 protected:
     void setUp() override {
-        ShardingMongodTestFixture::setUp();
-        serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-        initializeGlobalShardingStateForMongodForTest(ConnectionString(dummyHost))
-            .transitional_ignore();
-
-        configTargeter()->setFindHostReturnValue(dummyHost);
-
+        ShardServerTestFixture::setUp();
         _manager = std::make_shared<MetadataManager>(getServiceContext(), kNss, executor());
-    }
-
-    std::shared_ptr<RemoteCommandTargeterMock> configTargeter() const {
-        return RemoteCommandTargeterMock::get(shardRegistry()->getConfigShard()->getTargeter());
     }
 
     static std::unique_ptr<CollectionMetadata> makeEmptyMetadata() {

@@ -47,7 +47,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/views/durable_view_catalog.h"
@@ -458,12 +457,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     if (args.nss != NamespaceString::kSessionTransactionsTableNamespace) {
         if (!args.fromMigrate) {
             auto css = CollectionShardingState::get(opCtx, args.nss);
-            css->onUpdateOp(opCtx,
-                            args.criteria,
-                            args.update,
-                            args.updatedDoc,
-                            opTime.writeOpTime,
-                            opTime.prePostImageOpTime);
+            css->onUpdateOp(opCtx, args.updatedDoc, opTime.writeOpTime, opTime.prePostImageOpTime);
         }
     }
 
@@ -727,9 +721,6 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
-
-    auto css = CollectionShardingState::get(opCtx, collectionName);
-    css->onDropCollection(opCtx, collectionName);
 
     // Evict namespace entry from the namespace/uuid cache if it exists.
     NamespaceUUIDCache::get(opCtx).evictNamespace(collectionName);
