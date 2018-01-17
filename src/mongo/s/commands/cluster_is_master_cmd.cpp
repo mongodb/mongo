@@ -67,6 +67,10 @@ public:
         // No auth required
     }
 
+    bool requiresAuth() const override {
+        return false;
+    }
+
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
