@@ -220,7 +220,6 @@ MONGO_COMPILER_NORETURN void invariantOKFailed(const char* expr,
                                                const Status& status,
                                                const char* file,
                                                unsigned line) noexcept;
-void wasserted(const char* expr, const char* file, unsigned line);
 
 #define fassertFailed MONGO_fassertFailed
 #define MONGO_fassertFailed(...) ::mongo::fassertFailedWithLocation(__VA_ARGS__, __FILE__, __LINE__)
@@ -434,15 +433,6 @@ inline void fassertStatusOKWithLocation(int msgid,
         fassertFailedWithStatusWithLocation(msgid, s, file, line);
     }
 }
-
-/* warning only - keeps going */
-#define wassert MONGO_wassert
-#define MONGO_wassert(_Expression)                                \
-    do {                                                          \
-        if (MONGO_unlikely(!(_Expression))) {                     \
-            ::mongo::wasserted(#_Expression, __FILE__, __LINE__); \
-        }                                                         \
-    } while (false)
 
 /**
  * verify is deprecated. It is like invariant() in debug builds and massert() in release builds.

@@ -82,31 +82,6 @@ void DBException::traceIfNeeded(const DBException& e) {
     }
 }
 
-/* "warning" assert -- safe to continue, so we don't throw exception. */
-NOINLINE_DECL void wasserted(const char* expr, const char* file, unsigned line) {
-    static bool rateLimited;
-    static time_t lastWhen;
-    static unsigned lastLine;
-    if (lastLine == line && time(0) - lastWhen < 5) {
-        if (!rateLimited) {
-            rateLimited = true;
-            log() << "rate limiting wassert" << endl;
-        }
-        return;
-    }
-    lastWhen = time(0);
-    lastLine = line;
-
-    warning() << "warning assertion failure " << expr << ' ' << file << ' ' << dec << line << endl;
-    logContext();
-    assertionCount.condrollover(++assertionCount.warning);
-#if defined(MONGO_CONFIG_DEBUG_BUILD)
-    // this is so we notice in buildbot
-    severe() << "\n\n***aborting after wassert() failure in a debug/test build\n\n" << endl;
-    std::abort();
-#endif
-}
-
 NOINLINE_DECL void verifyFailed(const char* expr, const char* file, unsigned line) {
     assertionCount.condrollover(++assertionCount.regular);
     error() << "Assertion failure " << expr << ' ' << file << ' ' << dec << line << endl;

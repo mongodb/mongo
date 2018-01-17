@@ -633,7 +633,10 @@ BenchRunState::BenchRunState(unsigned numWorkers)
       _isCollectingStats(0) {}
 
 BenchRunState::~BenchRunState() {
-    wassert(_numActiveWorkers == 0 && _numUnstartedWorkers == 0);
+    if (_numActiveWorkers != 0)
+        warning() << "Destroying BenchRunState with active workers";
+    if (_numUnstartedWorkers != 0)
+        warning() << "Destroying BenchRunState with unstarted workers";
 }
 
 void BenchRunState::waitForState(State awaitedState) {

@@ -197,7 +197,6 @@ public:
 private:
     void _insertWriteIntent(void* p, int len) {
         _intents.push_back(WriteIntent(p, len));
-        wassert(_intents.size() < 2000000);
     }
 
 

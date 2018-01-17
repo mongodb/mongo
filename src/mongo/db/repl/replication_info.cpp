@@ -126,7 +126,7 @@ void appendReplicationInfo(OperationContext* opCtx, BSONObjBuilder& result, int 
             }
 
             if (level > 1) {
-                wassert(!opCtx->lockState()->isLocked());
+                invariant(!opCtx->lockState()->isLocked());
                 // note: there is no so-style timeout on this connection; perhaps we should have
                 // one.
                 ScopedDbConnection conn(s["host"].valuestr());

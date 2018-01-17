@@ -1105,7 +1105,7 @@ Status BtreeLogic<BtreeLayout>::_find(OperationContext* opCtx,
 
     // Some debugging checks.
     if (low != bucket->n) {
-        wassert(key.woCompare(getFullKey(bucket, low).data, _ordering) <= 0);
+        invariant(key.woCompare(getFullKey(bucket, low).data, _ordering) <= 0);
 
         if (low > 0) {
             if (getFullKey(bucket, low - 1).data.woCompare(key, _ordering) > 0) {
@@ -1113,7 +1113,7 @@ Status BtreeLogic<BtreeLayout>::_find(OperationContext* opCtx,
                     log() << key.toString() << endl;
                     log() << getFullKey(bucket, low - 1).data.toString() << endl;
                 }
-                wassert(false);
+                invariant(false);
             }
         }
     }
@@ -2061,8 +2061,8 @@ long long BtreeLogic<BtreeLayout>::_fullValidate(OperationContext* opCtx,
 
             if (strict) {
                 invariant(b->parent == bucketLoc);
-            } else {
-                wassert(b->parent == bucketLoc);
+            } else if (b->parent != bucketLoc) {
+                warning() << "index corruption detected: b->parent != bucketLoc";
             }
 
             keyCount += _fullValidate(opCtx, left, unusedCount, strict, dumpBuckets, depth + 1);
@@ -2073,8 +2073,8 @@ long long BtreeLogic<BtreeLayout>::_fullValidate(OperationContext* opCtx,
         BucketType* b = getBucket(opCtx, bucket->nextChild);
         if (strict) {
             invariant(b->parent == bucketLoc);
-        } else {
-            wassert(b->parent == bucketLoc);
+        } else if (b->parent != bucketLoc) {
+            warning() << "index corruption detected: b->parent != bucketLoc";
         }
 
         keyCount +=
@@ -2119,7 +2119,7 @@ void BtreeLogic<BtreeLayout>::assertValid(const std::string& ns,
                     }
                     dumpBucket(bucket);
                 }
-                wassert(false);
+                invariant(false);
                 break;
             } else if (z == 0) {
                 if (!(firstKey.header.recordLoc < secondKey.header.recordLoc)) {
@@ -2128,7 +2128,7 @@ void BtreeLogic<BtreeLayout>::assertValid(const std::string& ns,
                           << " RL:" << firstKey.header.recordLoc.toString() << endl;
                     log() << " k(" << i + 1 << ")" << redact(secondKey.data.toString())
                           << " RL:" << secondKey.header.recordLoc.toString() << endl;
-                    wassert(firstKey.header.recordLoc < secondKey.header.recordLoc);
+                    invariant(firstKey.header.recordLoc < secondKey.header.recordLoc);
                 }
             }
         }
@@ -2139,7 +2139,6 @@ void BtreeLogic<BtreeLayout>::assertValid(const std::string& ns,
             FullKey k1 = getFullKey(bucket, 0);
             FullKey k2 = getFullKey(bucket, bucket->n - 1);
             int z = k1.data.woCompare(k2.data, ordering);
-            // wassert( z <= 0 );
             if (z > 0) {
                 log() << "Btree keys out of order in collection " << ns;
                 std::call_once(assertValidFlag, [&bucket]() { dumpBucket(bucket); });

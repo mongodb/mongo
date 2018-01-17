@@ -1433,13 +1433,15 @@ public:
             state.prepTempCollection();
             ON_BLOCK_EXIT_OBJ(state, &State::dropTempCollections);
 
-            int progressTotal = 0;
+            int64_t progressTotal = 0;
             bool showTotal = true;
             if (state.config().filter.isEmpty()) {
                 const bool holdingGlobalLock = false;
                 const auto count = _collectionCount(opCtx, config.nss, holdingGlobalLock);
                 progressTotal =
-                    (config.limit && (unsigned)config.limit < count) ? config.limit : count;
+                    (config.limit && static_cast<unsigned long long>(config.limit) < count)
+                    ? config.limit
+                    : count;
             } else {
                 showTotal = false;
                 // Set an arbitrary total > 0 so the meter will be activated.
@@ -1452,9 +1454,6 @@ public:
             lk.unlock();
             progress.showTotal(showTotal);
             ProgressMeterHolder pm(progress);
-
-            // See cast on next line to 32 bit unsigned
-            wassert(config.limit < 0x4000000);
 
             long long mapTime = 0;
             long long reduceTime = 0;

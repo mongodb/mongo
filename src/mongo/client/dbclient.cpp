@@ -1443,21 +1443,7 @@ bool DBClientConnection::call(Message& toSend,
 }
 
 BSONElement getErrField(const BSONObj& o) {
-    BSONElement first = o.firstElement();
-    if (strcmp(first.fieldName(), "$err") == 0)
-        return first;
-
-    // temp - will be DEV only later
-    /*DEV*/
-    if (1) {
-        BSONElement e = o["$err"];
-        if (!e.eoo()) {
-            wassert(false);
-        }
-        return e;
-    }
-
-    return BSONElement();
+    return o["$err"];
 }
 
 bool hasErrField(const BSONObj& o) {

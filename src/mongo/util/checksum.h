@@ -41,7 +41,6 @@ struct Checksum {
 
     // if you change this you must bump dur::CurrentVersion
     void gen(const void* buf, unsigned len) {
-        wassert(((size_t)buf) % 8 == 0);  // performance warning
         unsigned n = len / 8 / 2;
         ConstDataCursor cdc(static_cast<const char*>(buf));
         uint64_t a = 0;
