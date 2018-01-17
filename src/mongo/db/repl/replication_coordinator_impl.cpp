@@ -1370,7 +1370,7 @@ Status ReplicationCoordinatorImpl::_setLastOptime_inlock(const UpdatePositionArg
 }
 
 bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
-    const OpTime& opTime, Timestamp minSnapshot, const WriteConcernOptions& writeConcern) {
+    const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     // The syncMode cannot be unset.
     invariant(writeConcern.syncMode != WriteConcernOptions::SyncMode::UNSET);
     Status status = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
@@ -1394,8 +1394,7 @@ bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
             }
 
             // Wait for the "current" snapshot to advance to/past the opTime.
-            const auto haveSnapshot = (_currentCommittedSnapshot >= opTime &&
-                                       _currentCommittedSnapshot->getTimestamp() >= minSnapshot);
+            const auto haveSnapshot = _currentCommittedSnapshot >= opTime;
             if (!haveSnapshot) {
                 LOG(1) << "Required snapshot optime: " << opTime << " is not yet part of the "
                        << "current 'committed' snapshot: " << *_currentCommittedSnapshot;
@@ -1512,7 +1511,7 @@ Status ReplicationCoordinatorImpl::_awaitReplication_inlock(
     stdx::condition_variable condVar;
     ThreadWaiter waiter(opTime, &writeConcern, &condVar);
     WaiterGuard guard(&_replicationWaiterList, &waiter);
-    while (!_doneWaitingForReplication_inlock(opTime, {}, writeConcern)) {
+    while (!_doneWaitingForReplication_inlock(opTime, writeConcern)) {
 
         if (_inShutdown) {
             return {ErrorCodes::ShutdownInProgress, "Replication is being shut down"};
@@ -2808,8 +2807,7 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
 
 void ReplicationCoordinatorImpl::_wakeReadyWaiters_inlock() {
     _replicationWaiterList.signalAndRemoveIf_inlock([this](Waiter* waiter) {
-        return _doneWaitingForReplication_inlock(
-            waiter->opTime, Timestamp(), *waiter->writeConcern);
+        return _doneWaitingForReplication_inlock(waiter->opTime, *waiter->writeConcern);
     });
 }
 
