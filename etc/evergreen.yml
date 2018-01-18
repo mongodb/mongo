@@ -4710,7 +4710,7 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    test_flags: --nojournal --excludeWithAnyTags=requires_journaling
+    test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication
     use_scons_cache: true
     build_mongoreplay: true
   tasks:
@@ -4732,15 +4732,11 @@ buildvariants:
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
-  - name: jstestfuzz_concurrent_replication
   - name: jstestfuzz_concurrent_sharded
-  - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
   - name: mongosTest
-  - name: replica_sets_auth
   - name: master_slave
   - name: master_slave_auth
-  - name: sharding_auth
 
 - name: linux-64-lsm
   stepback: false
