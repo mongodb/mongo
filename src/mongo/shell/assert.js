@@ -424,7 +424,10 @@ assert.doesNotThrow.automsg = function(func, params) {
             doassert("unknown response given to commandWorked");
         }
 
-        const failMsg = "command failed: " + tojson(res) + " : " + msg;
+        // Keep this as a function so we don't call tojson if not necessary.
+        const makeFailMsg = () => {
+            return "command failed: " + tojson(res) + " : " + msg;
+        };
 
         if (_isWriteResultType(res)) {
             // These can only contain write errors, not command errors.
@@ -435,17 +438,17 @@ assert.doesNotThrow.automsg = function(func, params) {
             // A WriteCommandError implies ok:0.
             // Error objects may have a `code` property added (e.g.
             // DBCollection.prototype.mapReduce) without a `ok` property.
-            doassert(failMsg, res);
+            doassert(makeFailMsg(), res);
         } else if (res.hasOwnProperty("ok")) {
             // Handle raw command responses or cases like MapReduceResult which extend command
             // response.
             if (ignoreWriteErrors) {
                 if (res.ok === 0) {
-                    doassert(failMsg, res);
+                    doassert(makeFailMsg(), res);
                 }
             } else {
                 if (!_rawReplyOkAndNoWriteErrors(res)) {
-                    doassert(failMsg, res);
+                    doassert(makeFailMsg(), res);
                 }
             }
         } else if (res.hasOwnProperty("acknowledged")) {
@@ -471,12 +474,17 @@ assert.doesNotThrow.automsg = function(func, params) {
             expectedCode = [expectedCode];
         }
 
-        const failMsg = "command worked when it should have failed: " + tojson(res) + " : " + msg;
+        // Keep this as a function so we don't call tojson if not necessary.
+        const makeFailMsg = () => {
+            return "command worked when it should have failed: " + tojson(res) + " : " + msg;
+        };
 
-        const failCodeMsg = (expectedCode !== kAnyErrorCode)
-            ? "command did not fail with any of the following codes " + tojson(expectedCode) + " " +
-                tojson(res) + " : " + msg
-            : "";
+        const makeFailCodeMsg = () => {
+            return (expectedCode !== kAnyErrorCode)
+                ? "command did not fail with any of the following codes " + tojson(expectedCode) +
+                    " " + tojson(res) + " : " + msg
+                : "";
+        };
 
         if (_isWriteResultType(res)) {
             // These can only contain write errors, not command errors.
@@ -487,14 +495,14 @@ assert.doesNotThrow.automsg = function(func, params) {
             // DBCollection.prototype.mapReduce) without a `ok` property.
             if (expectedCode !== kAnyErrorCode) {
                 if (!res.hasOwnProperty("code") || !expectedCode.includes(res.code)) {
-                    doassert(failCodeMsg, res);
+                    doassert(makeFailCodeMsg(), res);
                 }
             }
         } else if (res.hasOwnProperty("ok")) {
             // Handle raw command responses or cases like MapReduceResult which extend command
             // response.
             if (_rawReplyOkAndNoWriteErrors(res)) {
-                doassert(failMsg, res);
+                doassert(makeFailMsg(), res);
             }
             if (expectedCode !== kAnyErrorCode) {
                 let foundCode = false;
@@ -504,12 +512,12 @@ assert.doesNotThrow.automsg = function(func, params) {
                     foundCode = res.writeErrors.some((err) => expectedCode.includes(err.code));
                 }
                 if (!foundCode) {
-                    doassert(failCodeMsg, res);
+                    doassert(makeFailCodeMsg(), res);
                 }
             }
         } else if (res.hasOwnProperty("acknowledged")) {
             // CRUD api functions return plain js objects with an acknowledged property.
-            doassert(failMsg);
+            doassert(makeFailMsg());
         } else {
             doassert("unknown type of result, cannot check error: " + tojson(res) + " : " + msg,
                      res);
