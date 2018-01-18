@@ -35,7 +35,6 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -229,13 +228,6 @@ Status LogicalSessionCacheImpl::_reap(Client* client) {
 }
 
 void LogicalSessionCacheImpl::_refresh(Client* client) {
-    // Do not run this job if we are not in FCV 3.6
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-        LOG(1) << "Skipping session refresh job while feature compatibility version is not 3.6";
-        return;
-    }
-
     // Stats for serverStatus:
     {
         stdx::lock_guard<stdx::mutex> lk(_cacheMutex);

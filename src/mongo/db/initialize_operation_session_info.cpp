@@ -35,7 +35,6 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
 
 namespace mongo {
 
@@ -62,14 +61,6 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
     auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
 
     if (osi.getSessionId()) {
-        uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "cannot pass logical session id unless fully upgraded to "
-                                 "featureCompatibilityVersion 3.6. See "
-                              << feature_compatibility_version::kDochubLink
-                              << " .",
-                serverGlobalParams.featureCompatibility.getVersion() ==
-                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-
         stdx::lock_guard<Client> lk(*opCtx->getClient());
 
         opCtx->setLogicalSessionId(makeLogicalSessionId(osi.getSessionId().get(), opCtx));
