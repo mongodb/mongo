@@ -157,6 +157,7 @@ functions:
           source ./venv/bin/activate
           infrastructure_provisioning.py
           mongodb_setup.py
+          workload_setup.py
 
   "run test":
     - command: shell.exec
