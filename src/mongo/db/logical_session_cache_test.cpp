@@ -66,8 +66,7 @@ class LogicalSessionCacheTest : public unittest::Test {
 public:
     LogicalSessionCacheTest()
         : _service(std::make_shared<MockServiceLiasonImpl>()),
-          _sessions(std::make_shared<MockSessionsCollectionImpl>()),
-          _fcv(EnsureFCV::Version::kFullyUpgradedTo36) {}
+          _sessions(std::make_shared<MockSessionsCollectionImpl>()) {}
 
     void setUp() override {
         auto localManagerState = stdx::make_unique<AuthzManagerExternalStateMock>();
@@ -140,8 +139,6 @@ private:
     std::unique_ptr<LogicalSessionCache> _cache;
 
     Client* _client;
-
-    EnsureFCV _fcv;
 };
 
 // Test that the getFromCache method does not make calls to the sessions collection

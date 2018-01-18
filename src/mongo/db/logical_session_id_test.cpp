@@ -48,7 +48,6 @@
 #include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/service_liason_mock.h"
 #include "mongo/db/sessions_collection_mock.h"
@@ -72,8 +71,6 @@ public:
     AuthorizationSessionForTest* authzSession;
 
     void setUp() {
-        serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
         session = transportLayer.createSession();
         client = serviceContext.makeClient("testClient", session);
         RestrictionEnvironment::set(

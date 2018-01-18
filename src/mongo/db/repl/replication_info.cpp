@@ -51,7 +51,6 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/wire_version.h"
@@ -363,10 +362,7 @@ public:
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
         result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
         result.appendDate("localTime", jsTime());
-        if (serverGlobalParams.featureCompatibility.getVersion() ==
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
-        }
+        result.append("logicalSessionTimeoutMinutes", localLogicalSessionTimeoutMinutes);
 
         if (internalClientElement) {
             result.append("minWireVersion",

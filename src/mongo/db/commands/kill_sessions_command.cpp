@@ -101,12 +101,6 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) override {
-
-        if (serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            return SessionsCommandFCV34Status(getName());
-        }
-
         return Status::OK();
     }
 
@@ -114,13 +108,6 @@ public:
                      const std::string& db,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
-
-        if (serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            return CommandHelpers::appendCommandStatus(result,
-                                                       SessionsCommandFCV34Status(getName()));
-        }
-
         IDLParserErrorContext ctx("KillSessionsCmd");
         auto ksc = KillSessionsCmdFromClient::parse(ctx, cmdObj);
 
