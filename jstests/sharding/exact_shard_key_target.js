@@ -14,8 +14,12 @@ assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName()}))
 printjson(admin.runCommand({movePrimary: coll.getDB().getName(), to: st.shard0.shardName}));
 assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {"a.b": 1}}));
 assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {"a.b": 0}}));
-assert.commandWorked(
-    admin.runCommand({moveChunk: coll.getFullName(), find: {"a.b": 0}, to: st.shard1.shardName}));
+assert.commandWorked(admin.runCommand({
+    moveChunk: coll.getFullName(),
+    find: {"a.b": 0},
+    to: st.shard1.shardName,
+    _waitForDelete: true
+}));
 
 st.printShardingStatus();
 
