@@ -1,4 +1,5 @@
 // test basic operations in parallel, with replication
+// @tags: [requires_replication]
 load('jstests/libs/parallelTester.js');
 
 baseName = "parallel_repl";

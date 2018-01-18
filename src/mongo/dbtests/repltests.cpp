@@ -103,6 +103,10 @@ protected:
 public:
     Base()
         : _client(&_opCtx), _defaultReplSettings(getGlobalReplicationCoordinator()->getSettings()) {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         ReplSettings replSettings;
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);
         replSettings.setMaster(true);
@@ -131,6 +135,10 @@ public:
         wuow.commit();
     }
     ~Base() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         try {
             deleteAll(ns());
             deleteAll(cllNS());
@@ -299,6 +307,10 @@ protected:
 class LogBasic : public Base {
 public:
     void run() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         ASSERT_EQUALS(2, opCount());
         _client.insert(ns(), fromjson("{\"a\":\"b\"}"));
         ASSERT_EQUALS(3, opCount());
@@ -311,6 +323,10 @@ class Base : public ReplTests::Base {
 public:
     virtual ~Base() {}
     void run() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         reset();
         doIt();
         int nOps = opCount();
@@ -1292,6 +1308,10 @@ public:
 class DeleteOpIsIdBased : public Base {
 public:
     void run() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         insert(BSON("_id" << 0 << "a" << 10));
         insert(BSON("_id" << 1 << "a" << 11));
         insert(BSON("_id" << 3 << "a" << 10));
@@ -1311,6 +1331,10 @@ public:
 class DatabaseIgnorerBasic {
 public:
     void run() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         DatabaseIgnorer d;
         ASSERT(!d.ignoreAt("a", Timestamp(4, 0)));
         d.doIgnoreUntilAfter("a", Timestamp(5, 0));
@@ -1327,6 +1351,10 @@ public:
 class DatabaseIgnorerUpdate {
 public:
     void run() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         DatabaseIgnorer d;
         d.doIgnoreUntilAfter("a", Timestamp(5, 0));
         d.doIgnoreUntilAfter("a", Timestamp(6, 0));
@@ -1364,6 +1392,10 @@ public:
 class FetchAndInsertMissingDocument : public Base {
 public:
     void run() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         bool threw = false;
         auto oplogEntry = makeOplogEntry(OpTime(Timestamp(100, 1), 1LL),  // optime
                                          OpTypeEnum::kUpdate,             // op type

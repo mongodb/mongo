@@ -8234,8 +8234,14 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
+  - name: audit
   - name: auth
   - name: auth_audit
+  - name: dbtest
+  - name: concurrency
+    distros:
+    - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  - name: concurrency_simultaneous
   - name: disk_mobile
   - name: failpoints
   - name: failpoints_auth
@@ -8250,10 +8256,64 @@ buildvariants:
   - name: aggregation_fuzzer
   - name: noPassthrough
   - name: noPassthroughWithMongod
+  - name: parallel
+  - name: parallel_compatibility
   - name: rlp
   - name: sasl
+  - name: serial_run
   - name: session_jscore_passthrough
   - name: snmp
+
+- name: enterprise-osx-1010-mobile
+  display_name: Enterprise OS X 10.10 (mobile)
+  modules:
+  - enterprise
+  run_on:
+  - macos-1012
+  batchtime: 1440 # 1 day
+  expansions:
+    push_path: osx
+    push_bucket: downloads.10gen.com
+    push_name: osx
+    push_arch: x86_64-enterprise
+    gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
+    tooltags: "-tags 'ssl sasl'"
+    test_flags: --storageEngine=mobile --excludeWithAnyTags=requires_mmapv1,requires_wiredtiger,requires_sharding,requires_replication,SERVER-32709,SERVER-32710,SERVER-32675
+    compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    num_jobs_available: 1
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+  - name: compile_all
+  - name: aggregation
+  - name: aggregation_auth
+  - name: aggregation_facet_unwind_passthrough
+  - name: audit
+  - name: auth
+  - name: auth_audit
+  - name: dbtest
+  - name: concurrency
+  - name: concurrency_simultaneous
+  - name: disk_mobile
+  - name: failpoints
+  - name: failpoints_auth
+  - name: integration_tests_standalone
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jsCore_decimal
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_op_query
+  - name: jsonSchema
+  - name: aggregation_fuzzer
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: parallel
+  - name: parallel_compatibility
+  - name: sasl
+  - name: serial_run
+  - name: session_jscore_passthrough
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)

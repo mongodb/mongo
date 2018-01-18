@@ -1,4 +1,5 @@
 // perform basic js tests in parallel
+// @tags: [SERVER-32675]
 load('jstests/libs/parallelTester.js');
 
 Random.setRandomSeed();

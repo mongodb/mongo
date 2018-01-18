@@ -46,6 +46,11 @@ static const NamespaceString nss("unittests.oplogstarttests");
 class Base {
 public:
     Base() : _lk(&_opCtx), _context(&_opCtx, nss.ns()), _client(&_opCtx) {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
+
         Collection* c = _context.db()->getCollection(&_opCtx, nss);
         if (!c) {
             WriteUnitOfWork wuow(&_opCtx);
@@ -56,6 +61,10 @@ public:
     }
 
     ~Base() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         client()->dropCollection(nss.ns());
 
         // The OplogStart stage is not allowed to outlive it's RecoveryUnit.
@@ -116,6 +125,10 @@ private:
 class OplogStartIsOldest : public Base {
 public:
     void run() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         for (int i = 0; i < 10; ++i) {
             client()->insert(nss.ns(), BSON("_id" << i << "ts" << Timestamp(1000, i)));
         }
@@ -140,6 +153,10 @@ public:
 class OplogStartIsNewest : public Base {
 public:
     void run() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         for (int i = 0; i < 10; ++i) {
             client()->insert(nss.ns(), BSON("_id" << i << "ts" << Timestamp(1000, i)));
         }
@@ -167,6 +184,10 @@ public:
 class OplogStartIsNewestExtentHop : public Base {
 public:
     void run() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         for (int i = 0; i < 10; ++i) {
             client()->insert(nss.ns(), BSON("_id" << i << "ts" << Timestamp(1000, i)));
         }
@@ -189,13 +210,25 @@ public:
 class SizedExtentHopBase : public Base {
 public:
     SizedExtentHopBase() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         client()->dropCollection(nss.ns());
     }
     virtual ~SizedExtentHopBase() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         client()->dropCollection(nss.ns());
     }
 
     void run() {
+        // Replication is not supported by mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
         buildCollection();
 
         WorkingSetID id = WorkingSet::INVALID_ID;

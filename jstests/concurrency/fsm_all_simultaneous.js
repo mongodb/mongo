@@ -1,3 +1,4 @@
+// @tags: [SERVER-32675]
 'use strict';
 
 load('jstests/concurrency/fsm_libs/runner.js');

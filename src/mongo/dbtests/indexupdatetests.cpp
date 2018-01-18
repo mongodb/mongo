@@ -808,6 +808,12 @@ public:
     IndexUpdateTests() : Suite("indexupdate") {}
 
     void setupTests() {
+        // SERVER-32702: Skip this test for Mobile SE.
+        // This test should run successfully after fixing the server ticket.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
+
         add<InsertBuildIgnoreUnique<true>>();
         add<InsertBuildIgnoreUnique<false>>();
         add<InsertBuildEnforceUnique<true>>();

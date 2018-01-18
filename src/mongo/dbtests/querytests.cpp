@@ -1291,6 +1291,12 @@ public:
         _n = 0;
     }
     void run() {
+        // SERVER-32698 Skipping this test for mobile SE:
+        // Capped collection isn't properly supported yet with mobile SE.
+        if (mongo::storageGlobalParams.engine == "mobile") {
+            return;
+        }
+
         string err;
         OldClientWriteContext ctx(&_opCtx, ns());
 
