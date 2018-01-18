@@ -1,19 +1,15 @@
 // Test the awaitData flag for the find/getMore commands.
-// @tags: [requires_replication]
+// @tags: [requires_replication, requires_getmore]
 (function() {
     'use strict';
 
-    var mongo = MongoRunner.runMongod({master: ""});
+    load("jstests/libs/fixture_helpers.js");
 
     var cmdRes;
     var cursorId;
     var defaultBatchSize = 101;
     var collName = 'await_data';
-    var db = mongo.getDB("test");
     var coll = db[collName];
-
-    var localDB = db.getSiblingDB("local");
-    var oplogColl = localDB.oplog.$main;
 
     // Create a non-capped collection with 10 documents.
     coll.drop();
@@ -106,45 +102,65 @@
     assert.gte((new Date()) - now, 2000);
 
     // Repeat the test, this time tailing the oplog rather than a user-created capped collection.
-    cmdRes = localDB.runCommand(
-        {find: oplogColl.getName(), batchSize: 2, awaitData: true, tailable: true});
-    assert.commandWorked(cmdRes);
-    assert.gt(cmdRes.cursor.id, NumberLong(0));
-    assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
-    assert.eq(cmdRes.cursor.firstBatch.length, 2);
+    // The oplog tailing in not possible on mongos.
+    if (FixtureHelpers.isReplSet(db)) {
+        var localDB = db.getSiblingDB("local");
+        var oplogColl = localDB.oplog.$main;
 
-    cmdRes = localDB.runCommand(
-        {getMore: cmdRes.cursor.id, collection: oplogColl.getName(), maxTimeMS: 1000});
-    assert.commandWorked(cmdRes);
-    assert.gt(cmdRes.cursor.id, NumberLong(0));
-    assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
-
-    while (cmdRes.cursor.nextBatch.length > 0) {
-        now = new Date();
         cmdRes = localDB.runCommand(
-            {getMore: cmdRes.cursor.id, collection: oplogColl.getName(), maxTimeMS: 4000});
+            {find: oplogColl.getName(), batchSize: 2, awaitData: true, tailable: true});
         assert.commandWorked(cmdRes);
-        assert.gt(cmdRes.cursor.id, NumberLong(0));
-        assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
+        if (cmdRes.cursor.id > NumberLong(0)) {
+            assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
+            assert.eq(cmdRes.cursor.firstBatch.length, 2);
+
+            cmdRes = localDB.runCommand(
+                {getMore: cmdRes.cursor.id, collection: oplogColl.getName(), maxTimeMS: 1000});
+            assert.commandWorked(cmdRes);
+            assert.gt(cmdRes.cursor.id, NumberLong(0));
+            assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
+
+            while (cmdRes.cursor.nextBatch.length > 0) {
+                now = new Date();
+                cmdRes = localDB.runCommand(
+                    {getMore: cmdRes.cursor.id, collection: oplogColl.getName(), maxTimeMS: 4000});
+                assert.commandWorked(cmdRes);
+                assert.gt(cmdRes.cursor.id, NumberLong(0));
+                assert.eq(cmdRes.cursor.ns, oplogColl.getFullName());
+            }
+            assert.gte((new Date()) - now, 2000);
+        }
     }
-    assert.gte((new Date()) - now, 2000);
 
     // Test filtered inserts while writing to a capped collection.
     // Find with a filter which doesn't match any documents in the collection.
-    cmdRes = assert.commandWorked(db.runCommand(
-        {find: collName, batchSize: 2, filter: {x: 1}, awaitData: true, tailable: true}));
+    cmdRes = assert.commandWorked(db.runCommand({
+        find: collName,
+        batchSize: 2,
+        filter: {x: 1},
+        awaitData: true,
+        tailable: true,
+        comment: "uniquifier_comment"
+    }));
     assert.gt(cmdRes.cursor.id, NumberLong(0));
     assert.eq(cmdRes.cursor.ns, coll.getFullName());
     assert.eq(cmdRes.cursor.firstBatch.length, 0);
 
     // getMore should time out if we insert a non-matching document.
     let insertshell = startParallelShell(function() {
-        assert.soon(function() {
-            return db.currentOp({op: "getmore", "command.collection": "await_data"})
-                       .inprog.length == 1;
-        });
+        assert.soon(
+            function() {
+                return db.currentOp({
+                             op: "getmore",
+                             "command.collection": "await_data",
+                             "originatingCommand.comment": "uniquifier_comment"
+                         }).inprog.length == 1;
+            },
+            function() {
+                return tojson(db.currentOp().inprog);
+            });
         assert.writeOK(db.await_data.insert({x: 0}));
-    }, mongo.port);
+    });
 
     now = new Date();
     cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: 4000});
@@ -164,7 +180,7 @@
         assert.writeOK(db.await_data.insert({x: 0}));
         assert.writeOK(db.await_data.insert({_id: "match", x: 1}));
         jsTestLog("Written");
-    }, mongo.port);
+    });
 
     cmdRes =
         db.runCommand({getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: 5 * 60 * 1000});

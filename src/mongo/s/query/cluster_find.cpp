@@ -415,13 +415,16 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         ReadPreferenceSetting::get(opCtx) = *readPref;
     }
     if (pinnedCursor.getValue().isTailableAndAwaitData()) {
-        // Default to 1-second timeout for tailable awaitData cursors. If an explicit maxTimeMS has
-        // been specified, do not apply it to the opCtx, since its deadline will already have been
-        // set during command processing.
+        // A maxTimeMS specified on a tailable, awaitData cursor is special. Instead of imposing a
+        // deadline on the operation, it is used to communicate how long the server should wait for
+        // new results. Here we clear any deadline set during command processing and track the
+        // deadline instead via the 'waitForInsertsDeadline' decoration. This deadline defaults to
+        // 1 second if the user didn't specify a maxTimeMS.
+        opCtx->clearDeadline();
         auto timeout = request.awaitDataTimeout.value_or(Milliseconds{1000});
-        if (!request.awaitDataTimeout) {
-            opCtx->setDeadlineAfterNowBy(timeout);
-        }
+        awaitDataState(opCtx).waitForInsertsDeadline =
+            opCtx->getServiceContext()->getPreciseClockSource()->now() + timeout;
+
         invariant(pinnedCursor.getValue().setAwaitDataTimeout(timeout).isOK());
     } else if (request.awaitDataTimeout) {
         return {ErrorCodes::BadValue,

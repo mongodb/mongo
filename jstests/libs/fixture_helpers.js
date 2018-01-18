@@ -96,6 +96,14 @@ var FixtureHelpers = (function() {
         return shardConn;
     }
 
+    /**
+     * Returns true if we have a replica set.
+     */
+    function isReplSet(db) {
+        const primaryInfo = db.isMaster();
+        return primaryInfo.hasOwnProperty('setName');
+    }
+
     return {
         isMongos: isMongos,
         numberOfShardsForCollection: numberOfShardsForCollection,
@@ -103,5 +111,6 @@ var FixtureHelpers = (function() {
         awaitLastOpCommitted: awaitLastOpCommitted,
         runCommandOnEachPrimary: runCommandOnEachPrimary,
         getPrimaryForNodeHostingDatabase: getPrimaryForNodeHostingDatabase,
+        isReplSet: isReplSet,
     };
 })();

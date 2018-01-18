@@ -86,9 +86,6 @@ std::vector<ClusterClientCursorParams::RemoteCursor>
 RouterStageUpdateOnAddShard::establishShardCursorsOnNewShards(std::vector<ShardId> existingShardIds,
                                                               const BSONObj& newShardDetectedObj) {
     auto* opCtx = getOpCtx();
-    // Temporarily remove any deadline from this operation to avoid timing out while creating new
-    // cursors.
-    OperationContext::DeadlineStash deadlineStash(opCtx);
     // Reload the shard registry.  We need to ensure a reload initiated after calling this method
     // caused the reload, otherwise we aren't guaranteed to get all the new shards.
     auto* shardRegistry = Grid::get(opCtx)->shardRegistry();

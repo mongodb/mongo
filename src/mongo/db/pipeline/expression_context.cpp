@@ -84,13 +84,7 @@ void ExpressionContext::checkForInterrupt() {
     if (--_interruptCounter == 0) {
         invariant(opCtx);
         _interruptCounter = kInterruptCheckPeriod;
-        auto interruptStatus = opCtx->checkForInterruptNoAssert();
-        if (interruptStatus == ErrorCodes::ExceededTimeLimit && isTailableAwaitData()) {
-            // Don't respect deadline expiration during the pipeline when the cursor is
-            // tailable and awaitdata.
-            return;
-        }
-        uassertStatusOK(interruptStatus);
+        opCtx->checkForInterrupt();
     }
 }
 
