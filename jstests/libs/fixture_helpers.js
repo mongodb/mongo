@@ -83,10 +83,19 @@ var FixtureHelpers = (function() {
         return shardConn;
     }
 
+    /**
+     * Returns true if we have a replica set.
+     */
+    function isReplSet(db) {
+        const primaryInfo = db.isMaster();
+        return primaryInfo.hasOwnProperty('setName');
+    }
+
     return {
         awaitReplication: awaitReplication,
         awaitLastOpCommitted: awaitLastOpCommitted,
         runCommandOnEachPrimary: runCommandOnEachPrimary,
         getPrimaryForNodeHostingDatabase: getPrimaryForNodeHostingDatabase,
+        isReplSet: isReplSet,
     };
 })();

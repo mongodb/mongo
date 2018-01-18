@@ -101,17 +101,6 @@ Microseconds OperationContext::computeMaxTimeFromDeadline(Date_t when) {
     return maxTime;
 }
 
-OperationContext::DeadlineStash::DeadlineStash(OperationContext* opCtx)
-    : _opCtx(opCtx), _originalDeadline(_opCtx->getDeadline()) {
-    _opCtx->_deadline = Date_t::max();
-    _opCtx->_maxTime = _opCtx->computeMaxTimeFromDeadline(Date_t::max());
-}
-
-OperationContext::DeadlineStash::~DeadlineStash() {
-    _opCtx->_deadline = _originalDeadline;
-    _opCtx->_maxTime = _opCtx->computeMaxTimeFromDeadline(_originalDeadline);
-}
-
 void OperationContext::setDeadlineByDate(Date_t when) {
     setDeadlineAndMaxTime(when, computeMaxTimeFromDeadline(when));
 }

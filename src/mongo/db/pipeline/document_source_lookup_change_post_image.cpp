@@ -68,9 +68,6 @@ DocumentSource::GetNextResult DocumentSourceLookupChangePostImage::getNext() {
         return input;
     }
 
-    // Temporarily remove any deadline from this operation to avoid timeout during lookup.
-    OperationContext::DeadlineStash deadlineStash(pExpCtx->opCtx);
-
     MutableDocument output(input.releaseDocument());
     output[kFullDocumentFieldName] = lookupPostImage(output.peek());
     return output.freeze();

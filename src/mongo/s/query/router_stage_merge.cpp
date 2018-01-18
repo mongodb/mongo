@@ -78,17 +78,17 @@ StatusWith<ClusterQueryResult> RouterStageMerge::awaitNextWithTimeout(ExecContex
         auto event = nextEventStatus.getValue();
 
         // Block until there are further results to return, or our time limit is exceeded.
-        auto waitStatus = _executor->waitForEvent(getOpCtx(), event);
-
-        // Swallow ExceededTimeLimit errors for tailable awaitData cursors, stash the event
-        // that we were waiting on, and return EOF.
-        if (waitStatus == ErrorCodes::ExceededTimeLimit) {
-            _leftoverEventFromLastTimeout = std::move(event);
-            return ClusterQueryResult{};
-        }
+        auto waitStatus = _executor->waitForEvent(
+            getOpCtx(), event, awaitDataState(getOpCtx()).waitForInsertsDeadline);
 
         if (!waitStatus.isOK()) {
-            return waitStatus;
+            return waitStatus.getStatus();
+        }
+        // Swallow timeout errors for tailable awaitData cursors, stash the event that we were
+        // waiting on, and return EOF.
+        if (waitStatus == stdx::cv_status::timeout) {
+            _leftoverEventFromLastTimeout = std::move(event);
+            return ClusterQueryResult{};
         }
     }
 

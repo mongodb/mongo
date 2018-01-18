@@ -82,8 +82,10 @@ void TaskExecutorProxy::waitForEvent(const EventHandle& event) {
     _executor->waitForEvent(event);
 }
 
-Status TaskExecutorProxy::waitForEvent(OperationContext* opCtx, const EventHandle& event) {
-    return _executor->waitForEvent(opCtx, event);
+StatusWith<stdx::cv_status> TaskExecutorProxy::waitForEvent(OperationContext* opCtx,
+                                                            const EventHandle& event,
+                                                            Date_t deadline) {
+    return _executor->waitForEvent(opCtx, event, deadline);
 }
 
 StatusWith<executor::TaskExecutor::CallbackHandle> TaskExecutorProxy::scheduleWork(

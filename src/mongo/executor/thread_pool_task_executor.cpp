@@ -285,22 +285,26 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::onEvent(const E
     return cbHandle;
 }
 
-Status ThreadPoolTaskExecutor::waitForEvent(OperationContext* opCtx, const EventHandle& event) {
+StatusWith<stdx::cv_status> ThreadPoolTaskExecutor::waitForEvent(OperationContext* opCtx,
+                                                                 const EventHandle& event,
+                                                                 Date_t deadline) {
     invariant(opCtx);
     invariant(event.isValid());
     auto eventState = checked_cast<EventState*>(getEventFromHandle(event));
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    try {
-        // std::condition_variable::wait() can wake up spuriously, so provide a callback to detect
-        // when that happens and go back to waiting.
-        opCtx->waitForConditionOrInterrupt(eventState->isSignaledCondition, lk, [&eventState]() {
-            return eventState->isSignaledFlag;
-        });
-    } catch (const DBException& e) {
-        return e.toStatus();
+    // std::condition_variable::wait() can wake up spuriously, so we have to loop until the event
+    // is signalled or we time out.
+    while (!eventState->isSignaledFlag) {
+        auto status = opCtx->waitForConditionOrInterruptNoAssertUntil(
+            eventState->isSignaledCondition, lk, deadline);
+
+        if (!status.isOK() || stdx::cv_status::timeout == status) {
+            return status;
+        }
     }
-    return Status::OK();
+
+    return stdx::cv_status::no_timeout;
 }
 
 void ThreadPoolTaskExecutor::waitForEvent(const EventHandle& event) {
