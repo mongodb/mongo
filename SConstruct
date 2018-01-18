@@ -2854,22 +2854,25 @@ def doConfigure(myenv):
             # TODO: Implement native crypto for windows
             ssl_provider = 'openssl'
         elif conf.env.TargetOSIs('darwin', 'macOS'):
-            # TODO: Implement native crypto for apple
-            ssl_provider = 'openssl'
+            conf.env.Append( MONGO_CRYPTO=["apple"] )
+            if has_option("ssl"):
+                # TODO: Replace SSL implementation as well.
+                # For now, let openssl fill that role.
+                checkOpenSSL(conf)
 
     if ssl_provider == 'openssl':
         if has_option("ssl"):
             checkOpenSSL(conf)
             # Working OpenSSL available, use it.
-            env.Append( MONGO_CRYPTO=["openssl"] )
+            conf.env.Append( MONGO_CRYPTO=["openssl"] )
         else:
             # If we don't need an SSL build, we can get by with TomCrypt.
-            env.Append( MONGO_CRYPTO=["tom"] )
+            conf.env.Append( MONGO_CRYPTO=["tom"] )
 
     if has_option( "ssl" ):
         # Either crypto engine is native,
         # or it's OpenSSL and has been checked to be working.
-        env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
+        conf.env.SetConfigHeaderDefine("MONGO_CONFIG_SSL")
 
 
     if use_system_version_of_library("pcre"):

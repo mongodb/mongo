@@ -56,6 +56,17 @@ env.Library('sha_block_openssl',
         'sha256_block',
     ])
 
+if env.TargetOSIs('darwin', 'macOS'):
+    env.Library('sha_block_apple',
+        source=[
+            'sha_block_apple.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+            'sha1_block',
+            'sha256_block',
+        ])
+
 env.Library('scramauth',
             ['mechanism_scram.cpp'],
             LIBDEPS=['$BUILD_DIR/mongo/base',
