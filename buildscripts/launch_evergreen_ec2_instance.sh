@@ -18,6 +18,9 @@ This script supports the following parameters for Windows & Linux platforms:
                        information. This file will be used in etc/evergreen.yml for
                        macro expansion of variables used in other functions.
   -e <expire_hours>,   [OPTIONAL] Number of hours to expire the AWS EC2 instance.
+  -g <security_group_id>, [OPTIONAL] The security group id to be used for the new AWS EC2 instance.
+                          To specify more than one group, invoke this option each time.
+  -n <subnet_id>,      [OPTIONAL] The subnet id in which to launch the AWS EC2 instance.
   -s <security_group>, [OPTIONAL] The security group to be used for the new AWS EC2 instance.
                        To specify more than one group, invoke this option each time.
   -t <tag_name>,       [OPTIONAL] The tag name of the new AWS EC2 instance.
@@ -25,14 +28,20 @@ EOF
 }
 
 # Parse command line options
-while getopts "e:k:s:t:y:?" option
+while getopts "e:g:k:n:s:t:y:?" option
 do
    case $option in
      e)
         expire_hours=$OPTARG
         ;;
+     g)
+        sec_group_ids="$sec_group_ids $OPTARG"
+        ;;
      k)
         ssh_key_id=$OPTARG
+        ;;
+     n)
+        subnet_id=$OPTARG
         ;;
      s)
         sec_groups="$sec_groups $OPTARG"
@@ -64,6 +73,15 @@ for sec_group in $sec_groups
 do
   security_groups="$security_groups --securityGroup $sec_group"
 done
+
+for sec_group_id in $sec_group_ids
+do
+  security_group_ids="$security_group_ids --securityGroupIds $sec_group_id"
+done
+
+if [ ! -z $subnet_id ]; then
+  subnet_id="--subnetId $subnet_id"
+fi
 
 if [ ! -z $expire_hours ]; then
   expire_tag="--tagExpireHours $expire_hours"
@@ -151,7 +169,9 @@ aws_ec2=$(python buildscripts/aws_ec2.py \
           --instanceType $instance_type  \
           --keyName $ssh_key_id          \
           --mode create                  \
+          $security_group_ids            \
           $security_groups               \
+          $subnet_id                     \
           --tagName "$tag_name"          \
           --tagOwner "$USER"             \
           $expire_tag                    \

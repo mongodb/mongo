@@ -160,7 +160,9 @@ variables:
   monitor_system_file: system.json
   remote_dir: powercycle
   secret_port: "20001"
+  security_group_ids: ${powercycle_aws_security_group_id}
   security_groups: mci powercycle_testing
+  subnet_id: ${powercycle_aws_subnet_id}
   ssh_identity: -i ${private_key_file}
   ssh_key_id: ${powercycle_ssh_key_id}
   standard_port: "20000"
@@ -1186,10 +1188,21 @@ functions:
           ${activate_virtualenv}
           pip install boto3
 
-          for security_group in ${security_groups}
+          if [ ! -z "${subnet_id}" ]; then
+            subnet_id="-n ${subnet_id}"
+          fi
+
+          for security_group_id in ${security_group_ids}
           do
-            security_groups="$security_groups -s $security_group"
+            security_group_ids="$security_group_ids -g $security_group_id"
           done
+
+          if [ -z "${security_group_ids}" ]; then
+            for security_group in ${security_groups}
+            do
+              security_groups="$security_groups -s $security_group"
+            done
+          fi
 
           if [ ! -z "${expire_hours}" ]; then
             expire_hours="-e ${expire_hours}"
@@ -1200,6 +1213,8 @@ functions:
             $expire_hours                               \
             -k ${ssh_key_id}                            \
             $security_groups                            \
+            $security_group_ids                         \
+            $subnet_id                                  \
             -t "AMI Evergreen ${task_id}"               \
             -y ${aws_ec2_yml}
 

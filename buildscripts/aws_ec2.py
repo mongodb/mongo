@@ -156,7 +156,9 @@ class AwsEc2(object):
                         instance_type,
                         block_devices=None,
                         key_name=None,
+                        security_group_ids=None,
                         security_groups=None,
+                        subnet_id=None,
                         tags=None,
                         wait_time_secs=0,
                         show_progress=False,
@@ -175,8 +177,12 @@ class AwsEc2(object):
             bdms.append(bdm)
         if bdms:
             kwargs["BlockDeviceMappings"] = bdms
+        if security_group_ids:
+            kwargs["SecurityGroupIds"] = security_group_ids
         if security_groups:
             kwargs["SecurityGroups"] = security_groups
+        if subnet_id:
+            kwargs["SubnetId"] = subnet_id
         if key_name:
             kwargs["KeyName"] = key_name
 
@@ -257,12 +263,24 @@ def main():
                               default=None,
                               help="EC2 key name [REQUIRED for create].")
 
+    create_options.add_option("--securityGroupIds",
+                              dest="security_group_ids",
+                              action="append",
+                              default=[],
+                              help="EC2 security group ids. More than one security group id can be"
+                                   " added, by specifying this option more than once.")
+
     create_options.add_option("--securityGroup",
                               dest="security_groups",
                               action="append",
                               default=[],
                               help="EC2 security group. More than one security group can be added,"
                                    " by specifying this option more than once.")
+
+    create_options.add_option("--subnetId",
+                              dest="subnet_id",
+                              default=None,
+                              help="EC2 subnet id to use in VPC.")
 
     create_options.add_option("--tagExpireHours",
                               dest="tag_expire_hours",
@@ -325,7 +343,9 @@ def main():
             instance_type=options.instance_type,
             block_devices=block_devices,
             key_name=options.key_name,
+            security_group_ids=options.security_group_ids,
             security_groups=options.security_groups,
+            subnet_id=options.subnet_id,
             tags=tags,
             wait_time_secs=options.wait_time_secs,
             show_progress=True,
