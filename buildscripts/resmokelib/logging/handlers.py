@@ -3,7 +3,7 @@ Additional handlers that are used as the base classes of the buildlogger
 handler.
 """
 
-
+from __future__ import absolute_import
 
 import json
 import logging

@@ -3,10 +3,11 @@ Subclass of unittest.TestCase with helpers for spawning a separate
 process to perform the actual test case.
 """
 
-
+from __future__ import absolute_import
 
 import os
 import os.path
+import six
 import unittest
 
 from ... import config
@@ -27,7 +28,7 @@ def make_test_case(test_kind, *args, **kwargs):
     return _TEST_CASES[test_kind](*args, **kwargs)
 
 
-class TestCase(unittest.TestCase, metaclass=registry.make_registry_metaclass(_TEST_CASES)):
+class TestCase(six.with_metaclass(registry.make_registry_metaclass(_TEST_CASES), unittest.TestCase)):
     """
     A test case to execute.
     """

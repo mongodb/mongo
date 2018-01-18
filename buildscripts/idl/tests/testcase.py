@@ -14,7 +14,7 @@
 #
 """Utility methods and classes for testing IDL passes."""
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 import unittest
 from typing import Any, Tuple

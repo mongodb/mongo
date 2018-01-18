@@ -1,6 +1,6 @@
 
 """Unit tests for the buildscripts.ciconfig.tags module."""
-
+from __future__ import absolute_import
 
 import os
 import unittest

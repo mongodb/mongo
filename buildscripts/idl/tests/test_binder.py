@@ -16,7 +16,7 @@
 # pylint: disable=too-many-lines
 """Test cases for IDL binder."""
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 import textwrap
 import unittest

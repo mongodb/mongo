@@ -18,7 +18,7 @@ IDL Parser.
 Converts a YAML document to an idl.syntax tree.
 Only validates the document is syntatically correct, not semantically.
 """
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 from abc import ABCMeta, abstractmethod
 import io
@@ -31,6 +31,7 @@ from . import cpp_types
 from . import errors
 from . import syntax
 
+ABC = ABCMeta(str('ABC'), (object,), {'__slots__': ()})
 
 class _RuleDesc(object):
     """
@@ -543,7 +544,7 @@ def _parse(stream, error_file_name):
         return syntax.IDLParsedSpec(spec, None)
 
 
-class ImportResolverBase(object, metaclass=ABCMeta):
+class ImportResolverBase(ABC):
     """Base class for resolving imported files."""
 
     def __init__(self):

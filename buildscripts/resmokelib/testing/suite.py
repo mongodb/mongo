@@ -3,7 +3,7 @@ Holder for the (test kind, list of tests) pair with additional metadata about wh
 execute.
 """
 
-
+from __future__ import absolute_import
 
 import itertools
 import threading

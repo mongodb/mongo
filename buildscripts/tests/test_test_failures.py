@@ -2,7 +2,7 @@
 Tests for buildscripts/test_failures.py.
 """
 
-
+from __future__ import absolute_import
 
 import datetime
 import unittest

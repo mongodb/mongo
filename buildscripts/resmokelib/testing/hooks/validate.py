@@ -3,7 +3,7 @@ Testing hook for verifying the consistency and integrity of collection
 and index data.
 """
 
-
+from __future__ import absolute_import
 
 import os.path
 

@@ -14,7 +14,7 @@
 #
 """IDL C++ Code Generator."""
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 from abc import ABCMeta, abstractmethod
 import string
@@ -28,6 +28,7 @@ from . import writer
 
 _STD_ARRAY_UINT8_16 = 'std::array<std::uint8_t,16>'
 
+ABC = ABCMeta(str('ABC'), (object,), {'__slots__': ()})
 
 def is_primitive_scalar_type(cpp_type):
     # type: (unicode) -> bool
@@ -75,7 +76,7 @@ def _qualify_array_type(cpp_type):
     return "std::vector<%s>" % (cpp_type)
 
 
-class CppTypeBase(object, metaclass=ABCMeta):
+class CppTypeBase(ABC):
     """Base type for C++ Type information."""
 
     def __init__(self, field):
@@ -548,7 +549,7 @@ def get_cpp_type(field):
     return cpp_type_info
 
 
-class BsonCppTypeBase(object, metaclass=ABCMeta):
+class BsonCppTypeBase(ABC):
     """Base type for custom C++ support for BSON Types information."""
 
     def __init__(self, field):

@@ -1,6 +1,6 @@
 """GDB Pretty-printers for MongoDB
 """
-
+from __future__ import print_function
 
 import gdb.printing
 import struct

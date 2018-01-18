@@ -7,7 +7,7 @@ A script that provides:
 4. Has support for checking which files are to be checked.
 5. Supports validating and updating a set of files to the right coding style.
 """
-
+from __future__ import print_function, absolute_import
 
 import difflib
 import glob

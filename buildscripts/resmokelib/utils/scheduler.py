@@ -3,7 +3,7 @@ A thread-safe version of sched.scheduler since the class wasn't made
 thread-safe until Python 3.3.
 """
 
-
+from __future__ import absolute_import
 
 import heapq
 import sched

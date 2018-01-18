@@ -15,7 +15,7 @@
 #
 """Test cases for IDL binder."""
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 import io
 import textwrap

@@ -7,7 +7,9 @@ import copy
 from . import graph_consts
 
 if sys.version_info >= (3, 0):
-    str = str
+    basestring = str
+
+ABC = abc.ABCMeta('ABC', (object,), {'__slots__': ()})
 
 class Graph(object):
     """Graph class for storing the build dependency graph. The graph stores the
@@ -20,7 +22,7 @@ class Graph(object):
         """
         A graph can be initialized with a .json file, graph object, or with no args
         """
-        if isinstance(input, str):
+        if isinstance(input, basestring):
             if input.endswith('.json'):
                 with open(input, 'r') as f:
                     data = json.load(f, encoding="ascii")
@@ -170,7 +172,7 @@ class Graph(object):
                 sum(len(x) for x in self._edges.values()), hash(self))
 
 
-class NodeInterface(object, metaclass=abc.ABCMeta):
+class NodeInterface(ABC):
     """Abstract base class for all Node Objects - All nodes must have an id and name
     """
 

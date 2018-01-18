@@ -1,12 +1,13 @@
 """Base class and support functions for linters."""
-
-
+from __future__ import absolute_import
+from __future__ import print_function
 
 from abc import ABCMeta, abstractmethod
 from typing import Dict, List, Optional
 
+ABC = ABCMeta(str('ABC'), (object,), {'__slots__': ()})
 
-class LinterBase(object, metaclass=ABCMeta):
+class LinterBase(ABC):
     """Base Class for all linters."""
 
     def __init__(self, cmd_name, required_version):

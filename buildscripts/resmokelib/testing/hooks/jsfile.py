@@ -3,7 +3,7 @@ Interface for customizing the behavior of a test fixture by executing a
 JavaScript file.
 """
 
-
+from __future__ import absolute_import
 
 import sys
 

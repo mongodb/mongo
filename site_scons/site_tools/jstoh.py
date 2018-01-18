@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import os
 import sys
 
@@ -39,9 +41,9 @@ def jsToHeader(target, source):
 
     text = '\n'.join(h)
 
-    with open(outFile, 'wb') as out:
+    with open(outFile, 'w') as out:
         try:
-            out.write(text.encode("utf-8"))
+            out.write(text)
         finally:
             out.close()
 

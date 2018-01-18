@@ -26,6 +26,8 @@
 #    delete this exception statement from all source files in the program,
 #    then also delete it in the license file.
 
+from __future__ import unicode_literals
+
 """Generate error_codes.{h,cpp} from error_codes.err.
 
 Format of error_codes.err:
@@ -98,7 +100,7 @@ def main(argv):
                 categories=error_classes,
                 )
 
-        with open(output, 'wb') as outfile:
+        with open(output, 'w') as outfile:
             outfile.write(text)
 
 def die(message=None):

@@ -2,7 +2,7 @@
 Manages interactions with the report.json file.
 """
 
-
+from __future__ import absolute_import
 
 import json
 

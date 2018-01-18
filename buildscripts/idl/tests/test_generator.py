@@ -22,7 +22,7 @@ idl base directory:
 $ coverage run run_tests.py && coverage html
 """
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 import os
 import unittest

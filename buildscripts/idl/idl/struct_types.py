@@ -14,7 +14,7 @@
 #
 """Provide code generation information for structs and commands in a polymorphic way."""
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 from abc import ABCMeta, abstractmethod
 from typing import Optional, List
@@ -24,6 +24,7 @@ from . import common
 from . import cpp_types
 from . import writer
 
+ABC = ABCMeta(str('ABC'), (object,), {'__slots__': ()})
 
 class ArgumentInfo(object):
     """Class that encapsulates information about an argument to a method."""
@@ -126,7 +127,7 @@ class MethodInfo(object):
             "${method_name}(${args});", method_name=self.method_name, args=args)
 
 
-class StructTypeInfoBase(object, metaclass=ABCMeta):
+class StructTypeInfoBase(ABC):
     """Base class for struct and command code generation."""
 
     @abstractmethod

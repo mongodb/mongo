@@ -213,7 +213,7 @@ def find_python(min_version=(2, 5)):
         pass
 
     version = re.compile(r'[Pp]ython ([\d\.]+)', re.MULTILINE)
-    binaries = ('python27', 'python2.7', 'python26', 'python2.6', 'python25', 'python2.5', 'python')
+    binaries = ('python3', 'python27', 'python2.7', 'python26', 'python2.6', 'python25', 'python2.5', 'python')
     for binary in binaries:
         try:
             out, err = subprocess.Popen([binary, '-V'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()

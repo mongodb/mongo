@@ -6,8 +6,8 @@ Any test files with at least 2 executions in the report.json file that have a "s
 this script will change the outputted report to have a "fail" status instead.
 """
 
-
-
+from __future__ import absolute_import
+from __future__ import print_function
 
 import collections
 import json

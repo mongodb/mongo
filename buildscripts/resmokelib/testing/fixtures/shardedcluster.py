@@ -2,7 +2,7 @@
 Sharded cluster fixture for executing JSTests against.
 """
 
-
+from __future__ import absolute_import
 
 import os.path
 import time

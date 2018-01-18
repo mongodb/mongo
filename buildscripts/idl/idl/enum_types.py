@@ -18,7 +18,7 @@ IDL Enum type information.
 Support the code generation for enums
 """
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 from abc import ABCMeta, abstractmethod
 import textwrap
@@ -29,8 +29,10 @@ from . import common
 from . import syntax
 from . import writer
 
+ABC = ABCMeta(str('ABC'), (object,), {'__slots__': ()})
 
-class EnumTypeInfoBase(object, metaclass=ABCMeta):
+
+class EnumTypeInfoBase(ABC):
     """Base type for enumeration type information."""
 
     def __init__(self, idl_enum):
@@ -110,7 +112,7 @@ class EnumTypeInfoBase(object, metaclass=ABCMeta):
         pass
 
 
-class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
+class _EnumTypeInt(EnumTypeInfoBase):
     """Type information for integer enumerations."""
 
     def __init__(self, idl_enum):
@@ -189,7 +191,7 @@ def _get_constant_enum_name(idl_enum, enum_value):
         'k${enum_name}_${name}', enum_name=common.title_case(idl_enum.name), name=enum_value.name)
 
 
-class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
+class _EnumTypeString(EnumTypeInfoBase):
     """Type information for string enumerations."""
 
     def __init__(self, idl_enum):

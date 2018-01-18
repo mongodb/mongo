@@ -7,9 +7,14 @@ in order for KeyboardInterrupt exceptions to get propagated.
 See https://bugs.python.org/issue1167930 for more details.
 """
 
+from __future__ import absolute_import
 
+try:
+  import queue
+except ImportError:
+  #Python 2
+  import Queue as queue
 
-import queue
 import time
 
 

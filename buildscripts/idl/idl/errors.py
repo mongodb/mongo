@@ -19,7 +19,7 @@ Common error handling code for IDL compiler.
 - Error codes used by the IDL compiler.
 """
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 import inspect
 import os

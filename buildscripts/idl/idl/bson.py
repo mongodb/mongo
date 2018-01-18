@@ -18,7 +18,7 @@ BSON Type Information.
 Utilities for validating bson types, etc.
 """
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 from typing import Dict, List
 

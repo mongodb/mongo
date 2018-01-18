@@ -1,6 +1,6 @@
 """Unit tests for the buildscripts.git module."""
 
-
+from __future__ import absolute_import
 
 import subprocess
 import unittest

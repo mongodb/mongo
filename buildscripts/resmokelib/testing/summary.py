@@ -2,7 +2,7 @@
 Holder for summary information about a test suite.
 """
 
-
+from __future__ import absolute_import
 
 import collections
 

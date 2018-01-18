@@ -2,7 +2,7 @@
 Testing hook for verifying correctness of initial sync.
 """
 
-
+from __future__ import absolute_import
 
 import os.path
 import random

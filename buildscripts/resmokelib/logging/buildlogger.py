@@ -2,7 +2,7 @@
 Defines handlers for communicating with a buildlogger server.
 """
 
-
+from __future__ import absolute_import
 
 import functools
 import json

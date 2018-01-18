@@ -18,7 +18,7 @@ IDL Common classes.
 Classes which are shared among both the IDL idl.syntax and idl.AST trees.
 """
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 import os
 import string

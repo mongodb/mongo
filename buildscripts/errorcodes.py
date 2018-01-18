@@ -5,6 +5,8 @@
 Parses .cpp files for assertions and verifies assertion codes are distinct.
 Optionally replaces zero codes in source code with new distinct values.
 """
+from __future__ import unicode_literals
+import io
 
 import bisect
 import os
@@ -38,7 +40,7 @@ def assignErrorCodes():
             print( x )
             didAnything = False
             fixed = ""
-            for line in open( x, encoding="UTF-8" ):
+            for line in open( x ):
                 s = line.partition( root + "(" )
                 if s[1] == "" or line.startswith( "#define " + root):
                     fixed += line
@@ -47,7 +49,7 @@ def assignErrorCodes():
                 cur = cur + 1
                 didAnything = True
             if didAnything:
-                out = open( x , 'w', encoding="UTF-8" )
+                out = open( x , 'w' )
                 out.write( fixed )
                 out.close()
 
@@ -69,7 +71,7 @@ def parseSourceFiles( callback ):
         if list_files:
             print('scanning file: ' + sourceFile)
 
-        with open(sourceFile, encoding="UTF-8") as f:
+        with io.open(sourceFile, encoding="utf-8") as f:
             text = f.read()
 
             if not any([zz in text for zz in quick]):
@@ -94,7 +96,7 @@ def parseSourceFiles( callback ):
 # Converts an absolute position in a file into a line number.
 def getLineAndColumnForPosition(loc, _file_cache={}):
     if loc.sourceFile not in _file_cache:
-        with open(loc.sourceFile, encoding="UTF-8") as f:
+        with open(loc.sourceFile) as f:
             text = f.read()
             line_offsets = [0]
             for line in text.splitlines(True):
@@ -190,7 +192,7 @@ def replaceBadCodes( errors, nextCode ):
 
     for loc in skip_errors:
         line, col = getLineAndColumnForPosition(loc)
-        print ("SKIPPING NONZERO code=%s: %s:%d:%d"
+        print("SKIPPING NONZERO code=%s: %s:%d:%d"
                 % (loc.code, loc.sourceFile, line, col))
 
     # Dedupe, sort, and reverse so we don't have to update offsets as we go.
@@ -201,7 +203,7 @@ def replaceBadCodes( errors, nextCode ):
 
         ln = lineNum - 1
 
-        with open(sourceFile, 'r+', encoding="UTF-8") as f:
+        with open(sourceFile, 'r+') as f:
             print("LINE_%d_BEFORE:%s" % (lineNum, f.readlines()[ln].rstrip()))
 
             f.seek(0)

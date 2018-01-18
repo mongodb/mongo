@@ -3,7 +3,7 @@ Defines a mapping of shortened names for suite configuration files to
 their full path.
 """
 
-
+from __future__ import absolute_import
 
 import os
 import os.path

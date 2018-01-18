@@ -2,7 +2,7 @@
 Filename globbing utility.
 """
 
-
+from __future__ import absolute_import
 
 import glob as _glob
 import os

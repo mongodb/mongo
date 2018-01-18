@@ -20,7 +20,7 @@ It maps 1-1 to the YAML file, and has not been checked if
 it follows the rules of the IDL, etc.
 """
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 import itertools
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union

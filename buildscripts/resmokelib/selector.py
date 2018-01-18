@@ -5,7 +5,7 @@ Defines filtering rules for what tests to include in a suite depending
 on whether they apply to C++ unit tests, dbtests, or JS tests.
 """
 
-
+from __future__ import absolute_import
 
 import collections
 import errno

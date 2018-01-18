@@ -5,8 +5,8 @@
 Update etc/test_lifecycle.yml to tag unreliable tests based on historic failure rates.
 """
 
-
-
+from __future__ import absolute_import
+from __future__ import division
 
 import collections
 import datetime

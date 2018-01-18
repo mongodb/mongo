@@ -4,9 +4,9 @@
 Utility for computing test failure rates from the Evergreen API.
 """
 
-
-
-
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
 
 import collections
 import datetime

@@ -15,7 +15,7 @@
 # pylint: disable=too-many-lines
 """Transform idl.syntax trees from the parser into well-defined idl.ast trees."""
 
-
+from __future__ import absolute_import, print_function, unicode_literals
 
 import re
 from typing import cast, List, Set, Union

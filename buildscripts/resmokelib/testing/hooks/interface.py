@@ -2,11 +2,12 @@
 Interface for customizing the behavior of a test fixture.
 """
 
-
+from __future__ import absolute_import
 
 from ...logging import loggers
 from ...utils import registry
 
+import six
 
 _HOOKS = {}
 

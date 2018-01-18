@@ -5,7 +5,7 @@ Uses job objects when running on Windows to ensure that all created
 processes are terminated.
 """
 
-
+from __future__ import absolute_import
 
 import atexit
 import logging

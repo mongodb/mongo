@@ -1,8 +1,13 @@
 """Utility code to execute code in parallel."""
+from __future__ import absolute_import
+from __future__ import print_function
 
+try:
+  import queue
+except ImportError:
+  #Python 2
+  import Queue as queue
 
-
-import queue
 import threading
 import time
 from multiprocessing import cpu_count
@@ -17,7 +22,7 @@ def parallel_process(items, func):
     except NotImplementedError:
         cpus = 1
 
-    task_queue = queue.Queue()  # type: Queue.Queue
+    task_queue = queue.Queue()  # type: queue.Queue
 
     # Use a list so that worker function will capture this variable
     pp_event = threading.Event()

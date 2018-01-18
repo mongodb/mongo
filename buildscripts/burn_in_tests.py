@@ -4,7 +4,7 @@
 Command line utility for determining what jstests have been added or modified
 """
 
-
+from __future__ import absolute_import
 
 import collections
 import copy

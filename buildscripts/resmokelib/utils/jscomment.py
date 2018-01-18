@@ -2,7 +2,7 @@
 Utility for parsing JS comments.
 """
 
-
+from __future__ import absolute_import
 
 import re
 

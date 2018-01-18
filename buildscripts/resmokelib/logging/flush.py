@@ -3,7 +3,7 @@ Manages a thread responsible for periodically calling flush() on
 logging.Handler instances used to send logs to buildlogger.
 """
 
-
+from __future__ import absolute_import
 
 import logging
 import threading
