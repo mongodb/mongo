@@ -21,11 +21,13 @@
     // Truncate a non-existent collection on a non-existent database.
     assert.commandWorked(rst.getPrimary().getDB('nonexistent').dropDatabase());
     assert.commandFailedWithCode(
-        rst.getPrimary().getDB('nonexistent').runCommand({emptycapped: 'nonexistent'}), 13429);
+        rst.getPrimary().getDB('nonexistent').runCommand({emptycapped: 'nonexistent'}),
+        ErrorCodes.NamespaceNotFound);
 
     // Truncate a non-existent collection.
     primaryTestDB.nonexistent.drop();
-    assert.commandFailedWithCode(primaryTestDB.runCommand({emptycapped: 'nonexistent'}), 28584);
+    assert.commandFailedWithCode(primaryTestDB.runCommand({emptycapped: 'nonexistent'}),
+                                 ErrorCodes.NamespaceNotFound);
 
     // Truncate a capped collection.
     assert.commandWorked(primaryTestDB.createCollection("capped", {capped: true, size: 4096}));
