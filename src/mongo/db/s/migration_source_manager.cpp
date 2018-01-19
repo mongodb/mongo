@@ -611,7 +611,12 @@ void MigrationSourceManager::cleanupOnError(OperationContext* opCtx) {
                     ShardingCatalogClient::kMajorityWriteConcern)
         .ignore();
 
-    _cleanup(opCtx);
+    try {
+        _cleanup(opCtx);
+    } catch (const ExceptionForCat<ErrorCategory::NotMasterError>& ex) {
+        warning() << "Failed to clean up migration: " << redact(_args.toString())
+                  << "due to: " << redact(ex);
+    }
 }
 
 void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
