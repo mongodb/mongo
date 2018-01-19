@@ -42,6 +42,7 @@
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -138,7 +139,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
                                                HostAndPort recipientHost)
     : _args(std::move(request)),
       _donorConnStr(std::move(donorConnStr)),
-      _recipientHost(std::move(recipientHost)) {
+      _recipientHost(std::move(recipientHost)),
+      _stats(ShardingStatistics::get(opCtx)) {
     invariant(!opCtx->lockState()->isLocked());
 
     // Disallow moving a chunk to ourselves
@@ -219,6 +221,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
 MigrationSourceManager::~MigrationSourceManager() {
     invariant(!_cloneDriver);
+    _stats.totalDonorMoveChunkTimeMillis.addAndFetch(_entireOpTimer.millis());
 }
 
 NamespaceString MigrationSourceManager::getNss() const {
@@ -229,6 +232,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCreated);
     auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    _stats.countDonorMoveChunkStarted.addAndFetch(1);
 
     Grid::get(opCtx)
         ->catalogClient()
@@ -241,6 +245,8 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
                                << _args.getToShardId()),
                     ShardingCatalogClient::kMajorityWriteConcern)
         .ignore();
+
+    _cloneAndCommitTimer.reset();
 
     {
         // Register for notifications from the replication subsystem
@@ -276,6 +282,8 @@ Status MigrationSourceManager::awaitToCatchUp(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCloning);
     auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
+    _cloneAndCommitTimer.reset();
 
     // Block until the cloner deems it appropriate to enter the critical section.
     Status catchUpStatus = _cloneDriver->awaitUntilCriticalSectionIsAppropriate(
@@ -293,6 +301,8 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(_state == kCloneCaughtUp);
     auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
+    _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
+    _cloneAndCommitTimer.reset();
 
     {
         const auto metadata = [&] {
@@ -430,6 +440,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         _readsShouldWaitOnCritSec = true;
     }
 
+    Timer t;
+
     auto commitChunkMigrationResponse =
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -563,6 +575,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
     scopedGuard.Dismiss();
+
+    _stats.totalCriticalSectionCommitTimeMillis.addAndFetch(t.millis());
 
     // Exit the critical section and ensure that all the necessary state is fully persisted before
     // scheduling orphan cleanup.
@@ -708,6 +722,8 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
     }
 
     if (_state == kCriticalSection || _state == kCloneCompleted) {
+        _stats.totalCriticalSectionTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
+
         // NOTE: The order of the operations below is important and the comments explain the
         // reasoning behind it
 

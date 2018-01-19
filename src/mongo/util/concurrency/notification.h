@@ -97,8 +97,10 @@ public:
     }
 
     /**
-     * If the notification is not set, blocks either until it becomes set or until the waitTimeout
-     * expires. If the wait is interrupted, throws an exception. Otherwise, returns immediately.
+     * If the notification is set, returns immediately. Otherwise, blocks until it either becomes
+     * set or the waitTimeout expires, whichever comes first. Returns true if the notification is
+     * set (in which case a subsequent call to get is guaranteed to not block) or false otherwise.
+     * If the wait is interrupted, throws an exception.
      */
     bool waitFor(OperationContext* opCtx, Milliseconds waitTimeout) {
         stdx::unique_lock<stdx::mutex> lock(_mutex);

@@ -31,51 +31,91 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/balancer_configuration.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
 
-class ShardingServerStatus : public ServerStatusSection {
+bool isClusterNode() {
+    return serverGlobalParams.clusterRole != ClusterRole::None;
+}
+
+class ShardingServerStatus final : public ServerStatusSection {
 public:
     ShardingServerStatus() : ServerStatusSection("sharding") {}
 
-    bool includeByDefault() const final {
-        return true;
+    bool includeByDefault() const override {
+        return isClusterNode();
     }
 
-    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        if (!isClusterNode())
+            return {};
+
+        auto const shardingState = ShardingState::get(opCtx);
+        if (!shardingState->enabled())
+            return {};
+
+        auto const grid = Grid::get(opCtx);
+        auto const shardRegistry = grid->shardRegistry();
+
         BSONObjBuilder result;
 
-        auto shardingState = ShardingState::get(opCtx);
-        if (shardingState->enabled() &&
-            serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        result.append("configsvrConnectionString",
+                      shardRegistry->getConfigServerConnectionString().toString());
 
-            result.append("configsvrConnectionString",
-                          shardingState->getConfigServer(opCtx).toString());
+        grid->configOpTime().append(&result, "lastSeenConfigServerOpTime");
 
-            Grid::get(opCtx)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
+        const long long maxChunkSizeInBytes =
+            grid->getBalancerConfiguration()->getMaxChunkSizeBytes();
+        result.append("maxChunkSizeInBytes", maxChunkSizeInBytes);
 
-            long long maxChunkSizeInBytes =
-                Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes();
-            result.append("maxChunkSizeInBytes", maxChunkSizeInBytes);
-
-            // Get a migration status report if a migration is active for which this is the source
-            // shard. ShardingState::getActiveMigrationStatusReport will take an IS lock on the
-            // namespace of the active migration if there is one that is active.
-            BSONObj migrationStatus =
-                ShardingState::get(opCtx)->getActiveMigrationStatusReport(opCtx);
-            if (!migrationStatus.isEmpty()) {
-                result.append("migrations", migrationStatus);
-            }
+        // Get a migration status report if a migration is active for which this is the source
+        // shard. ShardingState::getActiveMigrationStatusReport will take an IS lock on the
+        // namespace of the active migration if there is one that is active.
+        BSONObj migrationStatus = shardingState->getActiveMigrationStatusReport(opCtx);
+        if (!migrationStatus.isEmpty()) {
+            result.append("migrations", migrationStatus);
         }
 
         return result.obj();
     }
 
 } shardingServerStatus;
+
+class ShardingStatisticsServerStatus final : public ServerStatusSection {
+public:
+    ShardingStatisticsServerStatus() : ServerStatusSection("shardingStatistics") {}
+
+    bool includeByDefault() const override {
+        return isClusterNode();
+    }
+
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        if (!isClusterNode())
+            return {};
+
+        auto const shardingState = ShardingState::get(opCtx);
+        if (!shardingState->enabled())
+            return {};
+
+        auto const grid = Grid::get(opCtx);
+        auto const catalogCache = grid->catalogCache();
+
+        BSONObjBuilder result;
+        ShardingStatistics::get(opCtx).report(&result);
+        catalogCache->report(&result);
+        return result.obj();
+    }
+
+} shardingStatisticsServerStatus;
 
 }  // namespace
 }  // namespace mongo
