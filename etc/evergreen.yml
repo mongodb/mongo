@@ -4710,6 +4710,8 @@ buildvariants:
     push_arch: x86_64
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    # Running WiredTiger with --nojournal in a replica set is no longer supported,
+    # so this variant does not include replica set tests.
     test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication
     use_scons_cache: true
     build_mongoreplay: true
