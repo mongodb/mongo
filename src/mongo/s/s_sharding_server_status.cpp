@@ -30,6 +30,8 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/s/balancer_configuration.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
@@ -39,35 +41,52 @@ namespace {
 
 class ShardingServerStatus : public ServerStatusSection {
 public:
-    ShardingServerStatus();
+    ShardingServerStatus() : ServerStatusSection("sharding") {}
 
-    bool includeByDefault() const final;
+    bool includeByDefault() const override {
+        return true;
+    }
 
-    BSONObj generateSection(OperationContext* txn, const BSONElement& configElement) const final;
-};
+    BSONObj generateSection(OperationContext* txn,
+                            const BSONElement& configElement) const override {
+        auto const grid = Grid::get(txn);
+        auto const shardRegistry = grid->shardRegistry();
+
+        BSONObjBuilder result;
+
+        result.append("configsvrConnectionString",
+                      shardRegistry->getConfigServerConnectionString().toString());
+
+        grid->configOpTime().append(&result, "lastSeenConfigServerOpTime");
+
+        const long long maxChunkSizeInBytes =
+            grid->getBalancerConfiguration()->getMaxChunkSizeBytes();
+        result.append("maxChunkSizeInBytes", maxChunkSizeInBytes);
+
+        return result.obj();
+    }
+
+} shardingServerStatus;
+
+class ShardingStatisticsServerStatus final : public ServerStatusSection {
+public:
+    ShardingStatisticsServerStatus() : ServerStatusSection("shardingStatistics") {}
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* txn,
+                            const BSONElement& configElement) const override {
+        auto const grid = Grid::get(txn);
+        auto const catalogCache = grid->catalogCache();
+
+        BSONObjBuilder result;
+        catalogCache->report(&result);
+        return result.obj();
+    }
+
+} shardingStatisticsServerStatus;
 
 }  // namespace
-
-ShardingServerStatus shardingServerStatus;
-
-ShardingServerStatus::ShardingServerStatus() : ServerStatusSection("sharding") {}
-
-bool ShardingServerStatus::includeByDefault() const {
-    return true;
-}
-
-// This implementation runs on mongoS.
-BSONObj ShardingServerStatus::generateSection(OperationContext* txn,
-                                              const BSONElement& configElement) const {
-    invariant(grid.shardRegistry());
-
-    BSONObjBuilder result;
-    result.append("configsvrConnectionString",
-                  grid.shardRegistry()->getConfigServerConnectionString().toString());
-
-    grid.configOpTime().append(&result, "lastSeenConfigServerOpTime");
-
-    return result.obj();
-}
-
 }  // namespace mongo

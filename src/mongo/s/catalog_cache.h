@@ -30,6 +30,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/chunk_version.h"
@@ -40,6 +41,7 @@
 
 namespace mongo {
 
+class BSONObjBuilder;
 class CachedDatabaseInfo;
 class CachedCollectionRoutingInfo;
 class OperationContext;
@@ -113,6 +115,11 @@ public:
      */
     void purgeAllDatabases();
 
+    /**
+     * Reports statistics about the catalog cache to be used by serverStatus
+     */
+    void report(BSONObjBuilder* builder) const;
+
 private:
     // Make the cache entries friends so they can access the private classes below
     friend class CachedDatabaseInfo;
@@ -165,8 +172,42 @@ private:
     // Interface from which chunks will be retrieved
     const std::unique_ptr<CatalogCacheLoader> _cacheLoader;
 
+    // Encapsulates runtime statistics across all collections in the catalog cache
+    struct Stats {
+        // Counts how many times threads hit stale config exception (which is what triggers metadata
+        // refreshes)
+        AtomicInt64 countStaleConfigErrors{0};
+
+        // Cumulative, always-increasing counter of how much time threads waiting for refresh
+        // combined
+        AtomicInt64 totalRefreshWaitTimeMicros{0};
+
+        // Tracks how many incremental refreshes are waiting to complete currently
+        AtomicInt64 numActiveIncrementalRefreshes{0};
+
+        // Cumulative, always-increasing counter of how many incremental refreshes have been kicked
+        // off
+        AtomicInt64 countIncrementalRefreshesStarted{0};
+
+        // Tracks how many full refreshes are waiting to complete currently
+        AtomicInt64 numActiveFullRefreshes{0};
+
+        // Cumulative, always-increasing counter of how many full refreshes have been kicked off
+        AtomicInt64 countFullRefreshesStarted{0};
+
+        // Cumulative, always-increasing counter of how many full or incremental refreshes failed
+        // for whatever reason
+        AtomicInt64 countFailedRefreshes{0};
+
+        /**
+         * Reports the accumulated statistics for serverStatus.
+         */
+        void report(BSONObjBuilder* builder) const;
+
+    } _stats;
+
     // Mutex to serialize access to the structures below
-    stdx::mutex _mutex;
+    mutable stdx::mutex _mutex;
 
     // Map from DB name to the info for that database
     DatabaseInfoMap _databases;

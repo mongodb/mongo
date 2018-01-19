@@ -42,6 +42,9 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
+#include "mongo/db/s/sharding_statistics.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
@@ -83,7 +86,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn,
     : _args(std::move(request)),
       _donorConnStr(std::move(donorConnStr)),
       _recipientHost(std::move(recipientHost)),
-      _startTime() {
+      _stats(ShardingStatistics::get(txn)) {
     invariant(!txn->lockState()->isLocked());
 
     // Disallow moving a chunk to ourselves
@@ -160,6 +163,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* txn,
 
 MigrationSourceManager::~MigrationSourceManager() {
     invariant(!_cloneDriver);
+    _stats.totalDonorMoveChunkTimeMillis.addAndFetch(_entireOpTimer.millis());
 }
 
 NamespaceString MigrationSourceManager::getNss() const {
@@ -170,6 +174,7 @@ Status MigrationSourceManager::startClone(OperationContext* txn) {
     invariant(!txn->lockState()->isLocked());
     invariant(_state == kCreated);
     auto scopedGuard = MakeGuard([&] { cleanupOnError(txn); });
+    _stats.countDonorMoveChunkStarted.addAndFetch(1);
 
     grid.catalogClient(txn)->logChange(txn,
                                        "moveChunk.start",
@@ -183,6 +188,8 @@ Status MigrationSourceManager::startClone(OperationContext* txn) {
 
     _cloneDriver = stdx::make_unique<MigrationChunkClonerSourceLegacy>(
         _args, _collectionMetadata->getKeyPattern(), _donorConnStr, _recipientHost);
+
+    _cloneAndCommitTimer.reset();
 
     {
         // Register for notifications from the replication subsystem
@@ -207,6 +214,8 @@ Status MigrationSourceManager::awaitToCatchUp(OperationContext* txn) {
     invariant(!txn->lockState()->isLocked());
     invariant(_state == kCloning);
     auto scopedGuard = MakeGuard([&] { cleanupOnError(txn); });
+    _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
+    _cloneAndCommitTimer.reset();
 
     // Block until the cloner deems it appropriate to enter the critical section.
     Status catchUpStatus = _cloneDriver->awaitUntilCriticalSectionIsAppropriate(
@@ -224,6 +233,8 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* txn) {
     invariant(!txn->lockState()->isLocked());
     invariant(_state == kCloneCaughtUp);
     auto scopedGuard = MakeGuard([&] { cleanupOnError(txn); });
+    _stats.totalDonorChunkCloneTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
+    _cloneAndCommitTimer.reset();
 
     // Mark the shard as running critical operation, which requires recovery on crash
     Status status = ShardingStateRecovery::startMetadataOp(txn);
@@ -318,6 +329,8 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* txn
                                                  _args.getTakeDistLock());
 
     builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());
+
+    Timer t;
 
     auto commitChunkMigrationResponse =
         grid.shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
@@ -426,6 +439,9 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* txn
     MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBeforeLeavingCriticalSection);
 
     scopedGuard.Dismiss();
+
+    _stats.totalCriticalSectionCommitTimeMillis.addAndFetch(t.millis());
+
     _cleanup(txn);
 
     grid.catalogClient(txn)->logChange(txn,
@@ -486,6 +502,8 @@ void MigrationSourceManager::_cleanup(OperationContext* txn) {
     // Decrement the metadata op counter outside of the collection lock in order to hold it for as
     // short as possible.
     if (_state == kCriticalSection || _state == kCloneCompleted) {
+        _stats.totalCriticalSectionTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
+
         ShardingStateRecovery::endMetadataOp(txn);
     }
 

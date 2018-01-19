@@ -1,6 +1,5 @@
-// @file timer.h
-
-/*    Copyright 2010 10gen Inc.
+/**
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,7 +30,6 @@
 
 #include "mongo/util/time_support.h"
 
-
 namespace mongo {
 
 class TickSource;
@@ -39,25 +37,28 @@ class TickSource;
 /**
  * Time tracking object.
  */
-class Timer /*copyable*/ {
+class Timer {
 public:
     /**
-     * Creates a timer with the system default tick source. Should not be created before
-     * global initialization completes.
+     * Creates a timer with the system default tick source. Should not be created before global
+     * initialization completes.
      */
     Timer();
 
     /**
-     * Creates a timer using the specified tick source. Caller retains ownership of
-     * TickSource, and must keep it in scope until Timer goes out of scope.
+     * Creates a timer using the specified tick source. Caller retains ownership of TickSource and
+     * must keep it in scope until Timer goes out of scope.
      */
     explicit Timer(TickSource* tickSource);
 
-    int seconds() const {
-        return static_cast<int>(micros() / 1000000);
+    long long micros() const {
+        return static_cast<long long>((now() - _old) * _microsPerCount);
     }
     int millis() const {
         return static_cast<int>(micros() / 1000);
+    }
+    int seconds() const {
+        return static_cast<int>(micros() / 1000000);
     }
     int minutes() const {
         return seconds() / 60;
@@ -74,15 +75,11 @@ public:
         return static_cast<int>(deltaMicros / 1000);
     }
 
-    inline long long micros() const {
-        return static_cast<long long>((now() - _old) * _microsPerCount);
-    }
-
     Microseconds elapsed() const {
         return Microseconds{micros()};
     }
 
-    inline void reset() {
+    void reset() {
         _old = now();
     }
 
@@ -97,4 +94,5 @@ private:
 
     long long _old;
 };
+
 }  // namespace mongo

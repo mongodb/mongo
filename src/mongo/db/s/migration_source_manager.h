@@ -41,6 +41,7 @@ namespace mongo {
 
 class MigrationChunkClonerSource;
 class OperationContext;
+struct ShardingStatistics;
 
 /**
  * The donor-side migration state machine. This object must be created and owned by a single thread,
@@ -211,8 +212,15 @@ private:
     // The resolved primary of the recipient shard
     const HostAndPort _recipientHost;
 
-    // Gets initialized at creation time and will time the entire move chunk operation
-    const Timer _startTime;
+    // Stores a reference to the process sharding statistics object which needs to be updated
+    ShardingStatistics& _stats;
+
+    // Times the entire moveChunk operation
+    const Timer _entireOpTimer;
+
+    // Starts counting from creation time and is used to time various parts from the lifetime of the
+    // move chunk sequence
+    Timer _cloneAndCommitTimer;
 
     // The current state. Used only for diagnostics and validation.
     State _state{kCreated};

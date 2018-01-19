@@ -74,7 +74,7 @@ public:
         auto css = CollectionShardingState::get(txn, *nss);
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "No active migrations were found for collection " << nss->ns(),
-                css && css->getMigrationSourceManager());
+                css->getMigrationSourceManager());
 
         // It is now safe to access the cloner
         _chunkCloner = dynamic_cast<MigrationChunkClonerSourceLegacy*>(
