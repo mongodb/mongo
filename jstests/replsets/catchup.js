@@ -56,7 +56,7 @@
     //
     // The old primary has extra writes that are not replicated to the other nodes yet,
     // but the new primary steps up, getting the vote from the the third node "voter".
-    function stopRelicationAndEnforceNewPrimaryToCatchUp() {
+    function stopReplicationAndEnforceNewPrimaryToCatchUp() {
         // Write documents that cannot be replicated to secondaries in time.
         var oldSecondaries = rst.getSecondaries();
         var oldPrimary = rst.getPrimary();
@@ -81,14 +81,15 @@
         };
     }
 
-    function reconfigCatchUpTimeoutMillis(timeout) {
+    function reconfigElectionAndCatchUpTimeout(electionTimeout, catchupTimeout) {
         // Reconnect all nodes to make sure reconfig succeeds.
         rst.nodes.forEach(reconnect);
-        // Reconfigure replicaset to decrease catchup timeout
-        conf = rst.getReplSetConfigFromNode();
-        conf.version++;
-        conf.settings.catchUpTimeoutMillis = timeout;
-        reconfig(rst, conf);
+        // Reconfigure replica set to decrease catchup timeout.
+        var newConfig = rst.getReplSetConfigFromNode();
+        newConfig.version++;
+        newConfig.settings.catchUpTimeoutMillis = catchupTimeout;
+        newConfig.settings.electionTimeoutMillis = electionTimeout;
+        reconfig(rst, newConfig);
         rst.awaitReplication();
         rst.awaitNodesAgreeOnPrimary();
     }
@@ -103,7 +104,7 @@
     rst.awaitReplication();
 
     jsTest.log("Case 2: The primary needs to catch up, succeeds in time.");
-    var stepUpResults = stopRelicationAndEnforceNewPrimaryToCatchUp();
+    var stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
 
     // Disable fail point to allow replication.
     restartServerReplication(stepUpResults.oldSecondaries);
@@ -116,7 +117,11 @@
     rst.awaitReplication();
 
     jsTest.log("Case 3: The primary needs to catch up, but has to change sync source to catch up.");
-    stepUpResults = stopRelicationAndEnforceNewPrimaryToCatchUp();
+    // Reconfig the election timeout to be longer than 1 minute so that the third node will no
+    // longer be blacklisted by the new primary if it happened to be at the beginning of the test.
+    reconfigElectionAndCatchUpTimeout(3 * 60 * 1000, conf.settings.catchUpTimeoutMillis);
+
+    stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
 
     // Disable fail point on the voter. Wait until it catches up with the old primary.
     restartServerReplication(stepUpResults.voter);
@@ -141,9 +146,10 @@
     rst.awaitReplication();
 
     jsTest.log("Case 4: The primary needs to catch up, fails due to timeout.");
-    reconfigCatchUpTimeoutMillis(10 * 1000);
+    // Reconfig to make the catchup timeout shorter.
+    reconfigElectionAndCatchUpTimeout(conf.settings.electionTimeoutMillis, 10 * 1000);
 
-    stepUpResults = stopRelicationAndEnforceNewPrimaryToCatchUp();
+    stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
     // Wait until the new primary completes the transition to primary and writes a no-op.
     checkLog.contains(stepUpResults.newPrimary, "Catchup timed out after becoming primary");
     restartServerReplication(stepUpResults.newPrimary);
@@ -161,8 +167,9 @@
     rst.awaitReplication();
 
     jsTest.log("Case 5: The primary needs to catch up with no timeout, then gets aborted.");
-    reconfigCatchUpTimeoutMillis(-1);
-    stepUpResults = stopRelicationAndEnforceNewPrimaryToCatchUp();
+    // Reconfig to make the catchup timeout infinite.
+    reconfigElectionAndCatchUpTimeout(conf.settings.electionTimeoutMillis, -1);
+    stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
 
     // Abort catchup.
     assert.commandWorked(stepUpResults.newPrimary.adminCommand({replSetAbortPrimaryCatchUp: 1}));
@@ -180,7 +187,7 @@
     checkOpInOplog(stepUpResults.newPrimary, stepUpResults.latestOpOnOldPrimary, 0);
 
     jsTest.log("Case 6: The primary needs to catch up with no timeout, but steps down.");
-    var stepUpResults = stopRelicationAndEnforceNewPrimaryToCatchUp();
+    var stepUpResults = stopReplicationAndEnforceNewPrimaryToCatchUp();
 
     // Step-down command should abort catchup.
     try {
