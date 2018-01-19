@@ -99,7 +99,8 @@ public:
     // 'dbName'.
     Status createCollectionsForDb(OperationContext* opCtx,
                                   const std::vector<CreateCollectionParams>& createCollectionParams,
-                                  const std::string& dbName);
+                                  const std::string& dbName,
+                                  const CloneOptions& opts);
 
     /*
      * Returns the _id index spec from 'indexSpecs', or an empty BSONObj if none is found.
@@ -135,6 +136,9 @@ private:
  *                repairDatabase need not use it.
  *  createCollections - When 'true', will fetch a list of collections from the remote and create
  *                them.  When 'false', assumes collections have already been created ahead of time.
+ * metadataOnly - Intended to be used with syncData=false. When metadataOnly=true, will copy
+ * collection
+ *                options, indexes, and views.
  */
 struct CloneOptions {
     std::string fromDB;
@@ -147,6 +151,8 @@ struct CloneOptions {
     bool syncData = true;
     bool syncIndexes = true;
     bool createCollections = true;
+
+    bool metadataOnly = false;
 };
 
 }  // namespace mongo

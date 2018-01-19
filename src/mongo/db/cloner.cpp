@@ -35,6 +35,7 @@
 #include "mongo/db/cloner.h"
 
 #include "mongo/base/status.h"
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_create.h"
@@ -518,6 +520,9 @@ bool Cloner::copyCollection(OperationContext* opCtx,
     return true;
 }
 
+// TODO SERVER-32847: This function should take in CloneOptions from copyDb,
+// indicating that we are in metadataOnly mode and we want to copy over UUID
+// info.
 StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
     const CloneOptions& opts, const std::list<BSONObj>& initialCollections) {
     std::vector<BSONObj> finalCollections;
@@ -566,7 +571,8 @@ StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
 Status Cloner::createCollectionsForDb(
     OperationContext* opCtx,
     const std::vector<CreateCollectionParams>& createCollectionParams,
-    const std::string& dbName) {
+    const std::string& dbName,
+    const CloneOptions& opts) {
     Database* db = dbHolder().openDb(opCtx, dbName);
     for (auto&& params : createCollectionParams) {
         auto options = params.collectionInfo["options"].Obj();
@@ -577,7 +583,32 @@ Status Cloner::createCollectionsForDb(
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);
 
+            // When in metadataOnly mode, we don't want to error when a collection
+            // we're trying to create already exists. Instead, we check if the existing
+            // collection's options match those of the one we're tying to create. If they
+            // do, we treat the create as a success; if they don't match, we return an error.
+            if (opts.metadataOnly) {
+                Collection* collection = db->getCollection(opCtx, nss.ns());
+                if (collection) {
+                    auto existingOpts =
+                        collection->getCatalogEntry()->getCollectionOptions(opCtx).toBSON();
+                    UnorderedFieldsBSONObjComparator bsonCmp;
+
+                    // TODO SERVER-32847: don't remove this field anymore.
+                    existingOpts = existingOpts.removeField("uuid");
+
+                    if (bsonCmp.evaluate(existingOpts == options)) {
+                        return Status::OK();
+                    }
+                    return Status(ErrorCodes::InvalidOptions,
+                                  str::stream() << "collection with same namespace " << nss.ns()
+                                                << " already exists, but options don't match");
+                }
+            }
+
             const bool createDefaultIndexes = true;
+            // TODO SERVER-32847: if in metadataOnly mode, we should use the UUID the
+            // collection had on the old primary here.
             Status createStatus =
                 userCreateNS(opCtx,
                              db,
@@ -670,8 +701,12 @@ Status Cloner::copyDb(OperationContext* opCtx,
         // getCollectionInfos may make a remote call, which may block indefinitely, so release
         // the global lock that we are entering with.
         Lock::TempRelease tempRelease(opCtx->lockState());
+
         std::list<BSONObj> initialCollections = _conn->getCollectionInfos(
             opts.fromDB, ListCollectionsFilter::makeTypeCollectionFilter());
+
+        // TODO SERVER-32847: pass in options here to indicate we should keep the UUIDs
+        // with the collection info.
         auto status = filterCollectionsForClone(opts, initialCollections);
         if (!status.isOK()) {
             return status.getStatus();
@@ -716,14 +751,23 @@ Status Cloner::copyDb(OperationContext* opCtx,
         !opCtx->writesAreReplicated() ||
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, toDBName));
 
-    if (opts.syncData) {
+    if (opts.syncData || opts.metadataOnly) {
         if (opts.createCollections) {
-            Status status = createCollectionsForDb(opCtx, createCollectionParams, toDBName);
+            // TODO SERVER-32847: make sure createCollectionsForDb can copy UUIDs when
+            // metadataOnly=true.
+            Status status = createCollectionsForDb(opCtx, createCollectionParams, toDBName, opts);
             if (!status.isOK()) {
                 return status;
             }
         }
+
         for (auto&& params : createCollectionParams) {
+
+            // If we are only here because metadataOnly = true, skip all non system.views colls.
+            if (!opts.syncData && params.collectionName != "system.views") {
+                continue;
+            }
+
             LOG(2) << "  really will clone: " << params.collectionInfo;
 
             const NamespaceString from_name(opts.fromDB, params.collectionName);

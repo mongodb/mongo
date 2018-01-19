@@ -116,6 +116,14 @@ public:
             }
         }
 
+        // If metadataOnly is set, we will copy collection options, indexes, and views,
+        // but not collection data.
+        if (cmdObj["metadataOnly"].booleanSafe()) {
+            opts.syncData = false;
+            opts.metadataOnly = true;
+        }
+
+        // Clone the non-ignored collections.
         set<string> clonedColls;
 
         Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
@@ -125,7 +133,6 @@ public:
 
         BSONArrayBuilder barr;
         barr.append(clonedColls);
-
         result.append("clonedColls", barr.arr());
 
         return CommandHelpers::appendCommandStatus(result, status);

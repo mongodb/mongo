@@ -25,6 +25,7 @@ selector:
   - jstests/sharding/geo_near_sort.js
   - jstests/sharding/basic_drop_coll.js
   - jstests/sharding/commands_that_write_accept_wc_configRS.js
+  - jstests/sharding/clone_metadata_only.js
   # Enable when 3.6 becomes last-stable.
   - jstests/sharding/coll_epoch_test1.js
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
