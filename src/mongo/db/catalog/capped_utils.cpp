@@ -66,13 +66,13 @@ Status emptyCapped(OperationContext* txn, const NamespaceString& collectionName)
     }
 
     Database* db = autoDb.getDb();
-    massert(13429, "no such database", db);
+    uassert(ErrorCodes::NamespaceNotFound, "no such database", db);
 
     Collection* collection = db->getCollection(collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
             collection || !db->getViewCatalog()->lookup(txn, collectionName.ns()));
-    massert(28584, "no such collection", collection);
+    uassert(ErrorCodes::NamespaceNotFound, "no such collection", collection);
 
     if (collectionName.isSystem() && !collectionName.isSystemDotProfile()) {
         return Status(ErrorCodes::IllegalOperation,

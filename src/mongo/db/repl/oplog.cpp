@@ -658,12 +658,16 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
           return applyOps(txn, nsToDatabase(ns), cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::UnknownError}}},
-    {"convertToCapped", {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         return convertToCapped(txn, parseNs(ns, cmd), cmd["size"].number());
-     }}},
-    {"emptycapped", {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
-         return emptyCapped(txn, parseNs(ns, cmd));
-     }}},
+    {"convertToCapped",
+     {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+          return convertToCapped(txn, parseNs(ns, cmd), cmd["size"].number());
+      },
+      {ErrorCodes::NamespaceNotFound}}},
+    {"emptycapped",
+     {[](OperationContext* txn, const char* ns, BSONObj& cmd) -> Status {
+          return emptyCapped(txn, parseNs(ns, cmd));
+      },
+      {ErrorCodes::NamespaceNotFound}}},
 };
 
 }  // namespace

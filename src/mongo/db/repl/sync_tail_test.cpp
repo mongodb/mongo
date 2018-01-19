@@ -1530,4 +1530,38 @@ TEST_F(IdempotencyTest, ResyncOnRenameCollection) {
     ASSERT_EQUALS(runOp(op), ErrorCodes::OplogOperationUnsupported);
 }
 
+TEST_F(IdempotencyTest, EmptyCappedNamespaceNotFound) {
+    // Create a BSON "emptycapped" command.
+    auto emptyCappedCmd = BSON("emptycapped" << nss.coll());
+
+    // Create an "emptycapped" oplog entry.
+    auto emptyCappedOp = makeCommandOplogEntry(nextOpTime(), nss, emptyCappedCmd);
+
+    // Ensure that NamespaceNotFound is acceptable.
+    ASSERT_OK(runOps({emptyCappedOp}));
+
+    AutoGetCollectionForRead autoColl(_opCtx.get(), nss);
+
+    // Ensure that autoColl.getCollection() and autoColl.getDb() are both null.
+    ASSERT_FALSE(autoColl.getCollection());
+    ASSERT_FALSE(autoColl.getDb());
+}
+
+TEST_F(IdempotencyTest, ConvertToCappedNamespaceNotFound) {
+    // Create a BSON "convertToCapped" command.
+    auto convertToCappedCmd = BSON("convertToCapped" << nss.coll());
+
+    // Create a "convertToCapped" oplog entry.
+    auto convertToCappedOp = makeCommandOplogEntry(nextOpTime(), nss, convertToCappedCmd);
+
+    // Ensure that NamespaceNotFound is acceptable.
+    ASSERT_OK(runOps({convertToCappedOp}));
+
+    AutoGetCollectionForRead autoColl(_opCtx.get(), nss);
+
+    // Ensure that autoColl.getCollection() and autoColl.getDb() are both null.
+    ASSERT_FALSE(autoColl.getCollection());
+    ASSERT_FALSE(autoColl.getDb());
+}
+
 }  // namespace
