@@ -86,6 +86,7 @@ env.Library(
         'sharding_initialization_mongod.cpp',
         'sharding_state.cpp',
         'sharding_state_recovery.cpp',
+        'sharding_statistics.cpp',
         'split_chunk.cpp',
         'split_vector.cpp',
     ],

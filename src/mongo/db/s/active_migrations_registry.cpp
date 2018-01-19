@@ -109,7 +109,7 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
         AutoGetCollection autoColl(opCtx, nss.get(), MODE_IS);
 
         auto css = CollectionShardingState::get(opCtx, nss.get());
-        if (css && css->getMigrationSourceManager()) {
+        if (css->getMigrationSourceManager()) {
             return css->getMigrationSourceManager()->getMigrationStatusReport();
         }
     }

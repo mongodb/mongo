@@ -49,6 +49,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
@@ -224,6 +225,8 @@ Status ShardingState::onStaleShardVersion(OperationContext* opCtx,
 
     LOG(2) << "metadata refresh requested for " << nss.ns() << " at shard version "
            << expectedVersion;
+
+    ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
 
     // Ensure any ongoing migrations have completed
     auto& oss = OperationShardingState::get(opCtx);

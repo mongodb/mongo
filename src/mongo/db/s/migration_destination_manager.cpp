@@ -64,10 +64,6 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-using std::string;
-using str::stream;
-
 namespace {
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
@@ -82,7 +78,7 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
 /**
  * Returns a human-readabale name of the migration manager's state.
  */
-string stateToString(MigrationDestinationManager::State state) {
+std::string stateToString(MigrationDestinationManager::State state) {
     switch (state) {
         case MigrationDestinationManager::READY:
             return "ready";
@@ -350,7 +346,6 @@ Status MigrationDestinationManager::start(const NamespaceString& nss,
 }
 
 Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
-
     stdx::lock_guard<stdx::mutex> sl(_mutex);
 
     if (!_sessionId) {
@@ -733,11 +728,10 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                                             cx.db(),
                                             docToClone,
                                             &localDoc)) {
-                        string errMsg = str::stream() << "cannot migrate chunk, local document "
-                                                      << redact(localDoc)
-                                                      << " has same _id as cloned "
-                                                      << "remote document " << redact(docToClone);
-
+                        const std::string errMsg = str::stream()
+                            << "cannot migrate chunk, local document " << redact(localDoc)
+                            << " has same _id as cloned "
+                            << "remote document " << redact(docToClone);
                         warning() << errMsg;
 
                         // Exception will abort migration cleanly
@@ -1008,10 +1002,9 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             BSONObj localDoc;
             if (willOverrideLocalId(
                     opCtx, nss, min, max, shardKeyPattern, cx.db(), updatedDoc, &localDoc)) {
-                string errMsg = str::stream() << "cannot migrate chunk, local document " << localDoc
-                                              << " has same _id as reloaded remote document "
-                                              << updatedDoc;
-
+                const std::string errMsg = str::stream()
+                    << "cannot migrate chunk, local document " << localDoc
+                    << " has same _id as reloaded remote document " << updatedDoc;
                 warning() << errMsg;
 
                 // Exception will abort migration cleanly

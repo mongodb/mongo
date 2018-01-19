@@ -28,10 +28,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/s/balancer_configuration.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
@@ -48,28 +48,44 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        invariant(shardRegistry);
+        auto const grid = Grid::get(opCtx);
+        auto const shardRegistry = grid->shardRegistry();
 
         BSONObjBuilder result;
+
         result.append("configsvrConnectionString",
                       shardRegistry->getConfigServerConnectionString().toString());
 
-        Grid::get(opCtx)->configOpTime().append(&result, "lastSeenConfigServerOpTime");
+        grid->configOpTime().append(&result, "lastSeenConfigServerOpTime");
 
-        long long maxChunkSizeInBytes =
-            Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes();
+        const long long maxChunkSizeInBytes =
+            grid->getBalancerConfiguration()->getMaxChunkSizeBytes();
         result.append("maxChunkSizeInBytes", maxChunkSizeInBytes);
 
         return result.obj();
     }
-};
 
-MONGO_INITIALIZER(ShardingServerStatusSection)(InitializerContext* context) {
-    new ShardingServerStatus();
+} shardingServerStatus;
 
-    return Status::OK();
-}
+class ShardingStatisticsServerStatus final : public ServerStatusSection {
+public:
+    ShardingStatisticsServerStatus() : ServerStatusSection("shardingStatistics") {}
+
+    bool includeByDefault() const override {
+        return true;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx,
+                            const BSONElement& configElement) const override {
+        auto const grid = Grid::get(opCtx);
+        auto const catalogCache = grid->catalogCache();
+
+        BSONObjBuilder result;
+        catalogCache->report(&result);
+        return result.obj();
+    }
+
+} shardingStatisticsServerStatus;
 
 }  // namespace
 }  // namespace mongo

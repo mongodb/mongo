@@ -26,62 +26,37 @@
  *    then also delete it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/util/time_support.h"
+#include "mongo/db/s/sharding_statistics.h"
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
+namespace {
 
-class TickSource;
+const auto getShardingStatistics = ServiceContext::declareDecoration<ShardingStatistics>();
 
-/**
- * Time tracking object.
- */
-class Timer {
-public:
-    /**
-     * Creates a timer with the system default tick source. Should not be created before global
-     * initialization completes.
-     */
-    Timer();
+}  // namespace
 
-    /**
-     * Creates a timer using the specified tick source. Caller retains ownership of TickSource and
-     * must keep it in scope until Timer goes out of scope.
-     */
-    explicit Timer(TickSource* tickSource);
+ShardingStatistics& ShardingStatistics::get(ServiceContext* serviceContext) {
+    return getShardingStatistics(serviceContext);
+}
 
-    long long micros() const {
-        return static_cast<long long>((now() - _old) * _microsPerCount);
-    }
-    int millis() const {
-        return static_cast<int>(micros() / 1000);
-    }
-    int seconds() const {
-        return static_cast<int>(micros() / 1000000);
-    }
-    int minutes() const {
-        return seconds() / 60;
-    }
+ShardingStatistics& ShardingStatistics::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
 
-    Microseconds elapsed() const {
-        return Microseconds{micros()};
-    }
+void ShardingStatistics::report(BSONObjBuilder* builder) const {
+    builder->append("countStaleConfigErrors", countStaleConfigErrors.load());
 
-    void reset() {
-        _old = now();
-    }
-
-private:
-    TickSource* const _tickSource;
-
-    // Derived value from _countsPerSecond. This represents the conversion ratio
-    // from clock ticks to microseconds.
-    const double _microsPerCount;
-
-    long long now() const;
-
-    long long _old;
-};
+    builder->append("countDonorMoveChunkStarted", countDonorMoveChunkStarted.load());
+    builder->append("totalDonorChunkCloneTimeMillis", totalDonorChunkCloneTimeMillis.load());
+    builder->append("totalCriticalSectionCommitTimeMillis",
+                    totalCriticalSectionCommitTimeMillis.load());
+    builder->append("totalCriticalSectionTimeMillis", totalCriticalSectionTimeMillis.load());
+}
 
 }  // namespace mongo
