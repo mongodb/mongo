@@ -104,6 +104,34 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             .toArray());
 
     /* --------------------------------------------------------------------------------------- */
+    coll.drop();
+
+    assert.writeOK(coll.insert([
+        {_id: 0, date: new ISODate("2017-01-01T15:08:51.911Z")},
+        {_id: 1, date: new ISODate("2017-07-04T15:09:12.911Z")},
+        {_id: 2, date: new ISODate("2017-12-04T15:09:14.911Z")},
+    ]));
+
+    assert.eq(
+        [
+          {_id: 0, date: "Natural: 2017-W1-01, ISO: 2016-W7-52"},
+          {_id: 1, date: "Natural: 2017-W3-27, ISO: 2017-W2-27"},
+          {_id: 2, date: "Natural: 2017-W2-49, ISO: 2017-W1-49"},
+        ],
+        coll.aggregate([
+                {
+                  $project: {
+                      date: {
+                          $dateToString:
+                              {format: "Natural: %Y-W%w-%U, ISO: %G-W%u-%V", date: "$date"}
+                      }
+                  }
+                },
+                {$sort: {_id: 1}}
+            ])
+            .toArray());
+
+    /* --------------------------------------------------------------------------------------- */
     /* Test that missing expressions, turn into BSON null values */
     coll.drop();
 

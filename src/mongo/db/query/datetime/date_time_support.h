@@ -271,9 +271,10 @@ public:
 
     /**
      * Verifies that any '%' is followed by a valid format character, and that 'format' string
-     * ends with an even number of '%' symbols
+     * ends with an even number of '%' symbols.
      */
-    static void validateFormat(StringData format);
+    static void validateToStringFormat(StringData format);
+    static void validateFromStringFormat(StringData format);
 
 private:
     std::unique_ptr<_timelib_time, TimelibTimeDeleter> getTimelibTime(Date_t) const;
@@ -358,10 +359,14 @@ public:
                     std::unique_ptr<TimeZoneDatabase> timeZoneDatabase);
 
     /**
-     * Constructs a Date_t from a string description of a date.
+     * Constructs a Date_t from a string description of a date, with an optional format specifier
+     * string.
      *
      * 'dateString' may contain time zone information if the information is simply an offset from
      * UTC, in which case the returned Date_t will be adjusted accordingly.
+     *
+     * The supported format specifiers for the 'format' string are listed in
+     * kDateFromStringFormatMap.
      *
      * Throws a AssertionException if any of the following occur:
      *  * The string cannot be parsed into a date.
@@ -371,8 +376,11 @@ public:
      *    string '2017-07-04T00:00:00Z'.
      *  * 'tz' is provided, but 'dateString' specifies an offset from UTC, like '-0400'
      *    in the string '2017-07-04 -0400'.
+     *  * The string does not match the 'format' specifier.
      */
-    Date_t fromString(StringData dateString, boost::optional<TimeZone> tz) const;
+    Date_t fromString(StringData dateString,
+                      boost::optional<TimeZone> tz,
+                      boost::optional<StringData> format = boost::none) const;
 
     /**
      * Returns a TimeZone object representing the UTC time zone.
