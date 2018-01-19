@@ -33,7 +33,6 @@
 #include <algorithm>
 
 #include "mongo/db/auth/role_graph.h"
-#include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/sequence_util.h"
@@ -773,9 +772,6 @@ TEST(RoleGraphTest, AddRoleFromDocument) {
         }
         return builder.obj();
     };
-
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
 
     RoleGraph graph;
 

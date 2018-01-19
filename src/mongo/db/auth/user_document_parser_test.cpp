@@ -39,7 +39,6 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/sock.h"
 
@@ -61,8 +60,6 @@ public:
     BSONObj credentials;
 
     void setUp() {
-        serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
         user.reset(new User(UserName("spencer", "test")));
         adminUser.reset(new User(UserName("admin", "admin")));
 
@@ -464,8 +461,6 @@ TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtraction) {
 }
 
 TEST_F(V2UserDocumentParsing, V2AuthenticationRestrictionsExtractionAndRetreival) {
-    serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
     enableIPv6(true);
     ASSERT_OK(v2parser.initializeAuthenticationRestrictionsFromUserDocument(
         BSON("user"

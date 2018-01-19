@@ -44,7 +44,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/session.h"
@@ -96,8 +95,6 @@ public:
     BSONObj credentials;
 
     void setUp() {
-        serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
         session = transportLayer.createSession();
         client = serviceContext.makeClient("testClient", session);
         RestrictionEnvironment::set(

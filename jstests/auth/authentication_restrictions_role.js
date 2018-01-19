@@ -28,22 +28,6 @@
         var externalMongo = new Mongo(get_ipaddr() + ":" + conn.port);
         var externalDb = externalMongo.getDB("admin");
 
-        print("=== Feature compatibility tests");
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: "3.4"}));
-
-        print(
-            "Given a server with 3.4 featureCompatibilityVersions, it is not possible to make a role with authenticationRestrictions");
-        assert.commandFailed(admin.runCommand({
-            createRole: "role1",
-            roles: [],
-            privileges: [],
-            authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
-        }));
-        assert.commandWorked(admin.runCommand({createRole: "role1", roles: [], privileges: []}));
-
-        print(
-            "When the server is upgraded to 3.6 featureCompatibilityVersion, roles may be created with authenticationRestrictions");
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: "3.6"}));
         assert.commandWorked(admin.runCommand({
             createRole: "role2",
             roles: [],
@@ -192,34 +176,6 @@
         sleepUntilUserDataRefreshed();
         assert.commandFailed(
             eventualDb.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
-
-        print(
-            "When a client downgrades featureCompatibilityVersion, roles with authenticationRestrictions are still enforced");
-        assert.commandWorked(admin.runCommand({
-            createRole: "role13",
-            roles: [],
-            privileges: [{resource: {db: "test", collection: "foo"}, actions: ["find"]}],
-            authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
-        }));
-        assert.commandWorked(
-            admin.runCommand({createUser: "user13", pwd: "user", roles: ["role13"]}));
-        assert(db.auth("user13", "user"));
-        assert.commandWorked(db.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
-
-        sleepUntilUserDataPropagated();
-        assert(eventualDb.auth("user13", "user"));
-        assert.commandWorked(
-            eventualDb.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
-
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: "3.4"}));
-
-        sleepUntilUserDataRefreshed();
-        assert(db.auth("user13", "user"));
-        assert.commandWorked(db.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
-        assert(eventualDb.auth("user13", "user"));
-        assert.commandWorked(
-            eventualDb.getSiblingDB("test").runCommand({find: "foo", batchSize: 0}));
-        assert(!externalDb.auth("user13", "user"));
     }
 
     function testUsersInfoCommand(conn) {
@@ -233,7 +189,6 @@
         var admin = conn.getDB("admin");
         assert(admin.auth("admin", "admin"));
 
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: "3.6"}));
         assert.commandWorked(admin.runCommand({createUser: "user", pwd: "pwd", roles: []}));
         assert.commandWorked(admin.runCommand({
             createUser: "restrictedUser",
@@ -256,99 +211,92 @@
             authenticationRestrictions: [{clientSource: ["127.0.0.1"]}]
         }));
 
-        ["3.4", "3.6"].forEach(function(version) {
-            print("Running FCV " + version + " usersInfo tests");
-            assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: version}));
+        print(
+            "Calling usersInfo for all users on a database with showAuthenticationRestrictions is an error");
+        assert.commandFailed(
+            admin.runCommand({usersInfo: 1, showAuthenticationRestrictions: true}));
 
-            print(
-                "Calling usersInfo for all users on a database with showAuthenticationRestrictions is an error");
-            assert.commandFailed(
-                admin.runCommand({usersInfo: 1, showAuthenticationRestrictions: true}));
+        print(
+            "Calling usersInfo for all users on a database with showAuthenticationRestrictions false or unset will succeed, and not produce authenticationRestriction fields");
+        [{}, {showAuthenticationRestrictions: false}].forEach(function(fragment) {
+            forEachUser(
+                assert.commandWorked(admin.runCommand(Object.merge({usersInfo: 1}, fragment))),
+                function(userDoc) {
+                    assert(!userDoc.hasOwnProperty("authenticationRestrictions"));
+                    assert(!userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                });
+        });
 
-            print(
-                "Calling usersInfo for all users on a database with showAuthenticationRestrictions false or unset will succeed, and not produce authenticationRestriction fields");
-            [{}, {showAuthenticationRestrictions: false}].forEach(function(fragment) {
+        print(
+            "If usersInfo is called with showAuthenticationRestrictions true, on a user without authenticationRestrictions, a document with empty authenticationRestrictions and inheritedAuthenticationRestrictions arrays is returned");
+        forEachUser(assert.commandWorked(admin.runCommand(
+                        {usersInfo: "user", showAuthenticationRestrictions: true})),
+                    function(userDoc) {
+                        assert(userDoc.hasOwnProperty("authenticationRestrictions"));
+                        assert.eq(0, userDoc["authenticationRestrictions"].length);
+
+                        assert(userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                        assert.eq(0, userDoc["inheritedAuthenticationRestrictions"].length);
+                    });
+
+        print(
+            "If usersInfo is called and showAuthenticationRestrictions is false or unset, return a document without an authenticationRestrictions or inheritedAuthenticationRestrictions field");
+        ["user", "restrictedUser", "userWithRestrictedRole", "restrictedUserWithRestrictedRole"]
+            .forEach(function(user) {
                 forEachUser(
-                    assert.commandWorked(admin.runCommand(Object.merge({usersInfo: 1}, fragment))),
+                    assert.commandWorked(admin.runCommand(
+                        {usersInfo: "user", showAuthenticationRestrictions: false})),
                     function(userDoc) {
                         assert(!userDoc.hasOwnProperty("authenticationRestrictions"));
                         assert(!userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
                     });
+                forEachUser(
+                    assert.commandWorked(admin.runCommand({usersInfo: "user"})), function(userDoc) {
+                        assert(!userDoc.hasOwnProperty("authenticationRestrictions"));
+                        assert(!userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                    });
+
             });
 
-            print(
-                "If usersInfo is called with showAuthenticationRestrictions true, on a user without authenticationRestrictions, a document with empty authenticationRestrictions and inheritedAuthenticationRestrictions arrays is returned");
-            forEachUser(assert.commandWorked(admin.runCommand(
-                            {usersInfo: "user", showAuthenticationRestrictions: true})),
-                        function(userDoc) {
-                            assert(userDoc.hasOwnProperty("authenticationRestrictions"));
-                            assert.eq(0, userDoc["authenticationRestrictions"].length);
+        print(
+            "Authentication restrictions can be obtained through usersInfo for a single user with restrictions");
+        forEachUser(assert.commandWorked(admin.runCommand(
+                        {usersInfo: "restrictedUser", showAuthenticationRestrictions: true})),
+                    function(userDoc) {
+                        assert(userDoc.hasOwnProperty("authenticationRestrictions"));
+                        assert.eq(1, userDoc["authenticationRestrictions"].length);
 
-                            assert(userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                            assert.eq(0, userDoc["inheritedAuthenticationRestrictions"].length);
-                        });
+                        assert(userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                        assert.eq(0, userDoc["inheritedAuthenticationRestrictions"].length);
+                    });
 
-            print(
-                "If usersInfo is called and showAuthenticationRestrictions is false or unset, return a document without an authenticationRestrictions or inheritedAuthenticationRestrictions field");
-            ["user", "restrictedUser", "userWithRestrictedRole", "restrictedUserWithRestrictedRole"]
-                .forEach(function(user) {
-                    forEachUser(
-                        assert.commandWorked(admin.runCommand(
-                            {usersInfo: "user", showAuthenticationRestrictions: false})),
-                        function(userDoc) {
-                            assert(!userDoc.hasOwnProperty("authenticationRestrictions"));
-                            assert(!userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                        });
-                    forEachUser(
-                        assert.commandWorked(admin.runCommand({usersInfo: "user"})),
-                        function(userDoc) {
-                            assert(!userDoc.hasOwnProperty("authenticationRestrictions"));
-                            assert(!userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                        });
+        print(
+            "Authentication restrictions can be obtained through usersInfo for a single user with restrictioned roles");
+        forEachUser(
+            assert.commandWorked(admin.runCommand(
+                {usersInfo: "userWithRestrictedRole", showAuthenticationRestrictions: true})),
+            function(userDoc) {
+                assert(userDoc.hasOwnProperty("authenticationRestrictions"));
+                assert.eq(0, userDoc["authenticationRestrictions"].length);
 
-                });
+                assert(userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                assert.eq(1, userDoc["inheritedAuthenticationRestrictions"].length);
+            });
 
-            print(
-                "Authentication restrictions can be obtained through usersInfo for a single user with restrictions");
-            forEachUser(assert.commandWorked(admin.runCommand(
-                            {usersInfo: "restrictedUser", showAuthenticationRestrictions: true})),
-                        function(userDoc) {
-                            assert(userDoc.hasOwnProperty("authenticationRestrictions"));
-                            assert.eq(1, userDoc["authenticationRestrictions"].length);
+        print(
+            "Authentication restrictions can be obtained through usersInfo for a single restricted user with restrictioned roles");
+        forEachUser(assert.commandWorked(admin.runCommand({
+            usersInfo: "restrictedUserWithRestrictedRole",
+            showAuthenticationRestrictions: true
+        })),
+                    function(userDoc) {
+                        print("This doc: " + tojson(userDoc));
+                        assert(userDoc.hasOwnProperty("authenticationRestrictions"));
+                        assert.eq(1, userDoc["authenticationRestrictions"].length);
 
-                            assert(userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                            assert.eq(0, userDoc["inheritedAuthenticationRestrictions"].length);
-                        });
-
-            print(
-                "Authentication restrictions can be obtained through usersInfo for a single user with restrictioned roles");
-            forEachUser(
-                assert.commandWorked(admin.runCommand(
-                    {usersInfo: "userWithRestrictedRole", showAuthenticationRestrictions: true})),
-                function(userDoc) {
-                    assert(userDoc.hasOwnProperty("authenticationRestrictions"));
-                    assert.eq(0, userDoc["authenticationRestrictions"].length);
-
-                    assert(userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                    assert.eq(1, userDoc["inheritedAuthenticationRestrictions"].length);
-                });
-
-            print(
-                "Authentication restrictions can be obtained through usersInfo for a single restricted user with restrictioned roles");
-            forEachUser(assert.commandWorked(admin.runCommand({
-                usersInfo: "restrictedUserWithRestrictedRole",
-                showAuthenticationRestrictions: true
-            })),
-                        function(userDoc) {
-                            print("This doc: " + tojson(userDoc));
-                            assert(userDoc.hasOwnProperty("authenticationRestrictions"));
-                            assert.eq(1, userDoc["authenticationRestrictions"].length);
-
-                            assert(userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                            assert.eq(1, userDoc["inheritedAuthenticationRestrictions"].length);
-                        });
-
-        });
+                        assert(userDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                        assert.eq(1, userDoc["inheritedAuthenticationRestrictions"].length);
+                    });
     }
 
     function testRolesInfoCommand(conn) {
@@ -362,7 +310,6 @@
         var admin = conn.getDB("admin");
         assert(admin.auth("admin", "admin"));
 
-        assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: "3.6"}));
         assert.commandWorked(admin.runCommand({createRole: "role", roles: [], privileges: []}));
         // restrictedRole already created
         assert.commandWorked(admin.runCommand(
@@ -374,59 +321,53 @@
             authenticationRestrictions: [{clientSource: ["127.0.0.3"]}]
         }));
 
-        ["3.4", "3.6"].forEach(function(version) {
-            print("Running FCV " + version + " usersInfo tests");
-            assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: version}));
+        ["role", "restrictedRole", "roleWithRestrictedRole", "restrictedRoleWithRestrictedRole"]
+            .forEach(function(role) {
+                forEachRole(
+                    assert.commandWorked(admin.runCommand({rolesInfo: role})), function(roleDoc) {
+                        assert(!roleDoc.hasOwnProperty("authenticationRestrictions"));
+                        assert(!roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                    });
+            });
 
-            ["role", "restrictedRole", "roleWithRestrictedRole", "restrictedRoleWithRestrictedRole"]
-                .forEach(function(role) {
-                    forEachRole(
-                        assert.commandWorked(admin.runCommand({rolesInfo: role})),
-                        function(roleDoc) {
-                            assert(!roleDoc.hasOwnProperty("authenticationRestrictions"));
-                            assert(!roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                        });
-                });
+        forEachRole(assert.commandWorked(admin.runCommand(
+                        {rolesInfo: "role", showAuthenticationRestrictions: true})),
+                    function(roleDoc) {
+                        assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
+                        assert.eq(0, roleDoc.authenticationRestrictions.length);
+                        assert(roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                        assert.eq(0, roleDoc.inheritedAuthenticationRestrictions.length);
+                    });
 
-            forEachRole(assert.commandWorked(admin.runCommand(
-                            {rolesInfo: "role", showAuthenticationRestrictions: true})),
-                        function(roleDoc) {
-                            assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
-                            assert.eq(0, roleDoc.authenticationRestrictions.length);
-                            assert(roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                            assert.eq(0, roleDoc.inheritedAuthenticationRestrictions.length);
-                        });
+        forEachRole(assert.commandWorked(admin.runCommand(
+                        {rolesInfo: "restrictedRole", showAuthenticationRestrictions: true})),
+                    function(roleDoc) {
+                        assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
+                        assert.eq(1, roleDoc.authenticationRestrictions.length);
+                        assert(roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                        assert.eq(1, roleDoc.inheritedAuthenticationRestrictions.length);
+                    });
 
-            forEachRole(assert.commandWorked(admin.runCommand(
-                            {rolesInfo: "restrictedRole", showAuthenticationRestrictions: true})),
-                        function(roleDoc) {
-                            assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
-                            assert.eq(1, roleDoc.authenticationRestrictions.length);
-                            assert(roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                            assert.eq(1, roleDoc.inheritedAuthenticationRestrictions.length);
-                        });
+        forEachRole(
+            assert.commandWorked(admin.runCommand(
+                {rolesInfo: "roleWithRestrictedRole", showAuthenticationRestrictions: true})),
+            function(roleDoc) {
+                assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
+                assert.eq(0, roleDoc.authenticationRestrictions.length);
+                assert(roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                assert.eq(1, roleDoc.inheritedAuthenticationRestrictions.length);
+            });
 
-            forEachRole(
-                assert.commandWorked(admin.runCommand(
-                    {rolesInfo: "roleWithRestrictedRole", showAuthenticationRestrictions: true})),
-                function(roleDoc) {
-                    assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
-                    assert.eq(0, roleDoc.authenticationRestrictions.length);
-                    assert(roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                    assert.eq(1, roleDoc.inheritedAuthenticationRestrictions.length);
-                });
-
-            forEachRole(assert.commandWorked(admin.runCommand({
-                rolesInfo: "restrictedRoleWithRestrictedRole",
-                showAuthenticationRestrictions: true
-            })),
-                        function(roleDoc) {
-                            assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
-                            assert.eq(1, roleDoc.authenticationRestrictions.length);
-                            assert(roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
-                            assert.eq(2, roleDoc.inheritedAuthenticationRestrictions.length);
-                        });
-        });
+        forEachRole(assert.commandWorked(admin.runCommand({
+            rolesInfo: "restrictedRoleWithRestrictedRole",
+            showAuthenticationRestrictions: true
+        })),
+                    function(roleDoc) {
+                        assert(roleDoc.hasOwnProperty("authenticationRestrictions"));
+                        assert.eq(1, roleDoc.authenticationRestrictions.length);
+                        assert(roleDoc.hasOwnProperty("inheritedAuthenticationRestrictions"));
+                        assert.eq(2, roleDoc.inheritedAuthenticationRestrictions.length);
+                    });
     }
 
     var keyfile = "jstests/libs/key1";
