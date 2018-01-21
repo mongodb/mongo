@@ -370,10 +370,14 @@ var ShardingTest = function(params) {
         }
     };
 
-    this.stop = function(opts) {
+    this.stopAllMongos = function(opts) {
         for (var i = 0; i < this._mongos.length; i++) {
             this.stopMongos(i, opts);
         }
+    };
+
+    this.stop = function(opts) {
+        this.stopAllMongos(opts);
 
         for (var i = 0; i < this._connections.length; i++) {
             if (this._rs[i]) {

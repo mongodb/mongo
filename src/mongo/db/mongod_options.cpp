@@ -58,6 +58,7 @@ using std::cout;
 using std::endl;
 using std::string;
 
+
 MongodGlobalParams mongodGlobalParams;
 
 extern DiagLog _diaglog;
@@ -685,14 +686,13 @@ Status validateMongodOptions(const moe::Environment& params) {
             }
         }
 
-        bool isClusterRoleShard = false;
+        bool isClusterRoleShard = params.count("shardsvr");
         if (params.count("sharding.clusterRole")) {
             auto clusterRole = params["sharding.clusterRole"].as<std::string>();
-            isClusterRoleShard = (clusterRole == "shardsvr");
+            isClusterRoleShard = isClusterRoleShard || (clusterRole == "shardsvr");
         }
 
-        if ((isClusterRoleShard || params.count("shardsvr")) &&
-            !params.count("sharding._overrideShardIdentity")) {
+        if (isClusterRoleShard && !params.count("sharding._overrideShardIdentity")) {
             return Status(
                 ErrorCodes::BadValue,
                 "shardsvr cluster role with queryableBackupMode requires _overrideShardIdentity");
@@ -1326,6 +1326,21 @@ Status storeMongodOptions(const moe::Environment& params) {
         warning() << "32-bit servers don't have journaling enabled by default. "
                   << "Please use --journal if you want durability.";
         log() << endl;
+    }
+
+    bool isClusterRoleShard = params.count("shardsvr");
+    bool isClusterRoleConfig = params.count("configsvr");
+    if (params.count("sharding.clusterRole")) {
+        auto clusterRole = params["sharding.clusterRole"].as<std::string>();
+        isClusterRoleShard = isClusterRoleShard || (clusterRole == "shardsvr");
+        isClusterRoleConfig = isClusterRoleConfig || (clusterRole == "configsvr");
+    }
+
+    if ((isClusterRoleShard || isClusterRoleConfig) && skipShardingConfigurationChecks) {
+        auto clusterRoleStr = isClusterRoleConfig ? "--configsvr" : "--shardsvr";
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Can not specify " << clusterRoleStr
+                                    << " and set skipShardingConfigurationChecks=true");
     }
 
     setGlobalReplSettings(replSettings);
