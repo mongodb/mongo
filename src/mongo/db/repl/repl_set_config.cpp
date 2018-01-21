@@ -35,11 +35,19 @@
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/mongod_options.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
+/**
+ * Dont run any sharding validations. Can not be combined with --configsvr or shardvr. Intended to
+ * allow restarting config server or shard as an independent replica set.
+ */
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(skipShardingConfigurationChecks, bool, false);
+
 namespace repl {
 
 const size_t ReplSetConfig::kMaxMembers;
@@ -569,7 +577,8 @@ Status ReplSetConfig::validate() const {
                               "servers cannot have a non-zero slaveDelay");
             }
         }
-        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
+            !skipShardingConfigurationChecks) {
             return Status(ErrorCodes::BadValue,
                           "Nodes being used for config servers must be started with the "
                           "--configsvr flag");

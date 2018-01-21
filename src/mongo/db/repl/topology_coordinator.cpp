@@ -37,6 +37,7 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
+#include "mongo/db/mongod_options.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
@@ -2757,7 +2758,7 @@ MemberState TopologyCoordinator::getMemberState() const {
     }
 
     if (_rsConfig.isConfigServer()) {
-        if (_options.clusterRole != ClusterRole::ConfigServer) {
+        if (_options.clusterRole != ClusterRole::ConfigServer && !skipShardingConfigurationChecks) {
             return MemberState::RS_REMOVED;
         } else {
             invariant(_storageEngineSupportsReadCommitted != ReadCommittedSupport::kUnknown);
@@ -2766,7 +2767,7 @@ MemberState TopologyCoordinator::getMemberState() const {
             }
         }
     } else {
-        if (_options.clusterRole == ClusterRole::ConfigServer) {
+        if (_options.clusterRole == ClusterRole::ConfigServer && !skipShardingConfigurationChecks) {
             return MemberState::RS_REMOVED;
         }
     }

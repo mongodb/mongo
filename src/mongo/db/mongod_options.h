@@ -52,6 +52,8 @@ struct MongodGlobalParams {
     boost::optional<std::vector<std::string>> whitelistedClusterNetwork;
 };
 
+extern bool skipShardingConfigurationChecks;
+
 extern MongodGlobalParams mongodGlobalParams;
 
 Status addMongodOptions(moe::OptionSection* options);

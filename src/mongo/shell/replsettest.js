@@ -484,7 +484,7 @@ var ReplSetTest = function(opts) {
      *
      * @param options - The options passed to {@link MongoRunner.runMongod}
      */
-    this.startSet = function(options) {
+    this.startSet = function(options, restart) {
         print("ReplSetTest starting set");
 
         if (options && options.keyFile) {
@@ -497,7 +497,7 @@ var ReplSetTest = function(opts) {
 
         var nodes = [];
         for (var n = 0; n < this.ports.length; n++) {
-            nodes.push(this.start(n, options));
+            nodes.push(this.start(n, options, restart));
         }
 
         this.nodes = nodes;
