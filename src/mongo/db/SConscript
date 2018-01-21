@@ -420,6 +420,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/curop",
         "$BUILD_DIR/mongo/util/net/miniwebserver",
         "mongodandmongos",
+        'repl/replica_set_messages',
         'repl/repl_coordinator_global',
     ],
     LIBDEPS_TAGS=[

@@ -59,6 +59,7 @@ using std::cout;
 using std::endl;
 using std::string;
 
+
 MongodGlobalParams mongodGlobalParams;
 
 extern DiagLog _diaglog;
@@ -1268,6 +1269,21 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         log() << endl;
     }
 
+    bool isClusterRoleShard = params.count("shardsvr");
+    bool isClusterRoleConfig = params.count("configsvr");
+    if (params.count("sharding.clusterRole")) {
+        auto clusterRole = params["sharding.clusterRole"].as<std::string>();
+        isClusterRoleShard = isClusterRoleShard || (clusterRole == "shardsvr");
+        isClusterRoleConfig = isClusterRoleConfig || (clusterRole == "configsvr");
+    }
+
+    if ((isClusterRoleShard || isClusterRoleConfig) && skipShardingConfigurationChecks) {
+        auto clusterRoleStr = isClusterRoleConfig ? "--configsvr" : "--shardsvr";
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Can not specify " << clusterRoleStr
+                                    << " and set skipShardingConfigurationChecks=true");
+    }
+
 #ifdef _WIN32
     // If dbPath is a default value, prepend with drive name so log entries are explicit
     if (storageGlobalParams.dbpath == storageGlobalParams.kDefaultDbPath ||
@@ -1276,7 +1292,6 @@ Status storeMongodOptions(const moe::Environment& params, const std::vector<std:
         storageGlobalParams.dbpath = currentPath.root_name().string() + storageGlobalParams.dbpath;
     }
 #endif
-
     setGlobalReplSettings(replSettings);
     return Status::OK();
 }

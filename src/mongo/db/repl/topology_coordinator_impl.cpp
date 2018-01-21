@@ -37,6 +37,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/mongod_options.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/isself.h"
@@ -2192,7 +2193,8 @@ MemberState TopologyCoordinatorImpl::getMemberState() const {
     }
 
     if (_rsConfig.isConfigServer()) {
-        if (_options.configServerMode == CatalogManager::ConfigServerMode::NONE) {
+        if (_options.configServerMode == CatalogManager::ConfigServerMode::NONE &&
+            !skipShardingConfigurationChecks) {
             return MemberState::RS_REMOVED;
         }
         if (_options.configServerMode == CatalogManager::ConfigServerMode::CSRS) {
@@ -2202,7 +2204,9 @@ MemberState TopologyCoordinatorImpl::getMemberState() const {
             }
         }
     } else {
-        if (_options.configServerMode != CatalogManager::ConfigServerMode::NONE) {
+        if (_options.configServerMode != CatalogManager::ConfigServerMode::NONE &&
+            (_options.configServerMode != CatalogManager::ConfigServerMode::SCCC &&
+             !skipShardingConfigurationChecks)) {
             return MemberState::RS_REMOVED;
         }
     }

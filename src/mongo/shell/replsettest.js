@@ -387,12 +387,12 @@ var ReplSetTest = function(opts) {
         return this.name + "/" + hosts.join(",");
     };
 
-    this.startSet = function(options) {
+    this.startSet = function(options, restart) {
         print("ReplSetTest starting set");
 
         var nodes = [];
         for (var n = 0; n < this.ports.length; n++) {
-            nodes.push(this.start(n, options));
+            nodes.push(this.start(n, options, restart));
         }
 
         this.nodes = nodes;
@@ -967,7 +967,14 @@ var ReplSetTest = function(opts) {
             options.binVersion = MongoRunner.versionIterator(options.binVersion);
         }
 
-        options = Object.merge(defaults, options);
+        // If restarting a node, use its existing options as the defaults.
+        if (((options && options.restart) || restart) && this.nodes[n] &&
+            this.nodes[n].hasOwnProperty("fullOptions")) {
+            options = Object.merge(this.nodes[n].fullOptions, options);
+        } else {
+            options = Object.merge(defaults, options);
+        }
+
         options = Object.merge(options, this.nodeOptions["n" + n]);
         delete options.rsConfig;
 

@@ -284,10 +284,14 @@ var ShardingTest = function(params) {
         throw Error("impossible");
     };
 
-    this.stop = function() {
+    this.stopAllMongos = function(opts) {
         for (var i = 0; i < this._mongos.length; i++) {
             this.stopMongos(i);
         }
+    };
+
+    this.stop = function(opts) {
+        this.stopAllMongos(opts);
 
         for (var i = 0; i < this._connections.length; i++) {
             if (this._rs[i]) {

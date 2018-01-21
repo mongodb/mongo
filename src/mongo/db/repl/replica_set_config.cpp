@@ -35,10 +35,18 @@
 #include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/mongod_options.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/stdx/functional.h"
 
 namespace mongo {
+/**
+ * Dont run any sharding validations. Can not be combined with --configsvr or shardvr. Intended to
+ * allow restarting config server or shard as an independent replica set.
+ */
+MONGO_EXPORT_STARTUP_SERVER_PARAMETER(skipShardingConfigurationChecks, bool, false);
+
 namespace repl {
 
 #ifndef _MSC_VER
@@ -498,7 +506,7 @@ Status ReplicaSetConfig::validate() const {
                               "servers cannot have a non-zero slaveDelay");
             }
         }
-        if (!serverGlobalParams.configsvr) {
+        if (!serverGlobalParams.configsvr && !skipShardingConfigurationChecks) {
             return Status(ErrorCodes::BadValue,
                           "Nodes being used for config servers must be started with the "
                           "--configsvr flag");
@@ -646,7 +654,7 @@ void ReplicaSetConfig::_addInternalWriteConcernModes() {
     } else if (status != ErrorCodes::NoSuchKey) {
         // NoSuchKey means we have no $voter-tagged nodes in this config;
         // other errors are unexpected.
-        fassert(28693, status);
+        fassert(40418, status);
     }
 
     // $stepDownCheck: one electable node plus ourselves
@@ -658,7 +666,7 @@ void ReplicaSetConfig::_addInternalWriteConcernModes() {
     } else if (status != ErrorCodes::NoSuchKey) {
         // NoSuchKey means we have no $electable-tagged nodes in this config;
         // other errors are unexpected
-        fassert(28694, status);
+        fassert(40419, status);
     }
 }
 

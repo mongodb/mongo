@@ -50,6 +50,8 @@ struct MongodGlobalParams {
     MongodGlobalParams() : scriptingEnabled(true) {}
 };
 
+extern bool skipShardingConfigurationChecks;
+
 extern MongodGlobalParams mongodGlobalParams;
 
 Status addMongodOptions(moe::OptionSection* options);
