@@ -3,6 +3,9 @@
  * also checks that fields that should not be in the document are absent
  */
 
+// Skip db hash check because node 2 is slave delayed and may time out on awaitReplication.
+TestData.skipCheckDBHashes = true;
+
 load("jstests/replsets/rslib.js");
 
 // function create the error message if an assert fails

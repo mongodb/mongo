@@ -104,6 +104,7 @@ function testShardedLookup(shardingTest) {
  * sharding test to see if they can work together...
  */
 function mixedShardTest(options1, options2, shouldSucceed) {
+    let authSucceeded = false;
     try {
         // Start ShardingTest with enableBalancer because ShardingTest attempts to turn
         // off the balancer otherwise, which it will not be authorized to do if auth is enabled.
@@ -118,6 +119,8 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         // Create admin user in case the options include auth
         st.admin.createUser({user: 'admin', pwd: 'pwd', roles: ['root']});
         st.admin.auth('admin', 'pwd');
+
+        authSucceeded = true;
 
         st.stopBalancer();
 
@@ -158,6 +161,12 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         // silence error if we should fail...
         print("IMPORTANT! => Test failed when it should have failed...continuing...");
     } finally {
+        // Authenticate csrs so ReplSetTest.stopSet() can do db hash check.
+        if (authSucceeded && st.configRS) {
+            st.configRS.nodes.forEach((node) => {
+                node.getDB('admin').auth('admin', 'pwd');
+            });
+        }
         // This has to be done in order for failure
         // to not prevent future tests from running...
         if (st) {

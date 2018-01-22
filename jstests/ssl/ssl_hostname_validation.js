@@ -75,6 +75,9 @@ testCombination(SERVER_CERT, true, true, true);
 // BAD_SAN_CERT has SAN=BadSAN.
 testCombination(BAD_SAN_CERT, false, false, false);
 
+// Skip db hash check because replset cannot initiate.
+TestData.skipCheckDBHashes = true;
+
 // 2. Initiate ReplSetTest with invalid certs
 ssl_options = {
     sslMode: "requireSSL",
@@ -89,6 +92,8 @@ assert.throws(function() {
     replTest.initiate();
 });
 replTest.stopSet();
+
+TestData.skipCheckDBHashes = false;
 
 // 3. Initiate ReplSetTest with invalid certs but set allowInvalidHostnames
 ssl_options = {

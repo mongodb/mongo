@@ -209,9 +209,9 @@
 
     // Verify data consistency between nodes.
     authutil.asCluster(replTest.nodes, 'jstests/libs/key1', function() {
-        replTest.checkReplicatedDataHashes();
         replTest.checkOplogs();
     });
 
+    // DB hash check is done in stopSet.
     replTest.stopSet();
 }());

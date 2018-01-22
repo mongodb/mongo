@@ -265,6 +265,7 @@ jsTestOptions = function() {
             overrideRetryAttempts: TestData.overrideRetryAttempts || 0,
             logRetryAttempts: TestData.logRetryAttempts || false,
             connectionString: TestData.connectionString || "",
+            skipCheckDBHashes: TestData.skipCheckDBHashes || false,
         });
     }
     return _jsTestOptions;

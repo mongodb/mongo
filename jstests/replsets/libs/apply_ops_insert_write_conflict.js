@@ -4,6 +4,9 @@
 var ApplyOpsInsertWriteConflictTest = function(options) {
     'use strict';
 
+    // Skip db hash check because this test may throw write conflicts and collmod fails.
+    TestData.skipCheckDBHashes = true;
+
     if (!(this instanceof ApplyOpsInsertWriteConflictTest)) {
         return new ApplyOpsInsertWriteConflictTest(options);
     }

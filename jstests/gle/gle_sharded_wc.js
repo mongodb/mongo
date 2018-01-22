@@ -8,6 +8,7 @@
 // Checking UUID consistency involves talking to the shard primaries, but by the end of this test,
 // one shard does not have a primary.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+TestData.skipCheckDBHashes = true;
 
 (function() {
     'use strict';

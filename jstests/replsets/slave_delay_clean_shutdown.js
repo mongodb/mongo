@@ -5,6 +5,9 @@ load('jstests/replsets/rslib.js');
 (function() {
     "use strict";
 
+    // Skip db hash check since secondary has slave delay.
+    TestData.skipCheckDBHashes = true;
+
     var ns = "test.coll";
 
     var rst = new ReplSetTest({

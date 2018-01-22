@@ -18,6 +18,9 @@
  * @tags: [requires_persistence, requires_replication]
  */
 
+// Skip db hash check because replset cannot reach consistent state.
+TestData.skipCheckDBHashes = true;
+
 print("1. make 3-member set w/arb (2)");
 var name = "minvalid";
 var replTest = new ReplSetTest({name: name, nodes: 3, oplogSize: 1, waitForKeys: true});
