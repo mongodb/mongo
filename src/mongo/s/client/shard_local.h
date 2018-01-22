@@ -61,6 +61,10 @@ public:
                                const BSONObj& keys,
                                bool unique) override;
 
+    void updateLastCommittedOpTime(LogicalTime lastCommittedOpTime) final;
+
+    LogicalTime getLastCommittedOpTime() const final;
+
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& unused,
