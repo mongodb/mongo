@@ -280,33 +280,6 @@ TEST_F(OplogFetcherTest, FindQueryHasNoReadconcernIfTermUninitialized) {
     ASSERT_FALSE(cmdObj.hasField("readConcern"));
 }
 
-TEST_F(OplogFetcherTest, FindQueryHasAfterOpTimeWithFeatureCompatibilityVersion34) {
-    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyDowngradedTo34);
-    ASSERT(serverGlobalParams.featureCompatibility.getVersion() !=
-           ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-    auto cmdObj = makeOplogFetcher(_createConfig(true))->getFindQuery_forTest();
-    auto readConcernElem = cmdObj["readConcern"];
-    ASSERT_EQUALS(mongo::BSONType::Object, readConcernElem.type());
-    ASSERT_FALSE(readConcernElem.Obj().hasField("afterClusterTime"));
-    ASSERT_BSONOBJ_EQ(readConcernElem.Obj(), BSON("afterOpTime" << lastFetched.opTime));
-
-    _checkDefaultCommandObjectFields(cmdObj);
-}
-
-TEST_F(OplogFetcherTest, FindQueryHasAfterOpTimeWithFeatureCompatibilityVersion36) {
-    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
-    ASSERT(serverGlobalParams.featureCompatibility.getVersion() ==
-           ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-    auto cmdObj = makeOplogFetcher(_createConfig(true))->getFindQuery_forTest();
-    auto readConcernElem = cmdObj["readConcern"];
-    ASSERT_EQUALS(mongo::BSONType::Object, readConcernElem.type());
-    ASSERT_FALSE(readConcernElem.Obj().hasField("afterOpTime"));
-    ASSERT_BSONOBJ_EQ(readConcernElem.Obj(),
-                      BSON("afterClusterTime" << lastFetched.opTime.getTimestamp()));
-
-    _checkDefaultCommandObjectFields(cmdObj);
-}
-
 TEST_F(OplogFetcherTest, InvalidReplSetMetadataInResponseStopsTheOplogFetcher) {
     auto shutdownState = processSingleBatch(
         {makeCursorResponse(0, {makeNoopOplogEntry(lastFetched)}),

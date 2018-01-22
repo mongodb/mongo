@@ -43,7 +43,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/rs_rollback.h"
-#include "mongo/db/repl/rs_rollback_no_uuid.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/logger/logger.h"
@@ -222,18 +221,9 @@ RollbackResyncsCollectionOptionsTest::RollbackSourceWithCollectionOptions::
                                         BSONObj collOptionsObj)
     : RollbackSourceMock(std::move(oplog)), collOptionsObj(collOptionsObj) {}
 
-
-StatusWith<BSONObj>
-RollbackResyncsCollectionOptionsTest::RollbackSourceWithCollectionOptions::getCollectionInfo(
-    const NamespaceString& nss) const {
-    calledNoUUID = true;
-    return BSON("options" << collOptionsObj);
-}
-
 StatusWith<BSONObj>
 RollbackResyncsCollectionOptionsTest::RollbackSourceWithCollectionOptions::getCollectionInfoByUUID(
     const std::string& db, const UUID& uuid) const {
-    calledWithUUID = true;
     return BSON("options" << collOptionsObj << "info" << BSON("uuid" << uuid));
 }
 
@@ -268,29 +258,12 @@ void RollbackResyncsCollectionOptionsTest::resyncCollectionOptionsTest(
         std::unique_ptr<OplogInterface>(new OplogInterfaceMock({commonOperation})),
         remoteCollOptionsObj);
 
-    if (coll->uuid()) {
-        ASSERT_OK(
-            syncRollback(_opCtx.get(),
-                         OplogInterfaceMock({collectionModificationOperation, commonOperation}),
-                         rollbackSource,
-                         {},
-                         _coordinator,
-                         _replicationProcess.get()));
-
-        ASSERT_TRUE(rollbackSource.calledWithUUID);
-        ASSERT_FALSE(rollbackSource.calledNoUUID);
-    } else {
-        ASSERT_OK(syncRollbackNoUUID(
-            _opCtx.get(),
-            OplogInterfaceMock({collectionModificationOperation, commonOperation}),
-            rollbackSource,
-            {},
-            _coordinator,
-            _replicationProcess.get()));
-
-        ASSERT_TRUE(rollbackSource.calledNoUUID);
-        ASSERT_FALSE(rollbackSource.calledWithUUID);
-    }
+    ASSERT_OK(syncRollback(_opCtx.get(),
+                           OplogInterfaceMock({collectionModificationOperation, commonOperation}),
+                           rollbackSource,
+                           {},
+                           _coordinator,
+                           _replicationProcess.get()));
 
     // Make sure the collection options are correct.
     AutoGetCollectionForReadCommand autoColl(_opCtx.get(), NamespaceString(nss.toString()));

@@ -187,12 +187,10 @@ private:
                                             OplogInterfaceRemote::GetConnectionFn getConnection);
 
     /**
-     * Executes a rollback via refetch in either rs_rollback.cpp or rs_rollback_no_uuid.cpp
+     * Executes a rollback via refetch in rs_rollback.cpp.
      *
-     * We fall back on the rollback via refetch algorithm when:
-     * 1)  the server parameter "rollbackMethod" is set to "rollbackViaRefetch" or
-     *     "rollbackViaRefetchNoUUID"; or
-     * 2)  the storage engine does not support "rollback to a checkpoint."
+     * We fall back on the rollback via refetch algorithm when the storage engine does not support
+     * "rollback to a checkpoint."
      *
      * Must be called from _runRollback() which ensures that all the conditions for entering
      * rollback have been met.
@@ -201,7 +199,6 @@ private:
                                        const HostAndPort& source,
                                        int requiredRBID,
                                        OplogInterface* localOplog,
-                                       bool useUUID,
                                        OplogInterfaceRemote::GetConnectionFn getConnection);
 
     // restart syncing

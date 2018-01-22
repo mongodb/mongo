@@ -311,71 +311,6 @@ bool FeatureCompatibilityVersion::isCleanStartUp() {
     return true;
 }
 
-namespace {
-
-// If a node finishes rollback while in fcv=3.6, but while in RECOVERING before reaching
-// minValid, sees that its sync source started a downgrade to fcv=3.4, it may be be unable to
-// become consistent. This is because an fcv=3.6 node will have used the UUID algorithm for
-// rollback, which treats a missing UUID as a collection drop. We fassert before becoming
-// SECONDARY in an inconsistent state.
-//
-// We only care about the start of downgrade, because if we see an oplog entry marking the end
-// of downgrade, then either we also saw a downgrade start op, or we did our rollback in fcv=3.4
-// with the no-UUID algorithm. Similarly, we do not care about upgrade, because either
-// it will also have a downgrade op, or we did our rollback in fcv=3.4. The no-UUID rollback
-// algorithm will be as safe as it was in 3.4 regardless of if the sync source has UUIDs or not.
-void uassertDuringRollbackOnDowngradeOp(
-    OperationContext* opCtx,
-    ServerGlobalParams::FeatureCompatibility::Version newVersion,
-    std::string msg) {
-    auto currentVersion = serverGlobalParams.featureCompatibility.getVersion();
-
-    if ((newVersion != ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34) ||
-        (currentVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
-        return;
-    }
-
-    invariant(newVersion == ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34);
-    invariant(currentVersion ==
-              ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
-
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    uassert(ErrorCodes::OplogOperationUnsupported,
-            msg,
-            replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet ||
-                replCoord->isInPrimaryOrSecondaryState());
-}
-
-// If we are finishing an upgrade, all collections should have UUIDs. We check to make sure
-// that the feature compatibility version collection has a UUID.
-void uassertDuringInvalidUpgradeOp(OperationContext* opCtx,
-                                   ServerGlobalParams::FeatureCompatibility::Version version) {
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeMasterSlave) {
-        // TODO (SERVER-31593) master-slave should uassert here, but cannot due to a bug.
-        return;
-    }
-
-    if (version < ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-        // Only check this assertion if we're completing an upgrade to 3.6.
-        return;
-    }
-
-    auto fcvUUID = repl::StorageInterface::get(opCtx)->getCollectionUUID(
-        opCtx, NamespaceString(FeatureCompatibilityVersion::kCollection));
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Error checking for UUID in feature compatibility version collection: "
-                          << fcvUUID.getStatus().toString(),
-            fcvUUID.isOK());
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Tried to complete upgrade, but "
-                          << FeatureCompatibilityVersion::kCollection
-                          << " did not have a UUID.",
-            fcvUUID.getValue());
-}
-
-}  // namespace
-
 void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc) {
     auto idElement = doc["_id"];
     if (idElement.type() != BSONType::String ||
@@ -383,14 +318,6 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
         return;
     }
     auto newVersion = uassertStatusOK(FeatureCompatibilityVersion::parse(doc));
-
-    uassertDuringRollbackOnDowngradeOp(opCtx,
-                                       newVersion,
-                                       str::stream()
-                                           << "Must be in primary or secondary state to "
-                                              "downgrade feature compatibility version document: "
-                                           << redact(doc));
-    uassertDuringInvalidUpgradeOp(opCtx, newVersion);
 
     // To avoid extra log messages when the targetVersion is set/unset, only log when the version
     // changes.
@@ -423,11 +350,6 @@ void FeatureCompatibilityVersion::onDelete(OperationContext* opCtx, const BSONOb
         return;
     }
 
-    uassertDuringRollbackOnDowngradeOp(
-        opCtx,
-        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34,
-        "Must be in primary or secondary state to delete feature compatibility version document");
-
     log() << "setting featureCompatibilityVersion to "
           << FeatureCompatibilityVersionCommandParser::kVersion34;
     opCtx->recoveryUnit()->onCommit([]() {
@@ -438,14 +360,6 @@ void FeatureCompatibilityVersion::onDelete(OperationContext* opCtx, const BSONOb
 }
 
 void FeatureCompatibilityVersion::onDropCollection(OperationContext* opCtx) {
-
-    uassertDuringRollbackOnDowngradeOp(
-        opCtx,
-        ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34,
-        str::stream() << "Must be in primary or secondary state to drop "
-                      << FeatureCompatibilityVersion::kCollection
-                      << " collection");
-
     log() << "setting featureCompatibilityVersion to "
           << FeatureCompatibilityVersionCommandParser::kVersion34;
     opCtx->recoveryUnit()->onCommit([]() {

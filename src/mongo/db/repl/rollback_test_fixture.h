@@ -184,12 +184,9 @@ class RollbackResyncsCollectionOptionsTest : public RollbackTest {
         RollbackSourceWithCollectionOptions(std::unique_ptr<OplogInterface> oplog,
                                             BSONObj collOptionsObj);
 
-        StatusWith<BSONObj> getCollectionInfo(const NamespaceString& nss) const override;
         StatusWith<BSONObj> getCollectionInfoByUUID(const std::string& db,
                                                     const UUID& uuid) const override;
 
-        mutable bool calledNoUUID = false;
-        mutable bool calledWithUUID = false;
         BSONObj collOptionsObj;
     };
 

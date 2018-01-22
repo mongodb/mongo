@@ -1268,13 +1268,11 @@ void shutdownTask() {
             opCtx = uniqueOpCtx.get();
         }
 
-        if (serverGlobalParams.featureCompatibility.getVersion() <
+        // TODO: Upgrade this check so that this block only runs when (FCV != kFullyUpgradedTo38).
+        // See SERVER-32589.
+        if (serverGlobalParams.featureCompatibility.getVersion() !=
             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            log(LogComponent::kReplication) << "shutdown: removing all drop-pending collections...";
-            repl::DropPendingCollectionReaper::get(serviceContext)
-                ->dropCollectionsOlderThan(opCtx, repl::OpTime::max());
-
-            // If we are in fCV 3.4, drop the 'checkpointTimestamp' collection so if we downgrade
+            // If we are in fCV 3.6, drop the 'checkpointTimestamp' collection so if we downgrade
             // and then upgrade again, we do not trust a stale 'checkpointTimestamp'.
             log(LogComponent::kReplication)
                 << "shutdown: removing checkpointTimestamp collection...";

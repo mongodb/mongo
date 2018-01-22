@@ -359,12 +359,6 @@ Timestamp ReplicationConsistencyMarkersImpl::getOplogTruncateAfterPoint(
     OperationContext* opCtx) const {
     auto doc = _getOplogTruncateAfterPointDocument(opCtx);
     if (!doc) {
-        if (serverGlobalParams.featureCompatibility.getVersion() <
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
-            LOG(3) << "Falling back on old oplog delete from point because there is no oplog "
-                      "truncate after point and we are in FCV 3.4.";
-            return _getOldOplogDeleteFromPoint(opCtx);
-        }
         LOG(3) << "Returning empty oplog truncate after point since document did not exist";
         return {};
     }
