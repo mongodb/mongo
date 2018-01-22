@@ -420,8 +420,8 @@
 
     /*
      * At this point, any platform specific modifications to the default
-     * reponses can be made in the manner described above by using any of
-     * the DEFINE_REPONSE, DEFAULT_RESPONSE and DEFAULT_NO_ERROR macros.  
+     * responses can be made in the manner described above by using any of
+     * the DEFINE_RESPONSE, DEFAULT_RESPONSE and DEFAULT_NO_ERROR macros.  
      */
 
 #   if (OP_SYSTEM == osf) || (OP_SYSTEM == vms) || (OP_SYSTEM == linux)
