@@ -259,7 +259,6 @@ void CollectionCloner::_cancelRemainingWork_inlock() {
     }
     if (_verifyCollectionDroppedScheduler) {
         _verifyCollectionDroppedScheduler->shutdown();
-        _verifyCollectionDroppedScheduler.reset();
     }
     _dbWorkTaskRunner.cancel();
 }

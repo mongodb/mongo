@@ -1652,6 +1652,40 @@ TEST_F(CollectionClonerUUIDTest, CloningIsSuccessfulIfCollectionWasDroppedWhileC
     ASSERT_FALSE(collectionCloner->isActive());
 }
 
+/**
+ * Start cloning.
+ * While copying collection, simulate a collection drop by having the ARM return a CursorNotFound
+ * error.
+ * The CollectionCloner should run a find command on the collection by UUID.
+ * Shut the CollectionCloner down.
+ * The CollectionCloner should return a CursorNotFound final status which is the last error from the
+ * ARM.
+ */
+TEST_F(CollectionClonerUUIDTest,
+       ShuttingDownCollectionClonerDuringCollectionDropVerificationReturnsCallbackCanceled) {
+    setUpVerifyCollectionWasDroppedTest();
+
+    // CollectionCloner should send a find command with the collection's UUID.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        auto noi = getVerifyCollectionDroppedRequest(getNet());
+
+        // Ignore the find request.
+        guard->blackHole(noi);
+    }
+
+    // Shut the CollectionCloner down. This should cancel the _verifyCollectionDropped() request.
+    collectionCloner->shutdown();
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        guard->runReadyNetworkOperations();
+    }
+
+    collectionCloner->join();
+    ASSERT_EQUALS(ErrorCodes::CursorNotFound, getStatus());
+    ASSERT_FALSE(collectionCloner->isActive());
+}
+
 class ParallelCollectionClonerTest : public BaseClonerTest {
 public:
     BaseCloner* getCloner() const override;
