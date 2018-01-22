@@ -140,7 +140,7 @@
             return member.state == ReplSetTest.State.PRIMARY;
         },
         'Replica set member state did not reach PRIMARY after starting up with --replSet option',
-        5000,
+        10 * 60 * 1000,
         1000);
 
     // Write/read a single document to ensure basic functionality.
@@ -163,7 +163,7 @@
         }
         print('Successfully saved document after transitioning to primary: ' + tojson(result));
         return true;
-    }, 'failed to save document after transitioning to primary', 5000, 1000);
+    }, 'failed to save document after transitioning to primary', 10 * 60 * 1000, 1000);
 
     assert.eq(1, t.count(), 'incorrect collection size after successful write');
     assert.eq(doc, t.findOne());
