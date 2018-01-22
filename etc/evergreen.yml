@@ -9360,3 +9360,67 @@ buildvariants:
   - name: tool
   - name: update_fuzzer
   - name: update_fuzzer_replication
+
+- name: linux-64-duroff-mmapv1
+  display_name: Linux (No Journal) MMAPv1
+  run_on:
+  - rhel62-small
+  batchtime: 1440 # 1 day
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux-duroff
+    push_arch: x86_64
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    test_flags: --nojournal --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger,requires_journaling
+    use_scons_cache: true
+    build_mongoreplay: false
+  tasks:
+  - name: compile
+    distros:
+    - rhel62-large
+  - name: compile_all
+    distros:
+    - rhel62-large
+  - name: aggregation
+  - name: aggregation_auth
+  - name: aggregation_fuzzer
+  - name: auth
+  - name: bulk_gle_passthrough
+  - name: concurrency
+  - name: concurrency_replication
+  - name: concurrency_sharded
+  - name: concurrency_simultaneous
+  - name: dbtest
+  - name: disk_mmapv1
+  - name: durability
+  - name: dur_jscore_passthrough
+  - name: failpoints
+  - name: failpoints_auth
+  - name: jsCore
+  - name: jsCore_auth
+  - name: jsCore_compatibility
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: master_slave
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough
+  - name: mmap
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: parallel
+  - name: parallel_compatibility
+  - name: replica_sets
+  - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough
+  - name: serial_run
+  - name: sharding
+  - name: sharding_auth
+  - name: sharding_jscore_passthrough
+  - name: slow1
+  - name: tool
