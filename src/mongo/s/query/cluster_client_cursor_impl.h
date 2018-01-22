@@ -97,6 +97,8 @@ public:
 
     void detachFromOperationContext() final;
 
+    OperationContext* getCurrentOperationContext() const final;
+
     bool isTailable() const final;
 
     bool isTailableAndAwaitData() const final;

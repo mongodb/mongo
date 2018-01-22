@@ -565,7 +565,7 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
             continue;
         }
 
-        Status killCursorStatus = manager->killCursor(*nss, cursorId);
+        Status killCursorStatus = manager->killCursor(opCtx, *nss, cursorId);
         if (!killCursorStatus.isOK()) {
             LOG(3) << "Can't find cursor to kill.  Namespace: '" << *nss
                    << "', cursor id: " << cursorId << ".";

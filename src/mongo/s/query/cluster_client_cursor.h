@@ -90,6 +90,11 @@ public:
     virtual void detachFromOperationContext() = 0;
 
     /**
+     * Return the current context the cursor is attached to, if any.
+     */
+    virtual OperationContext* getCurrentOperationContext() const = 0;
+
+    /**
      * Returns whether or not this cursor is tailable.
      */
     virtual bool isTailable() const = 0;

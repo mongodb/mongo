@@ -434,15 +434,6 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     long long startingFrom = pinnedCursor.getValue().getNumReturnedSoFar();
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
 
-    pinnedCursor.getValue().reattachToOperationContext(opCtx);
-
-    // A pinned cursor will not be destroyed immediately if an exception is thrown. Instead it will
-    // be marked as killed, then reaped by a background thread later. If this happens, we want to be
-    // sure the cursor does not have a pointer to this OperationContext, since it will be destroyed
-    // as soon as we return, but the cursor will live on a bit longer.
-    ScopeGuard cursorDetach =
-        MakeGuard([&pinnedCursor]() { pinnedCursor.getValue().detachFromOperationContext(); });
-
     while (!FindCommon::enoughForGetMore(batchSize, batch.size())) {
         auto context = batch.empty()
             ? RouterExecStage::ExecContext::kGetMoreNoResultsYet
@@ -489,10 +480,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         batch.push_back(std::move(*next.getValue().getResult()));
     }
 
-    // Upon successful completion, we need to detach from the operation and transfer ownership of
-    // the cursor back to the cursor manager.
-    cursorDetach.Dismiss();
-    pinnedCursor.getValue().detachFromOperationContext();
+    // Upon successful completion, transfer ownership of the cursor back to the cursor manager. If
+    // the cursor has been exhausted, the cursor manager will clean it up for us.
     pinnedCursor.getValue().returnCursor(cursorState);
 
     CursorId idToReturn = (cursorState == ClusterCursorManager::CursorState::Exhausted)

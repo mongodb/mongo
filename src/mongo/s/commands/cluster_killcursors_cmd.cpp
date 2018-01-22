@@ -53,7 +53,7 @@ private:
     Status _killCursor(OperationContext* opCtx,
                        const NamespaceString& nss,
                        CursorId cursorId) const final {
-        return grid.getCursorManager()->killCursor(nss, cursorId);
+        return grid.getCursorManager()->killCursor(opCtx, nss, cursorId);
     }
 } clusterKillCursorsCmd;
 

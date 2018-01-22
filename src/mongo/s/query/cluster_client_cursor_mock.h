@@ -51,9 +51,17 @@ public:
 
     void kill(OperationContext* opCtx) final;
 
-    void reattachToOperationContext(OperationContext* opCtx) final {}
+    void reattachToOperationContext(OperationContext* opCtx) final {
+        _opCtx = opCtx;
+    }
 
-    void detachFromOperationContext() final {}
+    void detachFromOperationContext() final {
+        _opCtx = nullptr;
+    }
+
+    OperationContext* getCurrentOperationContext() const final {
+        return _opCtx;
+    }
 
     bool isTailable() const final;
 
@@ -94,6 +102,8 @@ private:
     bool _remotesExhausted = true;
 
     boost::optional<LogicalSessionId> _lsid;
+
+    OperationContext* _opCtx = nullptr;
 };
 
 }  // namespace mongo
