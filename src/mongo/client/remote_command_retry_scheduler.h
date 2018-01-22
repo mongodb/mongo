@@ -150,7 +150,7 @@ private:
     executor::TaskExecutor* _executor;
 
     const executor::RemoteCommandRequest _request;
-    const executor::TaskExecutor::RemoteCommandCallbackFn _callback;
+    executor::TaskExecutor::RemoteCommandCallbackFn _callback;
     std::unique_ptr<RetryPolicy> _retryPolicy;
     std::size_t _currentAttempt{0};
     Milliseconds _currentUsedMillis{0};

@@ -284,7 +284,14 @@ void RemoteCommandRetryScheduler::_remoteCommandCallback(
 
 void RemoteCommandRetryScheduler::_onComplete(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& rcba) {
+
+    invariant(_callback);
     _callback(rcba);
+
+    // This will release the resources held by the '_callback' function object. To avoid any issues
+    // with destruction logic in the function object's resources accessing this
+    // RemoteCommandRetryScheduler, we release this function object outside the lock.
+    _callback = {};
 
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(_isActive_inlock());

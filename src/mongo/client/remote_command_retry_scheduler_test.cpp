@@ -461,4 +461,44 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerShouldRetryUntilSuccessfulRespo
     checkCompletionStatus(&scheduler, callback, response);
 }
 
+bool sharedCallbackStateDestroyed = false;
+class SharedCallbackState {
+    MONGO_DISALLOW_COPYING(SharedCallbackState);
+
+public:
+    SharedCallbackState() {}
+    ~SharedCallbackState() {
+        sharedCallbackStateDestroyed = true;
+    }
+};
+
+TEST_F(RemoteCommandRetrySchedulerTest,
+       SchedulerResetsOnCompletionCallbackFunctionAfterCompletion) {
+    sharedCallbackStateDestroyed = false;
+    auto sharedCallbackData = std::make_shared<SharedCallbackState>();
+
+    Status result = getDetectableErrorStatus();
+    auto policy = RemoteCommandRetryScheduler::makeNoRetryPolicy();
+
+    RemoteCommandRetryScheduler scheduler(
+        &getExecutor(),
+        request,
+        [&result,
+         sharedCallbackData](const executor::TaskExecutor::RemoteCommandCallbackArgs& rcba) {
+            unittest::log() << "setting result to " << rcba.response.status;
+            result = rcba.response.status;
+        },
+        std::move(policy));
+    start(&scheduler);
+
+    sharedCallbackData.reset();
+    ASSERT_FALSE(sharedCallbackStateDestroyed);
+
+    processNetworkResponse({ErrorCodes::OperationFailed, "command failed", Milliseconds(0)});
+
+    scheduler.join();
+    ASSERT_EQUALS(ErrorCodes::OperationFailed, result);
+    ASSERT_TRUE(sharedCallbackStateDestroyed);
+}
+
 }  // namespace
