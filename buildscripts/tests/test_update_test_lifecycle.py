@@ -1010,14 +1010,14 @@ class TestJiraIssueCreator(unittest.TestCase):
         self.assertEqual(expected, desc)
 
     def test_truncate_description(self):
-        desc = "a" * (JiraIssueCreator._MAX_DESCRIPTION_SIZE - 1)
-        self.assertTrue(desc == JiraIssueCreator._truncate_description(desc))
+        desc = "a" * (update_test_lifecycle.JiraIssueCreator._MAX_DESCRIPTION_SIZE - 1)
+        self.assertTrue(desc == update_test_lifecycle.JiraIssueCreator._truncate_description(desc))
        
         desc += "a"
-        self.assertTrue(desc == JiraIssueCreator._truncate_description(desc))
+        self.assertTrue(desc == update_test_lifecycle.JiraIssueCreator._truncate_description(desc))
 
         desc += "a"
-        self.assertTrue(len(desc) <= len(JiraIssueCreator._truncate_description(desc)))
+        self.assertTrue(len(update_test_lifecycle.JiraIssueCreator._truncate_description(desc)) <= update_test_lifecycle.JiraIssueCreator._MAX_DESCRIPTION_SIZE)
 
 class TestTagsConfigWithChangelog(unittest.TestCase):
     def setUp(self):
