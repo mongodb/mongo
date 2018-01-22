@@ -2,7 +2,6 @@
 // indexes are updated appropriately. See SERVER-23590 and SERVER-22970.
 //
 // Variation of index_multi.js
-// @tags: [SERVER-32710]
 
 (function() {
     "use strict";
