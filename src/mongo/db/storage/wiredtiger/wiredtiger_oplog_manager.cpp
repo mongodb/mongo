@@ -68,13 +68,16 @@ void WiredTigerOplogManager::start(OperationContext* opCtx,
         updateOldestTimestamp = updateOldestTimestamp ||
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeMasterSlave;
     }
+
+    // Need to obtain the mutex before starting the thread, as otherwise it may race ahead
+    // see _shuttingDown as true and quit prematurely.
+    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
     _oplogJournalThread = stdx::thread(&WiredTigerOplogManager::_oplogJournalThreadLoop,
                                        this,
                                        sessionCache,
                                        oplogRecordStore,
                                        updateOldestTimestamp);
 
-    stdx::lock_guard<stdx::mutex> lk(_oplogVisibilityStateMutex);
     _isRunning = true;
     _shuttingDown = false;
 }
