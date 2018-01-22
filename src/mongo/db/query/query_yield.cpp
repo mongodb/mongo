@@ -74,7 +74,7 @@ void QueryYield::yieldAllLocks(OperationContext* opCtx,
     MONGO_FAIL_POINT_BLOCK(setYieldAllLocksWait, customWait) {
         const BSONObj& data = customWait.getData();
         BSONElement customWaitNS = data["namespace"];
-        if (!customWaitNS || planExecNS == customWaitNS.str()) {
+        if (!customWaitNS || planExecNS.ns() == customWaitNS.str()) {
             sleepFor(Milliseconds(data["waitForMillis"].numberInt()));
         }
     }

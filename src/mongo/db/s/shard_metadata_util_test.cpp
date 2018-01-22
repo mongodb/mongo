@@ -201,7 +201,7 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
         assertGet(readShardCollectionsEntry(operationContext(), kNss));
 
     ASSERT_EQUALS(*shardCollectionsEntry.getUUID(), uuid);
-    ASSERT_EQUALS(shardCollectionsEntry.getNss(), kNss.ns());
+    ASSERT_EQUALS(shardCollectionsEntry.getNss().ns(), kNss.ns());
     ASSERT_EQUALS(shardCollectionsEntry.getEpoch(), maxCollVersion.epoch());
     ASSERT_BSONOBJ_EQ(shardCollectionsEntry.getKeyPattern().toBSON(), keyPattern.toBSON());
     ASSERT_BSONOBJ_EQ(shardCollectionsEntry.getDefaultCollation(), defaultCollation);

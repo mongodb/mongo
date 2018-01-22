@@ -335,7 +335,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
         const BSONObj& data = extraData.getData();
         const auto collElem = data["collectionNS"];
         // If the failpoint specifies no collection or matches the existing one, fail.
-        if (!collElem || _ns == collElem.str()) {
+        if (!collElem || _ns.ns() == collElem.str()) {
             const std::string msg = str::stream()
                 << "Failpoint (failCollectionInserts) has been enabled (" << data
                 << "), so rejecting insert (first doc): " << begin->doc;
@@ -394,7 +394,7 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
         const BSONObj& data = extraData.getData();
         const auto collElem = data["collectionNS"];
         // If the failpoint specifies no collection or matches the existing one, fail.
-        if (!collElem || _ns == collElem.str()) {
+        if (!collElem || _ns.ns() == collElem.str()) {
             const std::string msg = str::stream()
                 << "Failpoint (failCollectionInserts) has been enabled (" << data
                 << "), so rejecting insert: " << doc;

@@ -103,7 +103,7 @@ public:
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(ns, tagDoc.getNS());
+        ASSERT_EQ(ns.ns(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(range.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(range.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName, tagDoc.getTag());
@@ -655,7 +655,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMinPrefixOfExistingSho
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(ns, tagDoc.getNS());
+        ASSERT_EQ(ns.ns(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
@@ -709,7 +709,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMaxPrefixOfExistingSho
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(ns, tagDoc.getNS());
+        ASSERT_EQ(ns.ns(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());

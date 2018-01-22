@@ -293,27 +293,6 @@ public:
         return validDBName(db(), DollarInDbNameBehavior::Allow) && !coll().empty();
     }
 
-    bool operator==(const std::string& nsIn) const {
-        return nsIn == _ns;
-    }
-    bool operator==(StringData nsIn) const {
-        return nsIn == _ns;
-    }
-    bool operator==(const NamespaceString& nsIn) const {
-        return nsIn._ns == _ns;
-    }
-
-    bool operator!=(const std::string& nsIn) const {
-        return nsIn != _ns;
-    }
-    bool operator!=(const NamespaceString& nsIn) const {
-        return nsIn._ns != _ns;
-    }
-
-    bool operator<(const NamespaceString& rhs) const {
-        return _ns < rhs._ns;
-    }
-
     /** ( foo.bar ).getSisterNS( "blah" ) == foo.blah
      */
     std::string getSisterNS(StringData local) const;
@@ -399,6 +378,26 @@ public:
      * @return if the input is a valid collection name
      */
     static bool validCollectionName(StringData coll);
+
+    // Relops among `NamespaceString`.
+    friend bool operator==(const NamespaceString& a, const NamespaceString& b) {
+        return a.ns() == b.ns();
+    }
+    friend bool operator!=(const NamespaceString& a, const NamespaceString& b) {
+        return a.ns() != b.ns();
+    }
+    friend bool operator<(const NamespaceString& a, const NamespaceString& b) {
+        return a.ns() < b.ns();
+    }
+    friend bool operator>(const NamespaceString& a, const NamespaceString& b) {
+        return a.ns() > b.ns();
+    }
+    friend bool operator<=(const NamespaceString& a, const NamespaceString& b) {
+        return a.ns() <= b.ns();
+    }
+    friend bool operator>=(const NamespaceString& a, const NamespaceString& b) {
+        return a.ns() >= b.ns();
+    }
 
 private:
     std::string _ns;

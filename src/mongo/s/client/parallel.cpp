@@ -838,7 +838,7 @@ void ParallelSortClusteredCursor::finishInit(OperationContext* opCtx) {
                        << causedBy(redact(ex));
 
                 // This is somewhat strange
-                if (staleNS != ns) {
+                if (staleNS.ns() != ns) {
                     warning() << "versioned ns " << ns << " doesn't match stale config namespace "
                               << staleNS;
                 }

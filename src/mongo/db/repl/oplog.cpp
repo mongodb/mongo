@@ -1073,7 +1073,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     // During upgrade from 3.4 to 3.6, the feature compatibility version cannot change during
     // initial sync because we cannot do some operations with UUIDs and others without.
     if ((mode == OplogApplication::Mode::kInitialSync) &&
-        requestNss == FeatureCompatibilityVersion::kCollection) {
+        requestNss.ns() == FeatureCompatibilityVersion::kCollection) {
         std::string oID;
         auto status = bsonExtractStringField(o, "_id", &oID);
         if (status.isOK() && oID == FeatureCompatibilityVersion::kParameterName) {
@@ -1526,7 +1526,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(whitelistedOps.begin(), whitelistedOps.end(), o.firstElementFieldName()) ==
          whitelistedOps.end()) &&
-        parseNs(nss.ns(), o) == FeatureCompatibilityVersion::kCollection) {
+        parseNs(nss.ns(), o).ns() == FeatureCompatibilityVersion::kCollection) {
         return Status(ErrorCodes::OplogOperationUnsupported,
                       str::stream() << "Applying command to feature compatibility version "
                                        "collection not supported in initial sync: "
