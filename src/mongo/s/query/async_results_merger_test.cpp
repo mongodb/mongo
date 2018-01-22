@@ -181,14 +181,19 @@ protected:
         net->exitNetwork();
     }
 
-    RemoteCommandRequest getFirstPendingRequest() {
+    RemoteCommandRequest getNthPendingRequest(size_t n) {
         executor::NetworkInterfaceMock* net = network();
         net->enterNetwork();
         ASSERT_TRUE(net->hasReadyRequests());
-        NetworkInterfaceMock::NetworkOperationIterator noi = net->getFrontOfUnscheduledQueue();
+        NetworkInterfaceMock::NetworkOperationIterator noi = net->getNthUnscheduledRequest(n);
         RemoteCommandRequest retRequest = noi->getRequest();
         net->exitNetwork();
         return retRequest;
+    }
+
+    bool networkHasReadyRequests() {
+        NetworkInterfaceMock::InNetworkGuard guard(network());
+        return guard->hasReadyRequests();
     }
 
     void scheduleErrorResponse(ResponseStatus rs) {
@@ -222,6 +227,19 @@ protected:
 
     std::unique_ptr<AsyncResultsMerger> arm;
 };
+
+void assertKillCusorsCmdHasCursorId(const BSONObj& killCmd, CursorId cursorId) {
+    ASSERT_TRUE(killCmd.hasElement("killCursors"));
+    ASSERT_EQ(killCmd["cursors"].type(), BSONType::Array);
+
+    size_t numCursors = 0;
+    for (auto&& cursor : killCmd["cursors"].Obj()) {
+        ASSERT_EQ(cursor.type(), BSONType::NumberLong);
+        ASSERT_EQ(cursor.numberLong(), cursorId);
+        ++numCursors;
+    }
+    ASSERT_EQ(numCursors, 1u);
+}
 
 TEST_F(AsyncResultsMergerTest, SingleShardUnsorted) {
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
@@ -956,6 +974,9 @@ TEST_F(AsyncResultsMergerTest, KillAfterTaskExecutorShutdownWithOutstandingBatch
     executor()->shutdown();
     auto killEvent = arm->kill(operationContext());
     ASSERT_FALSE(killEvent.isValid());
+
+    // Ensure that the executor finishes all of the outstanding callbacks before the ARM is freed.
+    executor()->join();
 }
 
 TEST_F(AsyncResultsMergerTest, KillNoBatchesRequested) {
@@ -965,6 +986,7 @@ TEST_F(AsyncResultsMergerTest, KillNoBatchesRequested) {
 
     ASSERT_FALSE(arm->ready());
     auto killedEvent = arm->kill(operationContext());
+    assertKillCusorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
 
     // Killed cursors are considered ready, but return an error when you try to receive the next
     // doc.
@@ -974,7 +996,38 @@ TEST_F(AsyncResultsMergerTest, KillNoBatchesRequested) {
     executor()->waitForEvent(killedEvent);
 }
 
-TEST_F(AsyncResultsMergerTest, KillAllBatchesReceived) {
+TEST_F(AsyncResultsMergerTest, KillAllRemotesExhausted) {
+    std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
+    cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 1, {}));
+    cursors.emplace_back(kTestShardIds[1], kTestShardHosts[1], CursorResponse(_nss, 2, {}));
+    cursors.emplace_back(kTestShardIds[2], kTestShardHosts[2], CursorResponse(_nss, 3, {}));
+    makeCursorFromExistingCursors(std::move(cursors));
+
+    ASSERT_FALSE(arm->ready());
+    auto readyEvent = unittest::assertGet(arm->nextEvent());
+    ASSERT_FALSE(arm->ready());
+
+    std::vector<CursorResponse> responses;
+    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+    responses.emplace_back(_nss, CursorId(0), batch1);
+    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
+    responses.emplace_back(_nss, CursorId(0), batch2);
+    std::vector<BSONObj> batch3 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
+    responses.emplace_back(_nss, CursorId(0), batch3);
+    scheduleNetworkResponses(std::move(responses),
+                             CursorResponse::ResponseType::SubsequentResponse);
+
+    auto killedEvent = arm->kill(operationContext());
+
+    // ARM shouldn't schedule killCursors on anything since all of the remotes are exhausted.
+    ASSERT_FALSE(networkHasReadyRequests());
+
+    ASSERT_TRUE(arm->ready());
+    ASSERT_NOT_OK(arm->nextReady().getStatus());
+    executor()->waitForEvent(killedEvent);
+}
+
+TEST_F(AsyncResultsMergerTest, KillNonExhaustedCursorWithoutPendingRequest) {
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
     cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 1, {}));
     cursors.emplace_back(kTestShardIds[1], kTestShardHosts[1], CursorResponse(_nss, 2, {}));
@@ -990,13 +1043,17 @@ TEST_F(AsyncResultsMergerTest, KillAllBatchesReceived) {
     responses.emplace_back(_nss, CursorId(0), batch1);
     std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
     responses.emplace_back(_nss, CursorId(0), batch2);
+    // Cursor 3 is not exhausted.
     std::vector<BSONObj> batch3 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
     responses.emplace_back(_nss, CursorId(123), batch3);
     scheduleNetworkResponses(std::move(responses),
                              CursorResponse::ResponseType::SubsequentResponse);
 
-    // Kill should be able to return right away if there are no pending batches.
     auto killedEvent = arm->kill(operationContext());
+
+    // ARM should schedule killCursors on cursor 123
+    assertKillCusorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 123);
+
     ASSERT_TRUE(arm->ready());
     ASSERT_NOT_OK(arm->nextReady().getStatus());
     executor()->waitForEvent(killedEvent);
@@ -1022,17 +1079,12 @@ TEST_F(AsyncResultsMergerTest, KillTwoOutstandingBatches) {
     // Kill event will only be signalled once the callbacks for the pending batches have run.
     auto killedEvent = arm->kill(operationContext());
 
-    // Schedule the remaining batches.
-    responses.clear();
-    std::vector<BSONObj> batch2 = {fromjson("{_id: 3}"), fromjson("{_id: 4}")};
-    responses.emplace_back(_nss, CursorId(2), batch2);
-    scheduleNetworkResponses(std::move(responses),
-                             CursorResponse::ResponseType::SubsequentResponse);
-    responses.clear();
-    std::vector<BSONObj> batch3 = {fromjson("{_id: 5}"), fromjson("{_id: 6}")};
-    responses.emplace_back(_nss, CursorId(3), batch3);
-    scheduleNetworkResponses(std::move(responses),
-                             CursorResponse::ResponseType::SubsequentResponse);
+    // Check that the ARM kills both batches.
+    assertKillCusorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 2);
+    assertKillCusorsCmdHasCursorId(getNthPendingRequest(1u).cmdObj, 3);
+
+    // Run the callbacks which were canceled.
+    runReadyCallbacks();
 
     // Ensure that we properly signal those waiting for more results to be ready.
     executor()->waitForEvent(readyEvent);
@@ -1206,7 +1258,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     responses.emplace_back(_nss, CursorId(0), batch2);
     readyEvent = unittest::assertGet(arm->nextEvent());
 
-    BSONObj scheduledCmd = getFirstPendingRequest().cmdObj;
+    BSONObj scheduledCmd = getNthPendingRequest(0).cmdObj;
     auto request = GetMoreRequest::parseFromBSON("anydbname", scheduledCmd);
     ASSERT_OK(request.getStatus());
     ASSERT_EQ(*request.getValue().batchSize, 1LL);
@@ -1233,7 +1285,7 @@ TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
     auto readyEvent = unittest::assertGet(arm->nextEvent());
     ASSERT_FALSE(arm->ready());
 
-    BSONObj cmdRequestMetadata = getFirstPendingRequest().metadata;
+    BSONObj cmdRequestMetadata = getNthPendingRequest(0).metadata;
     ASSERT(uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(cmdRequestMetadata))
                .canRunOnSecondary())
         << "full metadata: " << cmdRequestMetadata;
@@ -1437,7 +1489,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
     // Pending getMore request should already have been scheduled without the maxTimeMS.
     BSONObj expectedCmdObj = BSON("getMore" << CursorId(123) << "collection"
                                             << "testcoll");
-    ASSERT_BSONOBJ_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
+    ASSERT_BSONOBJ_EQ(getNthPendingRequest(0).cmdObj, expectedCmdObj);
 
     ASSERT_FALSE(arm->ready());
 
@@ -1459,7 +1511,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
                                     << "testcoll"
                                     << "maxTimeMS"
                                     << 789);
-    ASSERT_BSONOBJ_EQ(getFirstPendingRequest().cmdObj, expectedCmdObj);
+    ASSERT_BSONOBJ_EQ(getNthPendingRequest(0).cmdObj, expectedCmdObj);
 
     // Clean up.
     responses.clear();
@@ -1803,7 +1855,7 @@ TEST_F(AsyncResultsMergerTest, ShardCanErrorInBetweenReadyAndNextEvent) {
     executor()->waitForEvent(killEvent);
 }
 
-TEST_F(AsyncResultsMergerTest, KillShouldWaitForRemoteCommandsBeforeSchedulingKillCursors) {
+TEST_F(AsyncResultsMergerTest, KillShouldNotWaitForRemoteCommandsBeforeSchedulingKillCursors) {
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
     cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 1, {}));
     makeCursorFromExistingCursors(std::move(cursors));
@@ -1819,23 +1871,17 @@ TEST_F(AsyncResultsMergerTest, KillShouldWaitForRemoteCommandsBeforeSchedulingKi
     ASSERT_FALSE(arm->ready());
     ASSERT_FALSE(arm->remotesExhausted());
 
-    // Kill the ARM while a batch is still outstanding.
+    // Kill the ARM while a batch is still outstanding. The callback for the outstanding batch
+    // should be canceled.
     auto killEvent = arm->kill(operationContext());
 
-    // Since the cursor has not returned any results and still has a pending remote
-    // request, the ARM should not attempt to kill the cursor.
-    ASSERT_FALSE(arm->remotesExhausted());
+    // Check that the ARM will run killCursors.
+    assertKillCusorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
 
-    // Schedule the batch response, this should trigger cleanup of the batch and schedule the
-    // killCursors command.
-    std::vector<CursorResponse> responses;
-    std::vector<BSONObj> batch = {fromjson("{_id: 1}")};
-    responses.emplace_back(_nss, CursorId(1), batch);
-    scheduleNetworkResponses(std::move(responses),
-                             CursorResponse::ResponseType::SubsequentResponse);
+    // Let the callback run now that it's been canceled.
+    runReadyCallbacks();
+
     executor()->waitForEvent(readyEvent);
-
-    // Now the kill cursors command should be scheduled.
     executor()->waitForEvent(killEvent);
 }
 

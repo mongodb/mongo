@@ -185,11 +185,12 @@ public:
     void addNewShardCursors(const std::vector<ClusterClientCursorParams::RemoteCursor>& newCursors);
 
     /**
-     * Starts shutting down this ARM by canceling all pending requests. Returns a handle to an event
-     * that is signaled when this ARM is safe to destroy.
+     * Starts shutting down this ARM by canceling all pending requests and scheduling killCursors
+     * on all of the unexhausted remotes. Returns a handle to an event that is signaled when this
+     * ARM is safe to destroy.
+     *
      * If there are no pending requests, schedules killCursors and signals the event immediately.
-     * Otherwise, the last callback that runs after kill() is called schedules killCursors and
-     * signals the event.
+     * Otherwise, the last callback that runs after kill() is called signals the event.
      *
      * Returns an invalid handle if the underlying task executor is shutting down. In this case,
      * killing is considered complete and the ARM may be destroyed immediately.
@@ -423,9 +424,9 @@ private:
 
     LifecycleState _lifecycleState = kAlive;
 
-    // Signaled when all outstanding batch request callbacks have run, and all killCursors commands
-    // have been scheduled. This means that the ARM is safe to delete.
-    executor::TaskExecutor::EventHandle _killCursorsScheduledEvent;
+    // Signaled when all outstanding batch request callbacks have run after kill() has been
+    // called. This means that the ARM is safe to delete.
+    executor::TaskExecutor::EventHandle _killCompleteEvent;
 };
 
 }  // namespace mongo

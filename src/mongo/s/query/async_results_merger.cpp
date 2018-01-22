@@ -513,16 +513,12 @@ void AsyncResultsMerger::_handleBatchResponse(WithLock lk,
 void AsyncResultsMerger::_cleanUpKilledBatch(WithLock lk) {
     invariant(_lifecycleState == kKillStarted);
 
-    // If we're killed and we're not waiting on any more batches to come back, then we are ready
-    // to kill the cursors on the remote hosts and clean up this cursor. Schedule the killCursors
-    // command and signal that this cursor is now safe to destroy.  We must not touch this object
-    // again after dropping the lock, because 'this' could become invalid immediately.
+    // If this is the last callback to run then we are ready to free the ARM. We signal the
+    // '_killCompleteEvent', which the caller of kill() may be waiting on.
     if (!_haveOutstandingBatchRequests(lk)) {
-        // If the event handle is invalid, then the executor is in the middle of shutting down,
-        // and we can't schedule any more work for it to complete.
-        if (_killCursorsScheduledEvent.isValid()) {
-            _scheduleKillCursors(lk, _opCtx);
-            _executor->signalEvent(_killCursorsScheduledEvent);
+        // If the event is invalid then '_executor' is in shutdown, so we cannot signal events.
+        if (_killCompleteEvent.isValid()) {
+            _executor->signalEvent(_killCompleteEvent);
         }
 
         _lifecycleState = kKillComplete;
@@ -643,12 +639,9 @@ bool AsyncResultsMerger::_haveOutstandingBatchRequests(WithLock) {
 }
 
 void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx) {
-    invariant(_lifecycleState == kKillStarted);
-    invariant(_killCursorsScheduledEvent.isValid());
+    invariant(_killCompleteEvent.isValid());
 
     for (const auto& remote : _remotes) {
-        invariant(!remote.cbHandle.isValid());
-
         if (remote.status.isOK() && remote.cursorId && !remote.exhausted()) {
             BSONObj cmdObj = KillCursorsRequest(_params->nsString, {remote.cursorId}).toBSON();
 
@@ -663,15 +656,17 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx)
 
 executor::TaskExecutor::EventHandle AsyncResultsMerger::kill(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    if (_killCursorsScheduledEvent.isValid()) {
+
+    if (_killCompleteEvent.isValid()) {
         invariant(_lifecycleState != kAlive);
-        return _killCursorsScheduledEvent;
+        return _killCompleteEvent;
     }
 
+    invariant(_lifecycleState == kAlive);
     _lifecycleState = kKillStarted;
 
-    // Make '_killCursorsScheduledEvent', which we will signal as soon as we have scheduled a
-    // killCursors command to run on all the remote shards.
+    // Make '_killCompleteEvent', which we will signal as soon as all of our callbacks
+    // have finished running.
     auto statusWithEvent = _executor->makeEvent();
     if (ErrorCodes::isShutdownError(statusWithEvent.getStatus().code())) {
         // The underlying task executor is shutting down.
@@ -681,18 +676,26 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill(OperationContext* o
         return executor::TaskExecutor::EventHandle();
     }
     fassertStatusOK(28716, statusWithEvent);
-    _killCursorsScheduledEvent = statusWithEvent.getValue();
+    _killCompleteEvent = statusWithEvent.getValue();
 
-    // If we're not waiting for responses from remotes, we can schedule killCursors commands on the
-    // remotes now. Otherwise, we have to wait until all responses are back because a cursor that
-    // is active (pinned) on a remote cannot be killed through killCursors.
+    _scheduleKillCursors(lk, opCtx);
+
     if (!_haveOutstandingBatchRequests(lk)) {
-        _scheduleKillCursors(lk, opCtx);
         _lifecycleState = kKillComplete;
-        _executor->signalEvent(_killCursorsScheduledEvent);
+        // Signal the event right now, as there's nothing to wait for.
+        _executor->signalEvent(_killCompleteEvent);
+        return _killCompleteEvent;
     }
 
-    return _killCursorsScheduledEvent;
+    _lifecycleState = kKillStarted;
+
+    // Cancel all of our callbacks. Once they all complete, the event will be signaled.
+    for (const auto& remote : _remotes) {
+        if (remote.cbHandle.isValid()) {
+            _executor->cancel(remote.cbHandle);
+        }
+    }
+    return _killCompleteEvent;
 }
 
 //

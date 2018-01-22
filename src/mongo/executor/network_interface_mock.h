@@ -175,9 +175,15 @@ public:
 
     /**
      * Gets the first unscheduled request. There must be at least one unscheduled request in the
-     * queue.
+     * queue. Equivalent to getNthUnscheduledRequest(0).
      */
     NetworkOperationIterator getFrontOfUnscheduledQueue();
+
+    /**
+     * Get the nth (starting at 0) unscheduled request. Assumes there are at least n+1 unscheduled
+     * requests in the queue.
+     */
+    NetworkOperationIterator getNthUnscheduledRequest(size_t n);
 
     /**
      * Schedules "response" in response to "noi" at virtual time "when".

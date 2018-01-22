@@ -291,10 +291,20 @@ NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNextRead
 }
 
 NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getFrontOfUnscheduledQueue() {
-    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    return getNthUnscheduledRequest(0);
+}
+
+NetworkInterfaceMock::NetworkOperationIterator NetworkInterfaceMock::getNthUnscheduledRequest(
+    size_t n) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(_currentlyRunning == kNetworkThread);
     invariant(_hasReadyRequests_inlock());
-    return _unscheduled.begin();
+
+    // Linear time, but it's just for testing so no big deal.
+    invariant(_unscheduled.size() > n);
+    auto it = _unscheduled.begin();
+    std::advance(it, n);
+    return it;
 }
 
 void NetworkInterfaceMock::scheduleResponse(NetworkOperationIterator noi,
