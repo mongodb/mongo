@@ -49,11 +49,13 @@ namespace repl {
 
 namespace {
 
+const Milliseconds maximumKeepAliveIntervalMS(30 * 1000);
+
 /**
  * Calculates the keep alive interval based on the given ReplSetConfig.
  */
 Milliseconds calculateKeepAliveInterval(const ReplSetConfig& rsConfig) {
-    return rsConfig.getElectionTimeoutPeriod() / 2;
+    return std::min((rsConfig.getElectionTimeoutPeriod() / 2), maximumKeepAliveIntervalMS);
 }
 
 /**

@@ -63,15 +63,18 @@ ServerStatusMetricField<Counter64> displayOpsRead("repl.network.ops", &opsReadSt
 Counter64 networkByteStats;
 ServerStatusMetricField<Counter64> displayBytesRead("repl.network.bytes", &networkByteStats);
 
+const Milliseconds maximumAwaitDataTimeoutMS(30 * 1000);
+
 /**
  * Calculates await data timeout based on the current replica set configuration.
  */
 Milliseconds calculateAwaitDataTimeout(const ReplSetConfig& config) {
     // Under protocol version 1, make the awaitData timeout (maxTimeMS) dependent on the election
     // timeout. This enables the sync source to communicate liveness of the primary to secondaries.
+    // We never wait longer than 30 seconds.
     // Under protocol version 0, use a default timeout of 2 seconds for awaitData.
     if (config.getProtocolVersion() == 1LL) {
-        return config.getElectionTimeoutPeriod() / 2;
+        return std::min((config.getElectionTimeoutPeriod() / 2), maximumAwaitDataTimeoutMS);
     }
     return OplogFetcher::kDefaultProtocolZeroAwaitDataTimeout;
 }
