@@ -38,6 +38,7 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
@@ -47,6 +48,7 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/balancer_configuration.h"
@@ -59,6 +61,7 @@
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
+#include "mongo/s/committed_optime_metadata_hook.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -116,17 +119,23 @@ void ShardingTestFixture::setUp() {
     _opCtx = _client->makeOperationContext();
 
     // Set up executor pool used for most operations.
+    auto makeMetadataHookList = [&] {
+        auto hookList = stdx::make_unique<rpc::EgressMetadataHookList>();
+        hookList->addHook(stdx::make_unique<rpc::LogicalTimeMetadataHook>(service));
+        hookList->addHook(stdx::make_unique<rpc::CommittedOpTimeMetadataHook>(service));
+        hookList->addHook(stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(service));
+        return hookList;
+    };
+
     auto fixedNet = stdx::make_unique<executor::NetworkInterfaceMock>();
-    fixedNet->setEgressMetadataHook(
-        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(service));
+    fixedNet->setEgressMetadataHook(makeMetadataHookList());
     _mockNetwork = fixedNet.get();
     auto fixedExec = makeShardingTestExecutor(std::move(fixedNet));
     _networkTestEnv = stdx::make_unique<NetworkTestEnv>(fixedExec.get(), _mockNetwork);
     _executor = fixedExec.get();
 
     auto netForPool = stdx::make_unique<executor::NetworkInterfaceMock>();
-    netForPool->setEgressMetadataHook(
-        stdx::make_unique<rpc::ShardingEgressMetadataHookForMongos>(service));
+    netForPool->setEgressMetadataHook(makeMetadataHookList());
     auto _mockNetworkForPool = netForPool.get();
     auto execForPool = makeShardingTestExecutor(std::move(netForPool));
     _networkTestEnvForPool =

@@ -31,56 +31,73 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_factory.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
+#include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
-const ShardId dummyShardId("dummyShard");
-const ConnectionString dummyShardCS("rs/dummy1:1234,dummy2:2345,dummy3:3456",
-                                    ConnectionString::SET);
+const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
 
-class ShardRemoteTest : public unittest::Test {
-public:
-    ShardFactory* getShardFactory() {
-        return _shardFactory.get();
-    }
+const std::vector<ShardId> kTestShardIds = {
+    ShardId("FakeShard1"), ShardId("FakeShard2"), ShardId("FakeShard3")};
+const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 12345),
+                                                  HostAndPort("FakeShard2Host", 12345),
+                                                  HostAndPort("FakeShard3Host", 12345)};
 
-private:
+class ShardRemoteTest : public ShardingTestFixture {
+protected:
     void setUp() {
-        auto targeterFactory = stdx::make_unique<RemoteCommandTargeterFactoryMock>();
-        auto targeterFactoryPtr = targeterFactory.get();
+        ShardingTestFixture::setUp();
 
-        ShardFactory::BuilderCallable setBuilder =
-            [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-                return stdx::make_unique<ShardRemote>(
-                    shardId, connStr, targeterFactoryPtr->create(connStr));
-            };
+        configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
-        ShardFactory::BuilderCallable masterBuilder =
-            [targeterFactoryPtr](const ShardId& shardId, const ConnectionString& connStr) {
-                return stdx::make_unique<ShardRemote>(
-                    shardId, connStr, targeterFactoryPtr->create(connStr));
-            };
+        std::vector<ShardType> shards;
 
-        ShardFactory::BuildersMap buildersMap{
-            {ConnectionString::SET, std::move(setBuilder)},
-            {ConnectionString::MASTER, std::move(masterBuilder)},
-        };
+        for (size_t i = 0; i < kTestShardIds.size(); i++) {
+            ShardType shardType;
+            shardType.setName(kTestShardIds[i].toString());
+            shardType.setHost(kTestShardHosts[i].toString());
+            shards.push_back(shardType);
 
-        _shardFactory =
-            stdx::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
+            std::unique_ptr<RemoteCommandTargeterMock> targeter(
+                stdx::make_unique<RemoteCommandTargeterMock>());
+            targeter->setConnectionStringReturnValue(ConnectionString(kTestShardHosts[i]));
+            targeter->setFindHostReturnValue(kTestShardHosts[i]);
+
+            targeterFactory()->addTargeterToReturn(ConnectionString(kTestShardHosts[i]),
+                                                   std::move(targeter));
+        }
+
+        setupShards(shards);
     }
 
-    std::unique_ptr<ShardFactory> _shardFactory;
+    void runDummyCommandOnShard(ShardId shardId) {
+        auto shard = shardRegistry()->getShardNoReload(shardId);
+        uassertStatusOK(shard->runCommand(operationContext(),
+                                          ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                          "unusedDb",
+                                          BSON("unused"
+                                               << "cmd"),
+                                          Shard::RetryPolicy::kNoRetry));
+    }
 };
 
+BSONObj makeLastCommittedOpTimeMetadata(LogicalTime time) {
+    return BSON("lastCommittedOpTime" << time.asTimestamp());
+}
+
 TEST_F(ShardRemoteTest, GetAndSetLatestLastCommittedOpTime) {
-    auto shard = getShardFactory()->createShard(dummyShardId, dummyShardCS);
+    auto shard = shardRegistry()->getShardNoReload(kTestShardIds[0]);
 
     // Shards can store last committed opTimes.
     LogicalTime time(Timestamp(10, 2));
@@ -96,6 +113,91 @@ TEST_F(ShardRemoteTest, GetAndSetLatestLastCommittedOpTime) {
     LogicalTime earlierTime(Timestamp(5, 1));
     shard->updateLastCommittedOpTime(earlierTime);
     ASSERT_EQ(laterTime, shard->getLastCommittedOpTime());
+}
+
+TEST_F(ShardRemoteTest, NetworkReplyWithLastCommittedOpTime) {
+    // Send a request to one shard.
+    auto targetedShard = kTestShardIds[0];
+    auto future = launchAsync([&] { runDummyCommandOnShard(targetedShard); });
+
+    // Mock a find response with a returned lastCommittedOpTime.
+    LogicalTime expectedTime(Timestamp(100, 2));
+    onFindWithMetadataCommand([&](const executor::RemoteCommandRequest& request) {
+        auto result = std::vector<BSONObj>{BSON("_id" << 1)};
+        auto metadata = makeLastCommittedOpTimeMetadata(expectedTime);
+        return std::make_tuple(result, metadata);
+    });
+
+    future.timed_get(kFutureTimeout);
+
+    // Verify the targeted shard has updated its lastCommittedOpTime.
+    ASSERT_EQ(expectedTime,
+              shardRegistry()->getShardNoReload(targetedShard)->getLastCommittedOpTime());
+
+    // Verify shards that were not targeted were not affected.
+    for (auto shardId : kTestShardIds) {
+        if (shardId != targetedShard) {
+            ASSERT_EQ(LogicalTime::kUninitialized,
+                      shardRegistry()->getShardNoReload(shardId)->getLastCommittedOpTime());
+        }
+    }
+}
+
+TEST_F(ShardRemoteTest, NetworkReplyWithoutLastCommittedOpTime) {
+    // Send a request to one shard.
+    auto targetedShard = kTestShardIds[0];
+    auto future = launchAsync([&] { runDummyCommandOnShard(targetedShard); });
+
+    // Mock a find response without a returned lastCommittedOpTime.
+    onFindWithMetadataCommand([&](const executor::RemoteCommandRequest& request) {
+        auto result = std::vector<BSONObj>{BSON("_id" << 1)};
+        auto metadata = BSONObj();
+        return std::make_tuple(result, metadata);
+    });
+
+    future.timed_get(kFutureTimeout);
+
+    // Verify the targeted shard has not updated its lastCommittedOpTime.
+    ASSERT_EQ(LogicalTime::kUninitialized,
+              shardRegistry()->getShardNoReload(targetedShard)->getLastCommittedOpTime());
+}
+
+TEST_F(ShardRemoteTest, ScatterGatherRepliesWithLastCommittedOpTime) {
+    // Send requests to several shards.
+    auto nss = NamespaceString("test.foo");
+    auto cmdObj = BSON("find" << nss.coll());
+    std::vector<std::pair<ShardId, BSONObj>> remotes{
+        {kTestShardIds[0], cmdObj}, {kTestShardIds[1], cmdObj}, {kTestShardIds[2], cmdObj}};
+
+    auto future = launchAsync([&] {
+        establishCursors(operationContext(),
+                         executor(),
+                         nss,
+                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                         remotes,
+                         false);  // allowPartialResults
+    });
+
+    // All remotes respond with a lastCommittedOpTime.
+    LogicalTime expectedTime(Timestamp(50, 1));
+    for (auto remote : remotes) {
+        onCommandWithMetadata([&](const executor::RemoteCommandRequest& request) {
+            std::vector<BSONObj> batch = {BSON("_id" << 1)};
+            CursorResponse cursorResponse(nss, CursorId(123), batch);
+            auto result = cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+
+            return executor::RemoteCommandResponse(
+                result, makeLastCommittedOpTimeMetadata(expectedTime), Milliseconds(1));
+        });
+    }
+
+    future.timed_get(kFutureTimeout);
+
+    // Verify all shards updated their lastCommittedOpTime.
+    for (auto shardId : kTestShardIds) {
+        ASSERT_EQ(expectedTime,
+                  shardRegistry()->getShardNoReload(shardId)->getLastCommittedOpTime());
+    }
 }
 
 }  // namespace

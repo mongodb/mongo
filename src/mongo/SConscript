@@ -424,6 +424,7 @@ if not hygienic:
                 's/client/sharding_connection_hook',
                 's/commands/cluster_commands',
                 's/commands/shared_cluster_commands',
+                's/committed_optime_metadata_hook',
                 's/coreshard',
                 's/is_mongos',
                 's/sharding_egress_metadata_hook_for_mongos',

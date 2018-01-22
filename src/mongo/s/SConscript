@@ -175,6 +175,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/clock_source_mock',
+        'committed_optime_metadata_hook',
         'sharding_egress_metadata_hook_for_mongos',
         'sharding_task_executor',
         'sharding_test_fixture_common',
@@ -366,6 +367,17 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/rpc/metadata',
         'cluster_last_error_info',
+        'coreshard',
+    ]
+)
+
+env.Library(
+    target='committed_optime_metadata_hook',
+    source=[
+        'committed_optime_metadata_hook.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/rpc/metadata',
         'coreshard',
     ]
 )
