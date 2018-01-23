@@ -214,7 +214,7 @@ class ShardedClusterFixture(interface.Fixture):
         auth_options = configsvr_options.pop("auth_options", self.auth_options)
         mongod_executable = configsvr_options.pop("mongod_executable", self.mongod_executable)
         preserve_dbpath = configsvr_options.pop("preserve_dbpath", self.preserve_dbpath)
-        num_nodes = configsvr_options.pop("num_nodes", 3)
+        num_nodes = configsvr_options.pop("num_nodes", 1)
 
         replset_config_options = configsvr_options.pop("replset_config_options", {})
         replset_config_options["configsvr"] = True

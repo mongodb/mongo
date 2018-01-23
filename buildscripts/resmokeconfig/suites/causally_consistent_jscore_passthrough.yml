@@ -192,6 +192,7 @@ executor:
     shard_options:
       voting_secondaries: true
     configsvr_options:
+      num_nodes: 3
       voting_secondaries: true
     enable_sharding:
     - test
