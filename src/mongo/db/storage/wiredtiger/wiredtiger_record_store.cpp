@@ -1061,15 +1061,20 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
         try {
             WriteUnitOfWork wuow(opCtx);
 
-            WiredTigerCursor startwrap(_uri, _tableId, true, opCtx);
-            WT_CURSOR* start = startwrap.get();
-            setKey(start, _oplogStones->firstRecord);
+            WiredTigerCursor cwrap(_uri, _tableId, true, opCtx);
+            WT_CURSOR* cursor = cwrap.get();
 
-            WiredTigerCursor endwrap(_uri, _tableId, true, opCtx);
-            WT_CURSOR* end = endwrap.get();
-            setKey(end, stone->lastRecord);
+            // The first record in the oplog should be within the truncate range.
+            int ret = WT_READ_CHECK(cursor->next(cursor));
+            invariantWTOK(ret);
+            RecordId firstRecord = getKey(cursor);
+            if (firstRecord < _oplogStones->firstRecord || firstRecord > stone->lastRecord) {
+                warning() << "First oplog record " << firstRecord << " is not in truncation range ("
+                          << _oplogStones->firstRecord << ", " << stone->lastRecord << ")";
+            }
 
-            invariantWTOK(session->truncate(session, nullptr, start, end, nullptr));
+            setKey(cursor, stone->lastRecord);
+            invariantWTOK(session->truncate(session, nullptr, nullptr, cursor, nullptr));
             _changeNumRecords(opCtx, -stone->records);
             _increaseDataSize(opCtx, -stone->bytes);
 
