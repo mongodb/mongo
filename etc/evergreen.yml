@@ -1095,6 +1095,7 @@ functions:
         export KITCHEN_SECURITY_GROUP="${kitchen_security_group}"
         export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
         export KITCHEN_SUBNET="${kitchen_subnet}"
+        export KITCHEN_VPC="${kitchen_vpc}"
 
         ${activate_virtualenv}
         # set expiration tag 2 hours in the future, since no test should take this long
