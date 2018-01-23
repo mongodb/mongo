@@ -100,7 +100,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
         '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl'
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface'
     ],
 )
 
@@ -111,7 +111,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         'rs_local_client',
         'shard_interface'
     ],

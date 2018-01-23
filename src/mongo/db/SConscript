@@ -646,7 +646,9 @@ env.Library(
         'repl/isself',
         'write_ops',
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog/index_create',
+        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
     ],
 )
 
@@ -709,7 +711,6 @@ env.Library(
         "concurrency/write_conflict_exception",
         "curop",
         "repl/read_concern_args",
-        "repl/repl_coordinator_impl",
         "repl/repl_coordinator_interface",
         "stats/timer_stats",
         "storage/storage_options",
@@ -1333,6 +1334,7 @@ env.Library(
         'keys_collection_document',
         'logical_time',
         '$BUILD_DIR/mongo/s/client/rs_local_client',
+        '$BUILD_DIR/mongo/s/client/shard_interface',
     ],
 )
 
@@ -1644,7 +1646,7 @@ env.Library(
         'query_exec',
         'query/command_request_response',
         'repl/oplog_entry',
-        'repl/repl_coordinator_impl',
+        'repl/repl_coordinator_interface',
         'service_context',
         'update/update_driver',
     ],

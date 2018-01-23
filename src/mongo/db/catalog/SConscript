@@ -279,6 +279,7 @@ env.Library(
     ],
     LIBDEPS=[
         'collection',
+        'collection_options',
         'database',
         'index_catalog',
         'index_create',
