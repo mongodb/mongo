@@ -405,6 +405,7 @@ functions:
         export KITCHEN_SECURITY_GROUP="${kitchen_security_group}"
         export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
         export KITCHEN_SUBNET="${kitchen_subnet}"
+        export KITCHEN_VPC="${kitchen_vpc}"
 
         for i in {1..3}
         do

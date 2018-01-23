@@ -2,11 +2,13 @@
 driver:
   name: ec2
   region: us-east-1
+  vpc_mode: true
+  vpc_id: <%= ENV['KITCHEN_VPC'] %>
   subnet_id: <%= ENV['KITCHEN_SUBNET'] %>
   security_group_ids:
     - <%= ENV['KITCHEN_SECURITY_GROUP'] %>
   aws_ssh_key_id: <%= ENV['KITCHEN_SSH_KEY_ID'] %>
-  interface: dns
+  interface: private
   associate_public_ip: true
 
 verifier:
