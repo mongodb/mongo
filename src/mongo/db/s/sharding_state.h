@@ -36,25 +36,20 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/chunk_splitter.h"
-#include "mongo/db/s/collection_range_deleter.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
 class BSONObj;
 class BSONObjBuilder;
-struct ChunkVersion;
-class CollectionMetadata;
-class CollectionShardingState;
 class ConnectionString;
 class OperationContext;
-class ScopedCollectionMetadata;
 class ServiceContext;
 class ShardIdentityType;
 class Status;
@@ -140,8 +135,6 @@ public:
      * ConfigServerMetadata decoration attached to the OperationContext.
      */
     Status updateConfigServerOpTimeFromMetadata(OperationContext* opCtx);
-
-    CollectionShardingState* getNS(const std::string& ns, OperationContext* opCtx);
 
     ChunkSplitter* getChunkSplitter();
 
@@ -277,10 +270,6 @@ public:
     executor::TaskExecutor* getRangeDeleterTaskExecutor();
 
 private:
-    // Map from a namespace into the sharding state for each collection we have
-    typedef stdx::unordered_map<std::string, std::unique_ptr<CollectionShardingState>>
-        CollectionShardingStateMap;
-
     // Progress of the sharding state initialization
     enum class InitializationState : uint32_t {
         // Initial state. The server must be under exclusive lock when this state is entered. No
@@ -337,11 +326,6 @@ private:
 
     // Sets the shard name for this host (comes through setShardVersion)
     std::string _shardName;
-
-    // Cache of collection metadata on this shard. It is not safe to look-up values from this map
-    // without holding some form of collection lock. It is only safe to add/remove values when
-    // holding X lock on the respective namespace.
-    CollectionShardingStateMap _collections;
 
     // The id for the cluster this shard belongs to.
     OID _clusterId;

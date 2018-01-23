@@ -34,7 +34,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/util/concurrency/notification.h"
 
@@ -42,6 +41,7 @@ namespace mongo {
 
 class BalancerConfiguration;
 class BSONObj;
+class BSONObjBuilder;
 struct ChunkVersion;
 class CollectionMetadata;
 class MigrationSourceManager;
@@ -92,6 +92,8 @@ public:
      */
     static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
     static CollectionShardingState* get(OperationContext* opCtx, const std::string& ns);
+
+    static void report(OperationContext* opCtx, BSONObjBuilder* builder);
 
     /**
      * Returns the chunk metadata for the collection. The metadata it represents lives as long as
