@@ -153,6 +153,13 @@ class ReplicaSetFixture(interface.ReplFixture):
             replset_settings = self.replset_config_options["settings"]
             config["settings"] = replset_settings
 
+        # If secondaries vote, all nodes are not electable, and no election timeout was specified,
+        # increase the election timeout to 24 hours to prevent elections.
+        if self.voting_secondaries and not self.all_nodes_electable:
+            config.setdefault("settings", {})
+            if "electionTimeoutMillis" not in config["settings"]:
+                config["settings"]["electionTimeoutMillis"] = 24 * 60 * 60 * 1000
+
         # Start up a single node replica set then reconfigure to the correct size (if the config
         # contains more than 1 node), so the primary is elected more quickly.
         config["members"] = [members[0]]
