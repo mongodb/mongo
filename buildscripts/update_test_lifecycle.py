@@ -568,6 +568,7 @@ class TagsConfigWithChangelog(object):
 class JiraIssueCreator(object):
     _LABEL = "test-lifecycle"
     _PROJECT = "TIGBOT"
+    _MAX_DESCRIPTION_SIZE = 32767
 
     def __init__(self, jira_server, jira_user, jira_password):
         self._client = jiraclient.JiraClient(jira_server, jira_user, jira_password)
@@ -600,6 +601,16 @@ class JiraIssueCreator(object):
         return "{{" + text + "}}"
 
     @staticmethod
+    def _truncate_description(desc):
+        max_size = JiraIssueCreator._MAX_DESCRIPTION_SIZE
+        if len(desc) > max_size:
+            warning = ("\nDescription truncated: "
+                       "exceeded max size of {} characters.").format(max_size)
+            truncated_length = max_size - len(warning)
+            desc = desc[:truncated_length] + warning
+        return desc
+
+    @staticmethod
     def _get_jira_description(project, mongo_revision, model_config, added, removed, cleaned_up):
         mono = JiraIssueCreator._monospace
         config_desc = _config_as_options(model_config)
@@ -610,15 +621,17 @@ class JiraIssueCreator(object):
             mono(project), project)
         revision_link = "[{0}|https://github.com/mongodb/mongo/commit/{1}]".format(
             mono(mongo_revision), mongo_revision)
-        return ("h3. Automatic update of the test lifecycle tags\n"
-                "Evergreen Project: {0}\n"
-                "Revision: {1}\n\n"
-                "{{{{update_test_lifecycle.py}}}} options:\n{2}\n\n"
-                "h5. Tags added\n{3}\n\n"
-                "h5. Tags removed\n{4}\n\n"
-                "h5. Tags cleaned up (no longer relevant)\n{5}\n").format(
-                    project_link, revision_link, mono(config_desc),
-                    added_desc, removed_desc, cleaned_up_desc)
+        full_desc = ("h3. Automatic update of the test lifecycle tags\n"
+                     "Evergreen Project: {0}\n"
+                     "Revision: {1}\n\n"
+                     "{{{{update_test_lifecycle.py}}}} options:\n{2}\n\n"
+                     "h5. Tags added\n{3}\n\n"
+                     "h5. Tags removed\n{4}\n\n"
+                     "h5. Tags cleaned up (no longer relevant)\n{5}\n").format(
+                         project_link, revision_link, mono(config_desc),
+                         added_desc, removed_desc, cleaned_up_desc)
+
+        return JiraIssueCreator._truncate_description(full_desc)
 
     @staticmethod
     def _make_updated_tags_description(data):
