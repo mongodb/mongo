@@ -562,9 +562,12 @@ std::string runQuery(OperationContext* opCtx,
     {
         const QueryRequest& qr = cq->getQueryRequest();
 
-        // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
-        // TODO(SERVER-31293): Don't set slaveOk for reads with a read pref of "primary".
-        const bool slaveOK = qr.isSlaveOk() || qr.hasReadPref();
+        // Allow the query to run on secondaries if the read preference permits it. If no read
+        // preference was specified, allow the query to run iff slaveOk has been set.
+        const bool slaveOK = qr.hasReadPref()
+            ? uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(q.query))
+                  .canRunOnSecondary()
+            : qr.isSlaveOk();
         uassertStatusOK(
             repl::ReplicationCoordinator::get(opCtx)->checkCanServeReadsFor(opCtx, nss, slaveOK));
     }
