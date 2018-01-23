@@ -28,8 +28,7 @@ executor:
         logComponentVerbosity:
           replication: 2
         enableTestCommands: 1
-        numInitialSyncAttempts: 2
-        numInitialSyncConnectAttempts: 60
+        numInitialSyncAttempts: 1
         writePeriodicNoops: 1
     num_nodes: 2
     start_initial_sync_node: True
