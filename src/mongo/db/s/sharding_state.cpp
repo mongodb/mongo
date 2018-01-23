@@ -45,7 +45,6 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -183,21 +182,6 @@ Status ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* opC
     }
 
     return Status::OK();
-}
-
-CollectionShardingState* ShardingState::getNS(const std::string& ns, OperationContext* opCtx) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    CollectionShardingStateMap::iterator it = _collections.find(ns);
-    if (it == _collections.end()) {
-        auto inserted =
-            _collections.insert(make_pair(ns,
-                                          stdx::make_unique<CollectionShardingState>(
-                                              opCtx->getServiceContext(), NamespaceString(ns))));
-        invariant(inserted.second);
-        it = std::move(inserted.first);
-    }
-
-    return it->second.get();
 }
 
 ChunkSplitter* ShardingState::getChunkSplitter() {
@@ -565,20 +549,6 @@ void ShardingState::appendInfo(OperationContext* opCtx, BSONObjBuilder& builder)
                    Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
     builder.append("shardName", _shardName);
     builder.append("clusterId", _clusterId);
-
-    BSONObjBuilder versionB(builder.subobjStart("versions"));
-    for (CollectionShardingStateMap::const_iterator it = _collections.begin();
-         it != _collections.end();
-         ++it) {
-        ScopedCollectionMetadata metadata = it->second->getMetadata();
-        if (metadata) {
-            versionB.appendTimestamp(it->first, metadata->getShardVersion().toLong());
-        } else {
-            versionB.appendTimestamp(it->first, ChunkVersion::UNSHARDED().toLong());
-        }
-    }
-
-    versionB.done();
 }
 
 bool ShardingState::needCollectionMetadata(OperationContext* opCtx, const string& ns) {

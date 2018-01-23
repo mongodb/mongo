@@ -32,6 +32,7 @@
 
 #include "mongo/db/s/collection_sharding_state.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -54,7 +55,6 @@
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
@@ -65,6 +65,61 @@ namespace {
 
 // How long to wait before starting cleanup of an emigrated chunk range
 MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
+
+// This map matches 1:1 with the set of collections in the storage catalog. It is not safe to
+// look-up values from this map without holding some form of collection lock. It is only safe to
+// add/remove values when holding X lock on the respective namespace.
+class CollectionShardingStateMap {
+    MONGO_DISALLOW_COPYING(CollectionShardingStateMap);
+
+public:
+    CollectionShardingStateMap() = default;
+
+    CollectionShardingState& getOrCreate(OperationContext* opCtx, const std::string& ns) {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+        auto it = _collections.find(ns);
+        if (it == _collections.end()) {
+            auto inserted =
+                _collections.emplace(ns,
+                                     std::make_unique<CollectionShardingState>(
+                                         opCtx->getServiceContext(), NamespaceString(ns)));
+            invariant(inserted.second);
+            it = std::move(inserted.first);
+        }
+
+        return *it->second;
+    }
+
+    void report(BSONObjBuilder* builder) {
+        BSONObjBuilder versionB(builder->subobjStart("versions"));
+
+        {
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+            for (auto& coll : _collections) {
+                ScopedCollectionMetadata metadata = coll.second->getMetadata();
+                if (metadata) {
+                    versionB.appendTimestamp(coll.first, metadata->getShardVersion().toLong());
+                } else {
+                    versionB.appendTimestamp(coll.first, ChunkVersion::UNSHARDED().toLong());
+                }
+            }
+        }
+
+        versionB.done();
+    }
+
+private:
+    mutable stdx::mutex _mutex;
+
+    using CollectionsMap =
+        stdx::unordered_map<std::string, std::unique_ptr<CollectionShardingState>>;
+    CollectionsMap _collections;
+};
+
+const auto collectionShardingStateMap =
+    ServiceContext::declareDecoration<CollectionShardingStateMap>();
 
 /**
  * Used to perform shard identity initialization once it is certain that the document is committed.
@@ -145,8 +200,13 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
     // Collection lock must be held to have a reference to the collection's sharding state
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_IS));
 
-    ShardingState* const shardingState = ShardingState::get(opCtx);
-    return shardingState->getNS(ns, opCtx);
+    auto& collectionsMap = collectionShardingStateMap(opCtx->getServiceContext());
+    return &collectionsMap.getOrCreate(opCtx, ns);
+}
+
+void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
+    auto& collectionsMap = collectionShardingStateMap(opCtx->getServiceContext());
+    collectionsMap.report(builder);
 }
 
 ScopedCollectionMetadata CollectionShardingState::getMetadata() {
