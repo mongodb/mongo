@@ -1058,6 +1058,7 @@ functions:
         export KITCHEN_SECURITY_GROUP="${kitchen_security_group}"
         export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
         export KITCHEN_SUBNET="${kitchen_subnet}"
+        export KITCHEN_VPC="${kitchen_vpc}"
 
         # set expiration tag 2 hours in the future, since no test should take this long
         export KITCHEN_EXPIRE="$(${python|/opt/mongodbtoolchain/v2/bin/python2} -c 'import datetime; print((datetime.datetime.utcnow() + datetime.timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S"))')"
