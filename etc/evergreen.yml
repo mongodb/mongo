@@ -3012,7 +3012,7 @@ tasks:
         set -o verbose
 
         ${activate_virtualenv}
-        python2 -m pip install -r src/mongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt
+        python -m pip install -r src/mongo/db/modules/enterprise/jstests/encryptdb/libs/requirements.txt
   - func: "run tests"
     vars:
       resmoke_args: --suites=ese --storageEngine=wiredTiger
