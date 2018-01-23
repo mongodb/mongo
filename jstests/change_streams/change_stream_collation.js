@@ -197,7 +197,7 @@
         assert.writeOK(noCollationCollection.insert({_id: 1, text: "abc"}));
         assert.soon(() => cursor.hasNext());
         assert.docEq(cursor.next(), {docId: 0});
-        assert(cursor.hasNext());
+        assert.soon(() => cursor.hasNext());
         assert.docEq(cursor.next(), {docId: 1});
         assert(!cursor.hasNext());
     }());
