@@ -1347,7 +1347,6 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		    (F_ISSET(r, WT_REC_VISIBLE_ALL) ?
 		    WT_TXNID_LE(r->last_running, txnid) :
 		    !__txn_visible_id(session, txnid))) {
-			WT_ASSERT(session, upd->type != WT_UPDATE_BIRTHMARK);
 			uncommitted = r->update_uncommitted = true;
 			continue;
 		}

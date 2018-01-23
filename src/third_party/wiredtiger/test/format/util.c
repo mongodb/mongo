@@ -621,6 +621,15 @@ timestamp(void *arg)
 		}
 
 		/*
+		 * Don't try to update until we've committed some transactions
+		 * with timestamps.
+		 */
+		if (oldest_timestamp == 0) {
+			__wt_sleep(1, 0);
+			continue;
+		}
+
+		/*
 		 * If less than 100 transactions out of date, wait up to 15
 		 * seconds before updating.
 		 */

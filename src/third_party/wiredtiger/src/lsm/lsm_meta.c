@@ -201,9 +201,12 @@ __lsm_meta_read_v1(
 		    cv.str, cv.len, &lsm_tree->collator_name));
 	}
 
-	WT_ERR(__wt_config_getones(
-	    session, lsmconf, "lsm.merge_custom.start_generation", &cv));
-	lsm_tree->custom_generation = (uint32_t)cv.val;
+	/* lsm.merge_custom does not appear in all V1 LSM metadata. */
+	lsm_tree->custom_generation = 0;
+	if ((ret = __wt_config_getones(
+	    session, lsmconf, "lsm.merge_custom.start_generation", &cv)) == 0)
+		lsm_tree->custom_generation = (uint32_t)cv.val;
+	WT_ERR_NOTFOUND_OK(ret);
 	if (lsm_tree->custom_generation != 0) {
 		WT_ERR(__wt_config_getones(
 		    session, lsmconf, "lsm.merge_custom.prefix", &cv));

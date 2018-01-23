@@ -1,9 +1,36 @@
 #!/usr/bin/env python
+#
+# Public Domain 2014-2018 MongoDB, Inc.
+# Public Domain 2008-2014 WiredTiger, Inc.
+#
+# This is free and unencumbered software released into the public domain.
+#
+# Anyone is free to copy, modify, publish, use, compile, sell, or
+# distribute this software, either in source code form or as a compiled
+# binary, for any purpose, commercial or non-commercial, and by any
+# means.
+#
+# In jurisdictions that recognize copyright laws, the author or authors
+# of this software dedicate any and all copyright interest in the
+# software to the public domain. We make this dedication for the benefit
+# of the public at large and to the detriment of our heirs and
+# successors. We intend this dedication to be an overt act of
+# relinquishment in perpetuity of all present and future rights to this
+# software under copyright law.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+#!/usr/bin/env python
 
 import argparse
 from bokeh.layouts import column
 from bokeh.models import ColumnDataSource, CustomJS, HoverTool, FixedTicker
-from bokeh.models import Legend, LegendItem
+from bokeh.models import  LabelSet, Legend, LegendItem
 from bokeh.models import NumeralTickFormatter, OpenURL, Range1d, TapTool
 from bokeh.models.annotations import Label
 from bokeh.plotting import figure, output_file, reset_output, save, show
@@ -14,10 +41,6 @@ import os
 import pandas as pd
 import sys
 import traceback
-
-# Names of the image files we use
-arrowLeftImg = "arrow-left.png";
-arrowRightImg = "arrow-right.png";
 
 # A directory where we store cross-file plots for each bucket of the outlier
 # histogram.
@@ -30,16 +53,16 @@ colorList = [];
 # Codes for various colors for printing of informational and error messages.
 #
 class color:
-   PURPLE = '\033[95m'
-   CYAN = '\033[96m'
-   DARKCYAN = '\033[36m'
-   BLUE = '\033[94m'
-   GREEN = '\033[92m'
-   YELLOW = '\033[93m'
-   RED = '\033[91m'
-   BOLD = '\033[1m'
-   UNDERLINE = '\033[4m'
-   END = '\033[0m'
+    PURPLE = '\033[95m'
+    CYAN = '\033[96m'
+    DARKCYAN = '\033[36m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END = '\033[0m'
 
 # A function name mapped to its corresponding color.
 #
@@ -80,7 +103,6 @@ pixelsPerWidthUnit = 5;
 #
 STDEV_MULT = 2;
 
-
 def initColorList():
 
     global colorList;
@@ -108,7 +130,6 @@ def getColorForFunction(function):
         lastColorUsed += 1;
 
     return funcToColor[function];
-
 
 #
 # An intervalEnd is a tuple of three items.
@@ -151,9 +172,6 @@ def getIntervalData(intervalBeginningsStack, intervalEnd, logfile):
         else:
             matchFound = True;
 
-    # This value determines how deep we are in the callstack
-    # stackDepth = len(intervalBeginningsStack);
-
     return intervalBegin[0], intervalEnd[0], intervalEnd[2], errorOccurred;
 
 def plotOutlierHistogram(dataframe, maxOutliers, func, durationThreshold,
@@ -179,7 +197,8 @@ def plotOutlierHistogram(dataframe, maxOutliers, func, durationThreshold,
                                        * pixelsPerHeightUnit + \
                                        pixelsForTitle)),
                x_axis_label = "Execution timeline (CPU cycles)",
-               y_axis_label = "Number of outliers", tools = TOOLS);
+               y_axis_label = "Number of outliers",
+               tools = TOOLS, toolbar_location="above");
 
     y_ticker_max = p.plot_height / pixelsPerHeightUnit;
     y_ticker_step = max(1, (maxOutliers + 1)/y_ticker_max);
@@ -316,12 +335,6 @@ def createCallstackSeries(data, logfilename):
             beginIntervals.append(intervalBegin);
             endIntervals.append(intervalEnd);
             functionNames.append(function);
-            #stackDepths.append(stackDepth);
-            #stackDepthsNext.append(stackDepth + 1);
-
-            #print("Begin: " + str(intervalBegin)),
-            #print(" Func: " + function),
-            #print(" Stack depth: " + str(stackDepth));
 
         else:
             print("Invalid event in this line:");
@@ -352,27 +365,110 @@ def createCallstackSeries(data, logfilename):
 
     return dataframe;
 
-def addLegend(p, legendItems, numLegends):
-
-    legend = Legend(items=legendItems, orientation = "horizontal");
-    p.add_layout(legend, place='above');
-    legendItems[:] = [];  # Empty the list.
-
-    return (numLegends + 1);
-
 # For each function we only show the legend once. In this dictionary we
 # keep track of colors already used.
 #
 colorAlreadyUsedInLegend = {};
 
+def createLegendFigure(legendDict):
+
+    global pixelsForTitle;
+    global plotWidth;
+
+    FUNCS_PER_ROW = 5;
+    HSPACE_BETWEEN_FUNCS = 10;
+    VSPACE_BETWEEN_FUNCS = 1;
+
+    funcs = [];
+    colors = [];
+    x_coords = [];
+    y_coords = [];
+    pixelsForLegendItem = 20;
+
+    # Get a sorted list of functions and their
+    # corresponding colors.
+    #
+    for func in sorted(legendDict.keys()):
+        funcs.append(func);
+        colors.append(legendDict[func]);
+
+    # Figure out the coordinates of functions on the plot
+    #
+    for i in range(len(funcs)):
+
+        x_coord = i % (FUNCS_PER_ROW) + 1;
+        x_coord += i % (FUNCS_PER_ROW) *  HSPACE_BETWEEN_FUNCS;
+        x_coords.append(x_coord);
+
+        y_coord = (i/FUNCS_PER_ROW) + 1;
+        y_coord += (i/FUNCS_PER_ROW) *  VSPACE_BETWEEN_FUNCS;
+        y_coords.append(y_coord);
+
+    data = {};
+    data['func'] = funcs;
+    data['color'] = colors;
+    data['left'] = x_coords;
+    data['bottom'] = y_coords;
+
+    df = pd.DataFrame(data=data);
+
+    max_ycoord = df['bottom'].max();
+    df['bottom'] = (max_ycoord + 1) - df['bottom'];
+
+    df['right'] = df['left'] + 1;
+    df['top'] = df['bottom'] + 1;
+
+    cds = ColumnDataSource(df);
+
+    p = figure(title="TRACKED FUNCTIONS",
+               plot_width=plotWidth,
+               plot_height = max((max_ycoord + 2) * pixelsForLegendItem, 90),
+               tools = [], toolbar_location="above",
+               x_range = (0, (FUNCS_PER_ROW + 1)* HSPACE_BETWEEN_FUNCS),
+               y_range = (0, max_ycoord + 2),
+               x_axis_label = "",
+               y_axis_label = "");
+
+    p.title.align = "center";
+    p.title.text_font_style = "normal";
+
+    p.xaxis.axis_line_color = "lightgrey";
+    p.xaxis.major_tick_line_color = None;
+    p.xaxis.minor_tick_line_color = None;
+    p.xaxis.major_label_text_font_size = '0pt';
+
+    p.yaxis.axis_line_color = "lightgrey";
+    p.yaxis.major_tick_line_color = None;
+    p.yaxis.minor_tick_line_color = None;
+    p.yaxis.major_label_text_font_size = '0pt';
+
+    p.xgrid.grid_line_color = None;
+    p.ygrid.grid_line_color = None;
+
+    p.outline_line_width = 1
+    p.outline_line_alpha = 1
+    p.outline_line_color = "lightgrey"
+
+    p.quad(left = 'left', right = 'right', bottom = 'bottom',
+           top = 'top', color = 'color', line_color = "lightgrey",
+           line_width = 0.5, source=cds);
+
+    labels = LabelSet(x='right', y='bottom', text='func', level='glyph',
+                      text_font_size = "10pt",
+                      x_offset=3, y_offset=0, source=cds, render_mode='canvas');
+    p.add_layout(labels);
+
+    return p;
+
 def generateBucketChartForFile(figureName, dataframe, y_max, x_min, x_max):
 
     global colorAlreadyUsedInLegend;
     global funcToColor;
+    global plotWidth;
 
-    MAX_ITEMS_PER_LEGEND = 5;
+    MAX_ITEMS_PER_LEGEND = 10;
     numLegends = 0;
-    legendItems = [];
+    legendItems = {};
     pixelsPerStackLevel = 30;
     pixelsPerLegend = 60;
     pixelsForTitle = 30;
@@ -387,13 +483,12 @@ def generateBucketChartForFile(figureName, dataframe, y_max, x_min, x_max):
 
     TOOLS = [hover];
 
-    p = figure(title=figureName, plot_width=1200,
+    p = figure(title=figureName, plot_width=plotWidth,
                x_range = (x_min, x_max),
                y_range = (0, y_max+1),
                x_axis_label = "Time (CPU cycles)",
                y_axis_label = "Stack depth",
-               tools = TOOLS
-    );
+               tools = TOOLS, toolbar_location="above");
 
     # No minor ticks or labels on the y-axis
     p.yaxis.major_tick_line_color = None;
@@ -402,7 +497,8 @@ def generateBucketChartForFile(figureName, dataframe, y_max, x_min, x_max):
     p.yaxis.ticker = FixedTicker(ticks = range(0, y_max+1));
     p.ygrid.ticker = FixedTicker(ticks = range(0, y_max+1));
 
-    p.xaxis.formatter = NumeralTickFormatter(format="0,")
+    p.xaxis.formatter = NumeralTickFormatter(format="0,");
+    p.title.text_font_style = "bold";
 
     p.quad(left = 'start', right = 'end', bottom = 'stackdepth',
            top = 'stackdepthNext', color = 'color', line_color = "lightgrey",
@@ -427,28 +523,13 @@ def generateBucketChartForFile(figureName, dataframe, y_max, x_min, x_max):
         else:
             colorAlreadyUsedInLegend[fColor] = True;
 
-        r = p.quad(left=0, right=1, bottom=0, top=1, color=fColor);
-
-        lItem = LegendItem(label = func,
-                           renderers = [r]);
-        legendItems.append(lItem);
-
-        # Cap the number of items in a legend, so it can
-        # fit horizontally.
-        if (len(legendItems) == MAX_ITEMS_PER_LEGEND):
-            numLegends = addLegend(p, legendItems, numLegends);
-
-    # Add whatever legend items did not get added
-    if (len(legendItems) > 0):
-        numLegends = addLegend(p, legendItems, numLegends);
+        legendItems[func] = fColor;
 
     # Plot height is the function of the maximum call stack and the number of
     # legends
-    p.plot_height =  (numLegends * pixelsPerLegend) \
-                     + max((y_max+1) * pixelsPerStackLevel, 100) \
-                     + pixelsForTitle;
+    p.plot_height =  max((y_max+1) * pixelsPerStackLevel, 100) + pixelsForTitle;
 
-    return p;
+    return p, legendItems;
 
 def generateEmptyDataset():
 
@@ -463,26 +544,6 @@ def generateEmptyDataset():
 
     return pd.DataFrame(data=dict);
 
-# When we have no data for a trace interva we generate an empty file
-# for that interval.
-#
-def createNoDataFile(filename):
-
-    try:
-        f = open(filename, "w");
-    except:
-        print(color.RED + color.BOLD),
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        traceback.print_exception(exc_type, exc_value, exc_traceback);
-        print("Could not open file " + filename + " for writing.");
-        print(color.END);
-        return;
-
-    f.write("<body>\n");
-    f.write("<p style=\"text-align:center;\">");
-    f.write("No data was generated for this trace interval.</p>\n");
-    f.write("</body>\n");
-    f.close()
 #
 # Here we generate plots that span all the input files. Each plot shows
 # the timelines for all files, stacked vertically. The timeline shows
@@ -493,25 +554,32 @@ def createNoDataFile(filename):
 # across the timelines for all files. We call it a bucket, because it
 # corresponds to a bucket in the outlier histogram.
 #
-def generateCrossFilePlotsForBucket(i, lowerBound, upperBound):
+def generateCrossFilePlotsForBucket(i, lowerBound, upperBound, navigatorDF):
 
     global bucketDir;
     global colorAlreadyUsedInLegend;
 
+    aggregateLegendDict = {};
     figuresForAllFiles = [];
     fileName = bucketDir + "/bucket-" + str(i) + ".html";
 
     reset_output();
+
+    intervalTitle = "Interval #" + str(i) + ". {:,}".format(lowerBound) + \
+                    " to " + "{:,}".format(upperBound) + \
+                    " CPU cycles.";
+
+    # Generate a navigator chart, which shows where we are in the
+    # trace and allows moving around the trace.
+    #
+    navigatorFigure = generateNavigatorFigure(navigatorDF, i, intervalTitle);
+    figuresForAllFiles.append(navigatorFigure);
 
     # The following dictionary keeps track of legends. We need
     # a legend for each new HTML file. So we reset the dictionary
     # before generating a new file.
     #
     colorAlreadyUsedInLegend = {};
-
-    intervalTitle = "Interval " + "{:,}".format(lowerBound) + \
-                    " to " + "{:,}".format(upperBound) + \
-                    " CPU cycles";
 
     # Select from the dataframe for this file the records whose 'start'
     # and 'end' timestamps fall within the lower and upper bound.
@@ -560,22 +628,120 @@ def generateCrossFilePlotsForBucket(i, lowerBound, upperBound):
         bucketDF.loc[mask, 'start'] = lowerBound;
 
         largestStackDepth = bucketDF['stackdepthNext'].max();
-        figureTitle = fname + ": " + intervalTitle;
+        figureTitle = fname;
 
-        figure = generateBucketChartForFile(figureTitle, bucketDF,
-                                            largestStackDepth,
-                                            lowerBound, upperBound);
-
+        figure, legendDict = generateBucketChartForFile(figureTitle, bucketDF,
+                                                        largestStackDepth,
+                                                        lowerBound, upperBound);
+        aggregateLegendDict.update(legendDict);
         figuresForAllFiles.append(figure);
 
-    if (len(figuresForAllFiles) > 0):
-        savedFileName = save(column(figuresForAllFiles),
-                             filename = fileName, title=intervalTitle,
-                             resources=CDN);
-    else:
-        createNoDataFile(fileName);
+    # Create the legend for this file and insert it after the navigator figure
+    if (len(aggregateLegendDict) > 0):
+        legendFigure = createLegendFigure(aggregateLegendDict);
+        figuresForAllFiles.insert(1, legendFigure);
+
+    save(column(figuresForAllFiles), filename = fileName,
+         title=intervalTitle, resources=CDN);
 
     return fileName;
+
+# Generate a plot that shows a view of the entire timeline in a form of
+# intervals. By clicking on an interval we can navigate to that interval.
+#
+def generateNavigatorFigure(dataframe, i, title):
+
+    global pixelsForTitle;
+    global pixelsPerHeightUnit;
+    global plotWidth;
+
+    # Generate the colors, such that the current interval is shown in a
+    # different color than the rest.
+    #
+    numIntervals = dataframe['intervalnumber'].size;
+    color = ["white" for x in range(numIntervals)];
+    color[i] = "salmon";
+    dataframe['color'] = color;
+
+    cds = ColumnDataSource(dataframe);
+
+    title = title + " CLICK TO NAVIGATE";
+
+    hover = HoverTool(tooltips = [
+        ("interval #", "@intervalnumber"),
+        ("interval start", "@intervalbegin{0,0}"),
+        ("interval end", "@intervalend{0,0}")]);
+
+    TOOLS = [hover, "tap"];
+
+    p = figure(title = title, plot_width = plotWidth,
+               x_range = (0, numIntervals),
+               plot_height =  2 * pixelsPerHeightUnit + pixelsForTitle,
+               x_axis_label = "",
+               y_axis_label = "", tools = TOOLS,
+               toolbar_location="above");
+
+    # No minor ticks or labels on the y-axis
+    p.yaxis.major_tick_line_color = None;
+    p.yaxis.minor_tick_line_color = None;
+    p.yaxis.major_label_text_font_size = '0pt';
+    p.yaxis.ticker = FixedTicker(ticks = range(0, 1));
+    p.ygrid.ticker = FixedTicker(ticks = range(0, 1));
+
+    p.xaxis.formatter = NumeralTickFormatter(format="0,");
+
+    p.title.align = "center";
+    p.title.text_font_style = "normal";
+
+    p.quad(left = 'intervalnumber', right = 'intervalnumbernext',
+           bottom = 0, top = 2, color = 'color', source = cds,
+           nonselection_fill_color='color',
+           nonselection_fill_alpha = 1.0,
+           line_color = "aliceblue",
+           selection_fill_color = "white",
+           selection_line_color="lightgrey"
+    );
+
+    url = "@bucketfiles";
+    taptool = p.select(type=TapTool);
+    taptool.callback = OpenURL(url=url);
+
+    return p;
+
+
+# Create a dataframe describing all time intervals, which will later be used
+# to generate a plot allowing us to navigate along the execution by clicking
+# on different intervals.
+#
+def createIntervalNavigatorDF(numBuckets, timeUnitsPerBucket):
+
+    global bucketDir;
+
+    bucketFiles = [];
+    bucketID = [];
+    intervalBegin = [];
+    intervalEnd = [];
+
+    for i in range(numBuckets):
+
+        lBound = i * timeUnitsPerBucket;
+        uBound = (i+1) * timeUnitsPerBucket;
+        fileName = "bucket-" + str(i) + ".html";
+
+        bucketID.append(i);
+        intervalBegin.append(lBound);
+        intervalEnd.append(uBound);
+        bucketFiles.append(fileName);
+
+    data = {};
+    data['bucketfiles'] = bucketFiles;
+    data['intervalbegin'] =  intervalBegin;
+    data['intervalend'] =  intervalEnd;
+    data['intervalnumber'] = bucketID;
+
+    dataframe = pd.DataFrame(data=data);
+    dataframe['intervalnumbernext'] = dataframe['intervalnumber'] + 1;
+    return dataframe;
 
 # Generate plots of time series slices across all files for each bucket
 # in the outlier histogram. Save each cross-file slice to an HTML file.
@@ -592,12 +758,14 @@ def generateTSSlicesForBuckets():
     numBuckets = plotWidth / pixelsPerWidthUnit;
     timeUnitsPerBucket = (lastTimeStamp - firstTimeStamp) / numBuckets;
 
+    navigatorDF = createIntervalNavigatorDF(numBuckets, timeUnitsPerBucket);
+
     for i in range(numBuckets):
         lowerBound = i * timeUnitsPerBucket;
         upperBound = (i+1) * timeUnitsPerBucket;
 
-        fileName = generateCrossFilePlotsForBucket(i, lowerBound,
-                                                       upperBound);
+        fileName = generateCrossFilePlotsForBucket(i, lowerBound, upperBound,
+                                                   navigatorDF);
 
         percentComplete = float(i) / float(numBuckets) * 100;
         print(color.BLUE + color.BOLD + " Generating timeline charts... "),
@@ -608,111 +776,6 @@ def generateTSSlicesForBuckets():
     print(color.END);
 
     return bucketFilenames;
-
-# Here we are making a line that will be inserted into an HTML file for
-# a given bucket (execution slice). This line will have links to the
-# previous slice and to the next slice, so we can navigate between slices
-# by clicking those links.
-#
-def makeLineWithLinks(previous, next):
-
-    global arrowLeftImg;
-    global arrowRightImg;
-
-    previousLink = "";
-    nextLink = "";
-
-    # Strip the directory component out of the file name.
-    #
-    if previous is not None:
-        words = previous.split("/");
-        previousStripped = words[len(words)-1];
-        previousLink =  "<a href=\"" + previousStripped + "\">" + \
-                        "<img src=\"" + arrowLeftImg + \
-                        "\" height=\"30\" style=\"float:left\"></a><p>&nbsp;";
-
-
-    if next is not None:
-        words = next.split("/");
-        nextStripped = words[len(words)-1];
-        nextLink = "<a href=\"" + nextStripped + "\">" + \
-                   "<img src=\"" + arrowRightImg + \
-                   "\" height=\"30\" style=\"float:right\"></a><p>&nbsp;";
-
-    line = previousLink + " " + nextLink + "\n";
-    return line;
-
-
-# Into the current file insert links to the previous one and to the next one.
-# The rewritten file is saved under a new file name.
-#
-def linkFiles(current, previous, next):
-
-    curFile = None;
-    newFile = None;
-    newFileName = current + ".new";
-
-    try:
-        curFile = open(current, "r");
-    except:
-        print(color.RED + color.BOLD),
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        traceback.print_exception(exc_type, exc_value, exc_traceback);
-        print("Could not open file " + current + " for reading.");
-        print(color.END);
-        return None;
-
-    try:
-        newFile = open(newFileName, "w");
-    except:
-        print(color.RED + color.BOLD),
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        traceback.print_exception(exc_type, exc_value, exc_traceback);
-        print("Could not open file " + newFileName + " for writing.");
-        print(color.END);
-        return None;
-
-    curFileLines = curFile.readlines();
-
-    for i in range(len(curFileLines)):
-        line = curFileLines[i];
-
-        insertedLine = makeLineWithLinks(previous, next);
-
-        if "<body>" in line:
-            curFileLines.insert(i+1, insertedLine);
-        elif "</body>" in line:
-            curFileLines.insert(i, insertedLine);
-
-    for line in curFileLines:
-        newFile.write(line);
-
-    curFile.close();
-    newFile.close();
-
-    os.rename(newFileName, current);
-
-# We have a list of bucket files. Each one is an HTML file showing a slice of
-# the execution. To be able to easily navigate between consecutive execution
-# slices we insert links into each slice-file that take us to the previous
-# slice and to the next slice.
-#
-def interlinkFiles(fnameList):
-
-    for i in range(len(fnameList)):
-        current = fnameList[i];
-
-        if i > 0:
-            previous = fnameList[i-1];
-        else:
-            previous = None;
-
-        if (i < len(fnameList)-1):
-            next = fnameList[i+1];
-        else:
-            next = None;
-
-        linkFiles(current, previous, next);
 
 def processFile(fname):
 
@@ -1011,13 +1074,6 @@ def main():
     if not os.path.exists(bucketDir):
         os.makedirs(bucketDir);
 
-    # Copy the image files that we will need later into bucketDir
-    scriptLocation = os.path.dirname(os.path.realpath(__file__));
-    os.system("cp " + scriptLocation + "/" + arrowLeftImg + " " + bucketDir +
-              "/" + arrowLeftImg);
-    os.system("cp " + scriptLocation + "/" + arrowRightImg + " " + bucketDir +
-              "/" + arrowRightImg);
-
     # Parallelize this later, so we are working on files in parallel.
     for fname in args.files:
         processFile(fname);
@@ -1029,12 +1085,6 @@ def main():
     # in the outlier histogram. Save each cross-file slice to an HTML file.
     #
     fileNameList = generateTSSlicesForBuckets();
-
-    # Rewrite the files, so that they have links to one another. This way
-    # you can navigate from one slice to the next by clicking the link inside
-    # the file.
-    #
-    interlinkFiles(fileNameList);
 
     totalFuncs = len(perFuncDF.keys());
     i = 0;
@@ -1058,6 +1108,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-

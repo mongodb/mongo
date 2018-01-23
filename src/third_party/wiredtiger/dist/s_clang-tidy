@@ -32,18 +32,14 @@ sh autogen.sh > /dev/null || exit 1
 
 # We need a custom wiredtiger_config.h, clang-tidy doesn't know where to
 # find the x86intrin.h include file.
-echo '!!!!'
-echo 'Modifying wiredtiger_config.h'
-echo '!!!!'
 cp wiredtiger_config.h $t
 sed '/HAVE_X86INTRIN_H/d' < $t > wiredtiger_config.h
 
-# XXX
-# clang-tidy doesn't like verify_build at the moment.
-echo '!!!!'
-echo 'Modifying src/include/verify_build.h'
-echo '!!!!'
-echo '#define WT_STATIC_ASSERT(a)' > src/include/verify_build.h
+# We need a custom verify_build.h, clang-tidy doesn't like the magic.
+f=src/include/verify_build.h
+rm -f $f.save
+cp $f $f.save
+echo '#define WT_STATIC_ASSERT(a)' > $f
 
 def="-D_GNU_SOURCE"
 inc="-I. -Isrc/include"
@@ -80,5 +76,10 @@ echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 sed -e '/ warnings generated/d' \
     -e '/Suppressed.*warnings/d' \
     -e '/Use -header-filter/d' < $t
+
+# Restore verify_build.h.
+f=src/include/verify_build.h
+rm -f $f
+mv $f.save $f
 
 exit 0
