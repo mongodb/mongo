@@ -2135,10 +2135,10 @@ timeout:
 ##   - Non standard jstests, i.e., jstestfuzz
 ## Note that the task name supports glob patterns.
 test_lifecycle_excluded_tasks:
+- aggregation_fuzzer*
 - burn_in_tests
 - compile*
 - dbtest*
-- aggregation_fuzzer*
 - idl_tests
 - integration*
 - jepsen*
@@ -2149,6 +2149,7 @@ test_lifecycle_excluded_tasks:
 - push
 - rollback_fuzzer*
 - unittests*
+- update_fuzzer*
 
 tasks:
 
@@ -2526,35 +2527,99 @@ tasks:
       jepsen_test_name: read-concern-majority
       jepsen_write_concern: --write-concern w1
 
-## jstestfuzz standalone generational fuzzer mmapv1 ##
+## jstestfuzz standalone aggregation generational fuzzer mmapv1 ##
 - <<: *jstestfuzz_template
   name: aggregation_fuzzer
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --generationalFuzzer --numGeneratedFiles 50
+      jstestfuzz_vars: --numGeneratedFiles 50
       npm_command: aggregation-fuzzer
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
-      resmoke_args: --suites=aggregation_fuzzer --storageEngine=mmapv1
+      resmoke_args: --suites=generational_fuzzer --storageEngine=mmapv1
 
-## jstestfuzz standalone generational fuzzer WT ##
+## jstestfuzz standalone aggregation generational fuzzer WT ##
 - <<: *jstestfuzz_template
   name: aggregation_fuzzer_WT
   commands:
   - func: "do setup"
   - func: "run jstestfuzz"
     vars:
-      jstestfuzz_vars: --generationalFuzzer --numGeneratedFiles 50
+      jstestfuzz_vars: --numGeneratedFiles 50
       npm_command: aggregation-fuzzer
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
-      resmoke_args: --suites=aggregation_fuzzer --storageEngine=wiredTiger
+      resmoke_args: --suites=generational_fuzzer --storageEngine=wiredTiger
 
-## rollback fuzzer ##
+## jstestfuzz standalone update generational fuzzer mmapv1 ##
+- <<: *jstestfuzz_template
+  name: update_fuzzer
+  commands:
+  - func: "do setup"
+  - func: "set up virtualenv"
+  - func: "do multiversion setup"
+  - func: "run jstestfuzz"
+    vars:
+      npm_command: update-fuzzer
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=generational_fuzzer --storageEngine=mmapv1
+
+## jstestfuzz replication update generational fuzzer mmapv1 ##
+- <<: *jstestfuzz_template
+  name: update_fuzzer_replication
+  commands:
+  - func: "do setup"
+  - func: "set up virtualenv"
+  - func: "do multiversion setup"
+  - func: "run jstestfuzz"
+    vars:
+      npm_command: update-fuzzer
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=generational_fuzzer_replication --storageEngine=mmapv1
+
+## jstestfuzz standalone update generational fuzzer WT ##
+- <<: *jstestfuzz_template
+  name: update_fuzzer_WT
+  commands:
+  - func: "do setup"
+  - func: "set up virtualenv"
+  - func: "do multiversion setup"
+  - func: "run jstestfuzz"
+    vars:
+      npm_command: update-fuzzer
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=generational_fuzzer --storageEngine=wiredTiger
+
+## jstestfuzz replication update generational fuzzer WT ##
+- <<: *jstestfuzz_template
+  name: update_fuzzer_replication_WT
+  commands:
+  - func: "do setup"
+  - func: "set up virtualenv"
+  - func: "do multiversion setup"
+  - func: "run jstestfuzz"
+    vars:
+      npm_command: update-fuzzer
+  - <<: *run_jstestfuzz_tests
+    vars:
+      <<: *jstestfuzz_config_vars
+      task_path_suffix: /data/multiversion
+      resmoke_args: --suites=generational_fuzzer_replication --storageEngine=wiredTiger
+
+## rollback generational fuzzer mmapv1 ##
 - <<: *jstestfuzz_template
   name: rollback_fuzzer
   commands:
@@ -2568,7 +2633,7 @@ tasks:
       <<: *jstestfuzz_config_vars
       resmoke_args: --suites=rollback_fuzzer --storageEngine=mmapv1
 
-## rollback fuzzer WT ##
+## rollback generational fuzzer WT ##
 - <<: *jstestfuzz_template
   name: rollback_fuzzer_WT
   commands:
@@ -6684,6 +6749,8 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: update_fuzzer_WT
+  - name: update_fuzzer_replication_WT
   - name: push
     distros:
     - rhel70-small
@@ -6737,6 +6804,7 @@ buildvariants:
     gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    multiversion_platform_arch: "osx-ssl"
     num_jobs_available: 1
     build_mongoreplay: true
   tasks:
@@ -6811,6 +6879,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: update_fuzzer_WT
   - name: push
     distros:
     - rhel70-small
@@ -7137,6 +7206,8 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: update_fuzzer_WT
+  - name: update_fuzzer_replication_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7258,6 +7329,7 @@ buildvariants:
   - name: snmp_WT
   - name: ssl
   - name: sslSpecial
+  - name: update_fuzzer_WT
 
 - name: enterprise-rhel-70-64-bit
   display_name: "* Enterprise RHEL 7.0"
@@ -8879,6 +8951,8 @@ buildvariants:
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
+    multiversion_platform_arch: "rhel62"
+    multiversion_edition: "enterprise"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
     build_mongoreplay: true
@@ -8978,6 +9052,8 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: update_fuzzer_WT
+  - name: update_fuzzer_replication_WT
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
@@ -9058,6 +9134,8 @@ buildvariants:
   - name: sharding_jscore_op_query_passthrough_WT
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: tool
+  - name: update_fuzzer_WT
+  - name: update_fuzzer_replication_WT
 
 - name: enterprise-rhel-71-ppc64le-inmem
   display_name: Enterprise RHEL 7.1 PPC64LE (inMemory) DEBUG
@@ -9375,6 +9453,8 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: update_fuzzer_WT
+  - name: update_fuzzer_replication_WT
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
@@ -9527,6 +9607,8 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: update_fuzzer_WT
+  - name: update_fuzzer_replication_WT
 
 - name: ubuntu1604-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise SSL Ubuntu 16.04 DEBUG"
@@ -9908,6 +9990,8 @@ buildvariants:
   - name: slow1
   - name: snmp
   - name: tool
+  - name: update_fuzzer
+  - name: update_fuzzer_replication
 
 - name: enterprise-windows-64-2k8-mmapv1
   display_name: Enterprise Windows 2008R2 MMAPv1
@@ -9924,6 +10008,8 @@ buildvariants:
     gorootvars: >-
       PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
       CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"
+    multiversion_platform_arch: windows
+    multiversion_edition: "enterprise"
     msi_target: msi
     content_type: application/zip
     compile_flags: >-
@@ -10035,6 +10121,8 @@ buildvariants:
   - name: slow1
   - name: snmp
   - name: tool
+  - name: update_fuzzer
+  - name: update_fuzzer_replication
 
 - name: enterprise-osx-1010-mmapv1
   display_name: Enterprise OS X 10.10 MMAPv1
@@ -10053,6 +10141,8 @@ buildvariants:
     compile_flags: >-
       --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10"
       LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    multiversion_platform_arch: "osx"
+    multiversion_edition: "enterprise"
     num_jobs_available: 1
     build_mongoreplay: true
   tasks:
@@ -10120,3 +10210,4 @@ buildvariants:
   - name: sharding_jscore_passthrough
   - name: slow1
   - name: tool
+  - name: update_fuzzer
