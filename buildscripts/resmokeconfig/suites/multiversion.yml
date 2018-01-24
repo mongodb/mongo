@@ -15,7 +15,6 @@ selector:
   - jstests/multiVersion/dumprestore.js
   - jstests/multiVersion/dumprestore_sharded.js
   # TODO: SERVER-31985
-  - jstests/multiVersion/set_feature_compatibility_version.js
   - jstests/multiVersion/downgrade_replset.js
   - jstests/multiVersion/feature_compatibility_version_lagging_secondary.js
   - jstests/multiVersion/initial_sync_last_stable_from_latest.js
