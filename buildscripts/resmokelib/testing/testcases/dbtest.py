@@ -46,7 +46,7 @@ class DBTestCase(interface.TestCase):
         dbpath = os.path.join(dbpath_prefix, "job%d" % (self.fixture.job_num), "unittest")
         self.dbtest_options["dbpath"] = dbpath
 
-        shutil.rmtree(dbpath, ignore_errors=True)
+        self._clear_dbpath()
 
         try:
             os.makedirs(dbpath)
@@ -58,11 +58,15 @@ class DBTestCase(interface.TestCase):
         try:
             dbtest = self._make_process()
             self._execute(dbtest)
+            self._clear_dbpath()
         except self.failureException:
             raise
         except:
             self.logger.exception("Encountered an error running dbtest suite %s.", self.basename())
             raise
+
+    def _clear_dbpath(self):
+        shutil.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
 
     def _make_process(self):
         return core.programs.dbtest_program(self.logger,
