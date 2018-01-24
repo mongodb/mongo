@@ -59,10 +59,12 @@
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -1333,13 +1335,13 @@ public:
             return CommandHelpers::appendCommandStatus(result, status);
         }
 
-        if (args.allForDB &&
+        if ((args.allForDB || args.filter) &&
             (args.showPrivileges ||
              args.authenticationRestrictionsFormat == AuthenticationRestrictionsFormat::kShow)) {
             return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,
-                       "Can only get privilege or restriction details on exact-match usersInfo "
+                       "Privilege or restriction details require exact-match usersInfo "
                        "queries."));
         }
 
@@ -1363,8 +1365,17 @@ public:
                 // to be stripped out
                 BSONObjBuilder strippedUser(usersArrayBuilder.subobjStart());
                 for (const BSONElement& e : userDetails) {
-                    if (!args.showCredentials && e.fieldNameStringData() == "credentials") {
-                        continue;
+                    if (e.fieldNameStringData() == "credentials") {
+                        BSONArrayBuilder mechanismNamesBuilder;
+                        BSONObj mechanismsObj = e.Obj();
+                        for (const BSONElement& mechanismElement : mechanismsObj) {
+                            mechanismNamesBuilder.append(mechanismElement.fieldNameStringData());
+                        }
+                        strippedUser.append("mechanisms", mechanismNamesBuilder.arr());
+
+                        if (!args.showCredentials) {
+                            continue;
+                        }
                     }
 
                     if (e.fieldNameStringData() == "authenticationRestrictions" &&
@@ -1380,10 +1391,10 @@ public:
         } else {
             // If you don't need privileges, or authenticationRestrictions, you can just do a
             // regular query on system.users
-            BSONObjBuilder queryBuilder;
+            std::vector<BSONObj> pipeline;
             if (args.allForDB) {
-                queryBuilder.append("query",
-                                    BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname));
+                pipeline.push_back(
+                    BSON("$match" << BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname)));
             } else {
                 BSONArrayBuilder usersMatchArray;
                 for (size_t i = 0; i < args.userNames.size(); ++i) {
@@ -1392,24 +1403,53 @@ public:
                                                 << AuthorizationManager::USER_DB_FIELD_NAME
                                                 << args.userNames[i].getDB()));
                 }
-                queryBuilder.append("query", BSON("$or" << usersMatchArray.arr()));
+                pipeline.push_back(BSON("$match" << BSON("$or" << usersMatchArray.arr())));
             }
             // Order results by user field then db field, matching how UserNames are ordered
-            queryBuilder.append("orderby", BSON("user" << 1 << "db" << 1));
+            pipeline.push_back(BSON("$sort" << BSON("user" << 1 << "db" << 1)));
 
-            BSONObjBuilder projection;
-            projection.append("authenticationRestrictions", 0);
+            // Authentication restrictions are only rendered in the single user case.
+            pipeline.push_back(BSON("$project" << BSON("authenticationRestrictions" << false)));
+
+            // Rewrite the credentials object into an array of its fieldnames.
+            pipeline.push_back(
+                BSON("$addFields" << BSON("mechanisms"
+                                          << BSON("$map" << BSON("input" << BSON("$objectToArray"
+                                                                                 << "$credentials")
+                                                                         << "as"
+                                                                         << "cred"
+                                                                         << "in"
+                                                                         << "$$cred.k")))));
+
+            // Remove credentials, they're not required in the output
             if (!args.showCredentials) {
-                projection.append("credentials", 0);
+                pipeline.push_back(BSON("$project" << BSON("credentials" << false)));
             }
-            Status status =
-                queryAuthzDocument(opCtx,
-                                   AuthorizationManager::usersCollectionNamespace,
-                                   queryBuilder.done(),
-                                   projection.done(),
-                                   [&](const BSONObj& obj) { usersArrayBuilder.append(obj); });
+
+            // Handle a user specified filter.
+            if (args.filter) {
+                pipeline.push_back(BSON("$match" << *args.filter));
+            }
+
+            BSONObjBuilder responseBuilder;
+            AggregationRequest aggRequest(AuthorizationManager::usersCollectionNamespace,
+                                          std::move(pipeline));
+            Status status = runAggregate(opCtx,
+                                         AuthorizationManager::usersCollectionNamespace,
+                                         aggRequest,
+                                         aggRequest.serializeToCommandObj().toBson(),
+                                         responseBuilder);
             if (!status.isOK()) {
                 return CommandHelpers::appendCommandStatus(result, status);
+            }
+
+            CommandHelpers::appendCommandStatus(responseBuilder, Status::OK());
+            auto swResponse = CursorResponse::parseFromBSON(responseBuilder.obj());
+            if (!swResponse.isOK()) {
+                return CommandHelpers::appendCommandStatus(result, swResponse.getStatus());
+            }
+            for (const BSONObj& obj : swResponse.getValue().getBatch()) {
+                usersArrayBuilder.append(obj);
             }
         }
         result.append("users", usersArrayBuilder.arr());

@@ -109,6 +109,7 @@ struct UsersInfoArgs {
     AuthenticationRestrictionsFormat authenticationRestrictionsFormat =
         AuthenticationRestrictionsFormat::kOmit;
     bool showCredentials = false;
+    boost::optional<BSONObj> filter;
 };
 
 /**
