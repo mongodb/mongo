@@ -108,10 +108,19 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     if (!collection)
         return RecordId();
 
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
-
     auto qr = stdx::make_unique<QueryRequest>(collection->ns());
     qr->setFilter(query);
+    return findOne(opCtx, collection, std::move(qr), requireIndex);
+}
+
+RecordId Helpers::findOne(OperationContext* opCtx,
+                          Collection* collection,
+                          std::unique_ptr<QueryRequest> qr,
+                          bool requireIndex) {
+    if (!collection)
+        return RecordId();
+
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
@@ -121,7 +130,8 @@ RecordId Helpers::findOne(OperationContext* opCtx,
                                      extensionsCallback,
                                      MatchExpressionParser::kAllowAllSpecialFeatures &
                                          ~MatchExpressionParser::AllowedFeatures::kIsolated);
-    massert(17244, "Could not canonicalize " + query.toString(), statusWithCQ.isOK());
+
+    massert(17244, "Could not canonicalize " + qr->asFindCommand().toString(), statusWithCQ.isOK());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;

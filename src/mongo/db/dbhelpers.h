@@ -72,6 +72,11 @@ struct Helpers {
                             const BSONObj& query,
                             bool requireIndex);
 
+    static RecordId findOne(OperationContext* opCtx,
+                            Collection* collection,
+                            std::unique_ptr<QueryRequest> qr,
+                            bool requireIndex);
+
     /**
      * @param foundIndex if passed in will be set to 1 if ns and index found
      * @return true if object found
