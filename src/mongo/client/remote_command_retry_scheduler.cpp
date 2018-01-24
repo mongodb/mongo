@@ -275,7 +275,15 @@ void RemoteCommandRetryScheduler::_remoteCommandCallback(
 
     // TODO(benety): Check cumulative elapsed time of failed responses received against retry
     // policy. Requires SERVER-24067.
-    auto scheduleStatus = _schedule_inlock();
+    auto scheduleStatus = [this]() {
+        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        if (State::kShuttingDown == _state) {
+            return Status(ErrorCodes::CallbackCanceled,
+                          "scheduler was shut down before retrying command");
+        }
+        return _schedule_inlock();
+    }();
+
     if (!scheduleStatus.isOK()) {
         _onComplete({rcba.executor, rcba.myHandle, rcba.request, scheduleStatus});
         return;
