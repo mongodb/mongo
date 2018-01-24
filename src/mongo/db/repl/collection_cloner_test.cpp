@@ -1465,6 +1465,60 @@ protected:
         auto requestUUID = uassertStatusOK(UUID::parse(noiRequest.cmdObj.firstElement()));
         ASSERT_EQUALS(options.uuid.get(), requestUUID);
     }
+
+    /**
+     * Sets up a test for the CollectionCloner that simulates the collection being dropped while
+     * copying the documents.
+     * The ARM returns CursorNotFound error to indicate a collection drop. Subsequently, the
+     * CollectionCloner should run a find command on the collection by UUID. This should be the next
+     * ready request on in the network interface.
+     */
+    void setUpVerifyCollectionWasDroppedTest() {
+        startupWithUUID();
+
+        {
+            executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+            processNetworkResponse(createCountResponse(0));
+            processNetworkResponse(createListIndexesResponse(0, BSON_ARRAY(idIndexSpec)));
+        }
+        ASSERT_TRUE(collectionCloner->isActive());
+
+        collectionCloner->waitForDbWorker();
+        ASSERT_TRUE(collectionCloner->isActive());
+        ASSERT_TRUE(collectionStats.initCalled);
+
+        {
+            executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+            processNetworkResponse(createCursorResponse(1, BSONArray()));
+        }
+
+        collectionCloner->waitForDbWorker();
+        ASSERT_TRUE(collectionCloner->isActive());
+
+        // Return error response to getMore command.
+        {
+            executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+            processNetworkResponse(ErrorCodes::CursorNotFound,
+                                   "collection dropped while copying documents");
+        }
+    }
+
+    /**
+     * Returns the next ready request.
+     * Ensures that the request was sent by the CollectionCloner to check if the collection was
+     * dropped while copying documents.
+     */
+    executor::NetworkInterfaceMock::NetworkOperationIterator getVerifyCollectionDroppedRequest(
+        executor::NetworkInterfaceMock* net) {
+        ASSERT_TRUE(net->hasReadyRequests());
+        auto noi = net->getNextReadyRequest();
+        const auto& request = noi->getRequest();
+        const auto& cmdObj = request.cmdObj;
+        const auto firstElement = cmdObj.firstElement();
+        ASSERT_EQUALS("find"_sd, firstElement.fieldNameStringData());
+        ASSERT_EQUALS(*options.uuid, unittest::assertGet(UUID::parse(firstElement)));
+        return noi;
+    }
 };
 
 TEST_F(CollectionClonerUUIDTest, FirstRemoteCommandWithUUID) {
@@ -1565,6 +1619,37 @@ TEST_F(CollectionClonerUUIDTest, SingleCloningCursorWithUUIDUsesFindCommand) {
 TEST_F(CollectionClonerUUIDTest, ThreeCloningCursorsWithUUIDUsesParallelCollectionScanCommand) {
     // With three cloning cursors, expect a parallelCollectionScan command.
     testWithMaxNumCloningCursors(3, "parallelCollectionScan");
+}
+
+/**
+ * Start cloning.
+ * While copying collection, simulate a collection drop by having the ARM return a CursorNotFound
+ * error.
+ * The CollectionCloner should run a find command on the collection by UUID.
+ * Simulate successful find command with a drop-pending namespace in the response.
+ * The CollectionCloner should complete with a successful final status.
+ */
+TEST_F(CollectionClonerUUIDTest, CloningIsSuccessfulIfCollectionWasDroppedWhileCopyingDocuments) {
+    setUpVerifyCollectionWasDroppedTest();
+
+    // CollectionCloner should send a find command with the collection's UUID.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(getNet());
+        auto noi = getVerifyCollectionDroppedRequest(getNet());
+
+        // Return a drop-pending namespace in the find response instead of the original collection
+        // name passed to CollectionCloner at construction.
+        repl::OpTime dropOpTime(Timestamp(Seconds(100), 0), 1LL);
+        auto dpns = nss.makeDropPendingNamespace(dropOpTime);
+        scheduleNetworkResponse(noi, createCursorResponse(0, dpns.ns(), BSONArray(), "firstBatch"));
+        finishProcessingNetworkResponse();
+    }
+
+    // CollectionCloner treats a in collection state to drop-pending during cloning as a successful
+    // clone operation.
+    collectionCloner->join();
+    ASSERT_OK(getStatus());
+    ASSERT_FALSE(collectionCloner->isActive());
 }
 
 class ParallelCollectionClonerTest : public BaseClonerTest {
