@@ -104,6 +104,7 @@ public:
      * Returns true if we have scheduled a remote command and are waiting for the response.
      */
     bool isActive() const;
+    bool _isActive_inlock() const;
 
     /**
      * Schedules remote command request.
@@ -159,8 +160,13 @@ private:
 
     mutable stdx::condition_variable _condition;
 
-    // _active is true when remote command is scheduled to be run by the executor.
-    bool _active = false;
+    // State transitions:
+    // PreStart --> Running --> ShuttingDown --> Complete
+    // It is possible to skip intermediate states. For example,
+    // Calling shutdown() when the scheduler has not started will transition from PreStart directly
+    // to Complete.
+    enum class State { kPreStart, kRunning, kShuttingDown, kComplete };
+    State _state = State::kPreStart;  // (M)
 
     // Callback handle to the scheduled remote command.
     executor::TaskExecutor::CallbackHandle _remoteCommandCallbackHandle;

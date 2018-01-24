@@ -299,6 +299,19 @@ TEST_F(RemoteCommandRetrySchedulerTest, StartupFailsWhenExecutorIsShutDown) {
     ASSERT_FALSE(scheduler.isActive());
 }
 
+TEST_F(RemoteCommandRetrySchedulerTest, StartupFailsWhenSchedulerIsShutDown) {
+    auto callback = [](const executor::TaskExecutor::RemoteCommandCallbackArgs&) {};
+    auto policy = RemoteCommandRetryScheduler::makeNoRetryPolicy();
+
+    RemoteCommandRetryScheduler scheduler(&getExecutor(), request, callback, std::move(policy));
+    ASSERT_FALSE(scheduler.isActive());
+
+    scheduler.shutdown();
+
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, scheduler.startup());
+    ASSERT_FALSE(scheduler.isActive());
+}
+
 TEST_F(RemoteCommandRetrySchedulerTest,
        ShuttingDownExecutorAfterSchedulerStartupInvokesCallbackWithCallbackCanceledError) {
     CallbackResponseSaver callback;
@@ -349,6 +362,9 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnNonRetryableEr
     ResponseStatus rs(ErrorCodes::OperationFailed, "injected error", Milliseconds(0));
     processNetworkResponse(rs);
     checkCompletionStatus(&scheduler, callback, rs);
+
+    // Scheduler cannot be restarted once it has run to completion.
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, scheduler.startup());
 }
 
 TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnFirstSuccessfulResponse) {
@@ -364,6 +380,10 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerInvokesCallbackOnFirstSuccessfu
 
     processNetworkResponse(response);
     checkCompletionStatus(&scheduler, callback, response);
+
+    // Scheduler cannot be restarted once it has run to completion.
+    ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, scheduler.startup());
+    ASSERT_FALSE(scheduler.isActive());
 }
 
 TEST_F(RemoteCommandRetrySchedulerTest, SchedulerIgnoresEmbeddedErrorInSuccessfulResponse) {
