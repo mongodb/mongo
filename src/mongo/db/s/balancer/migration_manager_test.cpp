@@ -41,7 +41,7 @@
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/config_server_test_fixture.h"
-#include "mongo/s/move_chunk_request.h"
+#include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/scopeguard.h"
 

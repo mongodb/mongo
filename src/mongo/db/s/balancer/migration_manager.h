@@ -39,7 +39,7 @@
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"

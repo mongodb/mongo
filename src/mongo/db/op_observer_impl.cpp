@@ -319,7 +319,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
     auto css = (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
         ? nullptr
-        : CollectionShardingState::get(opCtx, nss.ns());
+        : CollectionShardingState::get(opCtx, nss);
 
     size_t index = 0;
     for (auto it = begin; it != end; it++, index++) {
@@ -415,7 +415,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    NamespaceString const& nss,
                                    BSONObj const& doc) {
     auto& deleteState = getDeleteState(opCtx);
-    auto* css = CollectionShardingState::get(opCtx, nss.ns());
+    auto* css = CollectionShardingState::get(opCtx, nss);
     deleteState = css->makeDeleteState(doc);
 }
 
@@ -436,7 +436,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     if (nss != NamespaceString::kSessionTransactionsTableNamespace) {
         if (!fromMigrate) {
-            auto css = CollectionShardingState::get(opCtx, nss.ns());
+            auto css = CollectionShardingState::get(opCtx, nss);
             css->onDeleteOp(opCtx, deleteState, opTime.writeOpTime, opTime.prePostImageOpTime);
         }
     }

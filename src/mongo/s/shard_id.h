@@ -49,7 +49,7 @@ public:
     ShardId() = default;
 
     // Note that this c-tor allows the implicit conversion from std::string
-    ShardId(const std::string shardId) : _shardId(std::move(shardId)) {}
+    ShardId(std::string shardId) : _shardId(std::move(shardId)) {}
 
     // Implicit StringData conversion
     operator StringData();

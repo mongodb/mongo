@@ -51,7 +51,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
-#include "mongo/s/set_shard_version_request.h"
+#include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/stdx/memory.h"
@@ -240,7 +240,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
     {
         // Register for notifications from the replication subsystem
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
-        auto css = CollectionShardingState::get(opCtx, getNss().ns());
+        auto css = CollectionShardingState::get(opCtx, getNss());
 
         const auto metadata = css->getMetadata();
         Status status = checkCollectionEpochMatches(metadata, _collectionEpoch);
@@ -650,8 +650,7 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
     auto cloneDriver = [&]() {
         // Unregister from the collection's sharding state
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
-
-        auto css = CollectionShardingState::get(opCtx, getNss().ns());
+        auto css = CollectionShardingState::get(opCtx, getNss());
 
         // The migration source manager is not visible anymore after it is unregistered from the
         // collection

@@ -38,17 +38,6 @@ env.Library(
     ],
 )
 
-# Functionality shared between mongod and mongos
-env.Library(
-    target='shard_id',
-    source=[
-        'shard_id.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ]
-)
-
 env.Library(
     target="async_requests_sender",
     source=[
@@ -78,48 +67,35 @@ env.Library(
         'catalog/type_shard.cpp',
         'catalog/type_shard_collection.cpp',
         'catalog/type_tags.cpp',
+        'chunk_version.cpp',
         'request_types/add_shard_request_type.cpp',
         'request_types/add_shard_to_zone_request_type.cpp',
         'request_types/balance_chunk_request_type.cpp',
         'request_types/commit_chunk_migration_request_type.cpp',
-        'request_types/remove_shard_from_zone_request_type.cpp',
-        'request_types/split_chunk_request_type.cpp',
         'request_types/merge_chunk_request_type.cpp',
+        'request_types/migration_secondary_throttle_options.cpp',
+        'request_types/move_chunk_request.cpp',
+        'request_types/remove_shard_from_zone_request_type.cpp',
+        'request_types/set_shard_version_request.cpp',
+        'request_types/split_chunk_request_type.cpp',
         'request_types/update_zone_key_range_request_type.cpp',
-        'chunk_version.cpp',
-        'migration_secondary_throttle_options.cpp',
-        'move_chunk_request.cpp',
-        'set_shard_version_request.cpp',
-        'shard_key_pattern.cpp',
-        env.Idlc('database_version.idl')[0],
+        'shard_id.cpp',
         'versioning.cpp',
-    ],
-    LIBDEPS=[
-        'shard_id',
-        'sharding_request_types',
-        '$BUILD_DIR/mongo/client/connection_string',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/query/query_planner',
-        '$BUILD_DIR/mongo/db/query/query_request',
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/update/update_common',
-        '$BUILD_DIR/mongo/rpc/metadata',
-    ]
-)
-
-env.Library(
-    target='sharding_request_types',
-    source=[
+        env.Idlc('database_version.idl')[0],
         env.Idlc('request_types/create_database.idl')[0],
+        env.Idlc('request_types/flush_routing_table_cache_updates.idl')[0],
         env.Idlc('request_types/move_primary.idl')[0],
         env.Idlc('request_types/shard_collection.idl')[0],
-        env.Idlc('request_types/flush_routing_table_cache_updates.idl')[0],
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
+        '$BUILD_DIR/mongo/util/uuid',
+    ]
 )
 
 env.Library(
@@ -203,16 +179,6 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='shard_id_test',
-    source=[
-        'shard_id_test.cpp',
-    ],
-    LIBDEPS=[
-        'common_s',
-    ]
-)
-
-env.CppUnitTest(
     target='sharding_common_test',
     source=[
         'catalog/type_changelog_test.cpp',
@@ -223,14 +189,11 @@ env.CppUnitTest(
         'catalog/type_lockpings_test.cpp',
         'catalog/type_locks_test.cpp',
         'catalog/type_mongos_test.cpp',
-        'catalog/type_shard_test.cpp',
         'catalog/type_shard_collection_test.cpp',
+        'catalog/type_shard_test.cpp',
         'catalog/type_tags_test.cpp',
         'chunk_version_test.cpp',
-        'migration_secondary_throttle_options_test.cpp',
-        'move_chunk_request_test.cpp',
-        'set_shard_version_request_test.cpp',
-        'shard_key_pattern_test.cpp',
+        'shard_id_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
@@ -244,9 +207,12 @@ env.CppUnitTest('request_types_test',
         'request_types/add_shard_to_zone_request_test.cpp',
         'request_types/balance_chunk_request_test.cpp',
         'request_types/commit_chunk_migration_request_test.cpp',
-        'request_types/remove_shard_from_zone_request_test.cpp',
-        'request_types/split_chunk_request_test.cpp',
         'request_types/merge_chunk_request_test.cpp',
+        'request_types/migration_secondary_throttle_options_test.cpp',
+        'request_types/move_chunk_request_test.cpp',
+        'request_types/remove_shard_from_zone_request_test.cpp',
+        'request_types/set_shard_version_request_test.cpp',
+        'request_types/split_chunk_request_test.cpp',
         'request_types/update_zone_key_range_request_test.cpp',
     ],
     LIBDEPS=[
@@ -259,9 +225,13 @@ env.Library(
     source=[
         'chunk.cpp',
         'chunk_manager.cpp',
+        'shard_key_pattern.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/storage/key_string',
+        '$BUILD_DIR/mongo/db/update/update_common',
         'common_s',
     ],
 )
@@ -315,12 +285,13 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='catalog_cache_test',
+    target='routing_table_test',
     source=[
         'catalog_cache_refresh_test.cpp',
         'catalog_cache_test_fixture.cpp',
         'chunk_manager_index_bounds_test.cpp',
         'chunk_manager_query_test.cpp',
+        'shard_key_pattern_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',

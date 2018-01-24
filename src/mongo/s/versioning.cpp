@@ -26,17 +26,13 @@
  *    then also delete it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/s/versioning.h"
+
 #include "mongo/s/database_version_gen.h"
 
 namespace mongo {
-
-DatabaseVersion Versioning::increment(const DatabaseVersion& v) {
-    DatabaseVersion dbv;
-    dbv.setVersion(v.getVersion() + 1);
-    dbv.setUuid(v.getUuid());
-    return dbv;
-}
 
 DatabaseVersion Versioning::newDatabaseVersion() {
     DatabaseVersion dbv;
@@ -44,4 +40,12 @@ DatabaseVersion Versioning::newDatabaseVersion() {
     dbv.setUuid(UUID::gen());
     return dbv;
 }
+
+DatabaseVersion Versioning::incrementDatabaseVersion(const DatabaseVersion& v) {
+    DatabaseVersion dbv;
+    dbv.setVersion(v.getVersion() + 1);
+    dbv.setUuid(v.getUuid());
+    return dbv;
 }
+
+}  // namespace mongo

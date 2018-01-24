@@ -319,7 +319,7 @@ public:
         for (size_t i = 0; i < specs.size(); i++) {
             const BSONObj& spec = specs[i];
             if (spec["unique"].trueValue()) {
-                status = checkUniqueIndexConstraints(opCtx, ns.ns(), spec["key"].Obj());
+                status = checkUniqueIndexConstraints(opCtx, ns, spec["key"].Obj());
 
                 if (!status.isOK()) {
                     return CommandHelpers::appendCommandStatus(result, status);
@@ -408,11 +408,11 @@ public:
 
 private:
     static Status checkUniqueIndexConstraints(OperationContext* opCtx,
-                                              StringData ns,
+                                              const NamespaceString& nss,
                                               const BSONObj& newIdxKey) {
-        invariant(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_X));
+        invariant(opCtx->lockState()->isCollectionLockedForMode(nss.ns(), MODE_X));
 
-        auto metadata(CollectionShardingState::get(opCtx, ns.toString())->getMetadata());
+        auto metadata(CollectionShardingState::get(opCtx, nss)->getMetadata());
         if (metadata) {
             ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
             if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {

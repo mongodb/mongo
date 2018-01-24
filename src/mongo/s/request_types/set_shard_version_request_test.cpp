@@ -30,7 +30,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/oid.h"
-#include "mongo/s/set_shard_version_request.h"
+#include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

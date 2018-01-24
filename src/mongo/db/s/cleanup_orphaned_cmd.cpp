@@ -47,7 +47,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
-#include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -77,7 +77,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
 
     {
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        const auto css = CollectionShardingState::get(opCtx, ns.toString());
+        const auto css = CollectionShardingState::get(opCtx, ns);
         auto metadata = css->getMetadata();
         if (!metadata) {
             log() << "skipping orphaned data cleanup for " << ns.toString()

@@ -32,7 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/migration_session_id.h"
-#include "mongo/s/move_chunk_request.h"
+#include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"

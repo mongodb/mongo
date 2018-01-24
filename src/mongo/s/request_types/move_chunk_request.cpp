@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/move_chunk_request.h"
+#include "mongo/s/request_types/move_chunk_request.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"

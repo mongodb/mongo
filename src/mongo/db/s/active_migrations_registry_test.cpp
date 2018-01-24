@@ -33,7 +33,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/service_context_noop.h"
-#include "mongo/s/move_chunk_request.h"
+#include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

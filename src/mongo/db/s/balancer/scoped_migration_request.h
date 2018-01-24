@@ -30,7 +30,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/request_types/migration_secondary_throttle_options.h"
 
 namespace mongo {
 

@@ -32,7 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/s/move_chunk_request.h"
+#include "mongo/s/request_types/move_chunk_request.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/timer.h"
 

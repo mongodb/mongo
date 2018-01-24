@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/set_shard_version_request.h"
+#include "mongo/s/request_types/set_shard_version_request.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"

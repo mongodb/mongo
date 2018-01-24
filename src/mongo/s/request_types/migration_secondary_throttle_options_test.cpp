@@ -30,7 +30,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/migration_secondary_throttle_options.h"
+#include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
