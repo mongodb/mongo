@@ -461,6 +461,56 @@ TEST_F(RemoteCommandRetrySchedulerTest, SchedulerShouldRetryUntilSuccessfulRespo
     checkCompletionStatus(&scheduler, callback, response);
 }
 
+/**
+ * Retry policy that shuts down the scheduler whenever it is consulted by the scheduler.
+ * Results from getMaximumAttempts() and shouldRetryOnError() must cause the scheduler
+ * to resend the request.
+ */
+class ShutdownSchedulerRetryPolicy : public RemoteCommandRetryScheduler::RetryPolicy {
+public:
+    std::size_t getMaximumAttempts() const override {
+        if (scheduler) {
+            scheduler->shutdown();
+        }
+        return 2U;
+    }
+    Milliseconds getMaximumResponseElapsedTotal() const override {
+        return executor::RemoteCommandRequest::kNoTimeout;
+    }
+    bool shouldRetryOnError(ErrorCodes::Error) const override {
+        if (scheduler) {
+            scheduler->shutdown();
+        }
+        return true;
+    }
+    std::string toString() const override {
+        return "";
+    }
+
+    // This must be set before starting the scheduler.
+    RemoteCommandRetryScheduler* scheduler = nullptr;
+};
+
+TEST_F(RemoteCommandRetrySchedulerTest,
+       SchedulerReturnsCallbackCanceledIfShutdownBeforeSendingRetryCommand) {
+    CallbackResponseSaver callback;
+    auto policy = stdx::make_unique<ShutdownSchedulerRetryPolicy>();
+    auto policyPtr = policy.get();
+    TaskExecutorWithFailureInScheduleRemoteCommand badExecutor(&getExecutor());
+    RemoteCommandRetryScheduler scheduler(
+        &badExecutor, request, stdx::ref(callback), std::move(policy));
+    policyPtr->scheduler = &scheduler;
+    start(&scheduler);
+
+    processNetworkResponse({ErrorCodes::HostNotFound, "first", Milliseconds(0)});
+
+    checkCompletionStatus(&scheduler,
+                          callback,
+                          {ErrorCodes::CallbackCanceled,
+                           "scheduler was shut down before retrying command",
+                           Milliseconds(0)});
+}
+
 bool sharedCallbackStateDestroyed = false;
 class SharedCallbackState {
     MONGO_DISALLOW_COPYING(SharedCallbackState);
