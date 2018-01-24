@@ -9,7 +9,7 @@
 
     for (let n = 0; n < numTests; n++) {
         let t = db.geo_polygon3;
-        t.drop();
+        assert(t.drop());
 
         let num = 0;
         for (let x = 1; x < 9; x++) {
@@ -53,7 +53,7 @@
         ];
 
         assert.writeOK(t.insert({loc: [1, 3]}));  // Add a point that's in
-        assert.commandFailed(t.createIndex({loc: "2d"}, {bits: 2 + t}));
+        assert.commandFailed(t.createIndex({loc: "2d"}, {bits: 2 + n}));
 
         assert.eq(1, t.find({loc: {$within: {$polygon: pacman}}}).itcount(), "Pacman single point");
 
