@@ -236,16 +236,17 @@ Status RemoteCommandRetryScheduler::_schedule_inlock() {
 
 void RemoteCommandRetryScheduler::_remoteCommandCallback(
     const executor::TaskExecutor::RemoteCommandCallbackArgs& rcba) {
-    auto status = rcba.response.status;
-    auto currentAttempt = _currentAttempt;
-    {
+    const auto& status = rcba.response.status;
+
+    // Use a lambda to avoid unnecessary lock acquisition when checking conditions for termination.
+    auto getCurrentAttempt = [this]() {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        currentAttempt = _currentAttempt;
-    }
+        return _currentAttempt;
+    };
 
     if (status.isOK() || status == ErrorCodes::CallbackCanceled ||
-        currentAttempt == _retryPolicy->getMaximumAttempts() ||
-        !_retryPolicy->shouldRetryOnError(status.code())) {
+        !_retryPolicy->shouldRetryOnError(status.code()) ||
+        getCurrentAttempt() == _retryPolicy->getMaximumAttempts()) {
         _onComplete(rcba);
         return;
     }
