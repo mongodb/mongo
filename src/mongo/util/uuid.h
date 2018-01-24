@@ -60,6 +60,7 @@ class UUID {
 
     // Make the IDL generated parser a friend
     friend class ConfigsvrShardCollectionResponse;
+    friend class DatabaseVersion;
     friend class DbCheckOplogCollection;
     friend class idl::import::One_UUID;
     friend class LogicalSessionId;

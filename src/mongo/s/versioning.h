@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2012 10gen Inc.
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,49 +26,14 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/s/database_version_gen.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/s/catalog/type_database.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/uuid.h"
+namespace mongo {
 
-namespace {
+class Versioning {
+public:
+    static DatabaseVersion increment(const DatabaseVersion& v);
 
-using namespace mongo;
-using std::string;
-
-TEST(DatabaseType, Empty) {
-    StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSONObj());
-    ASSERT_FALSE(status.isOK());
+    static DatabaseVersion newDatabaseVersion();
+};
 }
-
-TEST(DatabaseType, Basic) {
-    UUID uuid = UUID::gen();
-    StatusWith<DatabaseType> status = DatabaseType::fromBSON(
-        BSON(DatabaseType::name("mydb")
-             << DatabaseType::primary("shard")
-             << DatabaseType::sharded(true)
-             << DatabaseType::version(BSON("uuid" << uuid << "version" << 0))));
-    ASSERT_TRUE(status.isOK());
-
-    DatabaseType db = status.getValue();
-    ASSERT_EQUALS(db.getName(), "mydb");
-    ASSERT_EQUALS(db.getPrimary(), "shard");
-    ASSERT_TRUE(db.getSharded());
-    ASSERT_EQUALS(db.getVersion().getUuid(), uuid);
-    ASSERT_EQUALS(db.getVersion().getVersion(), 0);
-}
-
-TEST(DatabaseType, BadType) {
-    StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSON(DatabaseType::name() << 0));
-    ASSERT_FALSE(status.isOK());
-}
-
-TEST(DatabaseType, MissingRequired) {
-    StatusWith<DatabaseType> status = DatabaseType::fromBSON(BSON(DatabaseType::name("mydb")));
-    ASSERT_FALSE(status.isOK());
-}
-
-}  // unnamed namespace

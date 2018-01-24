@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/s/database_version_gen.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
@@ -55,7 +56,7 @@ public:
     static const BSONField<std::string> name;
     static const BSONField<std::string> primary;
     static const BSONField<bool> sharded;
-
+    static const BSONField<BSONObj> version;
 
     /**
      * Constructs a new DatabaseType object from BSON. Also does validation of the contents.
@@ -95,6 +96,14 @@ public:
         _sharded = sharded;
     }
 
+    DatabaseVersion getVersion() const {
+        return _version.get();
+    }
+
+    void setVersion(DatabaseVersion version) {
+        _version = std::move(version);
+    }
+
 private:
     // Requred database name
     boost::optional<std::string> _name;
@@ -106,6 +115,8 @@ private:
     // Required whether sharding is enabled for this database. Even though this field is of
     // type optional, it is only used as an indicator that the value was explicitly set.
     boost::optional<bool> _sharded;
+
+    boost::optional<DatabaseVersion> _version;
 };
 
 }  // namespace mongo

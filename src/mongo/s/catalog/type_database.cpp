@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/s/versioning.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -45,6 +46,7 @@ const std::string DatabaseType::ConfigNS = "config.databases";
 const BSONField<std::string> DatabaseType::name("_id");
 const BSONField<std::string> DatabaseType::primary("primary");
 const BSONField<bool> DatabaseType::sharded("partitioned");
+const BSONField<BSONObj> DatabaseType::version("version");
 
 
 StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
@@ -78,6 +80,15 @@ StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
         dbt._sharded = dbtSharded;
     }
 
+    {
+        BSONObj versionField = source.getObjectField("version");
+        // TODO: parse this unconditionally after v4.0.
+        if (!versionField.isEmpty()) {
+            dbt._version =
+                DatabaseVersion::parse(IDLParserErrorContext("DatabaseType"), versionField);
+        }
+    }
+
     return StatusWith<DatabaseType>(dbt);
 }
 
@@ -102,6 +113,11 @@ BSONObj DatabaseType::toBSON() const {
     builder.append(name.name(), _name.get_value_or(""));
     builder.append(primary.name(), _primary.get_value_or(ShardId()).toString());
     builder.append(sharded.name(), _sharded.get_value_or(false));
+
+    BSONObjBuilder versionBuilder;
+    DatabaseVersion defaultDbv;
+    _version.get_value_or(Versioning::newDatabaseVersion()).serialize(&versionBuilder);
+    builder.append(version.name(), versionBuilder.obj());
 
     return builder.obj();
 }
