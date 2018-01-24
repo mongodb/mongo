@@ -152,6 +152,19 @@ public:
         OperationContext* opCtx) override;
 
 private:
+    using CollIter = std::list<std::string>::iterator;
+
+    Status _dropCollectionsNoTimestamp(OperationContext* opCtx,
+                                       KVDatabaseCatalogEntryBase* dbce,
+                                       CollIter begin,
+                                       CollIter end);
+
+    Status _dropCollectionsWithTimestamp(OperationContext* opCtx,
+                                         KVDatabaseCatalogEntryBase* dbce,
+                                         std::list<std::string>& toDrop,
+                                         CollIter begin,
+                                         CollIter end);
+
     class RemoveDBChange;
 
     stdx::function<KVDatabaseCatalogEntryFactory> _databaseCatalogEntryFactory;
@@ -163,6 +176,7 @@ private:
 
     const bool _supportsDocLocking;
     const bool _supportsDBLocking;
+    Timestamp _initialDataTimestamp = Timestamp::kAllowUnstableCheckpointsSentinel;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;
     std::unique_ptr<KVCatalog> _catalog;

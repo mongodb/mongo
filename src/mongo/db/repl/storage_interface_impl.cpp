@@ -61,6 +61,7 @@
 #include "mongo/db/exec/update.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/parsed_update.h"
@@ -428,6 +429,10 @@ Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const Names
         const auto status = autoDB.getDb()->dropCollectionEvenIfSystem(opCtx, nss);
         if (!status.isOK()) {
             return status;
+        }
+        if (nss.isDropPendingNamespace() && !opCtx->writesAreReplicated()) {
+            Timestamp ts = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+            fassertStatusOK(50661, opCtx->recoveryUnit()->setTimestamp(ts));
         }
         wunit.commit();
         return Status::OK();

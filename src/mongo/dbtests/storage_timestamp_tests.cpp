@@ -33,8 +33,10 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
@@ -44,7 +46,9 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/apply_ops.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
@@ -53,6 +57,7 @@
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
 #include "mongo/unittest/unittest.h"
@@ -96,7 +101,10 @@ public:
         // to avoid the invariant in ReplClientInfo::setLastOp that the optime only goes forward.
         repl::ReplClientInfo::forClient(_opCtx->getClient()).clearLastOp_forTest();
 
-        getGlobalServiceContext()->setOpObserver(stdx::make_unique<OpObserverImpl>());
+        auto registry = stdx::make_unique<OpObserverRegistry>();
+        registry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
+        registry->addObserver(stdx::make_unique<OpObserverImpl>());
+        _opCtx->getServiceContext()->setOpObserver(std::move(registry));
 
         repl::setOplogCollectionName(getGlobalServiceContext());
         repl::createOplog(_opCtx);
@@ -290,6 +298,58 @@ public:
             ASSERT(found == idents.end()) << nss.ns() << " was found at " << ts.toString()
                                           << " when it should not have been.";
         }
+    }
+
+    std::tuple<std::string, std::string> getNewCollectionIndexIdent(
+        KVCatalog* kvCatalog, std::vector<std::string>& origIdents) {
+        // Find the collection and index ident by performing a set difference on the original
+        // idents and the current idents.
+        std::vector<std::string> identsWithColl = kvCatalog->getAllIdents(_opCtx);
+        std::sort(origIdents.begin(), origIdents.end());
+        std::sort(identsWithColl.begin(), identsWithColl.end());
+        std::vector<std::string> collAndIdxIdents;
+        std::set_difference(identsWithColl.begin(),
+                            identsWithColl.end(),
+                            origIdents.begin(),
+                            origIdents.end(),
+                            std::back_inserter(collAndIdxIdents));
+
+        ASSERT(collAndIdxIdents.size() == 1 || collAndIdxIdents.size() == 2);
+        if (collAndIdxIdents.size() == 1) {
+            // `system.profile` collections do not have an `_id` index.
+            return std::tie(collAndIdxIdents[0], "");
+        }
+        if (collAndIdxIdents.size() == 2) {
+            // The idents are sorted, so the `collection-...` comes before `index-...`
+            return std::tie(collAndIdxIdents[0], collAndIdxIdents[1]);
+        }
+
+        MONGO_UNREACHABLE;
+    }
+
+    void assertIdentsExistAtTimestamp(KVCatalog* kvCatalog,
+                                      const std::string& collIdent,
+                                      const std::string& indexIdent,
+                                      Timestamp timestamp) {
+        WriteUnitOfWork wuow(_opCtx);
+        ASSERT_OK(_opCtx->recoveryUnit()->selectSnapshot(timestamp));
+        auto allIdents = kvCatalog->getAllIdents(_opCtx);
+        ASSERT(std::find(allIdents.begin(), allIdents.end(), collIdent) != allIdents.end());
+        if (indexIdent.size() > 0) {
+            // `system.profile` does not have an `_id` index.
+            ASSERT(std::find(allIdents.begin(), allIdents.end(), indexIdent) != allIdents.end());
+        }
+    }
+
+    void assertIdentsMissingAtTimestamp(KVCatalog* kvCatalog,
+                                        const std::string& collIdent,
+                                        const std::string& indexIdent,
+                                        Timestamp timestamp) {
+        WriteUnitOfWork wuow(_opCtx);
+        ASSERT_OK(_opCtx->recoveryUnit()->selectSnapshot(timestamp));
+        auto allIdents = kvCatalog->getAllIdents(_opCtx);
+        ASSERT(std::find(allIdents.begin(), allIdents.end(), collIdent) == allIdents.end());
+        ASSERT(std::find(allIdents.begin(), allIdents.end(), indexIdent) == allIdents.end());
     }
 };
 
@@ -1192,6 +1252,213 @@ public:
     }
 };
 
+class ReaperDropIsTimestamped : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        auto storageInterface = repl::StorageInterface::get(_opCtx);
+        repl::DropPendingCollectionReaper::set(
+            _opCtx->getServiceContext(),
+            stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
+        auto reaper = repl::DropPendingCollectionReaper::get(_opCtx);
+
+        auto kvStorageEngine =
+            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine());
+        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+
+        // Save the pre-state idents so we can capture the specific idents related to collection
+        // creation.
+        std::vector<std::string> origIdents = kvCatalog->getAllIdents(_opCtx);
+
+        NamespaceString nss("unittests.reaperDropIsTimestamped");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+
+        const LogicalTime insertTimestamp = _clock->reserveTicks(1);
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(autoColl.getCollection(),
+                           InsertStatement(BSON("_id" << 0), insertTimestamp.asTimestamp(), 0LL));
+            wuow.commit();
+            ASSERT_EQ(1, itCount(autoColl.getCollection()));
+        }
+
+        // The KVCatalog only adheres to timestamp requests on `getAllIdents`. To know the right
+        // collection/index that gets removed on a drop, we must capture the randomized "ident"
+        // string for the target collection and index.
+        std::string collIdent;
+        std::string indexIdent;
+        std::tie(collIdent, indexIdent) = getNewCollectionIndexIdent(kvCatalog, origIdents);
+
+        // The first phase of a drop in a replica set is to perform a rename. This does not change
+        // the ident values.
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            Database* db = autoColl.getDb();
+            ASSERT_OK(db->dropCollection(_opCtx, nss.ns()));
+            wuow.commit();
+        }
+
+        // Bump the clock two. The drop will get the second tick. The first tick will identify a
+        // snapshot of the data with the collection renamed.
+        const LogicalTime postRenameTimestamp = _clock->reserveTicks(2);
+
+        // Actually drop the collection, propagating to the KVCatalog. This drop will be
+        // timestamped at the logical clock value.
+        reaper->dropCollectionsOlderThan(
+            _opCtx, repl::OpTime(_clock->getClusterTime().asTimestamp(), presentTerm));
+        const LogicalTime postDropTime = _clock->reserveTicks(1);
+
+        // Querying the catalog at insert time shows the collection and index existing.
+        assertIdentsExistAtTimestamp(
+            kvCatalog, collIdent, indexIdent, insertTimestamp.asTimestamp());
+
+        // Querying the catalog at rename time continues to show the collection and index exist.
+        assertIdentsExistAtTimestamp(
+            kvCatalog, collIdent, indexIdent, postRenameTimestamp.asTimestamp());
+
+        // Querying the catalog after the drop shows the collection and index being deleted.
+        assertIdentsMissingAtTimestamp(
+            kvCatalog, collIdent, indexIdent, postDropTime.asTimestamp());
+    }
+};
+
+/**
+ * The first step of `mongo::dropDatabase` is to rename all replicated collections, generating a
+ * "drop collection" oplog entry. Then when those entries become majority commited, calls
+ * `StorageEngine::dropDatabase`. At this point, two separate code paths can perform the final
+ * removal of the collections from the storage engine: the reaper, or
+ * `[KV]StorageEngine::dropDatabase` when it is called from `mongo::dropDatabase`. This race
+ * exists on both primaries and secondaries. This test asserts `[KV]StorageEngine::dropDatabase`
+ * correctly timestamps the final drop.
+ */
+template <bool IsPrimary>
+class KVDropDatabase : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        auto storageInterface = repl::StorageInterface::get(_opCtx);
+        repl::DropPendingCollectionReaper::set(
+            _opCtx->getServiceContext(),
+            stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
+
+        auto kvStorageEngine =
+            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine());
+        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+
+        // Declare the database to be in a "synced" state, i.e: in steady-state replication.
+        Timestamp syncTime = _clock->reserveTicks(1).asTimestamp();
+        invariant(!syncTime.isNull());
+        kvStorageEngine->setInitialDataTimestamp(syncTime);
+
+        // This test is dropping collections individually before following up with a
+        // `dropDatabase` call. This is illegal in typical replication operation as `dropDatabase`
+        // may find collections that haven't been renamed to a "drop-pending"
+        // namespace. Workaround this by operating on a separate DB from the other tests.
+        const NamespaceString nss("unittestsDropDB.kvDropDatabase");
+        const NamespaceString sysProfile("unittestsDropDB.system.profile");
+
+        std::string collIdent;
+        std::string indexIdent;
+        std::string sysProfileIdent;
+        // `*.system.profile` does not have an `_id` index. Just create it to abide by the API. This
+        // value will be the empty string. Helper methods accommodate this.
+        std::string sysProfileIndexIdent;
+        for (auto& tuple : {std::tie(nss, collIdent, indexIdent),
+                            std::tie(sysProfile, sysProfileIdent, sysProfileIndexIdent)}) {
+            // Save the pre-state idents so we can capture the specific idents related to collection
+            // creation.
+            std::vector<std::string> origIdents = kvCatalog->getAllIdents(_opCtx);
+            const auto& nss = std::get<0>(tuple);
+
+            // Non-replicated namespaces are wrapped in an unreplicated writes block. This has the
+            // side-effect of not timestamping the collection creation.
+            repl::UnreplicatedWritesBlock notReplicated(_opCtx);
+            if (nss.isReplicated()) {
+                TimestampBlock tsBlock(_opCtx, _clock->reserveTicks(1).asTimestamp());
+                reset(nss);
+            } else {
+                reset(nss);
+            }
+
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+
+            // Bind the local values to the variables in the parent scope.
+            auto& collIdent = std::get<1>(tuple);
+            auto& indexIdent = std::get<2>(tuple);
+            std::tie(collIdent, indexIdent) = getNewCollectionIndexIdent(kvCatalog, origIdents);
+        }
+
+        const Timestamp postCreateTime = _clock->reserveTicks(1).asTimestamp();
+
+        // Assert that `kvDropDatabase` came into creation between `syncTime` and `postCreateTime`.
+        assertIdentsMissingAtTimestamp(kvCatalog, collIdent, indexIdent, syncTime);
+        assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postCreateTime);
+
+        // `system.profile` is never timestamped. This means the creation appears to have taken
+        // place at the beginning of time.
+        assertIdentsExistAtTimestamp(kvCatalog, sysProfileIdent, sysProfileIndexIdent, syncTime);
+        assertIdentsExistAtTimestamp(
+            kvCatalog, sysProfileIdent, sysProfileIndexIdent, postCreateTime);
+
+        AutoGetCollection coll(_opCtx, nss, LockMode::MODE_X);
+        {
+            // Drop/rename `kvDropDatabase`. `system.profile` does not get dropped/renamed.
+            WriteUnitOfWork wuow(_opCtx);
+            Database* db = coll.getDb();
+            ASSERT_OK(db->dropCollection(_opCtx, nss.ns()));
+            wuow.commit();
+        }
+
+        // Reserve two ticks. The first represents after the rename in which the `kvDropDatabase`
+        // idents still exist. The second will be used by the `dropDatabase`, as that only looks
+        // at the clock; it does not advance it.
+        const Timestamp postRenameTime = _clock->reserveTicks(2).asTimestamp();
+        // The namespace has changed, but the ident still exists as-is after the rename.
+        assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postRenameTime);
+
+        // Primaries and secondaries call `dropDatabase` (and thus, `StorageEngine->dropDatabase`)
+        // in different contexts. Both contexts must end up with correct results.
+        if (IsPrimary) {
+            // Primaries call `StorageEngine->dropDatabase` outside of the WUOW that logs the
+            // `dropDatabase` oplog entry. It is not called in the context of a `TimestampBlock`.
+
+            ASSERT_OK(dropDatabase(_opCtx, nss.db().toString()));
+        } else {
+            // Secondaries processing a `dropDatabase` oplog entry wrap the call in an
+            // UnreplicatedWritesBlock and a TimestampBlock with the oplog entry's optime.
+
+            repl::UnreplicatedWritesBlock norep(_opCtx);
+            const Timestamp preDropTime = _clock->getClusterTime().asTimestamp();
+            TimestampBlock dropTime(_opCtx, preDropTime);
+            ASSERT_OK(dropDatabase(_opCtx, nss.db().toString()));
+        }
+
+        const Timestamp postDropTime = _clock->reserveTicks(1).asTimestamp();
+
+        // First, assert that `system.profile` never seems to have existed.
+        for (const auto& ts : {syncTime, postCreateTime, postDropTime}) {
+            assertIdentsMissingAtTimestamp(kvCatalog, sysProfileIdent, sysProfileIndexIdent, ts);
+        }
+
+        // Now assert that `kvDropDatabase` still existed at `postCreateTime`, but was deleted at
+        // `postDropTime`.
+        assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postCreateTime);
+        assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postRenameTime);
+        assertIdentsMissingAtTimestamp(kvCatalog, collIdent, indexIdent, postDropTime);
+    }
+};
+
+
 class AllStorageTimestampTests : public unittest::Suite {
 public:
     AllStorageTimestampTests() : unittest::Suite("StorageTimestampTests") {}
@@ -1211,6 +1478,10 @@ public:
         add<SetMinValidInitialSyncFlag>();
         add<SetMinValidToAtLeast>();
         add<SetMinValidAppliedThrough>();
+        add<ReaperDropIsTimestamped>();
+        // KVDropDatabase<IsPrimary>
+        add<KVDropDatabase<false>>();
+        add<KVDropDatabase<true>>();
     }
 };
 

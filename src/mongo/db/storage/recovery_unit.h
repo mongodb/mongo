@@ -161,7 +161,9 @@ public:
      * must not be called while a commit timestamp is set.
      */
     virtual void setCommitTimestamp(Timestamp timestamp) {}
+
     virtual void clearCommitTimestamp() {}
+
     virtual Timestamp getCommitTimestamp() {
         return {};
     }

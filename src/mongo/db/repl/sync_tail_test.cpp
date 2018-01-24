@@ -1645,7 +1645,8 @@ TEST_F(IdempotencyTest, InsertToFCVCollectionBesidesFCVDocumentSucceeds) {
 }
 
 TEST_F(IdempotencyTest, DropDatabaseSucceeds) {
-    auto ns = NamespaceString("foo.bar");
+    // Choose `system.profile` so the storage engine doesn't expect the drop to be timestamped.
+    auto ns = NamespaceString("foo.system.profile");
     ::mongo::repl::createCollection(_opCtx.get(), ns, CollectionOptions());
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
@@ -1803,7 +1804,8 @@ TEST_F(SyncTailTest, UpgradeWithNoUUIDFailsInSecondary) {
 }
 
 TEST_F(SyncTailTest, DropDatabaseSucceedsInRecovering) {
-    auto ns = NamespaceString("foo.bar");
+    // Choose `system.profile` so the storage engine doesn't expect the drop to be timestamped.
+    auto ns = NamespaceString("foo.system.profile");
     ::mongo::repl::createCollection(_opCtx.get(), ns, CollectionOptions());
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));

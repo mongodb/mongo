@@ -84,7 +84,9 @@ public:
     Status setTimestamp(Timestamp timestamp) override;
 
     void setCommitTimestamp(Timestamp timestamp) override;
+
     void clearCommitTimestamp() override;
+
     Timestamp getCommitTimestamp() override;
 
     Status selectSnapshot(Timestamp timestamp) override;

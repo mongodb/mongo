@@ -221,6 +221,25 @@ Status NamespaceString::checkLengthForRename(
     return Status::OK();
 }
 
+bool NamespaceString::isReplicated() const {
+    if (isLocal()) {
+        return false;
+    }
+
+    // Of collections not in the `local` database, only `system` collections might not be
+    // replicated.
+    if (!isSystem()) {
+        return true;
+    }
+
+    if (isSystemDotProfile()) {
+        return false;
+    }
+
+    // E.g: `system.version` is replicated.
+    return true;
+}
+
 std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss) {
     return stream << nss.toString();
 }

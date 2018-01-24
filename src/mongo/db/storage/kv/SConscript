@@ -52,6 +52,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'kv_database_catalog_entry_core',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/logical_clock',
+    ],
 )
 
 env.Library(

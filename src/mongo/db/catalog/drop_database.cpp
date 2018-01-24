@@ -137,7 +137,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
         auto dropPendingGuard = MakeGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
 
         std::vector<NamespaceString> collectionsToDrop;
-        for (auto collection : *db) {
+        for (Collection* collection : *db) {
             const auto& nss = collection->ns();
             if (nss.isDropPendingNamespace() && replCoord->isReplEnabled() &&
                 opCtx->writesAreReplicated()) {
@@ -157,7 +157,20 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
               << " collections";
         for (auto nss : collectionsToDrop) {
             log() << "dropDatabase " << dbName << " - dropping collection: " << nss;
+            if (!opCtx->writesAreReplicated()) {
+                // Dropping a database on a primary replicates individual collection drops
+                // followed by a database drop oplog entry. When a secondary observes the database
+                // drop oplog entry, all of the replicated collections that were dropped must have
+                // been processed. Only non-replicated collections like `system.profile` should be
+                // left to remove. Collections with the `tmp.mr` namespace may or may not be
+                // getting replicated; be conservative and assume they are not.
+                invariant(!nss.isReplicated() || nss.coll().startsWith("tmp.mr"));
+            }
+
             WriteUnitOfWork wunit(opCtx);
+            // A primary processing this will assign a timestamp when the operation is written to
+            // the oplog. As stated above, a secondary processing must only observe non-replicated
+            // collections, thus this should not be timestamped.
             fassertStatusOK(40476, db->dropCollectionEvenIfSystem(opCtx, nss));
             wunit.commit();
         }

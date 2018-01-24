@@ -32,12 +32,14 @@
 
 #include <algorithm>
 
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -290,32 +292,156 @@ Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
         entry = it->second;
     }
 
+    std::list<std::string> toDrop;
+    entry->getCollectionNamespaces(&toDrop);
+
+    // Partition `toDrop` into ranges of `[untimestampedCollections...,
+    // timestampedCollections...]`. All timestamped collections must have already been renamed to
+    // a drop-pending namespace. Running without replication treats all collections as not
+    // timestamped.
+    auto untimestampedDropsEnd =
+        std::partition(toDrop.begin(), toDrop.end(), [](const std::string& dropNs) {
+            return !NamespaceString(dropNs).isDropPendingNamespace();
+        });
+
+    // The primary caller (`DatabaseImpl::dropDatabase`) of this method currently
+    // `transitional_ignore`s the result. To minimize the impact of that, while also returning a
+    // correct status, attempt to drop every collection, and if there were any errors, return the
+    // first one.
+    Status firstError = Status::OK();
+
+    // First drop the "non-timestamped" collections. "Non-timestamped" collections such as user
+    // collections in `local` or `system.profile` do not get rolled back. This means we also
+    // should not rollback their creation or deletion. To achieve that, the code takes care to
+    // suppress any timestamping state.
+    firstError = _dropCollectionsNoTimestamp(opCtx, entry, toDrop.begin(), untimestampedDropsEnd);
+
+    // Now drop any leftover timestamped collections (i.e: not already dropped by the reaper).  On
+    // secondaries there is already a `commit timestamp` set and these drops inherit the timestamp
+    // of the `dropDatabase` oplog entry. On primaries, we look at the logical clock and set the
+    // commit timestamp state.
+    //
+    // Additionally, before returning, this method will remove the `KVDatabaseCatalogEntry` from
+    // the `_dbs` map. This action creates a new constraint that this "timestamped drop" method
+    // must happen after the "non-timestamped drops".
+    auto status =
+        _dropCollectionsWithTimestamp(opCtx, entry, toDrop, untimestampedDropsEnd, toDrop.end());
+    if (firstError.isOK()) {
+        firstError = status;
+    }
+
+    return firstError;
+}
+
+/**
+ * Returns the first `dropCollection` error that this method encounters. This method will attempt
+ * to drop all collections, regardless of the error status.
+ */
+Status KVStorageEngine::_dropCollectionsNoTimestamp(OperationContext* opCtx,
+                                                    KVDatabaseCatalogEntryBase* dbce,
+                                                    CollIter begin,
+                                                    CollIter end) {
+    // On primaries, this method will be called outside of any `TimestampBlock` state meaning the
+    // "commit timestamp" will not be set. For this case, this method needs no special logic to
+    // avoid timestamping the upcoming writes.
+    //
+    // On secondaries, there will be a wrapping `TimestampBlock` and the "commit timestamp" will
+    // be set. Carefully save that to the side so the following writes can go through without that
+    // context.
+    const Timestamp commitTs = opCtx->recoveryUnit()->getCommitTimestamp();
+    if (!commitTs.isNull()) {
+        opCtx->recoveryUnit()->clearCommitTimestamp();
+    }
+
+    // Ensure the method exits with the same "commit timestamp" state that it was called with.
+    auto addCommitTimestamp = MakeGuard([&opCtx, commitTs] {
+        if (!commitTs.isNull()) {
+            opCtx->recoveryUnit()->setCommitTimestamp(commitTs);
+        }
+    });
+
+    Status firstError = Status::OK();
+    WriteUnitOfWork untimestampedDropWuow(opCtx);
+    for (auto toDrop = begin; toDrop != end; ++toDrop) {
+        std::string coll = *toDrop;
+        NamespaceString nss(coll);
+
+        // When in steady state replication and after filtering out drop-pending namespaces, the
+        // only collections that may show up here are either 1) not replicated 2) `tmp.mr`.
+        if (_initialDataTimestamp != Timestamp::kAllowUnstableCheckpointsSentinel) {
+            invariant(!nss.isReplicated() || nss.coll().startsWith("tmp.mr"),
+                      str::stream() << "Collection drop is not being timestamped. Namespace: "
+                                    << nss.ns());
+        }
+
+        Status result = dbce->dropCollection(opCtx, coll);
+        if (!result.isOK() && firstError.isOK()) {
+            firstError = result;
+        }
+    }
+
+    untimestampedDropWuow.commit();
+    return firstError;
+}
+
+Status KVStorageEngine::_dropCollectionsWithTimestamp(OperationContext* opCtx,
+                                                      KVDatabaseCatalogEntryBase* dbce,
+                                                      std::list<std::string>& toDrop,
+                                                      CollIter begin,
+                                                      CollIter end) {
+    // On primaries, these collection drops are performed in a separate WUOW than the insertion of
+    // the `dropDatabase` oplog entry. In this case, we expect the `existingCommitTs` to be null
+    // and the code looks at the logical clock to assign a timestamp to the writes.
+    //
+    // Secondaries reach this from within a `TimestampBlock` where there should be a non-null
+    // `existingCommitTs`.
+    const Timestamp existingCommitTs = opCtx->recoveryUnit()->getCommitTimestamp();
+
+    // `LogicalClock`s on standalones and master/slave do not necessarily return real
+    // optimes. Assume it's safe to not timestamp the write.
+    const Timestamp chosenCommitTs = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+    const bool setCommitTs = existingCommitTs.isNull() && !chosenCommitTs.isNull();
+    if (setCommitTs) {
+        opCtx->recoveryUnit()->setCommitTimestamp(chosenCommitTs);
+    }
+
+    // Ensure the method exits with the same "commit timestamp" state that it was called with.
+    auto removeCommitTimestamp = MakeGuard([&opCtx, setCommitTs] {
+        if (setCommitTs) {
+            opCtx->recoveryUnit()->clearCommitTimestamp();
+        }
+    });
+
     // This is called outside of a WUOW since MMAPv1 has unfortunate behavior around dropping
     // databases. We need to create one here since we want db dropping to all-or-nothing
     // wherever possible. Eventually we want to move this up so that it can include the logOp
     // inside of the WUOW, but that would require making DB dropping happen inside the Dur
     // system for MMAPv1.
-    WriteUnitOfWork wuow(opCtx);
+    WriteUnitOfWork timestampedDropWuow(opCtx);
 
-    std::list<std::string> toDrop;
-    entry->getCollectionNamespaces(&toDrop);
+    Status firstError = Status::OK();
+    for (auto toDropStr = begin; toDropStr != toDrop.end(); ++toDropStr) {
+        std::string coll = *toDropStr;
+        NamespaceString nss(coll);
 
-    for (std::list<std::string>::iterator it = toDrop.begin(); it != toDrop.end(); ++it) {
-        string coll = *it;
-        entry->dropCollection(opCtx, coll).transitional_ignore();
+        Status result = dbce->dropCollection(opCtx, coll);
+        if (!result.isOK() && firstError.isOK()) {
+            firstError = result;
+        }
     }
+
     toDrop.clear();
-    entry->getCollectionNamespaces(&toDrop);
+    dbce->getCollectionNamespaces(&toDrop);
     invariant(toDrop.empty());
 
     {
         stdx::lock_guard<stdx::mutex> lk(_dbsLock);
-        opCtx->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
-        _dbs.erase(db.toString());
+        opCtx->recoveryUnit()->registerChange(new RemoveDBChange(this, dbce->name(), dbce));
+        _dbs.erase(dbce->name());
     }
 
-    wuow.commit();
-    return Status::OK();
+    timestampedDropWuow.commit();
+    return firstError;
 }
 
 int KVStorageEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
@@ -369,6 +495,7 @@ void KVStorageEngine::setStableTimestamp(Timestamp stableTimestamp) {
 }
 
 void KVStorageEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
+    _initialDataTimestamp = initialDataTimestamp;
     _engine->setInitialDataTimestamp(initialDataTimestamp);
 }
 
