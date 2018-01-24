@@ -46,9 +46,14 @@ load("jstests/replsets/rslib.js");
 
     // Wait for the secondary to catch up by replicating a doc to both nodes.
     assert.writeOK(primary.getDB("test").bar.insert({x: 3}, {writeConcern: {w: "majority"}}));
-    // Step up the secondary and succeed.
-    res = secondary.adminCommand({replSetStepUp: 1});
-    assert.commandWorked(res);
+
+    // Step up the secondary. Retry since the old primary may step down when we try to ask for its
+    // vote.
+    assert.soonNoExcept(function() {
+        return secondary.adminCommand({replSetStepUp: 1}).ok;
+    });
+
+    // Make sure the step up succeeded.
     assert.eq(secondary, rst.getPrimary());
 
 })();
