@@ -38,22 +38,20 @@ def env_get_os_name_wrapper(self):
     return self['TARGET_OS']
 
 def is_os_raw(target_os, os_list_to_check):
-    okay = False
-
     darwin_os_list = [ 'macOS', 'tvOS', 'tvOS-sim', 'iOS', 'iOS-sim' ]
-    posix_os_list = [ 'linux', 'openbsd', 'freebsd', 'solaris' ] + darwin_os_list
+    linux_os_list = [ 'android', 'linux' ]
+    posix_os_list = [ 'openbsd', 'freebsd', 'solaris' ] + darwin_os_list + linux_os_list
 
-    for p in os_list_to_check:
-        if p == 'posix' and target_os in posix_os_list:
-            okay = True
-            break
-        if p == 'darwin' and target_os in darwin_os_list:
-            okay = True
-            break
-        elif p == target_os:
-            okay = True
-            break
-    return okay
+    os_families = {
+            "darwin": darwin_os_list,
+            "posix": posix_os_list,
+            "linux": linux_os_list,
+    }
+
+    for os in os_list_to_check:
+        if os == target_os or ( os in os_families and target_os in os_families[os] ):
+            return True
+    return False
 
 # This function tests the running OS as identified by Python
 # It should only be used to set up defaults for options/variables, because

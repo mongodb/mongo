@@ -1,5 +1,4 @@
-/**
- *    Copyright (C) 2013 10gen Inc.
+/*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,55 +25,4 @@
  *    then also delete it in the license file.
  */
 
-#pragma once
-
-#include <string>
-
-#include "mongo/base/disallow_copying.h"
-
-namespace mongo {
-namespace unittest {
-
-/**
- * An RAII temporary directory that deletes itself and all contents files on scope exit.
- */
-class TempDir {
-    MONGO_DISALLOW_COPYING(TempDir);
-
-public:
-    /**
-     * Creates a new unique temporary directory.
-     *
-     * Throws if this fails for any reason, such as bad permissions.
-     *
-     * The leaf of the directory path will start with namePrefix and have
-     * unspecified characters added to ensure uniqueness.
-     *
-     * namePrefix must not contain either / or \
-     */
-    explicit TempDir(const std::string& namePrefix);
-
-    /**
-     * Delete the directory and all contents.
-     *
-     * This only does best-effort. In particular no new files should be created in the directory
-     * once the TempDir goes out of scope. Any errors are logged and ignored.
-     */
-    ~TempDir();
-
-    const std::string& path() {
-        return _path;
-    }
-
-    /**
-     * Set the path where TempDir() will create temporary directories. This is a workaround
-     * for situations where you might want to log, but you've not yet run the MONGO_INITIALIZERs,
-     * and should be removed if ever command line parsing is seperated from MONGO_INITIALIZERs.
-     */
-    static void setTempPath(std::string tempPath);
-
-private:
-    std::string _path;
-};
-}  // namespace unittest
-}  // namespace mongo
+#include "mongo/util/processinfo_linux.cpp"

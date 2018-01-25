@@ -1061,6 +1061,7 @@ os_macros = {
     # the above declarations since we will never target them with anything other than XCode 8.
     "macOS": "defined(__APPLE__) && (TARGET_OS_OSX || (TARGET_OS_MAC && !TARGET_OS_IPHONE))",
     "linux": "defined(__linux__)",
+    "android": "defined(__ANDROID__)",
 }
 
 def CheckForOS(context, which_os):
@@ -1180,8 +1181,10 @@ env['TARGET_OS_FAMILY'] = 'posix' if env.TargetOSIs('posix') else env.GetTargetO
 # options for some strange reason in SCons. Instead, we store this
 # option as a new variable in the environment.
 if get_option('allocator') == "auto":
+    # using an allocator besides system on android would require either fixing or disabling
+    # gperftools on android
     if env.TargetOSIs('windows') or \
-       env.TargetOSIs('linux'):
+       env.TargetOSIs('linux') and not env.TargetOSIs('android'):
         env['MONGO_ALLOCATOR'] = "tcmalloc"
     else:
         env['MONGO_ALLOCATOR'] = "system"
@@ -1450,7 +1453,9 @@ else:
     env.AppendUnique( CPPDEFINES=[ 'NDEBUG' ] )
 
 if env.TargetOSIs('linux'):
-    env.Append( LIBS=['m',"resolv"] )
+    env.Append( LIBS=["m"] )
+    if not env.TargetOSIs('android'):
+        env.Append( LIBS=["resolv"] )
 
 elif env.TargetOSIs('solaris'):
      env.Append( LIBS=["socket","resolv","lgrp"] )

@@ -484,6 +484,17 @@ functions:
         done
         fi
 
+  "setup android toolchain" :
+    command: shell.exec
+    params:
+      script: |
+        set -o errexit
+        set -o verbose
+        if [ "${setup_android_toolchain|}" = "true" ]; then
+            ${activate_virtualenv}
+            PYTHON=$python ${compile_env|} src/buildscripts/setup-android-toolchain.sh
+        fi
+
   "build cdriver" :
     command: shell.exec
     params:
@@ -491,15 +502,17 @@ functions:
         set -o errexit
         set -o verbose
         if [ "${build_cdriver|}" = "true" ]; then
-        CDRIVER_VERSION=1.6.3
+        CDRIVER_VERSION=1.9.2
         rm -rf mongo-c-driver-$CDRIVER_VERSION
         rm -rf mongo-c-driver
         curl -LO https://github.com/mongodb/mongo-c-driver/releases/download/$CDRIVER_VERSION/mongo-c-driver-$CDRIVER_VERSION.tar.gz
         tar xzf mongo-c-driver-$CDRIVER_VERSION.tar.gz
         mv mongo-c-driver-$CDRIVER_VERSION mongo-c-driver
         cd mongo-c-driver
+        # remove this patch once SERVER-33101 is released
+        patch -p1 < ../src/buildscripts/mongoc-stat.c.diff
         export ${compile_env|}
-        ./configure --prefix=$(pwd)/install --build x86_64-apple-darwin --with-libbson=bundled --disable-automatic-init-and-cleanup --disable-ssl --disable-sasl --disable-examples --disable-man-pages --disable-html-docs --disable-shm-counters --disable-shared --enable-static ${cdriver_configure_flags|}
+        ./configure --prefix=$(pwd)/install --with-libbson=bundled --disable-automatic-init-and-cleanup --disable-ssl --disable-sasl --disable-examples --disable-man-pages --disable-html-docs --disable-shm-counters --disable-shared --enable-static ${cdriver_configure_flags|}
         make
         make install
         fi
@@ -952,6 +965,24 @@ functions:
         if [ ${enable_ios_sim_tests|false} = "true" ]; then
             ${compile_env|} $python buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_capi_test"
             ${compile_env|} $python buildscripts/runiossim.py --test "build/debug/mongo/client/embedded/mongo_embedded_transport_test"
+        fi
+
+  "run android emulator tests" :
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        set -o errexit
+
+        ${activate_virtualenv}
+        if [ ${enable_android_emu_tests|false} = "true" ]; then
+            # strip because the binaries with debug symbols are too big for the default storage on the emulator
+            $(dirname $(pwd))/android_toolchain/bin/aarch64-linux-android-strip "build/debug/mongo/client/embedded/mongo_embedded_capi_test"
+            $(dirname $(pwd))/android_toolchain/bin/aarch64-linux-android-strip "build/debug/mongo/client/embedded/mongo_embedded_transport_test"
+            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk "build/debug/mongo/client/embedded/mongo_embedded_capi_test"
+            ${compile_env|} buildscripts/runandroidsim.sh $(dirname $(pwd))/android_sdk "build/debug/mongo/client/embedded/mongo_embedded_transport_test"
         fi
 
   "run powercycle test" :
@@ -2367,6 +2398,7 @@ tasks:
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+    - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
     - func: "build cdriver" # noop if ${build_cdriver} is not "true"
     - *generate_compile_expansions
     # Then we load the generated version data into the agent so we can use it in task definitions.
@@ -2412,8 +2444,12 @@ tasks:
         run_multiple_jobs: true
 
     # Run the iOS embedded CAPI tests in the iOS simulator
-    # noop if ${run_ios_embedded_tests} is not "true"
+    # noop if ${enable_ios_sim_tests} is not "true"
     - func: "run ios sim embedded tests"
+
+    # Run the android embedded CAPI tests in the android emulator
+    # noop if ${enable_android_emu_tests} is not "true"
+    - func: "run android emulator tests"
 
 ## lint ##
 - name: lint
@@ -6273,9 +6309,9 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     build_cdriver: true
-    cdriver_configure_flags: --host arm-apple-darwin CC="$(xcrun -f --sdk iphoneos clang)" CXX="$(xcrun -f --sdk iphoneos clang++)" CPPFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode"  CFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode" CXXFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode" LDFLAGS="-miphoneos-version-min=10.2 -arch arm64"
+    cdriver_configure_flags: --build x86_64-apple-darwin --host arm-apple-darwin CC="$(xcrun -f --sdk iphoneos clang)" CXX="$(xcrun -f --sdk iphoneos clang++)" CPPFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode"  CFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode" CXXFLAGS="-isysroot $(xcrun --sdk iphoneos --show-sdk-path) -miphoneos-version-min=10.2 -arch arm64 -fembed-bitcode" LDFLAGS="-miphoneos-version-min=10.2 -arch arm64"
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --variables-files=etc/scons/xcode_ios.vars  CPPPATH="$(dirname $PWD)/mongo-c-driver/install/include/libbson-1.0 $(dirname $PWD)/mongo-c-driver/install/include/libmongoc-1.0" LIBPATH="$(dirname $PWD)/mongo-c-driver/install/lib" all
+    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --variables-files=etc/scons/xcode_ios.vars  CPPPATH="$(dirname $PWD)/mongo-c-driver/install/include/libbson-1.0 $(dirname $PWD)/mongo-c-driver/install/include/libmongoc-1.0" LIBPATH="$(dirname $PWD)/mongo-c-driver/install/lib"
     disable_unit_tests: true
   tasks:
   - name: compile_all
@@ -6287,9 +6323,9 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     build_cdriver: true
-    cdriver_configure_flags: --host x86_64-apple-darwin16.6.0 CC="$(xcrun -f --sdk iphonesimulator clang)" CXX="$(xcrun -f --sdk iphonesimulator clang++)" CPPFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"  CFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2" CXXFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2" LDFLAGS="-miphoneos-version-min=10.2"
+    cdriver_configure_flags: --build x86_64-apple-darwin --host x86_64-apple-darwin16.6.0 CC="$(xcrun -f --sdk iphonesimulator clang)" CXX="$(xcrun -f --sdk iphonesimulator clang++)" CPPFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2"  CFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2" CXXFLAGS="-isysroot $(xcrun --sdk iphonesimulator --show-sdk-path) -miphoneos-version-min=10.2" LDFLAGS="-miphoneos-version-min=10.2"
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --variables-files=etc/scons/xcode_ios_sim.vars CPPPATH="$(dirname $PWD)/mongo-c-driver/install/include/libbson-1.0 $(dirname $PWD)/mongo-c-driver/install/include/libmongoc-1.0" LIBPATH="$(dirname $PWD)/mongo-c-driver/install/lib" all
+    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --variables-files=etc/scons/xcode_ios_sim.vars CPPPATH="$(dirname $PWD)/mongo-c-driver/install/include/libbson-1.0 $(dirname $PWD)/mongo-c-driver/install/include/libmongoc-1.0" LIBPATH="$(dirname $PWD)/mongo-c-driver/install/lib"
     disable_unit_tests: true
     enable_ios_sim_tests: true
   tasks:
@@ -6302,7 +6338,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_tvos.vars all
+    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_tvos.vars
     disable_unit_tests: true
   tasks:
   - name: compile_all
@@ -6314,8 +6350,24 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_tvos_sim.vars all
+    compile_flags: -j$(sysctl -n hw.logicalcpu) --dbg=on --disable-warnings-as-errors --js-engine=none --variables-files=etc/scons/xcode_tvos_sim.vars
     disable_unit_tests: true
+  tasks:
+  - name: compile_all
+
+- name: android-emulator
+  display_name: "Android emulator DEBUG"
+  run_on:
+  - ubuntu1604-build
+  batchtime: 1440 # 1 day
+  expansions:
+    build_cdriver: true
+    cdriver_configure_flags: --prefix=$(pwd)/install --host aarch64-unknown-linux-gnu CC=$(dirname $(pwd))/android_toolchain/bin/clang CXX=$(dirname $(pwd))/android_toolchain/clang++
+    compile_env: JAVA_HOME=/opt/java/jdk8/
+    compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=on --android-toolchain-path=$(dirname $(pwd))/android_toolchain --variables-files=etc/scons/android_toolchain.vars CPPPATH="$(dirname $(pwd))/mongo-c-driver/install/include/libbson-1.0 $(dirname $(pwd))/mongo-c-driver/install/include/libmongoc-1.0" LIBPATH="$(dirname $(pwd))/mongo-c-driver/install/lib"
+    disable_unit_tests: true
+    enable_android_emu_tests: true
+    setup_android_toolchain: true
   tasks:
   - name: compile_all
 

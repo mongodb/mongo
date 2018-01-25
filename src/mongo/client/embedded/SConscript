@@ -121,6 +121,9 @@ capiTest = env.Program(
         '$BUILD_DIR/mongo/util/net/network',
         'mongo_embedded_capi',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_options_core',
+    ],
 )
 
 env.RegisterUnitTest(capiTest[0])
@@ -137,6 +140,9 @@ embeddedTransport = env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         'mongo_embedded_capi',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/third_party/shim_zlib',
     ],
     SYSLIBDEPS=[
         'mongoc-1.0',
@@ -156,7 +162,10 @@ embeddedTransportTest = env.Program(
         'mongo_embedded_transport',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/unittest/unittest',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_options_core',
+    ],
 )
 
 env.Alias('embedded_capi', embeddedTransportTest)

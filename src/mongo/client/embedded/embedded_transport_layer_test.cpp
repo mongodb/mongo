@@ -26,18 +26,25 @@
  *    it in the license file.
  */
 
-
 #include "mongo/client/embedded/embedded_transport_layer.h"
-#include "mongo/client/embedded/functions_for_test.h"
-#include "mongo/client/embedded/libmongodbcapi.h"
+
 #include <mongoc.h>
 #include <set>
 
+#include "mongo/client/embedded/functions_for_test.h"
+#include "mongo/client/embedded/libmongodbcapi.h"
+#include "mongo/db/server_options.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers_synchronous.h"
+
+namespace moe = mongo::optionenvironment;
+
 namespace {
 
 std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
@@ -49,10 +56,8 @@ protected:
             globalTempDir = mongo::stdx::make_unique<mongo::unittest::TempDir>("embedded_mongo");
         }
         int argc = 4;
-        const char* argv[] = {"mongo_embedded_transport_layer_test",
-                              "--nounixsocket",
-                              "--dbpath",
-                              globalTempDir->path().c_str()};
+        const char* argv[] = {
+            "mongo_embedded_transport_layer_test", "--dbpath", globalTempDir->path().c_str()};
         db_handle = libmongodbcapi_db_new(argc, argv, nullptr);
 
         mongoc_init();
@@ -156,8 +161,28 @@ TEST_F(MongodbEmbeddedTransportLayerTest, InsertAndDelete) {
 // call runGlobalInitializers(). The embedded C API calls mongoDbMain() which
 // calls runGlobalInitializers().
 int main(int argc, char** argv, char** envp) {
+
+    moe::OptionsParser parser;
+    moe::Environment environment;
+    moe::OptionSection options;
+    std::map<std::string, std::string> env;
+
+    options.addOptionChaining(
+        "tempPath", "tempPath", moe::String, "directory to place mongo::TempDir subdirectories");
+    std::vector<std::string> argVector(argv, argv + argc);
+    mongo::Status ret = parser.run(options, argVector, env, &environment);
+    if (!ret.isOK()) {
+        std::cerr << options.helpString();
+        return EXIT_FAILURE;
+    }
+    if (environment.count("tempPath")) {
+        ::mongo::unittest::TempDir::setTempPath(environment["tempPath"].as<std::string>());
+    }
+
     ::mongo::clearSignalMask();
     ::mongo::setupSynchronousSignalHandlers();
+    ::mongo::serverGlobalParams.noUnixSocket = true;
+    ::mongo::unittest::setupTestLogger();
     auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
     globalTempDir.reset();
     mongo::quickExit(result);

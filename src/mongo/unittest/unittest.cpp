@@ -78,11 +78,15 @@ logger::LogstreamBuilder log() {
     return LogstreamBuilder(unittestOutput, getThreadName(), logger::LogSeverity::Log());
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(UnitTestOutput, ("GlobalLogManager", "default"))
-(InitializerContext*) {
+void setupTestLogger() {
     unittestOutput->attachAppender(logger::MessageLogDomain::AppenderAutoPtr(
         new logger::ConsoleAppender<logger::MessageLogDomain::Event>(
             new logger::MessageEventDetailsEncoder)));
+}
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(UnitTestOutput, ("GlobalLogManager", "default"))
+(InitializerContext*) {
+    setupTestLogger();
     return Status::OK();
 }
 

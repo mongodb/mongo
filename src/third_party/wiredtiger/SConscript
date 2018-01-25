@@ -63,8 +63,12 @@ elif env.TargetOSIs('freebsd'):
 elif env.TargetOSIs('openbsd'):
     env.Append(CPPPATH=["build_openbsd"])
 elif env.TargetOSIs('linux'):
-    env.Append(CPPPATH=["build_linux"])
-    env.Append(CPPDEFINES=["_GNU_SOURCE"])
+    if env.TargetOSIs('android'):
+        env.Append(CPPPATH=["build_android"])
+        env.Append(CPPDEFINES=["_GNU_SOURCE"])
+    else:
+        env.Append(CPPPATH=["build_linux"])
+        env.Append(CPPDEFINES=["_GNU_SOURCE"])
 else:
     print("Wiredtiger is not supported on this platform. " +
         "Please generate an approriate wiredtiger_config.h")

@@ -107,5 +107,11 @@ TempDir::~TempDir() {
                   << "': " << e.what() << ". Ignoring and continuing.";
     }
 }
+
+void TempDir::setTempPath(string tempPath) {
+    invariant(defaultRoot.empty());
+    defaultRoot = std::move(tempPath);
+}
+
 }  // namespace unittest
 }  // namespace mongo
