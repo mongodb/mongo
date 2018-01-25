@@ -367,9 +367,16 @@ Status KVStorageEngine::_dropCollectionsNoTimestamp(OperationContext* opCtx,
         NamespaceString nss(coll);
 
         // When in steady state replication and after filtering out drop-pending namespaces, the
-        // only collections that may show up here are either 1) not replicated 2) `tmp.mr`.
+        // only collections that may show up here are either 1) not replicated 2) `tmp.mr` 3)
+        // `system.indexes`.
+        //
+        // Due to a bug in the `createCollection` command, `system.indexes` can become a real
+        // collection in the storage engine's catalog. However, this collection is often treated
+        // as a special collection. For example, dropping a database will skip over
+        // `system.indexes` and it will never be renamed to the drop pending namespace.
         if (_initialDataTimestamp != Timestamp::kAllowUnstableCheckpointsSentinel) {
-            invariant(!nss.isReplicated() || nss.coll().startsWith("tmp.mr"),
+            invariant(!nss.isReplicated() || nss.coll().startsWith("tmp.mr") ||
+                          nss.isSystemDotIndexes(),
                       str::stream() << "Collection drop is not being timestamped. Namespace: "
                                     << nss.ns());
         }
