@@ -124,14 +124,6 @@ bool BackgroundOperation::inProgForDb(StringData db) {
     return dbsInProg.find(db) != dbsInProg.end();
 }
 
-int BackgroundOperation::numInProgForDb(StringData db) {
-    stdx::lock_guard<stdx::mutex> lk(m);
-    std::shared_ptr<BgInfo> bgInfo = mapFindWithDefault(dbsInProg, db, std::shared_ptr<BgInfo>());
-    if (!bgInfo)
-        return 0;
-    return bgInfo->getOpsInProgCount();
-}
-
 bool BackgroundOperation::inProgForNs(StringData ns) {
     stdx::lock_guard<stdx::mutex> lk(m);
     return nsInProg.find(ns) != nsInProg.end();
@@ -153,6 +145,13 @@ void BackgroundOperation::assertNoBgOpInProgForNs(StringData ns) {
                    "collection "
                 << ns,
             !inProgForNs(ns));
+}
+
+void BackgroundOperation::awaitNoBgOpInProgForDbs(std::vector<StringData> dbs) {
+    stdx::unique_lock<stdx::mutex> lk(m);
+    for (auto db : dbs) {
+        awaitNoBgOps(lk, &dbsInProg, db);
+    }
 }
 
 void BackgroundOperation::awaitNoBgOpInProgForDb(StringData db) {
