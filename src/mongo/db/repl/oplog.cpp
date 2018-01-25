@@ -418,7 +418,10 @@ OpTime logOp(OperationContext* opCtx,
              const OplogLink& oplogLink) {
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
-        invariant(statementId == kUninitializedStmtId);
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "retryable writes is not supported for unreplicated ns: "
+                              << nss.ns(),
+                statementId == kUninitializedStmtId);
         return {};
     }
 
@@ -462,7 +465,10 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
 
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
-        invariant(begin->stmtId == kUninitializedStmtId);
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "retryable writes is not supported for unreplicated ns: "
+                              << nss.ns(),
+                begin->stmtId == kUninitializedStmtId);
         return {};
     }
 
