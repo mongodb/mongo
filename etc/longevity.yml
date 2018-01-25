@@ -61,6 +61,8 @@ functions:
           storageEngine: ${storageEngine}
           test: ${test}.longevity
           production: true
+          workloads_dir: ../src/workloads/workloads
+          ycsb_dir: ../src/YCSB/YCSB
 
           # compositions of expansions
           mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
