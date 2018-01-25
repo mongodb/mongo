@@ -1034,18 +1034,18 @@ private:
 };
 
 /**
- * Represents a latency measurement for each replica set member based on heartbeat requests.
- * The measurement is an average weighted 80% to the old value, and 20% to the new value.
+ * A PingStats object stores data about heartbeat attempts to a particular target node. Over the
+ * course of its lifetime, it may be used for multiple rounds of heartbeats. This allows for the
+ * collection of statistics like average heartbeat latency to a target. The heartbeat latency
+ * measurement it stores for each replica set member is an average weighted 80% to the old value,
+ * and 20% to the new value.
  *
- * Also stores information about heartbeat progress and retries.
  */
 class TopologyCoordinator::PingStats {
 public:
     /**
-     * Records that a new heartbeat request started at "now".
-     *
-     * This resets the failure count used in determining whether the next request to a target
-     * should be a retry or a regularly scheduled heartbeat message.
+     * Starts a new round of heartbeat attempts by transitioning to 'TRYING' and resetting the
+     * failure count. Also Records that a new heartbeat request started at "now".
      */
     void start(Date_t now);
 
@@ -1064,7 +1064,7 @@ public:
      * Gets the number of hit() calls.
      */
     unsigned int getCount() const {
-        return count;
+        return hitCount;
     }
 
     /**
@@ -1072,7 +1072,7 @@ public:
      * Returns 0 if there have been no pings recorded yet.
      */
     Milliseconds getMillis() const {
-        return value == UninitializedPing ? Milliseconds(0) : value;
+        return averagePingTimeMs == UninitializedPingTime ? Milliseconds(0) : averagePingTimeMs;
     }
 
     /**
@@ -1084,30 +1084,89 @@ public:
     }
 
     /**
-     * Returns true if the number of failed heartbeats has exceeded the max number
-     * of heartbeat retries or if a good heartbeat has been received since the
-     * last call to start(). Otherwise, returns false.
+     * Returns true if the number of failed heartbeats for the most recent round of attempts has
+     * exceeded the max number of heartbeat retries.
      */
-    bool hasFailed() const {
-        return (_numFailuresSinceLastStart > kMaxHeartbeatRetries) ||
-            (_goodHeartbeatReceived == true);
+    bool failed() const {
+        return _state == FAILED;
     }
 
     /**
-     * Gets the number of retries left for a failed heartbeat.
+     * Returns true if a good heartbeat has been received for the most recent round of heartbeat
+     * attempts before the maximum number of retries has been exceeded. Returns false otherwise.
      */
+    bool succeeded() const {
+        return _state == SUCCEEDED;
+    }
+
+    /**
+     * Returns true if a heartbeat attempt is currently in progress and there are still retries
+     * left.
+     */
+    bool trying() const {
+        return _state == TRYING;
+    }
+
+    /**
+     * Returns true if 'start' has never been called on this instance of PingStats. Otherwise
+     * returns false.
+     */
+    bool uninitialized() const {
+        return _state == UNINITIALIZED;
+    }
+
+    /**
+     * Gets the number of retries left for this heartbeat attempt. Invalid to call if the current
+     * state is 'UNINITIALIZED'.
+    */
     int retriesLeft() const {
         return kMaxHeartbeatRetries - _numFailuresSinceLastStart;
     }
 
 private:
-    static constexpr Milliseconds UninitializedPing{-1};
+    /**
+     * Represents the current state of this PingStats object.
+     *
+     * At creation time, a PingStats object is in the 'UNINITIALIZED' state, and will remain so
+     * until the first heartbeat attempt is initiated. Heartbeat attempts are initiated by calls to
+     * 'start', which puts the object into 'TRYING' state. If all heartbeat retries are used up
+     * before receiving a good response, it will enter the 'FAILED' state. If a good heartbeat
+     * response is received before exceeding the maximum number of retries, the object enters the
+     * 'SUCCEEDED' state. From either the 'SUCCEEDED' or 'FAILED' state, the object can go back into
+     * 'TRYING' state, to begin a new heartbeat attempt. The following is a simple state transition
+     * table illustrating this behavior:
+     *
+     * UNINITIALIZED:   [TRYING]
+     * TRYING:          [SUCCEEDED, FAILED]
+     * SUCCEEDED:       [TRYING]
+     * FAILED:          [TRYING]
+     *
+     */
+    enum HeartbeatState { UNINITIALIZED, TRYING, SUCCEEDED, FAILED };
 
-    unsigned int count = 0;
-    Milliseconds value = UninitializedPing;
+    // The current state of this PingStats object.
+    HeartbeatState _state = UNINITIALIZED;
+
+    // Represents the uninitialized value of a counter that should only ever be >=0 after
+    // initialization.
+    static constexpr int UninitializedCount{-1};
+
+    // The value of 'averagePingTimeMs' before any good heartbeats have been received.
+    static constexpr Milliseconds UninitializedPingTime{UninitializedCount};
+
+    // The number of successful heartbeats that have ever been received i.e. the total number of
+    // calls to 'PingStats::hit'.
+    unsigned int hitCount = 0;
+
+    // The running, weighted average round trip time for heartbeat messages to the target node.
+    // Weighted 80% to the old round trip ping time, and 20% to the new round trip ping time.
+    Milliseconds averagePingTimeMs = UninitializedPingTime;
+
+    // The time of the most recent call to 'PingStats::start'.
     Date_t _lastHeartbeatStartDate;
-    int _numFailuresSinceLastStart = std::numeric_limits<int>::max();
-    bool _goodHeartbeatReceived = false;
+
+    // The number of failed heartbeat attempts since the most recent call to 'PingStats::start'.
+    int _numFailuresSinceLastStart = UninitializedCount;
 };
 
 //

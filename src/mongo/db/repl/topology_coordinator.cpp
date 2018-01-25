@@ -74,7 +74,7 @@ MONGO_EXPORT_STARTUP_SERVER_PARAMETER(priorityTakeoverFreshnessWindowSeconds, in
 // re-evaluated if it lags behind another node by more than 'maxSyncSourceLagSecs' seconds.
 MONGO_FP_DECLARE(disableMaxSyncSourceLagSecs);
 
-constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPing;
+constexpr Milliseconds TopologyCoordinator::PingStats::UninitializedPingTime;
 
 std::string TopologyCoordinator::roleToString(TopologyCoordinator::Role role) {
     switch (role) {
@@ -148,18 +148,24 @@ void appendOpTime(BSONObjBuilder* bob,
 void TopologyCoordinator::PingStats::start(Date_t now) {
     _lastHeartbeatStartDate = now;
     _numFailuresSinceLastStart = 0;
-    _goodHeartbeatReceived = false;
+    _state = HeartbeatState::TRYING;
 }
 
 void TopologyCoordinator::PingStats::hit(Milliseconds millis) {
-    _goodHeartbeatReceived = true;
-    ++count;
+    _state = HeartbeatState::SUCCEEDED;
+    ++hitCount;
 
-    value = value == UninitializedPing ? millis : Milliseconds((value * 4 + millis) / 5);
+    averagePingTimeMs = averagePingTimeMs == UninitializedPingTime
+        ? millis
+        : Milliseconds((averagePingTimeMs * 4 + millis) / 5);
 }
 
 void TopologyCoordinator::PingStats::miss() {
     ++_numFailuresSinceLastStart;
+    // Transition to 'FAILED' state if this was our last retry.
+    if (_numFailuresSinceLastStart > kMaxHeartbeatRetries) {
+        _state = PingStats::HeartbeatState::FAILED;
+    }
 }
 
 TopologyCoordinator::TopologyCoordinator(Options options)
@@ -911,7 +917,7 @@ std::pair<ReplSetHeartbeatArgs, Milliseconds> TopologyCoordinator::prepareHeartb
     Date_t now, const std::string& ourSetName, const HostAndPort& target) {
     PingStats& hbStats = _pings[target];
     Milliseconds alreadyElapsed = now - hbStats.getLastHeartbeatStartDate();
-    if (!_rsConfig.isInitialized() || (hbStats.hasFailed()) ||
+    if (!_rsConfig.isInitialized() || !hbStats.trying() ||
         (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriodMillis())) {
         // This is either the first request ever for "target", or the heartbeat timeout has
         // passed, so we're starting a "new" heartbeat.
@@ -949,7 +955,7 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHear
     Date_t now, const std::string& ourSetName, const HostAndPort& target) {
     PingStats& hbStats = _pings[target];
     Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
-    if ((!_rsConfig.isInitialized()) || (hbStats.hasFailed()) ||
+    if ((!_rsConfig.isInitialized()) || !hbStats.trying() ||
         (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriodMillis())) {
         // This is either the first request ever for "target", or the heartbeat timeout has
         // passed, so we're starting a "new" heartbeat.
@@ -1026,8 +1032,9 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
 
     const Milliseconds alreadyElapsed = now - hbStats.getLastHeartbeatStartDate();
     Date_t nextHeartbeatStartDate;
-    // Determine next heartbeat start time.
-    if ((!hbStats.hasFailed()) && (alreadyElapsed < _rsConfig.getHeartbeatTimeoutPeriod())) {
+    // Determine the next heartbeat start time. If a heartbeat has not succeeded or failed, and we
+    // have not used up the timeout period, we should retry.
+    if (hbStats.trying() && (alreadyElapsed < _rsConfig.getHeartbeatTimeoutPeriod())) {
         // There are still retries left, let's use one.
         nextHeartbeatStartDate = now;
     } else {
@@ -1094,8 +1101,10 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     if (!hbResponse.isOK()) {
         if (isUnauthorized) {
             hbData.setAuthIssue(now);
-        } else if ((hbStats.hasFailed()) ||
-                   (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriod())) {
+        }
+        // If the heartbeat has failed i.e. used up all retries, then we mark the target node as
+        // down.
+        else if (hbStats.failed() || (alreadyElapsed >= _rsConfig.getHeartbeatTimeoutPeriod())) {
             hbData.setDownValues(now, hbResponse.getStatus().reason());
         } else {
             LOG(3) << "Bad heartbeat response from " << target
