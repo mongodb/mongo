@@ -85,6 +85,8 @@ functions:
           test: ${test}
           production: true
           mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
+          workloads_dir: ../src/workloads/workloads
+          ycsb_dir: ../src/YCSB/YCSB
           EOF
 
           cat > runtime.yml <<EOF
