@@ -267,7 +267,8 @@ typedef struct {
 	uint64_t rollback;
 	uint64_t deadlock;
 
-	uint64_t timestamp;			/* last committed timestamp */
+	uint64_t commit_timestamp;		/* last committed timestamp */
+	uint64_t read_timestamp;		/* read timestamp */
 
 	bool quit;				/* thread should quit */
 

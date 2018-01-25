@@ -72,6 +72,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
     )
 {
 	WT_HAZARD *hp;
+	uint32_t current_state;
 
 	*busyp = false;
 
@@ -84,7 +85,8 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 	 * eviction and splits, we re-check it after a barrier to make sure
 	 * we have a valid reference.
 	 */
-	if (ref->state != WT_REF_LIMBO && ref->state != WT_REF_MEM) {
+	current_state = ref->state;
+	if (current_state != WT_REF_LIMBO && current_state != WT_REF_MEM) {
 		*busyp = true;
 		return (0);
 	}
@@ -154,7 +156,8 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref, bool *busyp
 	 * Check if the page state is still valid, where valid means a
 	 * state of WT_REF_LIMBO or WT_REF_MEM.
 	 */
-	if (ref->state == WT_REF_LIMBO || ref->state == WT_REF_MEM) {
+	current_state = ref->state;
+	if (current_state == WT_REF_LIMBO || current_state == WT_REF_MEM) {
 		++session->nhazard;
 
 		/*

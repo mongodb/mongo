@@ -273,35 +273,6 @@ wts_ops(int lastrun)
 	free(tinfo_list);
 }
 
-/*
- * isolation_config --
- *	Return an isolation configuration.
- */
-static inline u_int
-isolation_config(WT_RAND_STATE *rnd, WT_SESSION *session)
-{
-	u_int v;
-	const char *config;
-
-	if ((v = g.c_isolation_flag) == ISOLATION_RANDOM)
-		v = mmrand(rnd, 2, 4);
-	switch (v) {
-	case ISOLATION_READ_UNCOMMITTED:
-		config = "isolation=read-uncommitted";
-		break;
-	case ISOLATION_READ_COMMITTED:
-		config = "isolation=read-committed";
-		break;
-	case ISOLATION_SNAPSHOT:
-	default:
-		v = ISOLATION_SNAPSHOT;
-		config = "isolation=snapshot";
-		break;
-	}
-	testutil_check(session->reconfigure(session, config));
-	return (v);
-}
-
 typedef struct {
 	uint64_t keyno;			/* Row number */
 
@@ -482,6 +453,58 @@ snap_check(WT_CURSOR *cursor,
 }
 
 /*
+ * begin_transaction --
+ *	Choose an isolation configuration and begin a transaction.
+ */
+static void
+begin_transaction(TINFO *tinfo, WT_SESSION *session, u_int *iso_configp)
+{
+	u_int v;
+	const char *config;
+	char config_buf[64];
+
+	if ((v = g.c_isolation_flag) == ISOLATION_RANDOM)
+		v = mmrand(&tinfo->rnd, 2, 4);
+	switch (v) {
+	case ISOLATION_READ_UNCOMMITTED:
+		config = "isolation=read-uncommitted";
+		break;
+	case ISOLATION_READ_COMMITTED:
+		config = "isolation=read-committed";
+		break;
+	case ISOLATION_SNAPSHOT:
+	default:
+		v = ISOLATION_SNAPSHOT;
+		config = "isolation=snapshot";
+		if (g.c_txn_timestamps) {
+			/*
+			 * Set the thread's read timestamp to the current value
+			 * before allocating a new read timestamp. This
+			 * guarantees the oldest timestamp won't move past the
+			 * allocated timestamp before the transaction begins.
+			 */
+			tinfo->read_timestamp = g.timestamp;
+			tinfo->read_timestamp =
+			    __wt_atomic_addv64(&g.timestamp, 1);
+			testutil_check(__wt_snprintf(
+			    config_buf, sizeof(config_buf),
+			    "read_timestamp=%" PRIx64, tinfo->read_timestamp));
+			config = config_buf;
+		}
+		break;
+	}
+	*iso_configp = v;
+
+	testutil_check(session->begin_transaction(session, config));
+
+	/*
+	 * It's OK for the oldest timestamp to move past a running query, clear
+	 * the thread's read timestamp, it no longer needs to be pinned.
+	 */
+	tinfo->read_timestamp = 0;
+}
+
+/*
  * commit_transaction --
  *     Commit a transaction
  */
@@ -493,11 +516,11 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 
 	if (g.c_txn_timestamps) {
 		/*
-		 * Update the thread's active timestamp with the current value
+		 * Update the thread's update timestamp with the current value
 		 * to prevent the oldest timestamp moving past our allocated
 		 * timestamp before the commit completes.
 		 */
-		tinfo->timestamp = g.timestamp;
+		tinfo->commit_timestamp = g.timestamp;
 		ts = __wt_atomic_addv64(&g.timestamp, 1);
 		testutil_check(__wt_snprintf(
 		    config_buf, sizeof(config_buf),
@@ -511,7 +534,7 @@ commit_transaction(TINFO *tinfo, WT_SESSION *session)
 		 * if we were to race with the timestamp thread, it might see
 		 * our thread update before the transaction commit.
 		 */
-		WT_PUBLISH(tinfo->timestamp, 0);
+		WT_PUBLISH(tinfo->commit_timestamp, 0);
 	} else
 		testutil_check(session->commit_transaction(session, NULL));
 	++tinfo->commit;
@@ -652,10 +675,7 @@ ops(void *arg)
 		 */
 		if (!SINGLETHREADED &&
 		    !intxn && mmrand(&tinfo->rnd, 1, 100) >= g.c_txn_freq) {
-			iso_config = isolation_config(&tinfo->rnd, session);
-			testutil_check(
-			    session->begin_transaction(session, NULL));
-
+			begin_transaction(tinfo, session, &iso_config);
 			snap =
 			    iso_config == ISOLATION_SNAPSHOT ? snap_list : NULL;
 			intxn = true;

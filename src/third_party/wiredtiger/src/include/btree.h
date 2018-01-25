@@ -98,10 +98,11 @@ struct __wt_btree {
 	uint64_t splitmempage;		/* In-memory split trigger size */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define	WT_ASSERT_COMMIT_TS_ALWAYS	0x1u
-#define	WT_ASSERT_COMMIT_TS_NEVER	0x2u
-#define	WT_ASSERT_READ_TS_ALWAYS	0x4u
-#define	WT_ASSERT_READ_TS_NEVER		0x8u
+#define	WT_ASSERT_COMMIT_TS_ALWAYS	0x01u
+#define	WT_ASSERT_COMMIT_TS_KEYS	0x02u
+#define	WT_ASSERT_COMMIT_TS_NEVER	0x04u
+#define	WT_ASSERT_READ_TS_ALWAYS	0x08u
+#define	WT_ASSERT_READ_TS_NEVER		0x10u
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t assert_flags;		/* Debugging assertion information */
 

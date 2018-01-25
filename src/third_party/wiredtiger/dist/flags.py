@@ -5,6 +5,11 @@ from dist import all_c_files, all_h_files, compare_srcfile
 
 # Automatically build flags values: read through all of the header files, and
 # for each group of flags, sort them and give them a unique value.
+#
+# To add a new flag declare it at the top of the flags list as:
+# #define WT_NEW_FLAG_NAME      0x0u
+#
+# and it will be automatically alphabetized and assigned the proper value.
 def flag_declare(name):
     tmp_file = '__tmp'
     with open(name, 'r') as f:

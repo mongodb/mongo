@@ -149,8 +149,10 @@ file_runtime_config = [
         Config('commit_timestamp', 'none', r'''
             verify that timestamps should 'always' or 'never' be used
             on modifications with this table.  Verification is 'none'
-            if mixed update use is allowed.''',
-            choices=['always','never','none']),
+            if mixed update use is allowed. If 'key_consistent' is
+            set then all updates to a specific key must be the same
+            with respect to timestamp usage or not.''',
+            choices=['always','key_consistent', 'never','none']),
         Config('read_timestamp', 'none', r'''
             verify that timestamps should 'always' or 'never' be used
             on reads with this table.  Verification is 'none'

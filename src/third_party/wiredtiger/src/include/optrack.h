@@ -8,7 +8,7 @@
 
 #define	WT_OPTRACK_MAXRECS (16384)
 #define	WT_OPTRACK_BUFSIZE (WT_OPTRACK_MAXRECS * sizeof(WT_OPTRACK_RECORD))
-#define	WT_OPTRACK_VERSION 1
+#define	WT_OPTRACK_VERSION 2
 
 /*
  * WT_OPTRACK_HEADER --
@@ -18,6 +18,7 @@
 struct __wt_optrack_header {
 	uint32_t optrack_version;
 	uint32_t optrack_session_internal;
+	uint32_t optrack_tsc_nsec_ratio;
 };
 
 /*

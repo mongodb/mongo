@@ -217,7 +217,8 @@ static const WT_CONFIG_CHECK confchk_WT_CURSOR_reconfigure[] = {
 
 static const WT_CONFIG_CHECK confchk_assert_subconfigs[] = {
 	{ "commit_timestamp", "string",
-	    NULL, "choices=[\"always\",\"never\",\"none\"]",
+	    NULL, "choices=[\"always\",\"key_consistent\",\"never\","
+	    "\"none\"]",
 	    NULL, 0 },
 	{ "read_timestamp", "string",
 	    NULL, "choices=[\"always\",\"never\",\"none\"]",

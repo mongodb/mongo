@@ -25,6 +25,7 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_ITEM key;
 	WT_PAGE *page;
 	WT_ROW *rip;
+	int cmp;
 
 	cursor = &cbt->iface;
 	WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_KEY_SET));
@@ -50,8 +51,9 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		key.size = WT_INSERT_KEY_SIZE(cbt->ins);
 	}
 
-	WT_ASSERT(session, key.size == cursor->key.size &&
-	    memcmp(key.data, cursor->key.data, key.size) == 0);
+	WT_ASSERT(session, __wt_compare(
+	    session, cbt->btree->collator, &key, &cursor->key, &cmp) == 0);
+	WT_ASSERT(session, cmp == 0);
 
 	__wt_buf_free(session, &key);
 }

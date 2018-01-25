@@ -612,7 +612,7 @@ __txn_commit_timestamp_validate(WT_SESSION_IMPL *session)
 	WT_TXN_OP *op;
 	WT_UPDATE *upd;
 	u_int i;
-	char timestamp_buf[2][2 * WT_TIMESTAMP_SIZE + 1];
+	bool op_used_ts, upd_used_ts;
 
 	txn = &session->txn;
 
@@ -630,39 +630,50 @@ __txn_commit_timestamp_validate(WT_SESSION_IMPL *session)
 		WT_RET_MSG(session, EINVAL, "no commit_timestamp required and "
 		    "timestamp set on this transaction");
 
-	if (WT_VERBOSE_ISSET(session, WT_VERB_TIMESTAMP)) {
-		/*
-		 * Error on any valid update structures for the same key that
-		 * are at a later timestamp.
-		 */
-		for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
-			if (op->type != WT_TXN_OP_BASIC_TS)
-				continue;
+	/*
+	 * If we're not doing any key consistency checking, we're done.
+	 */
+	if (!F_ISSET(txn, WT_TXN_TS_COMMIT_KEYS))
+		return (0);
+
+	/*
+	 * Error on any valid update structures for the same key that
+	 * are at a later timestamp or use timestamps inconsistently.
+	 */
+	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++)
+		if (op->type == WT_TXN_OP_BASIC_TS ||
+		    op->type == WT_TXN_OP_BASIC) {
 			/*
 			 * Skip over any aborted update structures.
 			 */
 			upd = op->u.upd->next;
 			while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
 				upd = upd->next;
+
 			/*
 			 * Check the timestamp on this update with the
 			 * first valid update in the chain. They're in
 			 * most recent order.
 			 */
-			if (upd != NULL &&
-			    __wt_timestamp_cmp(&op->u.upd->timestamp,
-			    &upd->timestamp) < 0) {
-				WT_RET(__wt_timestamp_to_hex_string(session,
-				    timestamp_buf[0], &op->u.upd->timestamp));
-				WT_RET(__wt_timestamp_to_hex_string(session,
-				    timestamp_buf[1], &upd->timestamp));
-				__wt_verbose(session, WT_VERB_TIMESTAMP,
-				    "Timestamp %s on new update is older than "
-				    "timestamp %s on existing update.",
-				    timestamp_buf[0], timestamp_buf[1]);
-			}
+			if (upd == NULL)
+				continue;
+			/*
+			 * Check for consistent per-key timestamp usage.
+			 * If timestamps are or are not used originally then
+			 * they should be used the same way always. Check
+			 * timestamps are used in order.
+			 */
+			op_used_ts =
+			    __wt_timestamp_iszero(&op->u.upd->timestamp);
+			upd_used_ts = __wt_timestamp_iszero(&upd->timestamp);
+			if (op_used_ts != upd_used_ts)
+				WT_RET_MSG(session, EINVAL,
+				    "per-key timestamps used inconsistently");
+			if (__wt_timestamp_cmp(&op->u.upd->timestamp,
+			    &upd->timestamp) < 0)
+				WT_RET_MSG(session, EINVAL,
+				    "out of order timestamps");
 		}
-	}
 	return (0);
 }
 #endif
