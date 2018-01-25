@@ -1045,7 +1045,7 @@ class TopologyCoordinator::PingStats {
 public:
     /**
      * Starts a new round of heartbeat attempts by transitioning to 'TRYING' and resetting the
-     * failure count. Also Records that a new heartbeat request started at "now".
+     * failure count. Also records that a new heartbeat request started at "now".
      */
     void start(Date_t now);
 
