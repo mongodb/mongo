@@ -399,7 +399,7 @@
         assert.eq(1, collContents[1].y);
     }
 
-    function runMultiTests(mainConn, priConn) {
+    function runMultiTests(mainConn) {
         // Test the behavior of retryable writes with multi=true / limit=0
         var lsid = {id: UUID()};
         var testDb = mainConn.getDB('test_multi');
@@ -447,6 +447,63 @@
                       res.writeErrors[0].code);
     }
 
+    function runInvalidTests(mainConn) {
+        var lsid = {id: UUID()};
+        var localDB = mainConn.getDB('local');
+
+        let cmd = {
+            insert: 'user',
+            documents: [{_id: 10}, {_id: 30}],
+            ordered: false,
+            lsid: lsid,
+            txnNumber: NumberLong(10),
+        };
+
+        let res = assert.commandWorkedIgnoringWriteErrors(localDB.runCommand(cmd));
+        assert.eq(2, res.writeErrors.length);
+
+        localDB.user.insert({_id: 10, x: 1});
+        localDB.user.insert({_id: 30, z: 2});
+
+        cmd = {
+            update: 'user',
+            updates: [
+                {q: {_id: 10}, u: {$inc: {x: 1}}},  // in place
+                {q: {_id: 20}, u: {$inc: {y: 1}}, upsert: true},
+                {q: {_id: 30}, u: {z: 1}}  // replacement
+            ],
+            ordered: false,
+            lsid: lsid,
+            txnNumber: NumberLong(11),
+        };
+
+        res = assert.commandWorkedIgnoringWriteErrors(localDB.runCommand(cmd));
+        assert.eq(3, res.writeErrors.length);
+
+        cmd = {
+            delete: 'user',
+            deletes: [{q: {x: 1}, limit: 1}, {q: {z: 2}, limit: 1}],
+            ordered: false,
+            lsid: lsid,
+            txnNumber: NumberLong(12),
+        };
+
+        res = assert.commandWorkedIgnoringWriteErrors(localDB.runCommand(cmd));
+        assert.eq(2, res.writeErrors.length);
+
+        cmd = {
+            findAndModify: 'user',
+            query: {_id: 60},
+            update: {$inc: {x: 1}},
+            new: true,
+            upsert: true,
+            lsid: {id: lsid},
+            txnNumber: NumberLong(37),
+        };
+
+        assert.commandFailed(localDB.runCommand(cmd));
+    }
+
     // Tests for replica set
     var replTest = new ReplSetTest({nodes: 2});
     replTest.startSet();
@@ -456,7 +513,8 @@
 
     runTests(priConn, priConn);
     runFailpointTests(priConn, priConn);
-    runMultiTests(priConn, priConn);
+    runMultiTests(priConn);
+    runInvalidTests(priConn);
 
     replTest.stopSet();
 
@@ -465,7 +523,7 @@
 
     runTests(st.s0, st.rs0.getPrimary());
     runFailpointTests(st.s0, st.rs0.getPrimary());
-    runMultiTests(st.s0, st.rs0.getPrimary());
+    runMultiTests(st.s0);
 
     st.stop();
 })();
