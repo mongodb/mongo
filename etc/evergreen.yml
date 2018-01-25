@@ -1091,6 +1091,13 @@ functions:
       script: |
         set -o errexit
 
+        # Override the aws credentials with the kitchen specific credentials
+        cat <<EOF > ~/.aws/credentials
+        [default]
+        aws_access_key_id = ${kitchen_aws_key}
+        aws_secret_access_key = ${kitchen_aws_secret}
+        EOF
+
         export KITCHEN_ARTIFACTS_URL="https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}.tgz"
         export KITCHEN_SECURITY_GROUP="${kitchen_security_group}"
         export KITCHEN_SSH_KEY_ID="${kitchen_ssh_key_id}"
