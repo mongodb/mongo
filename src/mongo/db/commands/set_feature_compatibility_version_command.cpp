@@ -235,6 +235,21 @@ public:
 
                 FeatureCompatibilityVersion::setTargetUpgrade_DEPRECATED(opCtx);
 
+                {
+                    // Take the global lock in S mode to create a barrier for createCollection
+                    // execution, which takes a database exclusive lock. This ensures that either
+                    //   - createCollection will start after the FCV change and see the upgrading to
+                    //     3.6 FCV and create the collection with a UUID.
+                    //   - createCollection that began prior to the FCV change, and is creating a
+                    //     collection without UUID, will finish before the updateUUIDSchemaVersion
+                    //     call below fetches a list of collections to which to add UUIDs for any
+                    //     without a UUID.
+                    // Otherwise createCollection may determine not to add a UUID before the FCV
+                    // change, but then actually create the collection after the update below
+                    // identifies all of the databases to update with UUIDs.
+                    Lock::GlobalLock lk(opCtx, MODE_S, UINT_MAX);
+                }
+
                 // First put UUIDs in the storage layer metadata. UUIDs will be generated for
                 // unsharded collections; shards will query the config server for sharded collection
                 // UUIDs. Remove after 3.4 -> 3.6 upgrade.
@@ -300,6 +315,21 @@ public:
             }
 
             FeatureCompatibilityVersion::setTargetDowngrade_DEPRECATED(opCtx);
+
+            {
+                // Take the global lock in S mode to create a barrier for createCollection
+                // execution, which takea a database exclusive lock. This ensures that either
+                //   - createCollection will start after the FCV change, see downgrading to 3.4 FCV
+                //     and not create the collection with a UUID.
+                //   - createCollection that began prior to the FCV change, and is creating a
+                //     collection with UUID, will finish before the updateUUIDSchemaVersion call
+                //     below fetches a list of collections from which to remove UUIDs for any with
+                //     a UUID.
+                // Otherwise createCollection may determine to add a UUID before the FCV change, but
+                // then actually create the collection after the update below identifies all of the
+                // databases from which to remove UUIDs.
+                Lock::GlobalLock lk(opCtx, MODE_S, UINT_MAX);
+            }
 
             // Fail after updating the FCV document but before removing UUIDs.
             if (MONGO_FAIL_POINT(featureCompatibilityDowngrade)) {
