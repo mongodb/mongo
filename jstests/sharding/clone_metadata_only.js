@@ -63,7 +63,9 @@
     // Ask the shard that just called clone for the collections, views, and indexes.
     var res = toShard.getDB('test').runCommand({listCollections: 1});
     assert.commandWorked(res);
-    var collections = res.cursor.firstBatch;
+    // Remove system.indexes collection (which exists in mmap)
+    // Indexes are checked separately below.
+    var collections = res.cursor.firstBatch.filter(coll => coll.name != 'system.indexes');
 
     function sortByName(a, b) {
         if (a.name < b.name)
