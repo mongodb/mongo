@@ -212,26 +212,12 @@ public:
         LOG(1) << "stopping " << name() << " thread";
     }
 
-    bool supportsRecoverToStableTimestamp() {
-        // Replication is calling this method, however it is not setting the
-        // `_initialDataTimestamp` in all necessary cases. This may be removed when replication
-        // believes all sets of `_initialDataTimestamp` are correct. See SERVER-30184,
-        // SERVER-30185, SERVER-30335.
-        const bool keepOldBehavior = true;
-        if (keepOldBehavior) {
-            return false;
-        }
-
+    bool canRecoverToStableTimestamp() {
         static const std::uint64_t allowUnstableCheckpointsSentinel =
             static_cast<std::uint64_t>(Timestamp::kAllowUnstableCheckpointsSentinel.asULL());
         const std::uint64_t initialDataTimestamp = _initialDataTimestamp.load();
         // Illegal to be called when the dataset is incomplete.
         invariant(initialDataTimestamp > allowUnstableCheckpointsSentinel);
-
-        // Must return false until `recoverToStableTimestamp` is implemented. See SERVER-29213.
-        if (keepOldBehavior) {
-            return false;
-        }
         return _stableTimestamp.load() > initialDataTimestamp;
     }
 
@@ -241,6 +227,14 @@ public:
 
     void setInitialDataTimestamp(Timestamp initialDataTimestamp) {
         _initialDataTimestamp.store(initialDataTimestamp.asULL());
+    }
+
+    std::uint64_t getInitialDataTimestamp() const {
+        return _initialDataTimestamp.load();
+    }
+
+    std::uint64_t getStableTimestamp() const {
+        return _stableTimestamp.load();
     }
 
     void shutdown() {
@@ -1112,7 +1106,32 @@ bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
         return false;
     }
 
-    return _checkpointThread->supportsRecoverToStableTimestamp();
+    // Must return false until `recoverToStableTimestamp` is implemented. See SERVER-29213.
+    const bool keepOldBehavior = true;
+    if (keepOldBehavior) {
+        return false;
+    }
+    return true;
+}
+
+Status WiredTigerKVEngine::recoverToStableTimestamp() {
+    if (!supportsRecoverToStableTimestamp()) {
+        severe() << "WiredTiger is configured to not support recover to a stable timestamp";
+        fassertFailed(50665);
+    }
+
+    if (!_checkpointThread->canRecoverToStableTimestamp()) {
+        Timestamp stableTS = Timestamp(_checkpointThread->getStableTimestamp());
+        Timestamp initialDataTS = Timestamp(_checkpointThread->getInitialDataTimestamp());
+        return Status(ErrorCodes::UnrecoverableRollbackError,
+                      str::stream()
+                          << "No stable timestamp available to recover to. Initial data timestamp: "
+                          << initialDataTS.toString()
+                          << ", Stable timestamp: "
+                          << stableTS.toString());
+    }
+    return Status(ErrorCodes::UnrecoverableRollbackError,
+                  "WT does not support recover to stable timestamp yet.");
 }
 
 bool WiredTigerKVEngine::supportsReadConcernSnapshot() const {

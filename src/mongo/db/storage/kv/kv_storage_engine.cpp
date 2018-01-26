@@ -514,6 +514,10 @@ bool KVStorageEngine::supportsRecoverToStableTimestamp() const {
     return _engine->supportsRecoverToStableTimestamp();
 }
 
+Status KVStorageEngine::recoverToStableTimestamp() {
+    return _engine->recoverToStableTimestamp();
+}
+
 bool KVStorageEngine::supportsReadConcernSnapshot() const {
     return _engine->supportsReadConcernSnapshot();
 }

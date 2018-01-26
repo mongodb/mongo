@@ -289,13 +289,10 @@ public:
     virtual void setJournalListener(JournalListener* jl) = 0;
 
     /**
-     * Returns whether the storage engine supports "recover to stable timestamp". Returns false
-     * if the storage engine supports the "recover to stable timestamp" feature but does not have
-     * a stable timestamp, or if for some reason the storage engine is unable to recover to the
-     * last provided stable timestamp.
-     *
-     * It is illegal to call this concurrently with `setStableTimestamp` or
-     * `setInitialDataTimestamp`.
+     * Returns whether the storage engine supports "recover to stable timestamp". Returns true
+     * if the storage engine supports "recover to stable timestamp" but does not currently have
+     * a stable timestamp. In that case StorageEngine::recoverToStableTimestamp() will return
+     * a bad status.
      */
     virtual bool supportsRecoverToStableTimestamp() const {
         return false;
@@ -317,7 +314,11 @@ public:
      * "local.replset.minvalid" and "local.replset.checkpointTimestamp" which must roll back to
      * the last stable timestamp.
      *
-     * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return false.
+     * fasserts if StorageEngine::supportsRecoverToStableTimestamp() would return
+     * false. Returns a bad status if there is no stable timestamp to recover to.
+     *
+     * It is illegal to call this concurrently with `setStableTimestamp` or
+     * `setInitialDataTimestamp`.
      */
     virtual Status recoverToStableTimestamp() {
         fassertFailed(40547);

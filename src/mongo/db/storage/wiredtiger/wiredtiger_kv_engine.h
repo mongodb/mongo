@@ -175,6 +175,8 @@ public:
 
     virtual bool supportsRecoverToStableTimestamp() const override;
 
+    virtual Status recoverToStableTimestamp() override;
+
     bool supportsReadConcernSnapshot() const final;
 
     // wiredtiger specific
