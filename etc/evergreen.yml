@@ -2853,6 +2853,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: aggregation_one_shard_sharded_collections
+  depends_on:
+  - name: aggregation
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=aggregation_one_shard_sharded_collections --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: aggregation_read_concern_majority_passthrough
   depends_on:
   - name: aggregation
@@ -4522,6 +4533,7 @@ buildvariants:
     - rhel62-large
   - name: aggregation
   - name: aggregation_auth
+  - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: auth
@@ -4640,6 +4652,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
+  - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: auth
@@ -5605,6 +5618,7 @@ buildvariants:
     - windows-64-vs2015-large
   - name: aggregation
   - name: aggregation_facet_unwind_passthrough
+  - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: auth
@@ -5926,6 +5940,7 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: aggregation
+  - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: auth
@@ -6065,6 +6080,7 @@ buildvariants:
   - name: compile
   - name: compile_all
   - name: aggregation
+  - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: auth
@@ -6308,6 +6324,7 @@ buildvariants:
   - name: aggregation_ese
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
+  - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
@@ -6492,6 +6509,7 @@ buildvariants:
   - name: aggregation
   - name: aggregation_ese
   - name: aggregation_auth
+  - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
@@ -8162,6 +8180,7 @@ buildvariants:
     - rhel62-large
   - name: aggregation
   - name: aggregation_auth
+  - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
@@ -8664,6 +8683,7 @@ buildvariants:
   - name: aggregation_ese
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
+  - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
@@ -8816,6 +8836,7 @@ buildvariants:
   - name: rollback_fuzzer
   - name: aggregation_auth
   - name: aggregation_facet_unwind_passthrough
+  - name: aggregation_one_shard_sharded_collections
   - name: aggregation_read_concern_majority_passthrough
   - name: aggregation_sharded_collections_passthrough
   - name: audit
