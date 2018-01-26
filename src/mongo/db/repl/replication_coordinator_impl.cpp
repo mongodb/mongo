@@ -1154,6 +1154,23 @@ void ReplicationCoordinatorImpl::_setMyLastAppliedOpTime_inlock(const OpTime& op
         // last applied optime here will permit WiredTiger to evict this data as it sees fit.
         _service->getGlobalStorageEngine()->setOldestTimestamp(opTime.getTimestamp());
     }
+    // If we are in pv0, we do not set the stable timestamp on secondaries, and thus do not set the
+    // oldest timestamp either.  This can cause timestamp history to accrue in the storage engine
+    // and never be purged.
+    // To solve this, we manually set the oldest timestamp here to the last applied write, so that
+    // oplog visibility will continue to operate properly (it uses timestamps).  Inside
+    // setOldestTimestamp(), it takes the minimum of the oplog read timestamp and the proposed
+    // oldest_timestamp value, to ensure that oplog reads are never impacted by an oldest_timestamp
+    // value that is too high.
+    if (!isV1ElectionProtocol() && !_memberState.primary()) {
+        auto storageEngine = _service->getGlobalStorageEngine();
+        if (storageEngine) {
+            auto newOldestTimestamp = opTime.getTimestamp();
+            if (!newOldestTimestamp.isNull()) {
+                _storage->setStableTimestamp(getServiceContext(), newOldestTimestamp);
+            }
+        }
+    }
 }
 
 void ReplicationCoordinatorImpl::_setMyLastDurableOpTime_inlock(const OpTime& opTime,

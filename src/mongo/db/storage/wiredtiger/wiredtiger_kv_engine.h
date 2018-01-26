@@ -266,7 +266,9 @@ private:
 
     std::string _uri(StringData ident) const;
 
+    // Protected by _oplogManagerMutex.
     Timestamp _previousSetOldestTimestamp;
+
     const bool _keepDataHistory;
 
     WT_CONNECTION* _conn;
