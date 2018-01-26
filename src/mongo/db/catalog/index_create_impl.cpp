@@ -401,9 +401,16 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
                      "'hangAfterStartingIndexBuildUnlocked' failpoint";
             sleepmillis(1000);
         }
-        // If we want to support this, we'd need to regrab the lock and be sure that all callers are
-        // ok with us yielding. They should be for BG indexes, but not for foreground.
-        invariant(!"the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off");
+
+        if (_buildInBackground) {
+            _opCtx->lockState()->restoreLockState(lockInfo);
+            _opCtx->recoveryUnit()->abandonSnapshot();
+            return Status(ErrorCodes::OperationFailed,
+                          "background index build aborted due to failpoint");
+        } else {
+            invariant(
+                !"the hangAfterStartingIndexBuildUnlocked failpoint can't be turned off for foreground index builds");
+        }
     }
 
     progress->finished();

@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/rollback_impl.h"
 
+#include "mongo/db/background.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
@@ -90,6 +91,13 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
         return status;
     }
     _listener->onTransitionToRollback();
+
+    // Wait for all background index builds to complete before starting the rollback process.
+    status = _awaitBgIndexCompletion(opCtx);
+    if (!status.isOK()) {
+        return status;
+    }
+    _listener->onBgIndexesComplete();
 
     auto commonPointSW = _findCommonPoint();
     if (!commonPointSW.isOK()) {
@@ -177,6 +185,37 @@ Status RollbackImpl::_transitionToRollback(OperationContext* opCtx) {
             return status;
         }
     }
+    return Status::OK();
+}
+
+Status RollbackImpl::_awaitBgIndexCompletion(OperationContext* opCtx) {
+    invariant(opCtx);
+    if (_isInShutdown()) {
+        return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
+    }
+
+    // Get a list of all databases.
+    StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    std::vector<std::string> dbs;
+    {
+        Lock::GlobalLock lk(opCtx, MODE_IS, UINT_MAX);
+        storageEngine->listDatabases(&dbs);
+    }
+
+    // Wait for all background operations to complete by waiting on each database.
+    std::vector<StringData> dbNames(dbs.begin(), dbs.end());
+    log() << "Waiting for all background operations to complete before starting rollback";
+    for (auto db : dbNames) {
+        LOG(1) << "Waiting for " << BackgroundOperation::numInProgForDb(db)
+               << " background operations to complete on database '" << db << "'";
+        BackgroundOperation::awaitNoBgOpInProgForDb(db);
+        // Check for shutdown again.
+        if (_isInShutdown()) {
+            return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
+        }
+    }
+
+    log() << "Finished waiting for background operations to complete before rollback";
     return Status::OK();
 }
 
