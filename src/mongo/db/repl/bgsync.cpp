@@ -645,8 +645,14 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
         return connection->get();
     };
 
-    log() << "Rollback using the 'rollbackViaRefetch' method.";
-    _fallBackOnRollbackViaRefetch(opCtx, source, requiredRBID, &localOplog, getConnection);
+    auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+    if (storageEngine->supportsRecoverToStableTimestamp()) {
+        _runRollbackViaRecoverToCheckpoint(
+            opCtx, source, &localOplog, storageInterface, getConnection);
+    } else {
+        log() << "Rollback using the 'rollbackViaRefetch' method.";
+        _fallBackOnRollbackViaRefetch(opCtx, source, requiredRBID, &localOplog, getConnection);
+    }
 
     // Reset the producer to clear the sync source and the last optime fetched.
     stop(true);
@@ -669,8 +675,6 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
         }
     }
 
-    fassertFailedNoTrace(40651);
-
     _rollback = stdx::make_unique<RollbackImpl>(
         localOplog, &remoteOplog, storageInterface, _replicationProcess, _replCoord);
 
@@ -678,8 +682,11 @@ void BackgroundSync::_runRollbackViaRecoverToCheckpoint(
     auto status = _rollback->runRollback(opCtx);
     if (status.isOK()) {
         log() << "Rollback successful.";
+    } else if (status == ErrorCodes::UnrecoverableRollbackError) {
+        severe() << "Rollback failed with unrecoverable error: " << status;
+        fassertFailedWithStatusNoTrace(50666, status);
     } else {
-        warning() << "Rollback failed with error: " << status;
+        warning() << "Rollback failed with retryable error: " << status;
     }
 }
 
