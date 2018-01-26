@@ -1,12 +1,9 @@
-// This is a regression test for post-image validation in the old update system, which is used when
-// the featureCompatibilityVersion is 3.4.
+// Verify that the update system correctly rejects invalid entries during post-image validation.
 (function() {
     "use strict";
 
     const conn = MongoRunner.runMongod();
     assert.neq(null, conn, "mongod was unable to start up");
-
-    assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
 
     const testDB = conn.getDB("test");
 

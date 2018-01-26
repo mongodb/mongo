@@ -49,7 +49,6 @@
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -1042,24 +1041,10 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
     }
 
     if (!collectionOptions.validator.isEmpty()) {
-        // Pre-parse the validator document to make sure there are no extensions that are not
-        // permitted in collection validators.
-        MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-            MatchExpressionParser::kBanAllSpecialFeatures;
-        if (!serverGlobalParams.validateFeaturesAsMaster.load() ||
-            (serverGlobalParams.featureCompatibility.getVersion() >=
-             ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
-            // Note that we don't enforce this feature compatibility check when we are on
-            // the secondary or on a backup instance, as indicated by !validateFeaturesAsMaster.
-            allowedFeatures |= MatchExpressionParser::kJSONSchema;
-            allowedFeatures |= MatchExpressionParser::kExpr;
-        }
         boost::intrusive_ptr<ExpressionContext> expCtx(
             new ExpressionContext(opCtx, collator.get()));
-        auto statusWithMatcher = MatchExpressionParser::parse(collectionOptions.validator,
-                                                              std::move(expCtx),
-                                                              ExtensionsCallbackNoop(),
-                                                              allowedFeatures);
+        auto statusWithMatcher =
+            MatchExpressionParser::parse(collectionOptions.validator, std::move(expCtx));
 
         // We check the status of the parse to see if there are any banned features, but we don't
         // actually need the result for now.
