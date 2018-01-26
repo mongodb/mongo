@@ -1,5 +1,6 @@
 /**
  *  Starts standalone RS with skipShardingConfigurationChecks.
+ *  @tags: [requires_persistence]
  */
 (function() {
     'use strict';
