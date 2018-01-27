@@ -1,0 +1,36 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+if env.TargetOSIs('windows'):
+    env.Prepend(CCFLAGS=[
+        # 'function' : destructor never returns, potential memory leak
+        '/wd4722',
+    ])
+
+    env.Append(LIBS=["ShLwApi.lib"])
+
+env.Append(CPPDEFINES=["HAVE_STD_REGEX"])
+
+env.Library(
+    target="benchmark",
+    source=[
+        "benchmark/src/benchmark.cc",
+        "benchmark/src/benchmark_register.cc",
+        "benchmark/src/colorprint.cc",
+        "benchmark/src/commandlineflags.cc",
+        "benchmark/src/complexity.cc",
+        "benchmark/src/console_reporter.cc",
+        "benchmark/src/counter.cc",
+        "benchmark/src/csv_reporter.cc",
+        "benchmark/src/json_reporter.cc",
+        "benchmark/src/reporter.cc",
+        "benchmark/src/sleep.cc",
+        "benchmark/src/statistics.cc",
+        "benchmark/src/string_util.cc",
+        "benchmark/src/sysinfo.cc",
+        "benchmark/src/timers.cc",
+    ]
+)

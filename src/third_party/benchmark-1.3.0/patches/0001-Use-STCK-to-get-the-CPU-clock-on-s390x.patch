@@ -1,0 +1,28 @@
+From f58107b74d08e604cac0fcec7bc3cf7a0e7a684f Mon Sep 17 00:00:00 2001
+From: Robert Guo <robert.guo@10gen.com>
+Date: Fri, 19 Jan 2018 16:30:42 -0500
+Subject: [PATCH] Use STCK to get the CPU clock on s390x
+
+---
+ src/cycleclock.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/cycleclock.h b/src/cycleclock.h
+index 4251fe4..e8a5ae4 100644
+--- a/src/cycleclock.h
++++ b/src/cycleclock.h
+@@ -159,6 +159,11 @@ inline BENCHMARK_ALWAYS_INLINE int64_t Now() {
+   struct timeval tv;
+   gettimeofday(&tv, nullptr);
+   return static_cast<int64_t>(tv.tv_sec) * 1000000 + tv.tv_usec;
++#elif defined(__s390__)
++  // MONGODB MODIFICATION: Return the CPU clock on s390x.
++  uint64_t tsc;
++  asm("\tstck\t%0\n" : "=Q" (tsc) : : "cc");
++  return tsc;
+ #else
+ // The soft failover to a generic implementation is automatic only for ARM.
+ // For other platforms the developer is expected to make an attempt to create
+-- 
+2.14.3 (Apple Git-98)
+

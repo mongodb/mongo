@@ -15,6 +15,7 @@ icuSuffix = '-57.1'
 gperftoolsSuffix = '-2.5'
 timelibSuffix = '-2017.05'
 tomcryptSuffix = '-1.18.0-rc2'
+benchmarkSuffix = '-1.3.0'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
@@ -46,6 +47,10 @@ if not use_system_version_of_library('valgrind'):
 if not use_system_version_of_library('zlib'):
     thirdPartyIncludePathList.append(
         ('zlib', '#/src/third_party/zlib' + zlibSuffix))
+
+if not use_system_version_of_library('google-benchmark'):
+    thirdPartyIncludePathList.append(
+        ('benchmark', '#/src/third_party/benchmark' + benchmarkSuffix + '/benchmark/include'))
 
 # TODO: figure out if we want to offer system versions of mozjs.  Mozilla
 # hasn't offered a source tarball since 24, but in theory they could.
@@ -212,6 +217,28 @@ zlibEnv.Library(
     target="shim_zlib",
     source=[
         'shim_zlib.cpp',
+    ])
+
+if use_system_version_of_library("google-benchmark"):
+    benchmarkEnv = env.Clone(
+        SYSLIBDEPS=[
+            env['LIBDEPS_BENCHMARK_SYSLIBDEP'],
+        ])
+else:
+    benchmarkEnv = env.Clone()
+    benchmarkEnv.InjectThirdPartyIncludePaths(libraries=['benchmark'])
+    benchmarkEnv.SConscript(
+        'benchmark' + benchmarkSuffix + '/SConscript',
+        exports={ 'env' : benchmarkEnv })
+    benchmarkEnv = benchmarkEnv.Clone(
+        LIBDEPS_INTERFACE=[
+            'benchmark' + benchmarkSuffix + '/benchmark',
+        ])
+
+benchmarkEnv.Library(
+    target="shim_benchmark",
+    source=[
+        'shim_benchmark.cpp',
     ])
 
 if usemozjs:

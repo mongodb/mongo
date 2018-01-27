@@ -306,6 +306,11 @@ add_option('use-system-valgrind',
     nargs=0,
 )
 
+add_option('use-system-google-benchmark',
+    help='use system version of Google benchmark library',
+    nargs=0,
+)
+
 add_option('use-system-zlib',
     help='use system version of zlib library',
     nargs=0,
@@ -557,6 +562,7 @@ def variable_tools_converter(val):
         'idl_tool',
         "jsheader",
         "mergelib",
+        "mongo_benchmark",
         "mongo_integrationtest",
         "mongo_unittest",
         "textfile",
@@ -901,6 +907,8 @@ envDict = dict(BUILD_ROOT=buildDir,
                UNITTEST_LIST='$BUILD_ROOT/unittests.txt',
                INTEGRATION_TEST_ALIAS='integration_tests',
                INTEGRATION_TEST_LIST='$BUILD_ROOT/integration_tests.txt',
+               BENCHMARK_ALIAS='benchmarks',
+               BENCHMARK_LIST='$BUILD_ROOT/benchmarks.txt',
                CONFIGUREDIR='$BUILD_ROOT/scons/$VARIANT_DIR/sconf_temp',
                CONFIGURELOG='$BUILD_ROOT/scons/config.log',
                INSTALL_DIR=installDir,
@@ -3267,7 +3275,7 @@ env.SConscript(
     variant_dir='$BUILD_DIR',
 )
 
-all = env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests'])
+all = env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'integration_tests', 'benchmarks'])
 
 # run the Dagger tool if it's installed
 if should_dagger:
