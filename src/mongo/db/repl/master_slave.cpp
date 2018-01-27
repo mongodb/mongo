@@ -703,9 +703,8 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* opCtx,
     if (op.getStringField("op")[0] == 'n')
         return;
 
-    char dbName[MaxDatabaseNameLen];
     const char* ns = op.getStringField("ns");
-    nsToDatabase(ns, dbName);
+    const auto dbName = nsToDatabaseSubstring(ns).toString();
 
     if (*ns == '.') {
         log() << "skipping bad op in oplog: " << redact(op) << endl;
@@ -775,7 +774,7 @@ void ReplSource::_sync_pullOpLog_applyOperation(OperationContext* opCtx,
         throw SyncException();
     }
 
-    if (!handleDuplicateDbName(opCtx, op, ns, dbName)) {
+    if (!handleDuplicateDbName(opCtx, op, ns, dbName.c_str())) {
         return;
     }
 

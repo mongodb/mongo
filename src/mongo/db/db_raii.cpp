@@ -31,7 +31,6 @@
 #include "mongo/db/db_raii.h"
 
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
@@ -69,49 +68,32 @@ AutoStatsTracker::~AutoStatsTracker() {
 }
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
+                                                   const NamespaceString& nss)
+    : AutoGetCollectionForRead(opCtx,
+                               nss,
+                               AutoGetCollection::ViewMode::kViewsForbidden,
+                               Lock::DBLock(opCtx, nss.db(), MODE_IS)) {}
+
+AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    const StringData dbName,
-                                                   const UUID& uuid) {
-    // Lock the database since a UUID will always be in the same database even though its
-    // collection name may change.
-    Lock::DBLock dbSLock(opCtx, dbName, MODE_IS);
-
-    auto nss = UUIDCatalog::get(opCtx).lookupNSSByUUID(uuid);
-
-    // If the UUID doesn't exist, we leave _autoColl to be boost::none.
-    if (!nss.isEmpty()) {
-        _autoColl.emplace(
-            opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsForbidden, std::move(dbSLock));
-
-        // Note: this can yield.
-        _ensureMajorityCommittedSnapshotIsValid(opCtx, nss);
-    }
-}
+                                                   const UUID& uuid)
+    : AutoGetCollectionForRead(opCtx,
+                               NamespaceStringOrUUID({dbName.toString(), uuid}),
+                               AutoGetCollection::ViewMode::kViewsForbidden,
+                               Lock::DBLock(opCtx, dbName, MODE_IS)) {}
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
-                                                   AutoGetCollection::ViewMode viewMode) {
-    _autoColl.emplace(opCtx, nss, MODE_IS, MODE_IS, viewMode);
-
-    // Note: this can yield.
-    _ensureMajorityCommittedSnapshotIsValid(opCtx, nss);
-}
-
-AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
-                                                   const NamespaceString& nss,
+                                                   const NamespaceStringOrUUID& nsOrUUID,
                                                    AutoGetCollection::ViewMode viewMode,
                                                    Lock::DBLock lock) {
-    _autoColl.emplace(opCtx, nss, MODE_IS, viewMode, std::move(lock));
+    _autoColl.emplace(opCtx, nsOrUUID, std::move(lock), MODE_IS, viewMode);
 
-    // Note: this can yield.
-    _ensureMajorityCommittedSnapshotIsValid(opCtx, nss);
-}
-void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(OperationContext* opCtx,
-                                                                       const NamespaceString& nss) {
     while (true) {
         auto coll = _autoColl->getCollection();
         if (!coll) {
             return;
         }
+
         auto minSnapshot = coll->getMinimumVisibleSnapshot();
         if (!minSnapshot) {
             return;
@@ -124,7 +106,7 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(Operation
             return;
         }
 
-        // Yield locks.
+        // Yield locks in order to do the blocking call below
         _autoColl = boost::none;
 
         repl::ReplicationCoordinator::get(opCtx)->waitUntilSnapshotCommitted(opCtx, *minSnapshot);
@@ -136,8 +118,7 @@ void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(Operation
             CurOp::get(opCtx)->yielded();
         }
 
-        // Relock.
-        _autoColl.emplace(opCtx, nss, MODE_IS);
+        _autoColl.emplace(opCtx, nsOrUUID, MODE_IS);
     }
 }
 

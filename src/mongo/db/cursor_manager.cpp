@@ -292,7 +292,7 @@ void GlobalCursorIdCache::visitAllCursorManagers(OperationContext* opCtx, Visito
     // For each collection, get its sessions under the collection lock (to prevent the
     // collection from going away during the erase).
     for (auto&& ns : namespaces) {
-        AutoGetCollectionOrView ctx(opCtx, NamespaceString(ns), MODE_IS);
+        AutoGetCollection ctx(opCtx, ns, MODE_IS);
         if (!ctx.getDb()) {
             continue;
         }

@@ -251,8 +251,15 @@ Lock::CollectionLock::CollectionLock(Locker* lockState, StringData ns, LockMode 
     }
 }
 
+Lock::CollectionLock::CollectionLock(CollectionLock&& otherLock)
+    : _id(otherLock._id), _lockState(otherLock._lockState) {
+    otherLock._lockState = nullptr;
+}
+
 Lock::CollectionLock::~CollectionLock() {
-    _lockState->unlock(_id);
+    if (_lockState) {
+        _lockState->unlock(_id);
+    }
 }
 
 void Lock::CollectionLock::relockAsDatabaseExclusive(Lock::DBLock& dbLock) {

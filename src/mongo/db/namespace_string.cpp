@@ -245,8 +245,19 @@ bool NamespaceString::isReplicated() const {
     return true;
 }
 
+std::string NamespaceStringOrUUID::toString() const {
+    if (_nss)
+        return _nss->toString();
+    else
+        return str::stream() << _dbAndUUID->dbName << ':' << _dbAndUUID->uuid.toString();
+}
+
 std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss) {
     return stream << nss.toString();
+}
+
+std::ostream& operator<<(std::ostream& stream, const NamespaceStringOrUUID& nsOrUUID) {
+    return stream << nsOrUUID.toString();
 }
 
 }  // namespace mongo

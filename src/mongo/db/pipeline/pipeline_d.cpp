@@ -890,7 +890,7 @@ boost::optional<Document> PipelineD::MongoDInterface::lookupSingleDocument(
 std::unique_ptr<CollatorInterface> PipelineD::MongoDInterface::_getCollectionDefaultCollator(
     OperationContext* opCtx, const NamespaceString& nss, UUID collectionUUID) {
     if (_collatorCache.find(collectionUUID) == _collatorCache.end()) {
-        AutoGetCollection autoColl(opCtx, nss, collectionUUID, MODE_IS);
+        AutoGetCollection autoColl(opCtx, NamespaceStringOrUUID(nss.db(), collectionUUID), MODE_IS);
         if (!autoColl.getCollection()) {
             // This collection doesn't exist - since we looked up by UUID, it will never exist in
             // the future, so we cache a null pointer as the default collation.
@@ -904,4 +904,5 @@ std::unique_ptr<CollatorInterface> PipelineD::MongoDInterface::_getCollectionDef
     }
     return _collatorCache[collectionUUID] ? _collatorCache[collectionUUID]->clone() : nullptr;
 }
+
 }  // namespace mongo

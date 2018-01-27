@@ -38,6 +38,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/platform/hash_namespace.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -442,9 +443,42 @@ private:
     size_t _dotIndex;
 };
 
-std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss);
+/**
+ * This class is intented to be used by commands which can accept either a collection name or
+ * database + collection UUID. It will never be initialized with both.
+ */
+class NamespaceStringOrUUID {
+public:
+    struct DBNameAndUUID {
+        std::string dbName;
+        UUID uuid;
+    };
 
-// "database.a.b.c" -> "database"
+    NamespaceStringOrUUID(NamespaceString nss) : _nss(std::move(nss)) {}
+    NamespaceStringOrUUID(StringData dbName, UUID uuid) : _dbAndUUID({dbName.toString(), uuid}) {}
+
+    const boost::optional<NamespaceString>& nss() const {
+        return _nss;
+    }
+
+    const boost::optional<DBNameAndUUID>& dbAndUUID() const {
+        return _dbAndUUID;
+    }
+
+    std::string toString() const;
+
+private:
+    // At any given time exactly one of these optionals will be initialized
+    boost::optional<NamespaceString> _nss;
+    boost::optional<DBNameAndUUID> _dbAndUUID;
+};
+
+std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss);
+std::ostream& operator<<(std::ostream& stream, const NamespaceStringOrUUID& nsOrUUID);
+
+/**
+ * "database.a.b.c" -> "database"
+ */
 inline StringData nsToDatabaseSubstring(StringData ns) {
     size_t i = ns.find('.');
     if (i == std::string::npos) {
@@ -455,18 +489,18 @@ inline StringData nsToDatabaseSubstring(StringData ns) {
     return ns.substr(0, i);
 }
 
-// "database.a.b.c" -> "database"
-inline void nsToDatabase(StringData ns, char* database) {
-    StringData db = nsToDatabaseSubstring(ns);
-    db.copyTo(database, true);
-}
-
-// TODO: make this return a StringData
+/**
+ * "database.a.b.c" -> "database"
+ *
+ * TODO: make this return a StringData
+ */
 inline std::string nsToDatabase(StringData ns) {
     return nsToDatabaseSubstring(ns).toString();
 }
 
-// "database.a.b.c" -> "a.b.c"
+/**
+ * "database.a.b.c" -> "a.b.c"
+ */
 inline StringData nsToCollectionSubstring(StringData ns) {
     size_t i = ns.find('.');
     massert(16886, "nsToCollectionSubstring: no .", i != std::string::npos);

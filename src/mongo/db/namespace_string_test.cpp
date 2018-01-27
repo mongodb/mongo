@@ -321,22 +321,6 @@ TEST(NamespaceStringTest, nsToDatabase1) {
     ASSERT_EQUALS("foo", nsToDatabase(std::string("foo")));
 }
 
-TEST(NamespaceStringTest, nsToDatabase2) {
-    char buf[MaxDatabaseNameLen];
-
-    nsToDatabase("foo.bar", buf);
-    ASSERT_EQUALS('f', buf[0]);
-    ASSERT_EQUALS('o', buf[1]);
-    ASSERT_EQUALS('o', buf[2]);
-    ASSERT_EQUALS(0, buf[3]);
-
-    nsToDatabase("bar", buf);
-    ASSERT_EQUALS('b', buf[0]);
-    ASSERT_EQUALS('a', buf[1]);
-    ASSERT_EQUALS('r', buf[2]);
-    ASSERT_EQUALS(0, buf[3]);
-}
-
 TEST(NamespaceStringTest, NamespaceStringParse1) {
     NamespaceString ns("a.b");
     ASSERT_EQUALS(std::string("a"), ns.db());

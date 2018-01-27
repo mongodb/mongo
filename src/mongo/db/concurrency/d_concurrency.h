@@ -319,6 +319,7 @@ public:
 
     public:
         CollectionLock(Locker* lockState, StringData ns, LockMode mode);
+        CollectionLock(CollectionLock&&);
         ~CollectionLock();
 
         /**
@@ -334,7 +335,7 @@ public:
 
     private:
         const ResourceId _id;
-        Locker* const _lockState;
+        Locker* _lockState;
     };
 
     /**

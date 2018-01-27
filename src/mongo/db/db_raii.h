@@ -82,44 +82,27 @@ class AutoGetCollectionForRead {
     MONGO_DISALLOW_COPYING(AutoGetCollectionForRead);
 
 public:
-    AutoGetCollectionForRead(OperationContext* opCtx, const NamespaceString& nss)
-        : AutoGetCollectionForRead(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
+    AutoGetCollectionForRead(OperationContext* opCtx, const NamespaceString& nss);
 
     AutoGetCollectionForRead(OperationContext* opCtx, const StringData dbName, const UUID& uuid);
 
-    /**
-     * This constructor is intended for internal use and should not be used outside this file.
-     * AutoGetCollectionForReadCommand and AutoGetCollectionOrViewForReadCommand use 'viewMode' to
-     * determine whether or not it is permissible to obtain a handle on a view namespace. Use
-     * another constructor or another 'AutoGet' class instead.
-     */
+    // TODO (SERVER-32367): Do not use this constructor, it is for internal purposes only
     AutoGetCollectionForRead(OperationContext* opCtx,
-                             const NamespaceString& nss,
-                             AutoGetCollection::ViewMode viewMode);
-
-    AutoGetCollectionForRead(OperationContext* opCtx,
-                             const NamespaceString& nss,
+                             const NamespaceStringOrUUID& nsOrUUID,
                              AutoGetCollection::ViewMode viewMode,
                              Lock::DBLock lock);
 
     Database* getDb() const {
-        if (!_autoColl) {
-            return nullptr;
-        }
         return _autoColl->getDb();
     }
 
     Collection* getCollection() const {
-        if (!_autoColl) {
-            return nullptr;
-        }
         return _autoColl->getCollection();
     }
 
 private:
-    void _ensureMajorityCommittedSnapshotIsValid(OperationContext* opCtx,
-                                                 const NamespaceString& nss);
-
+    // This field is optional, because the code to wait for majority committed snapshot needs to
+    // release locks in order to block waiting
     boost::optional<AutoGetCollection> _autoColl;
 };
 

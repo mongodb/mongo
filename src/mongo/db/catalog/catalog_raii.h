@@ -52,9 +52,14 @@ class AutoGetDb {
     MONGO_DISALLOW_COPYING(AutoGetDb);
 
 public:
-    AutoGetDb(OperationContext* opCtx, StringData ns, LockMode mode);
-    AutoGetDb(OperationContext* opCtx, StringData ns, Lock::DBLock lock);
+    AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode);
 
+    // TODO (SERVER-32367): Do not use this constructor, it is for internal purposes only
+    AutoGetDb(OperationContext* opCtx, StringData dbName, Lock::DBLock dbLock);
+
+    /**
+     * Returns nullptr if the database didn't exist.
+     */
     Database* getDb() const {
         return _db;
     }
@@ -66,50 +71,35 @@ private:
 
 /**
  * RAII-style class, which acquires a locks on the specified database and collection in the
- * requested mode and obtains references to both.
+ * requested modes and obtains references to both.
  *
- * Use this when you want to access something at the collection level, but do not want to do any of
- * the tasks associated with the 'ForRead' variants below. For example, you can use this to access a
- * Collection's CursorManager, or to remove a document.
+ * NOTE: If the collection cannot be resolved to a name, the collection lock will not be held.
  *
- * It is guaranteed that locks will be released when this object goes out of scope, therefore
- * the database and the collection references returned by this class should not be retained.
+ * Any acquired locks may be released when this object goes out of scope, therefore the database
+ * and the collection references returned by this class should not be retained.
  */
 class AutoGetCollection {
     MONGO_DISALLOW_COPYING(AutoGetCollection);
 
 public:
-    enum class ViewMode { kViewsPermitted, kViewsForbidden };
-
-    AutoGetCollection(OperationContext* opCtx, const NamespaceString& nss, LockMode modeAll)
-        : AutoGetCollection(opCtx, nss, modeAll, modeAll, ViewMode::kViewsForbidden) {}
+    enum ViewMode { kViewsPermitted, kViewsForbidden };
 
     AutoGetCollection(OperationContext* opCtx,
-                      const NamespaceString& nss,
+                      const NamespaceStringOrUUID& nsOrUUID,
                       LockMode modeDB,
-                      LockMode modeColl)
-        : AutoGetCollection(opCtx, nss, modeDB, modeColl, ViewMode::kViewsForbidden) {}
-
-    AutoGetCollection(OperationContext* opCtx,
-                      const NamespaceString& nss,
-                      const UUID& uuid,
-                      LockMode modeAll);
-
-    AutoGetCollection(OperationContext* opCtx,
-                      const NamespaceString& nss,
                       LockMode modeColl,
-                      ViewMode viewMode,
-                      Lock::DBLock lock);
+                      ViewMode viewMode = kViewsForbidden);
 
-    /**
-     * This constructor is intended for internal use and should not be used outside this file.
-     * AutoGetCollectionForReadCommand and AutoGetCollectionOrViewForReadCommand use 'viewMode' to
-     * determine whether or not it is permissible to obtain a handle on a view namespace. Use
-     * another constructor or another 'AutoGet' class instead.
-     */
     AutoGetCollection(OperationContext* opCtx,
-                      const NamespaceString& nss,
-                      LockMode modeDB,
+                      const NamespaceStringOrUUID& nsOrUUID,
+                      LockMode modeAll,
+                      ViewMode viewMode = kViewsForbidden)
+        : AutoGetCollection(opCtx, nsOrUUID, modeAll, modeAll, viewMode) {}
+
+    // TODO (SERVER-32367): Do not use this constructor, it is for internal purposes only
+    AutoGetCollection(OperationContext* opCtx,
+                      const NamespaceStringOrUUID& nsOrUUID,
+                      Lock::DBLock dbLock,
                       LockMode modeColl,
                       ViewMode viewMode);
 
@@ -127,44 +117,6 @@ public:
         return _coll;
     }
 
-private:
-    const ViewMode _viewMode;
-    const AutoGetDb _autoDb;
-    const Lock::CollectionLock _collLock;
-
-    Collection* const _coll;
-};
-
-/**
- * RAII-style class which acquires the appropriate hierarchy of locks for a collection or
- * view. The pointer to a view definition is nullptr if it does not exist.
- *
- * Use this when you have not yet determined if the namespace is a view or a collection.
- * For example, you can use this to access a namespace's CursorManager.
- *
- * It is guaranteed that locks will be released when this object goes out of scope, therefore
- * the view returned by this class should not be retained.
- */
-class AutoGetCollectionOrView {
-    MONGO_DISALLOW_COPYING(AutoGetCollectionOrView);
-
-public:
-    AutoGetCollectionOrView(OperationContext* opCtx, const NamespaceString& nss, LockMode modeAll);
-
-    /**
-     * Returns nullptr if the database didn't exist.
-     */
-    Database* getDb() const {
-        return _autoColl.getDb();
-    }
-
-    /**
-     * Returns nullptr if the collection didn't exist.
-     */
-    Collection* getCollection() const {
-        return _autoColl.getCollection();
-    }
-
     /**
      * Returns nullptr if the view didn't exist.
      */
@@ -173,7 +125,17 @@ public:
     }
 
 private:
-    const AutoGetCollection _autoColl;
+    struct NamespaceAndCollectionLock {
+        Lock::CollectionLock lock;
+        NamespaceString nss;
+    };
+
+    AutoGetDb _autoDb;
+
+    // This value will be initialized if the UUID can be resolved to a collection name
+    boost::optional<NamespaceAndCollectionLock> _nsAndLock;
+
+    Collection* _coll = nullptr;
     std::shared_ptr<ViewDefinition> _view;
 };
 
