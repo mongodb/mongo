@@ -63,7 +63,6 @@ public:
         const bool _locksReleased;
     };
 
-
     /**
      * General purpose RAII wrapper for a resource managed by the lock manager
      *
@@ -226,7 +225,6 @@ public:
         const bool _isOutermostLock;
     };
 
-
     /**
      * Global exclusive lock
      *
@@ -244,7 +242,6 @@ public:
         }
     };
 
-
     /**
      * Global shared lock
      *
@@ -261,7 +258,6 @@ public:
             }
         }
     };
-
 
     /**
      * Database lock with support for collection- and document-level locking
@@ -303,7 +299,6 @@ public:
         // Acquires the global lock on our behalf.
         GlobalLock _globalLock;
     };
-
 
     /**
      * Collection lock with support for document-level locking
@@ -361,7 +356,6 @@ public:
         bool _serialized;
     };
 
-
     /**
      * Turn on "parallel batch writer mode" by locking the global ParallelBatchWriterMode
      * resource in exclusive mode. This mode is off by default.
@@ -381,4 +375,5 @@ public:
         const bool _orginalShouldConflict;
     };
 };
-}
+
+}  // namespace mongo

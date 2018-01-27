@@ -423,9 +423,9 @@ public:
                            const BSONObj& cmdObj,
                            string& errmsg,
                            BSONObjBuilder& result) {
-        const NamespaceString nsToDrop = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nsToDrop(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
-        if (NamespaceString::virtualized(nsToDrop.ns())) {
+        if (nsToDrop.isVirtualized()) {
             errmsg = "can't drop a virtual collection";
             return false;
         }

@@ -50,14 +50,12 @@
 
 namespace mongo {
 
+class Command;
 class OperationContext;
-class Timer;
 
 namespace mutablebson {
 class Document;
 }  // namespace mutablebson
-
-class Command;
 
 // Various helpers unrelated to any single command or to the command registry.
 // Would be a namespace, but want to keep it closed rather than open.
@@ -65,15 +63,14 @@ class Command;
 struct CommandHelpers {
     // The type of the first field in 'cmdObj' must be mongo::String. The first field is
     // interpreted as a collection name.
-    static std::string parseNsFullyQualified(const std::string& dbname, const BSONObj& cmdObj);
+    static std::string parseNsFullyQualified(StringData dbname, const BSONObj& cmdObj);
 
     // The type of the first field in 'cmdObj' must be mongo::String or Symbol.
     // The first field is interpreted as a collection name.
-    static NamespaceString parseNsCollectionRequired(const std::string& dbname,
-                                                     const BSONObj& cmdObj);
+    static NamespaceString parseNsCollectionRequired(StringData dbname, const BSONObj& cmdObj);
 
     static NamespaceString parseNsOrUUID(OperationContext* opCtx,
-                                         const std::string& dbname,
+                                         StringData dbname,
                                          const BSONObj& cmdObj);
 
     static Command* findCommand(StringData name);
@@ -244,7 +241,6 @@ public:
      *            when $out is provided.
      */
     virtual bool supportsWriteConcern(const BSONObj& cmd) const = 0;
-
 
     /**
      * Return true if only the admin ns has privileges to run this command.

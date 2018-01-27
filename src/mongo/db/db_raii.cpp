@@ -35,7 +35,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/stats/top.h"
 
 namespace mongo {
 
@@ -84,7 +83,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             opCtx, nss, MODE_IS, AutoGetCollection::ViewMode::kViewsForbidden, std::move(dbSLock));
 
         // Note: this can yield.
-        _ensureMajorityCommittedSnapshotIsValid(nss, opCtx);
+        _ensureMajorityCommittedSnapshotIsValid(opCtx, nss);
     }
 }
 
@@ -94,7 +93,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     _autoColl.emplace(opCtx, nss, MODE_IS, MODE_IS, viewMode);
 
     // Note: this can yield.
-    _ensureMajorityCommittedSnapshotIsValid(nss, opCtx);
+    _ensureMajorityCommittedSnapshotIsValid(opCtx, nss);
 }
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
@@ -104,10 +103,10 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     _autoColl.emplace(opCtx, nss, MODE_IS, viewMode, std::move(lock));
 
     // Note: this can yield.
-    _ensureMajorityCommittedSnapshotIsValid(nss, opCtx);
+    _ensureMajorityCommittedSnapshotIsValid(opCtx, nss);
 }
-void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss,
-                                                                       OperationContext* opCtx) {
+void AutoGetCollectionForRead::_ensureMajorityCommittedSnapshotIsValid(OperationContext* opCtx,
+                                                                       const NamespaceString& nss) {
     while (true) {
         auto coll = _autoColl->getCollection();
         if (!coll) {

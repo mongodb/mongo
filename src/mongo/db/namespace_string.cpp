@@ -131,6 +131,11 @@ NamespaceString NamespaceString::getTargetNSForListIndexes() const {
     return NamespaceString(db(), coll().substr(listIndexesCursorNSPrefix.size()));
 }
 
+std::string NamespaceString::getSisterNS(StringData local) const {
+    verify(local.size() && local[0] != '.');
+    return db().toString() + "." + local.toString();
+}
+
 boost::optional<NamespaceString> NamespaceString::getTargetNSForGloballyManagedNamespace() const {
     // Globally managed namespaces are of the form '$cmd.commandName.<targetNs>' or simply
     // '$cmd.commandName'.
@@ -147,7 +152,7 @@ bool NamespaceString::isDropPendingNamespace() const {
 }
 
 NamespaceString NamespaceString::makeDropPendingNamespace(const repl::OpTime& opTime) const {
-    mongo::StringBuilder ss;
+    StringBuilder ss;
     ss << db() << "." << dropPendingNSPrefix;
     ss << opTime.getSecs() << "i" << opTime.getTimestamp().getInc() << "t" << opTime.getTerm();
     ss << "." << coll();

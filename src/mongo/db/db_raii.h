@@ -101,6 +101,7 @@ public:
                              const NamespaceString& nss,
                              AutoGetCollection::ViewMode viewMode,
                              Lock::DBLock lock);
+
     Database* getDb() const {
         if (!_autoColl) {
             return nullptr;
@@ -116,8 +117,8 @@ public:
     }
 
 private:
-    void _ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss,
-                                                 OperationContext* opCtx);
+    void _ensureMajorityCommittedSnapshotIsValid(OperationContext* opCtx,
+                                                 const NamespaceString& nss);
 
     boost::optional<AutoGetCollection> _autoColl;
 };
