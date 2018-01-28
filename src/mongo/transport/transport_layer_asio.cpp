@@ -181,6 +181,9 @@ Status TransportLayerASIO::setup() {
             GenericAcceptor acceptor(*_acceptorIOContext);
             acceptor.open(endpoint.protocol());
             acceptor.set_option(GenericAcceptor::reuse_address(true));
+            if (addr.getType() == AF_INET6) {
+                acceptor.set_option(asio::ip::v6_only(true));
+            }
 
             acceptor.non_blocking(true, ec);
             if (ec) {
