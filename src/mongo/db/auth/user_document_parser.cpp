@@ -57,7 +57,8 @@ const std::string READONLY_FIELD_NAME = "readOnly";
 const std::string CREDENTIALS_FIELD_NAME = "credentials";
 const std::string ROLE_NAME_FIELD_NAME = "role";
 const std::string ROLE_DB_FIELD_NAME = "db";
-const std::string SCRAM_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-1";
+const std::string SCRAMSHA1_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-1";
+const std::string SCRAMSHA256_CREDENTIAL_FIELD_NAME = "SCRAM-SHA-256";
 const std::string MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external";
 constexpr StringData AUTHENTICATION_RESTRICTIONS_FIELD_NAME = "authenticationRestrictions"_sd;
 constexpr StringData INHERITED_AUTHENTICATION_RESTRICTIONS_FIELD_NAME =
@@ -69,6 +70,39 @@ inline Status _badValue(const char* reason) {
 
 inline Status _badValue(const std::string& reason) {
     return Status(ErrorCodes::BadValue, reason);
+}
+
+template <typename Credentials>
+bool parseSCRAMCredentials(const BSONElement& credentialsElement,
+                           Credentials& scram,
+                           const std::string& fieldName) {
+    const auto scramElement = credentialsElement[fieldName];
+    if (scramElement.eoo()) {
+        return false;
+    }
+
+    // We are asserting rather then returning errors since these
+    // fields should have been prepopulated by the calling code.
+    scram.iterationCount = scramElement["iterationCount"].numberInt();
+    uassert(17501,
+            str::stream() << "Invalid or missing " << fieldName << " iteration count",
+            scram.iterationCount > 0);
+
+    scram.salt = scramElement["salt"].str();
+    uassert(17502, str::stream() << "Missing " << fieldName << " salt", !scram.salt.empty());
+
+    scram.serverKey = scramElement["serverKey"].str();
+    uassert(
+        17503, str::stream() << "Missing " << fieldName << " serverKey", !scram.serverKey.empty());
+
+    scram.storedKey = scramElement["storedKey"].str();
+    uassert(
+        17504, str::stream() << "Missing " << fieldName << " storedKey", !scram.storedKey.empty());
+
+    uassert(50684,
+            str::stream() << "credential document " << fieldName << " failed validation",
+            scram.isValid());
+    return true;
 }
 
 }  // namespace
@@ -134,13 +168,30 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
                 "'credentials' field set to {external: true}");
         }
     } else {
-        BSONElement scramElement = credentialsObj[SCRAM_CREDENTIAL_FIELD_NAME];
+        const auto validateScram = [&credentialsObj](const auto& fieldName) {
+            auto scramElement = credentialsObj[fieldName];
 
-        if (!scramElement.eoo()) {
-            if (scramElement.type() != Object) {
-                return _badValue("SCRAM credential must be an object, if present");
+            if (scramElement.eoo()) {
+                return Status(ErrorCodes::NoSuchKey,
+                              str::stream() << fieldName << " does not exist");
             }
-        } else {
+            if (scramElement.type() != Object) {
+                return _badValue(str::stream() << fieldName
+                                               << " credential must be an object, if present");
+            }
+            return Status::OK();
+        };
+
+        const auto sha1status = validateScram(SCRAMSHA1_CREDENTIAL_FIELD_NAME);
+        if (!sha1status.isOK() && (sha1status.code() != ErrorCodes::NoSuchKey)) {
+            return sha1status;
+        }
+        const auto sha256status = validateScram(SCRAMSHA256_CREDENTIAL_FIELD_NAME);
+        if (!sha256status.isOK() && (sha256status.code() != ErrorCodes::NoSuchKey)) {
+            return sha256status;
+        }
+
+        if (!sha1status.isOK() && !sha256status.isOK()) {
             return _badValue(
                 "User document must provide credentials for all "
                 "non-external users");
@@ -191,29 +242,15 @@ Status V2UserDocumentParser::initializeUserCredentialsFromUserDocument(
                               "credentials to {external:true}");
             }
         } else {
-            BSONElement scramElement = credentialsElement.Obj()[SCRAM_CREDENTIAL_FIELD_NAME];
+            const bool haveSha1 = parseSCRAMCredentials(
+                credentialsElement, credentials.scram_sha1, SCRAMSHA1_CREDENTIAL_FIELD_NAME);
+            const bool haveSha256 = parseSCRAMCredentials(
+                credentialsElement, credentials.scram_sha256, SCRAMSHA256_CREDENTIAL_FIELD_NAME);
 
-            if (scramElement.eoo()) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "User documents must provide credentials for SCRAM-SHA-1");
-            }
-
-            if (!scramElement.eoo()) {
-                // We are asserting rather then returning errors since these
-                // fields should have been prepopulated by the calling code.
-                credentials.scram.iterationCount = scramElement.Obj()["iterationCount"].numberInt();
-                uassert(17501,
-                        "Invalid or missing SCRAM iteration count",
-                        credentials.scram.iterationCount > 0);
-
-                credentials.scram.salt = scramElement.Obj()["salt"].str();
-                uassert(17502, "Missing SCRAM salt", !credentials.scram.salt.empty());
-
-                credentials.scram.serverKey = scramElement["serverKey"].str();
-                uassert(17503, "Missing SCRAM serverKey", !credentials.scram.serverKey.empty());
-
-                credentials.scram.storedKey = scramElement["storedKey"].str();
-                uassert(17504, "Missing SCRAM storedKey", !credentials.scram.storedKey.empty());
+            if (!haveSha1 && !haveSha256) {
+                return Status(
+                    ErrorCodes::UnsupportedFormat,
+                    "User documents must provide credentials for SCRAM-SHA-1 and/or SCRAM-SHA-256");
             }
 
             credentials.isExternal = false;

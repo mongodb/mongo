@@ -173,18 +173,18 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(std::vector<string>& in
 
     _saslAuthSession->getAuthorizationSession()->getAuthorizationManager().releaseUser(userObj);
 
-    // Check for authentication attempts of the __system user on
-    // systems started without a keyfile.
-    if (userName == internalSecurity.user->getName() && _creds.scram.salt.empty()) {
-        return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
-                                "It is not possible to authenticate as the __system user "
-                                "on servers started without a --keyFile parameter");
-    }
-
-    if (!_creds.scram.isValid()) {
-        return Status(ErrorCodes::AuthenticationFailed,
-                      "Unable to perform SCRAM authentication for a user with missing "
-                      "or invalid SCRAM credentials");
+    if (!initAndValidateCredentials()) {
+        // Check for authentication attempts of the __system user on
+        // systems started without a keyfile.
+        if (userName == internalSecurity.user->getName()) {
+            return Status(ErrorCodes::AuthenticationFailed,
+                          "It is not possible to authenticate as the __system user "
+                          "on servers started without a --keyFile parameter");
+        } else {
+            return Status(ErrorCodes::AuthenticationFailed,
+                          "Unable to perform SCRAM authentication for a user with missing "
+                          "or invalid SCRAM credentials");
+        }
     }
 
     // Generate server-first-message
@@ -201,7 +201,7 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(std::vector<string>& in
     _nonce =
         clientNonce + base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));
     StringBuilder sb;
-    sb << "r=" << _nonce << ",s=" << _creds.scram.salt << ",i=" << _creds.scram.iterationCount;
+    sb << "r=" << _nonce << ",s=" << getSalt() << ",i=" << getIterationCount();
     *outputData = sb.str();
 
     // add server-first-message to authMessage
@@ -269,7 +269,7 @@ StatusWith<bool> SaslSCRAMServerConversation::_secondStep(const std::vector<stri
     // ClientSignature := HMAC(StoredKey, AuthMessage)
     // ClientKey := ClientSignature XOR ClientProof
     // ServerSignature := HMAC(ServerKey, AuthMessage)
-    invariant(_creds.scram.isValid());
+    invariant(initAndValidateCredentials());
 
     if (!verifyClientProof(base64::decode(clientProof))) {
         return StatusWith<bool>(ErrorCodes::AuthenticationFailed,

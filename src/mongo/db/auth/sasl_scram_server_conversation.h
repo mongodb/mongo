@@ -59,9 +59,24 @@ public:
     StatusWith<bool> step(StringData inputData, std::string* outputData) override;
 
     /**
+     * Initialize details, called after _creds has been loaded.
+     */
+    virtual bool initAndValidateCredentials() = 0;
+
+    /**
+     * Provide the predetermined salt to the client.
+     */
+    virtual std::string getSalt() const = 0;
+
+    /**
+     * Provide the predetermined iteration count to the client.
+     */
+    virtual size_t getIterationCount() const = 0;
+
+    /**
      * Verify proof submitted by authenticating client.
      */
-    virtual bool verifyClientProof(StringData) = 0;
+    virtual bool verifyClientProof(StringData) const = 0;
 
     /**
      * Generate a signature to prove ourselves.
@@ -95,9 +110,27 @@ public:
         : SaslSCRAMServerConversation(session) {}
     ~SaslSCRAMServerConversationImpl() override = default;
 
-    bool verifyClientProof(StringData clientProof) final {
-        _credentials = scram::Secrets<HashBlock>(
-            "", base64::decode(_creds.scram.storedKey), base64::decode(_creds.scram.serverKey));
+    bool initAndValidateCredentials() final {
+        const auto& scram = _creds.scram<HashBlock>();
+        if (!scram.isValid()) {
+            return false;
+        }
+        if (!_credentials) {
+            _credentials = scram::Secrets<HashBlock>(
+                "", base64::decode(scram.storedKey), base64::decode(scram.serverKey));
+        }
+        return true;
+    }
+
+    std::string getSalt() const final {
+        return _creds.scram<HashBlock>().salt;
+    }
+
+    size_t getIterationCount() const final {
+        return _creds.scram<HashBlock>().iterationCount;
+    }
+
+    bool verifyClientProof(StringData clientProof) const final {
         return _credentials.verifyClientProof(_authMessage, clientProof);
     }
 

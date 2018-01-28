@@ -46,5 +46,13 @@ std::string decode(const std::string& s);
 
 bool validate(StringData);
 
+/**
+ * Calculate how large a given input would expand to.
+ * Effectively: ceil(inLen * 4 / 3)
+ */
+constexpr size_t encodedLength(size_t inLen) {
+    return static_cast<size_t>((inLen + 2.5) / 3) * 4;
+}
+
 }  // namespace base64
 }  // namespace mongo

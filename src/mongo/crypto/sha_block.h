@@ -55,6 +55,7 @@ class SHABlock {
 public:
     using HashType = typename Traits::HashType;
     static constexpr size_t kHashLength = sizeof(HashType);
+    static constexpr auto kName = Traits::name;
 
     SHABlock() = default;
 

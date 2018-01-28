@@ -35,6 +35,31 @@
 #include "mongo/util/text.h"
 
 namespace mongo {
+namespace {
+template <typename HashBlock>
+StatusWith<bool> trySCRAM(const User::CredentialData& credentials, StringData pwd) {
+    const auto scram = credentials.scram<HashBlock>();
+    if (!scram.isValid()) {
+        // No stored credentials available.
+        return false;
+    }
+
+    const auto decodedSalt = base64::decode(scram.salt);
+    scram::Secrets<HashBlock> secrets(scram::Presecrets<HashBlock>(
+        pwd.toString(),
+        std::vector<std::uint8_t>(reinterpret_cast<const std::uint8_t*>(decodedSalt.c_str()),
+                                  reinterpret_cast<const std::uint8_t*>(decodedSalt.c_str()) +
+                                      decodedSalt.size()),
+        scram.iterationCount));
+    if (scram.storedKey != base64::encode(reinterpret_cast<const char*>(secrets.storedKey().data()),
+                                          secrets.storedKey().size())) {
+        return Status(ErrorCodes::AuthenticationFailed,
+                      str::stream() << "Incorrect user name or password");
+    }
+
+    return true;
+}
+}  // namespace
 
 SaslPLAINServerConversation::SaslPLAINServerConversation(SaslAuthenticationSession* saslAuthSession)
     : SaslServerConversation(saslAuthSession) {}
@@ -98,31 +123,31 @@ StatusWith<bool> SaslPLAINServerConversation::step(StringData inputData, std::st
             &userObj);
 
     if (!status.isOK()) {
-        return StatusWith<bool>(status);
+        return status;
     }
 
-    const User::CredentialData creds = userObj->getCredentials();
+    const auto creds = userObj->getCredentials();
     _saslAuthSession->getAuthorizationSession()->getAuthorizationManager().releaseUser(userObj);
 
-    std::string authDigest = createPasswordDigest(_user, pwd->c_str());
-
-    // Handle schemaVersion28SCRAM (SCRAM only mode)
-    std::string decodedSalt = base64::decode(creds.scram.salt);
-    scram::SHA1Secrets secrets(scram::SHA1Presecrets(
-        authDigest,
-        std::vector<std::uint8_t>(reinterpret_cast<const std::uint8_t*>(decodedSalt.c_str()),
-                                  reinterpret_cast<const std::uint8_t*>(decodedSalt.c_str()) + 16),
-        creds.scram.iterationCount));
-    if (creds.scram.storedKey !=
-        base64::encode(reinterpret_cast<const char*>(secrets.storedKey().data()),
-                       secrets.storedKey().size())) {
-        return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
-                                mongoutils::str::stream() << "Incorrect user name or password");
+    *outputData = "";
+    const auto sha256Status = trySCRAM<SHA256Block>(creds, pwd->c_str());
+    if (!sha256Status.isOK()) {
+        return sha256Status;
+    }
+    if (sha256Status.getValue()) {
+        return true;
     }
 
-    *outputData = "";
+    const auto authDigest = createPasswordDigest(_user, pwd->c_str());
+    const auto sha1Status = trySCRAM<SHA1Block>(creds, authDigest);
+    if (!sha1Status.isOK()) {
+        return sha1Status;
+    }
+    if (sha1Status.getValue()) {
+        return true;
+    }
 
-    return StatusWith<bool>(true);
+    return Status(ErrorCodes::AuthenticationFailed, str::stream() << "No credentials available.");
 }
 
 }  // namespace mongo
