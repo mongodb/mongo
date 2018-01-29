@@ -763,9 +763,7 @@ function printShardingSizes(configDB) {
     output(1, "sharding version: " + tojson(configDB.getCollection("version").findOne()));
 
     output(1, "shards:");
-    var shards = {};
     configDB.shards.find().forEach(function(z) {
-        shards[z._id] = new Mongo(z.host);
         output(2, tojson(z));
     });
 
@@ -780,8 +778,7 @@ function printShardingSizes(configDB) {
                 .forEach(function(coll) {
                     output(3, coll._id + " chunks:");
                     configDB.chunks.find({"ns": coll._id}).sort({min: 1}).forEach(function(chunk) {
-                        var mydb = shards[chunk.shard].getDB(db._id);
-                        var out = mydb.runCommand({
+                        var out = saveDB.adminCommand({
                             dataSize: coll._id,
                             keyPattern: coll.key,
                             min: chunk.min,
