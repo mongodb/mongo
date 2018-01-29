@@ -634,7 +634,8 @@ env.Library(
         "op_observer_impl.cpp",
     ],
     LIBDEPS=[
-        'repl/serveronly_repl',
+        'catalog/collection_options',
+        'repl/oplog',
         'views/views_mongod',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
