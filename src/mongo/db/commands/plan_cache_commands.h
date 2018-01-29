@@ -68,7 +68,7 @@ public:
 
     virtual bool slaveOverrideOk() const;
 
-    virtual void help(std::stringstream& ss) const;
+    std::string help() const override;
 
     /**
      * Two action types defined for plan cache commands:

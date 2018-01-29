@@ -82,10 +82,10 @@ public:
         return true;
     }
 
-    void help(std::stringstream& help) const override {
-        help << "Shard a collection. Requires key. Optional unique."
-             << " Sharding must already be enabled for the database.\n"
-             << "   { enablesharding : \"<dbname>\" }\n";
+    std::string help() const override {
+        return "Shard a collection. Requires key. Optional unique."
+               " Sharding must already be enabled for the database.\n"
+               "   { enablesharding : \"<dbname>\" }\n";
     }
 
     Status checkAuthForCommand(Client* client,

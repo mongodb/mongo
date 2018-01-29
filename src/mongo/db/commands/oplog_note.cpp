@@ -99,8 +99,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "Adds a no-op entry to the oplog";
+    std::string help() const override {
+        return "Adds a no-op entry to the oplog";
     }
 
     virtual Status checkAuthForCommand(Client* client,

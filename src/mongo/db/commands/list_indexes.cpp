@@ -89,8 +89,8 @@ public:
         return false;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "list indexes for a collection";
+    std::string help() const override {
+        return "list indexes for a collection";
     }
 
     virtual Status checkAuthForCommand(Client* client,

@@ -107,8 +107,8 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-    virtual void help(stringstream& h) const {
-        h << url();
+    std::string help() const override {
+        return url();
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,

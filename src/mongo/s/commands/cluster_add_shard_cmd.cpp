@@ -68,8 +68,8 @@ public:
         return true;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "add a new shard to the system";
+    std::string help() const override {
+        return "add a new shard to the system";
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

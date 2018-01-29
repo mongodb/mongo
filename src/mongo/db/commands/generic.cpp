@@ -85,9 +85,9 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
-    virtual void help(stringstream& help) const {
-        help << "get version #, etc.\n";
-        help << "{ buildinfo:1 }";
+    std::string help() const override {
+        return "get version #, etc.\n"
+               "{ buildinfo:1 }";
     }
 
     bool run(OperationContext* opCtx,
@@ -107,9 +107,9 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual void help(stringstream& help) const {
-        help << "a way to check that the server is alive. responds immediately even if server is "
-                "in a db lock.";
+    std::string help() const override {
+        return "a way to check that the server is alive. responds immediately even if server is "
+               "in a db lock.";
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -135,8 +135,8 @@ public:
 class FeaturesCmd : public BasicCommand {
 public:
     FeaturesCmd() : BasicCommand("features") {}
-    void help(stringstream& h) const {
-        h << "return build level feature settings";
+    std::string help() const override {
+        return "return build level feature settings";
     }
     virtual bool slaveOk() const {
         return true;
@@ -178,8 +178,8 @@ public:
         return false;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "returns information about the daemon's host";
+    std::string help() const override {
+        return "returns information about the daemon's host";
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
@@ -248,8 +248,8 @@ public:
 
 class ListCommandsCmd : public BasicCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "get a list of all db commands";
+    std::string help() const override {
+        return "get a list of all db commands";
     }
     ListCommandsCmd() : BasicCommand("listCommands") {}
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -282,12 +282,7 @@ public:
         BSONObjBuilder b(result.subobjStart("commands"));
         for (const auto& c : commands) {
             BSONObjBuilder temp(b.subobjStart(c->getName()));
-
-            {
-                stringstream help;
-                c->help(help);
-                temp.append("help", help.str());
-            }
+            temp.append("help", c->help());
             temp.append("slaveOk", c->slaveOk());
             temp.append("adminOnly", c->adminOnly());
             // optionally indicates that the command can be forced to run on a slave/secondary
@@ -305,8 +300,8 @@ public:
 /* for testing purposes only */
 class CmdForceError : public BasicCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "for testing purposes only.  forces a user assertion exception";
+    std::string help() const override {
+        return "for testing purposes only.  forces a user assertion exception";
     }
     virtual bool slaveOk() const {
         return true;
@@ -347,8 +342,8 @@ public:
         actions.addAction(ActionType::getLog);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    virtual void help(stringstream& help) const {
-        help << "{ getLog : '*' }  OR { getLog : 'global' }";
+    std::string help() const override {
+        return "{ getLog : '*' }  OR { getLog : 'global' }";
     }
 
     virtual bool errmsgRun(OperationContext* opCtx,
@@ -418,8 +413,8 @@ public:
         // enabled at the command line.
         return Status::OK();
     }
-    virtual void help(stringstream& help) const {
-        help << "{ clearLog : 'global' }";
+    std::string help() const override {
+        return "{ clearLog : 'global' }";
     }
 
     virtual bool run(OperationContext* opCtx,
@@ -454,8 +449,8 @@ MONGO_INITIALIZER(RegisterClearLogCmd)(InitializerContext* context) {
 class CmdGetCmdLineOpts : public BasicCommand {
 public:
     CmdGetCmdLineOpts() : BasicCommand("getCmdLineOpts") {}
-    void help(stringstream& h) const {
-        h << "get argv";
+    std::string help() const override {
+        return "get argv";
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

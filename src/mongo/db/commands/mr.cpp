@@ -1364,10 +1364,10 @@ public:
         return FindCommon::kInitReplyBufferSize;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "Run a map/reduce operation on the server.\n";
-        help << "Note this is used for aggregation, not querying, in MongoDB.\n";
-        help << "http://dochub.mongodb.org/core/mapreduce";
+    std::string help() const override {
+        return "Run a map/reduce operation on the server.\n"
+               "Note this is used for aggregation, not querying, in MongoDB.\n"
+               "http://dochub.mongodb.org/core/mapreduce";
     }
 
 
@@ -1685,8 +1685,8 @@ public:
  */
 class MapReduceFinishCommand : public BasicCommand {
 public:
-    void help(stringstream& h) const {
-        h << "internal";
+    std::string help() const override {
+        return "internal";
     }
     MapReduceFinishCommand() : BasicCommand("mapreduce.shardedfinish") {}
     virtual bool slaveOk() const {

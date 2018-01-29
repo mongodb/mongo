@@ -53,8 +53,8 @@ public:
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << " shows status/reachability of servers in the cluster";
+    std::string help() const override {
+        return " shows status/reachability of servers in the cluster";
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

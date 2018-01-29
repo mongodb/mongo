@@ -57,8 +57,8 @@ public:
         return true;
     }
 
-    void help(std::stringstream& help) const override {
-        help << "test if this is master half of a replica pair";
+    std::string help() const override {
+        return "test if this is master half of a replica pair";
     }
 
     void addRequiredPrivileges(const std::string& dbname,

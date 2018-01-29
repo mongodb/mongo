@@ -336,8 +336,8 @@ class ClusterCmdInsert : public ClusterWriteCmd {
 public:
     ClusterCmdInsert() : ClusterWriteCmd("insert", BatchedCommandRequest::BatchType_Insert) {}
 
-    void help(std::stringstream& help) const {
-        help << "insert documents";
+    std::string help() const override {
+        return "insert documents";
     }
 
 } clusterInsertCmd;
@@ -346,8 +346,8 @@ class ClusterCmdUpdate : public ClusterWriteCmd {
 public:
     ClusterCmdUpdate() : ClusterWriteCmd("update", BatchedCommandRequest::BatchType_Update) {}
 
-    void help(std::stringstream& help) const {
-        help << "update documents";
+    std::string help() const override {
+        return "update documents";
     }
 
 } clusterUpdateCmd;
@@ -356,8 +356,8 @@ class ClusterCmdDelete : public ClusterWriteCmd {
 public:
     ClusterCmdDelete() : ClusterWriteCmd("delete", BatchedCommandRequest::BatchType_Delete) {}
 
-    void help(std::stringstream& help) const {
-        help << "delete documents";
+    std::string help() const override {
+        return "delete documents";
     }
 
 } clusterDeleteCmd;

@@ -65,9 +65,9 @@ class ConfigSvrSplitChunkCommand : public BasicCommand {
 public:
     ConfigSvrSplitChunkCommand() : BasicCommand("_configsvrCommitChunkSplit") {}
 
-    void help(std::stringstream& help) const override {
-        help << "Internal command, which is sent by a shard to the sharding config server. Do "
-                "not call directly. Receives, validates, and processes a SplitChunkRequest.";
+    std::string help() const override {
+        return "Internal command, which is sent by a shard to the sharding config server. Do "
+               "not call directly. Receives, validates, and processes a SplitChunkRequest.";
     }
 
     bool slaveOk() const override {

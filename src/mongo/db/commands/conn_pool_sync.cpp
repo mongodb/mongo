@@ -40,8 +40,8 @@ namespace mongo {
 class PoolFlushCmd : public BasicCommand {
 public:
     PoolFlushCmd() : BasicCommand("connPoolSync", "connpoolsync") {}
-    virtual void help(std::stringstream& help) const {
-        help << "internal";
+    std::string help() const override {
+        return "internal";
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

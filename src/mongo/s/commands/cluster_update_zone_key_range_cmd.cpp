@@ -84,8 +84,8 @@ public:
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "assigns/remove a range of a sharded collection to a zone";
+    std::string help() const override {
+        return "assigns/remove a range of a sharded collection to a zone";
     }
 
     Status checkAuthForCommand(Client* client,

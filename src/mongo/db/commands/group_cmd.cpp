@@ -93,8 +93,8 @@ private:
         return FindCommon::kInitReplyBufferSize;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "http://dochub.mongodb.org/core/aggregation";
+    std::string help() const override {
+        return "http://dochub.mongodb.org/core/aggregation";
     }
 
     virtual Status checkAuthForCommand(Client* client,

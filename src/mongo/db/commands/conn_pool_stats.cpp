@@ -49,8 +49,8 @@ class PoolStats final : public BasicCommand {
 public:
     PoolStats() : BasicCommand("connPoolStats") {}
 
-    void help(std::stringstream& help) const override {
-        help << "stats about connections between servers in a replica set or sharded cluster.";
+    std::string help() const override {
+        return "stats about connections between servers in a replica set or sharded cluster.";
     }
 
     bool slaveOk() const override {

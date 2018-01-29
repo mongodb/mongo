@@ -62,8 +62,8 @@ public:
         return false;
     }
 
-    void help(std::stringstream& help) const override {
-        help << "Starts or stops the sharding balancer.";
+    std::string help() const override {
+        return "Starts or stops the sharding balancer.";
     }
 
     Status checkAuthForCommand(Client* client,

@@ -66,8 +66,8 @@ public:
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    void help(std::stringstream& help) const override {
-        help << "kill logical sessions by pattern";
+    std::string help() const override {
+        return "kill logical sessions by pattern";
     }
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,

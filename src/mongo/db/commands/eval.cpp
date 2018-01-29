@@ -158,10 +158,10 @@ public:
         return false;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "DEPRECATED\n"
-             << "Evaluate javascript at the server.\n"
-             << "http://dochub.mongodb.org/core/serversidecodeexecution";
+    std::string help() const override {
+        return "DEPRECATED\n"
+               "Evaluate javascript at the server.\n"
+               "http://dochub.mongodb.org/core/serversidecodeexecution";
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

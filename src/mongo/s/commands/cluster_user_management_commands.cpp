@@ -76,8 +76,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Adds a user to the system";
+    std::string help() const override {
+        return "Adds a user to the system";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -117,8 +117,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Used to update a user, for example to change its password";
+    std::string help() const override {
+        return "Used to update a user, for example to change its password";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -169,8 +169,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Drops a single user.";
+    std::string help() const override {
+        return "Drops a single user.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -217,8 +217,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Drops all users for a single database.";
+    std::string help() const override {
+        return "Drops all users for a single database.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -260,8 +260,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Grants roles to a user.";
+    std::string help() const override {
+        return "Grants roles to a user.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -310,8 +310,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Revokes roles from a user.";
+    std::string help() const override {
+        return "Revokes roles from a user.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -364,8 +364,8 @@ public:
 
     CmdUsersInfo() : BasicCommand("usersInfo") {}
 
-    virtual void help(stringstream& ss) const {
-        ss << "Returns information about users.";
+    std::string help() const override {
+        return "Returns information about users.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -397,8 +397,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Adds a role to the system";
+    std::string help() const override {
+        return "Adds a role to the system";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -434,8 +434,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Used to update a role";
+    std::string help() const override {
+        return "Used to update a role";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -477,8 +477,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Grants privileges to a role";
+    std::string help() const override {
+        return "Grants privileges to a role";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -520,8 +520,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Revokes privileges from a role";
+    std::string help() const override {
+        return "Revokes privileges from a role";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -563,8 +563,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Grants roles to another role.";
+    std::string help() const override {
+        return "Grants roles to another role.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -606,8 +606,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Revokes roles from another role.";
+    std::string help() const override {
+        return "Revokes roles from another role.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -649,11 +649,11 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Drops a single role.  Before deleting the role completely it must remove it "
-              "from any users or roles that reference it.  If any errors occur in the middle "
-              "of that process it's possible to be left in a state where the role has been "
-              "removed from some user/roles but otherwise still exists.";
+    std::string help() const override {
+        return "Drops a single role.  Before deleting the role completely it must remove it "
+               "from any users or roles that reference it.  If any errors occur in the middle "
+               "of that process it's possible to be left in a state where the role has been "
+               "removed from some user/roles but otherwise still exists.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -695,12 +695,12 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Drops all roles from the given database.  Before deleting the roles completely "
-              "it must remove them from any users or other roles that reference them.  If any "
-              "errors occur in the middle of that process it's possible to be left in a state "
-              "where the roles have been removed from some user/roles but otherwise still "
-              "exist.";
+    std::string help() const override {
+        return "Drops all roles from the given database.  Before deleting the roles completely "
+               "it must remove them from any users or other roles that reference them.  If any "
+               "errors occur in the middle of that process it's possible to be left in a state "
+               "where the roles have been removed from some user/roles but otherwise still "
+               "exist.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -746,8 +746,8 @@ public:
         return false;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Returns information about roles.";
+    std::string help() const override {
+        return "Returns information about roles.";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -783,8 +783,8 @@ public:
         return false;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Invalidates the in-memory cache of user information";
+    std::string help() const override {
+        return "Invalidates the in-memory cache of user information";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -832,8 +832,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& ss) const {
-        ss << "Internal command used by mongorestore for updating user/role data";
+    std::string help() const override {
+        return "Internal command used by mongorestore for updating user/role data";
     }
 
     virtual Status checkAuthForCommand(Client* client,

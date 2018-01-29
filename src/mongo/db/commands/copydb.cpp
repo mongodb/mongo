@@ -109,10 +109,10 @@ public:
         return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
     }
 
-    virtual void help(stringstream& help) const {
-        help << "copy a database from another host to this host\n";
-        help << "usage: {copydb: 1, fromhost: <connection string>, fromdb: <db>, todb: <db>"
-             << "[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
+    std::string help() const override {
+        return "copy a database from another host to this host\n"
+               "usage: {copydb: 1, fromhost: <connection string>, fromdb: <db>, todb: <db>"
+               "[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
     }
 
     virtual bool errmsgRun(OperationContext* opCtx,

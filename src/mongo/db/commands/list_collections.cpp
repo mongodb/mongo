@@ -210,8 +210,8 @@ public:
         return false;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "list collections for this db";
+    std::string help() const override {
+        return "list collections for this db";
     }
 
     virtual Status checkAuthForCommand(Client* client,

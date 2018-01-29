@@ -718,10 +718,10 @@ public:
         return true;
     }
 
-    void help(std::stringstream& help) const override {
-        help << "Internal command, which is exported by the sharding config server. Do not call "
-             << "directly. Shards a collection. Requires key. Optional unique. Sharding must "
-                "already be enabled for the database";
+    std::string help() const override {
+        return "Internal command, which is exported by the sharding config server. Do not call "
+               "directly. Shards a collection. Requires key. Optional unique. Sharding must "
+               "already be enabled for the database";
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {

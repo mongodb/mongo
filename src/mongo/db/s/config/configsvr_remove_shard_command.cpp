@@ -57,9 +57,9 @@ class ConfigSvrRemoveShardCommand : public BasicCommand {
 public:
     ConfigSvrRemoveShardCommand() : BasicCommand("_configsvrRemoveShard") {}
 
-    void help(std::stringstream& help) const override {
-        help << "Internal command, which is exported by the sharding config server. Do not call "
-                "directly. Removes a shard from the cluster.";
+    std::string help() const override {
+        return "Internal command, which is exported by the sharding config server. Do not call "
+               "directly. Removes a shard from the cluster.";
     }
 
     bool slaveOk() const override {

@@ -80,9 +80,9 @@ public:
         return true;
     }
 
-    virtual void help(std::stringstream& help) const override {
-        help << "Internal command, which is exported by the sharding config server. Do not call "
-                "directly. Reassigns the primary shard of a database.";
+    std::string help() const override {
+        return "Internal command, which is exported by the sharding config server. Do not call "
+               "directly. Reassigns the primary shard of a database.";
     }
 
     virtual Status checkAuthForCommand(Client* client,

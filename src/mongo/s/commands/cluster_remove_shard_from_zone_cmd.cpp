@@ -81,8 +81,8 @@ public:
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "removes a shard from the zone";
+    std::string help() const override {
+        return "removes a shard from the zone";
     }
 
     Status checkAuthForCommand(Client* client,

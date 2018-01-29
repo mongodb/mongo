@@ -292,7 +292,9 @@ public:
     /**
      * Generates help text for this command.
      */
-    virtual void help(std::stringstream& help) const;
+    virtual std::string help() const {
+        return "no help defined";
+    }
 
     /**
      * Commands which can be explained override this method. Any operation which has a query

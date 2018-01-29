@@ -54,11 +54,12 @@ using std::stringstream;
 namespace mongo {
 
 namespace {
-void appendParameterNames(stringstream& help) {
-    help << "supported:\n";
-    const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
-    for (ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i) {
-        help << "  " << i->first << "\n";
+void appendParameterNames(std::string* help) {
+    *help += "supported:\n";
+    for (const auto& kv : ServerParameterSet::getGlobal()->getMap()) {
+        *help += "  ";
+        *help += kv.first;
+        *help += '\n';
     }
 }
 }
@@ -82,11 +83,13 @@ public:
         actions.addAction(ActionType::getParameter);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    virtual void help(stringstream& help) const {
-        help << "get administrative option(s)\nexample:\n";
-        help << "{ getParameter:1, notablescan:1 }\n";
-        appendParameterNames(help);
-        help << "{ getParameter:'*' } to get everything\n";
+    std::string help() const override {
+        std::string h =
+            "get administrative option(s)\nexample:\n"
+            "{ getParameter:1, notablescan:1 }\n";
+        appendParameterNames(&h);
+        h += "{ getParameter:'*' } to get everything\n";
+        return h;
     }
     bool errmsgRun(OperationContext* opCtx,
                    const string& dbname,
@@ -131,10 +134,12 @@ public:
         actions.addAction(ActionType::setParameter);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
-    virtual void help(stringstream& help) const {
-        help << "set administrative option(s)\n";
-        help << "{ setParameter:1, <param>:<value> }\n";
-        appendParameterNames(help);
+    std::string help() const override {
+        std::string h =
+            "set administrative option(s)\n"
+            "{ setParameter:1, <param>:<value> }\n";
+        appendParameterNames(&h);
+        return h;
     }
     bool errmsgRun(OperationContext* opCtx,
                    const string& dbname,

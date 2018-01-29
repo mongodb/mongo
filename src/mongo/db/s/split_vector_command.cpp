@@ -53,19 +53,19 @@ public:
         return false;
     }
 
-    void help(stringstream& help) const override {
-        help << "Internal command.\n"
-                "examples:\n"
-                "  { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, "
-                "maxChunkSize:200 }\n"
-                "  maxChunkSize unit in MBs\n"
-                "  May optionally specify 'maxSplitPoints' and 'maxChunkObjects' to avoid "
-                "traversing the whole chunk\n"
-                "  \n"
-                "  { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, "
-                "force: true }\n"
-                "  'force' will produce one split point even if data is small; defaults to false\n"
-                "NOTE: This command may take a while to run";
+    std::string help() const override {
+        return "Internal command.\n"
+               "examples:\n"
+               "  { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, "
+               "maxChunkSize:200 }\n"
+               "  maxChunkSize unit in MBs\n"
+               "  May optionally specify 'maxSplitPoints' and 'maxChunkObjects' to avoid "
+               "traversing the whole chunk\n"
+               "  \n"
+               "  { splitVector : \"blog.post\" , keyPattern:{x:1} , min:{x:10} , max:{x:20}, "
+               "force: true }\n"
+               "  'force' will produce one split point even if data is small; defaults to false\n"
+               "NOTE: This command may take a while to run";
     }
 
     Status checkAuthForCommand(Client* client,

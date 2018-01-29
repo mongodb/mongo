@@ -1065,8 +1065,8 @@ class DistinctCmd : public PublicGridCommand {
 public:
     DistinctCmd() : PublicGridCommand("distinct") {}
 
-    void help(stringstream& help) const override {
-        help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
+    std::string help() const override {
+        return "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
     }
 
     void addRequiredPrivileges(const std::string& dbname,
@@ -1278,8 +1278,8 @@ class FileMD5Cmd : public PublicGridCommand {
 public:
     FileMD5Cmd() : PublicGridCommand("filemd5") {}
 
-    void help(stringstream& help) const override {
-        help << " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
+    std::string help() const override {
+        return " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
@@ -1441,8 +1441,8 @@ class Geo2dFindNearCmd : public PublicGridCommand {
 public:
     Geo2dFindNearCmd() : PublicGridCommand("geoNear") {}
 
-    void help(stringstream& h) const override {
-        h << "http://dochub.mongodb.org/core/geo#GeospatialIndexing-geoNearCommand";
+    std::string help() const override {
+        return "http://dochub.mongodb.org/core/geo#GeospatialIndexing-geoNearCommand";
     }
 
     void addRequiredPrivileges(const std::string& dbname,

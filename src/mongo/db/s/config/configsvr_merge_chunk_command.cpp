@@ -67,9 +67,9 @@ class ConfigSvrMergeChunkCommand : public BasicCommand {
 public:
     ConfigSvrMergeChunkCommand() : BasicCommand("_configsvrCommitChunkMerge") {}
 
-    void help(std::stringstream& help) const override {
-        help << "Internal command, which is sent by a shard to the sharding config server. Do "
-                "not call directly. Receives, validates, and processes a MergeChunkRequest";
+    std::string help() const override {
+        return "Internal command, which is sent by a shard to the sharding config server. Do "
+               "not call directly. Receives, validates, and processes a MergeChunkRequest";
     }
 
     bool slaveOk() const override {

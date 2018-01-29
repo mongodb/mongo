@@ -132,8 +132,8 @@ bool PlanCacheCommand::slaveOverrideOk() const {
     return true;
 }
 
-void PlanCacheCommand::help(stringstream& ss) const {
-    ss << helpText;
+std::string PlanCacheCommand::help() const {
+    return helpText;
 }
 
 Status PlanCacheCommand::checkAuthForCommand(Client* client,

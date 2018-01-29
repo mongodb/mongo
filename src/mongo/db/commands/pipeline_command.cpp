@@ -48,9 +48,9 @@ class PipelineCommand : public BasicCommand {
 public:
     PipelineCommand() : BasicCommand("aggregate") {}
 
-    void help(std::stringstream& help) const override {
-        help << "Runs the aggregation command. See http://dochub.mongodb.org/core/aggregation for "
-                "more details.";
+    std::string help() const override {
+        return "Runs the aggregation command. See http://dochub.mongodb.org/core/aggregation for "
+               "more details.";
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

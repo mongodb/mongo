@@ -78,8 +78,8 @@ public:
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "explain database reads and writes";
+    std::string help() const override {
+        return "explain database reads and writes";
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {

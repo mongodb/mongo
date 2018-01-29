@@ -63,8 +63,8 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}
-    virtual void help(stringstream& help) const {
-        help << "returns the hash of the first BSONElement val in a BSONObj";
+    std::string help() const override {
+        return "returns the hash of the first BSONElement val in a BSONObj";
     }
 
     /* CmdObj has the form {"hash" : <thingToHash>}

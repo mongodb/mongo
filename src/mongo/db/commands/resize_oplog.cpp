@@ -66,8 +66,8 @@ public:
         return false;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "resize oplog size in MB";
+    std::string help() const override {
+        return "resize oplog size in MB";
     }
 
     Status checkAuthForCommand(Client* client,

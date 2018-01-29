@@ -60,9 +60,9 @@ class ConfigSvrAddShardCommand : public BasicCommand {
 public:
     ConfigSvrAddShardCommand() : BasicCommand("_configsvrAddShard") {}
 
-    void help(std::stringstream& help) const override {
-        help << "Internal command, which is exported by the sharding config server. Do not call "
-                "directly. Validates and adds a new shard to the cluster.";
+    std::string help() const override {
+        return "Internal command, which is exported by the sharding config server. Do not call "
+               "directly. Validates and adds a new shard to the cluster.";
     }
 
     bool slaveOk() const override {

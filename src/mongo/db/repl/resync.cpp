@@ -66,8 +66,8 @@ public:
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
-    void help(stringstream& h) const {
-        h << "resync (from scratch) a stale slave or replica set secondary node.\n";
+    std::string help() const override {
+        return "resync (from scratch) a stale slave or replica set secondary node.\n";
     }
 
     CmdResync() : ErrmsgCommandDeprecated(kResyncFieldName) {}

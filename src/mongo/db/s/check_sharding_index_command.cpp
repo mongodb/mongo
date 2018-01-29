@@ -59,8 +59,8 @@ class CheckShardingIndex : public ErrmsgCommandDeprecated {
 public:
     CheckShardingIndex() : ErrmsgCommandDeprecated("checkShardingIndex") {}
 
-    virtual void help(std::stringstream& help) const {
-        help << "Internal command.\n";
+    std::string help() const override {
+        return "Internal command.\n";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

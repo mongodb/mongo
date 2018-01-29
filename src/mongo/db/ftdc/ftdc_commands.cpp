@@ -53,8 +53,8 @@ public:
         return true;
     }
 
-    void help(std::stringstream& help) const override {
-        help << "get latest diagnostic data collection snapshot";
+    std::string help() const override {
+        return "get latest diagnostic data collection snapshot";
     }
 
     bool slaveOk() const override {

@@ -211,13 +211,13 @@ class CmdFindAndModify : public BasicCommand {
 public:
     CmdFindAndModify() : BasicCommand("findAndModify", "findandmodify") {}
 
-    void help(std::stringstream& help) const override {
-        help << "{ findAndModify: \"collection\", query: {processed:false}, update: {$set: "
-                "{processed:true}}, new: true}\n"
-                "{ findAndModify: \"collection\", query: {processed:false}, remove: true, sort: "
-                "{priority:-1}}\n"
-                "Either update or remove is required, all other fields have default values.\n"
-                "Output is in the \"value\" field\n";
+    std::string help() const override {
+        return "{ findAndModify: \"collection\", query: {processed:false}, update: {$set: "
+               "{processed:true}}, new: true}\n"
+               "{ findAndModify: \"collection\", query: {processed:false}, remove: true, sort: "
+               "{priority:-1}}\n"
+               "Either update or remove is required, all other fields have default values.\n"
+               "Output is in the \"value\" field\n";
     }
 
     bool slaveOk() const override {

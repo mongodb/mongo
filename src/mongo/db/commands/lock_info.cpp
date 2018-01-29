@@ -65,8 +65,8 @@ public:
         return false;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "show all lock info on the server";
+    std::string help() const override {
+        return "show all lock info on the server";
     }
 
     Status checkAuthForCommand(Client* client,

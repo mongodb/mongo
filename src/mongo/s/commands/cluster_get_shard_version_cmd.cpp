@@ -59,8 +59,8 @@ public:
         return false;
     }
 
-    void help(std::stringstream& help) const override {
-        help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
+    std::string help() const override {
+        return " example: { getShardVersion : 'alleyinsider.foo'  } ";
     }
 
     Status checkAuthForCommand(Client* client,

@@ -85,8 +85,8 @@ public:
         return false;
     }
 
-    void help(std::stringstream& help) const final {
-        help << "query for documents";
+    std::string help() const override {
+        return "query for documents";
     }
 
     /**

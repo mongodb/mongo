@@ -48,8 +48,8 @@ class UnsetShardingCommand : public BasicCommand {
 public:
     UnsetShardingCommand() : BasicCommand("unsetSharding") {}
 
-    void help(std::stringstream& help) const override {
-        help << "internal";
+    std::string help() const override {
+        return "internal";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

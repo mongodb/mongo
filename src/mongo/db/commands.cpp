@@ -53,6 +53,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/invariant.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -341,10 +342,6 @@ Command::Command(StringData name, StringData oldName)
     globalCommandRegistry()->registerCommand(this, name, oldName);
 }
 
-void Command::help(std::stringstream& help) const {
-    help << "no help defined";
-}
-
 Status Command::explain(OperationContext* opCtx,
                         const std::string& dbname,
                         const BSONObj& cmdObj,
@@ -466,12 +463,9 @@ bool Command::publicRun(OperationContext* opCtx,
 void Command::generateHelpResponse(OperationContext* opCtx,
                                    rpc::ReplyBuilderInterface* replyBuilder,
                                    const Command& command) {
-    std::stringstream ss;
     BSONObjBuilder helpBuilder;
-    ss << "help for: " << command.getName() << " ";
-    command.help(ss);
-    helpBuilder.append("help", ss.str());
-
+    helpBuilder.append("help",
+                       str::stream() << "help for: " << command.getName() << " " << command.help());
     replyBuilder->setCommandReply(helpBuilder.obj());
     replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 }

@@ -51,8 +51,8 @@ public:
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}  // No auth required
 
-    void help(stringstream& h) const {
-        h << "Returns connection-specific information such as logged-in users and their roles";
+    std::string help() const override {
+        return "Returns connection-specific information such as logged-in users and their roles";
     }
 
     bool run(OperationContext* opCtx,

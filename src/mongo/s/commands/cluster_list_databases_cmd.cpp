@@ -73,8 +73,8 @@ public:
         return false;
     }
 
-    void help(std::stringstream& help) const final {
-        help << "list databases in a cluster";
+    std::string help() const override {
+        return "list databases in a cluster";
     }
 
     /* listDatabases is always authorized,

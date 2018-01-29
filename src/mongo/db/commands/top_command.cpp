@@ -55,8 +55,8 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual void help(std::stringstream& help) const {
-        help << "usage by collection, in micros ";
+    std::string help() const override {
+        return "usage by collection, in micros ";
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,

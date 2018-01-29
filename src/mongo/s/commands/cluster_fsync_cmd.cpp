@@ -55,8 +55,8 @@ public:
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "invoke fsync on all shards belonging to the cluster";
+    std::string help() const override {
+        return "invoke fsync on all shards belonging to the cluster";
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

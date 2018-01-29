@@ -93,8 +93,8 @@ public:
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    void help(std::stringstream& help) const override {
-        help << "kill a logical session and its operations";
+    std::string help() const override {
+        return "kill a logical session and its operations";
     }
 
     // Any user can kill their own sessions

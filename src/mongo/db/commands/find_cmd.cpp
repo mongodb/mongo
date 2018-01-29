@@ -91,8 +91,8 @@ public:
         return true;
     }
 
-    void help(std::stringstream& help) const override {
-        help << "query for documents";
+    std::string help() const override {
+        return "query for documents";
     }
 
     LogicalOp getLogicalOp() const override {

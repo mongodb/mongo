@@ -42,9 +42,9 @@ class ClusterPipelineCommand : public BasicCommand {
 public:
     ClusterPipelineCommand() : BasicCommand("aggregate") {}
 
-    void help(std::stringstream& help) const {
-        help << "Runs the sharded aggregation command. See "
-                "http://dochub.mongodb.org/core/aggregation for more details.";
+    std::string help() const override {
+        return "Runs the sharded aggregation command. See "
+               "http://dochub.mongodb.org/core/aggregation for more details.";
     }
 
     bool slaveOk() const override {

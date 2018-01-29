@@ -59,8 +59,8 @@ class RecvChunkStartCommand : public ErrmsgCommandDeprecated {
 public:
     RecvChunkStartCommand() : ErrmsgCommandDeprecated("_recvChunkStart") {}
 
-    void help(std::stringstream& h) const {
-        h << "internal";
+    std::string help() const override {
+        return "internal";
     }
 
     virtual bool slaveOk() const {
@@ -159,8 +159,8 @@ class RecvChunkStatusCommand : public BasicCommand {
 public:
     RecvChunkStatusCommand() : BasicCommand("_recvChunkStatus") {}
 
-    void help(std::stringstream& h) const {
-        h << "internal";
+    std::string help() const override {
+        return "internal";
     }
 
     virtual bool slaveOk() const {
@@ -197,8 +197,8 @@ class RecvChunkCommitCommand : public BasicCommand {
 public:
     RecvChunkCommitCommand() : BasicCommand("_recvChunkCommit") {}
 
-    void help(std::stringstream& h) const {
-        h << "internal";
+    std::string help() const override {
+        return "internal";
     }
 
     virtual bool slaveOk() const {
@@ -243,8 +243,8 @@ class RecvChunkAbortCommand : public BasicCommand {
 public:
     RecvChunkAbortCommand() : BasicCommand("_recvChunkAbort") {}
 
-    void help(std::stringstream& h) const {
-        h << "internal";
+    std::string help() const override {
+        return "internal";
     }
 
     virtual bool slaveOk() const {

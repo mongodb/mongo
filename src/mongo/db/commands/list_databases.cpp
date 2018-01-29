@@ -69,9 +69,9 @@ public:
     bool supportsWriteConcern(const BSONObj& cmd) const final {
         return false;
     }
-    void help(stringstream& help) const final {
-        help << "{ listDatabases:1, [filter: <filterObject>] [, nameOnly: true ] }\n"
-                "list databases on this server";
+    std::string help() const final {
+        return "{ listDatabases:1, [filter: <filterObject>] [, nameOnly: true ] }\n"
+               "list databases on this server";
     }
 
     /* listDatabases is always authorized,

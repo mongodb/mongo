@@ -34,6 +34,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -66,15 +67,16 @@ public:
         return true;
     }
 
-    virtual void help(std::stringstream& help) const {
+    std::string help() const override {
         // TODO: update this comment when FCV 3.4 is removed (SERVER-32597).
-        help << "Set the API version for the cluster. If set to \""
-             << FeatureCompatibilityVersionCommandParser::kVersion34
-             << "\", then 3.6 features are disabled. If \""
-             << FeatureCompatibilityVersionCommandParser::kVersion36
-             << "\", then 3.6 features are enabled, and all nodes in the cluster must be version "
-             << "3.6. If \"4.0\", then 4.0 features are enabled. See "
-             << feature_compatibility_version::kDochubLink << ".";
+        return str::stream()
+            << "Set the API version for the cluster. If set to \""
+            << FeatureCompatibilityVersionCommandParser::kVersion34
+            << "\", then 3.6 features are disabled. If \""
+            << FeatureCompatibilityVersionCommandParser::kVersion36
+            << "\", then 3.6 features are enabled, and all nodes in the cluster must be version "
+            << "3.6. If \"4.0\", then 4.0 features are enabled. See "
+            << feature_compatibility_version::kDochubLink << ".";
     }
 
     Status checkAuthForCommand(Client* client,

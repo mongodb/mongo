@@ -86,8 +86,8 @@ public:
 // Testing only, enabled via command-line.
 class CmdReplSetTest : public ReplSetCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "Just for tests.\n";
+    std::string help() const override {
+        return "Just for tests.\n";
     }
     // No auth needed because it only works when enabled via command line.
     virtual Status checkAuthForCommand(Client* client,
@@ -183,10 +183,10 @@ public:
 
 class CmdReplSetGetStatus : public ReplSetCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "Report status of a replica set from the POV of this server\n";
-        help << "{ replSetGetStatus : 1 }";
-        help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
+    std::string help() const override {
+        return "Report status of a replica set from the POV of this server\n"
+               "{ replSetGetStatus : 1 }\n"
+               "http://dochub.mongodb.org/core/replicasetcommands";
     }
     CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus") {}
     virtual bool run(OperationContext* opCtx,
@@ -224,10 +224,10 @@ private:
 
 class CmdReplSetGetConfig : public ReplSetCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "Returns the current replica set configuration";
-        help << "{ replSetGetConfig : 1 }";
-        help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
+    std::string help() const override {
+        return "Returns the current replica set configuration"
+               "{ replSetGetConfig : 1 }\n"
+               "http://dochub.mongodb.org/core/replicasetcommands";
     }
     CmdReplSetGetConfig() : ReplSetCommand("replSetGetConfig") {}
     virtual bool run(OperationContext* opCtx,
@@ -342,9 +342,9 @@ void parseReplSetSeedList(ReplicationCoordinatorExternalState* externalState,
 class CmdReplSetInitiate : public ReplSetCommand {
 public:
     CmdReplSetInitiate() : ReplSetCommand("replSetInitiate") {}
-    virtual void help(stringstream& h) const {
-        h << "Initiate/christen a replica set.";
-        h << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
+    std::string help() const override {
+        return "Initiate/christen a replica set.\n"
+               "http://dochub.mongodb.org/core/replicasetcommands";
     }
     virtual bool run(OperationContext* opCtx,
                      const string&,
@@ -416,10 +416,10 @@ private:
 
 class CmdReplSetReconfig : public ReplSetCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "Adjust configuration of a replica set\n";
-        help << "{ replSetReconfig : config_object }";
-        help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
+    std::string help() const override {
+        return "Adjust configuration of a replica set\n"
+               "{ replSetReconfig : config_object }\n"
+               "http://dochub.mongodb.org/core/replicasetcommands";
     }
     CmdReplSetReconfig() : ReplSetCommand("replSetReconfig") {}
     virtual bool run(OperationContext* opCtx,
@@ -468,15 +468,15 @@ private:
 
 class CmdReplSetFreeze : public ReplSetCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "{ replSetFreeze : <seconds> }";
-        help << "'freeze' state of member to the extent we can do that.  What this really means is "
-                "that\n";
-        help << "this node will not attempt to become primary until the time period specified "
-                "expires.\n";
-        help << "You can call again with {replSetFreeze:0} to unfreeze sooner.\n";
-        help << "A process restart unfreezes the member also.\n";
-        help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
+    std::string help() const override {
+        return "{ replSetFreeze : <seconds> }\n"
+               "'freeze' state of member to the extent we can do that.  What this really means is "
+               "that\n"
+               "this node will not attempt to become primary until the time period specified "
+               "expires.\n"
+               "You can call again with {replSetFreeze:0} to unfreeze sooner.\n"
+               "A process restart unfreezes the member also.\n"
+               "http://dochub.mongodb.org/core/replicasetcommands";
     }
     CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") {}
     virtual bool run(OperationContext* opCtx,
@@ -500,13 +500,13 @@ private:
 
 class CmdReplSetStepDown : public ReplSetCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "{ replSetStepDown : <seconds> }\n";
-        help << "Step down as primary.  Will not try to reelect self for the specified time period "
-                "(1 minute if no numeric secs value specified, or secs is 0).\n";
-        help << "(If another member with same priority takes over in the meantime, it will stay "
-                "primary.)\n";
-        help << "http://dochub.mongodb.org/core/replicasetcommands";
+    std::string help() const override {
+        return "{ replSetStepDown : <seconds> }\n"
+               "Step down as primary.  Will not try to reelect self for the specified time period "
+               "(1 minute if no numeric secs value specified, or secs is 0).\n"
+               "(If another member with same priority takes over in the meantime, it will stay "
+               "primary.)\n"
+               "http://dochub.mongodb.org/core/replicasetcommands";
     }
     CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") {}
     virtual bool run(OperationContext* opCtx,
@@ -568,9 +568,9 @@ private:
 
 class CmdReplSetMaintenance : public ReplSetCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "{ replSetMaintenance : bool }\n";
-        help << "Enable or disable maintenance mode.";
+    std::string help() const override {
+        return "{ replSetMaintenance : bool }\n"
+               "Enable or disable maintenance mode.";
     }
     CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") {}
     virtual bool run(OperationContext* opCtx,
@@ -595,10 +595,10 @@ private:
 
 class CmdReplSetSyncFrom : public ReplSetCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "{ replSetSyncFrom : \"host:port\" }\n";
-        help << "Change who this member is syncing from. Note: This will interrupt and restart an "
-                "in-progress initial sync.";
+    std::string help() const override {
+        return "{ replSetSyncFrom : \"host:port\" }\n"
+               "Change who this member is syncing from. Note: This will interrupt and restart an "
+               "in-progress initial sync.";
     }
     CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") {}
     virtual bool run(OperationContext* opCtx,
@@ -872,10 +872,10 @@ private:
 
 class CmdReplSetAbortPrimaryCatchUp : public ReplSetCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "{ CmdReplSetAbortPrimaryCatchUp : 1 }\n";
-        help << "Abort primary catch-up mode; immediately finish the transition to primary "
-                "without fetching any further unreplicated writes from any other online nodes";
+    std::string help() const override {
+        return "{ CmdReplSetAbortPrimaryCatchUp : 1 }\n"
+               "Abort primary catch-up mode; immediately finish the transition to primary "
+               "without fetching any further unreplicated writes from any other online nodes";
     }
 
     CmdReplSetAbortPrimaryCatchUp() : ReplSetCommand("replSetAbortPrimaryCatchUp") {}

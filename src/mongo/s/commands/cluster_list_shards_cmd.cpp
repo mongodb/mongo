@@ -42,8 +42,8 @@ class ListShardsCmd : public BasicCommand {
 public:
     ListShardsCmd() : BasicCommand("listShards", "listshards") {}
 
-    void help(std::stringstream& help) const override {
-        help << "list all shards of the system";
+    std::string help() const override {
+        return "list all shards of the system";
     }
 
     bool adminOnly() const override {

@@ -51,8 +51,8 @@ public:
         return true;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "get previous error (since last reseterror command)";
+    std::string help() const override {
+        return "get previous error (since last reseterror command)";
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

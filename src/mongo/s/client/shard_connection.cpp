@@ -92,8 +92,8 @@ private:
 class ShardedPoolStats : public BasicCommand {
 public:
     ShardedPoolStats() : BasicCommand("shardConnPoolStats") {}
-    virtual void help(stringstream& help) const {
-        help << "stats about the shard connection pool";
+    std::string help() const override {
+        return "stats about the shard connection pool";
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

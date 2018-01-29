@@ -66,8 +66,8 @@ public:
         return false;
     }
 
-    void help(stringstream& ss) const {
-        ss << _helpText;
+    std::string help() const override {
+        return _helpText;
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {

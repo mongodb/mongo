@@ -129,7 +129,9 @@ public:
     bool slaveOverrideOk() const {
         return false;
     }
-    void help(std::stringstream& h) const {}
+    std::string help() const override {
+        return {};
+    }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,

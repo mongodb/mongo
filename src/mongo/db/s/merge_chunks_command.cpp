@@ -309,10 +309,10 @@ class MergeChunksCommand : public ErrmsgCommandDeprecated {
 public:
     MergeChunksCommand() : ErrmsgCommandDeprecated("mergeChunks") {}
 
-    void help(std::stringstream& h) const override {
-        h << "Merge Chunks command\n"
-          << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ],"
-          << " (opt) epoch : <epoch> }";
+    std::string help() const override {
+        return "Merge Chunks command\n"
+               "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ],"
+               " (opt) epoch : <epoch> }";
     }
 
     Status checkAuthForCommand(Client* client,

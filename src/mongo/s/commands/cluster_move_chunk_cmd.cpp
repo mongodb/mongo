@@ -67,12 +67,12 @@ public:
         return true;
     }
 
-    void help(std::stringstream& help) const override {
-        help << "Example: move chunk that contains the doc {num : 7} to shard001\n"
-             << "  { movechunk : 'test.foo' , find : { num : 7 } , to : 'shard0001' }\n"
-             << "Example: move chunk with lower bound 0 and upper bound 10 to shard001\n"
-             << "  { movechunk : 'test.foo' , bounds : [ { num : 0 } , { num : 10 } ] "
-             << " , to : 'shard001' }\n";
+    std::string help() const override {
+        return "Example: move chunk that contains the doc {num : 7} to shard001\n"
+               "  { movechunk : 'test.foo' , find : { num : 7 } , to : 'shard0001' }\n"
+               "Example: move chunk with lower bound 0 and upper bound 10 to shard001\n"
+               "  { movechunk : 'test.foo' , bounds : [ { num : 0 } , { num : 10 } ] "
+               " , to : 'shard001' }\n";
     }
 
     Status checkAuthForCommand(Client* client,

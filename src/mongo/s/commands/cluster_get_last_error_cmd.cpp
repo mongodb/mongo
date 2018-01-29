@@ -199,8 +199,8 @@ public:
         return true;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "check for an error on the last command executed";
+    std::string help() const override {
+        return "check for an error on the last command executed";
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

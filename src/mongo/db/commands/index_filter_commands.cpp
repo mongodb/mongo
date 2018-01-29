@@ -137,8 +137,8 @@ bool IndexFilterCommand::slaveOverrideOk() const {
     return true;
 }
 
-void IndexFilterCommand::help(stringstream& ss) const {
-    ss << helpText;
+std::string IndexFilterCommand::help() const {
+    return helpText;
 }
 
 Status IndexFilterCommand::checkAuthForCommand(Client* client,

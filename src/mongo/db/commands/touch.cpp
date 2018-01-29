@@ -67,11 +67,11 @@ public:
     virtual bool maintenanceMode() const {
         return true;
     }
-    virtual void help(stringstream& help) const {
-        help << "touch collection\n"
-                "Page in all pages of memory containing every extent for the given collection\n"
-                "{ touch : <collection_name>, [data : true] , [index : true] }\n"
-                " at least one of data or index must be true; default is both are false\n";
+    std::string help() const override {
+        return "touch collection\n"
+               "Page in all pages of memory containing every extent for the given collection\n"
+               "{ touch : <collection_name>, [data : true] , [index : true] }\n"
+               " at least one of data or index must be true; default is both are false\n";
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,

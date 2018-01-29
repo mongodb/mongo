@@ -48,12 +48,12 @@ public:
     virtual bool isWriteCommandForConfigServer() const {
         return false;
     }
-    virtual void help(stringstream& help) const {
-        help << "internal. for testing only.";
-        help << "{ cpuload : 1, cpuFactor : 1 } Runs a straight CPU load. Length of execution ";
-        help << "scaled by cpuFactor. Puts no additional load on the server beyond the cpu use.";
-        help << "Useful for testing the stability of the performance of the underlying system,";
-        help << "by running the command repeatedly and observing the variation in execution time.";
+    std::string help() const override {
+        return "internal. for testing only."
+               "{ cpuload : 1, cpuFactor : 1 } Runs a straight CPU load. Length of execution "
+               "scaled by cpuFactor. Puts no additional load on the server beyond the cpu use."
+               "Useful for testing the stability of the performance of the underlying system,"
+               "by running the command repeatedly and observing the variation in execution time.";
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,

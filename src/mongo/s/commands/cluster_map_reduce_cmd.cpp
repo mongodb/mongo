@@ -167,8 +167,8 @@ public:
         return mr::mrSupportsWriteConcern(cmd);
     }
 
-    void help(std::stringstream& help) const override {
-        help << "Runs the sharded map/reduce command";
+    std::string help() const override {
+        return "Runs the sharded map/reduce command";
     }
 
     void addRequiredPrivileges(const std::string& dbname,

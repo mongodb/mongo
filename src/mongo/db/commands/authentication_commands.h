@@ -43,8 +43,8 @@ public:
     virtual bool slaveOk() const {
         return true;
     }
-    virtual void help(std::stringstream& ss) const {
-        ss << "internal";
+    std::string help() const override {
+        return "internal";
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

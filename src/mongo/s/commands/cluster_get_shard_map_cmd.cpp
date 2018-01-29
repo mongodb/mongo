@@ -51,8 +51,8 @@ public:
         return true;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "lists the set of shards known to this instance";
+    std::string help() const override {
+        return "lists the set of shards known to this instance";
     }
 
     virtual bool adminOnly() const {

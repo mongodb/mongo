@@ -86,8 +86,8 @@ public:
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) {}
 
-    virtual void help(stringstream& h) const {
-        h << "modifies the settings of a fail point";
+    std::string help() const override {
+        return "modifies the settings of a fail point";
     }
 
     bool errmsgRun(OperationContext* opCtx,

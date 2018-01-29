@@ -47,8 +47,8 @@ public:
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "{whatsmyuri:1}";
+    std::string help() const override {
+        return "{whatsmyuri:1}";
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

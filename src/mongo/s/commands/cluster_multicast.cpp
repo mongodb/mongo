@@ -79,8 +79,8 @@ public:
         return false;
     }
 
-    void help(std::stringstream& help) const override {
-        help << "multicasts a command to hosts in a system";
+    std::string help() const override {
+        return "multicasts a command to hosts in a system";
     }
 
     // no privs because it's a test command

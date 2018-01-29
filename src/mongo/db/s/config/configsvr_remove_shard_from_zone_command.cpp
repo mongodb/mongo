@@ -60,9 +60,9 @@ class ConfigSvrRemoveShardFromZoneCommand : public BasicCommand {
 public:
     ConfigSvrRemoveShardFromZoneCommand() : BasicCommand("_configsvrRemoveShardFromZone") {}
 
-    void help(std::stringstream& help) const override {
-        help << "Internal command, which is exported by the sharding config server. Do not call "
-                "directly. Validates and removes the shard from the zone.";
+    std::string help() const override {
+        return "Internal command, which is exported by the sharding config server. Do not call "
+               "directly. Validates and removes the shard from the zone.";
     }
 
     bool slaveOk() const override {

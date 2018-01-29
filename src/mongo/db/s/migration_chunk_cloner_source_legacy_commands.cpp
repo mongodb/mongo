@@ -117,8 +117,8 @@ class InitialCloneCommand : public BasicCommand {
 public:
     InitialCloneCommand() : BasicCommand("_migrateClone") {}
 
-    void help(std::stringstream& h) const {
-        h << "internal";
+    std::string help() const override {
+        return "internal";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -179,8 +179,8 @@ class TransferModsCommand : public BasicCommand {
 public:
     TransferModsCommand() : BasicCommand("_transferMods") {}
 
-    void help(std::stringstream& h) const {
-        h << "internal";
+    std::string help() const override {
+        return "internal";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -228,8 +228,8 @@ class MigrateSessionCommand : public BasicCommand {
 public:
     MigrateSessionCommand() : BasicCommand("_getNextSessionMods") {}
 
-    void help(std::stringstream& h) const {
-        h << "internal";
+    std::string help() const override {
+        return "internal";
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

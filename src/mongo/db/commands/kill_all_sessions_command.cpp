@@ -66,8 +66,8 @@ public:
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    void help(std::stringstream& help) const override {
-        help << "kill all logical sessions, for a user, and their operations";
+    std::string help() const override {
+        return "kill all logical sessions, for a user, and their operations";
     }
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,

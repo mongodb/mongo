@@ -109,13 +109,13 @@ using std::unique_ptr;
 
 class CmdShutdownMongoD : public CmdShutdown {
 public:
-    virtual void help(stringstream& help) const {
-        help << "shutdown the database.  must be ran against admin db and "
-             << "either (1) ran from localhost or (2) authenticated. If "
-             << "this is a primary in a replica set and there is no member "
-             << "within 10 seconds of its optime, it will not shutdown "
-             << "without force : true.  You can also specify timeoutSecs : "
-             << "N to wait N seconds for other members to catch up.";
+    std::string help() const override {
+        return "shutdown the database.  must be ran against admin db and "
+               "either (1) ran from localhost or (2) authenticated. If "
+               "this is a primary in a replica set and there is no member "
+               "within 10 seconds of its optime, it will not shutdown "
+               "without force : true.  You can also specify timeoutSecs : "
+               "N to wait N seconds for other members to catch up.";
     }
 
     virtual bool run(OperationContext* opCtx,
@@ -144,8 +144,8 @@ public:
 
 class CmdDropDatabase : public BasicCommand {
 public:
-    virtual void help(stringstream& help) const {
-        help << "drop (delete) this database";
+    std::string help() const override {
+        return "drop (delete) this database";
     }
     virtual bool slaveOk() const {
         return false;
@@ -216,8 +216,8 @@ public:
     virtual bool maintenanceMode() const {
         return true;
     }
-    virtual void help(stringstream& help) const {
-        help << "repair database.  also compacts. note: slow.";
+    std::string help() const override {
+        return "repair database.  also compacts. note: slow.";
     }
 
 
@@ -299,12 +299,12 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "enable or disable performance profiling\n";
-        help << "{ profile : <n> }\n";
-        help << "0=off 1=log slow ops 2=log all\n";
-        help << "-1 to get current values\n";
-        help << "http://docs.mongodb.org/manual/reference/command/profile/#dbcmd.profile";
+    std::string help() const override {
+        return "enable or disable performance profiling\n"
+               "{ profile : <n> }\n"
+               "0=off 1=log slow ops 2=log all\n"
+               "-1 to get current values\n"
+               "http://docs.mongodb.org/manual/reference/command/profile/#dbcmd.profile";
     }
 
 
@@ -409,8 +409,8 @@ public:
         actions.addAction(ActionType::dropCollection);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
-    virtual void help(stringstream& help) const {
-        help << "drop a collection\n{drop : <collectionName>}";
+    std::string help() const override {
+        return "drop a collection\n{drop : <collectionName>}";
     }
 
 
@@ -464,9 +464,9 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "create a collection explicitly\n"
-                "{ create: <ns>[, capped: <bool>, size: <collSizeInBytes>, max: <nDocs>] }";
+    std::string help() const override {
+        return "create a collection explicitly\n"
+               "{ create: <ns>[, capped: <bool>, size: <collSizeInBytes>, max: <nDocs>] }";
     }
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
@@ -574,8 +574,8 @@ public:
         return true;
     }
 
-    virtual void help(stringstream& help) const {
-        help << " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
+    std::string help() const override {
+        return " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
     }
 
 
@@ -753,17 +753,17 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual void help(stringstream& help) const {
-        help << "determine data size for a set of data in a certain range"
-                "\nexample: { dataSize:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }"
-                "\nmin and max parameters are optional. They must either both be included or both "
-                "omitted"
-                "\nkeyPattern is an optional parameter indicating an index pattern that would be "
-                "useful"
-                "for iterating over the min/max bounds. If keyPattern is omitted, it is inferred "
-                "from "
-                "the structure of min. "
-                "\nnote: This command may take a while to run";
+    std::string help() const override {
+        return "determine data size for a set of data in a certain range"
+               "\nexample: { dataSize:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }"
+               "\nmin and max parameters are optional. They must either both be included or both "
+               "omitted"
+               "\nkeyPattern is an optional parameter indicating an index pattern that would be "
+               "useful"
+               "for iterating over the min/max bounds. If keyPattern is omitted, it is inferred "
+               "from "
+               "the structure of min. "
+               "\nnote: This command may take a while to run";
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
@@ -903,9 +903,8 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual void help(stringstream& help) const {
-        help
-            << "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024\n"
+    std::string help() const override {
+        return "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024\n"
                "    avgObjSize - in bytes";
     }
 
@@ -951,11 +950,11 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
-    virtual void help(stringstream& help) const {
-        help << "Sets collection options.\n"
-                "Example: { collMod: 'foo', usePowerOf2Sizes:true }\n"
-                "Example: { collMod: 'foo', index: {keyPattern: {a: 1}, expireAfterSeconds: 600} "
-                "Example: { collMod: 'foo', index: {name: 'bar', expireAfterSeconds: 600} }\n";
+    std::string help() const override {
+        return "Sets collection options.\n"
+               "Example: { collMod: 'foo', usePowerOf2Sizes:true }\n"
+               "Example: { collMod: 'foo', index: {keyPattern: {a: 1}, expireAfterSeconds: 600} "
+               "Example: { collMod: 'foo', index: {name: 'bar', expireAfterSeconds: 600} }\n";
     }
 
     virtual Status checkAuthForCommand(Client* client,
@@ -985,10 +984,10 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual void help(stringstream& help) const {
-        help << "Get stats on a database. Not instantaneous. Slower for databases with large "
-                ".ns files.\n"
-                "Example: { dbStats:1, scale:1 }";
+    std::string help() const override {
+        return "Get stats on a database. Not instantaneous. Slower for databases with large "
+               ".ns files.\n"
+               "Example: { dbStats:1, scale:1 }";
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
@@ -1081,8 +1080,8 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual void help(stringstream& help) const {
-        help << "{whatsmyuri:1}";
+    std::string help() const override {
+        return "{whatsmyuri:1}";
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,

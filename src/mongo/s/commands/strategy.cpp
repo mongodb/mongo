@@ -162,7 +162,7 @@ void execCommandClient(OperationContext* opCtx,
         if (fieldName == "help" && element.type() == Bool && element.Bool()) {
             std::stringstream help;
             help << "help for: " << c->getName() << " ";
-            c->help(help);
+            help << c->help();
             result.append("help", help.str());
             CommandHelpers::appendCommandStatus(result, true, "");
             return;

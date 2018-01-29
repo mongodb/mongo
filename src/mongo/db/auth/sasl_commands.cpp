@@ -77,7 +77,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result);
 
-    virtual void help(stringstream& help) const;
+    virtual std::string help() const override;
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -103,7 +103,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result);
 
-    virtual void help(stringstream& help) const;
+    std::string help() const override;
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -254,8 +254,8 @@ Status doSaslContinue(const Client* client,
 CmdSaslStart::CmdSaslStart() : BasicCommand(saslStartCommandName) {}
 CmdSaslStart::~CmdSaslStart() {}
 
-void CmdSaslStart::help(std::stringstream& os) const {
-    os << "First step in a SASL authentication conversation.";
+std::string CmdSaslStart::help() const {
+    return "First step in a SASL authentication conversation.";
 }
 
 void CmdSaslStart::redactForLogging(mutablebson::Document* cmdObj) {
@@ -301,8 +301,8 @@ bool CmdSaslStart::run(OperationContext* opCtx,
 CmdSaslContinue::CmdSaslContinue() : BasicCommand(saslContinueCommandName) {}
 CmdSaslContinue::~CmdSaslContinue() {}
 
-void CmdSaslContinue::help(std::stringstream& os) const {
-    os << "Subsequent steps in a SASL authentication conversation.";
+std::string CmdSaslContinue::help() const {
+    return "Subsequent steps in a SASL authentication conversation.";
 }
 
 bool CmdSaslContinue::run(OperationContext* opCtx,

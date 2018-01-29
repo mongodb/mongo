@@ -112,8 +112,8 @@ public:
         return ReadWriteType::kRead;
     }
 
-    void help(std::stringstream& help) const override {
-        help << "retrieve more results from an existing cursor";
+    std::string help() const override {
+        return "retrieve more results from an existing cursor";
     }
 
     LogicalOp getLogicalOp() const override {

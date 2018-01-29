@@ -90,8 +90,8 @@ public:
         return ReadWriteType::kRead;
     }
 
-    virtual void help(stringstream& help) const {
-        help << "count objects in collection";
+    std::string help() const override {
+        return "count objects in collection";
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,

@@ -53,8 +53,8 @@ public:
         return false;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "Not supported through mongos";
+    std::string help() const override {
+        return "Not supported through mongos";
     }
 
     virtual Status checkAuthForCommand(Client* client,

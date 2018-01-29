@@ -81,14 +81,16 @@ public:
         return true;
     }
 
-    virtual void help(std::stringstream& help) const {
-        help << "Set the API version exposed by this node. If set to \""
-             << FeatureCompatibilityVersionCommandParser::kVersion34
-             << "\", then 3.6 features are disabled. If \""
-             << FeatureCompatibilityVersionCommandParser::kVersion36
-             << "\", then 3.6 features are enabled, and all nodes in the cluster must be version "
-                "3.6. See "
-             << feature_compatibility_version::kDochubLink << ".";
+    std::string help() const override {
+        std::stringstream h;
+        h << "Set the API version exposed by this node. If set to \""
+          << FeatureCompatibilityVersionCommandParser::kVersion34
+          << "\", then 3.6 features are disabled. If \""
+          << FeatureCompatibilityVersionCommandParser::kVersion36
+          << "\", then 3.6 features are enabled, and all nodes in the cluster must be version "
+             "3.6. See "
+          << feature_compatibility_version::kDochubLink << ".";
+        return h.str();
     }
 
     Status checkAuthForCommand(Client* client,
