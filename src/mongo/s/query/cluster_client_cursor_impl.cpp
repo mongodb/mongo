@@ -125,11 +125,6 @@ bool ClusterClientCursorImpl::isTailableAndAwaitData() const {
     return _params.tailableMode == TailableMode::kTailableAndAwaitData;
 }
 
-UserNameIterator ClusterClientCursorImpl::getAuthenticatedUsers() const {
-    return makeUserNameIterator(_params.authenticatedUsers.begin(),
-                                _params.authenticatedUsers.end());
-}
-
 long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }

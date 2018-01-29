@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 
 #include <set>
@@ -145,11 +144,6 @@ boost::optional<ReadPreferenceSetting> ClusterCursorManager::PinnedCursor::getRe
     return _cursor->getReadPreference();
 }
 
-UserNameIterator ClusterCursorManager::PinnedCursor::getAuthenticatedUsers() const {
-    invariant(_cursor);
-    return _cursor->getAuthenticatedUsers();
-}
-
 void ClusterCursorManager::PinnedCursor::returnCursor(CursorState cursorState) {
     invariant(_cursor);
     // Note that unpinning a cursor transfers ownership of the underlying ClusterClientCursor object
@@ -221,7 +215,8 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
     std::unique_ptr<ClusterClientCursor> cursor,
     const NamespaceString& nss,
     CursorType cursorType,
-    CursorLifetime cursorLifetime) {
+    CursorLifetime cursorLifetime,
+    UserNameIterator authenticatedUsers) {
     // Read the clock out of the lock.
     const auto now = _clockSource->now();
 
@@ -268,8 +263,9 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
     } while (cursorId == 0 || entryMap.count(cursorId) > 0);
 
     // Create a new CursorEntry and register it in the CursorEntryContainer's map.
-    auto emplaceResult =
-        entryMap.emplace(cursorId, CursorEntry(std::move(cursor), cursorType, cursorLifetime, now));
+    auto emplaceResult = entryMap.emplace(
+        cursorId,
+        CursorEntry(std::move(cursor), cursorType, cursorLifetime, now, authenticatedUsers));
     invariant(emplaceResult.second);
 
     return cursorId;
@@ -279,6 +275,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     const NamespaceString& nss,
     CursorId cursorId,
     OperationContext* opCtx,
+    AuthzCheckFn authChecker,
     AuthCheck checkSessionAuth) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -295,6 +292,14 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
         return cursorNotFoundStatus(nss, cursorId);
     }
 
+    // Check if the user is coauthorized to access this cursor.
+    auto authCheckStatus = authChecker(entry->getAuthenticatedUsers());
+    if (!authCheckStatus.isOK()) {
+        return authCheckStatus.withContext(
+            str::stream() << "cursor id " << cursorId
+                          << " was not created by the authenticated user");
+    }
+
     if (checkSessionAuth == kCheckSession) {
         const auto cursorPrivilegeStatus = checkCursorSessionPrivilege(opCtx, entry->getLsid());
         if (!cursorPrivilegeStatus.isOK()) {
@@ -302,13 +307,14 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
         }
     }
 
-    std::unique_ptr<ClusterClientCursor> cursor = entry->releaseCursor();
-    if (!cursor) {
+    if (entry->getOperationUsingCursor()) {
         return cursorInUseStatus(nss, cursorId);
     }
+
     // Note: due to SERVER-31138, despite putting this in a unique_ptr, it's actually not safe to
-    // return before the end of this function.  Be careful to avoid any early returns/throws after
+    // return before the end of this function. Be careful to avoid any early returns/throws after
     // this point.
+    auto cursor = entry->releaseCursor(opCtx);
 
     // We use pinning of a cursor as a proxy for active, user-initiated use of a cursor.  Therefore,
     // we pass down to the logical session cache and vivify the record (updating last use).
@@ -316,8 +322,6 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
         LogicalSessionCache::get(opCtx)->vivify(opCtx, cursor->getLsid().get());
     }
 
-    // Note that pinning a cursor transfers ownership of the underlying ClusterClientCursor object
-    // to the pin; the CursorEntry is left with a null ClusterClientCursor.
     return PinnedCursor(this, std::move(cursor), nss, cursorId);
 }
 
@@ -361,6 +365,22 @@ void ClusterCursorManager::checkInCursor(std::unique_ptr<ClusterClientCursor> cu
     detachedCursor.getValue().reset();
 }
 
+Status ClusterCursorManager::checkAuthForKillCursors(OperationContext* opCtx,
+                                                     const NamespaceString& nss,
+                                                     CursorId cursorId,
+                                                     AuthzCheckFn authChecker) {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    auto entry = _getEntry(lk, nss, cursorId);
+
+    if (!entry) {
+        return cursorNotFoundStatus(nss, cursorId);
+    }
+
+    // Note that getAuthenticatedUsers() is thread-safe, so it's okay to call even if there's
+    // an operation using the cursor.
+    return authChecker(entry->getAuthenticatedUsers());
+}
+
 Status ClusterCursorManager::killCursor(const NamespaceString& nss, CursorId cursorId) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
 
@@ -380,8 +400,8 @@ void ClusterCursorManager::killMortalCursorsInactiveSince(Date_t cutoff) {
     for (auto& nsContainerPair : _namespaceToContainerMap) {
         for (auto& cursorIdEntryPair : nsContainerPair.second.entryMap) {
             CursorEntry& entry = cursorIdEntryPair.second;
-            if (entry.getLifetimeType() == CursorLifetime::Mortal && entry.isCursorOwned() &&
-                entry.getLastActive() <= cutoff) {
+            if (entry.getLifetimeType() == CursorLifetime::Mortal &&
+                !entry.getOperationUsingCursor() && entry.getLastActive() <= cutoff) {
                 entry.setInactive();
                 log() << "Marking cursor id " << cursorIdEntryPair.first
                       << " for deletion, idle since " << entry.getLastActive().toString();
@@ -468,7 +488,7 @@ ClusterCursorManager::Stats ClusterCursorManager::stats() const {
                 continue;
             }
 
-            if (!entry.isCursorOwned()) {
+            if (entry.getOperationUsingCursor()) {
                 ++stats.cursorsPinned;
             }
 
@@ -602,11 +622,14 @@ StatusWith<std::unique_ptr<ClusterClientCursor>> ClusterCursorManager::_detachCu
         return cursorNotFoundStatus(nss, cursorId);
     }
 
-    std::unique_ptr<ClusterClientCursor> cursor = entry->releaseCursor();
-    if (!cursor) {
+    if (entry->getOperationUsingCursor()) {
         return cursorInUseStatus(nss, cursorId);
     }
 
+    // Transfer ownership away from the entry.
+    std::unique_ptr<ClusterClientCursor> cursor = entry->releaseCursor(nullptr);
+
+    // Destroy the entry.
     auto nsToContainerIt = _namespaceToContainerMap.find(nss);
     invariant(nsToContainerIt != _namespaceToContainerMap.end());
     CursorEntryMap& entryMap = nsToContainerIt->second.entryMap;

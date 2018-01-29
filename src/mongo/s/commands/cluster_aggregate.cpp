@@ -520,10 +520,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
                                      std::unique_ptr<Pipeline, PipelineDeleter> pipelineForMerging,
                                      std::vector<ClusterClientCursorParams::RemoteCursor> cursors) {
 
-    ClusterClientCursorParams params(
-        requestedNss,
-        AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-        ReadPreferenceSetting::get(opCtx));
+    ClusterClientCursorParams params(requestedNss, ReadPreferenceSetting::get(opCtx));
 
     params.tailableMode = pipelineForMerging->getContext()->tailableMode;
     params.mergePipeline = std::move(pipelineForMerging);
@@ -595,12 +592,14 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     CursorId clusterCursorId = 0;
 
     if (cursorState == ClusterCursorManager::CursorState::NotExhausted) {
+        auto authUsers = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames();
         clusterCursorId = uassertStatusOK(Grid::get(opCtx)->getCursorManager()->registerCursor(
             opCtx,
             ccc.releaseCursor(),
             requestedNss,
             ClusterCursorManager::CursorType::MultiTarget,
-            ClusterCursorManager::CursorLifetime::Mortal));
+            ClusterCursorManager::CursorLifetime::Mortal,
+            authUsers));
     }
 
     responseBuilder.done(clusterCursorId, requestedNss.ns());

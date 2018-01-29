@@ -83,14 +83,6 @@ bool ClusterClientCursorMock::isTailableAndAwaitData() const {
     return false;
 }
 
-namespace {
-const std::vector<UserName> emptyAuthenticatedUsers{};
-}  // namespace
-
-UserNameIterator ClusterClientCursorMock::getAuthenticatedUsers() const {
-    return makeUserNameIterator(emptyAuthenticatedUsers.begin(), emptyAuthenticatedUsers.end());
-}
-
 void ClusterClientCursorMock::queueResult(const ClusterQueryResult& result) {
     _resultsQueue.push({result});
 }
