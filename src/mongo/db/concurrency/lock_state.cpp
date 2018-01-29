@@ -132,16 +132,16 @@ PartitionedInstanceWideLockStats globalStats;
  * that the data they protect is committed successfully.
  */
 bool shouldDelayUnlock(ResourceId resId, LockMode mode) {
-    // Global and flush lock are not used to protect transactional resources and as such, they
-    // need to be acquired and released when requested.
     switch (resId.getType()) {
-        case RESOURCE_GLOBAL:
+        // The flush lock must not participate in two-phase locking because we need to temporarily
+        // yield it while blocked waiting to acquire other locks.
         case RESOURCE_MMAPV1_FLUSH:
         case RESOURCE_MUTEX:
             return false;
 
-        case RESOURCE_COLLECTION:
+        case RESOURCE_GLOBAL:
         case RESOURCE_DATABASE:
+        case RESOURCE_COLLECTION:
         case RESOURCE_METADATA:
             break;
 
