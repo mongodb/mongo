@@ -67,6 +67,7 @@ variables:
     revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
       enterprise: ${enterprise_rev}
       rocksdb: ${rocksdb_rev}
+      wtdevelop: ${wtdevelop_rev}
 
 - &generate_compile_expansions
   command: shell.exec
@@ -419,6 +420,21 @@ functions:
         git clone https://github.com/facebook/rocksdb.git
         cd rocksdb
         make USE_RTTI=1 CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ static_lib
+        fi
+
+  "use WiredTiger develop" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+        if [ "${use_wt_develop|}" = "true" ]; then
+        cd src/third_party
+        for wtdir in api dist examples ext lang src test tools ; do
+          rm -rf wiredtiger/$wtdir
+          mv wtdevelop/$wtdir wiredtiger/
+        done
         fi
 
   "build cdriver" :
@@ -2196,6 +2212,7 @@ tasks:
     - func: "setup credentials"
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
+    - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
     - *generate_compile_expansions
     # Then we load the generated version data into the agent so we can use it in task definitions
     - *apply_compile_expansions
@@ -2339,6 +2356,7 @@ tasks:
     - func: "setup credentials"
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
+    - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
     - func: "build cdriver" # noop if ${build_cdriver} is not "true"
     - *generate_compile_expansions
     # Then we load the generated version data into the agent so we can use it in task definitions.
@@ -4466,6 +4484,11 @@ modules:
   prefix: src/mongo/db/modules
   branch: master
 
+- name: wtdevelop
+  repo: git@github.com:wiredtiger/wiredtiger.git
+  prefix: src/third_party
+  branch: develop
+
 #######################################
 #            Buildvariants            #
 #######################################
@@ -4597,7 +4620,8 @@ buildvariants:
   - name: concurrency_sharded
   - name: concurrency_simultaneous
 
-- name: linux-64-debug
+- &linux-64-debug-template
+  name: linux-64-debug
   display_name: "! Linux DEBUG"
   run_on:
   - rhel62-large
@@ -4678,6 +4702,19 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops
   - name: slow1
   - name: tool
+
+- <<: *linux-64-debug-template
+  name: linux-64-debug-wtdevelop
+  display_name: "~ Linux DEBUG WiredTiger develop"
+  batchtime: 1440 # 1 day
+  modules:
+  - wtdevelop
+  expansions:
+    use_wt_develop: true 
+    num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    use_scons_cache: true
+    build_mongoreplay: true
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -5660,7 +5697,8 @@ buildvariants:
     - windows-64-vs2015-large
   - name: tool
 
-- name: enterprise-windows-64-2k8
+- &enterprise-windows-64-2k8-template
+  name: enterprise-windows-64-2k8
   display_name: "! Enterprise Windows 2008R2"
   modules:
   - enterprise
@@ -5729,6 +5767,30 @@ buildvariants:
   - name: push
     distros:
     - rhel70-small
+
+- <<: *enterprise-windows-64-2k8-template
+  name: enterprise-windows-64-2k8-wtdevelop
+  display_name: "~ Enterprise Windows 2008R2 WiredTiger develop"
+  batchtime: 1440 # 1 day
+  modules:
+  - enterprise
+  - wtdevelop
+  expansions:
+    use_wt_develop: true
+    platform_decompress: unzip
+    tooltags: "-tags 'ssl sasl'"
+    exe: ".exe"
+    gorootvars: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH" CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"'
+    msi_target: msi
+    content_type: application/zip
+    compile_flags: --release --ssl MONGO_DISTMOD=windows-64 CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_compile_all_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    python: python
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    ext: zip
+    use_scons_cache: true
 
 - name: enterprise-windows-64-2k8-async
   display_name: "~ Enterprise Windows 2008R2 async"
