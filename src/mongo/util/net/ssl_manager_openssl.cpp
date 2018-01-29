@@ -41,6 +41,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
@@ -89,9 +90,9 @@ std::string removeFQDNRoot(std::string name) {
 // `mongo::SockAddr::Sockaddr(StringData, int, sa_family_t)`).  A user explicitly specifying a Unix
 // Domain Socket in the present working directory, through a code path which supplies `sa_family_t`
 // as `AF_UNIX` will cause this code to lie.  This will, in turn, cause the
-// `SSLManager::parseAndValidatePeerCertificate` code to believe a socket is a host, which will then
-// cause a connection failure if and only if that domain socket also has a certificate for SSL and
-// the connection is an SSL connection.
+// `SSLManagerInterface::parseAndValidatePeerCertificate` code to believe a socket is a host, which
+// will then cause a connection failure if and only if that domain socket also has a certificate for
+// SSL and the connection is an SSL connection.
 bool isUnixDomainSocket(const std::string& hostname) {
     return end(hostname) != std::find(begin(hostname), end(hostname), '/');
 }
@@ -293,6 +294,26 @@ void free_ssl_context(SSL_CTX* ctx) {
 }
 }  // namespace
 
+class SSLConnectionOpenSSL : public SSLConnectionInterface {
+public:
+    SSL* ssl;
+    BIO* networkBIO;
+    BIO* internalBIO;
+    Socket* socket;
+
+    SSLConnectionOpenSSL(SSL_CTX* ctx, Socket* sock, const char* initialBytes, int len);
+
+    ~SSLConnectionOpenSSL();
+
+    std::string getSNIServerName() const final {
+        const char* name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
+        if (!name)
+            return "";
+
+        return name;
+    }
+};
+
 ////////////////////////////////////////////////////////////////
 
 SimpleMutex sslManagerMtx;
@@ -301,9 +322,9 @@ using UniqueSSLContext = std::unique_ptr<SSL_CTX, decltype(&free_ssl_context)>;
 static const int BUFFER_SIZE = 8 * 1024;
 static const int DATE_LEN = 128;
 
-class SSLManager : public SSLManagerInterface {
+class SSLManagerOpenSSL : public SSLManagerInterface {
 public:
-    explicit SSLManager(const SSLParams& params, bool isServer);
+    explicit SSLManagerOpenSSL(const SSLParams& params, bool isServer);
 
     /**
      * Initializes an OpenSSL context according to the provided settings. Only settings which are
@@ -313,33 +334,33 @@ public:
                           const SSLParams& params,
                           ConnectionDirection direction) final;
 
-    virtual SSLConnection* connect(Socket* socket);
+    SSLConnectionInterface* connect(Socket* socket) final;
 
-    virtual SSLConnection* accept(Socket* socket, const char* initialBytes, int len);
+    SSLConnectionInterface* accept(Socket* socket, const char* initialBytes, int len) final;
 
-    virtual SSLPeerInfo parseAndValidatePeerCertificateDeprecated(const SSLConnection* conn,
-                                                                  const std::string& remoteHost);
+    SSLPeerInfo parseAndValidatePeerCertificateDeprecated(const SSLConnectionInterface* conn,
+                                                          const std::string& remoteHost) final;
 
     StatusWith<boost::optional<SSLPeerInfo>> parseAndValidatePeerCertificate(
         SSL* conn, const std::string& remoteHost) final;
 
-    virtual const SSLConfiguration& getSSLConfiguration() const {
+    const SSLConfiguration& getSSLConfiguration() const final {
         return _sslConfiguration;
     }
 
-    virtual int SSL_read(SSLConnection* conn, void* buf, int num);
+    int SSL_read(SSLConnectionInterface* conn, void* buf, int num) final;
 
-    virtual int SSL_write(SSLConnection* conn, const void* buf, int num);
+    int SSL_write(SSLConnectionInterface* conn, const void* buf, int num) final;
 
-    virtual unsigned long ERR_get_error();
+    virtual unsigned long ERR_get_error() final;
 
-    virtual char* ERR_error_string(unsigned long e, char* buf);
+    virtual char* ERR_error_string(unsigned long e, char* buf) final;
 
-    virtual int SSL_get_error(const SSLConnection* conn, int ret);
+    virtual int SSL_get_error(const SSLConnectionInterface* conn, int ret) final;
 
-    virtual int SSL_shutdown(SSLConnection* conn);
+    virtual int SSL_shutdown(SSLConnectionInterface* conn) final;
 
-    virtual void SSL_free(SSLConnection* conn);
+    void SSL_free(SSLConnectionInterface* conn) final;
 
 private:
     const int _rolesNid = OBJ_create(mongodbRolesOID.identifier.c_str(),
@@ -418,12 +439,12 @@ private:
     /*
      * sub function for checking the result of an SSL operation
      */
-    bool _doneWithSSLOp(SSLConnection* conn, int status);
+    bool _doneWithSSLOp(SSLConnectionOpenSSL* conn, int status);
 
     /*
      * Send and receive network data
      */
-    void _flushNetworkBIO(SSLConnection* conn);
+    void _flushNetworkBIO(SSLConnectionOpenSSL* conn);
 
     /**
      * Callbacks for SSL functions.
@@ -473,17 +494,17 @@ MONGO_INITIALIZER(SetupOpenSSL)(InitializerContext*) {
     return Status::OK();
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL"))(InitializerContext*) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManagerOpenSSL, ("SetupOpenSSL"))(InitializerContext*) {
     stdx::lock_guard<SimpleMutex> lck(sslManagerMtx);
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
-        theSSLManager = new SSLManager(sslGlobalParams, isSSLServer);
+        theSSLManager = new SSLManagerOpenSSL(sslGlobalParams, isSSLServer);
     }
     return Status::OK();
 }
 
 std::unique_ptr<SSLManagerInterface> SSLManagerInterface::create(const SSLParams& params,
                                                                  bool isServer) {
-    return stdx::make_unique<SSLManager>(params, isServer);
+    return stdx::make_unique<SSLManagerOpenSSL>(params, isServer);
 }
 
 SSLManagerInterface* getSSLManager() {
@@ -512,7 +533,10 @@ std::string getCertificateSubjectName(X509* cert) {
     return result;
 }
 
-SSLConnection::SSLConnection(SSL_CTX* context, Socket* sock, const char* initialBytes, int len)
+SSLConnectionOpenSSL::SSLConnectionOpenSSL(SSL_CTX* context,
+                                           Socket* sock,
+                                           const char* initialBytes,
+                                           int len)
     : socket(sock) {
     ssl = SSL_new(context);
 
@@ -532,7 +556,7 @@ SSLConnection::SSLConnection(SSL_CTX* context, Socket* sock, const char* initial
     }
 }
 
-SSLConnection::~SSLConnection() {
+SSLConnectionOpenSSL::~SSLConnectionOpenSSL() {
     if (ssl) {  // The internalBIO is automatically freed as part of SSL_free
         SSL_free(ssl);
     }
@@ -541,7 +565,7 @@ SSLConnection::~SSLConnection() {
     }
 }
 
-SSLManager::SSLManager(const SSLParams& params, bool isServer)
+SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params, bool isServer)
     : _serverContext(nullptr, free_ssl_context),
       _clientContext(nullptr, free_ssl_context),
       _weakValidation(params.sslWeakCertificateValidation),
@@ -588,7 +612,7 @@ SSLManager::SSLManager(const SSLParams& params, bool isServer)
     }
 }
 
-int SSLManager::password_cb(char* buf, int num, int rwflag, void* userdata) {
+int SSLManagerOpenSSL::password_cb(char* buf, int num, int rwflag, void* userdata) {
     // Unless OpenSSL misbehaves, num should always be positive
     fassert(17314, num > 0);
     invariant(userdata);
@@ -599,12 +623,13 @@ int SSLManager::password_cb(char* buf, int num, int rwflag, void* userdata) {
     return copied;
 }
 
-int SSLManager::verify_cb(int ok, X509_STORE_CTX* ctx) {
+int SSLManagerOpenSSL::verify_cb(int ok, X509_STORE_CTX* ctx) {
     return 1;  // always succeed; we will catch the error in our get_verify_result() call
 }
 
-int SSLManager::SSL_read(SSLConnection* conn, void* buf, int num) {
+int SSLManagerOpenSSL::SSL_read(SSLConnectionInterface* connInterface, void* buf, int num) {
     int status;
+    SSLConnectionOpenSSL* conn = checked_cast<SSLConnectionOpenSSL*>(connInterface);
     do {
         status = ::SSL_read(conn->ssl, buf, num);
     } while (!_doneWithSSLOp(conn, status));
@@ -614,8 +639,9 @@ int SSLManager::SSL_read(SSLConnection* conn, void* buf, int num) {
     return status;
 }
 
-int SSLManager::SSL_write(SSLConnection* conn, const void* buf, int num) {
+int SSLManagerOpenSSL::SSL_write(SSLConnectionInterface* connInterface, const void* buf, int num) {
     int status;
+    SSLConnectionOpenSSL* conn = checked_cast<SSLConnectionOpenSSL*>(connInterface);
     do {
         status = ::SSL_write(conn->ssl, buf, num);
     } while (!_doneWithSSLOp(conn, status));
@@ -625,20 +651,22 @@ int SSLManager::SSL_write(SSLConnection* conn, const void* buf, int num) {
     return status;
 }
 
-unsigned long SSLManager::ERR_get_error() {
+unsigned long SSLManagerOpenSSL::ERR_get_error() {
     return ::ERR_get_error();
 }
 
-char* SSLManager::ERR_error_string(unsigned long e, char* buf) {
+char* SSLManagerOpenSSL::ERR_error_string(unsigned long e, char* buf) {
     return ::ERR_error_string(e, buf);
 }
 
-int SSLManager::SSL_get_error(const SSLConnection* conn, int ret) {
+int SSLManagerOpenSSL::SSL_get_error(const SSLConnectionInterface* connInterface, int ret) {
+    const SSLConnection* conn = checked_cast<const SSLConnection*>(connInterface);
     return ::SSL_get_error(conn->ssl, ret);
 }
 
-int SSLManager::SSL_shutdown(SSLConnection* conn) {
+int SSLManagerOpenSSL::SSL_shutdown(SSLConnectionInterface* connInterface) {
     int status;
+    SSLConnectionOpenSSL* conn = checked_cast<SSLConnectionOpenSSL*>(connInterface);
     do {
         status = ::SSL_shutdown(conn->ssl);
     } while (!_doneWithSSLOp(conn, status));
@@ -648,13 +676,14 @@ int SSLManager::SSL_shutdown(SSLConnection* conn) {
     return status;
 }
 
-void SSLManager::SSL_free(SSLConnection* conn) {
+void SSLManagerOpenSSL::SSL_free(SSLConnectionInterface* connInterface) {
+    SSLConnectionOpenSSL* conn = checked_cast<SSLConnectionOpenSSL*>(connInterface);
     return ::SSL_free(conn->ssl);
 }
 
-Status SSLManager::initSSLContext(SSL_CTX* context,
-                                  const SSLParams& params,
-                                  ConnectionDirection direction) {
+Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
+                                         const SSLParams& params,
+                                         ConnectionDirection direction) {
     // SSL_OP_ALL - Activate all bug workaround options, to support buggy client SSL's.
     // SSL_OP_NO_SSLv2 - Disable SSL v2 support
     // SSL_OP_NO_SSLv3 - Disable SSL v3 support
@@ -757,9 +786,9 @@ Status SSLManager::initSSLContext(SSL_CTX* context,
     return Status::OK();
 }
 
-bool SSLManager::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,
-                                            const SSLParams& params,
-                                            ConnectionDirection direction) {
+bool SSLManagerOpenSSL::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,
+                                                   const SSLParams& params,
+                                                   ConnectionDirection direction) {
     *contextPtr = UniqueSSLContext(SSL_CTX_new(SSLv23_method()), free_ssl_context);
 
     uassertStatusOK(initSSLContext(contextPtr->get(), params, direction));
@@ -771,7 +800,7 @@ bool SSLManager::_initSynchronousSSLContext(UniqueSSLContext* contextPtr,
     return true;
 }
 
-unsigned long long SSLManager::_convertASN1ToMillis(ASN1_TIME* asn1time) {
+unsigned long long SSLManagerOpenSSL::_convertASN1ToMillis(ASN1_TIME* asn1time) {
     BIO* outBIO = BIO_new(BIO_s_mem());
     int timeError = ASN1_TIME_print(outBIO, asn1time);
     ON_BLOCK_EXIT(BIO_free, outBIO);
@@ -807,10 +836,10 @@ unsigned long long SSLManager::_convertASN1ToMillis(ASN1_TIME* asn1time) {
     return (posixTime - boost::posix_time::ptime(epoch)).total_milliseconds();
 }
 
-bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile,
-                                              const std::string& keyPassword,
-                                              std::string* subjectName,
-                                              Date_t* serverCertificateExpirationDate) {
+bool SSLManagerOpenSSL::_parseAndValidateCertificate(const std::string& keyFile,
+                                                     const std::string& keyPassword,
+                                                     std::string* subjectName,
+                                                     Date_t* serverCertificateExpirationDate) {
     BIO* inBIO = BIO_new(BIO_s_file());
     if (inBIO == NULL) {
         error() << "failed to allocate BIO object: " << getSSLErrorMessage(ERR_get_error());
@@ -827,7 +856,7 @@ bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile,
     // Callback will not manipulate the password, so const_cast is safe.
     X509* x509 = PEM_read_bio_X509(inBIO,
                                    NULL,
-                                   &SSLManager::password_cb,
+                                   &SSLManagerOpenSSL::password_cb,
                                    const_cast<void*>(static_cast<const void*>(&keyPassword)));
     if (x509 == NULL) {
         error() << "cannot retrieve certificate from keyfile: " << keyFile << ' '
@@ -861,9 +890,9 @@ bool SSLManager::_parseAndValidateCertificate(const std::string& keyFile,
     return true;
 }
 
-bool SSLManager::_setupPEM(SSL_CTX* context,
-                           const std::string& keyFile,
-                           const std::string& password) {
+bool SSLManagerOpenSSL::_setupPEM(SSL_CTX* context,
+                                  const std::string& keyFile,
+                                  const std::string& password) {
     if (SSL_CTX_use_certificate_chain_file(context, keyFile.c_str()) != 1) {
         error() << "cannot read certificate file: " << keyFile << ' '
                 << getSSLErrorMessage(ERR_get_error());
@@ -885,11 +914,11 @@ bool SSLManager::_setupPEM(SSL_CTX* context,
 
     // If password is empty, use default OpenSSL callback, which uses the terminal
     // to securely request the password interactively from the user.
-    decltype(&SSLManager::password_cb) password_cb = nullptr;
+    decltype(&SSLManagerOpenSSL::password_cb) password_cb = nullptr;
     void* userdata = nullptr;
     if (!password.empty()) {
-        password_cb = &SSLManager::password_cb;
-        // SSLManager::password_cb will not manipulate the password, so const_cast is safe.
+        password_cb = &SSLManagerOpenSSL::password_cb;
+        // SSLManagerOpenSSL::password_cb will not manipulate the password, so const_cast is safe.
         userdata = const_cast<void*>(static_cast<const void*>(&password));
     }
     EVP_PKEY* privateKey = PEM_read_bio_PrivateKey(inBio, nullptr, password_cb, userdata);
@@ -915,7 +944,7 @@ bool SSLManager::_setupPEM(SSL_CTX* context,
     return true;
 }
 
-Status SSLManager::_setupCA(SSL_CTX* context, const std::string& caFile) {
+Status SSLManagerOpenSSL::_setupCA(SSL_CTX* context, const std::string& caFile) {
     // Set the list of CAs sent to clients
     STACK_OF(X509_NAME)* certNames = SSL_load_client_CA_file(caFile.c_str());
     if (certNames == NULL) {
@@ -934,7 +963,7 @@ Status SSLManager::_setupCA(SSL_CTX* context, const std::string& caFile) {
 
     // Set SSL to require peer (client) certificate verification
     // if a certificate is presented
-    SSL_CTX_set_verify(context, SSL_VERIFY_PEER, &SSLManager::verify_cb);
+    SSL_CTX_set_verify(context, SSL_VERIFY_PEER, &SSLManagerOpenSSL::verify_cb);
     _sslConfiguration.hasCA = true;
     return Status::OK();
 }
@@ -1064,7 +1093,7 @@ Status importKeychainToX509_STORE(X509_STORE* verifyStore) {
 }
 #endif
 
-Status SSLManager::_setupSystemCA(SSL_CTX* context) {
+Status SSLManagerOpenSSL::_setupSystemCA(SSL_CTX* context) {
 #if !defined(_WIN32) && !defined(__APPLE__)
     // On non-Windows/non-Apple platforms, the OpenSSL libraries should have been configured
     // with default locations for CA certificates.
@@ -1097,7 +1126,7 @@ Status SSLManager::_setupSystemCA(SSL_CTX* context) {
 #endif
 }
 
-bool SSLManager::_setupCRL(SSL_CTX* context, const std::string& crlFile) {
+bool SSLManagerOpenSSL::_setupCRL(SSL_CTX* context, const std::string& crlFile) {
     X509_STORE* store = SSL_CTX_get_cert_store(context);
     fassert(16583, store);
 
@@ -1120,7 +1149,7 @@ bool SSLManager::_setupCRL(SSL_CTX* context, const std::string& crlFile) {
 * The interface layer between network and BIO-pair. The BIO-pair buffers
 * the data to/from the TLS layer.
 */
-void SSLManager::_flushNetworkBIO(SSLConnection* conn) {
+void SSLManagerOpenSSL::_flushNetworkBIO(SSLConnectionOpenSSL* conn) {
     char buffer[BUFFER_SIZE];
     int wantWrite;
 
@@ -1165,8 +1194,8 @@ void SSLManager::_flushNetworkBIO(SSLConnection* conn) {
     }
 }
 
-bool SSLManager::_doneWithSSLOp(SSLConnection* conn, int status) {
-    int sslErr = SSL_get_error(conn, status);
+bool SSLManagerOpenSSL::_doneWithSSLOp(SSLConnectionOpenSSL* conn, int status) {
+    int sslErr = SSL_get_error(conn->ssl, status);
     switch (sslErr) {
         case SSL_ERROR_NONE:
             _flushNetworkBIO(conn);  // success, flush network BIO before leaving
@@ -1180,9 +1209,9 @@ bool SSLManager::_doneWithSSLOp(SSLConnection* conn, int status) {
     }
 }
 
-SSLConnection* SSLManager::connect(Socket* socket) {
-    std::unique_ptr<SSLConnection> sslConn =
-        stdx::make_unique<SSLConnection>(_clientContext.get(), socket, (const char*)NULL, 0);
+SSLConnectionInterface* SSLManagerOpenSSL::connect(Socket* socket) {
+    std::unique_ptr<SSLConnectionOpenSSL> sslConn =
+        stdx::make_unique<SSLConnectionOpenSSL>(_clientContext.get(), socket, (const char*)NULL, 0);
 
     const auto undotted = removeFQDNRoot(socket->remoteAddr().hostOrIp());
     int ret = ::SSL_set_tlsext_host_name(sslConn->ssl, undotted.c_str());
@@ -1199,9 +1228,11 @@ SSLConnection* SSLManager::connect(Socket* socket) {
     return sslConn.release();
 }
 
-SSLConnection* SSLManager::accept(Socket* socket, const char* initialBytes, int len) {
-    std::unique_ptr<SSLConnection> sslConn =
-        stdx::make_unique<SSLConnection>(_serverContext.get(), socket, initialBytes, len);
+SSLConnectionInterface* SSLManagerOpenSSL::accept(Socket* socket,
+                                                  const char* initialBytes,
+                                                  int len) {
+    std::unique_ptr<SSLConnectionOpenSSL> sslConn =
+        stdx::make_unique<SSLConnectionOpenSSL>(_serverContext.get(), socket, initialBytes, len);
 
     int ret;
     do {
@@ -1214,7 +1245,7 @@ SSLConnection* SSLManager::accept(Socket* socket, const char* initialBytes, int 
     return sslConn.release();
 }
 
-StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertificate(
+StatusWith<boost::optional<SSLPeerInfo>> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     SSL* conn, const std::string& remoteHost) {
     if (!_sslConfiguration.hasCA && isSSLServer)
         return {boost::none};
@@ -1323,8 +1354,10 @@ StatusWith<boost::optional<SSLPeerInfo>> SSLManager::parseAndValidatePeerCertifi
 }
 
 
-SSLPeerInfo SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConnection* conn,
-                                                                  const std::string& remoteHost) {
+SSLPeerInfo SSLManagerOpenSSL::parseAndValidatePeerCertificateDeprecated(
+    const SSLConnectionInterface* connInterface, const std::string& remoteHost) {
+    const SSLConnectionOpenSSL* conn = checked_cast<const SSLConnectionOpenSSL*>(connInterface);
+
     auto swPeerSubjectName = parseAndValidatePeerCertificate(conn->ssl, remoteHost);
     // We can't use uassertStatusOK here because we need to throw a NetworkException.
     if (!swPeerSubjectName.isOK()) {
@@ -1333,7 +1366,7 @@ SSLPeerInfo SSLManager::parseAndValidatePeerCertificateDeprecated(const SSLConne
     return swPeerSubjectName.getValue().get_value_or(SSLPeerInfo());
 }
 
-StatusWith<stdx::unordered_set<RoleName>> SSLManager::_parsePeerRoles(X509* peerCert) const {
+StatusWith<stdx::unordered_set<RoleName>> SSLManagerOpenSSL::_parsePeerRoles(X509* peerCert) const {
     // exts is owned by the peerCert
     const STACK_OF(X509_EXTENSION)* exts = X509_get0_extensions(peerCert);
 
@@ -1463,7 +1496,7 @@ std::string SSLManagerInterface::getSSLErrorMessage(int code) {
     return msg;
 }
 
-void SSLManager::_handleSSLError(int code, int ret) {
+void SSLManagerOpenSSL::_handleSSLError(int code, int ret) {
     int err = ERR_get_error();
 
     switch (code) {

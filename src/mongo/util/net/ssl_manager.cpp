@@ -149,6 +149,8 @@ BSONObj SSLConfiguration::getServerStatusBSON() const {
 
 SSLManagerInterface::~SSLManagerInterface() {}
 
+SSLConnectionInterface::~SSLConnectionInterface() {}
+
 #endif
 
 }  // namespace mongo

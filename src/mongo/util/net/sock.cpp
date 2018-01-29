@@ -415,14 +415,7 @@ std::string Socket::getSNIServerName() const {
     if (!_sslConnection)
         return "";
 
-    if (!_sslConnection->ssl)
-        return "";
-
-    const char* name = SSL_get_servername(_sslConnection->ssl, TLSEXT_NAMETYPE_host_name);
-    if (!name)
-        return "";
-
-    return name;
+    return _sslConnection->getSNIServerName();
 }
 #endif
 
