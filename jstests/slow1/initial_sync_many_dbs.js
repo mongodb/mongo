@@ -4,9 +4,9 @@
 
 (function() {
     var name = 'initial_sync_many_dbs';
-    var num_dbs = 64;
-    var num_colls = 16;
-    var num_docs = 4;
+    var num_dbs = 32;
+    var max_colls = 32;
+    var num_docs = 2;
     var replSet = new ReplSetTest({
         name: name,
         nodes: 1,
@@ -15,11 +15,11 @@
     replSet.initiate();
 
     var primary = replSet.getPrimary();
-    jsTestLog('Seeding primary with ' + num_dbs + ' databases with ' + num_colls +
+    jsTestLog('Seeding primary with ' + num_dbs + ' databases with up to ' + max_colls +
               ' collections each. Each collection will contain ' + num_docs + ' documents');
     for (var i = 0; i < num_dbs; i++) {
         var dbname = name + '_db' + i;
-        for (var j = 0; j < num_colls; j++) {
+        for (var j = 0; j < (i % max_colls + 1); j++) {
             var collname = name + '_coll' + j;
             var coll = primary.getDB(dbname)[collname];
             for (var k = 0; k < num_docs; k++) {
@@ -33,12 +33,12 @@
     replSet.add();
     replSet.reInitiate();
 
-    replSet.awaitSecondaryNodes(10 * 60 * 1000);
+    replSet.awaitSecondaryNodes(30 * 60 * 1000);
     var secondary = replSet.getSecondary();
     jsTestLog('New node has transitioned to secondary. Checking collection sizes');
     for (var i = 0; i < num_dbs; i++) {
         var dbname = name + '_db' + i;
-        for (var j = 0; j < num_colls; j++) {
+        for (var j = 0; j < (i % max_colls + 1); j++) {
             var collname = name + '_coll' + j;
             var coll = secondary.getDB(dbname)[collname];
             assert.eq(num_docs,
