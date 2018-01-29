@@ -808,14 +808,14 @@ public:
     IndexUpdateTests() : Suite("indexupdate") {}
 
     void setupTests() {
-        // SERVER-32702: Skip this test for Mobile SE.
-        // This test should run successfully after fixing the server ticket.
-        if (mongo::storageGlobalParams.engine == "mobile") {
-            return;
-        }
 
-        add<InsertBuildIgnoreUnique<true>>();
-        add<InsertBuildIgnoreUnique<false>>();
+        if (mongo::storageGlobalParams.engine != "mobile") {
+            // These tests check that index creation ignores the unique constraint when told to.
+            // The mobile storage engine does not support duplicate keys in unique indexes so these
+            // tests are disabled.
+            add<InsertBuildIgnoreUnique<true>>();
+            add<InsertBuildIgnoreUnique<false>>();
+        }
         add<InsertBuildEnforceUnique<true>>();
         add<InsertBuildEnforceUnique<false>>();
         add<InsertBuildFillDups<true>>();
