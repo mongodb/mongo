@@ -21,7 +21,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/server_parameters',
-        '$BUILD_DIR/mongo/util/uuid',
     ],
 )
 
@@ -194,7 +193,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/decorable',
-        '$BUILD_DIR/mongo/util/uuid',
     ],
 )
 
@@ -322,7 +320,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/util/uuid',
     ],
 )
 

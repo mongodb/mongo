@@ -514,7 +514,6 @@ env.Library(
         'commands/server_status_core',
         'commands/test_commands_enabled',
         'service_context',
-        '$BUILD_DIR/mongo/util/uuid',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
@@ -964,7 +963,6 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/sha256_block',
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/util/uuid',
         'server_parameters',
     ],
 )

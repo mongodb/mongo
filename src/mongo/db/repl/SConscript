@@ -371,7 +371,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/decorable',
-        '$BUILD_DIR/mongo/util/uuid',
     ],
 )
 

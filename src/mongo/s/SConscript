@@ -94,7 +94,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/util/uuid',
     ]
 )
 
