@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -232,6 +232,7 @@ restart:	/*
 			descent =
 			    pindex->index[__wt_random(&session->rnd) % entries];
 			if (descent->state == WT_REF_DISK ||
+			    descent->state == WT_REF_LIMBO ||
 			    descent->state == WT_REF_LOOKASIDE ||
 			    descent->state == WT_REF_MEM)
 				break;
@@ -240,6 +241,7 @@ restart:	/*
 			for (i = 0; i < entries; ++i) {
 				descent = pindex->index[i];
 				if (descent->state == WT_REF_DISK ||
+				    descent->state == WT_REF_LIMBO ||
 				    descent->state == WT_REF_LOOKASIDE ||
 				    descent->state == WT_REF_MEM)
 					break;

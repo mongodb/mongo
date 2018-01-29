@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -25,6 +25,7 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_ITEM key;
 	WT_PAGE *page;
 	WT_ROW *rip;
+	int cmp;
 
 	cursor = &cbt->iface;
 	WT_ASSERT(session, F_ISSET(cursor, WT_CURSTD_KEY_SET));
@@ -50,8 +51,9 @@ __txn_op_log_row_key_check(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		key.size = WT_INSERT_KEY_SIZE(cbt->ins);
 	}
 
-	WT_ASSERT(session, key.size == cursor->key.size &&
-	    memcmp(key.data, cursor->key.data, key.size) == 0);
+	WT_ASSERT(session, __wt_compare(
+	    session, cbt->btree->collator, &key, &cursor->key, &cmp) == 0);
+	WT_ASSERT(session, cmp == 0);
 
 	__wt_buf_free(session, &key);
 }
@@ -85,17 +87,17 @@ __txn_op_log(WT_SESSION_IMPL *session,
 		__txn_op_log_row_key_check(session, cbt);
 #endif
 		switch (upd->type) {
-		case WT_UPDATE_DELETED:
-			WT_RET(__wt_logop_row_remove_pack(
-			    session, logrec, op->fileid, &cursor->key));
-			break;
-		case WT_UPDATE_MODIFIED:
+		case WT_UPDATE_MODIFY:
 			WT_RET(__wt_logop_row_modify_pack(
 			    session, logrec, op->fileid, &cursor->key, &value));
 			break;
 		case WT_UPDATE_STANDARD:
 			WT_RET(__wt_logop_row_put_pack(
 			    session, logrec, op->fileid, &cursor->key, &value));
+			break;
+		case WT_UPDATE_TOMBSTONE:
+			WT_RET(__wt_logop_row_remove_pack(
+			    session, logrec, op->fileid, &cursor->key));
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
@@ -104,17 +106,17 @@ __txn_op_log(WT_SESSION_IMPL *session,
 		WT_ASSERT(session, recno != WT_RECNO_OOB);
 
 		switch (upd->type) {
-		case WT_UPDATE_DELETED:
-			WT_RET(__wt_logop_col_remove_pack(
-			    session, logrec, op->fileid, recno));
-			break;
-		case WT_UPDATE_MODIFIED:
+		case WT_UPDATE_MODIFY:
 			WT_RET(__wt_logop_col_modify_pack(
 			    session, logrec, op->fileid, recno, &value));
 			break;
 		case WT_UPDATE_STANDARD:
 			WT_RET(__wt_logop_col_put_pack(
 			    session, logrec, op->fileid, recno, &value));
+			break;
+		case WT_UPDATE_TOMBSTONE:
+			WT_RET(__wt_logop_col_remove_pack(
+			    session, logrec, op->fileid, recno));
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}

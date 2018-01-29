@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -160,7 +160,8 @@ wt_startup(char *config_open)
 	testutil_make_work_dir(home);
 
 	testutil_check(__wt_snprintf(config_buf, sizeof(config_buf),
-	    "create,error_prefix=\"%s\",cache_size=5MB%s%s",
+	    "create,error_prefix=\"%s\",cache_size=5MB%s%s,"
+	    "operation_tracking=(enabled=false)",
 	    progname,
 	    config_open == NULL ? "" : ",",
 	    config_open == NULL ? "" : config_open));

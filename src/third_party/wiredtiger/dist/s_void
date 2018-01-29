@@ -64,11 +64,13 @@ func_ok()
 	    -e '/int __wt_lsm_manager_pop_entry$/d' \
 	    -e '/int __wt_once$/d' \
 	    -e '/int __wt_posix_directory_list_free$/d' \
+	    -e '/int __wt_session_breakpoint$/d' \
 	    -e '/int __wt_spin_init$/d' \
 	    -e '/int __wt_spin_trylock$/d' \
 	    -e '/int __wt_stat_connection_desc$/d' \
 	    -e '/int __wt_stat_dsrc_desc$/d' \
 	    -e '/int __wt_stat_join_desc$/d' \
+	    -e '/int __wt_txn_rollback_required$/d' \
 	    -e '/int __wt_win_directory_list_free$/d' \
 	    -e '/int bdb_compare_reverse$/d' \
 	    -e '/int copyout_val$/d' \

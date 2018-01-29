@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -257,7 +257,7 @@ __wt_cache_page_byte_dirty_decr(
 		 * Take care to read the dirty-byte count only once in case
 		 * we're racing with updates.
 		 */
-		orig = page->modify->bytes_dirty;
+		WT_ORDERED_READ(orig, page->modify->bytes_dirty);
 		decr = WT_MIN(size, orig);
 		if (__wt_atomic_cassize(
 		    &page->modify->bytes_dirty, orig, orig - decr))
@@ -400,7 +400,7 @@ __wt_cache_page_image_incr(WT_SESSION_IMPL *session, uint32_t size)
  *	Evict pages from the cache.
  */
 static inline void
-__wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page, bool rewrite)
+__wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_CACHE *cache;
@@ -448,17 +448,8 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page, bool rewrite)
 	/*
 	 * Track if eviction makes progress.  This is used in various places to
 	 * determine whether eviction is stuck.
-	 *
-	 * We don't count rewrites as progress.
-	 *
-	 * Further, if a page was read with eviction disabled, we don't count
-	 * evicting a it as progress.  Since disabling eviction allows pages to
-	 * be read even when the cache is full, we want to avoid workloads
-	 * repeatedly reading a page with eviction disabled (e.g., from the
-	 * metadata), then evicting that page and deciding that is a sign that
-	 * eviction is unstuck.
 	 */
-	if (!rewrite && !F_ISSET_ATOMIC(page, WT_PAGE_READ_NO_EVICT))
+	if (!F_ISSET_ATOMIC(page, WT_PAGE_EVICT_NO_PROGRESS))
 		(void)__wt_atomic_addv64(&cache->eviction_progress, 1);
 }
 
@@ -1236,7 +1227,7 @@ __wt_leaf_page_can_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * size, split as soon as there are 5 items on the page.
 	 */
 #define	WT_MAX_SPLIT_COUNT	5
-	if (page->memory_footprint > btree->maxleafpage * 2) {
+	if (page->memory_footprint > (size_t)btree->maxleafpage * 2) {
 		for (count = 0, ins = ins_head->head[0];
 		    ins != NULL;
 		    ins = ins->next[0]) {
@@ -1469,7 +1460,7 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 		    (LF_ISSET(WT_READ_NO_SPLIT) || (!inmem_split &&
 		    F_ISSET(session, WT_SESSION_NO_RECONCILE)))) {
 			if (!WT_SESSION_IS_CHECKPOINT(session))
-				__wt_page_evict_urgent(session, ref);
+				(void)__wt_page_evict_urgent(session, ref);
 		} else {
 			WT_RET_BUSY_OK(__wt_page_release_evict(session, ref));
 			return (0);

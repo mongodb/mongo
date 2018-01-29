@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -333,7 +333,6 @@ __wt_las_cursor_close(
 static int
 __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 {
-#ifdef HAVE_VERBOSE
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 #ifdef HAVE_TIMESTAMPS
@@ -342,7 +341,8 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 	char hex_timestamp[9]; /* Enough for disabled string */
 #endif
 	uint64_t ckpt_gen_current, ckpt_gen_last;
-	uint32_t btree_id, pct_dirty, pct_full;
+	uint32_t btree_id;
+	double pct_dirty, pct_full;
 
 	btree_id = S2BT(session)->id;
 
@@ -380,12 +380,12 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 		    "file ID %" PRIu32 ", page ID %" PRIu64 ". "
 		    "Max txn ID %" PRIu64 ", min timestamp %s, skewed %s. "
 		    "Entries now in lookaside file: %" PRId64 ", "
-		    "cache dirty: %" PRIu32 "%% , "
-		    "cache use: %" PRIu32 "%%",
+		    "cache dirty: %2.3f%% , "
+		    "cache use: %2.3f%%",
 		    btree_id, multi->page_las.las_pageid,
 		    multi->page_las.las_max_txn,
 		    hex_timestamp,
-		    multi->page_las.las_skew_newest? "newest" : "oldest",
+		    multi->page_las.las_skew_newest ? "newest" : "oldest",
 		    WT_STAT_READ(conn->stats, cache_lookaside_entries),
 		    pct_dirty, pct_full);
 	}
@@ -393,10 +393,6 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_MULTI *multi)
 	/* Never skip updating the tracked generation */
 	if (WT_VERBOSE_ISSET(session, WT_VERB_LOOKASIDE))
 		cache->las_verb_gen_write = ckpt_gen_current;
-#else
-	WT_UNUSED(session);
-	WT_UNUSED(multi);
-#endif
 	return (0);
 }
 
@@ -433,7 +429,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 	/* Wrap all the updates in a transaction. */
 	las_session = (WT_SESSION_IMPL *)cursor->session;
 	WT_RET(__wt_txn_begin(las_session, NULL));
-	las_session->txn.isolation = WT_TXN_ISO_READ_UNCOMMITTED;
+	las_session->txn.isolation = WT_ISO_READ_UNCOMMITTED;
 
 	/*
 	 * Make sure there are no leftover entries (e.g., from a handle
@@ -495,18 +491,16 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 				continue;
 
 			switch (upd->type) {
-			case WT_UPDATE_DELETED:
-				las_value.size = 0;
-				break;
-			case WT_UPDATE_MODIFIED:
+			case WT_UPDATE_MODIFY:
 			case WT_UPDATE_STANDARD:
 				las_value.data = upd->data;
 				las_value.size = upd->size;
 				break;
-			case WT_UPDATE_RESERVED:
-				WT_ASSERT(session,
-				    upd->type != WT_UPDATE_RESERVED);
-				continue;
+			case WT_UPDATE_BIRTHMARK:
+			case WT_UPDATE_TOMBSTONE:
+				las_value.size = 0;
+				break;
+			WT_ILLEGAL_VALUE_ERR(session);
 			}
 
 			cursor->set_key(cursor,
@@ -516,8 +510,25 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 			las_timestamp.data = &upd->timestamp;
 			las_timestamp.size = WT_TIMESTAMP_SIZE;
 #endif
-			cursor->set_value(cursor,
-			    upd->txnid, &las_timestamp, upd->type, &las_value);
+			/*
+			 * If saving a non-zero length value on the page, save a
+			 * birthmark instead of duplicating it in the lookaside
+			 * table. (We check the length because row-store doesn't
+			 * write zero-length data items.)
+			 */
+			if (multi->page_las.las_skew_newest &&
+			    upd == list->onpage_upd &&
+			    upd->size > 0 &&
+			    (upd->type == WT_UPDATE_STANDARD ||
+			    upd->type == WT_UPDATE_MODIFY)) {
+				las_value.size = 0;
+				cursor->set_value(cursor,
+				    upd->txnid, &las_timestamp,
+				    WT_UPDATE_BIRTHMARK, &las_value);
+			} else
+				cursor->set_value(cursor,
+				    upd->txnid, &las_timestamp,
+				    upd->type, &las_value);
 
 			/*
 			 * Using update looks a little strange because the keys
@@ -533,7 +544,7 @@ __wt_las_insert_block(WT_SESSION_IMPL *session, WT_CURSOR *cursor,
 	if (insert_cnt > 0) {
 		WT_STAT_CONN_INCRV(
 		    session, cache_lookaside_entries, insert_cnt);
-		__wt_atomic_add64(
+		(void)__wt_atomic_add64(
 		    &S2C(session)->cache->las_entry_count, insert_cnt);
 		WT_ERR(__las_insert_block_verbose(session, multi));
 	}
@@ -639,7 +650,7 @@ __wt_las_remove_block(WT_SESSION_IMPL *session,
 	 */
 	if (local_cursor) {
 		WT_ERR(__wt_txn_begin(las_session, NULL));
-		las_session->txn.isolation = WT_TXN_ISO_READ_UNCOMMITTED;
+		las_session->txn.isolation = WT_ISO_READ_UNCOMMITTED;
 		local_txn = true;
 	}
 
@@ -725,12 +736,10 @@ __las_sweep_init(WT_SESSION_IMPL *session)
 	cache->las_sweep_dropmin = UINT32_MAX;
 	cache->las_sweep_dropmax = 0;
 	for (i = 0; i < cache->las_dropped_next; i++) {
-		cache->las_sweep_dropmin = WT_MIN(
-		    cache->las_sweep_dropmin,
-		    cache->las_dropped[i]);
-		cache->las_sweep_dropmax = WT_MAX(
-		    cache->las_sweep_dropmax,
-		    cache->las_dropped[i]);
+		cache->las_sweep_dropmin =
+		    WT_MIN(cache->las_sweep_dropmin, cache->las_dropped[i]);
+		cache->las_sweep_dropmax =
+		    WT_MAX(cache->las_sweep_dropmax, cache->las_dropped[i]);
 	}
 
 	/* Initialize the bitmap. */

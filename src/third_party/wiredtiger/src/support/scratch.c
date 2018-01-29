@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -15,6 +15,7 @@
  */
 int
 __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	size_t offset;
 	bool copy_data;
@@ -68,6 +69,7 @@ __wt_buf_grow_worker(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 int
 __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_DECL_RET;
 	size_t len;
@@ -102,6 +104,7 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 int
 __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_DECL_RET;
 	size_t len, space;
@@ -141,8 +144,8 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 
 /*
  * __wt_buf_set_printable --
- *	Set the contents of the buffer to a printable representation of a
- * byte string.
+ *	Set the contents of the buffer to a printable representation of a byte
+ * string.
  */
 const char *
 __wt_buf_set_printable(
@@ -153,6 +156,85 @@ __wt_buf_set_printable(
 		buf->size = strlen("[Error]");
 	}
 	return (buf->data);
+}
+
+/*
+ * __wt_buf_set_printable_format --
+ *	Set the contents of the buffer to a printable representation of a byte
+ * string, based on a format.
+ */
+const char *
+__wt_buf_set_printable_format(WT_SESSION_IMPL *session,
+    const void *buffer, size_t size, const char *format, WT_ITEM *buf)
+{
+	WT_DECL_ITEM(tmp);
+	WT_DECL_PACK_VALUE(pv);
+	WT_DECL_RET;
+	WT_PACK pack;
+	const uint8_t *p, *end;
+	const char *retp, *sep;
+
+	p = (const uint8_t *)buffer;
+	end = p + size;
+
+	WT_ERR(__wt_buf_init(session, buf, 0));
+
+	WT_ERR(__pack_init(session, &pack, format));
+	for (sep = ""; (ret = __pack_next(&pack, &pv)) == 0;) {
+		WT_ERR(__unpack_read(session, &pv, &p, (size_t)(end - p)));
+		switch (pv.type) {
+		case 'x':
+			break;
+		case 's':
+		case 'S':
+			WT_ERR(__wt_buf_catfmt(
+			    session, buf, "%s%s", sep,  pv.u.s));
+			sep = ",";
+			break;
+		case 'U':
+		case 'u':
+			if (pv.u.item.size == 0)
+				break;
+
+			if (tmp == NULL)
+				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+			WT_ERR(__wt_buf_catfmt(session, buf, "%s%s",
+			    sep, __wt_buf_set_printable(
+			    session, pv.u.item.data, pv.u.item.size, tmp)));
+			break;
+		case 'b':
+		case 'h':
+		case 'i':
+		case 'l':
+		case 'q':
+			WT_ERR(__wt_buf_catfmt(
+			    session, buf, "%s%" PRId64, sep, pv.u.i));
+			sep = ",";
+			break;
+		case 'B':
+		case 't':
+		case 'H':
+		case 'I':
+		case 'L':
+		case 'Q':
+		case 'r':
+		case 'R':
+			WT_ERR(__wt_buf_catfmt(
+			    session, buf, "%s%" PRIu64, sep, pv.u.u));
+			sep = ",";
+			break;
+		WT_ILLEGAL_VALUE_ERR(session);
+		}
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+err:	__wt_scr_free(session, &tmp);
+	if (ret == 0)
+		return ((const char *)buf->data);
+
+	retp = "failed to create printable output";
+	__wt_err(session, ret, "%s: %s", __func__, retp);
+	return (retp);
 }
 
 /*
@@ -207,6 +289,7 @@ __wt_scr_alloc_func(WT_SESSION_IMPL *session, size_t size, WT_ITEM **scratchp
     , const char *file, int line
 #endif
     )
+    WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
 	WT_DECL_RET;
 	WT_ITEM *buf, **p, **best, **slot;

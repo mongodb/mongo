@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -45,7 +45,11 @@ main(int argc, char *argv[])
 	 * This code deliberately doesn't use the standard test_util macros,
 	 * we don't want to link against that code to smoke-test a build.
 	 */
-	(void)system("rm -rf WT_HOME && mkdir WT_HOME");
+	if ((ret = system("rm -rf WT_HOME && mkdir WT_HOME")) != 0) {
+		fprintf(stderr,
+		    "Failed to clean up prior to running example.\n");
+		return (EXIT_FAILURE);
+	}
 
 	/* Open a connection to the database, creating it if necessary. */
 	if ((ret = wiredtiger_open("WT_HOME", NULL, "create", &conn)) != 0) {

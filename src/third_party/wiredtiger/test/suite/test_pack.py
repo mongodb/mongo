@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2017 MongoDB, Inc.
+# Public Domain 2014-2018 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -74,6 +74,8 @@ class test_pack(wttest.WiredTigerTestCase):
         forw_idx.set_key(*v)
         self.assertEquals(forw_idx.search(), 0)
         self.assertEquals(forw_idx.get_value(), 1234)
+        forw.close()
+        forw_idx.close()
 
     def test_packing(self):
         self.check('iii', 0, 101, -99)

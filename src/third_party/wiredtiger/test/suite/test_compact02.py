@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2017 MongoDB, Inc.
+# Public Domain 2014-2018 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -30,7 +30,7 @@
 #   Test that compact reduces the file size.
 #
 
-import wiredtiger, wttest
+import time, wiredtiger, wttest
 from wiredtiger import stat
 from wtscenario import make_scenarios
 
@@ -146,7 +146,14 @@ class test_compact02(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         # 5. Call compact.
-        self.session.compact(self.uri, None)
+        # Compact can collide with eviction, if that happens we retry. Wait for
+        # up to a minute, the check for EBUSY should mean we're not retrying on
+        # real errors.
+        for i in range(1, 15):
+            if not self.raisesBusy(
+              lambda: self.session.compact(self.uri, None)):
+                break
+            time.sleep(4)
 
         # 6. Get stats on compacted table.
         sz = self.getSize()

@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -39,6 +39,12 @@ main(void)
 	int i;
 
 	memset(buf, 0xff, sizeof(buf));	/* -Werror=maybe-uninitialized */
+
+	/*
+	 * Required on some systems to pull in parts of the library
+	 * for which we have data references.
+	 */
+	testutil_check(__wt_library_init());
 
 	for (ncalls = 0, i = 0; i < 10000000; i++) {
 		for (s = 0; s < 50; s += 5) {

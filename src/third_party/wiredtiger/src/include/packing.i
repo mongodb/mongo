@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -253,14 +253,15 @@ next:	if (pack->cur == pack->end)
  * __pack_size --
  *      Get the size of a packed value.
  */
-static inline size_t
-__pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
+static inline int
+__pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv, size_t *vp)
 {
 	size_t s, pad;
 
 	switch (pv->type) {
 	case 'x':
-		return (pv->size);
+		*vp = pv->size;
+		return (0);
 	case 'j':
 	case 'J':
 	case 'K':
@@ -276,7 +277,8 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 			WT_ASSERT(session, len >= 0);
 			s = (size_t)len + (pv->type == 'K' ? 0 : 1);
 		}
-		return (s);
+		*vp = s;
+		return (0);
 	case 's':
 	case 'S':
 		if (pv->type == 's' || pv->havesize) {
@@ -284,7 +286,8 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 			WT_ASSERT(session, s != 0);
 		} else
 			s = strlen(pv->u.s) + 1;
-		return (s);
+		*vp = s;
+		return (0);
 	case 'U':
 	case 'u':
 		s = pv->u.item.size;
@@ -295,28 +298,33 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 			pad = pv->size - s;
 		if (pv->type == 'U')
 			s += __wt_vsize_uint(s + pad);
-		return (s + pad);
+		*vp = s + pad;
+		return (0);
 	case 'b':
 	case 'B':
 	case 't':
-		return (1);
+		*vp = 1;
+		return (0);
 	case 'h':
 	case 'i':
 	case 'l':
 	case 'q':
-		return (__wt_vsize_int(pv->u.i));
+		*vp = __wt_vsize_int(pv->u.i);
+		return (0);
 	case 'H':
 	case 'I':
 	case 'L':
 	case 'Q':
 	case 'r':
-		return (__wt_vsize_uint(pv->u.u));
+		*vp = __wt_vsize_uint(pv->u.u);
+		return (0);
 	case 'R':
-		return (sizeof(uint64_t));
+		*vp = sizeof(uint64_t);
+		return (0);
 	}
 
-	__wt_err(session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
-	return ((size_t)-1);
+	WT_RET_MSG(
+	    session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
 }
 
 /*
@@ -635,12 +643,10 @@ __wt_struct_packv(WT_SESSION_IMPL *session,
 		WT_PACK_GET(session, pv, ap);
 		WT_RET(__pack_write(session, &pv, &p, (size_t)(end - p)));
 	}
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Be paranoid - __pack_write should never overflow. */
 	WT_ASSERT(session, p <= end);
-
-	if (ret != WT_NOTFOUND)
-		return (ret);
 
 	return (0);
 }
@@ -654,22 +660,26 @@ __wt_struct_sizev(
     WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, va_list ap)
 {
 	WT_DECL_PACK_VALUE(pv);
+	WT_DECL_RET;
 	WT_PACK pack;
-	size_t total;
+	size_t v;
+
+	*sizep = 0;
 
 	if (fmt[0] != '\0' && fmt[1] == '\0') {
 		pv.type = fmt[0];
 		WT_PACK_GET(session, pv, ap);
-		*sizep = __pack_size(session, &pv);
-		return (0);
+		return (__pack_size(session, &pv, sizep));
 	}
 
 	WT_RET(__pack_init(session, &pack, fmt));
-	for (total = 0; __pack_next(&pack, &pv) == 0;) {
+	while ((ret = __pack_next(&pack, &pv)) == 0) {
 		WT_PACK_GET(session, pv, ap);
-		total += __pack_size(session, &pv);
+		WT_RET(__pack_size(session, &pv, &v));
+		*sizep += v;
 	}
-	*sizep = total;
+	WT_RET_NOTFOUND_OK(ret);
+
 	return (0);
 }
 
@@ -701,12 +711,10 @@ __wt_struct_unpackv(WT_SESSION_IMPL *session,
 		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));
 		WT_UNPACK_PUT(session, pv, ap);
 	}
+	WT_RET_NOTFOUND_OK(ret);
 
 	/* Be paranoid - __pack_write should never overflow. */
 	WT_ASSERT(session, p <= end);
-
-	if (ret != WT_NOTFOUND)
-		return (ret);
 
 	return (0);
 }

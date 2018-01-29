@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -60,6 +60,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 	page = cbt->ref->page;
 	upd = upd_arg;
 	logged = false;
+
+	/* We're going to modify the page, we should have loaded history. */
+	WT_ASSERT(session, cbt->ref->state != WT_REF_LIMBO);
 
 	/* If we don't yet have a modify structure, we'll need one. */
 	WT_RET(__wt_page_modify_init(session, page));
@@ -202,7 +205,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		    &ins, ins_size, skipdepth, exclusive));
 	}
 
-	if (logged && modify_type != WT_UPDATE_RESERVED)
+	if (logged && modify_type != WT_UPDATE_RESERVE)
 		WT_ERR(__wt_txn_log_op(session, cbt));
 
 	if (0) {
@@ -273,8 +276,9 @@ __wt_update_alloc(WT_SESSION_IMPL *session, const WT_ITEM *value,
 	 * Allocate the WT_UPDATE structure and room for the value, then copy
 	 * the value into place.
 	 */
-	if (modify_type == WT_UPDATE_DELETED ||
-	    modify_type == WT_UPDATE_RESERVED)
+	if (modify_type == WT_UPDATE_BIRTHMARK ||
+	    modify_type == WT_UPDATE_RESERVE ||
+	    modify_type == WT_UPDATE_TOMBSTONE)
 		WT_RET(__wt_calloc(session, 1, WT_UPDATE_SIZE, &upd));
 	else {
 		WT_RET(__wt_calloc(
@@ -321,7 +325,8 @@ __wt_update_obsolete_check(
 			continue;
 		if (!__wt_txn_upd_visible_all(session, upd))
 			first = NULL;
-		else if (first == NULL && WT_UPDATE_DATA_VALUE(upd))
+		else if (first == NULL && (WT_UPDATE_DATA_VALUE(upd) ||
+		    upd->type == WT_UPDATE_BIRTHMARK))
 			first = upd;
 	}
 
@@ -354,25 +359,4 @@ __wt_update_obsolete_check(
 	}
 
 	return (NULL);
-}
-
-/*
- * __wt_update_obsolete_free --
- *	Free an obsolete update list.
- */
-void
-__wt_update_obsolete_free(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *upd)
-{
-	WT_UPDATE *next;
-	size_t size;
-
-	/* Free a WT_UPDATE list. */
-	for (size = 0; upd != NULL; upd = next) {
-		next = upd->next;
-		size += WT_UPDATE_MEMSIZE(upd);
-		__wt_free(session, upd);
-	}
-	if (size != 0)
-		__wt_cache_page_inmem_decr(session, page, size);
 }

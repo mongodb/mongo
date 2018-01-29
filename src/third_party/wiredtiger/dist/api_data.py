@@ -108,6 +108,18 @@ lsm_config = [
             larger than this value.  This overrides the \c memory_page_max
             setting''',
             min='512K', max='500MB'),
+        Config('merge_custom', '', r'''
+            configure the tree to merge into a custom data source''',
+            type='category', subconfig=[
+            Config('prefix', '', r'''
+                custom data source prefix instead of \c "file"'''),
+            Config('start_generation', '0', r'''
+                merge generation at which the custom data source is used
+                (zero indicates no custom data source)''',
+                min='0', max='10'),
+            Config('suffix', '', r'''
+                custom data source suffix instead of \c ".lsm"'''),
+            ]),
         Config('merge_max', '15', r'''
             the maximum number of chunks to include in a merge operation''',
             min='2', max='100'),
@@ -137,8 +149,10 @@ file_runtime_config = [
         Config('commit_timestamp', 'none', r'''
             verify that timestamps should 'always' or 'never' be used
             on modifications with this table.  Verification is 'none'
-            if mixed update use is allowed.''',
-            choices=['always','never','none']),
+            if mixed update use is allowed. If 'key_consistent' is
+            set then all updates to a specific key must be the same
+            with respect to timestamp usage or not.''',
+            choices=['always','key_consistent', 'never','none']),
         Config('read_timestamp', 'none', r'''
             verify that timestamps should 'always' or 'never' be used
             on reads with this table.  Verification is 'none'
@@ -442,29 +456,36 @@ connection_runtime_config = [
             ]),
     Config('eviction_checkpoint_target', '5', r'''
         perform eviction at the beginning of checkpoints to bring the dirty
-        content in cache to this level, expressed as a percentage of the total
-        cache size.  Ignored if set to zero or \c in_memory is \c true''',
-        min=0, max=99),
+        content in cache to this level. It is a percentage of the cache size if
+        the value is within the range of 0 to 100 or an absolute size when
+        greater than 100. The value is not allowed to exceed the \c cache_size.
+        Ignored if set to zero or \c in_memory is \c true''',
+        min=0, max='10TB'),
     Config('eviction_dirty_target', '5', r'''
         perform eviction in worker threads when the cache contains at least
-        this much dirty content, expressed as a percentage of the total cache
-        size.''',
-        min=1, max=99),
+        this much dirty content. It is a percentage of the cache size if the
+        value is within the range of 1 to 100 or an absolute size when greater
+        than 100. The value is not allowed to exceed the \c cache_size.''',
+        min=1, max='10TB'),
     Config('eviction_dirty_trigger', '20', r'''
         trigger application threads to perform eviction when the cache contains
-        at least this much dirty content, expressed as a percentage of the
-        total cache size. This setting only alters behavior if it is lower than
-        eviction_trigger''',
-        min=1, max=99),
+        at least this much dirty content. It is a percentage of the cache size
+        if the value is within the range of 1 to 100 or an absolute size when
+        greater than 100. The value is not allowed to exceed the \c cache_size.
+        This setting only alters behavior if it is lower than eviction_trigger
+        ''', min=1, max='10TB'),
     Config('eviction_target', '80', r'''
         perform eviction in worker threads when the cache contains at least
-        this much content, expressed as a percentage of the total cache size.
-        Must be less than \c eviction_trigger''',
-        min=10, max=99),
+        this much content. It is a percentage of the cache size if the value is
+        within the range of 10 to 100 or an absolute size when greater than 100.
+        The value is not allowed to exceed the \c cache_size.''',
+        min=10, max='10TB'),
     Config('eviction_trigger', '95', r'''
         trigger application threads to perform eviction when the cache contains
-        at least this much content, expressed as a percentage of the
-        total cache size''', min=10, max=99),
+        at least this much content. It is a percentage of the cache size if the
+        value is within the range of 10 to 100 or an absolute size when greater
+        than 100.  The value is not allowed to exceed the \c cache_size.''',
+        min=10, max='10TB'),
     Config('file_manager', '', r'''
         control how file handles are managed''',
         type='category', subconfig=[
@@ -497,10 +518,25 @@ connection_runtime_config = [
     Config('lsm_merge', 'true', r'''
         merge LSM chunks where possible (deprecated)''',
         type='boolean', undoc=True),
+    Config('operation_tracking', '', r'''
+        enable tracking of performance-critical functions. See
+        @ref operation_tracking for more information''',
+        type='category', subconfig=[
+            Config('enabled', 'false', r'''
+                enable operation tracking subsystem''',
+                type='boolean'),
+            Config('path', '"."', r'''
+                the name of a directory into which operation tracking files are
+                written. The directory must already exist. If the value is not
+                an absolute path, the path is relative to the database home
+                (see @ref absolute_path for more information)'''),
+        ]),
     Config('shared_cache', '', r'''
         shared cache configuration options. A database should configure
         either a cache_size or a shared_cache not both. Enabling a
-        shared cache uses a session from the configured session_max''',
+        shared cache uses a session from the configured session_max. A
+        shared cache can not have absolute values configured for cache
+        eviction settings''',
         type='category', subconfig=[
         Config('chunk', '10MB', r'''
             the granularity that a shared cache is redistributed''',
@@ -525,7 +561,7 @@ connection_runtime_config = [
         Maintain database statistics, which may impact performance.
         Choosing "all" maintains all statistics regardless of cost,
         "fast" maintains a subset of statistics that are relatively
-        inexpensive, "none" turns off all statistics.  The "clear"
+        inexpensive, "none" turns off all statistics. The "clear"
         configuration resets statistics after they are gathered,
         where appropriate (for example, a cache size statistic is
         not cleared, while the count of cursor insert operations will
@@ -546,8 +582,7 @@ connection_runtime_config = [
         type='list', undoc=True, choices=[
             'checkpoint_slow', 'internal_page_split_race', 'page_split_race']),
     Config('verbose', '', r'''
-        enable messages for various events. Only available if WiredTiger
-        is configured with --enable-verbose. Options are given as a
+        enable messages for various events. Options are given as a
         list, such as <code>"verbose=[evictserver,read]"</code>''',
         type='list', choices=[
             'api',
@@ -576,6 +611,7 @@ connection_runtime_config = [
             'salvage',
             'shared_cache',
             'split',
+            'temporary',
             'thread_group',
             'timestamp',
             'transaction',

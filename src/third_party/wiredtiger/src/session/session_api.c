@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -190,6 +190,24 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	/* Free transaction information. */
 	__wt_txn_destroy(session);
+
+	/*
+	 * Close the file where we tracked long operations.  Do this before
+	 * releasing resources, as we do scratch buffer management when we flush
+	 * optrack buffers to disk
+	 */
+	if (F_ISSET(conn, WT_CONN_OPTRACK)) {
+		if (session->optrackbuf_ptr > 0) {
+			WT_IGNORE_RET((int)__wt_optrack_flush_buffer(session));
+			WT_IGNORE_RET(__wt_close(session,
+			    &session->optrack_fh));
+			/* Indicate that the file is closed */
+			session->optrack_fh = NULL;
+		}
+
+		/* Free the operation tracking buffer */
+		__wt_free(session, session->optrack_buf);
+	}
 
 	/* Release common session resources. */
 	WT_TRET(__wt_session_release_resources(session));
@@ -489,7 +507,8 @@ __session_alter(WT_SESSION *wt_session, const char *uri, const char *config)
 		ret = __wt_schema_worker(session, uri, __wt_alter, NULL, cfg,
 		WT_BTREE_ALTER | WT_DHANDLE_EXCLUSIVE)));
 
-err:	if (ret != 0)
+err:
+	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_alter_fail);
 	else
 		WT_STAT_CONN_INCR(session, session_table_alter_success);
@@ -580,7 +599,8 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	ret = __wt_session_create(session, uri, config);
 
-err:	if (ret != 0)
+err:
+	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_create_fail);
 	else
 		WT_STAT_CONN_INCR(session, session_table_create_success);
@@ -731,7 +751,8 @@ __session_rebalance(WT_SESSION *wt_session, const char *uri, const char *config)
 		ret = __wt_schema_worker(session, uri, __wt_bt_rebalance,
 		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_REBALANCE)));
 
-err:	if (ret != 0)
+err:
+	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_rebalance_fail);
 	else
 		WT_STAT_CONN_INCR(session, session_table_rebalance_success);
@@ -782,8 +803,8 @@ __session_rename(WT_SESSION *wt_session,
 	    WT_WITH_SCHEMA_LOCK(session,
 		WT_WITH_TABLE_WRITE_LOCK(session,
 		    ret = __wt_schema_rename(session, uri, newuri, cfg))));
-
-err:	if (ret != 0)
+err:
+	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_rename_fail);
 	else
 		WT_STAT_CONN_INCR(session, session_table_rename_success);
@@ -887,7 +908,8 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 				ret = __wt_schema_drop(session, uri, cfg)));
 	}
 
-err:	if (ret != 0)
+err:
+	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_drop_fail);
 	else
 		WT_STAT_CONN_INCR(session, session_table_drop_success);
@@ -1078,7 +1100,8 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 		ret = __wt_schema_worker(session, uri, __wt_salvage,
 		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_SALVAGE)));
 
-err:	if (ret != 0)
+err:
+	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_salvage_fail);
 	else
 		WT_STAT_CONN_INCR(session, session_table_salvage_success);
@@ -1395,7 +1418,8 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 		ret = __wt_schema_worker(session, uri, __wt_verify,
 		NULL, cfg, WT_DHANDLE_EXCLUSIVE | WT_BTREE_VERIFY)));
 
-err:	if (ret != 0)
+err:
+	if (ret != 0)
 		WT_STAT_CONN_INCR(session, session_table_verify_fail);
 	else
 		WT_STAT_CONN_INCR(session, session_table_verify_success);
@@ -1443,7 +1467,9 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 	txn = &session->txn;
 	if (F_ISSET(txn, WT_TXN_ERROR) && txn->mod_count != 0)
 		WT_ERR_MSG(session, EINVAL,
-		    "failed transaction requires rollback");
+		    "failed transaction requires rollback%s%s",
+		    txn->rollback_reason == NULL ? "" : ": ",
+		    txn->rollback_reason == NULL ? "" : txn->rollback_reason);
 
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);
@@ -1552,13 +1578,13 @@ __transaction_sync_run_chk(WT_SESSION_IMPL *session)
 static int
 __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 {
-	struct timespec now, start;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_SESSION_IMPL *session;
 	uint64_t remaining_usec, timeout_ms, waited_ms;
+	uint64_t time_start, time_stop;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, transaction_sync, config, cfg);
@@ -1600,18 +1626,18 @@ __session_transaction_sync(WT_SESSION *wt_session, const char *config)
 	if (timeout_ms == 0)
 		WT_ERR(ETIMEDOUT);
 
-	__wt_epoch(session, &start);
 	/*
 	 * Keep checking the LSNs until we find it is stable or we reach
 	 * our timeout, or there's some other reason to quit.
 	 */
+	time_start = __wt_clock(session);
 	while (__wt_log_cmp(&session->bg_sync_lsn, &log->sync_lsn) > 0) {
 		if (!__transaction_sync_run_chk(session))
 			WT_ERR(ETIMEDOUT);
 
 		__wt_cond_signal(session, conn->log_file_cond);
-		__wt_epoch(session, &now);
-		waited_ms = WT_TIMEDIFF_MS(now, start);
+		time_stop = __wt_clock(session);
+		waited_ms = WT_CLOCKDIFF_MS(time_stop, time_start);
 		if (waited_ms < timeout_ms) {
 			remaining_usec = (timeout_ms - waited_ms) * WT_THOUSAND;
 			__wt_cond_wait(session, log->log_sync_cond,
@@ -1755,6 +1781,19 @@ __wt_session_strerror(WT_SESSION *wt_session, int error)
 }
 
 /*
+ * __wt_session_breakpoint --
+ *	A place to put a breakpoint, if you need one, or call some check
+ * code.
+ */
+int
+__wt_session_breakpoint(WT_SESSION *wt_session)
+{
+	WT_UNUSED(wt_session);
+
+	return (0);
+}
+
+/*
  * __open_session --
  *	Allocate a session handle.
  */
@@ -1791,7 +1830,8 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_checkpoint,
 		__session_snapshot,
 		__session_transaction_pinned_range,
-		__session_transaction_sync
+		__session_transaction_sync,
+		__wt_session_breakpoint
 	}, stds_readonly = {
 		NULL,
 		NULL,
@@ -1820,7 +1860,8 @@ __open_session(WT_CONNECTION_IMPL *conn,
 		__session_checkpoint_readonly,
 		__session_snapshot,
 		__session_transaction_pinned_range,
-		__session_transaction_sync_readonly
+		__session_transaction_sync_readonly,
+		__wt_session_breakpoint
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
@@ -1847,9 +1888,9 @@ __open_session(WT_CONNECTION_IMPL *conn,
 			break;
 	if (i == conn->session_size)
 		WT_ERR_MSG(session, WT_ERROR,
-		    "out of sessions, only configured to support %" PRIu32
-		    " sessions (including %d additional internal sessions)",
-		    conn->session_size, WT_EXTRA_INTERNAL_SESSIONS);
+		    "out of sessions, configured for %" PRIu32 " (including "
+		    "internal sessions)",
+		    conn->session_size);
 
 	/*
 	 * If the active session count is increasing, update it.  We don't worry
@@ -1904,6 +1945,12 @@ __open_session(WT_CONNECTION_IMPL *conn,
 	/* Cache the offset of this session's statistics bucket. */
 	session_ret->stat_bucket = WT_STATS_SLOT_ID(session);
 
+	/* Allocate the buffer for operation tracking */
+	if (F_ISSET(conn, WT_CONN_OPTRACK)) {
+		WT_ERR(__wt_malloc(
+		    session, WT_OPTRACK_BUFSIZE, &session_ret->optrack_buf));
+		session_ret->optrackbuf_ptr = 0;
+	}
 	/*
 	 * Configuration: currently, the configuration for open_session is the
 	 * same as session.reconfigure, so use that function.

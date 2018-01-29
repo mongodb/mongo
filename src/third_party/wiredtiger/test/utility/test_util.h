@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -48,6 +48,7 @@
 /* Generic option parsing structure shared by all test cases. */
 typedef struct {
 	char  *home;
+	char  *progress_file_name;
 	const char  *progname;
 	enum {	TABLE_COL=1,	/* Fixed-length column store */
 		TABLE_FIX=2,	/* Variable-length column store */
@@ -240,6 +241,7 @@ void testutil_cleanup(TEST_OPTS *);
 bool testutil_is_flag_set(const char *);
 void testutil_make_work_dir(const char *);
 int  testutil_parse_opts(int, char * const *, TEST_OPTS *);
+void testutil_progress(TEST_OPTS *, const char *);
 void testutil_work_dir_from_path(char *, size_t, const char *);
 WT_THREAD_RET thread_append(void *);
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -41,7 +41,7 @@ usage(void)
 	    "\t" "compact\t  compact an object\n"
 	    "\t" "copyright copyright information\n"
 	    "\t" "create\t  create an object\n"
-	    "\t" "downgrade\t  downgrade an database\n"
+	    "\t" "downgrade downgrade a database\n"
 	    "\t" "drop\t  drop an object\n"
 	    "\t" "dump\t  dump an object\n"
 	    "\t" "list\t  list database objects\n"

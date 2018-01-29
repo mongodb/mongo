@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -49,7 +49,7 @@ __key_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 			 * itself because our caller might do another search in
 			 * this table using the key we return, and we'd corrupt
 			 * the search key during any subsequent search that used
-			 * the temporary buffer.
+			 * the temporary buffer).
 			 */
 			tmp = cbt->row_key;
 			cbt->row_key = cbt->tmp;
@@ -150,6 +150,7 @@ __wt_value_return_upd(WT_SESSION_IMPL *session,
 	WT_UPDATE **listp, *list[WT_MODIFY_ARRAY_SIZE];
 	size_t allocated_bytes;
 	u_int i;
+	bool skipped_birthmark;
 
 	cursor = &cbt->iface;
 	allocated_bytes = 0;
@@ -166,21 +167,33 @@ __wt_value_return_upd(WT_SESSION_IMPL *session,
 		cursor->value.size = upd->size;
 		return (0);
 	}
-	WT_ASSERT(session, upd->type == WT_UPDATE_MODIFIED);
+	WT_ASSERT(session, upd->type == WT_UPDATE_MODIFY);
 
 	/*
 	 * Find a complete update that's visible to us, tracking modifications
 	 * that are visible to us.
 	 */
-	for (i = 0, listp = list; upd != NULL; upd = upd->next) {
-		if (upd->txnid == WT_TXN_ABORTED ||
-		    (!ignore_visibility && !__wt_txn_upd_visible(session, upd)))
+	for (i = 0, listp = list, skipped_birthmark = false;
+	    upd != NULL;
+	    upd = upd->next) {
+		if (upd->txnid == WT_TXN_ABORTED)
 			continue;
+
+		if (!ignore_visibility && !__wt_txn_upd_visible(session, upd)) {
+			if (upd->type == WT_UPDATE_BIRTHMARK)
+				skipped_birthmark = true;
+			continue;
+		}
+
+		if (upd->type == WT_UPDATE_BIRTHMARK) {
+			upd = NULL;
+			break;
+		}
 
 		if (WT_UPDATE_DATA_VALUE(upd))
 			break;
 
-		if (upd->type == WT_UPDATE_MODIFIED) {
+		if (upd->type == WT_UPDATE_MODIFY) {
 			/*
 			 * Update lists are expected to be short, but it's not
 			 * guaranteed. There's sufficient room on the stack to
@@ -200,30 +213,45 @@ __wt_value_return_upd(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * If we hit the end of the chain, roll forward from the update item we
-	 * found, otherwise, from the original page's value.
+	 * If there's no visible update and we skipped a birthmark, the base
+	 * item is an empty item (in other words, birthmarks we can't read act
+	 * as tombstones).
+	 * If there's no visible update and we didn't skip a birthmark, the base
+	 * item is the on-page item, which must be globally visible.
+	 * If there's a visible update and it's a tombstone, the base item is an
+	 * empty item.
+	 * If there's a visible update and it's not a tombstone, the base item
+	 * is the on-page item.
 	 */
 	if (upd == NULL) {
-		/*
-		 * Callers of this function set the cursor slot to an impossible
-		 * value to check we're not trying to return on-page values when
-		 * the update list should have been sufficient (which happens,
-		 * for example, if an update list was truncated, deleting some
-		 * standard update required by a previous modify update). Assert
-		 * the case.
-		 */
-		WT_ASSERT(session, cbt->slot != UINT32_MAX);
+		if (skipped_birthmark)
+			WT_ERR(__wt_buf_set(session, &cursor->value, "", 0));
+		else {
+			/*
+			 * Callers of this function set the cursor slot to an
+			 * impossible value to check we don't try and return
+			 * on-page values when the update list should have been
+			 * sufficient (which happens, for example, if an update
+			 * list was truncated, deleting some standard update
+			 * required by a previous modify update). Assert the
+			 * case.
+			 */
+			WT_ASSERT(session, cbt->slot != UINT32_MAX);
 
-		WT_ERR(__value_return(session, cbt));
-	} else if (upd->type == WT_UPDATE_DELETED)
+			WT_ERR(__value_return(session, cbt));
+		}
+	} else if (upd->type == WT_UPDATE_TOMBSTONE)
 		WT_ERR(__wt_buf_set(session, &cursor->value, "", 0));
 	else
 		WT_ERR(__wt_buf_set(session,
 		    &cursor->value, upd->data, upd->size));
 
+	/*
+	 * Once we have a base item, roll forward through any visible modify
+	 * updates.
+	 */
 	while (i > 0)
-		WT_ERR(__wt_modify_apply(
-		    session, &cursor->value, listp[--i]->data));
+		WT_ERR(__wt_modify_apply(session, cursor, listp[--i]->data));
 
 err:	if (allocated_bytes != 0)
 		__wt_free(session, listp);

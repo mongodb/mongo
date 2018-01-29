@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -292,9 +292,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	const char **cfg, *enc_cfg[] = { NULL, NULL };
 	bool fixed;
 
-	WT_UNUSED(maj_version);				/* !HAVE_VERBOSE */
-	WT_UNUSED(min_version);				/* !HAVE_VERBOSE */
-
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
 	conn = S2C(session);
@@ -403,13 +400,20 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	    cfg, "assert.commit_timestamp", &cval));
 	if (WT_STRING_MATCH("always", cval.str, cval.len)) {
 		FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_ALWAYS);
-		FLD_CLR(btree->assert_flags, WT_ASSERT_COMMIT_TS_NEVER);
-	} else if (WT_STRING_MATCH("never", cval.str, cval.len)) {
-		FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_NEVER);
-		FLD_CLR(btree->assert_flags, WT_ASSERT_COMMIT_TS_ALWAYS);
-	} else
+		FLD_CLR(btree->assert_flags,
+		    WT_ASSERT_COMMIT_TS_KEYS | WT_ASSERT_COMMIT_TS_NEVER);
+	} else if (WT_STRING_MATCH("key_consistent", cval.str, cval.len)) {
+		FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_KEYS);
 		FLD_CLR(btree->assert_flags,
 		    WT_ASSERT_COMMIT_TS_ALWAYS | WT_ASSERT_COMMIT_TS_NEVER);
+	} else if (WT_STRING_MATCH("never", cval.str, cval.len)) {
+		FLD_SET(btree->assert_flags, WT_ASSERT_COMMIT_TS_NEVER);
+		FLD_CLR(btree->assert_flags,
+		    WT_ASSERT_COMMIT_TS_ALWAYS | WT_ASSERT_COMMIT_TS_KEYS);
+	} else
+		FLD_CLR(btree->assert_flags,
+		    WT_ASSERT_COMMIT_TS_ALWAYS |
+		    WT_ASSERT_COMMIT_TS_KEYS | WT_ASSERT_COMMIT_TS_NEVER);
 	WT_RET(__wt_config_gets(session, cfg, "assert.read_timestamp", &cval));
 	if (WT_STRING_MATCH("always", cval.str, cval.len)) {
 		FLD_SET(btree->assert_flags, WT_ASSERT_READ_TS_ALWAYS);
@@ -810,7 +814,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	btree->maxmempage = (uint64_t)cval.val;
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL) &&
 	    (cache_size = conn->cache_size) > 0)
-		btree->maxmempage = WT_MIN(btree->maxmempage,
+		btree->maxmempage = (uint64_t)WT_MIN(btree->maxmempage,
 		    (conn->cache->eviction_dirty_trigger * cache_size) / 1000);
 
 	/* Enforce a lower bound of a single disk leaf page */

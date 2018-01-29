@@ -95,6 +95,10 @@ test_wt3363_checkpoint_op_races_SOURCES = wt3363_checkpoint_op_races/main.c
 noinst_PROGRAMS += test_wt3363_checkpoint_op_races
 all_TESTS += test_wt3363_checkpoint_op_races
 
+test_wt3874_pad_byte_collator_SOURCES = wt3874_pad_byte_collator/main.c
+noinst_PROGRAMS += test_wt3874_pad_byte_collator
+all_TESTS += test_wt3874_pad_byte_collator
+
 test_rwlock_SOURCES = rwlock/main.c
 noinst_PROGRAMS += test_rwlock
 all_TESTS += test_rwlock

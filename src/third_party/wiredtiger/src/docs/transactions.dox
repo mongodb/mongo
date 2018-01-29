@@ -201,8 +201,7 @@ been used.  This is enforced by assertions in diagnostic builds, if
 applications violate this rule, data consistency can be violated.
 
 The commits to a particular data item must be performed in timestamp order.
-Again, this is only checked in diagnostic builds and if applications violate
-this rule, data consistency can be violated.
+If applications violate this rule, data consistency can be violated.
 
 @subsection Timestamp support in the extension API
 

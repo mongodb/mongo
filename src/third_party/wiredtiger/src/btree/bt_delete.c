@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -158,6 +158,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 	for (sleep_count = yield_count = 0;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
+		case WT_REF_LIMBO:
 		case WT_REF_LOOKASIDE:
 		case WT_REF_READING:
 			WT_ASSERT(session, 0);		/* Impossible, assert */
@@ -341,7 +342,7 @@ __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
 	 */
 	for (i = 0, size = 0; i < page->entries; ++i) {
 		WT_ERR(__wt_calloc_one(session, &upd));
-		upd->type = WT_UPDATE_DELETED;
+		upd->type = WT_UPDATE_TOMBSTONE;
 
 		if (page_del == NULL)
 			upd->txnid = WT_TXN_NONE;	/* Globally visible */

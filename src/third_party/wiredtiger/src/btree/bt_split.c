@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -720,6 +720,7 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 
 	/* Start making real changes to the tree, errors are fatal. */
 	complete = WT_ERR_PANIC;
+	WT_NOT_READ(complete);
 
 	/* Encourage a race */
 	__page_split_timing_stress(session,
@@ -756,16 +757,6 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 	 * on the just-updated parent page's index.
 	 */
 	if (discard) {
-		/*
-		 * Page-delete information is only read when the WT_REF state is
-		 * WT_REF_DELETED.  The page-delete memory wasn't added to the
-		 * parent's footprint, ignore it here.
-		 */
-		if (ref->page_del != NULL) {
-			__wt_free(session, ref->page_del->update_list);
-			__wt_free(session, ref->page_del);
-		}
-
 		/*
 		 * Set the discarded WT_REF state to split, ensuring we don't
 		 * race with any discard of the WT_REF deleted fields.
@@ -842,12 +833,18 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new,
 		}
 
 		/*
-		 * If this page was fast-truncated, any attached structure
-		 * should have been freed before now.
+		 * The page-delete and lookaside memory weren't added to the
+		 * parent's footprint, ignore it here.
 		 */
-		WT_ASSERT(session, next_ref->page_del == NULL);
+		if (next_ref->page_del != NULL) {
+			__wt_free(session, next_ref->page_del->update_list);
+			__wt_free(session, next_ref->page_del);
+		}
+		__wt_free(session, next_ref->page_las);
 
+		/* Free the backing block and address. */
 		WT_TRET(__wt_ref_block_free(session, next_ref));
+
 		WT_TRET(__split_safe_free(
 		    session, split_gen, exclusive, next_ref, sizeof(WT_REF)));
 		parent_decr += sizeof(WT_REF);
@@ -1476,6 +1473,12 @@ __split_multi_inmem(
 			WT_ERR(__wt_row_search(
 			    session, key, ref, &cbt, true, true));
 
+			/*
+			 * Birthmarks should only be applied to on-page values.
+			 */
+			WT_ASSERT(session, cbt.compare == 0 ||
+			    upd->type != WT_UPDATE_BIRTHMARK);
+
 			/* Apply the modification. */
 			WT_ERR(__wt_row_modify(session,
 			    &cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
@@ -1567,7 +1570,7 @@ __split_multi_inmem_fail(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_REF *ref)
 
 /*
  * __wt_multi_to_ref --
- *	Move a multi-block list into an array of WT_REF structures.
+ *	Move a multi-block entry into a WT_REF structure.
  */
 int
 __wt_multi_to_ref(WT_SESSION_IMPL *session,
@@ -2254,12 +2257,17 @@ __wt_split_rewrite(WT_SESSION_IMPL *session, WT_REF *ref, WT_MULTI *multi)
 	 *
 	 * Pages with unresolved changes are not marked clean during
 	 * reconciliation, do it now.
+	 *
+	 * Don't count this as eviction making progress, we did a one-for-one
+	 * rewrite of a page in memory, typical in the case of cache pressure.
 	 */
 	__wt_page_modify_clear(session, page);
-	__wt_ref_out_int(session, ref, true);
+	F_SET_ATOMIC(page, WT_PAGE_EVICT_NO_PROGRESS);
+	__wt_ref_out(session, ref);
 
 	/* Swap the new page into place. */
 	ref->page = new->page;
+
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 
 	__wt_free(session, new);

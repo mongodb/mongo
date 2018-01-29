@@ -1,5 +1,5 @@
 /*-
- * Public Domain 2014-2017 MongoDB, Inc.
+ * Public Domain 2014-2018 MongoDB, Inc.
  * Public Domain 2008-2014 WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
@@ -58,6 +58,12 @@ check(const char *fmt, ...)
 int
 main(void)
 {
+	/*
+	 * Required on some systems to pull in parts of the library
+	 * for which we have data references.
+	 */
+	testutil_check(__wt_library_init());
+
 	check("iii", 0, 101, -99);
 	check("3i", 0, 101, -99);
 	check("iS", 42, "forty two");

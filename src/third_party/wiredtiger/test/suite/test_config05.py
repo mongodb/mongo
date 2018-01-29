@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Public Domain 2014-2017 MongoDB, Inc.
+# Public Domain 2014-2018 MongoDB, Inc.
 # Public Domain 2008-2014 WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
@@ -90,7 +90,7 @@ class test_config05(wttest.WiredTigerTestCase):
         self.conn = self.wiredtiger_open('.', 'create,session_max=1')
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: [self.conn.open_session(None) for i in range(100)],
-            '/configured to support/')
+            '/out of sessions/')
 
     def test_exclusive_create(self):
         self.conn = self.wiredtiger_open('.', 'create,exclusive')

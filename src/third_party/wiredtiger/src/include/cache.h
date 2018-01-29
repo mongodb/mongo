@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -89,9 +89,7 @@ struct __wt_cache {
 	uint64_t worker_evicts;		/* Pages evicted by worker threads */
 
 	uint64_t evict_max_page_size;	/* Largest page seen at eviction */
-#if defined(HAVE_DIAGNOSTIC) || defined(HAVE_VERBOSE)
 	struct timespec stuck_time;	/* Stuck time */
-#endif
 
 	/*
 	 * Read information.
@@ -107,12 +105,16 @@ struct __wt_cache {
 	WT_CONDVAR *evict_cond;		/* Eviction server condition */
 	WT_SPINLOCK evict_walk_lock;	/* Eviction walk location */
 
-	u_int eviction_dirty_target;    /* Percent to allow dirty */
-	u_int eviction_dirty_trigger;	/* Percent to trigger dirty eviction */
-	u_int eviction_trigger;		/* Percent to trigger eviction */
-	u_int eviction_target;		/* Percent to end eviction */
+	/*
+	 * Eviction threshold percentages use double type to allow for
+	 * specifying percentages less than one.
+	 */
+	double eviction_dirty_target;	/* Percent to allow dirty */
+	double eviction_dirty_trigger;	/* Percent to trigger dirty eviction */
+	double eviction_trigger;	/* Percent to trigger eviction */
+	double eviction_target;		/* Percent to end eviction */
 
-	u_int eviction_checkpoint_target;/* Percent to reduce dirty
+	double eviction_checkpoint_target;/* Percent to reduce dirty
 					   to during checkpoint scrubs */
 	double eviction_scrub_limit;	/* Percent of cache to trigger
 					   dirty eviction during checkpoint
@@ -233,17 +235,21 @@ struct __wt_cache {
 	/*
 	 * Flags.
 	 */
-#define	WT_CACHE_POOL_MANAGER	  0x001 /* The active cache pool manager */
-#define	WT_CACHE_POOL_RUN	  0x002 /* Cache pool thread running */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CACHE_POOL_MANAGER	  0x1u	/* The active cache pool manager */
+#define	WT_CACHE_POOL_RUN	  0x2u	/* Cache pool thread running */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t pool_flags;		/* Cache pool flags */
 
-#define	WT_CACHE_EVICT_CLEAN	  0x001 /* Evict clean pages */
-#define	WT_CACHE_EVICT_CLEAN_HARD 0x002 /* Clean % blocking app threads */
-#define	WT_CACHE_EVICT_DIRTY	  0x004 /* Evict dirty pages */
-#define	WT_CACHE_EVICT_DIRTY_HARD 0x008 /* Dirty % blocking app threads */
-#define	WT_CACHE_EVICT_LOOKASIDE  0x010 /* Try lookaside eviction */
-#define	WT_CACHE_EVICT_SCRUB	  0x020 /* Scrub dirty pages */
-#define	WT_CACHE_EVICT_URGENT	  0x040 /* Pages are in the urgent queue */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CACHE_EVICT_CLEAN	  0x01u	/* Evict clean pages */
+#define	WT_CACHE_EVICT_CLEAN_HARD 0x02u	/* Clean % blocking app threads */
+#define	WT_CACHE_EVICT_DIRTY	  0x04u	/* Evict dirty pages */
+#define	WT_CACHE_EVICT_DIRTY_HARD 0x08u	/* Dirty % blocking app threads */
+#define	WT_CACHE_EVICT_LOOKASIDE  0x10u	/* Try lookaside eviction */
+#define	WT_CACHE_EVICT_SCRUB	  0x20u	/* Scrub dirty pages */
+#define	WT_CACHE_EVICT_URGENT	  0x40u	/* Pages are in the urgent queue */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 #define	WT_CACHE_EVICT_ALL	(WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY)
 	uint32_t flags;
 };
@@ -272,6 +278,8 @@ struct __wt_cache_pool {
 
 	uint8_t pool_managed;		/* Cache pool has a manager thread */
 
-#define	WT_CACHE_POOL_ACTIVE	0x01	/* Cache pool is active */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_CACHE_POOL_ACTIVE	0x1u	/* Cache pool is active */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint8_t flags;
 };

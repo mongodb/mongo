@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -97,7 +97,7 @@ wiredtiger_config_parser_open(WT_SESSION *wt_session,
  */
 int
 wiredtiger_config_validate(WT_SESSION *wt_session,
-    WT_EVENT_HANDLER *handler, const char *name, const char *config)
+    WT_EVENT_HANDLER *event_handler, const char *name, const char *config)
 {
 	const WT_CONFIG_ENTRY *ep, **epp;
 	WT_CONNECTION_IMPL *conn, dummy_conn;
@@ -108,9 +108,9 @@ wiredtiger_config_validate(WT_SESSION *wt_session,
 	/*
 	 * It's a logic error to specify both a session and an event handler.
 	 */
-	if (session != NULL && handler != NULL)
+	if (session != NULL && event_handler != NULL)
 		WT_RET_MSG(session, EINVAL,
-		    "wiredtiger_config_validate error handler ignored when "
+		    "wiredtiger_config_validate event handler ignored when "
 		    "a session also specified");
 
 	/*
@@ -118,13 +118,13 @@ wiredtiger_config_validate(WT_SESSION *wt_session,
 	 * a fake session/connection pair and configure the event handler.
 	 */
 	conn = NULL;
-	if (session == NULL && handler != NULL) {
+	if (session == NULL && event_handler != NULL) {
 		WT_CLEAR(dummy_conn);
 		conn = &dummy_conn;
 		session = conn->default_session = &conn->dummy_session;
 		session->iface.connection = &conn->iface;
 		session->name = "wiredtiger_config_validate";
-		__wt_event_handler_set(session, handler);
+		__wt_event_handler_set(session, event_handler);
 	}
 	if (session != NULL)
 		conn = S2C(session);

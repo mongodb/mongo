@@ -1,0 +1,85 @@
+#! /bin/sh
+
+t=__wt.$$
+trap 'rm -rf $t' 0 1 2 3 13 15
+
+# Installation of the clang development package isn't standard, list a
+# couple of the places we're using.
+export PATH=$PATH:/usr/local/clang50/bin:/usr/local/llvm-devel/bin
+
+# Remove old reports.
+rm -rf /tmp/scan-build-*
+
+# Find the top-level WiredTiger directory and move to there.
+p="$PWD"
+while test "$p" != "/" ; do
+	if test -d "$p/build_posix"; then
+		break;
+	fi
+	p=`dirname $p`
+done
+test "$p" != "/" || {
+	echo "$0: cannot find the WiredTiger top-level directory"
+	exit 1
+}
+
+cd $p || exit 1
+echo "$0: running clang-tidy in $p..."
+
+sh autogen.sh > /dev/null || exit 1
+
+./configure --enable-diagnostic --enable-strict > /dev/null
+
+# We need a custom wiredtiger_config.h, clang-tidy doesn't know where to
+# find the x86intrin.h include file.
+cp wiredtiger_config.h $t
+sed '/HAVE_X86INTRIN_H/d' < $t > wiredtiger_config.h
+
+# We need a custom verify_build.h, clang-tidy doesn't like the magic.
+f=src/include/verify_build.h
+rm -f $f.save
+cp $f $f.save
+echo '#define WT_STATIC_ASSERT(a)' > $f
+
+def="-D_GNU_SOURCE"
+inc="-I. -Isrc/include"
+
+args="-checks=*"
+args="$args,-android-cloexec-fopen"
+args="$args,-clang-analyzer-core.NullDereference"
+args="$args,-clang-analyzer-optin.performance.Padding"
+args="$args,-google-readability-braces-around-statements"
+args="$args,-hicpp-braces-around-statements"
+args="$args,-hicpp-no-assembler"
+args="$args,-hicpp-signed-bitwise"
+args="$args,-llvm-header-guard"
+args="$args,-llvm-include-order"
+args="$args,-readability-braces-around-statements"
+args="$args,-readability-inconsistent-declaration-parameter-name"
+args="$args,-readability-named-parameter"
+args="$args,-readability-non-const-parameter"
+
+# clang-tidy gets unhappy if we toss the whole tree at it, so run
+# through a file at a time.
+# Only specify -header once.
+(
+clang-tidy src/btree/bt_compact.c \
+    "-header-filter=.*" "$args" -- $def $inc 2>&1
+for i in src/[a-np-z]*/*.c src/os_posix/*.c; do
+	clang-tidy $i "$args" -- $def $inc 2>&1
+done
+) > $t
+
+echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+echo 'clang-tidy output'
+echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+sed -e '/ warnings generated/d' \
+    -e '/Suppressed.*warnings/d' \
+    -e '/Use -header-filter/d' < $t
+
+# Restore verify_build.h.
+f=src/include/verify_build.h
+rm -f $f
+mv $f.save $f
+
+exit 0

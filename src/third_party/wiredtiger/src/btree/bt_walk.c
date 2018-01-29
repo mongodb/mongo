@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -293,7 +293,7 @@ __tree_walk_internal(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_PAGE_INDEX *pindex;
 	WT_REF *couple, *couple_orig, *ref;
-	uint32_t slot;
+	uint32_t current_state, slot;
 	bool empty_internal, initial_descent, prev, skip;
 
 	btree = S2BT(session);
@@ -460,7 +460,8 @@ restart:	/*
 			 * If we see any child states other than deleted, the
 			 * page isn't empty.
 			 */
-			if (ref->state != WT_REF_DELETED &&
+			current_state = ref->state;
+			if (current_state != WT_REF_DELETED &&
 			    !LF_ISSET(WT_READ_TRUNCATE))
 				empty_internal = false;
 
@@ -470,11 +471,12 @@ restart:	/*
 				 * fast-path some common cases.
 				 */
 				if (LF_ISSET(WT_READ_NO_WAIT) &&
-				    ref->state != WT_REF_MEM)
+				    current_state != WT_REF_MEM &&
+				    current_state != WT_REF_LIMBO)
 					break;
 
 				/* Skip lookaside pages if not requested. */
-				if (ref->state == WT_REF_LOOKASIDE &&
+				if (current_state == WT_REF_LOOKASIDE &&
 				    !LF_ISSET(WT_READ_LOOKASIDE))
 					break;
 			} else if (LF_ISSET(WT_READ_TRUNCATE)) {
@@ -482,7 +484,7 @@ restart:	/*
 				 * Avoid pulling a deleted page back in to try
 				 * to delete it again.
 				 */
-				if (ref->state == WT_REF_DELETED &&
+				if (current_state == WT_REF_DELETED &&
 				    __wt_delete_page_skip(session, ref, false))
 					break;
 				/*
@@ -502,7 +504,7 @@ restart:	/*
 				/*
 				 * Try to skip deleted pages visible to us.
 				 */
-				if (ref->state == WT_REF_DELETED &&
+				if (current_state == WT_REF_DELETED &&
 				    __wt_delete_page_skip(session, ref, false))
 					break;
 			}
@@ -516,6 +518,7 @@ restart:	/*
 			 */
 			if (ret == WT_NOTFOUND) {
 				ret = 0;
+				WT_NOT_READ(ret);
 				break;
 			}
 
@@ -662,8 +665,8 @@ __wt_tree_walk_count(WT_SESSION_IMPL *session,
 int
 __wt_tree_walk_custom_skip(
     WT_SESSION_IMPL *session, WT_REF **refp,
-   int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool *),
-   void *func_cookie, uint32_t flags)
+    int (*skip_func)(WT_SESSION_IMPL *, WT_REF *, void *, bool *),
+    void *func_cookie, uint32_t flags)
 {
 	return (__tree_walk_internal(
 	    session, refp, NULL, skip_func, func_cookie, flags));

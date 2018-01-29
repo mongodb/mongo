@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -48,11 +48,11 @@
 	if ((dhandle) == NULL)						\
 		(dhandle) = TAILQ_FIRST(head);				\
 	else {								\
-		    WT_DHANDLE_RELEASE(dhandle);			\
-		    (dhandle) = TAILQ_NEXT(dhandle, field);		\
+		WT_DHANDLE_RELEASE(dhandle);				\
+		(dhandle) = TAILQ_NEXT(dhandle, field);			\
 	}								\
 	if ((dhandle) != NULL)						\
-		    WT_DHANDLE_ACQUIRE(dhandle);			\
+		WT_DHANDLE_ACQUIRE(dhandle);				\
 } while (0)
 
 /*
@@ -103,12 +103,14 @@ struct __wt_data_handle {
 	WT_DSRC_STATS *stat_array;
 
 	/* Flags values over 0xff are reserved for WT_BTREE_* */
-#define	WT_DHANDLE_DEAD		        0x01	/* Dead, awaiting discard */
-#define	WT_DHANDLE_DISCARD	        0x02	/* Close on release */
-#define	WT_DHANDLE_DISCARD_KILL		0x04	/* Mark dead on release */
-#define	WT_DHANDLE_EXCLUSIVE	        0x08	/* Exclusive access */
-#define	WT_DHANDLE_IS_METADATA		0x10	/* Metadata handle */
-#define	WT_DHANDLE_LOCK_ONLY	        0x20	/* Handle only used as a lock */
-#define	WT_DHANDLE_OPEN		        0x40	/* Handle is open */
+/* AUTOMATIC FLAG VALUE GENERATION START */
+#define	WT_DHANDLE_DEAD		        0x01u	/* Dead, awaiting discard */
+#define	WT_DHANDLE_DISCARD	        0x02u	/* Close on release */
+#define	WT_DHANDLE_DISCARD_KILL		0x04u	/* Mark dead on release */
+#define	WT_DHANDLE_EXCLUSIVE	        0x08u	/* Exclusive access */
+#define	WT_DHANDLE_IS_METADATA		0x10u	/* Metadata handle */
+#define	WT_DHANDLE_LOCK_ONLY	        0x20u	/* Handle only used as a lock */
+#define	WT_DHANDLE_OPEN		        0x40u	/* Handle is open */
+/* AUTOMATIC FLAG VALUE GENERATION STOP */
 	uint32_t flags;
 };

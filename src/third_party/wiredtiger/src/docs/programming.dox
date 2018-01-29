@@ -44,6 +44,7 @@ each of which is ordered by one or more columns.
 - @subpage in_memory
 - @subpage cursor_join
 - @subpage cursor_log
+- @subpage operation_tracking
 - @ref transaction_named_snapshots
 - @subpage rebalance
 - @subpage shared_cache

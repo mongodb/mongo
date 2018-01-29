@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -52,15 +52,15 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 int
 __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	struct timespec start, stop;
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_PAGE *page;
+	uint64_t time_start, time_stop;
 	bool locked, too_big;
 
 	btree = S2BT(session);
 	page = ref->page;
-	__wt_epoch(session, &start);
+	time_start = __wt_clock(session);
 
 	/*
 	 * Take some care with order of operations: if we release the hazard
@@ -83,12 +83,12 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * we have one of two pairs of stats to increment.
 	 */
 	ret = __wt_evict(session, ref, false);
-	__wt_epoch(session, &stop);
+	time_stop = __wt_clock(session);
 	if (ret == 0) {
 		if (too_big) {
 			WT_STAT_CONN_INCR(session, cache_eviction_force);
 			WT_STAT_CONN_INCRV(session, cache_eviction_force_time,
-			    WT_TIMEDIFF_US(stop, start));
+			    WT_CLOCKDIFF_US(time_stop, time_start));
 		} else {
 			/*
 			 * If the page isn't too big, we are evicting it because
@@ -98,12 +98,12 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref)
 			WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
 			WT_STAT_CONN_INCRV(session,
 			    cache_eviction_force_delete_time,
-			    WT_TIMEDIFF_US(stop, start));
+			    WT_CLOCKDIFF_US(time_stop, time_start));
 		}
 	} else {
 		WT_STAT_CONN_INCR(session, cache_eviction_force_fail);
 		WT_STAT_CONN_INCRV(session, cache_eviction_force_fail_time,
-		    WT_TIMEDIFF_US(stop, start));
+		    WT_CLOCKDIFF_US(time_stop, time_start));
 	}
 
 	(void)__wt_atomic_subv32(&btree->evict_busy, 1);
@@ -268,9 +268,16 @@ __evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	 * Discard the page and update the reference structure; if the page has
 	 * an address, it's a disk page; if it has no address, it's a deleted
 	 * page re-instantiated (for example, by searching) and never written.
+	 *
+	 * If evicting a WT_REF_LIMBO reference, we get to here and transition
+	 * back to WT_REF_LOOKASIDE.
 	 */
 	__wt_ref_out(session, ref);
-	if (ref->addr == NULL) {
+	if (!closing && ref->page_las != NULL &&
+	    ref->page_las->eviction_to_lookaside) {
+		ref->page_las->eviction_to_lookaside = false;
+		WT_PUBLISH(ref->state, WT_REF_LOOKASIDE);
+	} else if (ref->addr == NULL) {
 		WT_WITH_PAGE_INDEX(session,
 		    ret = __evict_delete_ref(session, ref, closing));
 		WT_RET_BUSY_OK(ret);
@@ -299,16 +306,14 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 	switch (mod->rec_result) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 		/*
-		 * Update the parent to reference a deleted page.  The fact that
-		 * reconciliation left the page "empty" means there's no older
-		 * transaction in the system that might need to see an earlier
-		 * version of the page.  For that reason, we clear the address
-		 * of the page, if we're forced to "read" into that namespace,
-		 * we'll instantiate a new page instead of trying to read from
-		 * the backing store.
+		 * Update the parent to reference a deleted page. Reconciliation
+		 * left the page "empty", so there's no older transaction in the
+		 * system that might need to see an earlier version of the page.
+		 * There's no backing address, if we're forced to "read" into
+		 * that namespace, we instantiate a new page instead of trying
+		 * to read from the backing store.
 		 */
 		__wt_ref_out(session, ref);
-		ref->addr = NULL;
 		WT_WITH_PAGE_INDEX(session,
 		    ret = __evict_delete_ref(session, ref, closing));
 		WT_RET_BUSY_OK(ret);
@@ -347,9 +352,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
-		if (mod->mod_replace.addr == NULL)
-			ref->addr = NULL;
-		else {
+		if (mod->mod_replace.addr != NULL) {
 			WT_RET(__wt_calloc_one(session, &addr));
 			*addr = mod->mod_replace;
 			mod->mod_replace.addr = NULL;
@@ -361,6 +364,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, bool closing)
 		 * Eviction wants to keep this page if we have a disk image,
 		 * re-instantiate the page in memory, else discard the page.
 		 */
+		__wt_free(session, ref->page_las);
 		if (mod->mod_disk_image == NULL) {
 			if (mod->mod_page_las.las_pageid != 0) {
 				WT_RET(

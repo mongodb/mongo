@@ -25,6 +25,10 @@ cat << UNUSED_STAT_FIELDS
 lock_checkpoint_count
 lock_checkpoint_wait_application
 lock_checkpoint_wait_internal
+lock_commit_timestamp_read_count
+lock_commit_timestamp_wait_application
+lock_commit_timestamp_wait_internal
+lock_commit_timestamp_write_count
 lock_dhandle_read_count
 lock_dhandle_wait_application
 lock_dhandle_wait_internal
@@ -32,6 +36,10 @@ lock_dhandle_write_count
 lock_metadata_count
 lock_metadata_wait_application
 lock_metadata_wait_internal
+lock_read_timestamp_read_count
+lock_read_timestamp_wait_application
+lock_read_timestamp_wait_internal
+lock_read_timestamp_write_count
 lock_schema_count
 lock_schema_wait_application
 lock_schema_wait_internal
@@ -39,6 +47,10 @@ lock_table_read_count
 lock_table_wait_application
 lock_table_wait_internal
 lock_table_write_count
+lock_txn_global_read_count
+lock_txn_global_wait_application
+lock_txn_global_wait_internal
+lock_txn_global_write_count
 UNUSED_STAT_FIELDS
 
 echo "$search"

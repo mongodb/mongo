@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014-2017 MongoDB, Inc.
+ * Copyright (c) 2014-2018 MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
  *
@@ -36,10 +36,16 @@
 
 /* Standard entry points to the API: declares/initializes local variables. */
 #define	API_SESSION_INIT(s, h, n, dh)					\
+	WT_TRACK_OP_DECL;						\
 	WT_DATA_HANDLE *__olddh = (s)->dhandle;				\
 	const char *__oldname = (s)->name;				\
 	(s)->dhandle = (dh);						\
 	(s)->name = (s)->lastop = #h "." #n;				\
+	/*								\
+	 * No code before this line, otherwise error handling  won't be	\
+	 * correct.							\
+	 */								\
+	WT_TRACK_OP_INIT(s);						\
 	WT_SINGLE_THREAD_CHECK_START(s);				\
 	WT_ERR(WT_SESSION_CHECK_PANIC(s));				\
 	__wt_verbose((s), WT_VERB_API, "%s", "CALL: " #h ":" #n)
@@ -57,38 +63,51 @@
 
 #define	API_END(s, ret)							\
 	if ((s) != NULL) {						\
-		WT_SINGLE_THREAD_CHECK_STOP(s);			\
-		(s)->dhandle = __olddh;					\
-		(s)->name = __oldname;					\
+		WT_TRACK_OP_END(s);					\
+		WT_SINGLE_THREAD_CHECK_STOP(s);				\
 		if (F_ISSET(&(s)->txn, WT_TXN_RUNNING) &&		\
 		    (ret) != 0 &&					\
 		    (ret) != WT_NOTFOUND &&				\
 		    (ret) != WT_DUPLICATE_KEY)				\
 			F_SET(&(s)->txn, WT_TXN_ERROR);			\
+		/*							\
+		 * No code after this line, otherwise error handling	\
+		 * won't be correct.					\
+		 */							\
+		(s)->dhandle = __olddh;					\
+		(s)->name = __oldname;					\
 	}								\
 } while (0)
 
 /* An API call wrapped in a transaction if necessary. */
 #define	TXN_API_CALL(s, h, n, bt, config, cfg) do {			\
-	bool __autotxn = false;						\
+	bool __autotxn = false, __update = false;			\
 	API_CALL(s, h, n, bt, config, cfg);				\
 	__wt_txn_timestamp_flags(s);					\
 	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
-		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT)
+		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT);			\
+	__update = !F_ISSET(&(s)->txn, WT_TXN_UPDATE);			\
+	if (__update)							\
+		F_SET(&(s)->txn, WT_TXN_UPDATE);			\
 
 /* An API call wrapped in a transaction if necessary. */
 #define	TXN_API_CALL_NOCONF(s, h, n, dh) do {				\
-	bool __autotxn = false;						\
+	bool __autotxn = false, __update = false;			\
 	API_CALL_NOCONF(s, h, n, dh);					\
 	__wt_txn_timestamp_flags(s);					\
 	__autotxn = !F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT | WT_TXN_RUNNING);\
 	if (__autotxn)							\
-		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT)
+		F_SET(&(s)->txn, WT_TXN_AUTOCOMMIT);			\
+	__update = !F_ISSET(&(s)->txn, WT_TXN_UPDATE);			\
+	if (__update)							\
+		F_SET(&(s)->txn, WT_TXN_UPDATE);			\
 
 /* End a transactional API call, optional retry on deadlock. */
 #define	TXN_API_END_RETRY(s, ret, retry)				\
 	API_END(s, ret);						\
+	if (__update)							\
+		F_CLR(&(s)->txn, WT_TXN_UPDATE);			\
 	if (__autotxn) {						\
 		if (F_ISSET(&(s)->txn, WT_TXN_AUTOCOMMIT))		\
 			F_CLR(&(s)->txn, WT_TXN_AUTOCOMMIT);		\

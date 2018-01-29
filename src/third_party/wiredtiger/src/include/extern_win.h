@@ -1,6 +1,7 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
 extern int __wt_win_directory_list(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *directory, const char *prefix, char ***dirlistp, uint32_t *countp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_win_directory_list_single(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const char *directory, const char *prefix, char ***dirlistp, uint32_t *countp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_win_directory_list_free(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, char **dirlist, uint32_t count) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, bool fail, void *sym_ret) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -27,6 +28,7 @@ extern int __wt_thread_create(WT_SESSION_IMPL *session, wt_thread_t *tidret, WT_
 extern int __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_thread_id(uintmax_t *id);
 extern int __wt_thread_str(char *buf, size_t buflen) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern uintmax_t __wt_process_id(void);
 extern void __wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp);
 extern int __wt_to_utf16_string( WT_SESSION_IMPL *session, const char*utf8, WT_ITEM **outbuf) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_to_utf8_string( WT_SESSION_IMPL *session, const wchar_t*wide, WT_ITEM **outbuf) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
