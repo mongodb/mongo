@@ -40,7 +40,7 @@
 
     assert.eq(1, configDB.chunks.find({"ns": "test.update"}).itcount());
 
-    for (var x = 0; x < 1100; x++) {
+    for (var x = 0; x < 2100; x++) {
         assert.writeOK(testDB.runCommand({
             update: 'update',
             updates: [{q: {x: x}, u: {x: x, v: doc1k}, upsert: true}],
@@ -80,7 +80,7 @@
 
     // Note: Estimated 'chunk size' tracked by mongos is initialized with a random value so
     // we are going to be conservative.
-    for (var x = 0; x < 1100; x += 400) {
+    for (var x = 0; x < 2100; x += 400) {
         var docs = [];
 
         for (var y = 0; y < 400; y++) {
@@ -101,7 +101,7 @@
 
     assert.eq(1, configDB.chunks.find({"ns": "test.update"}).itcount());
 
-    for (var x = 0; x < 1100; x += 400) {
+    for (var x = 0; x < 2100; x += 400) {
         var docs = [];
 
         for (var y = 0; y < 400; y++) {
@@ -123,7 +123,7 @@
 
     assert.eq(1, configDB.chunks.find({"ns": "test.delete"}).itcount());
 
-    for (var x = 0; x < 1100; x += 400) {
+    for (var x = 0; x < 2100; x += 400) {
         var docs = [];
 
         for (var y = 0; y < 400; y++) {
