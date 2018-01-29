@@ -90,6 +90,11 @@
 #include <winsock2.h>  //this must be included before the first windows.h include
 #include <ws2tcpip.h>
 
+// We must define SECURITY_WIN32 before include sspi.h
+#define SECURITY_WIN32
+
+#include <sspi.h>
+
 #undef WIN32_NO_STATUS
 
 // Obtain a definition for the ntstatus type.
