@@ -1,4 +1,14 @@
-// Contains helpers for checking the featureCompatibilityVersion.
+// Contains helpers for checking the featureCompatibilityVersion and constants for the current
+// featureCompatibilityVersion values.
+
+/**
+ * These constants represent the current "latest" and "last-stable" values for the
+ * featureCompatibilityVersion parameter. They should only be used for testing of upgrade-downgrade
+ * scenarios that are intended to be maintained between releases.
+ */
+
+const latestFCV = "4.0";
+const lastStableFCV = "3.6";
 
 /**
  * Checks the featureCompatibilityVersion document and server parameter. The

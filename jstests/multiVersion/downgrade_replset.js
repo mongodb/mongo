@@ -3,44 +3,47 @@
 
 load('./jstests/multiVersion/libs/multi_rs.js');
 load('./jstests/libs/test_background_ops.js');
+load('./jstests/libs/feature_compatibility_version.js');
 
-var newVersion = "latest";
-var oldVersion = "last-stable";
+let newVersion = "latest";
+let oldVersion = "last-stable";
 
-var name = "replsetdowngrade";
-var nodes = {
+let name = "replsetdowngrade";
+let nodes = {
     n1: {binVersion: newVersion},
     n2: {binVersion: newVersion},
     n3: {binVersion: newVersion}
 };
 
 function runDowngradeTest(protocolVersion) {
-    var rst = new ReplSetTest({name: name, nodes: nodes, waitForKeys: true});
+    let rst = new ReplSetTest({name: name, nodes: nodes, waitForKeys: true});
     rst.startSet();
-    var replSetConfig = rst.getReplSetConfig();
+    let replSetConfig = rst.getReplSetConfig();
     replSetConfig.protocolVersion = protocolVersion;
-    // Hard-code catchup timeout to be compatible with 3.4
-    replSetConfig.settings = {catchUpTimeoutMillis: 2000};
     rst.initiate(replSetConfig);
 
-    var primary = rst.getPrimary();
-    var coll = "test.foo";
+    let primary = rst.getPrimary();
+    let coll = "test.foo";
 
-    // We wait for the feature compatibility version to be set to "3.4" on all nodes of the replica
-    // set in order to ensure that all nodes can be successfully downgraded. This effectively allows
-    // us to emulate upgrading to the latest version with existing data files and then trying to
-    // downgrade back to 3.4.
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+    // TODO(SERVER-32597) remove this when fCV 4.0 becomes the default on clean startup.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    rst.awaitReplication();
+
+    // We wait for the feature compatibility version to be set to lastStableFCV on all nodes of the
+    // replica set in order to ensure that all nodes can be successfully downgraded. This
+    // effectively allows us to emulate upgrading to the latest version with existing data files and
+    // then trying to downgrade back to lastStableFCV.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
     rst.awaitReplication();
 
     jsTest.log("Inserting documents into collection.");
-    for (var i = 0; i < 10; i++) {
+    for (let i = 0; i < 10; i++) {
         primary.getCollection(coll).insert({_id: i, str: "hello world"});
     }
 
-    function insertDocuments(rsURL, coll) {
-        var coll = new Mongo(rsURL).getCollection(coll);
-        var count = 10;
+    function insertDocuments(rsURL, collParam) {
+        let coll = new Mongo(rsURL).getCollection(collParam);
+        let count = 10;
         while (!isFinished()) {
             assert.writeOK(coll.insert({_id: count, str: "hello world"}));
             count++;
@@ -48,7 +51,7 @@ function runDowngradeTest(protocolVersion) {
     }
 
     jsTest.log("Starting parallel operations during downgrade..");
-    var joinFindInsert = startParallelOps(primary, insertDocuments, [rst.getURL(), coll]);
+    let joinFindInsert = startParallelOps(primary, insertDocuments, [rst.getURL(), coll]);
 
     jsTest.log("Downgrading replica set..");
     rst.upgradeSet({binVersion: oldVersion});
@@ -57,7 +60,7 @@ function runDowngradeTest(protocolVersion) {
     // We save a reference to the old primary so that we can call reconnect() on it before
     // joinFindInsert() would attempt to send the node an update operation that signals the parallel
     // shell running the background operations to stop.
-    var oldPrimary = primary;
+    let oldPrimary = primary;
 
     primary = rst.getPrimary();
     printjson(rst.status());
