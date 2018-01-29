@@ -175,14 +175,6 @@ functions:
          name: "perf"
          file: "work/perf.json"
 
-  "make test log artifact":
-    - command: shell.exec
-      params:
-        working_dir: work
-        script: |
-          source ./dsienv.sh
-          make_artifact.sh
-
   "analyze":
     - command: json.get_history
       params:
@@ -327,7 +319,6 @@ tasks:
         test: "ycsb"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
       vars:
         # Disabling --ycsb-throughput-analysis until BF-7153 fixed
@@ -344,7 +335,6 @@ tasks:
         test: "ycsb"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
@@ -360,7 +350,6 @@ tasks:
         test: "ycsb-wmajority"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
@@ -376,7 +365,6 @@ tasks:
         test: "ycsb-wmajority"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
@@ -393,7 +381,6 @@ tasks:
         test: "core"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: core_workloads_MMAPv1
@@ -408,7 +395,6 @@ tasks:
         test: "core"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: agg_query_comparison_bestbuy_WT
@@ -422,7 +408,6 @@ tasks:
         test: "agg_query_comparison_bestbuy"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: agg_query_comparison_bestbuy_MMAPv1
@@ -436,7 +421,6 @@ tasks:
         test: "agg_query_comparison_bestbuy"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: non_sharded_workloads_WT
@@ -450,7 +434,6 @@ tasks:
         test: "non_sharded"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: non_sharded_workloads_MMAPv1
@@ -464,7 +447,6 @@ tasks:
         test: "non_sharded"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: mongos_workloads_WT
@@ -478,7 +460,6 @@ tasks:
         test: "mongos"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: mongos_workloads_MMAPv1
@@ -493,7 +474,6 @@ tasks:
         test: "mongos"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: move_chunk_workloads_WT
@@ -507,7 +487,6 @@ tasks:
         test: "move_chunk"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: move_chunk_workloads_MMAPv1
@@ -521,7 +500,6 @@ tasks:
         test: "move_chunk"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: secondary_performance_WT
@@ -537,7 +515,6 @@ tasks:
         setup: "secondary-performance"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: secondary_performance_MMAPv1
@@ -553,7 +530,6 @@ tasks:
         setup: "secondary-performance"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: initialsync_WT
@@ -567,7 +543,6 @@ tasks:
         test: "initialsync"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: initialsync_MMAPv1
@@ -581,7 +556,6 @@ tasks:
         test: "initialsync"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
 
 - name: initialsync-logkeeper_WT
@@ -596,9 +570,7 @@ tasks:
         test: "initialsync-logkeeper"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
-
 
 #######################################
 #               Modules               #
