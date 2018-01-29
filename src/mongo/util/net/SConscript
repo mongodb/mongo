@@ -1,7 +1,6 @@
 # -*- mode: python; -*-
 
 Import('env')
-Import('ssl_provider')
 
 env = env.Clone()
 
@@ -21,7 +20,6 @@ env.Library(
         "sockaddr.cpp",
         "socket_exception.cpp",
         "ssl_manager.cpp",
-        'ssl_manager_%s.cpp' % (ssl_provider),
         "ssl_options.cpp",
         "thread_idle_callback.cpp",
     ],
