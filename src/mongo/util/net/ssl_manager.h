@@ -59,15 +59,16 @@ const std::string getSSLVersion(const std::string& prefix, const std::string& su
 namespace mongo {
 struct SSLParams;
 
-/**
- * Maintain per connection SSL state for the Sock class. Used by SSLManagerInterface to perform SSL
- * operations.
- */
-class SSLConnectionInterface {
+class SSLConnection {
 public:
-    virtual ~SSLConnectionInterface();
+    SSL* ssl;
+    BIO* networkBIO;
+    BIO* internalBIO;
+    Socket* socket;
 
-    virtual std::string getSNIServerName() const = 0;
+    SSLConnection(SSL_CTX* ctx, Socket* sock, const char* initialBytes, int len);
+
+    ~SSLConnection();
 };
 
 struct SSLConfiguration {
@@ -113,19 +114,17 @@ public:
 
     /**
      * Initiates a TLS connection.
-     * Throws SocketException on failure.
-     * @return a pointer to an SSLConnectionInterface. Resources are freed in
-     * SSLConnectionInterface's destructor
+     * Throws NetworkException on failure.
+     * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
      */
-    virtual SSLConnectionInterface* connect(Socket* socket) = 0;
+    virtual SSLConnection* connect(Socket* socket) = 0;
 
     /**
      * Waits for the other side to initiate a TLS connection.
-     * Throws SocketException on failure.
-     * @return a pointer to an SSLConnectionInterface. Resources are freed in
-     * SSLConnectionInterface's destructor
+     * Throws NetworkException on failure.
+     * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
      */
-    virtual SSLConnectionInterface* accept(Socket* socket, const char* initialBytes, int len) = 0;
+    virtual SSLConnection* accept(Socket* socket, const char* initialBytes, int len) = 0;
 
     /**
      * Fetches a peer certificate and validates it if it exists
@@ -137,7 +136,7 @@ public:
      * a StatusWith instead.
      */
     virtual SSLPeerInfo parseAndValidatePeerCertificateDeprecated(
-        const SSLConnectionInterface* conn, const std::string& remoteHost) = 0;
+        const SSLConnection* conn, const std::string& remoteHost) = 0;
 
     /**
      * Gets the SSLConfiguration containing all information about the current SSL setup
@@ -151,21 +150,21 @@ public:
     static std::string getSSLErrorMessage(int code);
 
     /**
-     * SSL wrappers
+     * ssl.h wrappers
      */
-    virtual int SSL_read(SSLConnectionInterface* conn, void* buf, int num) = 0;
+    virtual int SSL_read(SSLConnection* conn, void* buf, int num) = 0;
 
-    virtual int SSL_write(SSLConnectionInterface* conn, const void* buf, int num) = 0;
+    virtual int SSL_write(SSLConnection* conn, const void* buf, int num) = 0;
 
     virtual unsigned long ERR_get_error() = 0;
 
     virtual char* ERR_error_string(unsigned long e, char* buf) = 0;
 
-    virtual int SSL_get_error(const SSLConnectionInterface* conn, int ret) = 0;
+    virtual int SSL_get_error(const SSLConnection* conn, int ret) = 0;
 
-    virtual int SSL_shutdown(SSLConnectionInterface* conn) = 0;
+    virtual int SSL_shutdown(SSLConnection* conn) = 0;
 
-    virtual void SSL_free(SSLConnectionInterface* conn) = 0;
+    virtual void SSL_free(SSLConnection* conn) = 0;
 
     enum class ConnectionDirection { kIncoming, kOutgoing };
 
