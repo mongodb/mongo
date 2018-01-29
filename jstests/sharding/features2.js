@@ -162,26 +162,6 @@
     assert.eq(3, db.countaa.count(), "counta1");
     assert.eq(3, db.countaa.find().itcount(), "counta1");
 
-    x = null;
-    y = null;
-    try {
-        x = db.runCommand("forceerror");
-    } catch (e) {
-        x = e;
-    }
-    try {
-        y = s._connections[0].getDB("test").runCommand("forceerror");
-    } catch (e) {
-        y = e;
-    }
-
-    // As the forceerror command is written, it doesnt set a code in the reply.
-    // OP_COMMAND changes will add a code of 121 (CommandFailed) if a failing command
-    // does not set one, so this comparison fails as "undefined" != 121.
-    assert.eq(x.code, y.code, "assert format");
-    assert.eq(x.errmsg, y.errmsg, "assert format");
-    assert.eq(x.ok, y.ok, "assert format");
-
     // isMaster and query-wrapped-command
     let isMaster = db.runCommand({isMaster: 1});
     assert(isMaster.ismaster);

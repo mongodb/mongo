@@ -11,7 +11,7 @@ assert(db.getPrevError().err == null, "preverror 1");
 
 // test 2
 
-db.runCommand({forceerror: 1});
+db.runCommand({insert: "x", documents: [{_id: 1, a: "xx"}, {_id: 1, b: "xx"}]});
 assert(db.runCommand({getlasterror: 1}).err != null, "D");
 assert(db.runCommand({getpreverror: 1}).err != null, "E");
 

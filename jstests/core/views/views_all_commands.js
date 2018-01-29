@@ -222,7 +222,6 @@
             expectFailure: true
         },
         flushRouterConfig: {skip: isUnrelated},
-        forceerror: {skip: isUnrelated},
         fsync: {skip: isUnrelated},
         fsyncUnlock: {skip: isUnrelated},
         geoNear: {

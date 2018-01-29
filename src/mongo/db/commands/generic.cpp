@@ -297,31 +297,6 @@ public:
 
 } listCommandsCmd;
 
-/* for testing purposes only */
-class CmdForceError : public BasicCommand {
-public:
-    std::string help() const override {
-        return "for testing purposes only.  forces a user assertion exception";
-    }
-    virtual bool slaveOk() const {
-        return true;
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
-    CmdForceError() : BasicCommand("forceerror") {}
-    bool run(OperationContext* opCtx,
-             const string& dbnamne,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        LastError::get(cc()).setLastError(10038, "forced error");
-        return false;
-    }
-} cmdForceError;
-
 class GetLogCmd : public ErrmsgCommandDeprecated {
 public:
     GetLogCmd() : ErrmsgCommandDeprecated("getLog") {}
