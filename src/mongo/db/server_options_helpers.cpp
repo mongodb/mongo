@@ -98,28 +98,11 @@ CODE facilitynames[] = {{"auth", LOG_AUTH},     {"cron", LOG_CRON},     {"daemon
 
 }  // namespace
 
-Status addGeneralServerOptions(moe::OptionSection* options) {
+Status addBaseServerOptions(moe::OptionSection* options) {
     StringBuilder portInfoBuilder;
-    StringBuilder maxConnInfoBuilder;
-    std::stringstream unixSockPermsBuilder;
 
     portInfoBuilder << "specify port number - " << ServerGlobalParams::DefaultDBPort
                     << " by default";
-    maxConnInfoBuilder << "max number of simultaneous connections - " << DEFAULT_MAX_CONN
-                       << " by default";
-    unixSockPermsBuilder << "permissions to set on UNIX domain socket file - "
-                         << "0" << std::oct << DEFAULT_UNIX_PERMS << " by default";
-
-    options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information")
-        .setSources(moe::SourceAllLegacy);
-
-    options->addOptionChaining("version", "version", moe::Switch, "show version information")
-        .setSources(moe::SourceAllLegacy);
-
-    options
-        ->addOptionChaining(
-            "config", "config,f", moe::String, "configuration file specifying additional options")
-        .setSources(moe::SourceAllLegacy);
 
     // The verbosity level can be set at startup in the following ways.  Note that if multiple
     // methods for setting the verbosity are specified simultaneously, the verbosity will be set
@@ -186,45 +169,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
 
     options
         ->addOptionChaining(
-            "net.bindIp",
-            "bind_ip",
-            moe::String,
-            "comma separated list of ip addresses to listen on - localhost by default")
-        .incompatibleWith("bind_ip_all");
-
-    options
-        ->addOptionChaining("net.bindIpAll", "bind_ip_all", moe::Switch, "bind to all ip addresses")
-        .incompatibleWith("bind_ip");
-
-    options->addOptionChaining(
-        "net.ipv6", "ipv6", moe::Switch, "enable IPv6 support (disabled by default)");
-
-    options
-        ->addOptionChaining(
-            "net.listenBacklog", "listenBacklog", moe::Int, "set socket listen backlog size")
-        .setDefault(moe::Value(SOMAXCONN));
-
-    options->addOptionChaining(
-        "net.maxIncomingConnections", "maxConns", moe::Int, maxConnInfoBuilder.str().c_str());
-
-    options
-        ->addOptionChaining("net.transportLayer",
-                            "transportLayer",
-                            moe::String,
-                            "sets the ingress transport layer implementation")
-        .hidden()
-        .setDefault(moe::Value("asio"));
-
-    options
-        ->addOptionChaining("net.serviceExecutor",
-                            "serviceExecutor",
-                            moe::String,
-                            "sets the service executor implementation")
-        .hidden()
-        .setDefault(moe::Value("synchronous"));
-
-    options
-        ->addOptionChaining(
             "logpath",
             "logpath",
             moe::String,
@@ -281,6 +225,93 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                                "Desired format for timestamps in log messages. One of ctime, "
                                "iso8601-utc or iso8601-local");
 
+    options
+        ->addOptionChaining(
+            "setParameter", "setParameter", moe::StringMap, "Set a configurable parameter")
+        .composing();
+
+    /* support for -vv -vvvv etc. */
+    for (string s = "vv"; s.length() <= 12; s.append("v")) {
+        options->addOptionChaining(s.c_str(), s.c_str(), moe::Switch, "verbose")
+            .hidden()
+            .setSources(moe::SourceAllLegacy);
+    }
+
+    options
+        ->addOptionChaining("systemLog.traceAllExceptions",
+                            "traceExceptions",
+                            moe::Switch,
+                            "log stack traces for every exception")
+        .hidden();
+
+    return Status::OK();
+}
+
+Status addGeneralServerOptions(moe::OptionSection* options) {
+    auto baseResult = addBaseServerOptions(options);
+    if (!baseResult.isOK()) {
+        return baseResult;
+    }
+
+    StringBuilder maxConnInfoBuilder;
+    std::stringstream unixSockPermsBuilder;
+
+    maxConnInfoBuilder << "max number of simultaneous connections - " << DEFAULT_MAX_CONN
+                       << " by default";
+    unixSockPermsBuilder << "permissions to set on UNIX domain socket file - "
+                         << "0" << std::oct << DEFAULT_UNIX_PERMS << " by default";
+
+    options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information")
+        .setSources(moe::SourceAllLegacy);
+
+    options->addOptionChaining("version", "version", moe::Switch, "show version information")
+        .setSources(moe::SourceAllLegacy);
+
+    options
+        ->addOptionChaining(
+            "config", "config,f", moe::String, "configuration file specifying additional options")
+        .setSources(moe::SourceAllLegacy);
+
+
+    options
+        ->addOptionChaining(
+            "net.bindIp",
+            "bind_ip",
+            moe::String,
+            "comma separated list of ip addresses to listen on - localhost by default")
+        .incompatibleWith("bind_ip_all");
+
+    options
+        ->addOptionChaining("net.bindIpAll", "bind_ip_all", moe::Switch, "bind to all ip addresses")
+        .incompatibleWith("bind_ip");
+
+    options->addOptionChaining(
+        "net.ipv6", "ipv6", moe::Switch, "enable IPv6 support (disabled by default)");
+
+    options
+        ->addOptionChaining(
+            "net.listenBacklog", "listenBacklog", moe::Int, "set socket listen backlog size")
+        .setDefault(moe::Value(SOMAXCONN));
+
+    options->addOptionChaining(
+        "net.maxIncomingConnections", "maxConns", moe::Int, maxConnInfoBuilder.str().c_str());
+
+    options
+        ->addOptionChaining("net.transportLayer",
+                            "transportLayer",
+                            moe::String,
+                            "sets the ingress transport layer implementation")
+        .hidden()
+        .setDefault(moe::Value("asio"));
+
+    options
+        ->addOptionChaining("net.serviceExecutor",
+                            "serviceExecutor",
+                            moe::String,
+                            "sets the service executor implementation")
+        .hidden()
+        .setDefault(moe::Value("synchronous"));
+
 #if MONGO_ENTERPRISE_VERSION
     options->addOptionChaining("security.redactClientLogData",
                                "redactClientLogData",
@@ -309,11 +340,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
         .incompatibleWith("keyFile")
         .incompatibleWith("transitionToAuth")
         .incompatibleWith("clusterAuthMode");
-
-    options
-        ->addOptionChaining(
-            "setParameter", "setParameter", moe::StringMap, "Set a configurable parameter")
-        .composing();
 
     options
         ->addOptionChaining(
@@ -360,13 +386,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
 
 #endif
 
-    /* support for -vv -vvvv etc. */
-    for (string s = "vv"; s.length() <= 12; s.append("v")) {
-        options->addOptionChaining(s.c_str(), s.c_str(), moe::Switch, "verbose")
-            .hidden()
-            .setSources(moe::SourceAllLegacy);
-    }
-
     options
         ->addOptionChaining("objcheck",
                             "objcheck",
@@ -392,13 +411,6 @@ Status addGeneralServerOptions(moe::OptionSection* options) {
                             "inspect client data for validity on receipt (DEFAULT)")
         .hidden()
         .setSources(moe::SourceYAMLConfig);
-
-    options
-        ->addOptionChaining("systemLog.traceAllExceptions",
-                            "traceExceptions",
-                            moe::Switch,
-                            "log stack traces for every exception")
-        .hidden();
 
     options
         ->addOptionChaining("enableExperimentalStorageDetailsCmd",

@@ -301,6 +301,7 @@ env.Library(
         'db/keys_collection_client_direct',
         'db/kill_sessions_local',
         'db/logical_session_cache_factory_mongod',
+        'db/mongod_options',
         'db/mongodandmongos',
         'db/op_observer_d',
         'db/query_exec',

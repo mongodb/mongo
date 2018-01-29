@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "embedded.h"
+#include "mongo/client/embedded/embedded.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/initializer.h"
@@ -45,10 +45,10 @@
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/index_rebuilder.h"
 #include "mongo/db/kill_sessions_local.h"
 #include "mongo/db/log_process_details.h"
-#include "mongo/db/mongod_options.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repair_database_and_check_version.h"

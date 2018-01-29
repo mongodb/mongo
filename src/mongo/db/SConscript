@@ -414,6 +414,16 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="global_settings",
+    source=[
+        "global_settings.cpp",
+    ],
+    LIBDEPS=[
+        'repl/repl_settings',
+    ],
+)
+
 # mongod options
 env.Library(
     target="mongod_options",
@@ -427,6 +437,9 @@ env.Library(
         'server_options',
         'storage/storage_options',
     ],
+    LIBDEPS_PRIVATE=[
+        'global_settings',
+    ]
 )
 
 env.Library(
