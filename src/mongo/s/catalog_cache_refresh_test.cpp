@@ -55,11 +55,7 @@ protected:
 
     void expectGetDatabase() {
         expectFindOnConfigSendBSONObjVector([&]() {
-            DatabaseType db;
-            db.setName(kNss.db().toString());
-            db.setPrimary({"0"});
-            db.setSharded(true);
-
+            DatabaseType db(kNss.db().toString(), {"0"}, true);
             return std::vector<BSONObj>{db.toBSON()};
         }());
     }

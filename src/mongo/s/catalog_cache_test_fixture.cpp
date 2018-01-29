@@ -95,11 +95,7 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
     ChunkVersion version(1, 0, OID::gen());
 
     const BSONObj databaseBSON = [&]() {
-        DatabaseType db;
-        db.setName(nss.db().toString());
-        db.setPrimary({"0"});
-        db.setSharded(true);
-
+        DatabaseType db(nss.db().toString(), {"0"}, true);
         return db.toBSON();
     }();
 

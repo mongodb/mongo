@@ -233,10 +233,6 @@ TEST_F(ShardCollectionTest, withInitialChunks) {
 
     ASSERT_OK(setupShards(vector<ShardType>{shard0, shard1, shard2}));
 
-    DatabaseType db;
-    db.setName("db1");
-    db.setPrimary(shard0.getName());
-    db.setSharded(true);
     setupDatabase(kNamespace.db().toString(), shard0.getName(), true);
 
     ShardKeyPattern keyPattern(BSON("_id" << 1));

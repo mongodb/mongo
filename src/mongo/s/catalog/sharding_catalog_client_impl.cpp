@@ -258,21 +258,13 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
 
     // The admin database is always hosted on the config server.
     if (dbName == "admin") {
-        DatabaseType dbt;
-        dbt.setName(dbName);
-        dbt.setSharded(false);
-        dbt.setPrimary(ShardRegistry::kConfigServerShardId);
-
+        DatabaseType dbt(dbName, ShardRegistry::kConfigServerShardId, false);
         return repl::OpTimeWith<DatabaseType>(dbt);
     }
 
     // The config database's primary shard is always config, and it is always sharded.
     if (dbName == "config") {
-        DatabaseType dbt;
-        dbt.setName(dbName);
-        dbt.setSharded(true);
-        dbt.setPrimary(ShardRegistry::kConfigServerShardId);
-
+        DatabaseType dbt(dbName, ShardRegistry::kConfigServerShardId, true);
         return repl::OpTimeWith<DatabaseType>(dbt);
     }
 

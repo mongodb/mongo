@@ -178,10 +178,7 @@ std::shared_ptr<RemoteCommandTargeterMock> MigrationManagerTest::shardTargeterMo
 }
 
 void MigrationManagerTest::setUpDatabase(const std::string& dbName, const ShardId primaryShard) {
-    DatabaseType db;
-    db.setName(dbName);
-    db.setPrimary(primaryShard);
-    db.setSharded(true);
+    DatabaseType db(dbName, primaryShard, true);
     ASSERT_OK(catalogClient()->insertConfigDocument(
         operationContext(), DatabaseType::ConfigNS, db.toBSON(), kMajorityWriteConcern));
 }

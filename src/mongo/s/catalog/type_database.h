@@ -51,6 +51,19 @@ class StatusWith;
  */
 class DatabaseType {
 public:
+    DatabaseType(const std::string& dbName,
+                 const ShardId& primaryShard,
+                 bool sharded,
+                 boost::optional<DatabaseVersion> = boost::none);
+
+#ifdef _WIN32
+    // TODO: Remove this when Microsoft's implementation of std::future doesn't require a default
+    // constructor.
+    // This type should not normally have a default constructor, however Microsoft's implementation
+    // of future requires one in violation of the standard so we're providing one only for Windows.
+    DatabaseType() = default;
+#endif
+
     // Name of the databases collection in the config server.
     static const NamespaceString ConfigNS;
 
@@ -81,42 +94,31 @@ public:
     std::string toString() const;
 
     const std::string& getName() const {
-        return _name.get();
+        return _name;
     }
     void setName(const std::string& name);
 
     const ShardId& getPrimary() const {
-        return _primary.get();
+        return _primary;
     }
     void setPrimary(const ShardId& primary);
 
     bool getSharded() const {
-        return _sharded.get();
+        return _sharded;
     }
-    void setSharded(bool sharded) {
-        _sharded = sharded;
-    }
+    void setSharded(bool sharded);
 
-    DatabaseVersion getVersion() const {
-        return _version.get();
+    boost::optional<DatabaseVersion> getVersion() const {
+        return _version;
     }
-
-    void setVersion(DatabaseVersion version) {
-        _version = std::move(version);
-    }
+    void setVersion(const DatabaseVersion& version);
 
 private:
-    // Requred database name
-    boost::optional<std::string> _name;
+    std::string _name;
+    ShardId _primary;
+    bool _sharded;
 
-    // Required primary shard (must be set even if the database is sharded, because there
-    // might be collections, which are unsharded).
-    boost::optional<ShardId> _primary;
-
-    // Required whether sharding is enabled for this database. Even though this field is of
-    // type optional, it is only used as an indicator that the value was explicitly set.
-    boost::optional<bool> _sharded;
-
+    // Optional while featureCompatibilityVersion 3.6 is supported.
     boost::optional<DatabaseVersion> _version;
 };
 

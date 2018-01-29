@@ -159,11 +159,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseInvalidName) {
 TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    DatabaseType expectedDb;
-    expectedDb.setName("bigdata");
-    expectedDb.setPrimary(ShardId("shard0000"));
-    expectedDb.setSharded(true);
-    expectedDb.setVersion(Versioning::newDatabaseVersion());
+    DatabaseType expectedDb("bigdata", ShardId("shard0000"), true);
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
@@ -207,11 +203,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseStaleSecondaryRetrySuccess) {
     HostAndPort secondHost{"TestHost2"};
     configTargeter()->setFindHostReturnValue(firstHost);
 
-    DatabaseType expectedDb;
-    expectedDb.setName("bigdata");
-    expectedDb.setPrimary(ShardId("shard0000"));
-    expectedDb.setSharded(true);
-    expectedDb.setVersion(Versioning::newDatabaseVersion());
+    DatabaseType expectedDb("bigdata", ShardId("shard0000"), true);
 
     auto future = launchAsync([this, &expectedDb] {
         return assertGet(
@@ -938,13 +930,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
 TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    DatabaseType dbt1;
-    dbt1.setName("db1");
-    dbt1.setPrimary(ShardId("shard0000"));
-
-    DatabaseType dbt2;
-    dbt2.setName("db2");
-    dbt2.setPrimary(ShardId("shard0000"));
+    DatabaseType dbt1("db1", ShardId("shard0000"), false);
+    DatabaseType dbt2("db2", ShardId("shard0000"), false);
 
     auto future = launchAsync([this] {
         return assertGet(
@@ -987,10 +974,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardInvalidDoc) {
     });
 
     onFindCommand([](const RemoteCommandRequest& request) {
-        DatabaseType dbt1;
-        dbt1.setName("db1");
-        dbt1.setPrimary(ShardId("shard0000"));
-
+        DatabaseType dbt1("db1", {"shard0000"}, false);
         return vector<BSONObj>{
             dbt1.toBSON(),
             BSON(DatabaseType::name() << 0)  // DatabaseType::name() should be a string
@@ -1096,11 +1080,7 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollectionInvalidTag) {
 TEST_F(ShardingCatalogClientTest, UpdateDatabase) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    DatabaseType dbt;
-    dbt.setName("test");
-    dbt.setPrimary(ShardId("shard0000"));
-    dbt.setSharded(true);
-    dbt.setVersion(Versioning::newDatabaseVersion());
+    DatabaseType dbt("test", ShardId("shard0000"), true);
 
     auto future = launchAsync([this, dbt] {
         auto status = catalogClient()->updateDatabase(operationContext(), dbt.getName(), dbt);
@@ -1141,10 +1121,7 @@ TEST_F(ShardingCatalogClientTest, UpdateDatabaseExceededTimeLimit) {
     HostAndPort host1("TestHost1");
     configTargeter()->setFindHostReturnValue(host1);
 
-    DatabaseType dbt;
-    dbt.setName("test");
-    dbt.setPrimary(ShardId("shard0001"));
-    dbt.setSharded(false);
+    DatabaseType dbt("test", ShardId("shard0001"), false);
 
     auto future = launchAsync([this, dbt] {
         auto status = catalogClient()->updateDatabase(operationContext(), dbt.getName(), dbt);
@@ -1442,10 +1419,7 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeFindThenCmd) {
             BSONObjBuilder builder;
             metadata.writeToMetadata(&builder).transitional_ignore();
 
-            DatabaseType dbType;
-            dbType.setName("TestDB");
-            dbType.setPrimary(ShardId("TestShard"));
-            dbType.setSharded("true");
+            DatabaseType dbType("TestDB", ShardId("TestShard"), true);
 
             return std::make_tuple(vector<BSONObj>{dbType.toBSON()}, builder.obj());
         });
@@ -1529,10 +1503,7 @@ TEST_F(ShardingCatalogClientTest, ReadAfterOpTimeCmdThenFind) {
         ASSERT_EQ(string("find"), request.cmdObj.firstElementFieldName());
         checkReadConcern(request.cmdObj, highestOpTime.getTimestamp(), highestOpTime.getTerm());
 
-        DatabaseType dbType;
-        dbType.setName("TestDB");
-        dbType.setPrimary(ShardId("TestShard"));
-        dbType.setSharded("true");
+        DatabaseType dbType("TestDB", ShardId("TestShard"), true);
 
         return vector<BSONObj>{dbType.toBSON()};
     });
@@ -1623,10 +1594,7 @@ TEST_F(ShardingCatalogClientTest, RetryOnFindCommandNetworkErrorSucceedsAtMaxRet
     }
 
     onFindCommand([](const RemoteCommandRequest& request) {
-        DatabaseType dbType;
-        dbType.setName("TestDB");
-        dbType.setPrimary(ShardId("TestShard"));
-        dbType.setSharded("true");
+        DatabaseType dbType("TestDB", ShardId("TestShard"), true);
 
         return vector<BSONObj>{dbType.toBSON()};
     });

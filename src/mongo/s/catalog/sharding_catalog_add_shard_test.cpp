@@ -379,15 +379,8 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     expectedShard.setMaxSizeMB(100);
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB1;
-    discoveredDB1.setName("TestDB1");
-    discoveredDB1.setPrimary(ShardId("StandaloneShard"));
-    discoveredDB1.setSharded(false);
-
-    DatabaseType discoveredDB2;
-    discoveredDB2.setName("TestDB2");
-    discoveredDB2.setPrimary(ShardId("StandaloneShard"));
-    discoveredDB2.setSharded(false);
+    DatabaseType discoveredDB1("TestDB1", ShardId("StandaloneShard"), false);
+    DatabaseType discoveredDB2("TestDB2", ShardId("StandaloneShard"), false);
 
     auto future = launchAsync([this, expectedShardName] {
         Client::initThreadIfNotAlready();
@@ -467,15 +460,8 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
     expectedShard.setMaxSizeMB(100);
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB1;
-    discoveredDB1.setName("TestDB1");
-    discoveredDB1.setPrimary(ShardId(expectedShardName));
-    discoveredDB1.setSharded(false);
-
-    DatabaseType discoveredDB2;
-    discoveredDB2.setName("TestDB2");
-    discoveredDB2.setPrimary(ShardId(expectedShardName));
-    discoveredDB2.setSharded(false);
+    DatabaseType discoveredDB1("TestDB1", ShardId(expectedShardName), false);
+    DatabaseType discoveredDB2("TestDB2", ShardId(expectedShardName), false);
 
     auto future = launchAsync([this, &expectedShardName, &shardTarget] {
         Client::initThreadIfNotAlready();
@@ -814,10 +800,7 @@ TEST_F(AddShardTest, ShardContainsExistingDatabase) {
     targeterFactory()->addTargeterToReturn(connString, std::move(targeter));
     std::string expectedShardName = "mySet";
 
-    DatabaseType existingDB;
-    existingDB.setName("existing");
-    existingDB.setPrimary(ShardId("existingShard"));
-    existingDB.setSharded(false);
+    DatabaseType existingDB("existing", ShardId("existingShard"), false);
 
     // Add a pre-existing database.
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
@@ -872,10 +855,7 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     expectedShard.setMaxSizeMB(100);
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB;
-    discoveredDB.setName("shardDB");
-    discoveredDB.setPrimary(ShardId(expectedShardName));
-    discoveredDB.setSharded(false);
+    DatabaseType discoveredDB("shardDB", ShardId(expectedShardName), false);
 
     auto future = launchAsync([this, &expectedShardName, &connString] {
         Client::initThreadIfNotAlready();
@@ -939,10 +919,7 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     expectedShard.setMaxSizeMB(100);
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB;
-    discoveredDB.setName("shardDB");
-    discoveredDB.setPrimary(ShardId(expectedShardName));
-    discoveredDB.setSharded(false);
+    DatabaseType discoveredDB("shardDB", ShardId(expectedShardName), false);
 
     auto future = launchAsync([this, &expectedShardName, &seedString] {
         Client::initThreadIfNotAlready();
@@ -1007,15 +984,8 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     expectedShard.setMaxSizeMB(100);
     expectedShard.setState(ShardType::ShardState::kShardAware);
 
-    DatabaseType discoveredDB1;
-    discoveredDB1.setName("TestDB1");
-    discoveredDB1.setPrimary(ShardId("StandaloneShard"));
-    discoveredDB1.setSharded(false);
-
-    DatabaseType discoveredDB2;
-    discoveredDB2.setName("TestDB2");
-    discoveredDB2.setPrimary(ShardId("StandaloneShard"));
-    discoveredDB2.setSharded(false);
+    DatabaseType discoveredDB1("TestDB1", ShardId("StandaloneShard"), false);
+    DatabaseType discoveredDB2("TestDB2", ShardId("StandaloneShard"), false);
 
     // Enable fail point to cause all updates to fail.  Since we add the databases detected from
     // the shard being added with upserts, but we add the shard document itself via insert, this

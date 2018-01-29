@@ -48,61 +48,57 @@ const BSONField<std::string> DatabaseType::primary("primary");
 const BSONField<bool> DatabaseType::sharded("partitioned");
 const BSONField<BSONObj> DatabaseType::version("version");
 
+DatabaseType::DatabaseType(const std::string& dbName,
+                           const ShardId& primaryShard,
+                           bool sharded,
+                           boost::optional<DatabaseVersion> version)
+    : _name(dbName), _primary(primaryShard), _sharded(sharded), _version(version) {}
 
 StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
-    DatabaseType dbt;
-
+    std::string dbtName;
     {
-        std::string dbtName;
         Status status = bsonExtractStringField(source, name.name(), &dbtName);
         if (!status.isOK())
             return status;
-
-        dbt._name = dbtName;
     }
 
+    std::string dbtPrimary;
     {
-        std::string dbtPrimary;
         Status status = bsonExtractStringField(source, primary.name(), &dbtPrimary);
         if (!status.isOK())
             return status;
-
-        dbt._primary = dbtPrimary;
     }
 
+    bool dbtSharded;
     {
-        bool dbtSharded;
         Status status =
             bsonExtractBooleanFieldWithDefault(source, sharded.name(), false, &dbtSharded);
         if (!status.isOK())
             return status;
-
-        dbt._sharded = dbtSharded;
     }
 
+    boost::optional<DatabaseVersion> dbtVersion = boost::none;
     {
         BSONObj versionField = source.getObjectField("version");
-        // TODO: parse this unconditionally after v4.0.
+        // TODO: Parse this unconditionally once featureCompatibilityVersion 3.6 is no longer
+        // supported.
         if (!versionField.isEmpty()) {
-            dbt._version =
+            dbtVersion =
                 DatabaseVersion::parse(IDLParserErrorContext("DatabaseType"), versionField);
         }
     }
 
-    return StatusWith<DatabaseType>(dbt);
+    return DatabaseType{
+        std::move(dbtName), std::move(dbtPrimary), dbtSharded, std::move(dbtVersion)};
 }
 
 Status DatabaseType::validate() const {
-    if (!_name.is_initialized() || _name->empty()) {
+    if (_name.empty()) {
         return Status(ErrorCodes::NoSuchKey, "missing name");
     }
 
-    if (!_primary.is_initialized() || !_primary->isValid()) {
+    if (!_primary.isValid()) {
         return Status(ErrorCodes::NoSuchKey, "missing primary");
-    }
-
-    if (!_sharded.is_initialized()) {
-        return Status(ErrorCodes::NoSuchKey, "missing sharded");
     }
 
     return Status::OK();
@@ -110,14 +106,16 @@ Status DatabaseType::validate() const {
 
 BSONObj DatabaseType::toBSON() const {
     BSONObjBuilder builder;
-    builder.append(name.name(), _name.get_value_or(""));
-    builder.append(primary.name(), _primary.get_value_or(ShardId()).toString());
-    builder.append(sharded.name(), _sharded.get_value_or(false));
 
-    BSONObjBuilder versionBuilder;
-    DatabaseVersion defaultDbv;
-    _version.get_value_or(Versioning::newDatabaseVersion()).serialize(&versionBuilder);
-    builder.append(version.name(), versionBuilder.obj());
+    // Required fields.
+    builder.append(name.name(), _name);
+    builder.append(primary.name(), _primary.toString());
+    builder.append(sharded.name(), _sharded);
+
+    // Optional fields.
+    if (_version) {
+        builder.append(version.name(), _version->toBSON());
+    }
 
     return builder.obj();
 }
@@ -134,6 +132,14 @@ void DatabaseType::setName(const std::string& name) {
 void DatabaseType::setPrimary(const ShardId& primary) {
     invariant(primary.isValid());
     _primary = primary;
+}
+
+void DatabaseType::setSharded(bool sharded) {
+    _sharded = sharded;
+}
+
+void DatabaseType::setVersion(const DatabaseVersion& version) {
+    _version = version;
 }
 
 }  // namespace mongo

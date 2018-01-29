@@ -107,10 +107,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
     log() << "Placing [" << dbName << "] on: " << primaryShardId;
 
     // Insert an entry for the new database into the sharding catalog.
-    DatabaseType db;
-    db.setName(dbName);
-    db.setPrimary(primaryShardId);
-    db.setSharded(false);
+    DatabaseType db(dbName, primaryShardId, false);
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
         opCtx, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kMajorityWriteConcern));
 

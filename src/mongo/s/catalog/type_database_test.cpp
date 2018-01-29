@@ -50,15 +50,15 @@ TEST(DatabaseType, Basic) {
         BSON(DatabaseType::name("mydb")
              << DatabaseType::primary("shard")
              << DatabaseType::sharded(true)
-             << DatabaseType::version(BSON("uuid" << uuid << "version" << 0))));
+             << DatabaseType::version(BSON("uuid" << uuid << "lastMod" << 0))));
     ASSERT_TRUE(status.isOK());
 
     DatabaseType db = status.getValue();
     ASSERT_EQUALS(db.getName(), "mydb");
     ASSERT_EQUALS(db.getPrimary(), "shard");
     ASSERT_TRUE(db.getSharded());
-    ASSERT_EQUALS(db.getVersion().getUuid(), uuid);
-    ASSERT_EQUALS(db.getVersion().getVersion(), 0);
+    ASSERT_EQUALS(db.getVersion()->getUuid(), uuid);
+    ASSERT_EQUALS(db.getVersion()->getLastMod(), 0);
 }
 
 TEST(DatabaseType, BadType) {

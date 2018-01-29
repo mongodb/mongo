@@ -698,11 +698,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Add all databases which were discovered on the new shard
     for (const auto& dbName : dbNamesStatus.getValue()) {
-        DatabaseType dbt;
-        dbt.setName(dbName);
-        dbt.setPrimary(shardType.getName());
-        dbt.setSharded(false);
-
+        DatabaseType dbt(dbName, shardType.getName(), false);
         Status status = Grid::get(opCtx)->catalogClient()->updateDatabase(opCtx, dbName, dbt);
         if (!status.isOK()) {
             log() << "adding shard " << shardConnectionString.toString()

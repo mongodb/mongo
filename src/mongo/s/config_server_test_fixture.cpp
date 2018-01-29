@@ -338,10 +338,7 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opC
 void ConfigServerTestFixture::setupDatabase(const std::string& dbName,
                                             const ShardId primaryShard,
                                             const bool sharded) {
-    DatabaseType db;
-    db.setName(dbName);
-    db.setPrimary(primaryShard);
-    db.setSharded(sharded);
+    DatabaseType db(dbName, primaryShard, sharded);
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     DatabaseType::ConfigNS,
                                                     db.toBSON(),

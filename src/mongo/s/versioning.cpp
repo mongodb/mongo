@@ -36,14 +36,14 @@ namespace mongo {
 
 DatabaseVersion Versioning::newDatabaseVersion() {
     DatabaseVersion dbv;
-    dbv.setVersion(0);
+    dbv.setLastMod(0);
     dbv.setUuid(UUID::gen());
     return dbv;
 }
 
 DatabaseVersion Versioning::incrementDatabaseVersion(const DatabaseVersion& v) {
     DatabaseVersion dbv;
-    dbv.setVersion(v.getVersion() + 1);
+    dbv.setLastMod(v.getLastMod() + 1);
     dbv.setUuid(v.getUuid());
     return dbv;
 }

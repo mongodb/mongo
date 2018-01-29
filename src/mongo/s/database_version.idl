@@ -1,4 +1,4 @@
-# Copyright (C) 2017 MongoDB Inc.
+# Copyright (C) 2018 MongoDB Inc.
 #
 # This program is free software: you can redistribute it and/or  modify
 # it under the terms of the GNU Affero General Public License, version 3,
@@ -23,11 +23,11 @@ imports:
 
 structs:
     DatabaseVersion:
-        description: "A type to represent DatabaseVersions"
+        description: "A (UUID, int) pair that uniquely identifies an incarnation of a database in a cluster and reflects changes to the database's primary shard"
         fields:
             uuid:
                 type: uuid
-                description: "UUID, indicating the incarnation of the database"
-            version:
+                description: "a unique identifier to distinguish different incarnations of this database"
+            lastMod:
                 type: int
-                description: "Int32, which is bumped whenever movePrimary is called"
+                description: "an integer which is bumped whenever the database's primary shard changes"
