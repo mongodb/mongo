@@ -1815,34 +1815,37 @@ TEST_F(SyncTailTest, DropDatabaseSucceedsInRecovering) {
 }
 
 TEST_F(IdempotencyTest, EmptyCappedNamespaceNotFound) {
-    // Create a dummy namespace string.
-    auto ns = NamespaceString("foo.bar");
+    // Create a BSON "emptycapped" command.
+    auto emptyCappedCmd = BSON("emptycapped" << nss.coll());
 
-    AutoGetCollectionForReadCommand autoColl(_opCtx.get(), ns);
+    // Create an "emptycapped" oplog entry.
+    auto emptyCappedOp = makeCommandOplogEntry(nextOpTime(), nss, emptyCappedCmd);
+
+    // Ensure that the returned status code signals a failure.
+    ASSERT_NOT_OK(runOpInitialSync(emptyCappedOp));
+
+    AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
 
     // Ensure that autoColl.getCollection() and autoColl.getDb() are both null.
     ASSERT_FALSE(autoColl.getCollection());
     ASSERT_FALSE(autoColl.getDb());
-
-    // Create a BSON "emptycapped" command.
-    auto emptyCappedCmd = BSON("emptycapped" << ns.coll());
-    auto emptyCappedOp = makeCommandOplogEntry(nextOpTime(), ns, emptyCappedCmd);
-    ASSERT_NOT_OK(runOpInitialSync(emptyCappedOp));
 }
 
 TEST_F(IdempotencyTest, ConvertToCappedNamespaceNotFound) {
-    // Create a dummy namespace string.
-    auto ns = NamespaceString("foo.bar");
-    AutoGetCollectionForReadCommand autoColl(_opCtx.get(), ns);
+    // Create a BSON "convertToCapped" command.
+    auto convertToCappedCmd = BSON("convertToCapped" << nss.coll());
+
+    // Create a "convertToCapped" oplog entry.
+    auto convertToCappedOp = makeCommandOplogEntry(nextOpTime(), nss, convertToCappedCmd);
+
+    // Ensure that the returned status code signals a failure.
+    ASSERT_NOT_OK(runOpInitialSync(convertToCappedOp));
+
+    AutoGetCollectionForReadCommand autoColl(_opCtx.get(), nss);
 
     // Ensure that autoColl.getCollection() and autoColl.getDb() are both null.
     ASSERT_FALSE(autoColl.getCollection());
     ASSERT_FALSE(autoColl.getDb());
-
-    // Create a BSON "converToCapped" command.
-    auto convertToCappedCmd = BSON("convertToCapped" << ns.coll());
-    auto convertToCappedOp = makeCommandOplogEntry(nextOpTime(), ns, convertToCappedCmd);
-    ASSERT_NOT_OK(runOpInitialSync(convertToCappedOp));
 }
 
 }  // namespace
