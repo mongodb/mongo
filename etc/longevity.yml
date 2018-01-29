@@ -173,14 +173,6 @@ functions:
           cd ..
           cat perf.json | egrep "name|ops_per_sec"
 
-  "make test log artifact":
-    - command: shell.exec
-      params:
-        working_dir: work
-        script: |
-          source ./dsienv.sh
-          make_artifact.sh
-
   "analyze":
     - command: json.get_history
       params:
@@ -270,7 +262,6 @@ tasks:
         test: "ycsb"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
@@ -287,7 +278,6 @@ tasks:
         test: "ycsb"
     - func: "deploy cluster"
     - func: "run test"
-    - func: "make test log artifact"
     - func: "analyze"
       vars:
         script_flags: --ycsb-throughput-analysis reports
