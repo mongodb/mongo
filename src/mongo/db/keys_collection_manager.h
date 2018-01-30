@@ -31,8 +31,8 @@
 #include <memory>
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/keys_collection_cache_reader.h"
-#include "mongo/db/keys_collection_cache_reader_and_updater.h"
+#include "mongo/db/key_generator.h"
+#include "mongo/db/keys_collection_cache.h"
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
@@ -192,7 +192,7 @@ private:
     const Seconds _keyValidForInterval;
 
     // No mutex needed since the members below have their own mutexes.
-    KeysCollectionCacheReader _keysCache;
+    KeysCollectionCache _keysCache;
     PeriodicRunner _refresher;
 };
 

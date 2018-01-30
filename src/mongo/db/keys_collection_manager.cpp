@@ -31,8 +31,8 @@
 
 #include "mongo/db/keys_collection_manager.h"
 
-#include "mongo/db/keys_collection_cache_reader.h"
-#include "mongo/db/keys_collection_cache_reader_and_updater.h"
+#include "mongo/db/key_generator.h"
+#include "mongo/db/keys_collection_cache.h"
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
@@ -165,19 +165,18 @@ void KeysCollectionManager::stopMonitoring() {
 void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doEnable) {
     if (doEnable) {
         _refresher.switchFunc(opCtx, [this](OperationContext* opCtx) {
-            KeysCollectionCacheReaderAndUpdater keyGenerator(
-                _purpose, _client.get(), _keyValidForInterval);
-            auto keyGenerationStatus = keyGenerator.refresh(opCtx);
+            KeyGenerator keyGenerator(_purpose, _client.get(), _keyValidForInterval);
+            auto keyGenerationStatus = keyGenerator.generateNewKeysIfNeeded(opCtx);
 
-            if (ErrorCodes::isShutdownError(keyGenerationStatus.getStatus().code())) {
-                return keyGenerationStatus;
+            if (ErrorCodes::isShutdownError(keyGenerationStatus.code())) {
+                return StatusWith<KeysCollectionDocument>(keyGenerationStatus);
             }
 
             // An error encountered by the keyGenerator should not prevent refreshing the cache
             auto cacheRefreshStatus = _keysCache.refresh(opCtx);
 
             if (!keyGenerationStatus.isOK()) {
-                return keyGenerationStatus;
+                return StatusWith<KeysCollectionDocument>(keyGenerationStatus);
             }
 
             return cacheRefreshStatus;

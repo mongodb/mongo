@@ -1364,8 +1364,8 @@ env.Library(
     target='keys_collection_manager',
     source=[
         'keys_collection_manager.cpp',
-        'keys_collection_cache_reader.cpp',
-        'keys_collection_cache_reader_and_updater.cpp',
+        'keys_collection_cache.cpp',
+        'key_generator.cpp',
     ],
     LIBDEPS=[
         'logical_clock',
@@ -1494,9 +1494,9 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='keys_collection_cache_reader_test',
+    target='keys_collection_cache_test',
     source=[
-        'keys_collection_cache_reader_test.cpp',
+        'keys_collection_cache_test.cpp',
     ],
     LIBDEPS=[
         'keys_collection_manager',
@@ -1506,9 +1506,9 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='keys_collection_cache_reader_and_updater_test',
+    target='key_generator_update_test',
     source=[
-        'keys_collection_cache_reader_and_updater_test.cpp',
+        'key_generator_update_test.cpp',
     ],
     LIBDEPS=[
         'keys_collection_manager',

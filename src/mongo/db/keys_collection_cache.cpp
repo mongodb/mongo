@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/keys_collection_cache_reader.h"
+#include "mongo/db/keys_collection_cache.h"
 
 #include "mongo/db/keys_collection_client.h"
 #include "mongo/db/keys_collection_document.h"
@@ -36,11 +36,10 @@
 
 namespace mongo {
 
-KeysCollectionCacheReader::KeysCollectionCacheReader(std::string purpose,
-                                                     KeysCollectionClient* client)
+KeysCollectionCache::KeysCollectionCache(std::string purpose, KeysCollectionClient* client)
     : _purpose(std::move(purpose)), _client(client) {}
 
-StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::refresh(OperationContext* opCtx) {
+StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext* opCtx) {
     LogicalTime newerThanThis;
 
     {
@@ -71,8 +70,8 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::refresh(OperationC
     return _cache.crbegin()->second;
 }
 
-StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::getKeyById(
-    long long keyId, const LogicalTime& forThisTime) {
+StatusWith<KeysCollectionDocument> KeysCollectionCache::getKeyById(long long keyId,
+                                                                   const LogicalTime& forThisTime) {
     stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
 
     for (auto iter = _cache.lower_bound(forThisTime); iter != _cache.cend(); ++iter) {
@@ -89,8 +88,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::getKeyById(
                           << keyId};
 }
 
-StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::getKey(
-    const LogicalTime& forThisTime) {
+StatusWith<KeysCollectionDocument> KeysCollectionCache::getKey(const LogicalTime& forThisTime) {
     stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
 
     auto iter = _cache.upper_bound(forThisTime);
@@ -103,7 +101,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::getKey(
     return iter->second;
 }
 
-void KeysCollectionCacheReader::resetCache() {
+void KeysCollectionCache::resetCache() {
     // keys that read with non majority readConcern level can be rolled back.
     if (!_client->supportsMajorityReads()) {
         _cache.clear();

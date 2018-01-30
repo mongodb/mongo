@@ -28,46 +28,38 @@
 
 #pragma once
 
-#include <map>
+#include <string>
 
-#include "mongo/db/keys_collection_cache.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
+class OperationContext;
 class KeysCollectionClient;
 
 /**
- * Keeps a local cache of the keys with the ability to refresh.
+ * Checks to make sure that there will be valid keys available to sign the current cluster time,
+ * and that there will be another key ready after the current key expires. Generates keys if they
+ * are necessary.
  *
- * Note: This assumes that user does not manually update the keys collection.
+ * Assumptions and limitations:
+ * - assumes that user does not manually update the keys collection.
+ * - assumes that current process is the config primary.
  */
-class KeysCollectionCacheReader : public KeysCollectionCache {
+class KeyGenerator {
 public:
-    KeysCollectionCacheReader(std::string purpose, KeysCollectionClient* client);
-    ~KeysCollectionCacheReader() = default;
+    KeyGenerator(std::string purpose, KeysCollectionClient* client, Seconds keyValidForInterval);
+    ~KeyGenerator() = default;
 
     /**
      * Check if there are new documents expiresAt > latestKeyDoc.expiresAt.
      */
-    StatusWith<KeysCollectionDocument> refresh(OperationContext* opCtx) override;
-
-    StatusWith<KeysCollectionDocument> getKey(const LogicalTime& forThisTime) override;
-    StatusWith<KeysCollectionDocument> getKeyById(long long keyId,
-                                                  const LogicalTime& forThisTime) override;
-
-    /**
-     * Resets the cache of keys if the client doesnt allow readConcern level:majority reads.
-     * This method intended to be called on the rollback of the node.
-     */
-    void resetCache();
+    Status generateNewKeysIfNeeded(OperationContext* opCtx);
 
 private:
-    const std::string _purpose;
     KeysCollectionClient* const _client;
-
-    stdx::mutex _cacheMutex;
-    std::map<LogicalTime, KeysCollectionDocument> _cache;  // expiresAt -> KeysDocument
+    const std::string _purpose;
+    const Seconds _keyValidForInterval;
 };
 
 }  // namespace mongo

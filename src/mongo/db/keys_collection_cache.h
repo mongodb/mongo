@@ -28,35 +28,47 @@
 
 #pragma once
 
+#include <map>
+
 #include "mongo/base/status_with.h"
 #include "mongo/db/keys_collection_document.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/stdx/mutex.h"
 
 namespace mongo {
 
-class LogicalTime;
-class OperationContext;
+class KeysCollectionClient;
 
+/**
+ * Keeps a local cache of the keys with the ability to refresh.
+ *
+ * Note: This assumes that user does not manually update the keys collection.
+ */
 class KeysCollectionCache {
 public:
-    virtual ~KeysCollectionCache() = default;
+    KeysCollectionCache(std::string purpose, KeysCollectionClient* client);
+    ~KeysCollectionCache() = default;
 
     /**
-     * Refreshes cache and returns the latest key seen.
+     * Check if there are new documents expiresAt > latestKeyDoc.expiresAt.
      */
-    virtual StatusWith<KeysCollectionDocument> refresh(OperationContext* opCtx) = 0;
+    StatusWith<KeysCollectionDocument> refresh(OperationContext* opCtx);
+
+    StatusWith<KeysCollectionDocument> getKey(const LogicalTime& forThisTime);
+    StatusWith<KeysCollectionDocument> getKeyById(long long keyId, const LogicalTime& forThisTime);
 
     /**
-     * Returns the key in the cache that has the smallest expiresAt value that is also greater than
-     * the forThisTime argument.
+     * Resets the cache of keys if the client doesnt allow readConcern level:majority reads.
+     * This method intended to be called on the rollback of the node.
      */
-    virtual StatusWith<KeysCollectionDocument> getKey(const LogicalTime& forThisTime) = 0;
+    void resetCache();
 
-    /**
-     * Returns the key in the cache that matches the keyId and expiresAt value to be no less than
-     * the forThisTime argument.
-     */
-    virtual StatusWith<KeysCollectionDocument> getKeyById(long long keyId,
-                                                          const LogicalTime& forThisTime) = 0;
+private:
+    const std::string _purpose;
+    KeysCollectionClient* const _client;
+
+    stdx::mutex _cacheMutex;
+    std::map<LogicalTime, KeysCollectionDocument> _cache;  // expiresAt -> KeysDocument
 };
 
 }  // namespace mongo

@@ -29,7 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/keys_collection_cache_reader.h"
+#include "mongo/db/keys_collection_cache.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_document.h"
 #include "mongo/db/operation_context.h"
@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-class CacheReaderTest : public ConfigServerTestFixture {
+class CacheTest : public ConfigServerTestFixture {
 protected:
     void setUp() override {
         ConfigServerTestFixture::setUp();
@@ -58,29 +58,29 @@ private:
     std::unique_ptr<KeysCollectionClient> _catalogClient;
 };
 
-TEST_F(CacheReaderTest, ErrorsIfCacheIsEmpty) {
-    KeysCollectionCacheReader reader("test", catalogClient());
-    auto status = reader.getKey(LogicalTime(Timestamp(1, 0))).getStatus();
+TEST_F(CacheTest, ErrorsIfCacheIsEmpty) {
+    KeysCollectionCache cache("test", catalogClient());
+    auto status = cache.getKey(LogicalTime(Timestamp(1, 0))).getStatus();
     ASSERT_EQ(ErrorCodes::KeyNotFound, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
-TEST_F(CacheReaderTest, RefreshErrorsIfCacheIsEmpty) {
-    KeysCollectionCacheReader reader("test", catalogClient());
-    auto status = reader.refresh(operationContext()).getStatus();
+TEST_F(CacheTest, RefreshErrorsIfCacheIsEmpty) {
+    KeysCollectionCache cache("test", catalogClient());
+    auto status = cache.refresh(operationContext()).getStatus();
     ASSERT_EQ(ErrorCodes::KeyNotFound, status.code());
     ASSERT_FALSE(status.reason().empty());
 }
 
-TEST_F(CacheReaderTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
-    KeysCollectionCacheReader reader("test", catalogClient());
+TEST_F(CacheTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
+    KeysCollectionCache cache("test", catalogClient());
 
     KeysCollectionDocument origKey1(
         1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey1.toBSON()));
 
-    auto refreshStatus = reader.refresh(operationContext());
+    auto refreshStatus = cache.refresh(operationContext());
     ASSERT_OK(refreshStatus.getStatus());
 
     {
@@ -91,7 +91,7 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
         ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
     }
 
-    auto status = reader.getKey(LogicalTime(Timestamp(1, 0)));
+    auto status = cache.getKey(LogicalTime(Timestamp(1, 0)));
     ASSERT_OK(status.getStatus());
 
     {
@@ -103,15 +103,15 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnCorrectKeyAfterRefresh) {
     }
 }
 
-TEST_F(CacheReaderTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
-    KeysCollectionCacheReader reader("test", catalogClient());
+TEST_F(CacheTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
+    KeysCollectionCache cache("test", catalogClient());
 
     KeysCollectionDocument origKey1(
         1, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey1.toBSON()));
 
-    auto refreshStatus = reader.refresh(operationContext());
+    auto refreshStatus = cache.refresh(operationContext());
     ASSERT_OK(refreshStatus.getStatus());
 
     {
@@ -122,12 +122,12 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnErrorIfNoKeyIsValidForGivenTime) {
         ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
     }
 
-    auto status = reader.getKey(LogicalTime(Timestamp(110, 0)));
+    auto status = cache.getKey(LogicalTime(Timestamp(110, 0)));
     ASSERT_EQ(ErrorCodes::KeyNotFound, status.getStatus());
 }
 
-TEST_F(CacheReaderTest, GetKeyShouldReturnOldestKeyPossible) {
-    KeysCollectionCacheReader reader("test", catalogClient());
+TEST_F(CacheTest, GetKeyShouldReturnOldestKeyPossible) {
+    KeysCollectionCache cache("test", catalogClient());
 
     KeysCollectionDocument origKey0(
         0, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
@@ -144,7 +144,7 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnOldestKeyPossible) {
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey2.toBSON()));
 
-    auto refreshStatus = reader.refresh(operationContext());
+    auto refreshStatus = cache.refresh(operationContext());
     ASSERT_OK(refreshStatus.getStatus());
 
     {
@@ -155,7 +155,7 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnOldestKeyPossible) {
         ASSERT_EQ(Timestamp(110, 0), key.getExpiresAt().asTimestamp());
     }
 
-    auto keyStatus = reader.getKey(LogicalTime(Timestamp(103, 1)));
+    auto keyStatus = cache.getKey(LogicalTime(Timestamp(103, 1)));
     ASSERT_OK(keyStatus.getStatus());
 
     {
@@ -167,8 +167,8 @@ TEST_F(CacheReaderTest, GetKeyShouldReturnOldestKeyPossible) {
     }
 }
 
-TEST_F(CacheReaderTest, RefreshShouldNotGetKeysForOtherPurpose) {
-    KeysCollectionCacheReader reader("test", catalogClient());
+TEST_F(CacheTest, RefreshShouldNotGetKeysForOtherPurpose) {
+    KeysCollectionCache cache("test", catalogClient());
 
     KeysCollectionDocument origKey0(
         0, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
@@ -176,10 +176,10 @@ TEST_F(CacheReaderTest, RefreshShouldNotGetKeysForOtherPurpose) {
         operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey0.toBSON()));
 
     {
-        auto refreshStatus = reader.refresh(operationContext());
+        auto refreshStatus = cache.refresh(operationContext());
         ASSERT_EQ(ErrorCodes::KeyNotFound, refreshStatus.getStatus());
 
-        auto emptyKeyStatus = reader.getKey(LogicalTime(Timestamp(50, 0)));
+        auto emptyKeyStatus = cache.getKey(LogicalTime(Timestamp(50, 0)));
         ASSERT_EQ(ErrorCodes::KeyNotFound, emptyKeyStatus.getStatus());
     }
 
@@ -189,7 +189,7 @@ TEST_F(CacheReaderTest, RefreshShouldNotGetKeysForOtherPurpose) {
         operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey1.toBSON()));
 
     {
-        auto refreshStatus = reader.refresh(operationContext());
+        auto refreshStatus = cache.refresh(operationContext());
         ASSERT_OK(refreshStatus.getStatus());
 
         auto key = refreshStatus.getValue();
@@ -199,7 +199,7 @@ TEST_F(CacheReaderTest, RefreshShouldNotGetKeysForOtherPurpose) {
         ASSERT_EQ(Timestamp(105, 0), key.getExpiresAt().asTimestamp());
     }
 
-    auto keyStatus = reader.getKey(LogicalTime(Timestamp(60, 1)));
+    auto keyStatus = cache.getKey(LogicalTime(Timestamp(60, 1)));
     ASSERT_OK(keyStatus.getStatus());
 
     {
@@ -211,8 +211,8 @@ TEST_F(CacheReaderTest, RefreshShouldNotGetKeysForOtherPurpose) {
     }
 }
 
-TEST_F(CacheReaderTest, RefreshCanIncrementallyGetNewKeys) {
-    KeysCollectionCacheReader reader("test", catalogClient());
+TEST_F(CacheTest, RefreshCanIncrementallyGetNewKeys) {
+    KeysCollectionCache cache("test", catalogClient());
 
     KeysCollectionDocument origKey0(
         0, "test", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0)));
@@ -220,7 +220,7 @@ TEST_F(CacheReaderTest, RefreshCanIncrementallyGetNewKeys) {
         operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey0.toBSON()));
 
     {
-        auto refreshStatus = reader.refresh(operationContext());
+        auto refreshStatus = cache.refresh(operationContext());
         ASSERT_OK(refreshStatus.getStatus());
 
 
@@ -230,7 +230,7 @@ TEST_F(CacheReaderTest, RefreshCanIncrementallyGetNewKeys) {
         ASSERT_EQ("test", key.getPurpose());
         ASSERT_EQ(Timestamp(100, 0), key.getExpiresAt().asTimestamp());
 
-        auto keyStatus = reader.getKey(LogicalTime(Timestamp(112, 1)));
+        auto keyStatus = cache.getKey(LogicalTime(Timestamp(112, 1)));
         ASSERT_EQ(ErrorCodes::KeyNotFound, keyStatus.getStatus());
     }
 
@@ -245,7 +245,7 @@ TEST_F(CacheReaderTest, RefreshCanIncrementallyGetNewKeys) {
         operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey2.toBSON()));
 
     {
-        auto refreshStatus = reader.refresh(operationContext());
+        auto refreshStatus = cache.refresh(operationContext());
         ASSERT_OK(refreshStatus.getStatus());
 
         auto key = refreshStatus.getValue();
@@ -256,7 +256,7 @@ TEST_F(CacheReaderTest, RefreshCanIncrementallyGetNewKeys) {
     }
 
     {
-        auto keyStatus = reader.getKey(LogicalTime(Timestamp(108, 1)));
+        auto keyStatus = cache.getKey(LogicalTime(Timestamp(108, 1)));
 
         auto key = keyStatus.getValue();
         ASSERT_EQ(2, key.getKeyId());
