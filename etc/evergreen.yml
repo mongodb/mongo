@@ -1388,9 +1388,9 @@ functions:
           else
              variant=ubuntu1604
           fi
-          # Download latest version of curator
-          latest_curator_hash=$(git ls-remote https://github.com/mongodb/curator.git | grep HEAD | cut -f1)
-          curator_url="https://s3.amazonaws.com/boxes.10gen.com/build/curator/curator-dist-$variant-$latest_curator_hash.tar.gz"
+          # Download stable version of curator
+          curator_hash=117d1a65256ff78b6d15ab79a1c7088443b936d0
+          curator_url="https://s3.amazonaws.com/boxes.10gen.com/build/curator/curator-dist-$variant-$curator_hash.tar.gz"
           cmds="curl -s $curator_url | tar -xzv"
           if [ "Windows_NT" = "$OS" ]; then
             # Since curator runs as SYSTEM user, ensure the output files can be accessed.
