@@ -71,6 +71,21 @@ function validateCollections(db, obj) {
         filter = {$or: [filter, {type: {$exists: false}}]};
     }
 
+    // Optionally skip collections.
+    if (Array.isArray(jsTest.options().skipValidationNamespaces) &&
+        jsTest.options().skipValidationNamespaces.length > 0) {
+        let skippedCollections = [];
+        for (let ns of jsTest.options().skipValidationNamespaces) {
+            // Strip off the database name from 'ns' to extract the collName.
+            const collName = ns.replace(new RegExp('^' + db.getName() + '\.'), '');
+            // Skip the collection 'collName' if the db name was removed from 'ns'.
+            if (collName !== ns) {
+                skippedCollections.push({name: {$ne: collName}});
+            }
+        }
+        filter = {$and: [filter, ...skippedCollections]};
+    }
+
     let collInfo = db.getCollectionInfos(filter);
     for (var collDocument of collInfo) {
         var coll = db.getCollection(collDocument["name"]);

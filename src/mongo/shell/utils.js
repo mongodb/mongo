@@ -242,7 +242,8 @@ jsTestOptions = function() {
             networkMessageCompressors: TestData.networkMessageCompressors,
             skipValidationOnInvalidViewDefinitions: TestData.skipValidationOnInvalidViewDefinitions,
             forceValidationWithFeatureCompatibilityVersion:
-                TestData.forceValidationWithFeatureCompatibilityVersion
+                TestData.forceValidationWithFeatureCompatibilityVersion,
+            skipValidationNamespaces: TestData.skipValidationNamespaces || [],
         });
     }
     return _jsTestOptions;
