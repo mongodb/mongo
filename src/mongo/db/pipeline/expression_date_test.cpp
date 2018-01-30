@@ -772,11 +772,34 @@ TEST_F(ExpressionDateFromStringTest, SerializesToObjectSyntax) {
 
     ASSERT_VALUE_EQ(dateExp->serialize(true), expectedSerialization);
     ASSERT_VALUE_EQ(dateExp->serialize(false), expectedSerialization);
+
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-04T13:06:44Z"
+                                          << "timezone"
+                                          << "Europe/London"
+                                          << "format"
+                                          << "%Y-%d-%mT%H:%M:%S"
+                                          << "onNull"
+                                          << "nullDefault"
+                                          << "onError"
+                                          << "errorDefault"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    expectedSerialization =
+        Value(Document{{"$dateFromString",
+                        Document{{"dateString", Document{{"$const", "2017-07-04T13:06:44Z"_sd}}},
+                                 {"timezone", Document{{"$const", "Europe/London"_sd}}},
+                                 {"format", Document{{"$const", "%Y-%d-%mT%H:%M:%S"_sd}}},
+                                 {"onNull", Document{{"$const", "nullDefault"_sd}}},
+                                 {"onError", Document{{"$const", "errorDefault"_sd}}}}}});
+
+    ASSERT_VALUE_EQ(dateExp->serialize(true), expectedSerialization);
+    ASSERT_VALUE_EQ(dateExp->serialize(false), expectedSerialization);
 }
 
 TEST_F(ExpressionDateFromStringTest, OptimizesToConstantIfAllInputsAreConstant) {
     auto expCtx = getExpCtx();
-    // Test that it becomes a constant with just the dateString.
+
+    // Test that it becomes a constant if all parameters evaluate to a constant value.
     auto spec = BSON("$dateFromString" << BSON("dateString"
                                                << "2017-07-04T13:09:57Z"));
     auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
@@ -785,7 +808,6 @@ TEST_F(ExpressionDateFromStringTest, OptimizesToConstantIfAllInputsAreConstant) 
     Date_t dateVal = Date_t::fromMillisSinceEpoch(1499173797000);
     ASSERT_VALUE_EQ(Value(dateVal), dateExp->evaluate(Document{}));
 
-    // Test that it becomes a constant with the dateString and timezone being a constant.
     spec = BSON("$dateFromString" << BSON("dateString"
                                           << "2017-07-04T13:09:57"
                                           << "timezone"
@@ -805,6 +827,29 @@ TEST_F(ExpressionDateFromStringTest, OptimizesToConstantIfAllInputsAreConstant) 
 
     dateVal = Date_t::fromMillisSinceEpoch(1499170197000);
     ASSERT_VALUE_EQ(Value(dateVal), dateExp->evaluate(Document{}));
+
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-04T13:09:57"
+                                          << "onNull"
+                                          << "Null default"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-04T13:09:57"
+                                          << "onError"
+                                          << "Error default"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-04T13:09:57"
+                                          << "onError"
+                                          << "Error default"
+                                          << "onNull"
+                                          << "null default"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
 
     // Test that it does *not* become a constant if dateString is not a constant.
     spec = BSON("$dateFromString" << BSON("dateString"
@@ -829,6 +874,22 @@ TEST_F(ExpressionDateFromStringTest, OptimizesToConstantIfAllInputsAreConstant) 
                                           << "$format"));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
     ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if onNull is not a constant.
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-04T13:09:57Z"
+                                          << "onNull"
+                                          << "$onNull"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+
+    // Test that it does *not* become a constant if onError is not a constant.
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2017-07-04T13:09:57Z"
+                                          << "onError"
+                                          << "$onError"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
 }
 
 TEST_F(ExpressionDateFromStringTest, RejectsUnparsableString) {
@@ -837,7 +898,7 @@ TEST_F(ExpressionDateFromStringTest, RejectsUnparsableString) {
     auto spec = BSON("$dateFromString" << BSON("dateString"
                                                << "60.Monday1770/06:59"));
     auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40553);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
 }
 
 TEST_F(ExpressionDateFromStringTest, RejectsTimeZoneInString) {
@@ -846,12 +907,12 @@ TEST_F(ExpressionDateFromStringTest, RejectsTimeZoneInString) {
     auto spec = BSON("$dateFromString" << BSON("dateString"
                                                << "2017-07-13T10:02:57 Europe/London"));
     auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40553);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
 
     spec = BSON("$dateFromString" << BSON("dateString"
                                           << "July 4, 2017 Europe/London"));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40553);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
 }
 
 TEST_F(ExpressionDateFromStringTest, RejectsTimeZoneInStringAndArgument) {
@@ -863,7 +924,7 @@ TEST_F(ExpressionDateFromStringTest, RejectsTimeZoneInStringAndArgument) {
                                                << "timezone"
                                                << "Europe/London"));
     auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40551);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
 
     // Test with timezone abbreviation and timezone
     spec = BSON("$dateFromString" << BSON("dateString"
@@ -871,7 +932,7 @@ TEST_F(ExpressionDateFromStringTest, RejectsTimeZoneInStringAndArgument) {
                                           << "timezone"
                                           << "Europe/London"));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40551);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
 
     // Test with GMT offset and timezone
     spec = BSON("$dateFromString" << BSON("dateString"
@@ -879,7 +940,7 @@ TEST_F(ExpressionDateFromStringTest, RejectsTimeZoneInStringAndArgument) {
                                           << "timezone"
                                           << "Europe/London"));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40554);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
 
     // Test with GMT offset and GMT timezone
     spec = BSON("$dateFromString" << BSON("dateString"
@@ -887,7 +948,7 @@ TEST_F(ExpressionDateFromStringTest, RejectsTimeZoneInStringAndArgument) {
                                           << "timezone"
                                           << "GMT"));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40554);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
 }
 
 TEST_F(ExpressionDateFromStringTest, RejectsNonStringFormat) {
@@ -916,14 +977,14 @@ TEST_F(ExpressionDateFromStringTest, RejectsStringsThatDoNotMatchFormat) {
                                                << "format"
                                                << "%Y-%m-%d"));
     auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40553);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
 
     spec = BSON("$dateFromString" << BSON("dateString"
                                           << "2017-07"
                                           << "format"
                                           << "%m-%Y"));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40553);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
 }
 
 TEST_F(ExpressionDateFromStringTest, EscapeCharacterAllowsPrefixUsage) {
@@ -1050,6 +1111,201 @@ TEST_F(ExpressionDateFromStringTest, ConvertStringWithISODateFormat) {
     ASSERT_EQ("2017-01-08T00:00:00.000Z", dateExp->evaluate(Document{}).toString());
 }
 
-}  // namespace ExpressionDateFromStringTest
+TEST_F(ExpressionDateFromStringTest, ReturnsOnNullForNullishInput) {
+    auto expCtx = getExpCtx();
 
+    auto spec = BSON("$dateFromString" << BSON("dateString" << BSONNULL << "onNull"
+                                                            << "Null default"));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_VALUE_EQ(Value("Null default"_sd), dateExp->evaluate(Document{}));
+
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "$missing"
+                                          << "onNull"
+                                          << "Null default"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_VALUE_EQ(Value("Null default"_sd), dateExp->evaluate(Document{}));
+
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "$missing"
+                                          << "onNull"
+                                          << "$alsoMissing"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_VALUE_EQ(Value(), dateExp->evaluate(Document{}));
+
+    spec = BSON("$dateFromString" << BSON("dateString" << BSONNULL << "onNull" << BSONNULL));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_VALUE_EQ(Value(BSONNULL), dateExp->evaluate(Document{}));
+}
+
+TEST_F(ExpressionDateFromStringTest, InvalidFormatTakesPrecedenceOverOnNull) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromString" << BSON("dateString" << BSONNULL << "onNull"
+                                                            << "Null default"
+                                                            << "format"
+                                                            << 5));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40684);
+
+    spec = BSON("$dateFromString" << BSON("dateString" << BSONNULL << "onNull"
+                                                       << "Null default"
+                                                       << "format"
+                                                       << "%"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 18535);
+}
+
+TEST_F(ExpressionDateFromStringTest, InvalidFormatTakesPrecedenceOverOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromString" << BSON("dateString"
+                                               << "Invalid dateString"
+                                               << "onError"
+                                               << "Not used default"
+                                               << "format"
+                                               << 5));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40684);
+
+    spec = BSON("$dateFromString" << BSON("dateString" << 5 << "onError"
+                                                       << "Not used default"
+                                                       << "format"
+                                                       << "%"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 18535);
+}
+
+TEST_F(ExpressionDateFromStringTest, InvalidTimezoneTakesPrecedenceOverOnNull) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromString" << BSON("dateString" << BSONNULL << "onNull"
+                                                            << "Null default"
+                                                            << "timezone"
+                                                            << 5));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40517);
+
+    spec = BSON("$dateFromString" << BSON("dateString" << BSONNULL << "onNull"
+                                                       << "Null default"
+                                                       << "timezone"
+                                                       << "invalid timezone string"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40485);
+}
+
+TEST_F(ExpressionDateFromStringTest, InvalidTimezoneTakesPrecedenceOverOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromString" << BSON("dateString"
+                                               << "Invalid dateString"
+                                               << "onError"
+                                               << "On error default"
+                                               << "timezone"
+                                               << 5));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40517);
+
+    spec = BSON("$dateFromString" << BSON("dateString" << 5 << "onError"
+                                                       << "On error default"
+                                                       << "timezone"
+                                                       << "invalid timezone string"));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(dateExp->evaluate({}), AssertionException, 40485);
+}
+
+TEST_F(ExpressionDateFromStringTest, OnNullTakesPrecedenceOverOtherNullishParameters) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromString" << BSON("dateString" << BSONNULL << "onNull"
+                                                            << "Null default"
+                                                            << "timezone"
+                                                            << BSONNULL));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_VALUE_EQ(Value("Null default"_sd), dateExp->evaluate(Document{}));
+
+    spec = BSON("$dateFromString" << BSON("dateString" << BSONNULL << "onNull"
+                                                       << "Null default"
+                                                       << "format"
+                                                       << BSONNULL));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_VALUE_EQ(Value("Null default"_sd), dateExp->evaluate(Document{}));
+}
+
+TEST_F(ExpressionDateFromStringTest, OnNullOnlyUsedIfInputStringIsNullish) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromString" << BSON("dateString"
+                                               << "2018-02-14"
+                                               << "onNull"
+                                               << "Null default"
+                                               << "timezone"
+                                               << BSONNULL));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_VALUE_EQ(Value(BSONNULL), dateExp->evaluate(Document{}));
+
+    spec = BSON("$dateFromString" << BSON("dateString"
+                                          << "2018-02-14"
+                                          << "onNull"
+                                          << "Null default"
+                                          << "format"
+                                          << BSONNULL));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_VALUE_EQ(Value(BSONNULL), dateExp->evaluate(Document{}));
+}
+
+TEST_F(ExpressionDateFromStringTest, ReturnsOnErrorForParseFailures) {
+    auto expCtx = getExpCtx();
+
+    std::vector<std::string> invalidDates = {
+        "60.Monday1770/06:59", "July 4th", "12:50:53", "2017, 12:50:53"};
+    for (auto date : invalidDates) {
+        auto spec = BSON("$dateFromString" << BSON("dateString" << date << "onError"
+                                                                << "Error default"));
+        auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+        ASSERT_VALUE_EQ(Value("Error default"_sd), dateExp->evaluate(Document{}));
+    }
+}
+
+TEST_F(ExpressionDateFromStringTest, ReturnsOnErrorForFormatMismatch) {
+    auto expCtx = getExpCtx();
+
+    const std::string date = "2018/02/06";
+    std::vector<std::string> unmatchedFormats = {"%Y", "%Y/%m/%d:%H", "Y/m/d"};
+    for (auto format : unmatchedFormats) {
+        auto spec =
+            BSON("$dateFromString" << BSON("dateString" << date << "format" << format << "onError"
+                                                        << "Error default"));
+        auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+        ASSERT_VALUE_EQ(Value("Error default"_sd), dateExp->evaluate(Document{}));
+    }
+}
+
+TEST_F(ExpressionDateFromStringTest, OnNullEvaluatedLazily) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromString" << BSON("dateString"
+                                               << "$date"
+                                               << "onNull"
+                                               << BSON("$divide" << BSON_ARRAY(1 << 0))));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_EQ("2018-02-14T00:00:00.000Z",
+              dateExp->evaluate(Document{{"date", "2018-02-14"_sd}}).toString());
+    ASSERT_THROWS_CODE(dateExp->evaluate(Document{}), AssertionException, 16608);
+}
+
+TEST_F(ExpressionDateFromStringTest, OnErrorEvaluatedLazily) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromString" << BSON("dateString"
+                                               << "$date"
+                                               << "onError"
+                                               << BSON("$divide" << BSON_ARRAY(1 << 0))));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_EQ("2018-02-14T00:00:00.000Z",
+              dateExp->evaluate(Document{{"date", "2018-02-14"_sd}}).toString());
+    ASSERT_THROWS_CODE(dateExp->evaluate(Document{{"date", 5}}), AssertionException, 16608);
+}
+
+}  // namespace ExpressionDateFromStringTest
 }  // namespace mongo

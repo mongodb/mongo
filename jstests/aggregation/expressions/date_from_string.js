@@ -593,8 +593,10 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
     ];
 
     pipelines.forEach(function(pipeline) {
-        assertErrMsgContains(
-            coll, pipeline, 40545, "an incomplete date/time string has been found");
+        assertErrMsgContains(coll,
+                             pipeline,
+                             ErrorCodes.ConversionFailure,
+                             "an incomplete date/time string has been found");
     });
 
     /* --------------------------------------------------------------------------------------- */
@@ -612,7 +614,8 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
     ];
 
     pipelines.forEach(function(pipeline) {
-        assertErrMsgContains(coll, pipeline, 40553, "Error parsing date string");
+        assertErrMsgContains(
+            coll, pipeline, ErrorCodes.ConversionFailure, "Error parsing date string");
     });
 
     /* --------------------------------------------------------------------------------------- */
@@ -670,8 +673,10 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
     assertErrMsgContains(coll, pipeline, 40541, "Unrecognized argument");
 
     pipeline = [{$project: {date: {$dateFromString: {dateString: 5}}}}];
-    assertErrMsgContains(
-        coll, pipeline, 40543, "$dateFromString requires that 'dateString' be a string");
+    assertErrMsgContains(coll,
+                         pipeline,
+                         ErrorCodes.ConversionFailure,
+                         "$dateFromString requires that 'dateString' be a string");
 
     /* --------------------------------------------------------------------------------------- */
     /* Passing in time zone with date/time string. */
@@ -684,7 +689,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
             }
         }
     };
-    assertErrorCode(coll, pipeline, 40554);
+    assertErrorCode(coll, pipeline, ErrorCodes.ConversionFailure);
 
     pipeline = {
         $project: {
@@ -694,7 +699,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
             }
         }
     };
-    assertErrorCode(coll, pipeline, 40551);
+    assertErrorCode(coll, pipeline, ErrorCodes.ConversionFailure);
 
     pipeline = {
         $project: {
@@ -706,26 +711,26 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
             }
         }
     };
-    assertErrorCode(coll, pipeline, 40553);
+    assertErrorCode(coll, pipeline, ErrorCodes.ConversionFailure);
 
     pipeline = {
         $project: {date: {$dateFromString: {dateString: "2017-07-12T22:23:55 Europe/Amsterdam"}}}
     };
-    assertErrorCode(coll, pipeline, 40553);
+    assertErrorCode(coll, pipeline, ErrorCodes.ConversionFailure);
 
     /* --------------------------------------------------------------------------------------- */
     /* Error cases for $dateFromString with format specifier string. */
 
     // Test umatched format specifier string.
     pipeline = [{$project: {date: {$dateFromString: {dateString: "2018-01", format: "%Y-%m-%d"}}}}];
-    assertErrMsgContains(coll, pipeline, 40553, "Data missing");
+    assertErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Data missing");
 
     pipeline = [{$project: {date: {$dateFromString: {dateString: "2018-01", format: "%Y"}}}}];
-    assertErrMsgContains(coll, pipeline, 40553, "Trailing data");
+    assertErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Trailing data");
 
     // Test missing specifier prefix '%'.
     pipeline = [{$project: {date: {$dateFromString: {dateString: "1992-26-04", format: "Y-d-m"}}}}];
-    assertErrMsgContains(coll, pipeline, 40553, "Format literal not found");
+    assertErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Format literal not found");
 
     pipeline = [{$project: {date: {$dateFromString: {dateString: "1992", format: "%n"}}}}];
     assertErrMsgContains(coll, pipeline, 18536, "Invalid format character");
@@ -741,7 +746,7 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
     assertErrMsgContains(
         coll,
         pipeline,
-        40554,
+        ErrorCodes.ConversionFailure,
         "you cannot pass in a date/time string with GMT offset together with a timezone argument");
 
     pipeline = [{$project: {date: {$dateFromString: {dateString: "4/26/1992", format: 5}}}}];
@@ -754,31 +759,37 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertE
 
     pipeline =
         [{$project: {date: {$dateFromString: {dateString: "ISO Day 6", format: "ISO Day %u"}}}}];
-    assertErrMsgContains(coll, pipeline, 40553, "The parsed date was invalid");
+    assertErrMsgContains(
+        coll, pipeline, ErrorCodes.ConversionFailure, "The parsed date was invalid");
 
     pipeline =
         [{$project: {date: {$dateFromString: {dateString: "ISO Week 52", format: "ISO Week %V"}}}}];
-    assertErrMsgContains(coll, pipeline, 40553, "The parsed date was invalid");
+    assertErrMsgContains(
+        coll, pipeline, ErrorCodes.ConversionFailure, "The parsed date was invalid");
 
     pipeline = [{
         $project: {
             date: {$dateFromString: {dateString: "ISO Week 1, 2018", format: "ISO Week %V, %Y"}}
         }
     }];
-    assertErrMsgContains(
-        coll, pipeline, 40553, "Mixing of ISO dates with natural dates is not allowed");
+    assertErrMsgContains(coll,
+                         pipeline,
+                         ErrorCodes.ConversionFailure,
+                         "Mixing of ISO dates with natural dates is not allowed");
 
     pipeline =
         [{$project: {date: {$dateFromString: {dateString: "12/31/2018", format: "%m/%d/%G"}}}}];
-    assertErrMsgContains(
-        coll, pipeline, 40553, "Mixing of ISO dates with natural dates is not allowed");
+    assertErrMsgContains(coll,
+                         pipeline,
+                         ErrorCodes.ConversionFailure,
+                         "Mixing of ISO dates with natural dates is not allowed");
 
     // Test embedded null bytes in the 'dateString' and 'format' fields.
     pipeline =
         [{$project: {date: {$dateFromString: {dateString: "12/31\0/2018", format: "%m/%d/%Y"}}}}];
-    assertErrMsgContains(coll, pipeline, 40553, "Data missing");
+    assertErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Data missing");
 
     pipeline =
         [{$project: {date: {$dateFromString: {dateString: "12/31/2018", format: "%m/%d\0/%Y"}}}}];
-    assertErrMsgContains(coll, pipeline, 40553, "Trailing data");
+    assertErrMsgContains(coll, pipeline, ErrorCodes.ConversionFailure, "Trailing data");
 })();

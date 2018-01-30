@@ -1000,10 +1000,10 @@ TEST(DateFromString, CorrectlyParsesStringThatMatchesFormat) {
 TEST(DateFromString, RejectsStringWithInvalidYearFormat) {
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("201", kDefaultTimeZone, "%Y"_sd),
                        AssertionException,
-                       40545);
+                       ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("20i7", kDefaultTimeZone, "%Y"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
 }
 
 TEST(DateFromString, RejectsStringWithInvalidMinuteFormat) {
@@ -1011,11 +1011,11 @@ TEST(DateFromString, RejectsStringWithInvalidMinuteFormat) {
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString(
                            "2017-01-01T00:1:00", kDefaultTimeZone, "%Y-%m-%dT%H%M%S"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString(
                            "2017-01-01T00:0i:00", kDefaultTimeZone, "%Y-%m-%dT%H%M%S"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
 }
 
 TEST(DateFromString, RejectsStringWithInvalidSecondsFormat) {
@@ -1023,54 +1023,54 @@ TEST(DateFromString, RejectsStringWithInvalidSecondsFormat) {
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString(
                            "2017-01-01T00:00:1", kDefaultTimeZone, "%Y-%m-%dT%H%M%S"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString(
                            "2017-01-01T00:00:i0", kDefaultTimeZone, "%Y-%m-%dT%H%M%S"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
 }
 
 TEST(DateFromString, RejectsStringWithInvalidMillisecondsFormat) {
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString(
                            "2017-01-01T00:00:00.i", kDefaultTimeZone, "%Y-%m-%dT%H:%M:%S.%L"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
 }
 
 TEST(DateFromString, RejectsStringWithInvalidISOYear) {
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("20i7", kDefaultTimeZone, "%G"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
 }
 
 TEST(DateFromString, RejectsStringWithInvalidISOWeekOfYear) {
     // ISO week of year must be between 1 and 53.
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-55", kDefaultTimeZone, "%G-%V"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-FF", kDefaultTimeZone, "%G-%V"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
 }
 
 TEST(DateFromString, RejectsStringWithInvalidISODayOfWeek) {
     // Day of week must be single digit between 1 and 7.
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-8", kDefaultTimeZone, "%G-%u"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-0", kDefaultTimeZone, "%G-%u"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-a", kDefaultTimeZone, "%G-%u"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-11", kDefaultTimeZone, "%G-%u"_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(
         kDefaultTimeZoneDatabase.fromString("2017-123", kDefaultTimeZone, "%G-%u"_sd),
         AssertionException,
-        40553);
+        ErrorCodes::ConversionFailure);
 }
 
 TEST(DateFromString, RejectsStringWithInvalidTimezoneOffset) {
@@ -1078,24 +1078,24 @@ TEST(DateFromString, RejectsStringWithInvalidTimezoneOffset) {
     ASSERT_THROWS_CODE(
         kDefaultTimeZoneDatabase.fromString("2017 500", kDefaultTimeZone, "%G %Z"_sd),
         AssertionException,
-        40553);
+        ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(
         kDefaultTimeZoneDatabase.fromString("2017 0500", kDefaultTimeZone, "%G %Z"_sd),
         AssertionException,
-        40553);
+        ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(
         kDefaultTimeZoneDatabase.fromString("2017 +i00", kDefaultTimeZone, "%G %Z"_sd),
         AssertionException,
-        40553);
+        ErrorCodes::ConversionFailure);
 }
 
 TEST(DateFromString, EmptyFormatStringThrowsForAllInputs) {
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("1/1/2017", kDefaultTimeZone, ""_sd),
                        AssertionException,
-                       40553);
+                       ErrorCodes::ConversionFailure);
     ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("", kDefaultTimeZone, ""_sd),
                        AssertionException,
-                       40545);
+                       ErrorCodes::ConversionFailure);
 }
 
 }  // namespace

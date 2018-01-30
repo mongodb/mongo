@@ -874,11 +874,15 @@ private:
     ExpressionDateFromString(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                              boost::intrusive_ptr<Expression> dateString,
                              boost::intrusive_ptr<Expression> timeZone,
-                             boost::intrusive_ptr<Expression> format);
+                             boost::intrusive_ptr<Expression> format,
+                             boost::intrusive_ptr<Expression> onNull,
+                             boost::intrusive_ptr<Expression> onError);
 
     boost::intrusive_ptr<Expression> _dateString;
     boost::intrusive_ptr<Expression> _timeZone;
     boost::intrusive_ptr<Expression> _format;
+    boost::intrusive_ptr<Expression> _onNull;
+    boost::intrusive_ptr<Expression> _onError;
 };
 
 class ExpressionDateFromParts final : public Expression {
