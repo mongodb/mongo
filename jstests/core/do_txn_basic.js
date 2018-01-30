@@ -4,6 +4,18 @@
     "use strict";
 
     load("jstests/libs/get_index_helpers.js");
+    // For supportsDocumentLevelConcurrency.
+    load("jstests/concurrency/fsm_workload_helpers/server_types.js");
+
+    if (!supportsDocumentLevelConcurrency(db)) {
+        assert.commandFailedWithCode(
+            db.adminCommand({doTxn: []}),
+            ErrorCodes.CommandNotSupported,
+            "doTxn should fail if document level locking isn't supported.");
+
+        jsTestLog("Skipping test as the storage engine does not support doTxn.");
+        return;
+    }
 
     var t = db.do_txn1;
     t.drop();

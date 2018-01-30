@@ -155,6 +155,10 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        uassert(ErrorCodes::CommandNotSupported,
+                "This storage engine does not support transactions.",
+                opCtx->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking());
+
         validateDoTxnCommand(cmdObj);
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
