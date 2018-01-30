@@ -61,7 +61,7 @@ namespace mongo {
 
 #ifdef MONGO_CONFIG_SSL
 class SSLManagerInterface;
-class SSLConnection;
+class SSLConnectionInterface;
 #endif
 struct SSLPeerInfo;
 
@@ -261,7 +261,7 @@ private:
     time_t _lastValidityCheckAtSecs;
 
 #ifdef MONGO_CONFIG_SSL
-    std::unique_ptr<SSLConnection> _sslConnection;
+    std::unique_ptr<SSLConnectionInterface> _sslConnection;
     SSLManagerInterface* _sslManager;
 #endif
     logger::LogSeverity _logLevel;  // passed to log() when logging errors
