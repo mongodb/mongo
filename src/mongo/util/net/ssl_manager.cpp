@@ -1217,8 +1217,8 @@ bool SSLManager::_setupCRL(SSL_CTX* context, const std::string& crlFile) {
                 << getSSLErrorMessage(ERR_get_error());
         return false;
     }
-    log() << "ssl imported " << status << " revoked certificate" << ((status == 1) ? "" : "s")
-          << " from the revocation list.";
+    log() << "ssl imported " << status << " revoked certificate list"
+          << ((status == 1) ? "" : "s") << " from the CRL file.";
     return true;
 }
 
