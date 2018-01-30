@@ -10,12 +10,13 @@
 
 /*
  * __wt_optrack_record_funcid --
- *	Record optrack function id
+ *	Allocate and record optrack function ID.
  */
 void
 __wt_optrack_record_funcid(
     WT_SESSION_IMPL *session, const char *func, uint16_t *func_idp)
 {
+	static uint16_t optrack_uid = 0; /* Unique for the process lifetime. */
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
@@ -27,7 +28,7 @@ __wt_optrack_record_funcid(
 
 	__wt_spin_lock(session, &conn->optrack_map_spinlock);
 	if (*func_idp == 0) {
-		*func_idp = ++conn->optrack_uid;
+		*func_idp = ++optrack_uid;
 
 		WT_ERR(__wt_buf_fmt(
 		    session, tmp, "%" PRIu16 " %s\n", *func_idp, func));
