@@ -70,10 +70,16 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
                                       << " believes it is a config server"};
             }
             using ConfigServerMode = CatalogManager::ConfigServerMode;
-            const BSONElement setName = isMasterReply.data["setName"];
             auto configServerMode =
                 (configServerModeNumber == 0 ? ConfigServerMode::SCCC : ConfigServerMode::CSRS);
 
+            if (configServerMode == ConfigServerMode::CSRS) {
+                uassert(ErrorCodes::ReplicaSetNotFound,
+                        "CSRS replica set is not initialized",
+                        isMasterReply.data.hasField("setName"));
+            }
+
+            const BSONElement setName = isMasterReply.data["setName"];
             // We still want to call scheduleReplaceCatalogManagerIfNeeded when configServerMode
             // is SCCC to catch illegal downgrade attempts and return a useful error message.
             // To enable that we use the default (invalid) ConnectionString when configServerMode
