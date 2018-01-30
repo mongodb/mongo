@@ -61,6 +61,7 @@ env.Library(
         'role_graph.cpp',
         'role_graph_update.cpp',
         'role_graph_builtin_roles.cpp',
+        'sasl_mechanism_advertiser.cpp',
         'user.cpp',
         'user_document_parser.cpp',
         'user_management_commands_parser.cpp',

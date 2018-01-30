@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/auth/sasl_mechanism_advertiser.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
@@ -388,6 +389,8 @@ public:
             MessageCompressorManager::forSession(opCtx->getClient()->session())
                 .serverNegotiate(cmdObj, &result);
         }
+
+        SASLMechanismAdvertiser::advertise(opCtx, cmdObj, &result);
 
         return true;
     }

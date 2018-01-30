@@ -47,6 +47,21 @@ UserName::UserName(StringData user, StringData dbname) {
     _splitPoint = user.size();
 }
 
+
+StatusWith<UserName> UserName::parse(StringData userNameStr) {
+    size_t splitPoint = userNameStr.find('.');
+
+    if (splitPoint == std::string::npos) {
+        return Status(ErrorCodes::BadValue,
+                      "username must contain a '.' separated database.user pair");
+    }
+
+    StringData userDBPortion = userNameStr.substr(0, splitPoint);
+    StringData userNamePortion = userNameStr.substr(splitPoint + 1);
+
+    return UserName(userNamePortion, userDBPortion);
+}
+
 std::ostream& operator<<(std::ostream& os, const UserName& name) {
     return os << name.getFullName();
 }
