@@ -179,7 +179,7 @@ public:
         authzManager->setAuthEnabled(true);
 
         credentials = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
-                               "password", saslGlobalParams.scramIterationCount.load()));
+                               "password", saslGlobalParams.scramSHA1IterationCount.load()));
     }
 
     std::unique_ptr<AuthorizationManager> authzManager;

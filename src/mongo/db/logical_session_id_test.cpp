@@ -106,7 +106,7 @@ public:
 
     User* addSimpleUser(UserName un) {
         const auto creds = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
-                                    "a", saslGlobalParams.scramIterationCount.load()));
+                                    "a", saslGlobalParams.scramSHA1IterationCount.load()));
         ASSERT_OK(managerState->insertPrivilegeDocument(
             _opCtx.get(),
             BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << creds << "roles"
@@ -121,7 +121,7 @@ public:
 
     User* addClusterUser(UserName un) {
         const auto creds = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
-                                    "a", saslGlobalParams.scramIterationCount.load()));
+                                    "a", saslGlobalParams.scramSHA1IterationCount.load()));
         ASSERT_OK(managerState->insertPrivilegeDocument(
             _opCtx.get(),
             BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << creds << "roles"
