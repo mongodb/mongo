@@ -74,15 +74,15 @@ public:
     AllowedOnSecondary secondaryAllowed() const override {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return true;
     }
-    virtual bool localHostOnlyIfNoAuth() {
+    bool localHostOnlyIfNoAuth() const override {
         return true;
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) override {
         ActionSet actions;
         actions.addAction(ActionType::cpuProfiler);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
@@ -91,7 +91,7 @@ public:
     // This is an abuse of the global dbmutex.  We only really need to
     // ensure that only one cpuprofiler command runs at once; it would
     // be fine for it to run concurrently with other operations.
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 };

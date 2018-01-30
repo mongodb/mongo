@@ -45,7 +45,7 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-    virtual bool localHostOnlyIfNoAuth() {
+    bool localHostOnlyIfNoAuth() const override {
         return true;
     }
     AllowedOnSecondary secondaryAllowed() const override {

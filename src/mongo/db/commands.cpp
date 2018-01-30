@@ -371,17 +371,6 @@ Status BasicCommand::checkAuthForCommand(Client* client,
     return Status(ErrorCodes::Unauthorized, "unauthorized");
 }
 
-void Command::redactForLogging(mutablebson::Document* cmdObj) {}
-
-BSONObj Command::getRedactedCopyForLogging(const BSONObj& cmdObj) {
-    namespace mmb = mutablebson;
-    mmb::Document cmdToLog(cmdObj, mmb::Document::kInPlaceDisabled);
-    redactForLogging(&cmdToLog);
-    BSONObjBuilder bob;
-    cmdToLog.writeTo(&bob);
-    return bob.obj();
-}
-
 static Status _checkAuthorizationImpl(Command* c,
                                       OperationContext* opCtx,
                                       const OpMsgRequest& request) {

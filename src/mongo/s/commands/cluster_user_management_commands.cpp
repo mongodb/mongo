@@ -97,7 +97,7 @@ public:
             &result);
     }
 
-    virtual void redactForLogging(mutablebson::Document* cmdObj) {
+    void redactForLogging(mutablebson::Document* cmdObj) const override {
         auth::redactPasswordData(cmdObj->root());
     }
 
@@ -148,7 +148,7 @@ public:
         return ok;
     }
 
-    virtual void redactForLogging(mutablebson::Document* cmdObj) {
+    void redactForLogging(mutablebson::Document* cmdObj) const override {
         auth::redactPasswordData(cmdObj->root());
     }
 

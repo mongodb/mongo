@@ -259,7 +259,7 @@ public:
      *
      * When localHostOnlyIfNoAuth() is true, adminOnly() must also be true.
      */
-    virtual bool localHostOnlyIfNoAuth() {
+    virtual bool localHostOnlyIfNoAuth() const {
         return false;
     }
 
@@ -315,13 +315,7 @@ public:
      *
      * The default implementation does nothing.
      */
-    virtual void redactForLogging(mutablebson::Document* cmdObj);
-
-    /**
-     * Returns a copy of "cmdObj" in a form suitable for writing to logs.
-     * Uses redactForLogging() to transform "cmdObj".
-     */
-    virtual BSONObj getRedactedCopyForLogging(const BSONObj& cmdObj);
+    virtual void redactForLogging(mutablebson::Document* cmdObj) const {}
 
     /**
      * Return true if a replica set secondary should go into "recovering"
