@@ -352,15 +352,7 @@ public:
 
     int SSL_write(SSLConnectionInterface* conn, const void* buf, int num) final;
 
-    virtual unsigned long ERR_get_error() final;
-
-    virtual char* ERR_error_string(unsigned long e, char* buf) final;
-
-    virtual int SSL_get_error(const SSLConnectionInterface* conn, int ret) final;
-
-    virtual int SSL_shutdown(SSLConnectionInterface* conn) final;
-
-    void SSL_free(SSLConnectionInterface* conn) final;
+    int SSL_shutdown(SSLConnectionInterface* conn) final;
 
 private:
     const int _rolesNid = OBJ_create(mongodbRolesOID.identifier.c_str(),
@@ -635,7 +627,7 @@ int SSLManagerOpenSSL::SSL_read(SSLConnectionInterface* connInterface, void* buf
     } while (!_doneWithSSLOp(conn, status));
 
     if (status <= 0)
-        _handleSSLError(SSL_get_error(conn, status), status);
+        _handleSSLError(SSL_get_error(conn->ssl, status), status);
     return status;
 }
 
@@ -647,21 +639,8 @@ int SSLManagerOpenSSL::SSL_write(SSLConnectionInterface* connInterface, const vo
     } while (!_doneWithSSLOp(conn, status));
 
     if (status <= 0)
-        _handleSSLError(SSL_get_error(conn, status), status);
+        _handleSSLError(SSL_get_error(conn->ssl, status), status);
     return status;
-}
-
-unsigned long SSLManagerOpenSSL::ERR_get_error() {
-    return ::ERR_get_error();
-}
-
-char* SSLManagerOpenSSL::ERR_error_string(unsigned long e, char* buf) {
-    return ::ERR_error_string(e, buf);
-}
-
-int SSLManagerOpenSSL::SSL_get_error(const SSLConnectionInterface* connInterface, int ret) {
-    const SSLConnection* conn = checked_cast<const SSLConnection*>(connInterface);
-    return ::SSL_get_error(conn->ssl, ret);
 }
 
 int SSLManagerOpenSSL::SSL_shutdown(SSLConnectionInterface* connInterface) {
@@ -672,13 +651,8 @@ int SSLManagerOpenSSL::SSL_shutdown(SSLConnectionInterface* connInterface) {
     } while (!_doneWithSSLOp(conn, status));
 
     if (status < 0)
-        _handleSSLError(SSL_get_error(conn, status), status);
+        _handleSSLError(SSL_get_error(conn->ssl, status), status);
     return status;
-}
-
-void SSLManagerOpenSSL::SSL_free(SSLConnectionInterface* connInterface) {
-    SSLConnectionOpenSSL* conn = checked_cast<SSLConnectionOpenSSL*>(connInterface);
-    return ::SSL_free(conn->ssl);
 }
 
 Status SSLManagerOpenSSL::initSSLContext(SSL_CTX* context,
@@ -1216,14 +1190,14 @@ SSLConnectionInterface* SSLManagerOpenSSL::connect(Socket* socket) {
     const auto undotted = removeFQDNRoot(socket->remoteAddr().hostOrIp());
     int ret = ::SSL_set_tlsext_host_name(sslConn->ssl, undotted.c_str());
     if (ret != 1)
-        _handleSSLError(SSL_get_error(sslConn.get(), ret), ret);
+        _handleSSLError(SSL_get_error(sslConn.get()->ssl, ret), ret);
 
     do {
         ret = ::SSL_connect(sslConn->ssl);
     } while (!_doneWithSSLOp(sslConn.get(), ret));
 
     if (ret != 1)
-        _handleSSLError(SSL_get_error(sslConn.get(), ret), ret);
+        _handleSSLError(SSL_get_error(sslConn.get()->ssl, ret), ret);
 
     return sslConn.release();
 }
@@ -1240,7 +1214,7 @@ SSLConnectionInterface* SSLManagerOpenSSL::accept(Socket* socket,
     } while (!_doneWithSSLOp(sslConn.get(), ret));
 
     if (ret != 1)
-        _handleSSLError(SSL_get_error(sslConn.get(), ret), ret);
+        _handleSSLError(SSL_get_error(sslConn.get()->ssl, ret), ret);
 
     return sslConn.release();
 }

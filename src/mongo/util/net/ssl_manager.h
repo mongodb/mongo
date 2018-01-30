@@ -157,15 +157,7 @@ public:
 
     virtual int SSL_write(SSLConnectionInterface* conn, const void* buf, int num) = 0;
 
-    virtual unsigned long ERR_get_error() = 0;
-
-    virtual char* ERR_error_string(unsigned long e, char* buf) = 0;
-
-    virtual int SSL_get_error(const SSLConnectionInterface* conn, int ret) = 0;
-
     virtual int SSL_shutdown(SSLConnectionInterface* conn) = 0;
-
-    virtual void SSL_free(SSLConnectionInterface* conn) = 0;
 
     enum class ConnectionDirection { kIncoming, kOutgoing };
 
