@@ -2376,6 +2376,10 @@ void ReplicationCoordinatorImpl::_finishReplSetReconfig(
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig_inlock(opCtx.get(), newConfig, myIndex);
 
+    // On a reconfig we drop all snapshots so we don't mistakenely read from the wrong one.
+    // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
+    _dropAllSnapshots_inlock();
+
     lk.unlock();
     _resetElectionInfoOnProtocolVersionUpgrade(opCtx.get(), oldConfig, newConfig);
     _performPostMemberStateUpdateAction(action);
@@ -2931,6 +2935,20 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
                 auto ts = LogicalClock::get(getServiceContext())->reserveTicks(1).asTimestamp();
                 _topCoord->setElectionInfo(_electionId, ts);
             }
+
+            // On PV downgrade, we drop all snapshots and clear the stable optime candidates because
+            // read majority isn't supported in PV0.
+            //
+            // TODO: On a reconfig in PV1, we should also drop all snapshots so we don't mistakenly
+            // read from the wrong one, for example, if we change the meaning of the "committed"
+            // snapshot from applied -> durable or the quorum gets changed.
+            // We currently only do this on the primary that processes the replSetReconfig command,
+            // but not on nodes that learn of the new config via a heartbeat.
+            _dropAllSnapshots_inlock();
+            // Also clear all stable snapshots. This is critical for PV downgrade and then upgrade
+            // to make sure OpTimes before the downgrade don't interfere the second upgrade.
+            _stableOpTimeCandidates.clear();
+
         } else if (oldConfig.getProtocolVersion() < newConfig.getProtocolVersion()) {
             // Upgrade
             if (_memberState.primary()) {
@@ -2954,13 +2972,6 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(OperationContext* opCtx,
     // On PV downgrade, commit point is probably still from PV1 but will advance to an OpTime with
     // term -1 once any write gets committed in PV0.
     _updateLastCommittedOpTime_inlock();
-
-    // On a reconfig we drop all snapshots so we don't mistakenly read from the wrong one.
-    // For example, if we change the meaning of the "committed" snapshot from applied -> durable.
-    _dropAllSnapshots_inlock();
-    // Also clear all stable snapshots. This is critical for PV downgrade and then upgrade to make
-    // sure OpTimes before the downgrade don't interfere the second upgrade.
-    _stableOpTimeCandidates.clear();
 
     return action;
 }
