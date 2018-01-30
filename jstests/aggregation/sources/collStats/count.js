@@ -4,6 +4,7 @@
     "use strict";
 
     load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
+    load("jstests/libs/fixture_helpers.js");      // For "FixtureHelpers".
 
     let testDB = db.getSiblingDB("aggregation_count_db");
     let coll = testDB.aggregation_count;
@@ -54,12 +55,17 @@
     result = coll.aggregate(pipeline).next();
     assert.eq(0, result.count);
 
-    // Assert when there is no collection.
+    // Test that we error when the collection does not exist.
     coll.drop();
     assertErrorCode(coll, pipeline, 40481);
 
-    // Assert when there is no database.
+    // Test that we error when the database does not exist.
+    // TODO SERVER-33039 When running against a mongos, a non-existent database will cause all
+    // aggregations to return an empty result set.
     assert.commandWorked(testDB.dropDatabase());
-    assertErrorCode(coll, pipeline, 40481);
-
+    if (FixtureHelpers.isMongos(testDB)) {
+        assert.eq([], coll.aggregate(pipeline).toArray());
+    } else {
+        assertErrorCode(coll, pipeline, 40481);
+    }
 }());

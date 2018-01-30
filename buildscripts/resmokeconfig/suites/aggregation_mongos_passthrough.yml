@@ -14,11 +14,6 @@ selector:
   # TODO: Remove when SERVER-23229 is fixed.
   - jstests/aggregation/bugs/groupMissing.js
   exclude_with_any_tags:
-  # Tests tagged with the following will fail because they assume collections are not sharded.
-  - assumes_no_implicit_collection_creation_after_drop
-  - assumes_no_implicit_index_creation
-  - assumes_unsharded_collection
-  - cannot_create_unique_index_when_using_hashed_shard_key
   # The following tests start their own ShardingTest or ReplSetTest, respectively.
   - requires_sharding
   - requires_replication
@@ -26,19 +21,14 @@ selector:
 executor:
   config:
     shell_options:
-      # Use the overrides to implicitly shard all accessed collections, and to error if a test
-      # starts its own test fixture - since such a test should not be part of this passthrough.
-      eval: >-
-        load("jstests/libs/override_methods/implicitly_shard_accessed_collections.js");
-        load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+      # Use an override to error if a test starts its own test fixture since such a test should not
+      # be part of this passthrough.
+      eval: load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections
-  - class: CleanEveryN
-    n: 20
   fixture:
     class: ShardedClusterFixture
-    num_shards: 1
     mongos_options:
       set_parameters:
         enableTestCommands: 1
@@ -47,3 +37,5 @@ executor:
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
+    enable_sharding:
+    - test
