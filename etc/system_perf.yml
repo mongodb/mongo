@@ -598,6 +598,7 @@ tasks:
         test: "change_streams"
     - func: "deploy cluster"
     - func: "run test"
+    - func: "analyze"
 
 - name: change_streams_multi_mongos
   depends_on:
@@ -610,6 +611,7 @@ tasks:
         test: "change_streams_multi_mongos"
     - func: "deploy cluster"
     - func: "run test"
+    - func: "analyze"
 
 
 #######################################
