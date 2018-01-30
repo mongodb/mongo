@@ -80,9 +80,6 @@ Status ShardingNetworkConnectionHook::validateHostImpl(
             // is SCCC.
             ConnectionString configConnString;
             if (configServerMode == ConfigServerMode::CSRS) {
-                uassert(ErrorCodes::ReplicaSetNotFound,
-                        "CSRS replica set is not initialized",
-                        isMasterResponse.hasField("setName"));
                 configConnString =
                     ConnectionString::forReplicaSet(setName.valueStringData(), {remoteHost});
             }
