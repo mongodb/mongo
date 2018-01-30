@@ -21,8 +21,8 @@
     assert(planHasStage(db, explain_distinct_with_query.queryPlanner.winningPlan, "PROJECTION"));
     // If the collection is sharded, we expect at most 2 distinct values per shard. If the
     // collection is not sharded, we expect 2 returned.
-    assert.lte(2 * FixtureHelpers.numberOfShardsForCollection(coll),
-               explain_distinct_with_query.executionStats.nReturned);
+    assert.lte(explain_distinct_with_query.executionStats.nReturned,
+               2 * FixtureHelpers.numberOfShardsForCollection(coll));
 
     var explain_distinct_without_query = coll.explain("executionStats").distinct('b');
     assert.commandWorked(explain_distinct_without_query);
