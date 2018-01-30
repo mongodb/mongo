@@ -8,6 +8,7 @@ selector:
   - jstests/core/dbadmin.js
   - jstests/core/opcounters_write_cmd.js
   - jstests/core/capped_update.js
+  - jstests/core/apply_ops1.js  # Nested applyOps work differently in master/slave.
 
 executor:
   config:

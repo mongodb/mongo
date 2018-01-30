@@ -896,10 +896,9 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          BSONObj& cmd,
          const OpTime& opTime,
          OplogApplication::Mode mode) -> Status {
-          BSONObjBuilder resultWeDontCareAbout;
-          return applyOps(opCtx, nsToDatabase(ns), cmd, mode, &resultWeDontCareAbout);
-      },
-      {ErrorCodes::UnknownError}}},
+         BSONObjBuilder resultWeDontCareAbout;
+         return applyOps(opCtx, nsToDatabase(ns), cmd, mode, &resultWeDontCareAbout);
+     }}},
     {"convertToCapped",
      {[](OperationContext* opCtx,
          const char* ns,

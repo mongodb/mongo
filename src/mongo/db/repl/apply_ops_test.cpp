@@ -166,7 +166,7 @@ TEST_F(ApplyOpsTest, InsertInNestedApplyOpsReturnsSuccess) {
     auto innerCmdObj = BSON("op"
                             << "i"
                             << "ns"
-                            << nss.getCommandNS().ns()
+                            << nss.ns()
                             << "o"
                             << BSON("_id"
                                     << "a"));
@@ -178,8 +178,9 @@ TEST_F(ApplyOpsTest, InsertInNestedApplyOpsReturnsSuccess) {
                                  << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
     auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
 
+    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, CollectionOptions()));
     ASSERT_OK(applyOps(opCtx.get(), nss.db().toString(), cmdObj, mode, &resultBuilder));
-    ASSERT_BSONOBJ_EQ({}, _opObserver->onApplyOpsCmdObj);
+    ASSERT_BSONOBJ_EQ(BSON("applyOps" << BSON_ARRAY(innerCmdObj)), _opObserver->onApplyOpsCmdObj);
 }
 
 TEST_F(ApplyOpsTest, AtomicApplyOpsWithNoOpsReturnsSuccess) {
@@ -222,7 +223,7 @@ TEST_F(ApplyOpsTest,
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, boost::none, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_EQUALS(ErrorCodes::UnknownError,
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
     auto result = resultBuilder.obj();
     auto status = getStatusFromApplyOpsResult(result);
@@ -279,7 +280,7 @@ TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWithoutUuid) {
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, uuid, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_EQUALS(ErrorCodes::UnknownError,
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
     auto result = resultBuilder.obj();
     auto status = getStatusFromApplyOpsResult(result);
