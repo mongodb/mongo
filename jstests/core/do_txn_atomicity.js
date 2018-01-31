@@ -4,14 +4,6 @@
 (function() {
     'use strict';
 
-    // For supportsDocumentLevelConcurrency.
-    load("jstests/concurrency/fsm_workload_helpers/server_types.js");
-
-    if (!supportsDocumentLevelConcurrency(db)) {
-        jsTestLog("Skipping test as the storage engine does not support doTxn.");
-        return;
-    }
-
     var t = db.doTxn;
     t.drop();
     assert.writeOK(t.insert({_id: 1}));
