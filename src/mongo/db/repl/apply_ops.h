@@ -34,6 +34,7 @@ class BSONObj;
 class BSONObjBuilder;
 class OperationContext;
 
+namespace repl {
 class ApplyOps {
 public:
     static constexpr StringData kPreconditionFieldName = "preCondition"_sd;
@@ -56,4 +57,5 @@ Status applyOps(OperationContext* opCtx,
                 repl::OplogApplication::Mode oplogApplicationMode,
                 BSONObjBuilder* result);
 
+}  // namespace repl
 }  // namespace mongo

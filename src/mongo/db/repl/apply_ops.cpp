@@ -55,6 +55,7 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace repl {
 
 constexpr StringData ApplyOps::kPreconditionFieldName;
 constexpr StringData ApplyOps::kOplogApplicationModeFieldName;
@@ -497,4 +498,5 @@ Status applyOps(OperationContext* opCtx,
     return Status::OK();
 }
 
+}  // namespace repl
 }  // namespace mongo

@@ -253,7 +253,7 @@ public:
             repl::OplogApplication::Mode::kApplyOpsCmd;  // the default mode.
         std::string oplogApplicationModeString;
         status = bsonExtractStringField(
-            cmdObj, ApplyOps::kOplogApplicationModeFieldName, &oplogApplicationModeString);
+            cmdObj, repl::ApplyOps::kOplogApplicationModeFieldName, &oplogApplicationModeString);
 
         if (status.isOK()) {
             auto modeSW = repl::OplogApplication::parseMode(oplogApplicationModeString);
@@ -261,20 +261,22 @@ public:
                 // Unable to parse the mode argument.
                 return CommandHelpers::appendCommandStatus(
                     result,
-                    modeSW.getStatus().withContext(str::stream() << "Could not parse " +
-                                                       ApplyOps::kOplogApplicationModeFieldName));
+                    modeSW.getStatus().withContext(
+                        str::stream()
+                        << "Could not parse " + repl::ApplyOps::kOplogApplicationModeFieldName));
             }
             oplogApplicationMode = modeSW.getValue();
         } else if (status != ErrorCodes::NoSuchKey) {
             // NoSuchKey means the user did not supply a mode.
             return CommandHelpers::appendCommandStatus(
                 result,
-                status.withContext(str::stream() << "Could not parse out "
-                                                 << ApplyOps::kOplogApplicationModeFieldName));
+                status.withContext(str::stream()
+                                   << "Could not parse out "
+                                   << repl::ApplyOps::kOplogApplicationModeFieldName));
         }
 
         auto applyOpsStatus = CommandHelpers::appendCommandStatus(
-            result, applyOps(opCtx, dbname, cmdObj, oplogApplicationMode, &result));
+            result, repl::applyOps(opCtx, dbname, cmdObj, oplogApplicationMode, &result));
 
         return applyOpsStatus;
     }
