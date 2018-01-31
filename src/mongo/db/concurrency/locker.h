@@ -328,11 +328,24 @@ public:
         return _shouldConflictWithSecondaryBatchApplication;
     }
 
+    /**
+     * If set to false, this opts out of the ticket mechanism. This should be used sparingly
+     * for special purpose threads, such as FTDC.
+     */
+    void setShouldAcquireTicket(bool newValue) {
+        _shouldAcquireTicket = newValue;
+    }
+    bool shouldAcquireTicket() const {
+        return _shouldAcquireTicket;
+    }
+
+
 protected:
     Locker() {}
 
 private:
     bool _shouldConflictWithSecondaryBatchApplication = true;
+    bool _shouldAcquireTicket = true;
 };
 
 }  // namespace mongo
