@@ -5751,7 +5751,6 @@ buildvariants:
     - rhel62-build
   - name: aggregation_WT
   - name: aggregation_auth
-  - name: aggregation_read_concern_majority_passthrough_WT
   - name: audit
   - name: auth
   - name: auth_audit
@@ -5786,7 +5785,6 @@ buildvariants:
   - name: noPassthroughWithMongod
   - name: parallel
   - name: parallel_compatibility
-  # - name: read_concern_majority_passthrough_WT
   - name: replicasets_WT
   - name: replicasets_auth
   - name: replicasets_legacy
