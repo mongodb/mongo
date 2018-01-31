@@ -53,8 +53,8 @@ public:
         return "stats about connections between servers in a replica set or sharded cluster.";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    bool slaveOk() const override {
+        return true;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

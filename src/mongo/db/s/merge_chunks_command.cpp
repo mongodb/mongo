@@ -333,8 +333,8 @@ public:
         return true;
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

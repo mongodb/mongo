@@ -54,8 +54,8 @@ class ConfigSvrDropDatabaseCommand : public BasicCommand {
 public:
     ConfigSvrDropDatabaseCommand() : BasicCommand("_configsvrDropDatabase") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {

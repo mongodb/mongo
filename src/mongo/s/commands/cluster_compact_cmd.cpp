@@ -37,8 +37,8 @@ class CompactCmd : public BasicCommand {
 public:
     CompactCmd() : BasicCommand("compact") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    bool slaveOk() const override {
+        return true;
     }
 
     bool adminOnly() const override {

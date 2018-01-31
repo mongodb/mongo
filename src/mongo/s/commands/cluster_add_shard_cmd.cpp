@@ -56,8 +56,8 @@ class AddShardCmd : public BasicCommand {
 public:
     AddShardCmd() : BasicCommand("addShard", "addshard") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     virtual bool adminOnly() const {

@@ -611,8 +611,8 @@ class CmdCreateUser : public BasicCommand {
 public:
     CmdCreateUser() : BasicCommand("createUser") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -758,8 +758,8 @@ class CmdUpdateUser : public BasicCommand {
 public:
     CmdUpdateUser() : BasicCommand("updateUser") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -892,8 +892,8 @@ class CmdDropUser : public BasicCommand {
 public:
     CmdDropUser() : BasicCommand("dropUser") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -959,8 +959,8 @@ class CmdDropAllUsersFromDatabase : public BasicCommand {
 public:
     CmdDropAllUsersFromDatabase() : BasicCommand("dropAllUsersFromDatabase") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1015,8 +1015,8 @@ class CmdGrantRolesToUser : public BasicCommand {
 public:
     CmdGrantRolesToUser() : BasicCommand("grantRolesToUser") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1087,8 +1087,8 @@ class CmdRevokeRolesFromUser : public BasicCommand {
 public:
     CmdRevokeRolesFromUser() : BasicCommand("revokeRolesFromUser") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1157,8 +1157,12 @@ public:
 
 class CmdUsersInfo : public BasicCommand {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kOptIn;
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool slaveOverrideOk() const {
+        return true;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1281,8 +1285,8 @@ class CmdCreateRole : public BasicCommand {
 public:
     CmdCreateRole() : BasicCommand("createRole") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1402,8 +1406,8 @@ class CmdUpdateRole : public BasicCommand {
 public:
     CmdUpdateRole() : BasicCommand("updateRole") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1519,8 +1523,8 @@ class CmdGrantPrivilegesToRole : public BasicCommand {
 public:
     CmdGrantPrivilegesToRole() : BasicCommand("grantPrivilegesToRole") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1629,8 +1633,8 @@ class CmdRevokePrivilegesFromRole : public BasicCommand {
 public:
     CmdRevokePrivilegesFromRole() : BasicCommand("revokePrivilegesFromRole") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1741,8 +1745,8 @@ class CmdGrantRolesToRole : public BasicCommand {
 public:
     CmdGrantRolesToRole() : BasicCommand("grantRolesToRole") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1830,8 +1834,8 @@ class CmdRevokeRolesFromRole : public BasicCommand {
 public:
     CmdRevokeRolesFromRole() : BasicCommand("revokeRolesFromRole") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -1914,8 +1918,8 @@ class CmdDropRole : public BasicCommand {
 public:
     CmdDropRole() : BasicCommand("dropRole") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -2056,8 +2060,8 @@ class CmdDropAllRolesFromDatabase : public BasicCommand {
 public:
     CmdDropAllRolesFromDatabase() : BasicCommand("dropAllRolesFromDatabase") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -2187,8 +2191,12 @@ public:
 
 class CmdRolesInfo : public BasicCommand {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kOptIn;
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool slaveOverrideOk() const {
+        return true;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -2272,8 +2280,8 @@ public:
 
 class CmdInvalidateUserCache : public BasicCommand {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     virtual bool adminOnly() const {
@@ -2309,8 +2317,8 @@ public:
 
 class CmdGetCacheGeneration : public BasicCommand {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     virtual bool adminOnly() const {
@@ -2358,8 +2366,8 @@ class CmdMergeAuthzCollections : public BasicCommand {
 public:
     CmdMergeAuthzCollections() : BasicCommand("_mergeAuthzCollections") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

@@ -87,8 +87,8 @@ class AppendOplogNoteCmd : public BasicCommand {
 public:
     AppendOplogNoteCmd() : BasicCommand("appendOplogNote") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool adminOnly() const {

@@ -489,8 +489,8 @@ class DbCheckCmd : public BasicCommand {
 public:
     DbCheckCmd() : BasicCommand("dbCheck") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool adminOnly() const {

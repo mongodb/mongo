@@ -147,8 +147,8 @@ public:
     std::string help() const override {
         return "drop (delete) this database";
     }
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
@@ -210,8 +210,8 @@ public:
 
 class CmdRepairDatabase : public ErrmsgCommandDeprecated {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool maintenanceMode() const {
         return true;
@@ -295,8 +295,8 @@ public:
 */
 class CmdProfile : public ErrmsgCommandDeprecated {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     std::string help() const override {
@@ -396,8 +396,8 @@ public:
 class CmdDrop : public ErrmsgCommandDeprecated {
 public:
     CmdDrop() : ErrmsgCommandDeprecated("drop") {}
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
     virtual bool adminOnly() const {
         return false;
@@ -452,8 +452,8 @@ public:
 class CmdCreate : public BasicCommand {
 public:
     CmdCreate() : BasicCommand("create") {}
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
     virtual bool adminOnly() const {
         return false;
@@ -570,8 +570,8 @@ class CmdFileMD5 : public BasicCommand {
 public:
     CmdFileMD5() : BasicCommand("filemd5") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     std::string help() const override {
@@ -747,8 +747,8 @@ class CmdDatasize : public ErrmsgCommandDeprecated {
 public:
     CmdDatasize() : ErrmsgCommandDeprecated("dataSize", "datasize") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -897,8 +897,8 @@ class CollectionStats : public ErrmsgCommandDeprecated {
 public:
     CollectionStats() : ErrmsgCommandDeprecated("collStats", "collstats") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -944,8 +944,8 @@ class CollectionModCommand : public BasicCommand {
 public:
     CollectionModCommand() : BasicCommand("collMod") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
@@ -978,8 +978,8 @@ class DBStats : public ErrmsgCommandDeprecated {
 public:
     DBStats() : ErrmsgCommandDeprecated("dbStats", "dbstats") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -1074,8 +1074,8 @@ public:
 class CmdWhatsMyUri : public BasicCommand {
 public:
     CmdWhatsMyUri() : BasicCommand("whatsmyuri") {}
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -1099,8 +1099,8 @@ class AvailableQueryOptions : public BasicCommand {
 public:
     AvailableQueryOptions() : BasicCommand("availableQueryOptions", "availablequeryoptions") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

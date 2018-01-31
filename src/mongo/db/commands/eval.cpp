@@ -154,8 +154,8 @@ bool dbEval(OperationContext* opCtx,
 
 class CmdEval : public ErrmsgCommandDeprecated {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     std::string help() const override {

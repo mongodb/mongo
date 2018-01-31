@@ -75,8 +75,12 @@ class DistinctCommand : public BasicCommand {
 public:
     DistinctCommand() : BasicCommand("distinct") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kOptIn;
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool slaveOverrideOk() const {
+        return true;
     }
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

@@ -63,8 +63,8 @@ public:
         return "internal";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool adminOnly() const {
@@ -163,8 +163,8 @@ public:
         return "internal";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool adminOnly() const {
@@ -201,8 +201,8 @@ public:
         return "internal";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool adminOnly() const {
@@ -247,8 +247,8 @@ public:
         return "internal";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool adminOnly() const {

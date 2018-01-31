@@ -69,8 +69,8 @@ class RemoveShardFromZoneCmd : public BasicCommand {
 public:
     RemoveShardFromZoneCmd() : BasicCommand("removeShardFromZone", "removeshardfromzone") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     virtual bool adminOnly() const {

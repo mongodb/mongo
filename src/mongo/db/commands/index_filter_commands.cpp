@@ -129,8 +129,12 @@ bool IndexFilterCommand::supportsWriteConcern(const BSONObj& cmd) const {
     return false;
 }
 
-Command::AllowedOnSecondary IndexFilterCommand::secondaryAllowed() const {
-    return AllowedOnSecondary::kOptIn;
+bool IndexFilterCommand::slaveOk() const {
+    return false;
+}
+
+bool IndexFilterCommand::slaveOverrideOk() const {
+    return true;
 }
 
 std::string IndexFilterCommand::help() const {

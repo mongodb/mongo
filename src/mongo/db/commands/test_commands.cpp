@@ -62,8 +62,8 @@ public:
     virtual bool adminOnly() const {
         return false;
     }
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
@@ -118,8 +118,8 @@ public:
         return true;
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     std::string help() const override {
@@ -201,8 +201,8 @@ public:
 class CapTrunc : public BasicCommand {
 public:
     CapTrunc() : BasicCommand("captrunc") {}
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
@@ -276,8 +276,8 @@ public:
 class EmptyCapped : public BasicCommand {
 public:
     EmptyCapped() : BasicCommand("emptycapped") {}
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;

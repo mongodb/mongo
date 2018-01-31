@@ -57,8 +57,8 @@ class MoveDatabasePrimaryCommand : public BasicCommand {
 public:
     MoveDatabasePrimaryCommand() : BasicCommand("movePrimary", "moveprimary") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     virtual bool adminOnly() const {

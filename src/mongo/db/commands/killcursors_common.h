@@ -45,8 +45,8 @@ public:
         return false;
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    bool slaveOk() const final {
+        return true;
     }
 
     bool maintenanceOk() const final {

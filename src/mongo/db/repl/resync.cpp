@@ -49,8 +49,8 @@ constexpr StringData kWaitFieldName = "wait"_sd;
 // operator requested resynchronization of replication (on a slave or secondary). {resync: 1}
 class CmdResync : public ErrmsgCommandDeprecated {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool adminOnly() const {
         return true;

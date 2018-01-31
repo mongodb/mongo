@@ -216,8 +216,8 @@ public:
     bool requiresAuth() const override {
         return false;
     }
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     std::string help() const override {
         return "Check if this server is primary for a replica pair/set; also if it is --master or "

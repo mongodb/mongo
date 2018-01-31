@@ -67,8 +67,8 @@ public:
         return false;
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,

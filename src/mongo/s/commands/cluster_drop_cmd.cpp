@@ -45,8 +45,8 @@ class DropCmd : public BasicCommand {
 public:
     DropCmd() : BasicCommand("drop") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    bool slaveOk() const override {
+        return true;
     }
 
     bool adminOnly() const override {

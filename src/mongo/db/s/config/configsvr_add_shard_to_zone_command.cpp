@@ -65,8 +65,8 @@ public:
                "directly. Validates and adds a new zone to the shard.";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {

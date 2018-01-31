@@ -52,8 +52,8 @@ class EnableShardingCmd : public ErrmsgCommandDeprecated {
 public:
     EnableShardingCmd() : ErrmsgCommandDeprecated("enableSharding", "enablesharding") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     virtual bool adminOnly() const {

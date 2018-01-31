@@ -65,8 +65,8 @@ public:
                "directly. Validates and adds a new shard to the cluster.";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {

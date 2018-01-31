@@ -37,8 +37,8 @@ class ProfileCmd : public ErrmsgCommandDeprecated {
 public:
     ProfileCmd() : ErrmsgCommandDeprecated("profile") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     virtual bool adminOnly() const {

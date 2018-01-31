@@ -88,8 +88,8 @@ class SplitCollectionCmd : public ErrmsgCommandDeprecated {
 public:
     SplitCollectionCmd() : ErrmsgCommandDeprecated("split") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    bool slaveOk() const override {
+        return true;
     }
 
     bool adminOnly() const override {

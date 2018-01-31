@@ -49,8 +49,12 @@ using std::stringstream;
  */
 class CmdLockInfo : public BasicCommand {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
+    }
+
+    virtual bool slaveOverrideOk() const {
+        return true;
     }
 
     virtual bool adminOnly() const {

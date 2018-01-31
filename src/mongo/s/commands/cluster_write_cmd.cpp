@@ -139,8 +139,8 @@ class ClusterWriteCmd : public Command {
 public:
     virtual ~ClusterWriteCmd() {}
 
-    AllowedOnSecondary secondaryAllowed() const final {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const final {
+        return false;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const final {

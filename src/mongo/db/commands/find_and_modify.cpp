@@ -220,8 +220,8 @@ public:
                "Output is in the \"value\" field\n";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool supportsReadConcern(const std::string& dbName,

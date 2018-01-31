@@ -51,8 +51,8 @@ public:
         return false;
     }
 
-    AllowedOnSecondary secondaryAllowed() const final {
-        return AllowedOnSecondary::kAlways;
+    bool slaveOk() const final {
+        return true;
     }
 
     bool adminOnly() const final {

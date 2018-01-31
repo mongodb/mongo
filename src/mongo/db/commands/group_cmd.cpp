@@ -71,8 +71,12 @@ private:
         return false;
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kOptIn;
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool slaveOverrideOk() const {
+        return true;
     }
 
     bool supportsReadConcern(const std::string& dbName,

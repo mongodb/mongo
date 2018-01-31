@@ -123,8 +123,11 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const {
+        return false;
+    }
+    bool slaveOverrideOk() const {
+        return false;
     }
     std::string help() const override {
         return {};

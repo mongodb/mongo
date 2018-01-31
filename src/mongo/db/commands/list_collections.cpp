@@ -197,8 +197,11 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
 
 class CmdListCollections : public BasicCommand {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kOptIn;
+    virtual bool slaveOk() const {
+        return false;
+    }
+    virtual bool slaveOverrideOk() const {
+        return true;
     }
     virtual bool adminOnly() const {
         return false;

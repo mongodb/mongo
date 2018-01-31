@@ -54,8 +54,8 @@ class CmdReplSetResizeOplog : public BasicCommand {
 public:
     CmdReplSetResizeOplog() : BasicCommand("replSetResizeOplog") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const final {
+        return true;
     }
 
     bool adminOnly() const final {

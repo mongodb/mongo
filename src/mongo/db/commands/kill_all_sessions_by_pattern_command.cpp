@@ -57,8 +57,8 @@ class KillAllSessionsByPatternCommand final : public BasicCommand {
 public:
     KillAllSessionsByPatternCommand() : BasicCommand("killAllSessionsByPattern") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    bool slaveOk() const override {
+        return true;
     }
     bool adminOnly() const override {
         return false;

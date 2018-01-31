@@ -64,7 +64,9 @@ public:
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override;
 
-    AllowedOnSecondary secondaryAllowed() const override;
+    virtual bool slaveOk() const;
+
+    virtual bool slaveOverrideOk() const;
 
     std::string help() const override;
 

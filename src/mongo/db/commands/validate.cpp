@@ -67,8 +67,8 @@ class ValidateCmd : public BasicCommand {
 public:
     ValidateCmd() : BasicCommand("validate") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     std::string help() const override {

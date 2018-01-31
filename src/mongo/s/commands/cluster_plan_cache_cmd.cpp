@@ -54,8 +54,12 @@ class ClusterPlanCacheCmd : public BasicCommand {
 public:
     virtual ~ClusterPlanCacheCmd() {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kOptIn;
+    bool slaveOk() const {
+        return false;
+    }
+
+    bool slaveOverrideOk() const {
+        return true;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

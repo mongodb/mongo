@@ -47,8 +47,8 @@ public:
                "http://dochub.mongodb.org/core/aggregation for more details.";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    bool slaveOk() const override {
+        return true;
     }
 
     bool adminOnly() const override {

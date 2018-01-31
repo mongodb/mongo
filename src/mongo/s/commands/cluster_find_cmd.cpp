@@ -65,8 +65,12 @@ public:
         return false;
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kOptIn;
+    bool slaveOk() const final {
+        return false;
+    }
+
+    bool slaveOverrideOk() const final {
+        return true;
     }
 
     bool maintenanceOk() const final {

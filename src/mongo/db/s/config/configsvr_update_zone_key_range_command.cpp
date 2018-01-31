@@ -67,8 +67,8 @@ public:
                "directly. Validates and assigns a new range to a zone.";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {

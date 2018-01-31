@@ -151,8 +151,8 @@ class PublicGridCommand : public BasicCommand {
 protected:
     PublicGridCommand(const char* n, const char* oldname = NULL) : BasicCommand(n, oldname) {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
     virtual bool adminOnly() const {
@@ -247,8 +247,8 @@ class DropIndexesCmd : public ErrmsgCommandDeprecated {
 public:
     DropIndexesCmd() : ErrmsgCommandDeprecated("dropIndexes", "deleteIndexes") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {
@@ -291,8 +291,8 @@ class CreateIndexesCmd : public ErrmsgCommandDeprecated {
 public:
     CreateIndexesCmd() : ErrmsgCommandDeprecated("createIndexes") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {
@@ -340,8 +340,8 @@ class ReIndexCmd : public ErrmsgCommandDeprecated {
 public:
     ReIndexCmd() : ErrmsgCommandDeprecated("reIndex") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {
@@ -384,8 +384,8 @@ class CollectionModCmd : public ErrmsgCommandDeprecated {
 public:
     CollectionModCmd() : ErrmsgCommandDeprecated("collMod") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {

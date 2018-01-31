@@ -70,8 +70,8 @@ public:
                "not call directly. Receives, validates, and processes a SplitChunkRequest.";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {

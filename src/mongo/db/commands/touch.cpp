@@ -61,8 +61,8 @@ public:
     virtual bool adminOnly() const {
         return false;
     }
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool maintenanceMode() const {
         return true;

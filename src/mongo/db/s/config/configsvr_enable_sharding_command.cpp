@@ -61,8 +61,8 @@ class ConfigSvrEnableShardingCommand : public BasicCommand {
 public:
     ConfigSvrEnableShardingCommand() : BasicCommand("_configsvrEnableSharding") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
 
     virtual bool adminOnly() const {

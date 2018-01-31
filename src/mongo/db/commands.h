@@ -188,7 +188,6 @@ struct CommandHelpers {
 class Command {
 public:
     using CommandMap = StringMap<Command*>;
-    enum class AllowedOnSecondary { kAlways, kNever, kOptIn };
 
     /**
      * Constructs a new command and causes it to be registered with the global commands list. It is
@@ -263,7 +262,17 @@ public:
         return false;
     }
 
-    virtual AllowedOnSecondary secondaryAllowed() const = 0;
+    /* Return true if slaves are allowed to execute the command
+    */
+    virtual bool slaveOk() const = 0;
+
+    /**
+     * Return true if the client force a command to be run on a slave by
+     * turning on the 'slaveOk' option in the command query.
+     */
+    virtual bool slaveOverrideOk() const {
+        return false;
+    }
 
     /**
      * Override and return fales if the command opcounters should not be incremented on

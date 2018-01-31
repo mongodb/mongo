@@ -42,8 +42,8 @@ using std::stringstream;
 class IsSelfCommand : public BasicCommand {
 public:
     IsSelfCommand() : BasicCommand("_isSelf") {}
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

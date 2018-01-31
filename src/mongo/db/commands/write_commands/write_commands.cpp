@@ -198,8 +198,8 @@ class WriteCommand : public Command {
 public:
     explicit WriteCommand(StringData name) : Command(name) {}
 
-    AllowedOnSecondary secondaryAllowed() const final {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const final {
+        return false;
     }
 
     bool shouldAffectCommandCounter() const final {

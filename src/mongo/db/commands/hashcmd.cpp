@@ -56,8 +56,8 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     // No auth needed because it only works when enabled via command line.
     virtual void addRequiredPrivileges(const std::string& dbname,

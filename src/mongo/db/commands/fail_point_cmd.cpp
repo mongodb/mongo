@@ -68,9 +68,10 @@ class FaultInjectCmd : public ErrmsgCommandDeprecated {
 public:
     FaultInjectCmd() : ErrmsgCommandDeprecated("configureFailPoint") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
+
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

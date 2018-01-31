@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
@@ -63,8 +62,12 @@ public:
     /**
      * Running an explain on a secondary requires explicitly setting slaveOk.
      */
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kOptIn;
+    virtual bool slaveOk() const {
+        return false;
+    }
+
+    virtual bool slaveOverrideOk() const {
+        return true;
     }
 
     virtual bool maintenanceOk() const {
@@ -146,7 +149,21 @@ public:
             return CommandHelpers::appendCommandStatus(result, explainStatus);
         }
 
-        if (!commandCanRunHere(opCtx, dbname, commToExplain)) {
+        // Check whether the child command is allowed to run here. TODO: this logic is
+        // copied from Command::execCommand and should be abstracted. Until then, make
+        // sure to keep it up to date.
+        repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
+        bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
+        bool commandCanRunOnSecondary = commToExplain->slaveOk();
+
+        bool commandIsOverriddenToRunOnSecondary = commToExplain->slaveOverrideOk() &&
+            ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
+        bool iAmStandalone = !opCtx->writesAreReplicated();
+
+        const bool canRunHere = iAmPrimary || commandCanRunOnSecondary ||
+            commandIsOverriddenToRunOnSecondary || iAmStandalone;
+
+        if (!canRunHere) {
             mongoutils::str::stream ss;
             ss << "Explain's child command cannot run on this node. "
                << "Are you explaining a write command on a secondary?";

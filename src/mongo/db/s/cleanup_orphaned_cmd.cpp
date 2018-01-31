@@ -164,8 +164,8 @@ class CleanupOrphanedCommand : public ErrmsgCommandDeprecated {
 public:
     CleanupOrphanedCommand() : ErrmsgCommandDeprecated("cleanupOrphaned") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    bool slaveOk() const override {
+        return false;
     }
 
     bool adminOnly() const override {

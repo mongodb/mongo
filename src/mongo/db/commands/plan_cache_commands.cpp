@@ -124,8 +124,12 @@ bool PlanCacheCommand::supportsWriteConcern(const BSONObj& cmd) const {
     return false;
 }
 
-Command::AllowedOnSecondary PlanCacheCommand::secondaryAllowed() const {
-    return AllowedOnSecondary::kOptIn;
+bool PlanCacheCommand::slaveOk() const {
+    return false;
+}
+
+bool PlanCacheCommand::slaveOverrideOk() const {
+    return true;
 }
 
 std::string PlanCacheCommand::help() const {

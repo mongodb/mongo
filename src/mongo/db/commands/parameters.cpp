@@ -67,8 +67,8 @@ void appendParameterNames(std::string* help) {
 class CmdGet : public ErrmsgCommandDeprecated {
 public:
     CmdGet() : ErrmsgCommandDeprecated("getParameter") {}
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool adminOnly() const {
         return true;
@@ -118,8 +118,8 @@ public:
 class CmdSet : public ErrmsgCommandDeprecated {
 public:
     CmdSet() : ErrmsgCommandDeprecated("setParameter") {}
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
     virtual bool adminOnly() const {
         return true;

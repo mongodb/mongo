@@ -78,9 +78,10 @@ public:
         return true;
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kNever;
+    virtual bool slaveOk() const {
+        return false;
     }
+
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

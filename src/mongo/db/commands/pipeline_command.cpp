@@ -57,8 +57,12 @@ public:
         return Pipeline::aggSupportsWriteConcern(cmd);
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kOptIn;
+    bool slaveOk() const override {
+        return false;
+    }
+
+    bool slaveOverrideOk() const override {
+        return true;
     }
 
     bool supportsReadConcern(const std::string& dbName,

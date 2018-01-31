@@ -38,8 +38,8 @@ class WhatsMyUriCmd : public BasicCommand {
 public:
     WhatsMyUriCmd() : BasicCommand("whatsmyuri") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
+    virtual bool slaveOk() const {
+        return true;
     }
 
 
