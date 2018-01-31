@@ -62,12 +62,13 @@ const int kMinPerfMillis = 30;     // min duration for reliable timing
 class UseGlobalThrottling {
 public:
     explicit UseGlobalThrottling(OperationContext* opCtx, int numTickets)
-        : _opCtx(opCtx), _holder(1) {
+        : _opCtx(opCtx), _holder(numTickets) {
         _opCtx->lockState()->setGlobalThrottling(&_holder, &_holder);
     }
-    ~UseGlobalThrottling() {
+    ~UseGlobalThrottling() noexcept(false) {
         // Reset the global setting as we're about to destroy the ticket holder.
         _opCtx->lockState()->setGlobalThrottling(nullptr, nullptr);
+        ASSERT_EQ(_holder.used(), 0);
     }
 
 private:
@@ -1006,6 +1007,24 @@ TEST_F(DConcurrencyTestFixture, Throttling) {
         overlongWait = t2 - t1 >= Seconds(1);
     } while (overlongWait && ++tries < maxTries);
     ASSERT(!overlongWait);
+}
+
+TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+    auto opctx2 = clientOpctxPairs[1].second.get();
+    // Limit the locker to 1 ticket at a time.
+    UseGlobalThrottling throttle(opctx1, 1);
+
+    // Prevent the enforcement of ticket throttling.
+    opctx1->lockState()->setShouldAcquireTicket(false);
+
+    // Both locks should be acquired immediately because there is no throttling.
+    Lock::GlobalRead R1(opctx1, Date_t::now());
+    ASSERT(R1.isLocked());
+
+    Lock::GlobalRead R2(opctx2, Date_t::now());
+    ASSERT(R2.isLocked());
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTimeout) {
