@@ -30,8 +30,12 @@
 
 #include "mongo/db/catalog/collection_options.h"
 
+#include <algorithm>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -240,6 +244,17 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
             }
 
             pipeline = e.Obj().getOwned();
+        } else if (fieldName == "idIndex" && kind == parseForCommand) {
+            if (e.type() != mongo::Object) {
+                return Status(ErrorCodes::TypeMismatch, "'idIndex' has to be an object.");
+            }
+
+            auto tempIdIndex = e.Obj().getOwned();
+            if (tempIdIndex.isEmpty()) {
+                return {ErrorCodes::FailedToParse, "idIndex cannot be empty"};
+            }
+
+            idIndex = std::move(tempIdIndex);
         } else if (!createdOn24OrEarlier && !CommandHelpers::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream() << "The field '" << fieldName
@@ -257,65 +272,158 @@ Status CollectionOptions::parse(const BSONObj& options, ParseKind kind) {
 
 BSONObj CollectionOptions::toBSON() const {
     BSONObjBuilder b;
+    appendBSON(&b);
+    return b.obj();
+}
 
+void CollectionOptions::appendBSON(BSONObjBuilder* builder) const {
     if (uuid) {
-        b.appendElements(uuid->toBSON());
+        builder->appendElements(uuid->toBSON());
     }
 
     if (capped) {
-        b.appendBool("capped", true);
-        b.appendNumber("size", cappedSize);
+        builder->appendBool("capped", true);
+        builder->appendNumber("size", cappedSize);
 
         if (cappedMaxDocs)
-            b.appendNumber("max", cappedMaxDocs);
+            builder->appendNumber("max", cappedMaxDocs);
     }
 
     if (initialNumExtents)
-        b.appendNumber("$nExtents", initialNumExtents);
+        builder->appendNumber("$nExtents", initialNumExtents);
     if (!initialExtentSizes.empty())
-        b.append("$nExtents", initialExtentSizes);
+        builder->append("$nExtents", initialExtentSizes);
 
     if (autoIndexId != DEFAULT)
-        b.appendBool("autoIndexId", autoIndexId == YES);
+        builder->appendBool("autoIndexId", autoIndexId == YES);
 
     if (flagsSet)
-        b.append("flags", flags);
+        builder->append("flags", flags);
 
     if (temp)
-        b.appendBool("temp", true);
+        builder->appendBool("temp", true);
 
     if (!storageEngine.isEmpty()) {
-        b.append("storageEngine", storageEngine);
+        builder->append("storageEngine", storageEngine);
     }
 
     if (!indexOptionDefaults.isEmpty()) {
-        b.append("indexOptionDefaults", indexOptionDefaults);
+        builder->append("indexOptionDefaults", indexOptionDefaults);
     }
 
     if (!validator.isEmpty()) {
-        b.append("validator", validator);
+        builder->append("validator", validator);
     }
 
     if (!validationLevel.empty()) {
-        b.append("validationLevel", validationLevel);
+        builder->append("validationLevel", validationLevel);
     }
 
     if (!validationAction.empty()) {
-        b.append("validationAction", validationAction);
+        builder->append("validationAction", validationAction);
     }
 
     if (!collation.isEmpty()) {
-        b.append("collation", collation);
+        builder->append("collation", collation);
     }
 
     if (!viewOn.empty()) {
-        b.append("viewOn", viewOn);
+        builder->append("viewOn", viewOn);
     }
 
     if (!pipeline.isEmpty()) {
-        b.append("pipeline", pipeline);
+        builder->appendArray("pipeline", pipeline);
     }
 
-    return b.obj();
+    if (!idIndex.isEmpty()) {
+        builder->append("idIndex", idIndex);
+    }
+}
+
+bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
+                                              CollatorFactoryInterface* collatorFactory) const {
+    if (capped != other.capped) {
+        return false;
+    }
+
+    if (cappedSize != other.cappedSize) {
+        return false;
+    }
+
+    if (cappedMaxDocs != other.cappedMaxDocs) {
+        return false;
+    }
+
+    if (initialNumExtents != other.initialNumExtents) {
+        return false;
+    }
+
+    if (initialExtentSizes.size() != other.initialExtentSizes.size()) {
+        return false;
+    }
+
+    if (!std::equal(other.initialExtentSizes.begin(),
+                    other.initialExtentSizes.end(),
+                    initialExtentSizes.begin())) {
+        return false;
+    }
+
+    if (autoIndexId != other.autoIndexId) {
+        return false;
+    }
+
+    if (flagsSet != other.flagsSet) {
+        return false;
+    }
+
+    if (flags != other.flags) {
+        return false;
+    }
+
+    if (temp != other.temp) {
+        return false;
+    }
+
+    if (storageEngine.woCompare(other.storageEngine) != 0) {
+        return false;
+    }
+
+    if (indexOptionDefaults.woCompare(other.indexOptionDefaults) != 0) {
+        return false;
+    }
+
+    if (validator.woCompare(other.validator) != 0) {
+        return false;
+    }
+
+    if (validationAction != other.validationAction) {
+        return false;
+    }
+
+    if (validationLevel != other.validationLevel) {
+        return false;
+    }
+
+    // Note: the server can add more stuff on the collation options that were not specified in
+    // the original user request. Use the collator to check for equivalence.
+    auto myCollator =
+        collation.isEmpty() ? nullptr : uassertStatusOK(collatorFactory->makeFromBSON(collation));
+    auto otherCollator = other.collation.isEmpty()
+        ? nullptr
+        : uassertStatusOK(collatorFactory->makeFromBSON(other.collation));
+
+    if (!CollatorInterface::collatorsMatch(myCollator.get(), otherCollator.get())) {
+        return false;
+    }
+
+    if (viewOn != other.viewOn) {
+        return false;
+    }
+
+    if (pipeline.woCompare(other.pipeline) != 0) {
+        return false;
+    }
+
+    return true;
 }
 }

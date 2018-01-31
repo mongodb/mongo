@@ -43,6 +43,7 @@
 
 namespace mongo {
 
+struct CollectionOptions;
 class OperationContext;
 class RemoteCommandTargeter;
 class ServiceContext;
@@ -280,6 +281,15 @@ public:
      */
     std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
                                                                StringData dbName);
+
+    /**
+     * Creates a new unsharded collection with the given options.
+     *
+     * Throws exception on errors.
+     */
+    void createCollection(OperationContext* opCtx,
+                          const NamespaceString& ns,
+                          const CollectionOptions& options);
 
     //
     // Shard Operations

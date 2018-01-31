@@ -47,11 +47,15 @@ namespace {
 
 const int kOnErrorNumRetries = 3;
 
-Status _getEffectiveStatus(const StatusWith<Shard::CommandResponse>& swResponse) {
+}  // namespace
+
+Status Shard::CommandResponse::getEffectiveStatus(
+    const StatusWith<Shard::CommandResponse>& swResponse) {
     // Check if the request even reached the shard.
     if (!swResponse.isOK()) {
         return swResponse.getStatus();
     }
+
     auto& response = swResponse.getValue();
 
     // If the request reached the shard, check if the command failed.
@@ -67,11 +71,9 @@ Status _getEffectiveStatus(const StatusWith<Shard::CommandResponse>& swResponse)
     return Status::OK();
 }
 
-}  // namespace
-
 Status Shard::CommandResponse::processBatchWriteResponse(
     StatusWith<Shard::CommandResponse> swResponse, BatchedCommandResponse* batchResponse) {
-    auto status = _getEffectiveStatus(swResponse);
+    auto status = getEffectiveStatus(swResponse);
     if (status.isOK()) {
         string errmsg;
         if (!batchResponse->parseBSON(swResponse.getValue().response, &errmsg)) {
@@ -126,7 +128,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
         }
 
         auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
-        auto status = _getEffectiveStatus(swResponse);
+        auto status = CommandResponse::getEffectiveStatus(swResponse);
         if (isRetriableError(status.code(), retryPolicy)) {
             LOG(2) << "Command " << redact(cmdObj)
                    << " failed with retriable error and will be retried"
@@ -163,7 +165,7 @@ StatusWith<Shard::CommandResponse> Shard::runCommandWithFixedRetryAttempts(
         }
 
         auto swResponse = _runCommand(opCtx, readPref, dbName, maxTimeMSOverride, cmdObj);
-        auto status = _getEffectiveStatus(swResponse);
+        auto status = CommandResponse::getEffectiveStatus(swResponse);
         if (retry < kOnErrorNumRetries && isRetriableError(status.code(), retryPolicy)) {
             LOG(2) << "Command " << redact(cmdObj)
                    << " failed with retriable error and will be retried"

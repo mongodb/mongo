@@ -71,6 +71,11 @@ public:
         static Status processBatchWriteResponse(StatusWith<CommandResponse> response,
                                                 BatchedCommandResponse* batchResponse);
 
+        /**
+         * Returns an error status if either commandStatus or writeConcernStatus has an error.
+         */
+        static Status getEffectiveStatus(const StatusWith<CommandResponse>& swResponse);
+
         boost::optional<HostAndPort> hostAndPort;
         BSONObj response;
         BSONObj metadata;

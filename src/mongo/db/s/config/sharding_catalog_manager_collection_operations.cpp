@@ -41,7 +41,9 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -60,6 +62,8 @@
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
@@ -111,6 +115,49 @@ void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss)
                           << nss.ns()
                           << " from config.chunks",
             numChunks == 0);
+}
+
+boost::optional<UUID> checkCollectionOptions(OperationContext* opCtx,
+                                             Shard* shard,
+                                             const NamespaceString& ns,
+                                             const CollectionOptions options) {
+    BSONObjBuilder listCollCmd;
+    listCollCmd.append("listCollections", 1);
+    listCollCmd.append("filter", BSON("name" << ns.coll()));
+
+    auto response = uassertStatusOK(
+        shard->runCommandWithFixedRetryAttempts(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                ns.db().toString(),
+                                                listCollCmd.obj(),
+                                                Shard::RetryPolicy::kIdempotent));
+
+    auto cursorObj = response.response["cursor"].Obj();
+    auto collections = cursorObj["firstBatch"].Obj();
+    BSONObjIterator collIter(collections);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "cannot find ns: " << ns.ns(),
+            collIter.more());
+
+    auto collectionDetails = collIter.next();
+    CollectionOptions actualOptions;
+
+    uassertStatusOK(actualOptions.parse(collectionDetails["options"].Obj()));
+    // TODO: SERVER-33048 check idIndex field
+
+    uassert(ErrorCodes::NamespaceExists,
+            str::stream() << "ns: " << ns.ns() << " already exists with different options: "
+                          << actualOptions.toBSON(),
+            options.matchesStorageOptions(
+                actualOptions, CollatorFactoryInterface::get(opCtx->getServiceContext())));
+
+    if (actualOptions.isView()) {
+        // Views don't have UUID.
+        return boost::none;
+    }
+
+    auto collectionInfo = collectionDetails["info"].Obj();
+    return uassertStatusOK(UUID::parse(collectionInfo["uuid"]));
 }
 
 }  // namespace
@@ -600,6 +647,38 @@ std::vector<NamespaceString> ShardingCatalogManager::getAllShardedCollectionsFor
     }
 
     return collectionsToReturn;
+}
+
+void ShardingCatalogManager::createCollection(OperationContext* opCtx,
+                                              const NamespaceString& ns,
+                                              const CollectionOptions& collOptions) {
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    auto dbEntry =
+        uassertStatusOK(catalogClient->getDatabase(
+                            opCtx, ns.db().toString(), repl::ReadConcernLevel::kLocalReadConcern))
+            .value;
+    const auto& primaryShardId = dbEntry.getPrimary();
+    auto primaryShard = uassertStatusOK(shardRegistry->getShard(opCtx, primaryShardId));
+
+    BSONObjBuilder createCmdBuilder;
+    createCmdBuilder.append("create", ns.coll());
+    collOptions.appendBSON(&createCmdBuilder);
+    auto swResponse = primaryShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        ns.db().toString(),
+        CommandHelpers::appendMajorityWriteConcern(createCmdBuilder.obj()),
+        Shard::RetryPolicy::kIdempotent);
+
+    auto createStatus = Shard::CommandResponse::getEffectiveStatus(swResponse);
+    if (!createStatus.isOK() && createStatus != ErrorCodes::NamespaceExists) {
+        uassertStatusOK(createStatus);
+    }
+
+    checkCollectionOptions(opCtx, primaryShard.get(), ns, collOptions);
+    // TODO: SERVER-33094 use UUID returned to write config.collections entries.
 }
 
 }  // namespace mongo
