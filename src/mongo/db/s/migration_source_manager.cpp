@@ -358,7 +358,7 @@ Status MigrationSourceManager::commitChunkOnRecipient(OperationContext* opCtx) {
     auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
 
     // Tell the recipient shard to fetch the latest changes.
-    Status commitCloneStatus = _cloneDriver->commitClone(opCtx);
+    auto commitCloneStatus = _cloneDriver->commitClone(opCtx);
 
     if (MONGO_FAIL_POINT(failMigrationCommit) && commitCloneStatus.isOK()) {
         commitCloneStatus = {ErrorCodes::InternalError,
@@ -366,7 +366,11 @@ Status MigrationSourceManager::commitChunkOnRecipient(OperationContext* opCtx) {
     }
 
     if (!commitCloneStatus.isOK()) {
-        return commitCloneStatus.withContext("commit clone failed");
+        return commitCloneStatus.getStatus().withContext("commit clone failed");
+    }
+
+    if (commitCloneStatus.getValue()["counts"].type() == BSONType::Object) {
+        _recipientCloneCounts = commitCloneStatus.getValue()["counts"].Obj().getOwned();
     }
 
     _state = kCloneCompleted;
@@ -571,7 +575,9 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                     BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
                                << _args.getFromShardId()
                                << "to"
-                               << _args.getToShardId()),
+                               << _args.getToShardId()
+                               << "counts"
+                               << _recipientCloneCounts),
                     ShardingCatalogClient::kMajorityWriteConcern)
         .ignore();
 

@@ -95,7 +95,7 @@ public:
      *
      * NOTE: Must be called without any locks.
      */
-    virtual Status commitClone(OperationContext* opCtx) = 0;
+    virtual StatusWith<BSONObj> commitClone(OperationContext* opCtx) = 0;
 
     /**
      * Tells the recipient to abort the clone and cleanup any unused data. This method's
