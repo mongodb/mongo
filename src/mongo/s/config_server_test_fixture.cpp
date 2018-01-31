@@ -243,7 +243,7 @@ Status ConfigServerTestFixture::deleteToConfigCollection(OperationContext* opCtx
                                                          const NamespaceString& ns,
                                                          const BSONObj& doc,
                                                          const bool multi) {
-    auto deleteReponse = getConfigShard()->runCommand(opCtx,
+    auto deleteResponse = getConfigShard()->runCommand(opCtx,
                                                       kReadPref,
                                                       ns.db().toString(),
                                                       [&]() {
@@ -261,7 +261,7 @@ Status ConfigServerTestFixture::deleteToConfigCollection(OperationContext* opCtx
 
 
     BatchedCommandResponse batchResponse;
-    auto status = Shard::CommandResponse::processBatchWriteResponse(deleteReponse, &batchResponse);
+    auto status = Shard::CommandResponse::processBatchWriteResponse(deleteResponse, &batchResponse);
     return status;
 }
 
