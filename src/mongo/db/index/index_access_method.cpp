@@ -220,7 +220,10 @@ Status IndexAccessMethod::remove(OperationContext* opCtx,
     // multikey when removing a document since the index metadata isn't updated when keys are
     // deleted.
     MultikeyPaths* multikeyPaths = nullptr;
-    getKeys(obj, options.getKeysMode, &keys, multikeyPaths);
+
+    // Relax key constraints on removal when deleting documents with invalid formats, but only
+    // those that don't apply to the partialIndex filter.
+    getKeys(obj, GetKeysMode::kRelaxConstraintsUnfiltered, &keys, multikeyPaths);
 
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
         removeOneKey(opCtx, *i, loc, options.dupsAllowed);
@@ -595,11 +598,11 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
     try {
         doGetKeys(obj, keys, multikeyPaths);
     } catch (const AssertionException& ex) {
+        // Suppress all indexing errors when mode is kRelaxConstraints.
         if (mode == GetKeysMode::kEnforceConstraints) {
             throw;
         }
 
-        // Suppress indexing errors when mode is kRelaxConstraints.
         keys->clear();
         if (multikeyPaths) {
             multikeyPaths->clear();
@@ -608,6 +611,15 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
         if (whiteList.find(ex.code()) == whiteList.end()) {
             throw;
         }
+
+        // If the document applies to the filter (which means that it should have never been
+        // indexed), do not supress the error.
+        const MatchExpression* filter = _btreeState->getFilterExpression();
+        if (mode == GetKeysMode::kRelaxConstraintsUnfiltered && filter &&
+            filter->matchesBSON(obj)) {
+            throw;
+        }
+
         LOG(1) << "Ignoring indexing error for idempotency reasons: " << redact(ex)
                << " when getting index keys of " << redact(obj);
     }
