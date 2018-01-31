@@ -1,6 +1,9 @@
-// @tags: [requires_non_retryable_writes]
-
 // Tests whether the geospatial search is stable under btree updates
+//
+// @tags: [
+//   assumes_write_concern_unchanged,
+//   requires_non_retryable_writes,
+// ]
 
 var coll = db.getCollection("jstests_geo_update_btree");
 coll.drop();

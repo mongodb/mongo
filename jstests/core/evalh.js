@@ -1,7 +1,10 @@
-// @tags: [requires_non_retryable_commands]
-
 /**
  * Test that db.eval does not support auth.
+ *
+ * @tags: [
+ *   requires_eval_command,
+ *   requires_non_retryable_commands,
+ * ]
  */
 (function() {
     'use strict';

@@ -39,7 +39,7 @@
     // in the stream.
     jsTestLog("Adding documents to collection.");
     for (let i = 1; i < batchSize * 2; i++) {
-        assert.writeOK(cursorCollection.insert({_id: i}, {writeConcern: {w: 1}}));
+        assert.writeOK(cursorCollection.insert({_id: i}));
     }
 
     // Look at one batch's worth.

@@ -1,201 +1,221 @@
 /**
- * Use prototype overrides to set read concern and write concern while running core tests.
+ * Use prototype overrides to set read concern and write concern while running tests.
  */
 (function() {
     "use strict";
 
+    load("jstests/libs/override_methods/override_helpers.js");
+
     if (typeof TestData === "undefined" || !TestData.hasOwnProperty("defaultReadConcernLevel")) {
         throw new Error(
-            "The default read-concern level must be set as the 'defaultReadConcernLevel' " +
-            "property on TestData");
-    }
-    var defaultReadConcern = {level: TestData.defaultReadConcernLevel};
-
-    var defaultWriteConcern = {
-        w: "majority",
-        // Use a "signature" value that won't typically match a value assigned in normal use.
-        // This way the wtimeout set by this override is distinguishable in the server logs.
-        wtimeout: 5 * 60 * 1000 + 321,  // 300321ms
-    };
-    if (TestData.hasOwnProperty("defaultWriteConcern")) {
-        defaultWriteConcern = TestData.defaultWriteConcern;
+            "The readConcern level to use must be set as the 'defaultReadConcernLevel'" +
+            " property on the global TestData object");
     }
 
-    var originalDBQuery = DBQuery;
+    const kDefaultReadConcern = {level: TestData.defaultReadConcernLevel};
+    const kDefaultWriteConcern =
+        (TestData.hasOwnProperty("defaultWriteConcern")) ? TestData.defaultWriteConcern : {
+            w: "majority",
+            // Use a "signature" value that won't typically match a value assigned in normal use.
+            // This way the wtimeout set by this override is distinguishable in the server logs.
+            wtimeout: 5 * 60 * 1000 + 321,  // 300321ms
+        };
 
-    DBQuery = function(mongo, db, collection, ns, query, fields, limit, skip, batchSize, options) {
-        if (ns.endsWith("$cmd")) {
-            if (query.hasOwnProperty("writeConcern") &&
-                bsonWoCompare(query.writeConcern, defaultWriteConcern) !== 0) {
-                jsTestLog("Warning: DBQuery overriding existing writeConcern of: " +
-                          tojson(query.writeConcern));
-                query.writeConcern = defaultWriteConcern;
+    const kCommandsSupportingReadConcern = new Set([
+        "aggregate",
+        "count",
+        "distinct",
+        "find",
+        "geoNear",
+        "geoSearch",
+        "group",
+        "parallelCollectionScan",
+    ]);
+
+    const kCommandsSupportingWriteConcern = new Set([
+        "_configsvrAddShard",
+        "_configsvrAddShardToZone",
+        "_configsvrCommitChunkMerge",
+        "_configsvrCommitChunkMigration",
+        "_configsvrCommitChunkSplit",
+        "_configsvrCreateDatabase",
+        "_configsvrEnableSharding",
+        "_configsvrMoveChunk",
+        "_configsvrMovePrimary",
+        "_configsvrRemoveShard",
+        "_configsvrRemoveShardFromZone",
+        "_configsvrShardCollection",
+        "_configsvrUpdateZoneKeyRange",
+        "_mergeAuthzCollections",
+        "_recvChunkStart",
+        "appendOplogNote",
+        "applyOps",
+        "aggregate",
+        "captrunc",
+        "cleanupOrphaned",
+        "clone",
+        "cloneCollection",
+        "cloneCollectionAsCapped",
+        "collMod",
+        "convertToCapped",
+        "copydb",
+        "create",
+        "createIndexes",
+        "createRole",
+        "createUser",
+        "delete",
+        "doTxn",
+        "drop",
+        "dropAllRolesFromDatabase",
+        "dropAllUsersFromDatabase",
+        "dropDatabase",
+        "dropIndexes",
+        "dropRole",
+        "dropUser",
+        "emptycapped",
+        "findAndModify",
+        "findandmodify",
+        "godinsert",
+        "grantPrivilegesToRole",
+        "grantRolesToRole",
+        "grantRolesToUser",
+        "insert",
+        "mapReduce",
+        "mapreduce",
+        "mapreduce.shardedfinish",
+        "moveChunk",
+        "renameCollection",
+        "revokePrivilegesFromRole",
+        "revokeRolesFromRole",
+        "revokeRolesFromUser",
+        "setFeatureCompatibilityVersion",
+        "update",
+        "updateRole",
+        "updateUser",
+    ]);
+
+    function runCommandWithReadAndWriteConcerns(
+        conn, dbName, commandName, commandObj, func, makeFuncArgs) {
+        if (typeof commandObj !== "object" || commandObj === null) {
+            return func.apply(conn, makeFuncArgs(commandObj));
+        }
+
+        // If the command is in a wrapped form, then we look for the actual command object inside
+        // the query/$query object.
+        let commandObjUnwrapped = commandObj;
+        if (commandName === "query" || commandName === "$query") {
+            commandObjUnwrapped = commandObj[commandName];
+            commandName = Object.keys(commandObjUnwrapped)[0];
+        }
+
+        if (commandName === "eval" || commandName === "$eval") {
+            throw new Error("Cowardly refusing to run test with overridden write concern when it" +
+                            " uses a command that can only perform w=1 writes: " +
+                            tojson(commandObj));
+        }
+
+        let shouldForceReadConcern = kCommandsSupportingReadConcern.has(commandName);
+        let shouldForceWriteConcern = kCommandsSupportingWriteConcern.has(commandName);
+
+        if (commandName === "aggregate") {
+            if (OverrideHelpers.isAggregationWithListLocalCursorsStage(commandName,
+                                                                       commandObjUnwrapped)) {
+                // The $listLocalCursors stage can only be used with readConcern={level: "local"}.
+                shouldForceReadConcern = false;
             }
-        }
 
-        return originalDBQuery.apply(this, arguments);
-    };
-
-    DBQuery.Option = originalDBQuery.Option;
-
-    var originalStartParallelShell = startParallelShell;
-    startParallelShell = function(jsCode, port, noConnect) {
-        var newCode;
-        var overridesFile = "jstests/libs/override_methods/set_read_and_write_concerns.js";
-        if (typeof(jsCode) === "function") {
-            // Load the override file and immediately invoke the supplied function.
-            newCode = `load("${overridesFile}"); (${jsCode})();`;
-        } else {
-            newCode = `load("${overridesFile}"); ${jsCode};`;
-        }
-
-        return originalStartParallelShell(newCode, port, noConnect);
-    };
-
-    const originalRunCommand = DB.prototype._runCommandImpl;
-    DB.prototype._runCommandImpl = function(dbName, obj, options) {
-        var cmdName = "";
-        for (var fieldName in obj) {
-            cmdName = fieldName;
-            break;
-        }
-
-        // These commands directly support a writeConcern argument.
-        var commandsToForceWriteConcern = [
-            "_configsvrAddShard",
-            "_configsvrAddShardToZone",
-            "_configsvrCommitChunkMerge",
-            "_configsvrCommitChunkMigration",
-            "_configsvrCommitChunkSplit",
-            "_configsvrCreateDatabase",
-            "_configsvrEnableSharding",
-            "_configsvrMoveChunk",
-            "_configsvrMovePrimary",
-            "_configsvrRemoveShard",
-            "_configsvrRemoveShardFromZone",
-            "_configsvrShardCollection",
-            "_configsvrUpdateZoneKeyRange",
-            "_mergeAuthzCollections",
-            "_recvChunkStart",
-            "appendOplogNote",
-            "applyOps",
-            "captrunc",
-            "cleanupOrphaned",
-            "clone",
-            "cloneCollection",
-            "cloneCollectionAsCapped",
-            "collMod",
-            "convertToCapped",
-            "copydb",
-            "create",
-            "createIndexes",
-            "createRole",
-            "createUser",
-            "delete",
-            "doTxn",
-            "drop",
-            "dropAllRolesFromDatabase",
-            "dropAllUsersFromDatabase",
-            "dropDatabase",
-            "dropIndexes",
-            "dropRole",
-            "dropUser",
-            "emptycapped",
-            "findAndModify",
-            "findandmodify",
-            "godinsert",
-            "grantPrivilegesToRole",
-            "grantRolesToRole",
-            "grantRolesToUser",
-            "insert",
-            "mapreduce.shardedfinish",
-            "moveChunk",
-            "renameCollection",
-            "revokePrivilegesFromRole",
-            "revokeRolesFromRole",
-            "revokeRolesFromUser",
-            "setFeatureCompatibilityVersion",
-            "update",
-            "updateRole",
-            "updateUser",
-        ];
-
-        // These are reading commands that support majority readConcern.
-        var commandsToForceReadConcern = [
-            "count",
-            "distinct",
-            "find",
-            "geoNear",
-            "geoSearch",
-            "group",
-            "parallelCollectionScan",
-        ];
-
-        var forceWriteConcern = Array.contains(commandsToForceWriteConcern, cmdName);
-        var forceReadConcern = Array.contains(commandsToForceReadConcern, cmdName);
-
-        if (cmdName === "aggregate") {
-            // Aggregate can be either a read or a write depending on whether it has a $out stage.
-            // $out is required to be the last stage of the pipeline.
-            var stages = obj.pipeline;
-            const lastStage = stages && Array.isArray(stages) && (stages.length !== 0)
-                ? stages[stages.length - 1]
-                : undefined;
-            const hasOut =
-                lastStage && (typeof lastStage === 'object') && lastStage.hasOwnProperty('$out');
-            const hasExplain = obj.hasOwnProperty("explain");
-            if (!hasExplain) {
-                if (hasOut) {
-                    forceWriteConcern = true;
-                } else {
-                    forceReadConcern = true;
-                }
+            if (OverrideHelpers.isAggregationWithListLocalSessionsStage(commandName,
+                                                                        commandObjUnwrapped)) {
+                // The $listLocalSessions stage can only be used with readConcern={level: "local"}.
+                shouldForceReadConcern = false;
             }
-        }
 
-        else if (cmdName === "mapReduce") {
-            var stages = obj.pipeline;
-            const lastStage = stages && Array.isArray(stages) && (stages.length !== 0)
-                ? stages[stages.length - 1]
-                : undefined;
-            const hasOut =
-                lastStage && (typeof lastStage === 'object') && lastStage.hasOwnProperty('$out');
-            if (hasOut) {
-                forceWriteConcern = true;
-            }
-        }
-
-        if (forceWriteConcern) {
-            if (obj.hasOwnProperty("writeConcern")) {
-                if (bsonWoCompare(obj.writeConcern, defaultWriteConcern) !== 0) {
-                    jsTestLog("Warning: _runCommandImpl overriding existing writeConcern of: " +
-                              tojson(obj.writeConcern));
-                    obj.writeConcern = defaultWriteConcern;
-                }
+            if (OverrideHelpers.isAggregationWithOutStage(commandName, commandObjUnwrapped)) {
+                // The $out stage can only be used with readConcern={level: "local"}.
+                shouldForceReadConcern = false;
             } else {
-                obj.writeConcern = defaultWriteConcern;
+                // A writeConcern can only be used with a $out stage.
+                shouldForceWriteConcern = false;
             }
 
-        } else if (forceReadConcern) {
-            if (obj.hasOwnProperty("readConcern")) {
-                if (bsonWoCompare(obj.readConcern, defaultReadConcern) !== 0) {
-                    jsTestLog("Warning: _runCommandImpl overriding existing readConcern of: " +
-                              tojson(obj.readConcern));
-                    obj.readConcern = defaultReadConcern;
-                }
+            if (commandObjUnwrapped.explain) {
+                // Attempting to specify a readConcern while explaining an aggregation would always
+                // return an error prior to SERVER-30582 and it otherwise only compatible with
+                // readConcern={level: "local"}.
+                shouldForceReadConcern = false;
+            }
+        } else if (OverrideHelpers.isMapReduceWithInlineOutput(commandName, commandObjUnwrapped)) {
+            // A writeConcern can only be used with non-inline output.
+            shouldForceWriteConcern = false;
+        }
+
+        const inWrappedForm = commandObj !== commandObjUnwrapped;
+
+        if (shouldForceReadConcern) {
+            // We create a copy of 'commandObj' to avoid mutating the parameter the caller
+            // specified.
+            commandObj = Object.assign({}, commandObj);
+            if (inWrappedForm) {
+                commandObjUnwrapped = Object.assign({}, commandObjUnwrapped);
+                commandObj[Object.keys(commandObj)[0]] = commandObjUnwrapped;
             } else {
-                obj.readConcern = defaultReadConcern;
+                commandObjUnwrapped = commandObj;
+            }
+
+            if (commandObjUnwrapped.hasOwnProperty("readConcern")) {
+                let readConcern = commandObjUnwrapped.readConcern;
+
+                if (typeof readConcern !== "object" || readConcern === null ||
+                    (readConcern.hasOwnProperty("level") &&
+                     bsonWoCompare({_: readConcern.level}, {_: kDefaultReadConcern.level}) !== 0)) {
+                    throw new Error("Cowardly refusing to override read concern of command: " +
+                                    tojson(commandObj));
+                }
+
+                // We create a copy of the readConcern object to avoid mutating the parameter the
+                // caller specified.
+                readConcern = Object.assign({}, readConcern, kDefaultReadConcern);
+                commandObjUnwrapped.readConcern = readConcern;
+            } else {
+                commandObjUnwrapped.readConcern = kDefaultReadConcern;
             }
         }
 
-        var res = originalRunCommand.call(this, dbName, obj, options);
+        if (shouldForceWriteConcern) {
+            // We create a copy of 'commandObj' to avoid mutating the parameter the caller
+            // specified.
+            commandObj = Object.assign({}, commandObj);
+            if (inWrappedForm) {
+                commandObjUnwrapped = Object.assign({}, commandObjUnwrapped);
+                commandObj[Object.keys(commandObj)[0]] = commandObjUnwrapped;
+            } else {
+                commandObjUnwrapped = commandObj;
+            }
 
-        return res;
-    };
+            if (commandObjUnwrapped.hasOwnProperty("writeConcern")) {
+                let writeConcern = commandObjUnwrapped.writeConcern;
 
-    // Use a majority write concern if the operation does not specify one.
-    DBCollection.prototype.getWriteConcern = function() {
-        return new WriteConcern(defaultWriteConcern);
-    };
+                if (typeof writeConcern !== "object" || writeConcern === null ||
+                    (writeConcern.hasOwnProperty("w") &&
+                     bsonWoCompare({_: writeConcern.w}, {_: kDefaultWriteConcern.w}) !== 0)) {
+                    throw new Error("Cowardly refusing to override write concern of command: " +
+                                    tojson(commandObj));
+                }
 
+                // We create a copy of the writeConcern object to avoid mutating the parameter the
+                // caller specified.
+                writeConcern = Object.assign({}, writeConcern, kDefaultWriteConcern);
+                commandObjUnwrapped.writeConcern = writeConcern;
+            } else {
+                commandObjUnwrapped.writeConcern = kDefaultWriteConcern;
+            }
+        }
+
+        return func.apply(conn, makeFuncArgs(commandObj));
+    }
+
+    OverrideHelpers.prependOverrideInParallelShell(
+        "jstests/libs/override_methods/set_read_and_write_concerns.js");
+
+    OverrideHelpers.overrideRunCommand(runCommandWithReadAndWriteConcerns);
 })();

@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_commands]
+// @tags: [
+//   requires_eval_command,
+//   requires_non_retryable_commands,
+// ]
 
 (function() {
     "use strict";

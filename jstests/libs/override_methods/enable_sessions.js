@@ -4,6 +4,8 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/override_methods/override_helpers.js");
+
     var runCommandOriginal = Mongo.prototype.runCommand;
     var runCommandWithMetadataOriginal = Mongo.prototype.runCommandWithMetadata;
     var getDBOriginal = Mongo.prototype.getDB;
@@ -18,19 +20,8 @@
     db = driverSession.getDatabase(db.getName());
     sessionMap.set(db.getMongo(), driverSession);
 
-    var originalStartParallelShell = startParallelShell;
-    startParallelShell = function(jsCode, port, noConnect) {
-        var newCode;
-        var overridesFile = "jstests/libs/override_methods/enable_sessions.js";
-        if (typeof(jsCode) === "function") {
-            // Load the override file and immediately invoke the supplied function.
-            newCode = `load("${overridesFile}"); (${jsCode})();`;
-        } else {
-            newCode = `load("${overridesFile}"); ${jsCode};`;
-        }
-
-        return originalStartParallelShell(newCode, port, noConnect);
-    };
+    OverrideHelpers.prependOverrideInParallelShell(
+        "jstests/libs/override_methods/enable_sessions.js");
 
     function startSession(conn) {
         const driverSession = conn.startSession(sessionOptions);

@@ -7,18 +7,32 @@ selector:
   - jstests/aggregation/expressions/*.js
   - jstests/aggregation/sources/*/*.js
   exclude_files:
-  - jstests/aggregation/bugs/server18198.js # Uses a mocked mongo client to test read preference.
-  - jstests/aggregation/mongos_merge.js # Cannot specify write concern when
-                                        # secondaryThrottle is not set.
-  - jstests/aggregation/mongos_slaveok.js # Majority read on secondary requires afterOpTime.
-  - jstests/aggregation/shard_targeting.js # Cannot specify write concern when
-                                           # secondaryThrottle is not set.
-  - jstests/aggregation/sources/collStats/shard_host_info.js # Cannot specify write concern when
-                                                             # secondaryThrottle is not set.
-  - jstests/aggregation/sources/facet/use_cases.js # Cannot specify write concern when
-                                                   # secondaryThrottle is not set.
-  - jstests/aggregation/testSlave.js # Majority read on secondary requires afterOpTime.
-  - jstests/aggregation/sources/out/*.js # Cannot specify write concern when secondaryThrottle is not set.
+  # This test specifies a $out stage not as the last stage in the aggregation pipeline, causing a
+  # non-local readConcern to erroneously be sent with the command.
+  - jstests/aggregation/sources/out/required_last_position.js
+  # These tests fail due to the inability to specify a writeConcern when secondaryThrottle is not
+  # set as part of the moveChunk command.
+  - jstests/aggregation/mongos_merge.js
+  - jstests/aggregation/shard_targeting.js
+  - jstests/aggregation/sources/facet/use_cases.js
+  # These test fail because afterOpTime is required to guarantee a secondary has advanced its
+  # majority-committed snapshot.
+  - jstests/aggregation/mongos_slaveok.js
+  - jstests/aggregation/testSlave.js
+  exclude_with_any_tags:
+  ##
+  # The next three tags correspond to the special errors thrown by the
+  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+  # warranted.
+  ##
+  # "Cowardly refusing to override read concern of command: ..."
+  - assumes_read_concern_unchanged
+  # "Cowardly refusing to override write concern of command: ..."
+  - assumes_write_concern_unchanged
+  # "Cowardly refusing to run test with overridden write concern when it uses a command that can
+  #  only perform w=1 writes: ..."
+  - requires_eval_command
 
 executor:
   config:
@@ -27,7 +41,9 @@ executor:
         TestData:
           defaultReadConcernLevel: majority
           enableMajorityReadConcern: ''
-      eval: "var testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');"
+      eval: >-
+        var testingReplication = true;
+        load('jstests/libs/override_methods/set_read_and_write_concerns.js');
       readMode: commands
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
@@ -45,5 +61,3 @@ executor:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
     num_nodes: 2
-    # Needs to be set for any ephemeral or no-journaling storage engine
-    write_concern_majority_journal_default: false

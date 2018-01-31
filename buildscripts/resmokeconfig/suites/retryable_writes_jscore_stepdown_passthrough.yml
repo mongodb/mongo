@@ -59,25 +59,21 @@ selector:
   - jstests/core/validate_cmd_ns.js # Calls _exec() directly, not retryable.
 
   exclude_with_any_tags:
-  - cannot_inject_read_write_concern
-
+  ##
   # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js
-  # override when it refuses to run a certain command. Above each tag are the messages that
-  # warrant it.
-
+  # override when it refuses to run a certain command. Above each tag are the message(s) that cause
+  # the tag to be warranted.
+  ##
   # "Refusing to run a test that issues a getMore command since if a network error occurs during
   #   it then we won't know whether the cursor was advanced or not"
   - requires_getmore
-
   # "Refusing to run a test that issues non-retryable write operations since the test likely makes
   #   assertions on the write results and can lead to spurious failures if a network error occurs"
   - requires_non_retryable_writes
-
   # "Refusing to run a test that issues commands that are not blindly retryable"
   # "Refusing to run a test that issues an aggregation command with $out because it is not
   #   retryable"
   - requires_non_retryable_commands
-
   # "Refusing to run a test that issues commands that may return different values after a failover"
   # "Refusing to run a test that issues an aggregation command with explain because it may return
   #   incomplete results"
@@ -86,6 +82,19 @@ selector:
   # "Refusing to run a test that issues a mapReduce command, because it calls std::terminate() if
   #   interrupted by a stepdown"
   - does_not_support_stepdowns
+  ##
+  # The next three tags correspond to the special errors thrown by the
+  # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+  # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to be
+  # warranted.
+  ##
+  # "Cowardly refusing to override read concern of command: ..."
+  - assumes_read_concern_unchanged
+  # "Cowardly refusing to override write concern of command: ..."
+  - assumes_write_concern_unchanged
+  # "Cowardly refusing to run test with overridden write concern when it uses a command that can
+  #  only perform w=1 writes: ..."
+  - requires_eval_command
 
 executor:
   config:

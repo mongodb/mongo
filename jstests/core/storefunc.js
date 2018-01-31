@@ -1,4 +1,8 @@
-// @tags: [requires_non_retryable_commands, requires_non_retryable_writes]
+// @tags: [
+//   requires_eval_command,
+//   requires_non_retryable_commands,
+//   requires_non_retryable_writes,
+// ]
 
 // Use a private sister database to avoid conflicts with other tests that use system.js
 var testdb = db.getSisterDB("storefunc");
