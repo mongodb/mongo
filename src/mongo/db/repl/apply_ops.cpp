@@ -498,5 +498,39 @@ Status applyOps(OperationContext* opCtx,
     return Status::OK();
 }
 
+// static
+MultiApplier::Operations ApplyOps::extractOperations(const OplogEntry& applyOpsOplogEntry) {
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "ApplyOps::extractOperations(): not a command: "
+                          << redact(applyOpsOplogEntry.toBSON()),
+            applyOpsOplogEntry.isCommand());
+
+    uassert(ErrorCodes::CommandNotSupported,
+            str::stream() << "ApplyOps::extractOperations(): not applyOps command: "
+                          << redact(applyOpsOplogEntry.toBSON()),
+            OplogEntry::CommandType::kApplyOps == applyOpsOplogEntry.getCommandType());
+
+    auto cmdObj = applyOpsOplogEntry.getOperationToApply();
+    auto operationDocs = cmdObj.firstElement().Obj();
+
+    uassert(ErrorCodes::EmptyArrayOperation,
+            str::stream() << "ApplyOps::extractOperations(): applyOps contains no operations: "
+                          << redact(applyOpsOplogEntry.toBSON()),
+            !operationDocs.isEmpty());
+
+    MultiApplier::Operations operations;
+
+    auto topLevelDoc = applyOpsOplogEntry.toBSON();
+    for (const auto& elem : operationDocs) {
+        auto operationDoc = elem.Obj();
+        BSONObjBuilder builder(operationDoc);
+        builder.appendElementsUnique(topLevelDoc);
+        auto operation = builder.obj();
+        operations.emplace_back(operation);
+    }
+
+    return operations;
+}
+
 }  // namespace repl
 }  // namespace mongo

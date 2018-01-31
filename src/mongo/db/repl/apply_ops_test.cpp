@@ -346,6 +346,105 @@ TEST_F(ApplyOpsTest, ApplyOpsPropagatesOplogApplicationMode) {
     stopCapturingLogMessages();
 }
 
+/**
+ * Generates oplog entries with the given number used for the timestamp.
+ */
+OplogEntry makeOplogEntry(OpTypeEnum opType, const BSONObj& oField) {
+    return OplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
+                      1LL,                         // hash
+                      opType,                      // op type
+                      NamespaceString("a.a"),      // namespace
+                      boost::none,                 // uuid
+                      boost::none,                 // fromMigrate
+                      OplogEntry::kOplogVersion,   // version
+                      oField,                      // o
+                      boost::none,                 // o2
+                      {},                          // sessionInfo
+                      boost::none,                 // wall clock time
+                      boost::none,                 // statement id
+                      boost::none,   // optime of previous write within same transaction
+                      boost::none,   // pre-image optime
+                      boost::none);  // post-image optime
+}
+
+TEST_F(ApplyOpsTest, ExtractOperationsReturnsTypeMismatchIfNotCommand) {
+    ASSERT_THROWS_CODE(
+        ApplyOps::extractOperations(makeOplogEntry(OpTypeEnum::kInsert, BSON("_id" << 0))),
+        DBException,
+        ErrorCodes::TypeMismatch);
+}
+
+TEST_F(ApplyOpsTest, ExtractOperationsReturnsCommandNotSupportedIfNotApplyOpsCommand) {
+    ASSERT_THROWS_CODE(ApplyOps::extractOperations(makeOplogEntry(OpTypeEnum::kCommand,
+                                                                  BSON("create"
+                                                                       << "t"))),
+                       DBException,
+                       ErrorCodes::CommandNotSupported);
+}
+
+TEST_F(ApplyOpsTest, ExtractOperationsReturnsEmptyArrayOperationIfApplyOpsContainsNoOperations) {
+    ASSERT_THROWS_CODE(ApplyOps::extractOperations(
+                           makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSONArray()))),
+                       DBException,
+                       ErrorCodes::EmptyArrayOperation);
+}
+
+TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps) {
+    NamespaceString ns1("test.a");
+    auto ui1 = UUID::gen();
+    auto op1 = BSON("op"
+                    << "i"
+                    << "ns"
+                    << ns1.ns()
+                    << "ui"
+                    << ui1
+                    << "o"
+                    << BSON("_id" << 1));
+
+    NamespaceString ns2("test.b");
+    auto ui2 = UUID::gen();
+    auto op2 = BSON("op"
+                    << "i"
+                    << "ns"
+                    << ns2.ns()
+                    << "ui"
+                    << ui2
+                    << "o"
+                    << BSON("_id" << 2));
+
+    auto oplogEntry =
+        makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSON_ARRAY(op1 << op2)));
+
+    auto operations = ApplyOps::extractOperations(oplogEntry);
+    ASSERT_EQUALS(2U, operations.size()) << "Unexpected number of operations extracted: "
+                                         << oplogEntry.toBSON();
+
+    // Check extracted CRUD operations.
+    {
+        const auto operation1 = operations.front();
+        ASSERT(OpTypeEnum::kInsert == operation1.getOpType()) << "Unexpected op type: "
+                                                              << operation1.toBSON();
+        ASSERT_EQUALS(ui1, *operation1.getUuid());
+        ASSERT_EQUALS(ns1, operation1.getNamespace());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 1), operation1.getOperationToApply());
+
+        // OpTime of CRUD operation should match applyOps.
+        ASSERT_EQUALS(oplogEntry.getOpTime(), operation1.getOpTime());
+    }
+
+    {
+        const auto operation2 = operations.back();
+        ASSERT(OpTypeEnum::kInsert == operation2.getOpType()) << "Unexpected op type: "
+                                                              << operation2.toBSON();
+        ASSERT_EQUALS(ui2, *operation2.getUuid());
+        ASSERT_EQUALS(ns2, operation2.getNamespace());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 2), operation2.getOperationToApply());
+
+        // OpTime of CRUD operation should match applyOps.
+        ASSERT_EQUALS(oplogEntry.getOpTime(), operation2.getOpTime());
+    }
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

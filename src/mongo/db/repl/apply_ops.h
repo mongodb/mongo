@@ -26,11 +26,15 @@
  *    it in the license file.
  */
 
+#include <vector>
+
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
-class BSONObj;
 class BSONObjBuilder;
 class OperationContext;
 
@@ -39,6 +43,12 @@ class ApplyOps {
 public:
     static constexpr StringData kPreconditionFieldName = "preCondition"_sd;
     static constexpr StringData kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;
+
+    /**
+     * Extracts CRUD operations from an atomic applyOps oplog entry.
+     * Throws UserException on error.
+     */
+    static MultiApplier::Operations extractOperations(const OplogEntry& applyOpsOplogEntry);
 };
 
 /**
