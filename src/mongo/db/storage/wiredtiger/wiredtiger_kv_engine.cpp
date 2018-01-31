@@ -549,7 +549,7 @@ void WiredTigerKVEngine::cleanShutdown() {
 
             WT_CURSOR* tableCursor;
             invariantWTOK(
-                session->open_cursor(session, "metadata:", nullptr, nullptr, &tableCursor));
+                session->open_cursor(session, "metadata:create", nullptr, nullptr, &tableCursor));
             while (tableCursor->next(tableCursor) == 0) {
                 const char* raw;
                 tableCursor->get_key(tableCursor, &raw);
@@ -941,7 +941,7 @@ bool WiredTigerKVEngine::hasIdent(OperationContext* opCtx, StringData ident) con
 bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) const {
     // can't use WiredTigerCursor since this is called from constructor.
     WT_CURSOR* c = NULL;
-    int ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
+    int ret = session->open_cursor(session, "metadata:create", NULL, NULL, &c);
     if (ret == ENOENT)
         return false;
     invariantWTOK(ret);
@@ -954,7 +954,7 @@ bool WiredTigerKVEngine::_hasUri(WT_SESSION* session, const std::string& uri) co
 std::vector<std::string> WiredTigerKVEngine::getAllIdents(OperationContext* opCtx) const {
     std::vector<std::string> all;
     int ret;
-    WiredTigerCursor cursor("metadata:", WiredTigerSession::kMetadataTableId, false, opCtx);
+    WiredTigerCursor cursor("metadata:create", WiredTigerSession::kMetadataTableId, false, opCtx);
     WT_CURSOR* c = cursor.get();
     if (!c)
         return all;
