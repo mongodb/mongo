@@ -153,6 +153,10 @@ public:
     StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> reconcileCatalogAndIdents(
         OperationContext* opCtx) override;
 
+    void loadCatalog(OperationContext* opCtx) final;
+
+    void closeCatalog(OperationContext* opCtx) final;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 

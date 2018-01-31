@@ -221,13 +221,14 @@ env.CppUnitTest(
 env.Library(
     target='catalog_impl',
     source=[
+        "catalog_control.cpp",
         "collection_compact.cpp",
         "collection_impl.cpp",
         "collection_info_cache_impl.cpp",
-        "database_impl.cpp",
         "database_holder_impl.cpp",
-        "index_catalog_impl.cpp",
+        "database_impl.cpp",
         "index_catalog_entry_impl.cpp",
+        "index_catalog_impl.cpp",
         "index_consistency.cpp",
         "index_create_impl.cpp",
         "private/record_store_validate_adaptor.cpp",

@@ -203,6 +203,15 @@ public:
     }
 
     /**
+     * Populates and tears down in-memory data structures, respectively. Only required for storage
+     * engines that support recoverToStableTimestamp().
+     *
+     * Must be called with the global lock acquired in exclusive mode.
+     */
+    virtual void loadCatalog(OperationContext* opCtx) {}
+    virtual void closeCatalog(OperationContext* opCtx) {}
+
+    /**
      * Closes all file handles associated with a database.
      */
     virtual Status closeDatabase(OperationContext* opCtx, StringData db) = 0;

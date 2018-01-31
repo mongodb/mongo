@@ -1687,6 +1687,12 @@ void acquireOplogCollectionForLogging(OperationContext* opCtx) {
     }
 }
 
+void establishOplogCollectionForLogging(OperationContext* opCtx, Collection* oplog) {
+    invariant(opCtx->lockState()->isW());
+    invariant(oplog);
+    _localOplogCollection = oplog;
+}
+
 void signalOplogWaiters() {
     if (_localOplogCollection) {
         _localOplogCollection->notifyCappedWaitersIfNeeded();

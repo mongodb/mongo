@@ -195,6 +195,9 @@ if (typeof _threadInject != "undefined") {
             // Views tests
             "views/invalid_system_views.js",  // Creates invalid view definitions in system.views.
             "views/views_all_commands.js",    // Drops test DB.
+
+            // Destroys and recreates the catalog, which will interfere with other tests.
+            "restart_catalog.js",
         ]);
 
         // The following tests cannot run when shell readMode is legacy.

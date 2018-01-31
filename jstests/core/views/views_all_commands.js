@@ -389,6 +389,7 @@
         reapLogicalSessionCacheNow: {skip: isAnInternalCommand},
         refreshSessions: {skip: isUnrelated},
         refreshSessionsInternal: {skip: isAnInternalCommand},
+        restartCatalog: {skip: isAnInternalCommand},
         reIndex: {command: {reIndex: "view"}, expectFailure: true},
         removeShard: {skip: isUnrelated},
         removeShardFromZone: {skip: isUnrelated},

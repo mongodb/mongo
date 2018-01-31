@@ -18,6 +18,9 @@ selector:
   - jstests/core/top.js
   - jstests/core/views/views_stats.js
 
+  # Uses plan cache commands.
+  - jstests/core/restart_catalog.js
+
   # TODO SERVER-31249: getLastError should not be affected by no-op retries.
   - jstests/core/bulk_legacy_enforce_gle.js
 

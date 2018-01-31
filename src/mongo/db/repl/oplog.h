@@ -155,6 +155,14 @@ void oplogCheckCloseDatabase(OperationContext* opCtx, Database* db);
  */
 void acquireOplogCollectionForLogging(OperationContext* opCtx);
 
+/**
+ * Use 'oplog' as the new cached pointer to the local oplog.
+ *
+ * Called by catalog::openCatalog() to re-establish the oplog collection pointer while holding onto
+ * the global lock in exclusive mode.
+ */
+void establishOplogCollectionForLogging(OperationContext* opCtx, Collection* oplog);
+
 using IncrementOpsAppliedStatsFn = stdx::function<void()>;
 /**
  * Take the object field of a BSONObj, the BSONObj, and the namespace of

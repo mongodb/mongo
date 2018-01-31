@@ -83,20 +83,23 @@ KVStorageEngine::KVStorageEngine(
             !(options.directoryPerDB && !engine->supportsDirectoryPerDB()));
 
     OperationContextNoop opCtx(_engine->newRecoveryUnit());
+    loadCatalog(&opCtx);
+}
 
-    bool catalogExists = engine->hasIdent(&opCtx, catalogInfo);
-
-    if (options.forRepair && catalogExists) {
+void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
+    bool catalogExists = _engine->hasIdent(opCtx, catalogInfo);
+    if (_options.forRepair && catalogExists) {
         log() << "Repairing catalog metadata";
         // TODO should also validate all BSON in the catalog.
-        engine->repairIdent(&opCtx, catalogInfo).transitional_ignore();
+        _engine->repairIdent(opCtx, catalogInfo).transitional_ignore();
     }
 
     if (!catalogExists) {
-        WriteUnitOfWork uow(&opCtx);
+        WriteUnitOfWork uow(opCtx);
 
-        Status status = _engine->createGroupedRecordStore(
-            &opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
+        auto status = _engine->createGroupedRecordStore(
+            opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
+
         // BadValue is usually caused by invalid configuration string.
         // We still fassert() but without a stack trace.
         if (status.code() == ErrorCodes::BadValue) {
@@ -107,10 +110,10 @@ KVStorageEngine::KVStorageEngine(
     }
 
     _catalogRecordStore = _engine->getGroupedRecordStore(
-        &opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
+        opCtx, catalogInfo, catalogInfo, CollectionOptions(), KVPrefix::kNotPrefixed);
     _catalog.reset(new KVCatalog(
         _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes));
-    _catalog->init(&opCtx);
+    _catalog->init(opCtx);
 
     std::vector<std::string> collections;
     _catalog->getAllCollections(&collections);
@@ -127,13 +130,25 @@ KVStorageEngine::KVStorageEngine(
             db = _databaseCatalogEntryFactory(dbName, this).release();
         }
 
-        db->initCollection(&opCtx, coll, options.forRepair);
-        auto maxPrefixForCollection = _catalog->getMetaData(&opCtx, coll).getMaxPrefix();
+        db->initCollection(opCtx, coll, _options.forRepair);
+        auto maxPrefixForCollection = _catalog->getMetaData(opCtx, coll).getMaxPrefix();
         maxSeenPrefix = std::max(maxSeenPrefix, maxPrefixForCollection);
     }
 
     KVPrefix::setLargestPrefix(maxSeenPrefix);
-    opCtx.recoveryUnit()->abandonSnapshot();
+    opCtx->recoveryUnit()->abandonSnapshot();
+}
+
+void KVStorageEngine::closeCatalog(OperationContext* opCtx) {
+    dassert(opCtx->lockState()->isLocked());
+    stdx::lock_guard<stdx::mutex> lock(_dbsLock);
+    for (auto entry : _dbs) {
+        delete entry.second;
+    }
+    _dbs.clear();
+
+    _catalog.reset(nullptr);
+    _catalogRecordStore.reset(nullptr);
 }
 
 /**
