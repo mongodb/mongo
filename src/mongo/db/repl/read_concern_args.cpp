@@ -87,7 +87,7 @@ BSONObj ReadConcernArgs::toBSON() const {
 }
 
 bool ReadConcernArgs::isEmpty() const {
-    return !_afterClusterTime && !_opTime && !_level;
+    return !_afterClusterTime && !_opTime && !_atClusterTime && !_level;
 }
 
 ReadConcernLevel ReadConcernArgs::getLevel() const {

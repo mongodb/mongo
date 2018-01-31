@@ -173,6 +173,10 @@ public:
      */
     void setOldestTimestamp(Timestamp oldestTimestamp);
 
+    Timestamp getPreviousSetOldestTimestamp() const {
+        return _previousSetOldestTimestamp;
+    }
+
     virtual bool supportsRecoverToStableTimestamp() const override;
 
     virtual Status recoverToStableTimestamp() override;

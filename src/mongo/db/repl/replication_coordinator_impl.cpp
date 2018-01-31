@@ -1208,7 +1208,8 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForRead(OperationContext* opCt
     }
 
     // nothing to wait for
-    if (!readConcern.getArgsAfterClusterTime() && !readConcern.getArgsOpTime()) {
+    if (!readConcern.getArgsAfterClusterTime() && !readConcern.getArgsOpTime() &&
+        !readConcern.getArgsAtClusterTime()) {
         return Status::OK();
     }
 
@@ -1219,14 +1220,13 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForReadUntil(OperationContext*
                                                                const ReadConcernArgs& readConcern,
                                                                boost::optional<Date_t> deadline) {
     if (getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
-        // For master/slave and standalone nodes, readAfterOpTime is not supported, so we return an
-        // error. However, we consider all writes "committed" and can treat MajorityReadConcern as
-        // LocalReadConcern, which is immediately satisfied since there is no OpTime to wait for.
+        // 'afterOpTime', 'afterClusterTime', and 'atClusterTime' are only supported for replica
+        // sets.
         return {ErrorCodes::NotAReplicaSet,
                 "node needs to be a replica set member to use read concern"};
     }
 
-    if (readConcern.getArgsAfterClusterTime()) {
+    if (readConcern.getArgsAfterClusterTime() || readConcern.getArgsAtClusterTime()) {
         return _waitUntilClusterTimeForRead(opCtx, readConcern, deadline);
     } else {
         return _waitUntilOpTimeForReadDeprecated(opCtx, readConcern);
@@ -1234,10 +1234,10 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForReadUntil(OperationContext*
 }
 
 Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
-                                                    bool isMajorityReadConcern,
+                                                    bool isMajorityCommittedRead,
                                                     OpTime targetOpTime,
                                                     boost::optional<Date_t> deadline) {
-    if (!isMajorityReadConcern) {
+    if (!isMajorityCommittedRead) {
         // This assumes the read concern is "local" level.
         // We need to wait for all committed writes to be visible, even in the oplog (which uses
         // special visibility rules).
@@ -1246,17 +1246,17 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
 
     stdx::unique_lock<stdx::mutex> lock(_mutex);
 
-    if (isMajorityReadConcern && !_externalState->snapshotsEnabled()) {
+    if (isMajorityCommittedRead && !_externalState->snapshotsEnabled()) {
         return {ErrorCodes::CommandNotSupported,
-                "Current storage engine does not support majority readConcerns"};
+                "Current storage engine does not support majority committed reads"};
     }
 
-    auto getCurrentOpTime = [this, isMajorityReadConcern]() {
-        return isMajorityReadConcern ? _getCurrentCommittedSnapshotOpTime_inlock()
-                                     : _getMyLastAppliedOpTime_inlock();
+    auto getCurrentOpTime = [this, isMajorityCommittedRead]() {
+        return isMajorityCommittedRead ? _getCurrentCommittedSnapshotOpTime_inlock()
+                                       : _getMyLastAppliedOpTime_inlock();
     };
 
-    if (isMajorityReadConcern && targetOpTime > getCurrentOpTime()) {
+    if (isMajorityCommittedRead && targetOpTime > getCurrentOpTime()) {
         LOG(1) << "waitUntilOpTime: waiting for optime:" << targetOpTime
                << " to be in a snapshot -- current snapshot: " << getCurrentOpTime();
     }
@@ -1266,9 +1266,8 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
             return {ErrorCodes::ShutdownInProgress, "Shutdown in progress"};
         }
 
-        // If we are doing a majority read concern we only need to wait for a new snapshot.
-        if (isMajorityReadConcern) {
-            // Wait for a snapshot that meets our needs (< targetOpTime).
+        // If we are doing a majority committed read we only need to wait for a new snapshot.
+        if (isMajorityCommittedRead) {
             LOG(3) << "waitUntilOpTime: waiting for a new snapshot until " << opCtx->getDeadline();
 
             auto waitStatus =
@@ -1312,7 +1311,11 @@ Status ReplicationCoordinatorImpl::_waitUntilOpTime(OperationContext* opCtx,
 Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext* opCtx,
                                                                 const ReadConcernArgs& readConcern,
                                                                 boost::optional<Date_t> deadline) {
-    auto clusterTime = *readConcern.getArgsAfterClusterTime();
+    invariant(readConcern.getArgsAfterClusterTime() || readConcern.getArgsAtClusterTime());
+    invariant(!readConcern.getArgsAfterClusterTime() || !readConcern.getArgsAtClusterTime());
+    auto clusterTime = readConcern.getArgsAfterClusterTime()
+        ? *readConcern.getArgsAfterClusterTime()
+        : *readConcern.getArgsAtClusterTime();
     invariant(clusterTime != LogicalTime::kUninitialized);
 
     // convert clusterTime to opTime so it can be used by the _opTimeWaiterList for wait on
@@ -1320,20 +1323,22 @@ Status ReplicationCoordinatorImpl::_waitUntilClusterTimeForRead(OperationContext
     auto targetOpTime = OpTime(clusterTime.asTimestamp(), OpTime::kUninitializedTerm);
     invariant(!readConcern.getArgsOpTime());
 
-    const bool isMajorityReadConcern =
-        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern;
+    const bool isMajorityCommittedRead =
+        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern ||
+        readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern;
 
-    return _waitUntilOpTime(opCtx, isMajorityReadConcern, targetOpTime, deadline);
+    return _waitUntilOpTime(opCtx, isMajorityCommittedRead, targetOpTime, deadline);
 }
 
 // TODO: remove when SERVER-29729 is done
 Status ReplicationCoordinatorImpl::_waitUntilOpTimeForReadDeprecated(
     OperationContext* opCtx, const ReadConcernArgs& readConcern) {
-    const bool isMajorityReadConcern =
-        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern;
+    const bool isMajorityCommittedRead =
+        readConcern.getLevel() == ReadConcernLevel::kMajorityReadConcern ||
+        readConcern.getLevel() == ReadConcernLevel::kSnapshotReadConcern;
 
     const auto targetOpTime = readConcern.getArgsOpTime().value_or(OpTime());
-    return _waitUntilOpTime(opCtx, isMajorityReadConcern, targetOpTime);
+    return _waitUntilOpTime(opCtx, isMajorityCommittedRead, targetOpTime);
 }
 
 OpTime ReplicationCoordinatorImpl::_getMyLastAppliedOpTime_inlock() const {
