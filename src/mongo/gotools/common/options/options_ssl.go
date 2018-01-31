@@ -8,7 +8,7 @@
 
 package options
 
-import "github.com/spacemonkeygo/openssl"
+import "github.com/10gen/openssl"
 
 func init() {
 	ConnectionOptFunctions = append(ConnectionOptFunctions, registerSSLOptions)

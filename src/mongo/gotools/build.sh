@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -o errexit
 tags=""
 if [ ! -z "$1" ]

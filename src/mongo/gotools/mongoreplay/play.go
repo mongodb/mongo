@@ -77,6 +77,8 @@ func (play *PlayCommand) Execute(args []string) error {
 	context := NewExecutionContext(statColl, session, &ExecutionOptions{fullSpeed: play.FullSpeed,
 		driverOpsFiltered: playbackFileReader.metadata.DriverOpsFiltered})
 
+	session.SetPoolLimit(-1)
+
 	var opChan <-chan *RecordedOp
 	var errChan <-chan error
 

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/10gen/llmgo/bson"
@@ -28,9 +29,9 @@ type PlaybackFileMetadata struct {
 // which is just an io.ReadCloser.
 type PlaybackFileReader struct {
 	io.ReadSeeker
-	fname string
-
-	metadata PlaybackFileMetadata
+	fname                   string
+	parallelFileReadManager *parallelFileReadManager
+	metadata                PlaybackFileMetadata
 }
 
 // PlaybackFileWriter stores the necessary information for a playback destination,
@@ -68,7 +69,6 @@ func NewPlaybackFileReader(filename string, gzip bool) (*PlaybackFileReader, err
 }
 
 func playbackFileReaderFromReadSeeker(rs io.ReadSeeker, filename string) (*PlaybackFileReader, error) {
-
 	// read the metadata from the file
 	metadata := new(PlaybackFileMetadata)
 	err := bsonFromReader(rs, metadata)
@@ -84,18 +84,16 @@ func playbackFileReaderFromReadSeeker(rs io.ReadSeeker, filename string) (*Playb
 	}, nil
 }
 
+func (pfReader *PlaybackFileReader) beginParallelRead() {
+	pfReader.parallelFileReadManager = &parallelFileReadManager{}
+	numWorkers := runtime.NumCPU()
+	pfReader.parallelFileReadManager.begin(numWorkers, pfReader.ReadSeeker)
+}
+
 // NextRecordedOp iterates through the PlaybackFileReader to yield the next
 // RecordedOp. It returns io.EOF when successfully complete.
 func (file *PlaybackFileReader) NextRecordedOp() (*RecordedOp, error) {
-	doc := new(RecordedOp)
-	err := bsonFromReader(file, doc)
-	if err != nil {
-		if err != io.EOF {
-			err = fmt.Errorf("ReadDocument Error: %v", err)
-		}
-		return nil, err
-	}
-	return doc, nil
+	return file.parallelFileReadManager.next()
 }
 
 // NewPlaybackFileWriter initializes a new PlaybackFileWriter
@@ -196,8 +194,12 @@ func (pfReader *PlaybackFileReader) OpChan(repeat int) (<-chan *RecordedOp, <-ch
 					return fmt.Errorf("bson read error: %v", err)
 				}
 
+				pfReader.beginParallelRead()
 				var order int64
 				for {
+					if err = pfReader.parallelFileReadManager.err(); err != nil {
+						return err
+					}
 					recordedOp, err := pfReader.NextRecordedOp()
 					if err != nil {
 						if err == io.EOF {

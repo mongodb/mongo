@@ -82,8 +82,11 @@ func TestRemoveDriverOpsFromFile(t *testing.T) {
 			}
 		}()
 
+		skipConf := newSkipConfig(c.shouldRemoveDriverOps, time.Time{}, 0*time.Second)
+
 		// run Filter to remove the driver op from the file
-		if err := Filter(generator.opChan, []*PlaybackFileWriter{playbackWriter}, c.shouldRemoveDriverOps, time.Time{}); err != nil {
+		if err := Filter(generator.opChan, []*PlaybackFileWriter{playbackWriter},
+			skipConf); err != nil {
 			t.Error(err)
 		}
 
@@ -180,8 +183,9 @@ func TestSplitInputFile(t *testing.T) {
 			close(opChan)
 		}()
 
+		skipConf := newSkipConfig(false, time.Time{}, 0*time.Second)
 		// run the main filter routine with the given input
-		if err := Filter(opChan, outfiles, false, time.Time{}); err != nil {
+		if err := Filter(opChan, outfiles, skipConf); err != nil {
 			t.Error(err)
 		}
 
@@ -277,8 +281,10 @@ func TestRemoveOpsBeforeTime(t *testing.T) {
 			close(inputOpChan)
 		}()
 
+		skipConf := newSkipConfig(false, c.timeToTruncateBefore, 0*time.Second)
+
 		// run the main filter routine with the given input
-		if err := Filter(inputOpChan, []*PlaybackFileWriter{playbackWriter}, false, c.timeToTruncateBefore); err != nil {
+		if err := Filter(inputOpChan, []*PlaybackFileWriter{playbackWriter}, skipConf); err != nil {
 			t.Error(err)
 		}
 
@@ -293,6 +299,126 @@ func TestRemoveOpsBeforeTime(t *testing.T) {
 		for op := range resultOpChan {
 			numOpsSeen++
 			if op.Seen.Time.Before(c.timeToTruncateBefore) {
+				t.Errorf("execpected op with time %v to be truncated", op.Seen.Time)
+			}
+		}
+
+		if numOpsSeen != c.numOpsExpectedAfterFilter {
+			t.Errorf("expected to see %d ops but instead saw %d", c.numOpsExpectedAfterFilter, numOpsSeen)
+		}
+
+		err = <-errChan
+		if err != io.EOF {
+			t.Errorf("should have eof at end, but got %v", err)
+		}
+	}
+}
+
+func TestRemoveOpsAfterDuration(t *testing.T) {
+	// array of times to use for testing
+	timesForTest := make([]time.Time, 16)
+	now := time.Now()
+	for i := range timesForTest {
+		timesForTest[i] = now.Add(time.Second * time.Duration(i))
+	}
+
+	cases := []struct {
+		name string
+
+		durationToTruncateAfter time.Duration
+		timeToTruncateBefore    time.Time
+		timesOfRecordedOps      []time.Time
+
+		numOpsExpectedAfterFilter int
+	}{
+		{
+			"no truncation",
+
+			time.Second * 0,
+			time.Time{},
+			timesForTest,
+			16,
+		},
+		{
+			"truncate all but one",
+
+			time.Nanosecond * 1,
+			time.Time{},
+			timesForTest,
+			1,
+		},
+		{
+			"truncate half",
+
+			(time.Second * time.Duration(len(timesForTest)/2-1)),
+			time.Time{},
+			timesForTest,
+
+			8,
+		},
+		{
+			"truncate after duration with initial truncation",
+
+			(time.Second * time.Duration(len(timesForTest)/2-1)),
+			timesForTest[3],
+			timesForTest,
+
+			8,
+		},
+	}
+	for _, c := range cases {
+		t.Logf("running case: %s\n", c.name)
+		t.Logf("initial time is: %v\n", now)
+		t.Logf("duration is  %v\n", c.durationToTruncateAfter)
+		t.Logf("time to truncate before is %v\n", c.timeToTruncateBefore)
+
+		// create a bytes buffer to write output into
+		b := &bytes.Buffer{}
+		bufferFile := NopWriteCloser(b)
+
+		playbackWriter, err := playbackFileWriterFromWriteCloser(bufferFile, "file", PlaybackFileMetadata{})
+		if err != nil {
+			t.Fatalf("couldn't create playbackfile writer %v", err)
+		}
+
+		//create a recorded op for each time specified
+		inputOpChan := make(chan *RecordedOp)
+		go func() {
+			generator := newRecordedOpGenerator()
+			generator.generateInsertHelper("insert", 0, len(c.timesOfRecordedOps))
+			close(generator.opChan)
+			i := 0
+			for recordedOp := range generator.opChan {
+				recordedOp.Seen = &PreciseTime{c.timesOfRecordedOps[i]}
+				inputOpChan <- recordedOp
+				i++
+			}
+			close(inputOpChan)
+		}()
+
+		skipConf := newSkipConfig(false, c.timeToTruncateBefore, c.durationToTruncateAfter)
+		// run the main filter routine with the given input
+		if err := Filter(inputOpChan, []*PlaybackFileWriter{playbackWriter}, skipConf); err != nil {
+			t.Error(err)
+		}
+
+		rs := bytes.NewReader(b.Bytes())
+		playbackReader, err := playbackFileReaderFromReadSeeker(rs, "")
+		if err != nil {
+			t.Fatalf("couldn't create playbackfile reader %v", err)
+		}
+		resultOpChan, errChan := playbackReader.OpChan(1)
+
+		numOpsSeen := 0
+		for op := range resultOpChan {
+			numOpsSeen++
+			var endTime time.Time
+			if c.timeToTruncateBefore.After(now) {
+				endTime = c.timeToTruncateBefore.Add(c.durationToTruncateAfter)
+			} else {
+				endTime = now.Add(c.durationToTruncateAfter)
+			}
+			if c.durationToTruncateAfter.Nanoseconds() != 0 && op.Seen.Time.After(endTime) {
 				t.Errorf("execpected op with time %v to be truncated", op.Seen.Time)
 			}
 		}
