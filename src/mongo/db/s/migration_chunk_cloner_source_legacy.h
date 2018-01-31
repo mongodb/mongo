@@ -68,7 +68,7 @@ public:
     Status awaitUntilCriticalSectionIsAppropriate(OperationContext* opCtx,
                                                   Milliseconds maxTimeToWait) override;
 
-    Status commitClone(OperationContext* opCtx) override;
+    StatusWith<BSONObj> commitClone(OperationContext* opCtx) override;
 
     void cancelClone(OperationContext* opCtx) override;
 

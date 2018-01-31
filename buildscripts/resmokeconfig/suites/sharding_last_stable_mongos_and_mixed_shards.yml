@@ -18,6 +18,7 @@ selector:
   # 3.6 mongods have improved covering behavior for queries on shard key index. Un-blacklist when
   # 3.6 becomes 'last-stable'.
   - jstests/sharding/covered_shard_key_indexes.js
+  - jstests/sharding/movechunk_commit_changelog_stats.js
   # Enable when 3.6 becomes last-stable.
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
   - jstests/sharding/views.js
