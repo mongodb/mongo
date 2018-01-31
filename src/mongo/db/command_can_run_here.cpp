@@ -30,8 +30,8 @@
 
 #include "mongo/db/command_can_run_here.h"
 
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
