@@ -93,7 +93,7 @@
 
     // After collection creation, we see oplog entries for the collection.
     const collNowExists = assertCreateCollection(db, collDoesNotExistName);
-    assert.writeOK(collNowExists.insert({_id: 0}, {writeConcern: {j: true}}));
+    assert.writeOK(collNowExists.insert({_id: 0}));
     change = cst.getOneChange(aggcursor);
     assert.eq(change.operationType, "insert", tojson(change));
 
