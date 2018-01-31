@@ -15,6 +15,9 @@
 (function() {
     'use strict';
 
+    // For isMMAPv1.
+    load("jstests/concurrency/fsm_workload_helpers/server_types.js");
+
     function assertFailsValidation(res) {
         if (res instanceof WriteResult || res instanceof BulkWriteResult) {
             assert.writeErrorWithCode(res, ErrorCodes.DocumentValidationFailure, tojson(res));
@@ -50,8 +53,8 @@
             assert.eq(1, coll.count({_id: 9}));
         }
 
-        // Test doTxn with a simple insert if not on mongos.
-        if (!isMongos) {
+        // Test doTxn with a simple insert if not on mongos and not on MMAPv1.
+        if (!isMongos && !isMMAPv1(db)) {
             const op = [{h: 1, v: 2, op: 'i', ns: coll.getFullName(), o: {_id: 10}}];
             assertFailsValidation(myDb.runCommand({doTxn: op, bypassDocumentValidation: false}));
             assert.eq(0, coll.count({_id: 10}));

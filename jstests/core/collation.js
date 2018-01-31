@@ -9,6 +9,8 @@
 
     load("jstests/libs/analyze_plan.js");
     load("jstests/libs/get_index_helpers.js");
+    // For isMMAPv1.
+    load("jstests/concurrency/fsm_workload_helpers/server_types.js");
 
     var coll = db.collation;
     coll.drop();
@@ -1971,7 +1973,7 @@
     }
 
     // doTxn
-    if (!isMongos) {
+    if (!isMongos && !isMMAPv1(db)) {
         coll.drop();
         assert.commandWorked(
             db.createCollection("collation", {collation: {locale: "en_US", strength: 2}}));

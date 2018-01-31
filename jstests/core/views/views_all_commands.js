@@ -187,6 +187,8 @@
         doTxn: {
             command: {doTxn: [{op: "i", o: {_id: 1}, ns: "test.view"}]},
             expectFailure: true,
+            expectedErrorCode:
+                [ErrorCodes.CommandNotSupportedOnView, ErrorCodes.CommandNotSupported],
             skipSharded: true,
         },
         driverOIDTest: {skip: isUnrelated},
