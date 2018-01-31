@@ -1,6 +1,12 @@
-// @tags: [requires_non_retryable_commands]
-
 // Test NamespaceDetails::cappedTruncateAfter via "captrunc" command
+//
+// @tags: [
+//   # This test attempts to perform read operations on a capped collection after truncating
+//   # documents using the captrunc command. The former operations may be routed to a secondary in
+//   # the replica set, whereas the latter must be routed to the primary.
+//   assumes_read_preference_unchanged,
+//   requires_non_retryable_commands,
+// ]
 (function() {
     var coll = db.capped6;
 
