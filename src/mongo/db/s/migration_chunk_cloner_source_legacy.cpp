@@ -306,7 +306,7 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
     return {ErrorCodes::ExceededTimeLimit, "Timed out waiting for the cloner to catch up"};
 }
 
-Status MigrationChunkClonerSourceLegacy::commitClone(OperationContext* txn) {
+StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationContext* txn) {
     invariant(_state == kCloning);
     invariant(!txn->lockState()->isLocked());
 
@@ -314,7 +314,7 @@ Status MigrationChunkClonerSourceLegacy::commitClone(OperationContext* txn) {
         _callRecipient(createRequestWithSessionId(kRecvChunkCommit, _args.getNss(), _sessionId));
     if (responseStatus.isOK()) {
         _cleanup(txn);
-        return Status::OK();
+        return responseStatus;
     }
 
     cancelClone(txn);

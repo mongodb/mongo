@@ -233,6 +233,9 @@ private:
     // callers don't have to hold collection lock in order to wait on it. Available after the
     // critical section stage has completed.
     std::shared_ptr<Notification<void>> _critSecSignal;
+
+    // The statistics about a chunk migration to be included in moveChunk.commit
+    BSONObj _recipientCloneCounts;
 };
 
 }  // namespace mongo
