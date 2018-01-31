@@ -235,6 +235,7 @@ error_code("RetryChangeStream", 234)
 error_code("InternalErrorNotSupported", 235) # this function or module is not available on this platform or configuration
 error_code("ForTestingErrorExtraInfo", 236, extra="ErrorExtraInfoExample")
 error_code("CursorKilled", 237)
+error_code("NotImplemented", 238)
 
 # Error codes 4000-8999 are reserved.
 

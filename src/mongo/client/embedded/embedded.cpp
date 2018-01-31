@@ -34,6 +34,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/initializer.h"
+#include "mongo/client/embedded/replication_coordinator_embedded.h"
 #include "mongo/client/embedded/service_context_embedded.h"
 #include "mongo/client/embedded/service_entry_point_embedded.h"
 #include "mongo/config.h"
@@ -50,7 +51,6 @@
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repair_database_and_check_version.h"
-#include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_killer.h"
@@ -103,17 +103,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
 (InitializerContext* context) {
     auto serviceContext = getGlobalServiceContext();
     repl::StorageInterface::set(serviceContext, stdx::make_unique<repl::StorageInterfaceImpl>());
-    auto storageInterface = repl::StorageInterface::get(serviceContext);
 
-    auto replCoord = stdx::make_unique<repl::ReplicationCoordinatorImpl>(
-        serviceContext,
-        getGlobalReplSettings(),
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        storageInterface,
-        static_cast<int64_t>(curTimeMillis64()));
+    auto replCoord = stdx::make_unique<ReplicationCoordinatorEmbedded>(serviceContext);
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     repl::setOplogCollectionName(serviceContext);
     return Status::OK();

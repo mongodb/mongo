@@ -45,6 +45,16 @@ env.Library(
     ],
 )
 
+env.Library('repl_coordinator_embedded',
+    [
+        'replication_coordinator_embedded.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/replica_set_messages',
+    ],
+)
+
 env.Library(
     target='embedded',
     source=[
@@ -62,12 +72,12 @@ env.Library(
         '$BUILD_DIR/mongo/db/op_observer_d',
         '$BUILD_DIR/mongo/db/repair_database_and_check_version',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_impl',
         '$BUILD_DIR/mongo/db/startup_warnings_mongod',
         '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
         '$BUILD_DIR/mongo/mongod_options_init',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/version_impl',
+        'repl_coordinator_embedded',
         'service_context_embedded',
         'service_entry_point_embedded',
     ]
