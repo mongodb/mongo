@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,41 +28,30 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/db/command_can_run_here.h"
+
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace {
 
-class IsDbGridCmd : public BasicCommand {
-public:
-    IsDbGridCmd() : BasicCommand("isdbgrid") {}
-
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+bool commandCanRunHere(OperationContext* opCtx, const std::string& dbname, const Command* command) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname))
+        return true;  // primary: always ok
+    if (!opCtx->writesAreReplicated())
+        return true;  // standalone: always ok
+    switch (command->secondaryAllowed()) {
+        case Command::AllowedOnSecondary::kAlways:
+            return true;
+        case Command::AllowedOnSecondary::kNever:
+            return false;
+        case Command::AllowedOnSecondary::kOptIn:
+            // Did the user opt in?
+            return ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
     }
+    MONGO_UNREACHABLE;
+}
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        // No auth required
-    }
-
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        result.append("isdbgrid", 1);
-        result.append("hostname", getHostNameCached());
-        return true;
-    }
-
-} isdbGrid;
-
-}  // namespace
 }  // namespace mongo

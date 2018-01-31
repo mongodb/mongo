@@ -66,8 +66,8 @@ using std::vector;
 /* "dropIndexes" is now the preferred form - "deleteIndexes" deprecated */
 class CmdDropIndexes : public BasicCommand {
 public:
-    virtual bool slaveOk() const {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
@@ -96,9 +96,9 @@ public:
 
 class CmdReIndex : public ErrmsgCommandDeprecated {
 public:
-    virtual bool slaveOk() const {
-        return true;
-    }  // can reindex on a secondary
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;  // can reindex on a secondary
+    }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }

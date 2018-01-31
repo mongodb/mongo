@@ -72,8 +72,8 @@ public:
                "not call directly. Receives, validates, and processes a MergeChunkRequest";
     }
 
-    bool slaveOk() const override {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
 
     bool adminOnly() const override {

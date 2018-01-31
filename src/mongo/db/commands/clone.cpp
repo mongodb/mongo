@@ -56,10 +56,9 @@ class CmdClone : public BasicCommand {
 public:
     CmdClone() : BasicCommand("clone") {}
 
-    virtual bool slaveOk() const {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
-
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;

@@ -40,8 +40,8 @@ class CmdAuthenticate : public BasicCommand {
 public:
     static void disableAuthMechanism(std::string authMechanism);
 
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
     std::string help() const override {
         return "internal";

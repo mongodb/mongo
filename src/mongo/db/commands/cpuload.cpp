@@ -42,8 +42,8 @@ using std::stringstream;
 class CPULoadCommand : public BasicCommand {
 public:
     CPULoadCommand() : BasicCommand("cpuload") {}
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
     virtual bool isWriteCommandForConfigServer() const {
         return false;

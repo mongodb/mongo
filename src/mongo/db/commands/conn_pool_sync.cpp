@@ -62,8 +62,8 @@ public:
         globalConnPool.flush();
         return true;
     }
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
 } poolFlushCmd;

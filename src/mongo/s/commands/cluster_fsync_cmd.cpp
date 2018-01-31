@@ -42,8 +42,8 @@ class FsyncCommand : public ErrmsgCommandDeprecated {
 public:
     FsyncCommand() : ErrmsgCommandDeprecated("fsync") {}
 
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     virtual bool adminOnly() const {

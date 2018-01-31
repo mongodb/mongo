@@ -61,14 +61,9 @@ public:
 
     virtual ~ClusterIndexFilterCmd() {}
 
-    bool slaveOk() const {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kOptIn;
     }
-
-    bool slaveOverrideOk() const {
-        return true;
-    }
-
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

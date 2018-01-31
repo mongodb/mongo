@@ -56,8 +56,8 @@ public:
                "directly. Requests the balancer to move or rebalance a single chunk.";
     }
 
-    bool slaveOk() const override {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
 
     bool adminOnly() const override {

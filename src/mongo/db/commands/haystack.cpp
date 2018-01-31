@@ -68,12 +68,8 @@ public:
         return false;
     }
 
-    bool slaveOk() const {
-        return true;
-    }
-
-    bool slaveOverrideOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     bool supportsReadConcern(const std::string& dbName,

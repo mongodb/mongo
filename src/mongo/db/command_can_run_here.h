@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,43 +26,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
+
+#include <string>
 
 #include "mongo/db/commands.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
-namespace {
 
-class IsDbGridCmd : public BasicCommand {
-public:
-    IsDbGridCmd() : BasicCommand("isdbgrid") {}
+bool commandCanRunHere(OperationContext* opCtx, const std::string& dbname, const Command* command);
 
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
-        // No auth required
-    }
-
-    virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
-        result.append("isdbgrid", 1);
-        result.append("hostname", getHostNameCached());
-        return true;
-    }
-
-} isdbGrid;
-
-}  // namespace
 }  // namespace mongo

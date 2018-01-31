@@ -216,9 +216,9 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }
-    virtual bool slaveOk() const {
-        return false;
-    }  // TODO: this could be made true...
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
+    }
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,

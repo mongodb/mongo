@@ -40,8 +40,8 @@ class CmdReplSetGetStatus : public ErrmsgCommandDeprecated {
 public:
     CmdReplSetGetStatus() : ErrmsgCommandDeprecated("replSetGetStatus") {}
 
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     virtual bool adminOnly() const {

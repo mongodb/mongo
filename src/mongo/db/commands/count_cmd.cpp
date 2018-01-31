@@ -63,13 +63,12 @@ public:
         return false;
     }
 
-    virtual bool slaveOk() const {
-        // ok on --slave setups
-        return repl::getGlobalReplicationCoordinator()->getSettings().isSlave();
-    }
-
-    virtual bool slaveOverrideOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        if (repl::getGlobalReplicationCoordinator()->getSettings().isSlave()) {
+            // ok on --slave setups
+            return Command::AllowedOnSecondary::kAlways;
+        }
+        return Command::AllowedOnSecondary::kOptIn;
     }
 
     virtual bool maintenanceOk() const {

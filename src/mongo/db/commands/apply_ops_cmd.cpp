@@ -202,8 +202,8 @@ class ApplyOpsCmd : public BasicCommand {
 public:
     ApplyOpsCmd() : BasicCommand("applyOps") {}
 
-    bool slaveOk() const override {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

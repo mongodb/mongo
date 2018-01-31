@@ -46,8 +46,8 @@ class RefreshSessionsCommandInternal final : public BasicCommand {
 public:
     RefreshSessionsCommandInternal() : BasicCommand("refreshSessionsInternal") {}
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
     bool adminOnly() const override {
         return false;

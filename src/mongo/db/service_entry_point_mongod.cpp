@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
 #include "mongo/db/client.h"
+#include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/concurrency/global_lock_acquisition_tracker.h"
@@ -609,18 +610,13 @@ void execCommandDatabase(OperationContext* opCtx,
 
         if (!opCtx->getClient()->isInDirectClient() &&
             !MONGO_FAIL_POINT(skipCheckingForNotMasterInCommandDispatch)) {
-
-            bool commandCanRunOnSecondary = command->slaveOk();
-
-            bool commandIsOverriddenToRunOnSecondary =
-                command->slaveOverrideOk() && ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
-
-            bool iAmStandalone = !opCtx->writesAreReplicated();
-            bool canRunHere = iAmPrimary || commandCanRunOnSecondary ||
-                commandIsOverriddenToRunOnSecondary || iAmStandalone;
-
-            // This logic is clearer if we don't have to invert it.
-            if (!canRunHere && command->slaveOverrideOk()) {
+            auto allowed = command->secondaryAllowed();
+            bool alwaysAllowed = allowed == Command::AllowedOnSecondary::kAlways;
+            bool couldHaveOptedIn = allowed == Command::AllowedOnSecondary::kOptIn;
+            bool optedIn =
+                couldHaveOptedIn && ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
+            bool canRunHere = commandCanRunHere(opCtx, dbname, command);
+            if (!canRunHere && couldHaveOptedIn) {
                 uasserted(ErrorCodes::NotMasterNoSlaveOk, "not master and slaveOk=false");
             }
 
@@ -644,7 +640,7 @@ void execCommandDatabase(OperationContext* opCtx,
                 // Check ticket SERVER-21432, slaveOk commands are allowed in drain mode
                 uassert(ErrorCodes::NotMasterOrSecondary,
                         "node is in drain mode",
-                        commandIsOverriddenToRunOnSecondary || commandCanRunOnSecondary);
+                        optedIn || alwaysAllowed);
             }
         }
 

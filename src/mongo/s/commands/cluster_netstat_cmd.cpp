@@ -40,8 +40,8 @@ class NetStatCmd : public BasicCommand {
 public:
     NetStatCmd() : BasicCommand("netstat") {}
 
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     virtual bool adminOnly() const {

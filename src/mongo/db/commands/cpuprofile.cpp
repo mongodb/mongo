@@ -71,8 +71,8 @@ namespace {
 class CpuProfilerCommand : public ErrmsgCommandDeprecated {
 public:
     CpuProfilerCommand(char const* name) : ErrmsgCommandDeprecated(name) {}
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
     virtual bool adminOnly() const {
         return true;
