@@ -70,8 +70,8 @@ class ShardCollectionCmd : public BasicCommand {
 public:
     ShardCollectionCmd() : BasicCommand("shardCollection", "shardcollection") {}
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const override {

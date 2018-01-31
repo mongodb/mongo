@@ -62,8 +62,8 @@ public:
                "directly. Removes a shard from the cluster.";
     }
 
-    bool slaveOk() const override {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
 
     bool adminOnly() const override {

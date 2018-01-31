@@ -56,12 +56,8 @@ class ListDatabasesCmd : public BasicCommand {
 public:
     ListDatabasesCmd() : BasicCommand("listDatabases", "listdatabases") {}
 
-    bool slaveOk() const final {
-        return true;
-    }
-
-    bool slaveOverrideOk() const final {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const final {
+        return AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const final {

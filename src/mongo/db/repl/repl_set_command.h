@@ -47,8 +47,8 @@ class ReplSetCommand : public BasicCommand {
 protected:
     ReplSetCommand(const char* s) : BasicCommand(s) {}
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const override {

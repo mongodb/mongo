@@ -151,8 +151,8 @@ class MRCmd : public ErrmsgCommandDeprecated {
 public:
     MRCmd() : ErrmsgCommandDeprecated("mapReduce", "mapreduce") {}
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const override {

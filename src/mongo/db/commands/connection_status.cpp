@@ -41,8 +41,8 @@ using std::stringstream;
 class CmdConnectionStatus : public BasicCommand {
 public:
     CmdConnectionStatus() : BasicCommand("connectionStatus") {}
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;

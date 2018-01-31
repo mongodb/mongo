@@ -63,8 +63,8 @@ class ConfigSvrCreateDatabaseCommand : public BasicCommand {
 public:
     ConfigSvrCreateDatabaseCommand() : BasicCommand("_configsvrCreateDatabase") {}
 
-    virtual bool slaveOk() const {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
 
     virtual bool adminOnly() const {

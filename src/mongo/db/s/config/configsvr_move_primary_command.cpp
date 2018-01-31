@@ -68,8 +68,8 @@ class ConfigSvrMovePrimaryCommand : public BasicCommand {
 public:
     ConfigSvrMovePrimaryCommand() : BasicCommand("_configsvrMovePrimary") {}
 
-    virtual bool slaveOk() const {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
 
     virtual bool adminOnly() const {

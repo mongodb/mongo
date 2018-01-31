@@ -58,8 +58,8 @@ public:
         return false;
     }
 
-    bool slaveOk() const final {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const final {
+        return AllowedOnSecondary::kAlways;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const final {

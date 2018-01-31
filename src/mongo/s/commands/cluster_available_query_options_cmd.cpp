@@ -39,8 +39,8 @@ class AvailableQueryOptions : public BasicCommand {
 public:
     AvailableQueryOptions() : BasicCommand("availableQueryOptions", "availablequeryoptions") {}
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

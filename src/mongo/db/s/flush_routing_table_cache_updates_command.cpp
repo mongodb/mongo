@@ -70,8 +70,8 @@ public:
         return true;
     }
 
-    bool slaveOk() const override {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

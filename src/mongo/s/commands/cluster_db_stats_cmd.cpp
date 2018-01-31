@@ -44,8 +44,8 @@ class DBStatsCmd : public ErrmsgCommandDeprecated {
 public:
     DBStatsCmd() : ErrmsgCommandDeprecated("dbStats", "dbstats") {}
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
     bool adminOnly() const override {
         return false;

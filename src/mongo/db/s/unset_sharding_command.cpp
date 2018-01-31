@@ -60,8 +60,8 @@ public:
         return true;
     }
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     void addRequiredPrivileges(const std::string& dbname,

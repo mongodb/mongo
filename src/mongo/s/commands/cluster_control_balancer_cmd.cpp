@@ -50,8 +50,8 @@ public:
           _configsvrCommandName(configsvrCommandName),
           _authorizationAction(authorizationAction) {}
 
-    bool slaveOk() const override {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
 
     bool adminOnly() const override {

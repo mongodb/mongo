@@ -66,10 +66,9 @@ class MulticastCmd : public BasicCommand {
 public:
     MulticastCmd() : BasicCommand("multicast") {}
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
-
     bool adminOnly() const override {
         return true;
     }

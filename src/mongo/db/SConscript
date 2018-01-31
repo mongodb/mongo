@@ -513,10 +513,25 @@ env.Library(
         'auth/authcore',
         'commands/server_status_core',
         'commands/test_commands_enabled',
+        'command_can_run_here',
         'service_context',
         '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
+
+env.Library(
+    target='command_can_run_here',
+    source=[
+        'command_can_run_here.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        'service_context',
+    ],
+)
+
 
 env.CppUnitTest(
     target="commands_test",
@@ -597,6 +612,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/transport/service_entry_point',
         'auth/authmongod',
+        'command_can_run_here',
         'commands/dcommands_fsync',
         'concurrency/lock_manager',
         'curop',

@@ -72,8 +72,8 @@ class UpdateZoneKeyRangeCmd : public BasicCommand {
 public:
     UpdateZoneKeyRangeCmd() : BasicCommand("updateZoneKeyRange", "updatezonekeyRange") {}
 
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     virtual bool adminOnly() const {

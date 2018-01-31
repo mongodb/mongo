@@ -80,8 +80,8 @@ public:
         return "should not be calling this directly";
     }
 
-    bool slaveOk() const override {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
 
     bool adminOnly() const override {

@@ -56,8 +56,8 @@ public:
         return "get latest diagnostic data collection snapshot";
     }
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

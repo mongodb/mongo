@@ -131,8 +131,8 @@ class DoTxnCmd : public BasicCommand {
 public:
     DoTxnCmd() : BasicCommand("doTxn") {}
 
-    bool slaveOk() const override {
-        return false;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kNever;
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {

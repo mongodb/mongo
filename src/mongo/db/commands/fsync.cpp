@@ -101,8 +101,8 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
     virtual bool adminOnly() const {
         return true;
@@ -273,8 +273,8 @@ public:
         return false;
     }
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const override {

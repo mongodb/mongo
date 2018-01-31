@@ -51,8 +51,8 @@ class ClusterCountCmd : public ErrmsgCommandDeprecated {
 public:
     ClusterCountCmd() : ErrmsgCommandDeprecated("count") {}
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     bool adminOnly() const override {

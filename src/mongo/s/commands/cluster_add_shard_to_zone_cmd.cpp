@@ -69,8 +69,8 @@ class AddShardToZoneCmd : public BasicCommand {
 public:
     AddShardToZoneCmd() : BasicCommand("addShardToZone", "addshardtozone") {}
 
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     virtual bool adminOnly() const {

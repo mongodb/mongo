@@ -39,8 +39,8 @@ class FlushRouterConfigCmd : public BasicCommand {
 public:
     FlushRouterConfigCmd() : BasicCommand("flushRouterConfig", "flushrouterconfig") {}
 
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     virtual bool adminOnly() const {

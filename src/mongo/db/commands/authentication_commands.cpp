@@ -97,8 +97,8 @@ class CmdGetNonce : public BasicCommand {
 public:
     CmdGetNonce() : BasicCommand("getnonce"), _random(SecureRandom::create()) {}
 
-    bool slaveOk() const final {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
 
     std::string help() const final {
@@ -259,8 +259,8 @@ CmdAuthenticate cmdAuthenticate;
 
 class CmdLogout : public BasicCommand {
 public:
-    virtual bool slaveOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,

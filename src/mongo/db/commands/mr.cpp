@@ -1351,13 +1351,12 @@ class MapReduceCommand : public ErrmsgCommandDeprecated {
 public:
     MapReduceCommand() : ErrmsgCommandDeprecated("mapReduce", "mapreduce") {}
 
-    virtual bool slaveOk() const {
-        return repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
-            repl::ReplicationCoordinator::modeReplSet;
-    }
-
-    virtual bool slaveOverrideOk() const {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+            repl::ReplicationCoordinator::modeReplSet) {
+            return AllowedOnSecondary::kAlways;
+        }
+        return AllowedOnSecondary::kOptIn;
     }
 
     std::size_t reserveBytesForReply() const override {
@@ -1689,13 +1688,15 @@ public:
         return "internal";
     }
     MapReduceFinishCommand() : BasicCommand("mapreduce.shardedfinish") {}
-    virtual bool slaveOk() const {
-        return repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
-            repl::ReplicationCoordinator::modeReplSet;
+
+    AllowedOnSecondary secondaryAllowed() const override {
+        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+            repl::ReplicationCoordinator::modeReplSet) {
+            return AllowedOnSecondary::kAlways;
+        }
+        return AllowedOnSecondary::kOptIn;
     }
-    virtual bool slaveOverrideOk() const {
-        return true;
-    }
+
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return true;
     }

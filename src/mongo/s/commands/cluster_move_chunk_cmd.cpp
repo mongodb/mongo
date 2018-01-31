@@ -55,10 +55,9 @@ class MoveChunkCmd : public ErrmsgCommandDeprecated {
 public:
     MoveChunkCmd() : ErrmsgCommandDeprecated("moveChunk", "movechunk") {}
 
-    bool slaveOk() const override {
-        return true;
+    AllowedOnSecondary secondaryAllowed() const override {
+        return AllowedOnSecondary::kAlways;
     }
-
     bool adminOnly() const override {
         return true;
     }
