@@ -160,7 +160,8 @@ struct CommandHelpers {
      * what they send to the shards.
      */
     static BSONObj filterCommandRequestForPassthrough(const BSONObj& cmdObj);
-    static void filterCommandReplyForPassthrough(const BSONObj& reply, BSONObjBuilder* output);
+    static void filterCommandRequestForPassthrough(BSONObjIterator* cmdIter,
+                                                   BSONObjBuilder* requestBuilder);
 
     /**
      * Rewrites reply into a format safe to blindly forward from shards to clients.
@@ -169,6 +170,7 @@ struct CommandHelpers {
      * what they return from the shards.
      */
     static BSONObj filterCommandReplyForPassthrough(const BSONObj& reply);
+    static void filterCommandReplyForPassthrough(const BSONObj& reply, BSONObjBuilder* output);
 
     /**
      * Returns true if this a request for the 'help' information associated with the command.

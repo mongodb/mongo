@@ -264,11 +264,19 @@ bool CommandHelpers::isUserManagementCommand(const std::string& name) {
 }
 
 BSONObj CommandHelpers::filterCommandRequestForPassthrough(const BSONObj& cmdObj) {
+    BSONObjIterator cmdIter(cmdObj);
     BSONObjBuilder bob;
-    for (auto elem : cmdObj) {
+    filterCommandRequestForPassthrough(&cmdIter, &bob);
+    return bob.obj();
+}
+
+void CommandHelpers::filterCommandRequestForPassthrough(BSONObjIterator* cmdIter,
+                                                        BSONObjBuilder* requestBuilder) {
+    while (cmdIter->more()) {
+        auto elem = cmdIter->next();
         const auto name = elem.fieldNameStringData();
         if (name == "$readPreference") {
-            BSONObjBuilder(bob.subobjStart("$queryOptions")).append(elem);
+            BSONObjBuilder(requestBuilder->subobjStart("$queryOptions")).append(elem);
         } else if (!isGenericArgument(name) ||  //
                    name == "$queryOptions" ||   //
                    name == "maxTimeMS" ||       //
@@ -278,10 +286,9 @@ BSONObj CommandHelpers::filterCommandRequestForPassthrough(const BSONObj& cmdObj
                    name == "txnNumber") {
             // This is the whitelist of generic arguments that commands can be trusted to blindly
             // forward to the shards.
-            bob.append(elem);
+            requestBuilder->append(elem);
         }
     }
-    return bob.obj();
 }
 
 void CommandHelpers::filterCommandReplyForPassthrough(const BSONObj& cmdObj,

@@ -61,6 +61,7 @@
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/s/request_types/create_collection_gen.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
@@ -519,9 +520,28 @@ public:
              BSONObjBuilder& result) override {
         uassertStatusOK(createShardDatabase(opCtx, dbName));
 
-        const auto dbInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-        return passthrough(opCtx, dbName, dbInfo.primaryId(), cmdObj, result);
+        BSONObjIterator cmdIter(cmdObj);
+        invariant(cmdIter.more());
+
+        const NamespaceString ns(dbName, cmdIter.next().str());
+
+        ConfigsvrCreateCollection configCreateCmd;
+        configCreateCmd.setNs(ns);
+
+        BSONObjBuilder optionsBuilder;
+        CommandHelpers::filterCommandRequestForPassthrough(&cmdIter, &optionsBuilder);
+        configCreateCmd.setOptions(optionsBuilder.obj());
+
+        auto response =
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "admin",
+                CommandHelpers::appendMajorityWriteConcern(configCreateCmd.toBSON()),
+                Shard::RetryPolicy::kIdempotent);
+
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+        return true;
     }
 
 } createCmd;

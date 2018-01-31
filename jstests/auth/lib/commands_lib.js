@@ -2501,6 +2501,20 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "_configsvrCreateCollection",
+          command: {_configsvrCreateCollection: "test.user"},
+          skipSharded: true,
+          expectFail: true,
+          testcases: [
+              {
+                runOnDb: "admin",
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+          ]
+        },
+        {
           testname: "create_views",
           command: {create: "view", viewOn: "collection", pipeline: [{$match: {}}]},
           teardown: function(db) {

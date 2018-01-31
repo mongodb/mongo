@@ -176,6 +176,7 @@ env.Library(
         'config/configsvr_add_shard_to_zone_command.cpp',
         'config/configsvr_commit_chunk_migration_command.cpp',
         'config/configsvr_control_balancer_command.cpp',
+        'config/configsvr_create_collection_command.cpp',
         'config/configsvr_create_database_command.cpp',
         'config/configsvr_drop_collection_command.cpp',
         'config/configsvr_drop_database_command.cpp',
