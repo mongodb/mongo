@@ -1661,6 +1661,11 @@ post:
   - command: attach.results
     params:
       file_location: src/report.json
+  - command: attach.artifacts
+    params:
+      ignore_artifacts_for_spawn: false
+      files:
+        - src/archive.json
 
   - func: "set EC2 address"
   - func: "copy EC2 artifacts"
