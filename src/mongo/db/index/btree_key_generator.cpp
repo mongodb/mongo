@@ -77,6 +77,7 @@ std::unique_ptr<BtreeKeyGenerator> BtreeKeyGenerator::make(IndexVersion indexVer
             return stdx::make_unique<BtreeKeyGeneratorV0>(fieldNames, fixed, isSparse);
         case IndexVersion::kV1:
         case IndexVersion::kV2:
+        case IndexVersion::kV2Unique:
             return stdx::make_unique<BtreeKeyGeneratorV1>(fieldNames, fixed, isSparse, collator);
     }
     return nullptr;

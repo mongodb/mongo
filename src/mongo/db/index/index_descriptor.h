@@ -56,7 +56,7 @@ class OperationContext;
  */
 class IndexDescriptor {
 public:
-    enum class IndexVersion { kV0 = 0, kV1 = 1, kV2 = 2 };
+    enum class IndexVersion { kV0 = 0, kV1 = 1, kV2 = 2, kV2Unique = 3 };
     static constexpr IndexVersion kLatestIndexVersion = IndexVersion::kV2;
 
     static constexpr StringData k2dIndexBitsFieldName = "bits"_sd;

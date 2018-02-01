@@ -135,6 +135,11 @@ public:
 
     virtual bool unique() const = 0;
 
+    // Returns true if V2 unique index format is supported.
+    virtual bool isV2FormatUniqueIndex() const {
+        return false;
+    }
+
     Status dupKeyError(const BSONObj& key);
 
 protected:
@@ -153,6 +158,7 @@ protected:
     class BulkBuilder;
     class StandardBulkBuilder;
     class UniqueBulkBuilder;
+    class UniqueV2BulkBuilder;
 
     const Ordering _ordering;
     // The keystring version is effectively const after the WiredTigerIndex instance is constructed.
@@ -179,6 +185,35 @@ public:
     SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) override;
 
     bool unique() const override {
+        return true;
+    }
+
+    Status _insert(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
+
+    void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
+
+private:
+    bool _partial;
+};
+
+class WiredTigerIndexUniqueV2 : public WiredTigerIndex {
+public:
+    WiredTigerIndexUniqueV2(OperationContext* ctx,
+                            const std::string& uri,
+                            const IndexDescriptor* desc,
+                            KVPrefix prefix,
+                            bool readOnly = false);
+
+    std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
+                                                           bool forward) const override;
+
+    SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) override;
+
+    bool unique() const override {
+        return true;
+    }
+
+    bool isV2FormatUniqueIndex() const override {
         return true;
     }
 

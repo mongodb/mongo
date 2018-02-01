@@ -781,8 +781,16 @@ SortedDataInterface* WiredTigerKVEngine::getGroupedSortedDataInterface(Operation
                                                                        StringData ident,
                                                                        const IndexDescriptor* desc,
                                                                        KVPrefix prefix) {
-    if (desc->unique())
-        return new WiredTigerIndexUnique(opCtx, _uri(ident), desc, prefix, _readOnly);
+    if (desc->unique()) {
+        // MongoDB 4.0 onwards new index version `kV2Unique` would be supported. By default unique
+        // index would be created with index version `kV2`. New format unique index would be created
+        // only if `IndexVersion` is `kV2Unique`.
+        if (desc->version() == IndexDescriptor::IndexVersion::kV2Unique)
+            return new WiredTigerIndexUniqueV2(opCtx, _uri(ident), desc, prefix, _readOnly);
+        else
+            return new WiredTigerIndexUnique(opCtx, _uri(ident), desc, prefix, _readOnly);
+    }
+
     return new WiredTigerIndexStandard(opCtx, _uri(ident), desc, prefix, _readOnly);
 }
 
