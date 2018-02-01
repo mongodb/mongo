@@ -36,6 +36,8 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
+#include "mongo/db/logical_session_cache.h"
+#include "mongo/db/logical_session_cache_factory_mongod.h"
 #include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
@@ -107,7 +109,7 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
         validator->resetKeyManager();
     }
 
-    return initializeGlobalShardingState(
+    auto initializeStatus = initializeGlobalShardingState(
         opCtx,
         configCS,
         distLockProcessId,
@@ -124,6 +126,20 @@ Status initializeGlobalShardingStateForMongod(OperationContext* opCtx,
         // We only need one task executor here because sharding task executors aren't used for user
         // queries in mongod.
         1);
+
+    if (!initializeStatus.isOK()) {
+        return initializeStatus;
+    }
+
+    const auto serverType = serverGlobalParams.clusterRole == ClusterRole::ConfigServer
+        ? LogicalSessionCacheServer::kConfigServer
+        : LogicalSessionCacheServer::kSharded;
+
+    invariant(LogicalSessionCache::get(opCtx) == nullptr);
+    auto sessionCache = makeLogicalSessionCacheD(opCtx->getServiceContext(), serverType);
+    LogicalSessionCache::set(opCtx->getServiceContext(), std::move(sessionCache));
+
+    return Status::OK();
 }
 
 }  // namespace mongo

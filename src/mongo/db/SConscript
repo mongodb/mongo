@@ -585,6 +585,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/logical_session_cache_factory_mongod',
         '$BUILD_DIR/mongo/transport/service_entry_point',
         'auth/authmongod',
         'commands/dcommands_fsync',
