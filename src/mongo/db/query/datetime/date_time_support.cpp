@@ -47,8 +47,13 @@
 namespace mongo {
 
 namespace {
+
 const auto getTimeZoneDatabase =
     ServiceContext::declareDecoration<std::unique_ptr<TimeZoneDatabase>>();
+
+std::unique_ptr<_timelib_time, TimeZone::TimelibTimeDeleter> createTimelibTime() {
+    return std::unique_ptr<_timelib_time, TimeZone::TimelibTimeDeleter>(timelib_time_ctor());
+}
 
 // Converts a date to a number of seconds, being careful to round appropriately for negative numbers
 // of seconds.
@@ -373,9 +378,14 @@ void TimeZone::adjustTimeZone(timelib_time* timelibTime) const {
     timelib_update_from_sse(timelibTime);
 }
 
-Date_t TimeZone::createFromDateParts(
-    int year, int month, int day, int hour, int minute, int second, int millisecond) const {
-    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> newTime(timelib_time_ctor());
+Date_t TimeZone::createFromDateParts(long long year,
+                                     long long month,
+                                     long long day,
+                                     long long hour,
+                                     long long minute,
+                                     long long second,
+                                     long long millisecond) const {
+    auto newTime = createTimelibTime();
 
     newTime->y = year;
     newTime->m = month;
@@ -393,14 +403,14 @@ Date_t TimeZone::createFromDateParts(
     return returnValue;
 }
 
-Date_t TimeZone::createFromIso8601DateParts(int isoYear,
-                                            int isoWeekYear,
-                                            int isoDayOfWeek,
-                                            int hour,
-                                            int minute,
-                                            int second,
-                                            int millisecond) const {
-    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> newTime(timelib_time_ctor());
+Date_t TimeZone::createFromIso8601DateParts(long long isoYear,
+                                            long long isoWeekYear,
+                                            long long isoDayOfWeek,
+                                            long long hour,
+                                            long long minute,
+                                            long long second,
+                                            long long millisecond) const {
+    auto newTime = createTimelibTime();
 
     timelib_date_from_isodate(
         isoYear, isoWeekYear, isoDayOfWeek, &newTime->y, &newTime->m, &newTime->d);
@@ -468,7 +478,7 @@ void TimeZone::TimelibTimeDeleter::operator()(timelib_time* time) {
 
 std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> TimeZone::getTimelibTime(
     Date_t date) const {
-    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> time(timelib_time_ctor());
+    auto time = createTimelibTime();
 
     timelib_unixtime2gmt(time.get(), seconds(date));
     adjustTimeZone(time.get());

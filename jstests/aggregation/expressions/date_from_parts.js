@@ -1,4 +1,4 @@
-load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
+load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and assertErrMsgContains.
 
 (function() {
     "use strict";
@@ -459,47 +459,126 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
 
     pipelines = [
         [{'$project': {date: {'$dateFromParts': {year: "$outOfRangeValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, month: "$outOfRangeValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, day: "$outOfRangeValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, hour: "$outOfRangeValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, minute: "$outOfRangeValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, second: "$outOfRangeValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: "$outOfRangeValue"}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoWeekYear: "$outOfRangeValue"}}}}],
-        [{
-           '$project':
-               {date: {'$dateFromParts': {isoWeekYear: 2017, isoWeek: "$outOfRangeValue"}}}
-        }],
-        [{
-           '$project':
-               {date: {'$dateFromParts': {isoWeekYear: 2017, isoDayOfWeek: "$outOfRangeValue"}}}
-        }],
-
         [{'$project': {date: {'$dateFromParts': {year: -1}}}}],
         [{'$project': {date: {'$dateFromParts': {year: 10000}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, month: 0}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, month: 13}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, day: 0}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, day: 32}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, hour: -1}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, hour: 25}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, minute: -1}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, minute: 60}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, second: -1}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, second: 60}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: -1}}}}],
-        [{'$project': {date: {'$dateFromParts': {year: 2017, millisecond: 1000}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoWeekYear: -1}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 10000}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, isoWeek: -1}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, isoWeek: 54}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, isoDayOfWeek: 0}}}}],
-        [{'$project': {date: {'$dateFromParts': {isoWeekYear: 2017, isoDayOfWeek: 8}}}}],
     ];
 
     pipelines.forEach(function(pipeline) {
         assertErrorCode(coll, pipeline, 40523, tojson(pipeline));
     });
+
+    /* --------------------------------------------------------------------------------------- */
+    /* Testing "out of range" under and overflows */
+
+    coll.drop();
+
+    assert.writeOK(coll.insert([{
+        _id: 0,
+        minusOne: -1,
+        zero: 0,
+        thirteen: 13,
+        twentyFive: 25,
+        sixtyOne: 61,
+        thousandAndOne: 1001,
+        tenThousandMinusOne: 9999,
+        tenThousandAndOne: 10001,
+        seventyMillionAndSomething: 71841012,
+        secondsSinceEpoch: 1502095918,
+        millisSinceEpoch: NumberLong("1502095918551"),
+    }]));
+
+    tests = [
+        {expected: "0000-01-01T00:00:00.000Z", parts: {year: "$zero"}},
+        {expected: "9999-01-01T00:00:00.000Z", parts: {year: "$tenThousandMinusOne"}},
+        {expected: "2016-11-01T00:00:00.000Z", parts: {year: 2017, month: "$minusOne"}},
+        {expected: "2016-12-01T00:00:00.000Z", parts: {year: 2017, month: "$zero"}},
+        {expected: "2018-01-01T00:00:00.000Z", parts: {year: 2017, month: "$thirteen"}},
+        {expected: "2016-12-30T00:00:00.000Z", parts: {year: 2017, day: "$minusOne"}},
+        {expected: "2016-12-31T00:00:00.000Z", parts: {year: 2017, day: "$zero"}},
+        {expected: "2017-03-02T00:00:00.000Z", parts: {year: 2017, day: "$sixtyOne"}},
+        {expected: "2016-12-31T23:00:00.000Z", parts: {year: 2017, hour: "$minusOne"}},
+        {expected: "2017-01-02T01:00:00.000Z", parts: {year: 2017, hour: "$twentyFive"}},
+        {expected: "2016-12-31T23:59:00.000Z", parts: {year: 2017, minute: "$minusOne"}},
+        {expected: "2017-01-01T00:00:00.000Z", parts: {year: 2017, minute: "$zero"}},
+        {expected: "2017-01-01T01:01:00.000Z", parts: {year: 2017, minute: "$sixtyOne"}},
+        {expected: "2016-12-31T23:59:59.000Z", parts: {year: 2017, second: "$minusOne"}},
+        {expected: "2017-01-01T00:01:01.000Z", parts: {year: 2017, second: "$sixtyOne"}},
+        {
+          expected: "2019-04-12T11:50:12.000Z",
+          parts: {year: 2017, second: "$seventyMillionAndSomething"}
+        },
+        {
+          expected: "1972-04-11T11:50:12.000Z",
+          parts: {year: 1970, second: "$seventyMillionAndSomething"}
+        },
+        {expected: "2017-08-07T08:51:58.000Z", parts: {year: 1970, second: "$secondsSinceEpoch"}},
+        {expected: "2016-12-31T23:59:59.999Z", parts: {year: 2017, millisecond: "$minusOne"}},
+        {expected: "2017-01-01T00:00:01.001Z", parts: {year: 2017, millisecond: "$thousandAndOne"}},
+        {
+          expected: "2017-01-01T19:57:21.012Z",
+          parts: {year: 2017, millisecond: "$seventyMillionAndSomething"}
+        },
+        {
+          expected: "2017-01-18T09:14:55.918Z",
+          parts: {year: 2017, millisecond: "$secondsSinceEpoch"}
+        },
+        {
+          expected: "1970-01-01T19:57:21.012Z",
+          parts: {year: 1970, millisecond: "$seventyMillionAndSomething"}
+        },
+        {
+          expected: "2017-08-07T08:51:58.551Z",
+          parts: {year: 1970, millisecond: "$millisSinceEpoch"}
+        },
+    ];
+
+    tests.forEach(function(test) {
+        assert.eq(
+            [
+              {_id: 0, date: ISODate(test.expected)},
+            ],
+            coll.aggregate([{$project: {date: {"$dateFromParts": test.parts}}}]).toArray(),
+            tojson(test));
+    });
+
+    /* --------------------------------------------------------------------------------------- */
+    /*
+     * Testing double and Decimal128 millisecond values that aren't representable as a 64-bit
+     * integer or overflow when converting to a 64-bit microsecond value.
+     */
+    coll.drop();
+
+    assert.writeOK(coll.insert([{
+        _id: 0,
+        veryBigDoubleA: 18014398509481984.0,
+        veryBigDecimal128A: NumberDecimal("9223372036854775807"),  // 2^63-1
+        veryBigDoubleB: 18014398509481984000.0,
+        veryBigDecimal128B: NumberDecimal("9223372036854775807000"),  // (2^63-1) * 1000
+    }]));
+
+    pipeline =
+        [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDoubleA"}}}}];
+    assertErrMsgContains(
+        coll,
+        pipeline,
+        ErrorCodes.DurationOverflow,
+        "Overflow casting from a lower-precision duration to a higher-precision duration");
+
+    pipeline =
+        [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDecimal128A"}}}}];
+    assertErrMsgContains(
+        coll,
+        pipeline,
+        ErrorCodes.DurationOverflow,
+        "Overflow casting from a lower-precision duration to a higher-precision duration");
+
+    pipeline =
+        [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDoubleB"}}}}];
+    assertErrMsgContains(coll, pipeline, 40515, "'millisecond' must evaluate to an integer");
+
+    pipeline =
+        [{$project: {date: {"$dateFromParts": {year: 1970, millisecond: "$veryBigDecimal128B"}}}}];
+    assertErrMsgContains(coll, pipeline, 40515, "'millisecond' must evaluate to an integer");
 
     /* --------------------------------------------------------------------------------------- */
     /* Testing wrong arguments */

@@ -96,19 +96,24 @@ public:
     /**
      * Returns a Date_t populated with the argument values for the current timezone.
      */
-    Date_t createFromDateParts(
-        int year, int month, int day, int hour, int minute, int second, int millisecond) const;
+    Date_t createFromDateParts(long long year,
+                               long long month,
+                               long long day,
+                               long long hour,
+                               long long minute,
+                               long long second,
+                               long long millisecond) const;
 
     /**
      * Returns a Date_t populated with the argument values for the current timezone.
      */
-    Date_t createFromIso8601DateParts(int isoYear,
-                                      int isoWeekYear,
-                                      int isoDayOfWeek,
-                                      int hour,
-                                      int minute,
-                                      int second,
-                                      int millisecond) const;
+    Date_t createFromIso8601DateParts(long long isoYear,
+                                      long long isoWeekYear,
+                                      long long isoDayOfWeek,
+                                      long long hour,
+                                      long long minute,
+                                      long long second,
+                                      long long millisecond) const;
     /**
      * Returns a struct with members for each piece of the date.
      */

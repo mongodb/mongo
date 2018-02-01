@@ -5365,12 +5365,40 @@ TEST_F(ExpressionDateFromPartsTest, OptimizesToConstantIfAllInputsAreConstant) {
     ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
 
     // Test that it does *not* become a constant if both isoWeekYear and isoDayOfWeek are provided,
-    // but
-    // isoDayOfWeek is not a constant.
+    // but isoDayOfWeek is not a constant.
     spec = BSON("$dateFromParts" << BSON("isoWeekYear" << 2017 << "isoDayOfWeek"
                                                        << "$isoDayOfWeekday"));
     dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
     ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateExp->optimize().get()));
+}
+
+TEST_F(ExpressionDateFromPartsTest, TestThatOutOfRangeValuesRollOver) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$dateFromParts" << BSON("year" << 2017 << "month" << -1));
+    auto dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    auto dateVal = Date_t::fromMillisSinceEpoch(1477958400000);  // 11/1/2016 in ms.
+    ASSERT_VALUE_EQ(Value(dateVal), dateExp->evaluate(Document{}));
+
+    spec = BSON("$dateFromParts" << BSON("year" << 2017 << "day" << -1));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    dateVal = Date_t::fromMillisSinceEpoch(1483056000000);  // 12/30/2016
+    ASSERT_VALUE_EQ(Value(dateVal), dateExp->evaluate(Document{}));
+
+    spec = BSON("$dateFromParts" << BSON("year" << 2017 << "hour" << 25));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    dateVal = Date_t::fromMillisSinceEpoch(1483318800000);  // 1/2/2017 01:00:00
+    ASSERT_VALUE_EQ(Value(dateVal), dateExp->evaluate(Document{}));
+
+    spec = BSON("$dateFromParts" << BSON("year" << 2017 << "minute" << 61));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    dateVal = Date_t::fromMillisSinceEpoch(1483232460000);  // 1/1/2017 01:01:00
+    ASSERT_VALUE_EQ(Value(dateVal), dateExp->evaluate(Document{}));
+
+    spec = BSON("$dateFromParts" << BSON("year" << 2017 << "second" << 61));
+    dateExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    dateVal = Date_t::fromMillisSinceEpoch(1483228861000);  // 1/1/2017 00:01:01
+    ASSERT_VALUE_EQ(Value(dateVal), dateExp->evaluate(Document{}));
 }
 
 }  // namespace ExpressionDateFromPartsTest

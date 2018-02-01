@@ -45,6 +45,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/represent_as.h"
 
 namespace mongo {
 using namespace mongoutils;
@@ -1013,17 +1014,33 @@ bool Value::integral() const {
         case NumberInt:
             return true;
         case NumberLong:
-            return (_storage.longValue <= numeric_limits<int>::max() &&
-                    _storage.longValue >= numeric_limits<int>::min());
+            return bool(representAs<int>(_storage.longValue));
         case NumberDouble:
-            return (_storage.doubleValue <= numeric_limits<int>::max() &&
-                    _storage.doubleValue >= numeric_limits<int>::min() &&
-                    _storage.doubleValue == static_cast<int>(_storage.doubleValue));
+            return bool(representAs<int>(_storage.doubleValue));
         case NumberDecimal: {
-            // If we are able to convert the decimal to an int32_t without an rounding errors,
+            // If we are able to convert the decimal to an int32_t without any rounding errors,
             // then it is integral.
             uint32_t signalingFlags = Decimal128::kNoFlag;
             (void)_storage.getDecimal().toIntExact(&signalingFlags);
+            return signalingFlags == Decimal128::kNoFlag;
+        }
+        default:
+            return false;
+    }
+}
+
+bool Value::integral64Bit() const {
+    switch (getType()) {
+        case NumberInt:
+        case NumberLong:
+            return true;
+        case NumberDouble:
+            return bool(representAs<int64_t>(_storage.doubleValue));
+        case NumberDecimal: {
+            // If we are able to convert the decimal to an int64_t without any rounding errors,
+            // then it is a 64-bit.
+            uint32_t signalingFlags = Decimal128::kNoFlag;
+            (void)_storage.getDecimal().toLongExact(&signalingFlags);
             return signalingFlags == Decimal128::kNoFlag;
         }
         default:

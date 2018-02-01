@@ -1147,27 +1147,11 @@ Value ExpressionDateFromParts::serialize(bool explain) const {
                   {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()}}}});
 }
 
-/**
- * This function checks whether a field is a number, and fits in the given range.
- *
- * If the field does not exist, the default value is returned trough the returnValue out parameter
- * and the function returns true.
- *
- * If the field exists:
- * - if the value is "nullish", the function returns false, so that the calling function can return
- *   a BSONNULL value.
- * - if the value can not be coerced to an integral value, an exception is returned.
- * - if the value is out of the range [minValue..maxValue], an exception is returned.
- * - otherwise, the coerced integral value is returned through the returnValue
- *   out parameter, and the function returns true.
- */
-bool ExpressionDateFromParts::evaluateNumberWithinRange(const Document& root,
-                                                        const Expression* field,
+bool ExpressionDateFromParts::evaluateNumberWithDefault(const Document& root,
+                                                        intrusive_ptr<Expression> field,
                                                         StringData fieldName,
-                                                        int defaultValue,
-                                                        int minValue,
-                                                        int maxValue,
-                                                        int* returnValue) const {
+                                                        long long defaultValue,
+                                                        long long* returnValue) const {
     if (!field) {
         *returnValue = defaultValue;
         return true;
@@ -1184,30 +1168,21 @@ bool ExpressionDateFromParts::evaluateNumberWithinRange(const Document& root,
                           << typeName(fieldValue.getType())
                           << " with value "
                           << fieldValue.toString(),
-            fieldValue.integral());
+            fieldValue.integral64Bit());
 
-    *returnValue = fieldValue.coerceToInt();
-
-    uassert(40523,
-            str::stream() << "'" << fieldName << "' must evaluate to an integer in the range "
-                          << minValue
-                          << " to "
-                          << maxValue
-                          << ", found "
-                          << *returnValue,
-            *returnValue >= minValue && *returnValue <= maxValue);
+    *returnValue = fieldValue.coerceToLong();
 
     return true;
 }
 
 Value ExpressionDateFromParts::evaluate(const Document& root) const {
-    int hour, minute, second, millisecond;
+    long long hour, minute, second, millisecond;
 
-    if (!evaluateNumberWithinRange(root, _hour.get(), "hour"_sd, 0, 0, 24, &hour) ||
-        !evaluateNumberWithinRange(root, _minute.get(), "minute"_sd, 0, 0, 59, &minute) ||
-        !evaluateNumberWithinRange(root, _second.get(), "second"_sd, 0, 0, 59, &second) ||
-        !evaluateNumberWithinRange(
-            root, _millisecond.get(), "millisecond"_sd, 0, 0, 999, &millisecond)) {
+    if (!evaluateNumberWithDefault(root, _hour, "hour"_sd, 0, &hour) ||
+        !evaluateNumberWithDefault(root, _minute, "minute"_sd, 0, &minute) ||
+        !evaluateNumberWithDefault(root, _second, "second"_sd, 0, &second) ||
+        !evaluateNumberWithDefault(root, _millisecond, "millisecond"_sd, 0, &millisecond)) {
+        // One of the evaluated inputs in nullish.
         return Value(BSONNULL);
     }
 
@@ -1218,26 +1193,33 @@ Value ExpressionDateFromParts::evaluate(const Document& root) const {
     }
 
     if (_year) {
-        int year, month, day;
+        long long year, month, day;
 
-        if (!evaluateNumberWithinRange(root, _year.get(), "year"_sd, 1970, 0, 9999, &year) ||
-            !evaluateNumberWithinRange(root, _month.get(), "month"_sd, 1, 1, 12, &month) ||
-            !evaluateNumberWithinRange(root, _day.get(), "day"_sd, 1, 1, 31, &day)) {
+        if (!evaluateNumberWithDefault(root, _year, "year"_sd, 1970, &year) ||
+            !evaluateNumberWithDefault(root, _month, "month"_sd, 1, &month) ||
+            !evaluateNumberWithDefault(root, _day, "day"_sd, 1, &day)) {
+            // One of the evaluated inputs in nullish.
             return Value(BSONNULL);
         }
+
+        uassert(40523,
+                str::stream() << "'year' must evaluate to an integer in the range " << 0 << " to "
+                              << 9999
+                              << ", found "
+                              << year,
+                year >= 0 && year <= 9999);
 
         return Value(
             timeZone->createFromDateParts(year, month, day, hour, minute, second, millisecond));
     }
 
     if (_isoWeekYear) {
-        int isoWeekYear, isoWeek, isoDayOfWeek;
+        long long isoWeekYear, isoWeek, isoDayOfWeek;
 
-        if (!evaluateNumberWithinRange(
-                root, _isoWeekYear.get(), "isoWeekYear"_sd, 1970, 0, 9999, &isoWeekYear) ||
-            !evaluateNumberWithinRange(root, _isoWeek.get(), "isoWeek"_sd, 1, 1, 53, &isoWeek) ||
-            !evaluateNumberWithinRange(
-                root, _isoDayOfWeek.get(), "isoDayOfWeek"_sd, 1, 1, 7, &isoDayOfWeek)) {
+        if (!evaluateNumberWithDefault(root, _isoWeekYear, "isoWeekYear"_sd, 1970, &isoWeekYear) ||
+            !evaluateNumberWithDefault(root, _isoWeek, "isoWeek"_sd, 1, &isoWeek) ||
+            !evaluateNumberWithDefault(root, _isoDayOfWeek, "isoDayOfWeek"_sd, 1, &isoDayOfWeek)) {
+            // One of the evaluated inputs in nullish.
             return Value(BSONNULL);
         }
 

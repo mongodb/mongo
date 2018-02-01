@@ -168,6 +168,12 @@ public:
      */
     bool integral() const;
 
+    /**
+     * Returns true if this value is a numeric type that can be represented as a 64-bit integer,
+     * and false otherwise.
+     */
+    bool integral64Bit() const;
+
     /// Get the BSON type of the field.
     BSONType getType() const {
         return _storage.bsonType();

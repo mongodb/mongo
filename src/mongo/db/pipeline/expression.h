@@ -910,16 +910,22 @@ private:
                             boost::intrusive_ptr<Expression> timeZone);
 
     /**
-     * Evaluates the value in field as number, and makes sure it fits in the minValue..maxValue
-     * range. If the field is missing or empty, the function returns the defaultValue.
+     * This function checks whether a field is a number.
+     *
+     * If 'field' is null, the default value is returned trough the 'returnValue' out
+     * parameter and the function returns true.
+     *
+     * If 'field' is not null:
+     * - if the value is "nullish", the function returns false.
+     * - if the value can not be coerced to an integral value, a UserException is thrown.
+     * - otherwise, the coerced integral value is returned through the 'returnValue'
+     *   out parameter, and the function returns true.
      */
-    bool evaluateNumberWithinRange(const Document& root,
-                                   const Expression* field,
+    bool evaluateNumberWithDefault(const Document& root,
+                                   boost::intrusive_ptr<Expression> field,
                                    StringData fieldName,
-                                   int defaultValue,
-                                   int minValue,
-                                   int maxValue,
-                                   int* returnValue) const;
+                                   long long defaultValue,
+                                   long long* returnValue) const;
 
     boost::intrusive_ptr<Expression> _year;
     boost::intrusive_ptr<Expression> _month;
