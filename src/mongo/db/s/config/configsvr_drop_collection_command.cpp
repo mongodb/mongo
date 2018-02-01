@@ -129,8 +129,8 @@ public:
         ON_BLOCK_EXIT(
             [opCtx, nss] { Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(nss); });
 
-        auto collStatus = catalogClient->getCollection(
-            opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+        auto collStatus =
+            catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
         if (collStatus == ErrorCodes::NamespaceNotFound) {
             // We checked the sharding catalog and found that this collection doesn't exist.
             // This may be because it never existed, or because a drop command was sent
