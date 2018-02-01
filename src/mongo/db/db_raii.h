@@ -53,7 +53,8 @@ public:
     AutoStatsTracker(OperationContext* opCtx,
                      const NamespaceString& nss,
                      Top::LockType lockType,
-                     boost::optional<int> dbProfilingLevel);
+                     boost::optional<int> dbProfilingLevel,
+                     Milliseconds timeoutMs = Milliseconds::max());
 
     /**
      * Records stats about the current operation via Top.
@@ -82,15 +83,21 @@ class AutoGetCollectionForRead {
     MONGO_DISALLOW_COPYING(AutoGetCollectionForRead);
 
 public:
-    AutoGetCollectionForRead(OperationContext* opCtx, const NamespaceString& nss);
+    AutoGetCollectionForRead(OperationContext* opCtx,
+                             const NamespaceString& nss,
+                             Milliseconds timeoutMs = Milliseconds::max());
 
-    AutoGetCollectionForRead(OperationContext* opCtx, const StringData dbName, const UUID& uuid);
+    AutoGetCollectionForRead(OperationContext* opCtx,
+                             const StringData dbName,
+                             const UUID& uuid,
+                             Milliseconds timeoutMs = Milliseconds::max());
 
     // TODO (SERVER-32367): Do not use this constructor, it is for internal purposes only
     AutoGetCollectionForRead(OperationContext* opCtx,
                              const NamespaceStringOrUUID& nsOrUUID,
                              AutoGetCollection::ViewMode viewMode,
-                             Lock::DBLock lock);
+                             Lock::DBLock lock,
+                             Milliseconds timeoutMs = Milliseconds::max());
 
     Database* getDb() const {
         return _autoColl->getDb();
@@ -124,19 +131,26 @@ class AutoGetCollectionForReadCommand {
     MONGO_DISALLOW_COPYING(AutoGetCollectionForReadCommand);
 
 public:
-    AutoGetCollectionForReadCommand(OperationContext* opCtx, const NamespaceString& nss)
+    AutoGetCollectionForReadCommand(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    Milliseconds timeoutMs = Milliseconds::max())
         : AutoGetCollectionForReadCommand(
-              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
+              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, timeoutMs) {}
 
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    Lock::DBLock lock)
-        : AutoGetCollectionForReadCommand(
-              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, std::move(lock)) {}
+                                    Lock::DBLock lock,
+                                    Milliseconds timeoutMs = Milliseconds::max())
+        : AutoGetCollectionForReadCommand(opCtx,
+                                          nss,
+                                          AutoGetCollection::ViewMode::kViewsForbidden,
+                                          std::move(lock),
+                                          timeoutMs) {}
 
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const StringData dbName,
-                                    const UUID& uuid);
+                                    const UUID& uuid,
+                                    Milliseconds timeoutMs = Milliseconds::max());
 
     Database* getDb() const {
         return _autoCollForRead->getDb();
@@ -149,12 +163,14 @@ public:
 protected:
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    AutoGetCollection::ViewMode viewMode);
+                                    AutoGetCollection::ViewMode viewMode,
+                                    Milliseconds timeoutMs = Milliseconds::max());
 
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     AutoGetCollection::ViewMode viewMode,
-                                    Lock::DBLock lock);
+                                    Lock::DBLock lock,
+                                    Milliseconds timeoutMs = Milliseconds::max());
 
     // '_autoCollForRead' may need to be reset by AutoGetCollectionOrViewForReadCommand, so needs to
     // be a boost::optional.
@@ -176,10 +192,13 @@ class AutoGetCollectionOrViewForReadCommand final : public AutoGetCollectionForR
     MONGO_DISALLOW_COPYING(AutoGetCollectionOrViewForReadCommand);
 
 public:
-    AutoGetCollectionOrViewForReadCommand(OperationContext* opCtx, const NamespaceString& nss);
     AutoGetCollectionOrViewForReadCommand(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          Lock::DBLock lock);
+                                          Milliseconds timeoutMs = Milliseconds::max());
+    AutoGetCollectionOrViewForReadCommand(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          Lock::DBLock lock,
+                                          Milliseconds timeoutMs = Milliseconds::max());
 
     ViewDefinition* getView() const {
         return _view.get();

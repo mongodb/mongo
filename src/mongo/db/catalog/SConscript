@@ -135,6 +135,18 @@ env.Library(
 )
 
 env.CppUnitTest(
+    target='catalog_raii_test',
+    source=[
+        'catalog_raii_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_raii',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
+    ],
+)
+
+env.CppUnitTest(
     target='database_test',
     source=[
         'database_test.cpp',

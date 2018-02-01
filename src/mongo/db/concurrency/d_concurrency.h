@@ -275,7 +275,10 @@ public:
      */
     class DBLock {
     public:
-        DBLock(OperationContext* opCtx, StringData db, LockMode mode);
+        DBLock(OperationContext* opCtx,
+               StringData db,
+               LockMode mode,
+               Milliseconds timeoutMs = Milliseconds::max());
         DBLock(DBLock&&);
         ~DBLock();
 
@@ -318,7 +321,10 @@ public:
         MONGO_DISALLOW_COPYING(CollectionLock);
 
     public:
-        CollectionLock(Locker* lockState, StringData ns, LockMode mode);
+        CollectionLock(Locker* lockState,
+                       StringData ns,
+                       LockMode mode,
+                       Milliseconds timeoutMs = Milliseconds::max());
         CollectionLock(CollectionLock&&);
         ~CollectionLock();
 

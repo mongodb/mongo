@@ -40,12 +40,13 @@ namespace mongo {
 AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    Top::LockType lockType,
-                                   boost::optional<int> dbProfilingLevel)
+                                   boost::optional<int> dbProfilingLevel,
+                                   Milliseconds timeoutMs)
     : _opCtx(opCtx), _lockType(lockType) {
     if (!dbProfilingLevel) {
         // No profiling level was determined, attempt to read the profiling level from the Database
         // object.
-        AutoGetDb autoDb(_opCtx, nss.db(), MODE_IS);
+        AutoGetDb autoDb(_opCtx, nss.db(), MODE_IS, timeoutMs);
         if (autoDb.getDb()) {
             dbProfilingLevel = autoDb.getDb()->getProfilingLevel();
         }
@@ -68,25 +69,30 @@ AutoStatsTracker::~AutoStatsTracker() {
 }
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
-                                                   const NamespaceString& nss)
+                                                   const NamespaceString& nss,
+                                                   Milliseconds timeoutMs)
     : AutoGetCollectionForRead(opCtx,
                                nss,
                                AutoGetCollection::ViewMode::kViewsForbidden,
-                               Lock::DBLock(opCtx, nss.db(), MODE_IS)) {}
+                               Lock::DBLock(opCtx, nss.db(), MODE_IS, timeoutMs),
+                               timeoutMs) {}
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    const StringData dbName,
-                                                   const UUID& uuid)
+                                                   const UUID& uuid,
+                                                   Milliseconds timeoutMs)
     : AutoGetCollectionForRead(opCtx,
                                NamespaceStringOrUUID({dbName.toString(), uuid}),
                                AutoGetCollection::ViewMode::kViewsForbidden,
-                               Lock::DBLock(opCtx, dbName, MODE_IS)) {}
+                               Lock::DBLock(opCtx, dbName, MODE_IS, timeoutMs),
+                               timeoutMs) {}
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    const NamespaceStringOrUUID& nsOrUUID,
                                                    AutoGetCollection::ViewMode viewMode,
-                                                   Lock::DBLock lock) {
-    _autoColl.emplace(opCtx, nsOrUUID, std::move(lock), MODE_IS, viewMode);
+                                                   Lock::DBLock lock,
+                                                   Milliseconds timeoutMs) {
+    _autoColl.emplace(opCtx, nsOrUUID, std::move(lock), MODE_IS, viewMode, timeoutMs);
 
     while (true) {
         auto coll = _autoColl->getCollection();
@@ -118,7 +124,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             CurOp::get(opCtx)->yielded();
         }
 
-        _autoColl.emplace(opCtx, nsOrUUID, MODE_IS);
+        _autoColl.emplace(opCtx, nsOrUUID, MODE_IS, viewMode, timeoutMs);
     }
 }
 
@@ -126,14 +132,16 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
     OperationContext* opCtx,
     const NamespaceString& nss,
     AutoGetCollection::ViewMode viewMode,
-    Lock::DBLock lock) {
-    _autoCollForRead.emplace(opCtx, nss, viewMode, std::move(lock));
+    Lock::DBLock lock,
+    Milliseconds timeoutMs) {
+    _autoCollForRead.emplace(opCtx, nss, viewMode, std::move(lock), timeoutMs);
     const int doNotChangeProfilingLevel = 0;
     _statsTracker.emplace(opCtx,
                           nss,
                           Top::LockType::ReadLocked,
                           _autoCollForRead->getDb() ? _autoCollForRead->getDb()->getProfilingLevel()
-                                                    : doNotChangeProfilingLevel);
+                                                    : doNotChangeProfilingLevel,
+                          timeoutMs);
 
     // We have both the DB and collection locked, which is the prerequisite to do a stable shard
     // version check, but we'd like to do the check after we have a satisfactory snapshot.
@@ -142,34 +150,40 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
 }
 
 AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
-    OperationContext* opCtx, const NamespaceString& nss, AutoGetCollection::ViewMode viewMode)
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    AutoGetCollection::ViewMode viewMode,
+    Milliseconds timeoutMs)
     : AutoGetCollectionForReadCommand(
-          opCtx, nss, viewMode, Lock::DBLock(opCtx, nss.db(), MODE_IS)) {}
+          opCtx, nss, viewMode, Lock::DBLock(opCtx, nss.db(), MODE_IS, timeoutMs)) {}
 
 AutoGetCollectionOrViewForReadCommand::AutoGetCollectionOrViewForReadCommand(
-    OperationContext* opCtx, const NamespaceString& nss)
-    : AutoGetCollectionForReadCommand(opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted),
+    OperationContext* opCtx, const NamespaceString& nss, Milliseconds timeoutMs)
+    : AutoGetCollectionForReadCommand(
+          opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted, timeoutMs),
       _view(_autoCollForRead->getDb() && !getCollection()
                 ? _autoCollForRead->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())
                 : nullptr) {}
 
 AutoGetCollectionOrViewForReadCommand::AutoGetCollectionOrViewForReadCommand(
-    OperationContext* opCtx, const NamespaceString& nss, Lock::DBLock lock)
+    OperationContext* opCtx, const NamespaceString& nss, Lock::DBLock lock, Milliseconds timeoutMs)
     : AutoGetCollectionForReadCommand(
-          opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted, std::move(lock)),
+          opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted, std::move(lock), timeoutMs),
       _view(_autoCollForRead->getDb() && !getCollection()
                 ? _autoCollForRead->getDb()->getViewCatalog()->lookup(opCtx, nss.ns())
                 : nullptr) {}
 
 AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                                                  const StringData dbName,
-                                                                 const UUID& uuid) {
-    _autoCollForRead.emplace(opCtx, dbName, uuid);
+                                                                 const UUID& uuid,
+                                                                 Milliseconds timeoutMs) {
+    _autoCollForRead.emplace(opCtx, dbName, uuid, timeoutMs);
     if (_autoCollForRead->getCollection()) {
         _statsTracker.emplace(opCtx,
                               _autoCollForRead->getCollection()->ns(),
                               Top::LockType::ReadLocked,
-                              _autoCollForRead->getDb()->getProfilingLevel());
+                              _autoCollForRead->getDb()->getProfilingLevel(),
+                              timeoutMs);
 
         // We have both the DB and collection locked, which is the prerequisite to do a stable shard
         // version check, but we'd like to do the check after we have a satisfactory snapshot.

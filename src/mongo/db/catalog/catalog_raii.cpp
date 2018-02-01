@@ -41,8 +41,11 @@ MONGO_FP_DECLARE(setAutoGetCollectionWait);
 
 }  // namespace
 
-AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode)
-    : _dbLock(opCtx, dbName, mode), _db(dbHolder().get(opCtx, dbName)) {}
+AutoGetDb::AutoGetDb(OperationContext* opCtx,
+                     StringData dbName,
+                     LockMode mode,
+                     Milliseconds timeoutMs)
+    : _dbLock(opCtx, dbName, mode, timeoutMs), _db(dbHolder().get(opCtx, dbName)) {}
 
 AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, Lock::DBLock dbLock)
     : _dbLock(std::move(dbLock)), _db(dbHolder().get(opCtx, dbName)) {}
@@ -51,19 +54,21 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,
                                      LockMode modeDB,
                                      LockMode modeColl,
-                                     ViewMode viewMode)
+                                     ViewMode viewMode,
+                                     Milliseconds timeoutMs)
     : AutoGetCollection(
-          opCtx, nsOrUUID, Lock::DBLock(opCtx, nsOrUUID.db(), modeDB), modeColl, viewMode) {}
+          opCtx, nsOrUUID, Lock::DBLock(opCtx, nsOrUUID.db(), modeDB, timeoutMs), modeColl, viewMode, timeoutMs) {}
 
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,
                                      Lock::DBLock dbLock,
                                      LockMode modeColl,
-                                     ViewMode viewMode)
+                                     ViewMode viewMode,
+                                     Milliseconds timeoutMs)
     : _autoDb(opCtx, nsOrUUID.db(), std::move(dbLock)),
       _nsAndLock([&]() -> NamespaceAndCollectionLock {
           if (nsOrUUID.nss()) {
-              return {Lock::CollectionLock(opCtx->lockState(), nsOrUUID.nss()->ns(), modeColl),
+              return {Lock::CollectionLock(opCtx->lockState(), nsOrUUID.nss()->ns(), modeColl, timeoutMs),
                       *nsOrUUID.nss()};
           } else {
               UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
@@ -75,7 +80,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                       str::stream() << "Unable to resolve " << nsOrUUID.toString(),
                       resolvedNss.isValid());
 
-              return {Lock::CollectionLock(opCtx->lockState(), resolvedNss.ns(), modeColl),
+              return {Lock::CollectionLock(opCtx->lockState(), resolvedNss.ns(), modeColl, timeoutMs),
                       std::move(resolvedNss)};
           }
       }()) {
@@ -105,8 +110,11 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
             !_view || viewMode == kViewsPermitted);
 }
 
-AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx, StringData ns, LockMode mode)
-    : _dbLock(opCtx, ns, mode), _db(dbHolder().get(opCtx, ns)) {
+AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
+                                     StringData dbName,
+                                     LockMode mode,
+                                     Milliseconds timeoutMs)
+    : _dbLock(opCtx, dbName, mode, timeoutMs), _db(dbHolder().get(opCtx, dbName)) {
     invariant(mode == MODE_IX || mode == MODE_X);
     _justCreated = false;
 
@@ -116,7 +124,7 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx, StringData ns, Loc
             _dbLock.relockWithMode(MODE_X);
         }
 
-        _db = dbHolder().openDb(opCtx, ns);
+        _db = dbHolder().openDb(opCtx, dbName);
         _justCreated = true;
     }
 }

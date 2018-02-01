@@ -1002,6 +1002,50 @@ TEST_F(DConcurrencyTestFixture, Throttling) {
     ASSERT(!overlongWait);
 }
 
+TEST_F(DConcurrencyTestFixture, DBLockTimeout) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+    auto opctx2 = clientOpctxPairs[1].second.get();
+
+    const Milliseconds timeoutMillis = Milliseconds(30000);
+
+    Lock::DBLock L1(opctx1, "testdb"_sd, MODE_X, Milliseconds::max());
+    ASSERT(opctx1->lockState()->isDbLockedForMode("testdb"_sd, MODE_X));
+
+    Date_t t1 = Date_t::now();
+    try {
+        Lock::DBLock L2(opctx2, "testdb"_sd, MODE_X, timeoutMillis);
+        FAIL("Should have gotten an exception due to timeout");
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout> DBException& ex) {
+        Date_t t2 = Date_t::now();
+        ASSERT_GTE(t2 - t1, Milliseconds(timeoutMillis));
+    }
+}
+
+TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+    auto opctx2 = clientOpctxPairs[1].second.get();
+
+    const Milliseconds timeoutMillis = Milliseconds(30000);
+
+    Lock::DBLock DBL1(opctx1, "testdb"_sd, MODE_IX, Milliseconds::max());
+    ASSERT(opctx1->lockState()->isDbLockedForMode("testdb"_sd, MODE_IX));
+    Lock::CollectionLock CL1(opctx1->lockState(), "testdb.test"_sd, MODE_X, Milliseconds::max());
+    ASSERT(opctx1->lockState()->isCollectionLockedForMode("testdb.test"_sd, MODE_X));
+
+    Date_t t1 = Date_t::now();
+    try {
+        Lock::DBLock DBL2(opctx2, "testdb"_sd, MODE_IX, Milliseconds::max());
+        ASSERT(opctx2->lockState()->isDbLockedForMode("testdb"_sd, MODE_IX));
+        Lock::CollectionLock CL2(opctx2->lockState(), "testdb.test"_sd, MODE_X, timeoutMillis);
+        FAIL("Should have gotten an exception due to timeout");
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout> DBException& ex) {
+        Date_t t2 = Date_t::now();
+        ASSERT_GTE(t2 - t1, Milliseconds(timeoutMillis));
+    }
+}
+
 TEST_F(DConcurrencyTestFixture, CompatibleFirstWithSXIS) {
     auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(3);
     auto opctx1 = clientOpctxPairs[0].second.get();

@@ -190,11 +190,11 @@ void Lock::GlobalLock::_unlock() {
     }
 }
 
-Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode)
+Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode, Milliseconds timeoutMs)
     : _id(RESOURCE_DATABASE, db),
       _opCtx(opCtx),
       _mode(mode),
-      _globalLock(opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, Milliseconds::max()) {
+      _globalLock(opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, timeoutMs) {
     massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
 
     // Need to acquire the flush lock
@@ -206,7 +206,12 @@ Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode)
         _mode = MODE_X;
     }
 
-    invariant(LOCK_OK == _opCtx->lockState()->lock(_id, _mode));
+    uassert(ErrorCodes::LockTimeout,
+            str::stream() << "Failed to acqure database '" << db << "' in " << modeName(_mode)
+                          << " after waiting for "
+                          << timeoutMs
+                          << " ms.",
+            LOCK_OK == _opCtx->lockState()->lock(_id, _mode, timeoutMs));
 }
 
 Lock::DBLock::DBLock(DBLock&& otherLock)
@@ -238,17 +243,25 @@ void Lock::DBLock::relockWithMode(LockMode newMode) {
 }
 
 
-Lock::CollectionLock::CollectionLock(Locker* lockState, StringData ns, LockMode mode)
+Lock::CollectionLock::CollectionLock(Locker* lockState,
+                                     StringData ns,
+                                     LockMode mode,
+                                     Milliseconds timeoutMs)
     : _id(RESOURCE_COLLECTION, ns), _lockState(lockState) {
     massert(28538, "need a non-empty collection name", nsIsFull(ns));
 
     dassert(_lockState->isDbLockedForMode(nsToDatabaseSubstring(ns),
                                           isSharedLockMode(mode) ? MODE_IS : MODE_IX));
-    if (supportsDocLocking()) {
-        _lockState->lock(_id, mode);
-    } else {
-        _lockState->lock(_id, isSharedLockMode(mode) ? MODE_S : MODE_X);
+    LockMode actualLockMode = mode;
+    if (!supportsDocLocking()) {
+        actualLockMode = isSharedLockMode(mode) ? MODE_S : MODE_X;
     }
+    uassert(ErrorCodes::LockTimeout,
+            str::stream() << "Failed to acquire collection '" << ns << "' in " << modeName(mode)
+                          << " after waiting for "
+                          << timeoutMs
+                          << " ms.",
+            LOCK_OK == _lockState->lock(_id, actualLockMode, timeoutMs));
 }
 
 Lock::CollectionLock::CollectionLock(CollectionLock&& otherLock)
