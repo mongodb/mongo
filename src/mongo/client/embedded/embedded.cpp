@@ -62,7 +62,6 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/quick_exit.h"
@@ -176,7 +175,6 @@ int initialize(int argc, char* argv[], char** envp) {
 
     auto serviceContext = checked_cast<ServiceContextMongoEmbedded*>(getGlobalServiceContext());
 
-    serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
     auto opObserverRegistry = stdx::make_unique<OpObserverRegistry>();
     opObserverRegistry->addObserver(stdx::make_unique<OpObserverImpl>());
     opObserverRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
