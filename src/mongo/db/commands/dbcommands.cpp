@@ -247,7 +247,16 @@ public:
 
         // Closing a database requires a global lock.
         Lock::GlobalWrite lk(opCtx);
-        if (!dbHolder().get(opCtx, dbname)) {
+        auto db = dbHolder().get(opCtx, dbname);
+        if (db) {
+            if (db->isDropPending(opCtx)) {
+                return appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::DatabaseDropPending,
+                           str::stream() << "Cannot repair database " << dbname
+                                         << " since it is pending being dropped."));
+            }
+        } else {
             // If the name doesn't make an exact match, check for a case insensitive match.
             std::set<std::string> otherCasing = dbHolder().getNamesWithConflictingCasing(dbname);
             if (otherCasing.empty()) {
