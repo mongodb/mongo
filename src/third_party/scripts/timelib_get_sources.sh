@@ -12,7 +12,7 @@ set -o errexit
 # parser to hang.
 #
 
-VERSION=2017.05
+VERSION=2018.01alpha1
 NAME=timelib
 TARBALL=$VERSION.tar.gz
 TARBALL_DIR=$NAME-$VERSION
