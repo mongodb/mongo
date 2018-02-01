@@ -507,14 +507,18 @@ string OpDebug::report(Client* client,
         s << " writeConflicts:" << writeConflicts;
     }
 
-    if (!exceptionInfo.isOK()) {
-        s << " exception: " << redact(exceptionInfo.reason());
-        s << " code:" << exceptionInfo.code();
+    s << " numYields:" << curop.numYields();
+    OPDEBUG_TOSTRING_HELP(nreturned);
+
+    if (!errInfo.isOK()) {
+        s << " ok:" << 0;
+        if (!errInfo.reason().empty()) {
+            s << " errMsg:\"" << escape(redact(errInfo.reason())) << "\"";
+        }
+        s << " errName:" << errInfo.code();
+        s << " errCode:" << static_cast<int>(errInfo.code());
     }
 
-    s << " numYields:" << curop.numYields();
-
-    OPDEBUG_TOSTRING_HELP(nreturned);
     if (responseLength > 0) {
         s << " reslen:" << responseLength;
     }
@@ -598,18 +602,22 @@ void OpDebug::append(const CurOp& curop,
     }
 
     b.appendNumber("numYield", curop.numYields());
+    OPDEBUG_APPEND_NUMBER(nreturned);
 
     {
         BSONObjBuilder locks(b.subobjStart("locks"));
         lockStats.report(&locks);
     }
 
-    if (!exceptionInfo.isOK()) {
-        b.append("exception", exceptionInfo.reason());
-        b.append("exceptionCode", exceptionInfo.code());
+    if (!errInfo.isOK()) {
+        b.appendNumber("ok", 0.0);
+        if (!errInfo.reason().empty()) {
+            b.append("errMsg", errInfo.reason());
+        }
+        b.append("errName", ErrorCodes::errorString(errInfo.code()));
+        b.append("errCode", errInfo.code());
     }
 
-    OPDEBUG_APPEND_NUMBER(nreturned);
     OPDEBUG_APPEND_NUMBER(responseLength);
     if (iscommand) {
         b.append("protocol", getProtoString(networkOp));

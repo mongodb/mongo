@@ -203,7 +203,7 @@
                 "command.aggregate": mongosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
-                exceptionCode: {$in: shardExceptions}
+                errCode: {$in: shardExceptions}
             }
         });
 
@@ -215,7 +215,7 @@
                 "command.aggregate": mongosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
-                exceptionCode: {$in: shardExceptions}
+                errCode: {$in: shardExceptions}
             }
         });
 
@@ -229,7 +229,7 @@
                 "command.aggregate": mongosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
-                exceptionCode: {$exists: false}
+                errCode: {$exists: false}
             },
             maxExpectedMatches: 2
         });
@@ -241,7 +241,7 @@
                 "command.aggregate": mongosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
-                exceptionCode: {$exists: false}
+                errCode: {$exists: false}
             }
         });
 
@@ -301,7 +301,7 @@
                 "command.aggregate": mongosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
-                exceptionCode: {$in: shardExceptions}
+                errCode: {$in: shardExceptions}
             }
         });
 
@@ -313,7 +313,7 @@
                 "command.aggregate": mongosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
-                exceptionCode: {$in: shardExceptions}
+                errCode: {$in: shardExceptions}
             }
         });
 
@@ -327,7 +327,7 @@
                 "command.aggregate": mongosColl.getName(),
                 "command.comment": testName,
                 "command.pipeline.$mergeCursors": {$exists: false},
-                exceptionCode: {$exists: false}
+                errCode: {$exists: false}
             },
             maxExpectedMatches: 2
         });

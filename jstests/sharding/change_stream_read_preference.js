@@ -121,7 +121,7 @@
                 // We need to filter out any profiler entries with a stale config - this is the
                 // first read on this secondary with a readConcern specified, so it is the first
                 // read on this secondary that will enforce shard version.
-                exceptionCode: {$ne: ErrorCodes.StaleConfig}
+                errCode: {$ne: ErrorCodes.StaleConfig}
             }
         });
     }

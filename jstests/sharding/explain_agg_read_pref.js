@@ -93,7 +93,7 @@
                         "command.explain.aggregate": coll.getName(),
                         "command.explain.comment": comment,
                         "command.$readPreference.mode": pref == 'primary' ? null : pref,
-                        "exception": {"$exists": false}
+                        "errMsg": {"$exists": false}
                     }
                 });
 
@@ -129,7 +129,7 @@
                         "command.explain.aggregate": coll.getName(),
                         "command.explain.comment": comment,
                         "command.$readPreference.mode": pref == 'primary' ? null : pref,
-                        "exception": {"$exists": false}
+                        "errMsg": {"$exists": false}
                     }
                 });
             });

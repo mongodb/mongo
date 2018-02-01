@@ -62,7 +62,7 @@
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
             "command.readConcern": {"level": "local"},
-            "exceptionCode": ErrorCodes.StaleConfig
+            "errCode": ErrorCodes.StaleConfig
         }
     });
 
@@ -77,7 +77,7 @@
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
             "command.readConcern": {"level": "local"},
-            "exceptionCode": ErrorCodes.StaleConfig
+            "errCode": ErrorCodes.StaleConfig
         }
     });
 
@@ -91,7 +91,7 @@
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
             "command.readConcern": {"level": "local"},
-            "exceptionCode": {"$exists": false}
+            "errCode": {"$exists": false}
         }
     });
 

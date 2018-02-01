@@ -79,7 +79,7 @@
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
             "command.readConcern.afterClusterTime": {"$exists": true},
-            "exceptionCode": ErrorCodes.StaleConfig
+            "errCode": ErrorCodes.StaleConfig
         }
     });
 
@@ -94,7 +94,7 @@
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
             "command.readConcern.afterClusterTime": {"$exists": true},
-            "exceptionCode": ErrorCodes.StaleConfig
+            "errCode": ErrorCodes.StaleConfig
         }
     });
 
@@ -108,7 +108,7 @@
             "command.shardVersion": {"$exists": true},
             "command.$readPreference": {"mode": "secondary"},
             "command.readConcern.afterClusterTime": {"$exists": true},
-            "exceptionCode": {"$exists": false}
+            "errCode": {"$exists": false}
         }
     });
 
