@@ -96,6 +96,8 @@ executor:
       oplogSize: 511
       set_parameters:
         enableTestCommands: 1
-        numInitialSyncAttempts: 1
+        # TODO SERVER-33063: Use numInitialSyncAttempts=1 once the idempotency issues in initial
+        # sync have been addressed.
+        numInitialSyncAttempts: 10
     num_nodes: 2
     start_initial_sync_node: True
