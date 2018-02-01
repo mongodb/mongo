@@ -241,7 +241,7 @@ void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccriToInvali
     // Here we received a stale config error for a collection which we previously though was sharded
     stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-    auto it = _databases.find(NamespaceString(ccri._cm->getns()).db());
+    auto it = _databases.find(ccri._cm->getns().db());
     if (it == _databases.end()) {
         // If the database does not exist, the collection must have been dropped so there is
         // nothing to invalidate. The getCollectionRoutingInfo will handle the reload of the
@@ -251,7 +251,7 @@ void CatalogCache::onStaleConfigError(CachedCollectionRoutingInfo&& ccriToInvali
 
     auto& collections = it->second->collections;
 
-    auto itColl = collections.find(ccri._cm->getns());
+    auto itColl = collections.find(ccri._cm->getns().ns());
     if (itColl == collections.end()) {
         // If the collection does not exist, this means it must have been dropped since the last
         // time we retrieved a cache entry for it. Doing nothing in this case will cause the

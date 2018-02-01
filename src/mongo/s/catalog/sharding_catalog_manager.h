@@ -138,7 +138,7 @@ public:
      * MinKey values.
      */
     Status assignKeyRangeToZone(OperationContext* opCtx,
-                                const NamespaceString& ns,
+                                const NamespaceString& nss,
                                 const ChunkRange& range,
                                 const std::string& zoneName);
 
@@ -149,7 +149,7 @@ public:
      * full shard key.
      */
     Status removeKeyRangeFromZone(OperationContext* opCtx,
-                                  const NamespaceString& ns,
+                                  const NamespaceString& nss,
                                   const ChunkRange& range);
 
     //
@@ -161,7 +161,7 @@ public:
      * smaller chunks at the specified split points.
      */
     Status commitChunkSplit(OperationContext* opCtx,
-                            const NamespaceString& ns,
+                            const NamespaceString& nss,
                             const OID& requestEpoch,
                             const ChunkRange& range,
                             const std::vector<BSONObj>& splitPoints,
@@ -172,7 +172,7 @@ public:
      * merged into a single larger chunk.
      */
     Status commitChunkMerge(OperationContext* opCtx,
-                            const NamespaceString& ns,
+                            const NamespaceString& nss,
                             const OID& requestEpoch,
                             const std::vector<BSONObj>& chunkBoundaries,
                             const std::string& shardName);
@@ -229,7 +229,7 @@ public:
      * some of the known failures:
      *  - NamespaceNotFound - collection does not exist
      */
-    Status dropCollection(OperationContext* opCtx, const NamespaceString& ns);
+    Status dropCollection(OperationContext* opCtx, const NamespaceString& nss);
 
 
     /**
@@ -248,7 +248,7 @@ public:
      *     Otherwise all chunks will be assigned to the primary shard for the database.
      */
     void shardCollection(OperationContext* opCtx,
-                         const std::string& ns,
+                         const NamespaceString& nss,
                          const boost::optional<UUID> uuid,
                          const ShardKeyPattern& fieldsAndOrder,
                          const BSONObj& defaultCollation,
@@ -430,7 +430,7 @@ private:
      * handling.
      */
     StatusWith<long long> _runCountCommandOnConfig(OperationContext* opCtx,
-                                                   const NamespaceString& ns,
+                                                   const NamespaceString& nss,
                                                    BSONObj query);
 
     /**

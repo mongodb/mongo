@@ -406,7 +406,7 @@ ShardConnection::ShardConnection(const ConnectionString& connectionString,
 
     // Make sure we specified a manager for the correct namespace
     if (_ns.size() && _manager) {
-        invariant(_manager->getns() == _ns);
+        invariant(_manager->getns().ns() == _ns);
     }
 
     auto csString = _cs.toString();

@@ -430,7 +430,7 @@ void CollectionShardingState::onDeleteOp(OperationContext* opCtx,
     }
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        if (_nss.ns() == VersionType::ConfigNS) {
+        if (_nss == VersionType::ConfigNS) {
             if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
                 uasserted(40302, "cannot delete config.version document while in --configsvr mode");
             } else {
@@ -467,7 +467,7 @@ void CollectionShardingState::onDropCollection(OperationContext* opCtx,
     }
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        if (_nss.ns() == VersionType::ConfigNS) {
+        if (_nss == VersionType::ConfigNS) {
             if (!repl::ReplicationCoordinator::get(opCtx)->getMemberState().rollback()) {
                 uasserted(40303, "cannot drop config.version document while in --configsvr mode");
             } else {

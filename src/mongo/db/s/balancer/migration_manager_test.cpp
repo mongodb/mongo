@@ -99,13 +99,13 @@ protected:
      * Inserts a document into the config.collections collection to indicate that "collName" is
      * sharded with version "version". The shard key pattern defaults to "_id".
      */
-    void setUpCollection(const std::string collName, ChunkVersion version);
+    void setUpCollection(const NamespaceString& collName, ChunkVersion version);
 
     /**
      * Inserts a document into the config.chunks collection so that the chunk defined by the
      * parameters exists. Returns a ChunkType defined by the parameters.
      */
-    ChunkType setUpChunk(const std::string& collName,
+    ChunkType setUpChunk(const NamespaceString& collName,
                          const BSONObj& chunkMin,
                          const BSONObj& chunkMax,
                          const ShardId& shardId,
@@ -188,9 +188,9 @@ void MigrationManagerTest::setUpDatabase(const std::string& dbName, const ShardI
         operationContext(), DatabaseType::ConfigNS, db.toBSON(), kMajorityWriteConcern));
 }
 
-void MigrationManagerTest::setUpCollection(const std::string collName, ChunkVersion version) {
+void MigrationManagerTest::setUpCollection(const NamespaceString& collName, ChunkVersion version) {
     CollectionType coll;
-    coll.setNs(NamespaceString(collName));
+    coll.setNs(collName);
     coll.setEpoch(version.epoch());
     coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(version.toLong()));
     coll.setKeyPattern(kKeyPattern);
@@ -199,7 +199,7 @@ void MigrationManagerTest::setUpCollection(const std::string collName, ChunkVers
         operationContext(), CollectionType::ConfigNS, coll.toBSON(), kMajorityWriteConcern));
 }
 
-ChunkType MigrationManagerTest::setUpChunk(const std::string& collName,
+ChunkType MigrationManagerTest::setUpChunk(const NamespaceString& collName,
                                            const BSONObj& chunkMin,
                                            const BSONObj& chunkMax,
                                            const ShardId& shardId,
@@ -217,7 +217,7 @@ ChunkType MigrationManagerTest::setUpChunk(const std::string& collName,
 
 void MigrationManagerTest::setUpMigration(const ChunkType& chunk, const ShardId& toShard) {
     BSONObjBuilder builder;
-    builder.append(MigrationType::ns(), chunk.getNS());
+    builder.append(MigrationType::ns(), chunk.getNS().ns());
     builder.append(MigrationType::min(), chunk.getMin());
     builder.append(MigrationType::max(), chunk.getMax());
     builder.append(MigrationType::toShard(), toShard.toString());
@@ -237,7 +237,7 @@ void MigrationManagerTest::checkMigrationsCollectionIsEmptyAndLocksAreUnlocked()
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kMajorityReadConcern,
-            NamespaceString(MigrationType::ConfigNS),
+            MigrationType::ConfigNS,
             BSONObj(),
             BSONObj(),
             boost::none);
@@ -249,7 +249,7 @@ void MigrationManagerTest::checkMigrationsCollectionIsEmptyAndLocksAreUnlocked()
         operationContext(),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kMajorityReadConcern,
-        NamespaceString(LocksType::ConfigNS),
+        LocksType::ConfigNS,
         BSON(LocksType::state(LocksType::LOCKED) << LocksType::name("{ '$ne' : 'balancer'}")),
         BSONObj(),
         boost::none);
@@ -262,13 +262,13 @@ void MigrationManagerTest::expectMoveChunkCommand(const ChunkType& chunk,
                                                   const BSONObj& response) {
     onCommand([&chunk, &toShardId, &response](const RemoteCommandRequest& request) {
         NamespaceString nss(request.cmdObj.firstElement().valueStringData());
-        ASSERT_EQ(chunk.getNS(), nss.ns());
+        ASSERT_EQ(chunk.getNS(), nss);
 
         const StatusWith<MoveChunkRequest> moveChunkRequestWithStatus =
             MoveChunkRequest::createFromCommand(nss, request.cmdObj);
         ASSERT_OK(moveChunkRequestWithStatus.getStatus());
 
-        ASSERT_EQ(chunk.getNS(), moveChunkRequestWithStatus.getValue().getNss().ns());
+        ASSERT_EQ(chunk.getNS(), moveChunkRequestWithStatus.getValue().getNss());
         ASSERT_BSONOBJ_EQ(chunk.getMin(), moveChunkRequestWithStatus.getValue().getMinKey());
         ASSERT_BSONOBJ_EQ(chunk.getMax(), moveChunkRequestWithStatus.getValue().getMaxKey());
         ASSERT_EQ(chunk.getShard(), moveChunkRequestWithStatus.getValue().getFromShardId());
@@ -295,8 +295,8 @@ TEST_F(MigrationManagerTest, OneCollectionTwoMigrations) {
         operationContext(), ShardType::ConfigNS, kShard2, kMajorityWriteConcern));
 
     // Set up the database and collection as sharded in the metadata.
-    std::string dbName = "foo";
-    std::string collName = "foo.bar";
+    const std::string dbName = "foo";
+    const NamespaceString collName(dbName, "bar");
     ChunkVersion version(2, 0, OID::gen());
 
     setUpDatabase(dbName, kShardId0);
@@ -347,8 +347,8 @@ TEST_F(MigrationManagerTest, TwoCollectionsTwoMigrationsEach) {
 
     // Set up a database and two collections as sharded in the metadata.
     std::string dbName = "foo";
-    std::string collName1 = "foo.bar";
-    std::string collName2 = "foo.baz";
+    const NamespaceString collName1(dbName, "bar");
+    const NamespaceString collName2(dbName, "baz");
     ChunkVersion version1(2, 0, OID::gen());
     ChunkVersion version2(2, 0, OID::gen());
 
@@ -413,8 +413,8 @@ TEST_F(MigrationManagerTest, SourceShardNotFound) {
         operationContext(), ShardType::ConfigNS, kShard2, kMajorityWriteConcern));
 
     // Set up the database and collection as sharded in the metadata.
-    std::string dbName = "foo";
-    std::string collName = "foo.bar";
+    const std::string dbName = "foo";
+    const NamespaceString collName(dbName, "bar");
     ChunkVersion version(2, 0, OID::gen());
 
     setUpDatabase(dbName, kShardId0);
@@ -463,8 +463,8 @@ TEST_F(MigrationManagerTest, JumboChunkResponseBackwardsCompatibility) {
         operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
 
     // Set up the database and collection as sharded in the metadata.
-    std::string dbName = "foo";
-    std::string collName = "foo.bar";
+    const std::string dbName = "foo";
+    const NamespaceString collName(dbName, "bar");
     ChunkVersion version(2, 0, OID::gen());
 
     setUpDatabase(dbName, kShardId0);
@@ -505,8 +505,8 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
         operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
 
     // Set up the database and collection as sharded in the metadata.
-    std::string dbName = "foo";
-    std::string collName = "foo.bar";
+    const std::string dbName = "foo";
+    const NamespaceString collName(dbName, "bar");
     ChunkVersion version(2, 0, OID::gen());
 
     setUpDatabase(dbName, kShardId0);
@@ -564,7 +564,7 @@ TEST_F(MigrationManagerTest, InterruptMigration) {
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kMajorityReadConcern,
-            NamespaceString(MigrationType::ConfigNS),
+            MigrationType::ConfigNS,
             BSON(MigrationType::name(chunk.getName())),
             BSONObj(),
             boost::none);
@@ -588,8 +588,8 @@ TEST_F(MigrationManagerTest, RestartMigrationManager) {
         operationContext(), ShardType::ConfigNS, kShard0, kMajorityWriteConcern));
 
     // Set up the database and collection as sharded in the metadata.
-    std::string dbName = "foo";
-    std::string collName = "foo.bar";
+    const std::string dbName = "foo";
+    const NamespaceString collName(dbName, "bar");
     ChunkVersion version(2, 0, OID::gen());
 
     setUpDatabase(dbName, kShardId0);
@@ -633,8 +633,8 @@ TEST_F(MigrationManagerTest, MigrationRecovery) {
         operationContext(), ShardType::ConfigNS, kShard2, kMajorityWriteConcern));
 
     // Set up the database and collection as sharded in the metadata.
-    std::string dbName = "foo";
-    std::string collName = "foo.bar";
+    const std::string dbName = "foo";
+    const NamespaceString collName(dbName, "bar");
     ChunkVersion version(1, 0, OID::gen());
 
     setUpDatabase(dbName, kShardId0);
@@ -689,8 +689,8 @@ TEST_F(MigrationManagerTest, FailMigrationRecovery) {
         operationContext(), ShardType::ConfigNS, kShard2, kMajorityWriteConcern));
 
     // Set up the database and collection as sharded in the metadata.
-    std::string dbName = "foo";
-    std::string collName = "foo.bar";
+    const std::string dbName = "foo";
+    const NamespaceString collName(dbName, "bar");
     ChunkVersion version(1, 0, OID::gen());
 
     setUpDatabase(dbName, kShardId0);
@@ -725,7 +725,7 @@ TEST_F(MigrationManagerTest, FailMigrationRecovery) {
     // session ID used here doesn't matter.
     ASSERT_OK(catalogClient()->getDistLockManager()->lockWithSessionID(
         operationContext(),
-        collName,
+        collName.ns(),
         "MigrationManagerTest",
         OID::gen(),
         DistLockManager::kSingleLockAttemptTimeout));
@@ -748,8 +748,8 @@ TEST_F(MigrationManagerTest, RemoteCallErrorConversionToOperationFailed) {
         operationContext(), ShardType::ConfigNS, kShard2, kMajorityWriteConcern));
 
     // Set up the database and collection as sharded in the metadata.
-    std::string dbName = "foo";
-    std::string collName = "foo.bar";
+    const std::string dbName = "foo";
+    const NamespaceString collName(dbName, "bar");
     ChunkVersion version(1, 0, OID::gen());
 
     setUpDatabase(dbName, kShardId0);

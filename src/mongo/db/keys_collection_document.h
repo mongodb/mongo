@@ -30,6 +30,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/time_proof_service.h"
 
 namespace mongo {
@@ -47,7 +48,7 @@ namespace mongo {
  */
 class KeysCollectionDocument {
 public:
-    static const std::string ConfigNS;
+    static const NamespaceString ConfigNS;
 
     KeysCollectionDocument(long long keyId,
                            std::string purpose,

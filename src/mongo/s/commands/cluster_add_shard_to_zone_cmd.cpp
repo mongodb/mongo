@@ -89,8 +89,7 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(ShardType::ConfigNS)),
-                ActionType::update)) {
+                ResourcePattern::forExactNamespace(ShardType::ConfigNS), ActionType::update)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();

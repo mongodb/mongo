@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -49,7 +50,7 @@ class StatusWith;
 class TagsType {
 public:
     // Name of the tags collection in the config server.
-    static const std::string ConfigNS;
+    static const NamespaceString ConfigNS;
 
     // Field names and types in the tags collection type.
     static const BSONField<std::string> ns;
@@ -80,10 +81,10 @@ public:
      */
     std::string toString() const;
 
-    const std::string& getNS() const {
+    const NamespaceString& getNS() const {
         return _ns.get();
     }
-    void setNS(const std::string& ns);
+    void setNS(const NamespaceString& ns);
 
     const std::string& getTag() const {
         return _tag.get();
@@ -102,7 +103,7 @@ public:
 
 private:
     // Required namespace to which this tag belongs
-    boost::optional<std::string> _ns;
+    boost::optional<NamespaceString> _ns;
 
     // Required tag name
     boost::optional<std::string> _tag;

@@ -125,7 +125,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeFiveChunks(
         collVersion.incMajor();
 
         ChunkType chunk;
-        chunk.setNS(kNss.ns());
+        chunk.setNS(kNss);
         chunk.setMin(mins[i]);
         chunk.setMax(maxs[i]);
         chunk.setShard(kShardId);
@@ -148,7 +148,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeThreeUpdatedChunksDiff(
     // dependent on a race between persistence and retrieving data because it combines enqueued and
     // persisted results without applying modifications.
     ChunkType oldChunk;
-    oldChunk.setNS(kNss.ns());
+    oldChunk.setNS(kNss);
     oldChunk.setMin(BSON("a" << 200));
     oldChunk.setMax(BSON("a" << MAXKEY));
     oldChunk.setShard(kShardId);
@@ -164,7 +164,7 @@ vector<ChunkType> ShardServerCatalogCacheLoaderTest::makeThreeUpdatedChunksDiff(
         collVersion.incMinor();
 
         ChunkType chunk;
-        chunk.setNS(kNss.ns());
+        chunk.setNS(kNss);
         chunk.setMin(mins[i]);
         chunk.setMax(maxs[i]);
         chunk.setShard(kShardId);

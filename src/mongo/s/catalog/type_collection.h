@@ -70,7 +70,7 @@ class StatusWith;
 class CollectionType {
 public:
     // Name of the collections collection in the config server.
-    static const std::string ConfigNS;
+    static const NamespaceString ConfigNS;
 
     static const BSONField<std::string> fullNs;
     static const BSONField<OID> epoch;

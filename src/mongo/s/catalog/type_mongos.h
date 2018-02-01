@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -44,7 +45,7 @@ namespace mongo {
 class MongosType {
 public:
     // Name of the mongos collection in the config server.
-    static const std::string ConfigNS;
+    static const NamespaceString ConfigNS;
 
     // Field names and types in the mongos collection type.
     static const BSONField<std::string> name;

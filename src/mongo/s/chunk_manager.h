@@ -139,8 +139,8 @@ public:
         return _sequenceNumber;
     }
 
-    const std::string& getns() const {
-        return _nss.ns();
+    const NamespaceString& getns() const {
+        return _nss;
     }
 
     const ShardKeyPattern& getShardKeyPattern() const {

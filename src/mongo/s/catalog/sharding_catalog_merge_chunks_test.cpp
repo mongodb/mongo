@@ -40,9 +40,11 @@ namespace {
 
 using MergeChunkTest = ConfigServerTestFixture;
 
+const NamespaceString kNamespace("TestDB.TestColl");
+
 TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -76,7 +78,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 ChunkType::ConfigNS,
                                                  BSON(ChunkType::ns() << "TestDB.TestColl"),
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -100,7 +102,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
 
 TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -140,7 +142,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 ChunkType::ConfigNS,
                                                  BSON(ChunkType::ns() << "TestDB.TestColl"),
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -164,8 +166,8 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
 
 TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     ChunkType chunk, otherChunk;
-    chunk.setNS("TestDB.TestColl");
-    otherChunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
+    otherChunk.setNS(kNamespace);
     auto collEpoch = OID::gen();
 
     auto origVersion = ChunkVersion(1, 2, collEpoch);
@@ -208,7 +210,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 ChunkType::ConfigNS,
                                                  BSON(ChunkType::ns() << "TestDB.TestColl"),
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -232,7 +234,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
 
 TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 2, OID::gen());
     chunk.setVersion(origVersion);
@@ -272,7 +274,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 ChunkType::ConfigNS,
                                                  BSON(ChunkType::ns() << "TestDB.TestColl"),
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -301,7 +303,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
 
 TEST_F(MergeChunkTest, NonExistingNamespace) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -335,7 +337,7 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
 
 TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -369,7 +371,7 @@ TEST_F(MergeChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
 
 TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -411,7 +413,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedFailsPrecondition) {
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                  ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                  repl::ReadConcernLevel::kLocalReadConcern,
-                                                 NamespaceString(ChunkType::ConfigNS),
+                                                 ChunkType::ConfigNS,
                                                  BSON(ChunkType::ns() << "TestDB.TestColl"),
                                                  BSON(ChunkType::lastmod << -1),
                                                  boost::none));
@@ -436,7 +438,7 @@ TEST_F(MergeChunkTest, ChunkBoundariesOutOfOrderFails) {
         ChunkVersion version = ChunkVersion(1, 0, epoch);
 
         ChunkType chunk;
-        chunk.setNS("TestDB.TestColl");
+        chunk.setNS(kNamespace);
         chunk.setShard(ShardId("shard0000"));
 
         chunk.setVersion(version);

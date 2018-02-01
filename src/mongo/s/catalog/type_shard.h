@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
@@ -56,7 +57,7 @@ public:
     };
 
     // Name of the shards collection in the config server.
-    static const std::string ConfigNS;
+    static const NamespaceString ConfigNS;
 
     // Field names and types in the shards collection type.
     static const BSONField<std::string> name;

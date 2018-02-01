@@ -258,7 +258,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
         return;
     }
 
-    const NamespaceString nss(manager->getns());
+    const NamespaceString& nss = manager->getns();
 
     if (!manager->_autoSplitThrottle._splitTickets.tryAcquire()) {
         LOG(1) << "won't auto split because not enough tickets: " << nss;
@@ -390,7 +390,7 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
             suggestedMigrateChunk->getMin());
 
         ChunkType chunkToMove;
-        chunkToMove.setNS(nss.ns());
+        chunkToMove.setNS(nss);
         chunkToMove.setShard(suggestedChunk->getShardId());
         chunkToMove.setMin(suggestedChunk->getMin());
         chunkToMove.setMax(suggestedChunk->getMax());

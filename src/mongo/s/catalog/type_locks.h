@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -51,7 +52,7 @@ public:
     };
 
     // Name of the locks collection in the config server.
-    static const std::string ConfigNS;
+    static const NamespaceString ConfigNS;
 
     // Field names and types in the locks collection type.
     static const BSONField<std::string> name;

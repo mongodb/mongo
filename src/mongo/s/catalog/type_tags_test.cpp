@@ -50,7 +50,7 @@ TEST(TagsType, Valid) {
 
     TagsType tag = status.getValue();
 
-    ASSERT_EQUALS(tag.getNS(), "test.mycol");
+    ASSERT_EQUALS(tag.getNS().ns(), "test.mycol");
     ASSERT_EQUALS(tag.getTag(), "tag");
     ASSERT_BSONOBJ_EQ(tag.getMinKey(), BSON("a" << 10));
     ASSERT_BSONOBJ_EQ(tag.getMaxKey(), BSON("a" << 20));

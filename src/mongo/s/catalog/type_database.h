@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/database_version_gen.h"
 #include "mongo/s/shard_id.h"
 
@@ -51,7 +52,7 @@ class StatusWith;
 class DatabaseType {
 public:
     // Name of the databases collection in the config server.
-    static const std::string ConfigNS;
+    static const NamespaceString ConfigNS;
 
     static const BSONField<std::string> name;
     static const BSONField<std::string> primary;

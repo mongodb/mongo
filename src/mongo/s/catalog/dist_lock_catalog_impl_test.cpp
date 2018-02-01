@@ -1126,7 +1126,7 @@ TEST_F(DistLockCatalogFixture, BasicUnlockAll) {
         ASSERT_BSONOBJ_EQ(BSON("w" << 1 << "wtimeout" << 0), commandRequest.getWriteConcern());
 
         const auto& updateOp = commandRequest.getUpdateRequest();
-        ASSERT_EQUALS(LocksType::ConfigNS, updateOp.getNamespace().ns());
+        ASSERT_EQUALS(LocksType::ConfigNS, updateOp.getNamespace());
 
         const auto& updates = updateOp.getUpdates();
         ASSERT_EQUALS(1U, updates.size());

@@ -537,7 +537,7 @@ MigrateInfo::MigrateInfo(const ShardId& a_to, const ChunkType& a_chunk) {
 
     to = a_to;
 
-    ns = a_chunk.getNS();
+    nss = a_chunk.getNS();
     from = a_chunk.getShard();
     minKey = a_chunk.getMin();
     maxKey = a_chunk.getMax();
@@ -545,12 +545,12 @@ MigrateInfo::MigrateInfo(const ShardId& a_to, const ChunkType& a_chunk) {
 }
 
 std::string MigrateInfo::getName() const {
-    return ChunkType::genID(ns, minKey);
+    return ChunkType::genID(nss, minKey);
 }
 
 string MigrateInfo::toString() const {
-    return str::stream() << ns << ": [" << minKey << ", " << maxKey << "), from " << from << ", to "
-                         << to;
+    return str::stream() << nss.ns() << ": [" << minKey << ", " << maxKey << "), from " << from
+                         << ", to " << to;
 }
 
 }  // namespace mongo

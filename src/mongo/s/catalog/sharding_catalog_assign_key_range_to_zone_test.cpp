@@ -66,17 +66,16 @@ public:
         shardedCollection.setEpoch(OID::gen());
         shardedCollection.setKeyPattern(BSON("x" << 1));
 
-        ASSERT_OK(insertToConfigCollection(operationContext(),
-                                           NamespaceString(CollectionType::ConfigNS),
-                                           shardedCollection.toBSON()));
+        ASSERT_OK(insertToConfigCollection(
+            operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
     }
 
     /**
      * Asserts that the config.tags collection is empty.
      */
     void assertNoZoneDoc() {
-        auto findStatus = findOneOnConfigCollection(
-            operationContext(), NamespaceString(TagsType::ConfigNS), BSONObj());
+        auto findStatus =
+            findOneOnConfigCollection(operationContext(), TagsType::ConfigNS, BSONObj());
         ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
     }
 
@@ -90,7 +89,7 @@ public:
             getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                      kReadPref,
                                                      repl::ReadConcernLevel::kMajorityReadConcern,
-                                                     NamespaceString(TagsType::ConfigNS),
+                                                     TagsType::ConfigNS,
                                                      BSONObj(),
                                                      BSONObj(),
                                                      1);
@@ -103,7 +102,7 @@ public:
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(ns.ns(), tagDoc.getNS());
+        ASSERT_EQ(ns, tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(range.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(range.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName, tagDoc.getTag());
@@ -145,9 +144,8 @@ TEST_F(AssignKeyRangeToZoneTestFixture, AssignKeyRangeOnDroppedShardedCollShould
     unshardedCollection.setKeyPattern(BSON("x" << 1));
     unshardedCollection.setDropped(true);
 
-    ASSERT_OK(insertToConfigCollection(operationContext(),
-                                       NamespaceString(CollectionType::ConfigNS),
-                                       unshardedCollection.toBSON()));
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), CollectionType::ConfigNS, unshardedCollection.toBSON()));
 
     auto status =
         ShardingCatalogManager::get(operationContext())
@@ -199,7 +197,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToF
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(CollectionType::ConfigNS), shardedCollection.toBSON()));
+        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
 
     const ChunkRange newRange(BSON("x" << 0), BSON("x" << 10 << "y" << 10));
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
@@ -218,7 +216,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MaxThatIsAShardKeyPrefixShouldConvertToF
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(CollectionType::ConfigNS), shardedCollection.toBSON()));
+        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
 
     const ChunkRange newRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10));
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
@@ -272,7 +270,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsAShardKeyPrefixShouldSucceed
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(CollectionType::ConfigNS), shardedCollection.toBSON()));
+        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
 
     const ChunkRange newRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10 << "y" << 10));
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
@@ -314,14 +312,14 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMaxAlignsWithExistingMinShouldSucce
 
     {
         auto findStatus = findOneOnConfigCollection(
-            operationContext(), NamespaceString(TagsType::ConfigNS), BSON("min" << BSON("x" << 2)));
+            operationContext(), TagsType::ConfigNS, BSON("min" << BSON("x" << 2)));
         ASSERT_OK(findStatus);
 
         auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
+        ASSERT_EQ(shardedNS(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(BSON("x" << 2), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(BSON("x" << 4), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
@@ -329,16 +327,15 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMaxAlignsWithExistingMinShouldSucce
 
     {
         const auto existingRange = getExistingRange();
-        auto findStatus = findOneOnConfigCollection(operationContext(),
-                                                    NamespaceString(TagsType::ConfigNS),
-                                                    BSON("min" << existingRange.getMin()));
+        auto findStatus = findOneOnConfigCollection(
+            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
         ASSERT_OK(findStatus);
 
         auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
+        ASSERT_EQ(shardedNS(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
@@ -389,7 +386,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShou
     shardedCollection.setKeyPattern(BSON("x" << 1));
 
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(CollectionType::ConfigNS), shardedCollection.toBSON()));
+        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->assignKeyRangeToZone(operationContext(),
@@ -399,30 +396,29 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShou
 
     {
         const auto existingRange = getExistingRange();
-        auto findStatus = findOneOnConfigCollection(operationContext(),
-                                                    NamespaceString(TagsType::ConfigNS),
-                                                    BSON("min" << existingRange.getMin()));
+        auto findStatus = findOneOnConfigCollection(
+            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
         ASSERT_OK(findStatus);
 
         auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
+        ASSERT_EQ(shardedNS(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
     }
     {
         auto findStatus = findOneOnConfigCollection(
-            operationContext(), NamespaceString(TagsType::ConfigNS), BSON("min" << BSON("x" << 5)));
+            operationContext(), TagsType::ConfigNS, BSON("min" << BSON("x" << 5)));
         ASSERT_OK(findStatus);
 
         auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedCollection.getNs().ns(), tagDoc.getNS());
+        ASSERT_EQ(shardedCollection.getNs(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(BSON("x" << 5), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(BSON("x" << 7), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
@@ -454,8 +450,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture,
     shard.setHost("b:1234");
     shard.setTags({"y"});
 
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(ShardType::ConfigNS), shard.toBSON()));
+    ASSERT_OK(insertToConfigCollection(operationContext(), ShardType::ConfigNS, shard.toBSON()));
 
     auto status =
         ShardingCatalogManager::get(operationContext())
@@ -495,16 +490,15 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMinAlignsWithExistingMaxShouldSucce
 
     {
         const auto existingRange = getExistingRange();
-        auto findStatus = findOneOnConfigCollection(operationContext(),
-                                                    NamespaceString(TagsType::ConfigNS),
-                                                    BSON("min" << existingRange.getMin()));
+        auto findStatus = findOneOnConfigCollection(
+            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
         ASSERT_OK(findStatus);
 
         auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
+        ASSERT_EQ(shardedNS(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
@@ -512,14 +506,14 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewMinAlignsWithExistingMaxShouldSucce
 
     {
         auto findStatus = findOneOnConfigCollection(
-            operationContext(), NamespaceString(TagsType::ConfigNS), BSON("min" << BSON("x" << 8)));
+            operationContext(), TagsType::ConfigNS, BSON("min" << BSON("x" << 8)));
         ASSERT_OK(findStatus);
 
         auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
+        ASSERT_EQ(shardedNS(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(BSON("x" << 8), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(BSON("x" << 10), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
@@ -551,13 +545,12 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeIsSuperSetOfExistingShouldFail
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, AssignWithExistingOveralpShouldFail) {
     TagsType tagDoc;
-    tagDoc.setNS(shardedNS().ns());
+    tagDoc.setNS(shardedNS());
     tagDoc.setMinKey(BSON("x" << 0));
     tagDoc.setMaxKey(BSON("x" << 2));
     tagDoc.setTag("z");
 
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(TagsType::ConfigNS), tagDoc.toBSON()));
+    ASSERT_OK(insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON()));
 
     auto status = ShardingCatalogManager::get(operationContext())
                       ->assignKeyRangeToZone(operationContext(),
@@ -593,9 +586,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveKeyRangeOnDroppedShardedCollShou
     unshardedCollection.setKeyPattern(BSON("x" << 1));
     unshardedCollection.setDropped(true);
 
-    ASSERT_OK(insertToConfigCollection(operationContext(),
-                                       NamespaceString(CollectionType::ConfigNS),
-                                       unshardedCollection.toBSON()));
+    ASSERT_OK(insertToConfigCollection(
+        operationContext(), CollectionType::ConfigNS, unshardedCollection.toBSON()));
 
     auto status = ShardingCatalogManager::get(operationContext())
                       ->removeKeyRangeFromZone(
@@ -633,7 +625,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMinPrefixOfExistingSho
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(CollectionType::ConfigNS), shardedCollection.toBSON()));
+        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
 
     const ChunkRange existingRange(fromjson("{ x: 0, y: { $minKey: 1 }}"),
                                    BSON("x" << 10 << "y" << 10));
@@ -646,16 +638,15 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMinPrefixOfExistingSho
                 operationContext(), ns, ChunkRange(BSON("x" << 0), BSON("x" << 10 << "y" << 10))));
 
     {
-        auto findStatus = findOneOnConfigCollection(operationContext(),
-                                                    NamespaceString(TagsType::ConfigNS),
-                                                    BSON("min" << existingRange.getMin()));
+        auto findStatus = findOneOnConfigCollection(
+            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
         ASSERT_OK(findStatus);
 
         auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(ns.ns(), tagDoc.getNS());
+        ASSERT_EQ(ns, tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
@@ -663,16 +654,15 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMinPrefixOfExistingSho
 
     {
         const auto existingRange = getExistingRange();
-        auto findStatus = findOneOnConfigCollection(operationContext(),
-                                                    NamespaceString(TagsType::ConfigNS),
-                                                    BSON("min" << existingRange.getMin()));
+        auto findStatus = findOneOnConfigCollection(
+            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
         ASSERT_OK(findStatus);
 
         auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
+        ASSERT_EQ(shardedNS(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
@@ -687,7 +677,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMaxPrefixOfExistingSho
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(CollectionType::ConfigNS), shardedCollection.toBSON()));
+        operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));
 
     const ChunkRange existingRange(BSON("x" << 0 << "y" << 0),
                                    fromjson("{ x: 10, y: { $minKey: 1 }}"));
@@ -700,16 +690,15 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMaxPrefixOfExistingSho
                 operationContext(), ns, ChunkRange(BSON("x" << 0 << "y" << 0), BSON("x" << 10))));
 
     {
-        auto findStatus = findOneOnConfigCollection(operationContext(),
-                                                    NamespaceString(TagsType::ConfigNS),
-                                                    BSON("min" << existingRange.getMin()));
+        auto findStatus = findOneOnConfigCollection(
+            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
         ASSERT_OK(findStatus);
 
         auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(ns.ns(), tagDoc.getNS());
+        ASSERT_EQ(ns, tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
@@ -717,16 +706,15 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveThatIsOnlyMaxPrefixOfExistingSho
 
     {
         const auto existingRange = getExistingRange();
-        auto findStatus = findOneOnConfigCollection(operationContext(),
-                                                    NamespaceString(TagsType::ConfigNS),
-                                                    BSON("min" << existingRange.getMin()));
+        auto findStatus = findOneOnConfigCollection(
+            operationContext(), TagsType::ConfigNS, BSON("min" << existingRange.getMin()));
         ASSERT_OK(findStatus);
 
         auto tagDocStatus = TagsType::fromBSON(findStatus.getValue());
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedNS().ns(), tagDoc.getNS());
+        ASSERT_EQ(shardedNS(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(existingRange.getMin(), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(existingRange.getMax(), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());

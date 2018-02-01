@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-const std::string ShardType::ConfigNS = "config.shards";
+const NamespaceString ShardType::ConfigNS("config.shards");
 
 const BSONField<std::string> ShardType::name("_id");
 const BSONField<std::string> ShardType::host("host");

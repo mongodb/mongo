@@ -43,9 +43,9 @@ namespace {
 
 using CommitChunkMigrate = ConfigServerTestFixture;
 
-TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
+const NamespaceString kNamespace("TestDB.TestColl");
 
-    std::string const nss = "TestDB.TestColl";
+TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -61,7 +61,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
 
     ChunkType chunk0;
-    chunk0.setNS(nss);
+    chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
 
@@ -72,7 +72,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
     chunk0.setMax(chunkMax);
 
     ChunkType chunk1;
-    chunk1.setNS(nss);
+    chunk1.setNS(kNamespace);
     chunk1.setVersion(origVersion);
     chunk1.setShard(shard0.getName());
 
@@ -88,7 +88,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
 
     StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
                                          ->commitChunkMigration(operationContext(),
-                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0.getNS(),
                                                                 chunk0cref,
                                                                 chunk1cref,
                                                                 origVersion.epoch(),
@@ -119,8 +119,6 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
 
 TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
 
-    std::string const nss = "TestDB.TestColl";
-
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -135,7 +133,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
     auto const origVersion = ChunkVersion(origMajorVersion, 4, OID::gen());
 
     ChunkType chunk0;
-    chunk0.setNS(nss);
+    chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
 
@@ -149,7 +147,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
 
     StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
                                          ->commitChunkMigration(operationContext(),
-                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0.getNS(),
                                                                 chunk0,
                                                                 boost::none,
                                                                 origVersion.epoch(),
@@ -175,8 +173,6 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
 
 TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 
-    std::string const nss = "TestDB.TestColl";
-
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -191,7 +187,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
 
     ChunkType chunk0;
-    chunk0.setNS(nss);
+    chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
 
@@ -202,7 +198,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     chunk0.setMax(chunkMax);
 
     ChunkType chunk1;
-    chunk1.setNS(nss);
+    chunk1.setNS(kNamespace);
     chunk1.setVersion(origVersion);
     chunk1.setShard(shard0.getName());
 
@@ -214,7 +210,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 
     StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
                                          ->commitChunkMigration(operationContext(),
-                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0.getNS(),
                                                                 chunk0,
                                                                 chunk1,
                                                                 OID::gen(),
@@ -225,8 +221,6 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 }
 
 TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
-
-    std::string const nss = "TestDB.TestColl";
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -243,7 +237,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     auto const otherVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
 
     ChunkType chunk0;
-    chunk0.setNS(nss);
+    chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
 
@@ -254,7 +248,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     chunk0.setMax(chunkMax);
 
     ChunkType chunk1;
-    chunk1.setNS(nss);
+    chunk1.setNS(kNamespace);
     chunk1.setVersion(otherVersion);
     chunk1.setShard(shard0.getName());
 
@@ -267,7 +261,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
 
     StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
                                          ->commitChunkMigration(operationContext(),
-                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0.getNS(),
                                                                 chunk0,
                                                                 chunk1,
                                                                 origVersion.epoch(),
@@ -279,8 +273,6 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
 
 TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
 
-    std::string const nss = "TestDB.TestColl";
-
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -295,7 +287,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
 
     ChunkType chunk0;
-    chunk0.setNS(nss);
+    chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
 
@@ -306,7 +298,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
     chunk0.setMax(chunkMax);
 
     ChunkType chunk1;
-    chunk1.setNS(nss);
+    chunk1.setNS(kNamespace);
     chunk1.setVersion(origVersion);
     chunk1.setShard(shard0.getName());
 
@@ -318,7 +310,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
 
     StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
                                          ->commitChunkMigration(operationContext(),
-                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0.getNS(),
                                                                 chunk0,
                                                                 chunk1,
                                                                 origVersion.epoch(),
@@ -329,8 +321,6 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
 }
 
 TEST_F(CommitChunkMigrate, RejectChunkMissing1) {
-
-    std::string const nss = "TestDB.TestColl";
 
     ShardType shard0;
     shard0.setName("shard0");
@@ -346,7 +336,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing1) {
     auto const origVersion = ChunkVersion(origMajorVersion, 7, OID::gen());
 
     ChunkType chunk0;
-    chunk0.setNS(nss);
+    chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
 
@@ -357,7 +347,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing1) {
     chunk0.setMax(chunkMax);
 
     ChunkType chunk1;
-    chunk1.setNS(nss);
+    chunk1.setNS(kNamespace);
     chunk1.setVersion(origVersion);
     chunk1.setShard(shard0.getName());
 
@@ -369,7 +359,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing1) {
 
     StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
                                          ->commitChunkMigration(operationContext(),
-                                                                NamespaceString(chunk0.getNS()),
+                                                                chunk0.getNS(),
                                                                 chunk0,
                                                                 chunk1,
                                                                 origVersion.epoch(),

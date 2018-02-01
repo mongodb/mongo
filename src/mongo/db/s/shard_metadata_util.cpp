@@ -148,11 +148,11 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
     try {
         DBDirectClient client(opCtx);
         std::unique_ptr<DBClientCursor> cursor =
-            client.query(ShardCollectionType::ConfigNS.c_str(), fullQuery, 1);
+            client.query(ShardCollectionType::ConfigNS.ns(), fullQuery, 1);
         if (!cursor) {
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "Failed to establish a cursor for reading "
-                                        << ShardCollectionType::ConfigNS
+                                        << ShardCollectionType::ConfigNS.ns()
                                         << " from local storage");
         }
 

@@ -300,8 +300,8 @@ Status ConfigServerTestFixture::setupShards(const std::vector<ShardType>& shards
 
 StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opCtx,
                                                            const std::string& shardId) {
-    auto doc = findOneOnConfigCollection(
-        opCtx, NamespaceString(ShardType::ConfigNS), BSON(ShardType::name(shardId)));
+    auto doc =
+        findOneOnConfigCollection(opCtx, ShardType::ConfigNS, BSON(ShardType::name(shardId)));
     if (!doc.isOK()) {
         if (doc.getStatus() == ErrorCodes::NoMatchingDocument) {
             return {ErrorCodes::ShardNotFound,
@@ -327,8 +327,8 @@ Status ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks
 
 StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opCtx,
                                                            const BSONObj& minKey) {
-    auto doc = findOneOnConfigCollection(
-        opCtx, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::min() << minKey));
+    auto doc =
+        findOneOnConfigCollection(opCtx, ChunkType::ConfigNS, BSON(ChunkType::min() << minKey));
     if (!doc.isOK())
         return doc.getStatus();
 
@@ -374,14 +374,13 @@ StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationCo
 
 std::vector<KeysCollectionDocument> ConfigServerTestFixture::getKeys(OperationContext* opCtx) {
     auto config = getConfigShard();
-    auto findStatus =
-        config->exhaustiveFindOnConfig(opCtx,
-                                       kReadPref,
-                                       repl::ReadConcernLevel::kMajorityReadConcern,
-                                       NamespaceString(KeysCollectionDocument::ConfigNS),
-                                       BSONObj(),
-                                       BSON("expiresAt" << 1),
-                                       boost::none);
+    auto findStatus = config->exhaustiveFindOnConfig(opCtx,
+                                                     kReadPref,
+                                                     repl::ReadConcernLevel::kMajorityReadConcern,
+                                                     KeysCollectionDocument::ConfigNS,
+                                                     BSONObj(),
+                                                     BSON("expiresAt" << 1),
+                                                     boost::none);
     ASSERT_OK(findStatus.getStatus());
 
     std::vector<KeysCollectionDocument> keys;

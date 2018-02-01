@@ -83,7 +83,7 @@ StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientDirect::getN
     auto findStatus = _query(opCtx,
                              ReadPreferenceSetting(ReadPreference::Nearest, TagSet{}),
                              repl::ReadConcernLevel::kLocalReadConcern,
-                             NamespaceString(KeysCollectionDocument::ConfigNS),
+                             KeysCollectionDocument::ConfigNS,
                              queryBuilder.obj(),
                              BSON("expiresAt" << 1),
                              boost::none);
@@ -130,10 +130,9 @@ StatusWith<Shard::QueryResponse> KeysCollectionClientDirect::_query(
 }
 
 Status KeysCollectionClientDirect::_insert(OperationContext* opCtx,
-                                           const std::string& ns,
+                                           const NamespaceString& nss,
                                            const BSONObj& doc,
                                            const WriteConcernOptions& writeConcern) {
-    const NamespaceString nss(ns);
     BatchedCommandRequest request([&] {
         write_ops::Insert insertOp(nss);
         insertOp.setDocuments({doc});

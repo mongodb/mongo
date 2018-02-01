@@ -147,7 +147,7 @@ private:
 class ChunkType {
 public:
     // Name of the chunks collection in the config server.
-    static const std::string ConfigNS;
+    static const NamespaceString ConfigNS;
 
     // The shard chunks collections' common namespace prefix.
     static const std::string ShardNSPrefix;
@@ -199,10 +199,10 @@ public:
     /**
      * Getters and setters.
      */
-    const std::string& getNS() const {
-        return _ns.get();
+    const NamespaceString& getNS() const {
+        return _nss.get();
     }
-    void setNS(const std::string& name);
+    void setNS(const NamespaceString& nss);
 
     const BSONObj& getMin() const {
         return _min.get();
@@ -239,7 +239,7 @@ public:
     /**
      * Generates chunk id based on the namespace name and the lower bound of the chunk.
      */
-    static std::string genID(StringData ns, const BSONObj& min);
+    static std::string genID(const NamespaceString& nss, const BSONObj& min);
 
     /**
      * Returns OK if all the mandatory fields have been set. Otherwise returns NoSuchKey and
@@ -256,7 +256,7 @@ private:
     // Convention: (M)andatory, (O)ptional, (S)pecial; (C)onfig, (S)hard.
 
     // (O)(C)     collection this chunk is in
-    boost::optional<std::string> _ns;
+    boost::optional<NamespaceString> _nss;
     // (M)(C)(S)  first key of the range, inclusive
     boost::optional<BSONObj> _min;
     // (M)(C)(S)  last key of the range, non-inclusive

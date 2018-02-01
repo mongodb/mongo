@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/mongo_version_range.h"
 
 namespace mongo {
@@ -45,7 +46,7 @@ namespace mongo {
 class VersionType {
 public:
     // Name of the version collection in the config server.
-    static const std::string ConfigNS;
+    static const NamespaceString ConfigNS;
 
     // Field names and types in the version collection type.
     static const BSONField<int> minCompatibleVersion;

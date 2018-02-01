@@ -605,7 +605,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
             log() << "Performing a split because migration " << redact(requestIt->toString())
                   << " failed for size reasons" << causedBy(redact(status));
 
-            _splitOrMarkJumbo(opCtx, NamespaceString(requestIt->ns), requestIt->minKey);
+            _splitOrMarkJumbo(opCtx, requestIt->nss, requestIt->minKey);
             continue;
         }
 
@@ -650,7 +650,7 @@ void Balancer::_splitOrMarkJumbo(OperationContext* opCtx,
 
         chunk->markAsJumbo();
 
-        const std::string chunkName = ChunkType::genID(nss.ns(), chunk->getMin());
+        const std::string chunkName = ChunkType::genID(nss, chunk->getMin());
 
         auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
             opCtx,

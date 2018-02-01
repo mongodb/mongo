@@ -110,7 +110,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
                     opCtx,
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                     repl::ReadConcernLevel::kLocalReadConcern,
-                    NamespaceString(MigrationType::ConfigNS),
+                    MigrationType::ConfigNS,
                     BSON(MigrationType::name(migrateInfo.getName())),
                     BSONObj(),
                     boost::none);
@@ -156,8 +156,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
         // As long as there isn't a DuplicateKey error, the document may have been written, and it's
         // safe (won't delete another migration's document) and necessary to try to clean up the
         // document via the destructor.
-        ScopedMigrationRequest scopedMigrationRequest(
-            opCtx, NamespaceString(migrateInfo.ns), migrateInfo.minKey);
+        ScopedMigrationRequest scopedMigrationRequest(opCtx, migrateInfo.nss, migrateInfo.minKey);
 
         // If there was a write error, let the object go out of scope and clean up in the
         // destructor.
@@ -173,7 +172,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
                                 << "number of retries. Chunk '"
                                 << ChunkRange(migrateInfo.minKey, migrateInfo.maxKey).toString()
                                 << "' in collection '"
-                                << migrateInfo.ns
+                                << migrateInfo.nss.ns()
                                 << "' was being moved (somewhere) by another operation.");
 }
 

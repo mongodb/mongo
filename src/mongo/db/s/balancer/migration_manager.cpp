@@ -183,7 +183,7 @@ Status MigrationManager::executeManualMigration(
 
     auto routingInfoStatus =
         Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
-            opCtx, NamespaceString(migrateInfo.ns));
+            opCtx, migrateInfo.nss);
     if (!routingInfoStatus.isOK()) {
         return routingInfoStatus.getStatus();
     }
@@ -228,7 +228,7 @@ void MigrationManager::startRecoveryAndAcquireDistLocks(OperationContext* opCtx)
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
-            NamespaceString(MigrationType::ConfigNS),
+            MigrationType::ConfigNS,
             BSONObj(),
             BSONObj(),
             boost::none);
@@ -417,7 +417,7 @@ shared_ptr<Notification<RemoteCommandResponse>> MigrationManager::_schedule(
     uint64_t maxChunkSizeBytes,
     const MigrationSecondaryThrottleOptions& secondaryThrottle,
     bool waitForDelete) {
-    const NamespaceString nss(migrateInfo.ns);
+    const NamespaceString& nss = migrateInfo.nss;
 
     // Ensure we are not stopped in order to avoid doing the extra work
     {

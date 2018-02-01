@@ -38,7 +38,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-const std::string LocksType::ConfigNS = "config.locks";
+const NamespaceString LocksType::ConfigNS("config.locks");
 
 const BSONField<std::string> LocksType::name("_id");
 const BSONField<LocksType::State> LocksType::state("state");

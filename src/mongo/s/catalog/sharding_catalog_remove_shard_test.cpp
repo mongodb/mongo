@@ -101,7 +101,7 @@ protected:
             operationContext(),
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kMajorityReadConcern,
-            NamespaceString(ShardType::ConfigNS),
+            ShardType::ConfigNS,
             BSON(ShardType::name() << shardName),
             BSONObj(),
             1));
@@ -314,7 +314,7 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
         operationContext(),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kMajorityReadConcern,
-        NamespaceString(ShardType::ConfigNS),
+        ShardType::ConfigNS,
         BSON(ShardType::name() << shard1.getName()),
         BSONObj(),
         1));

@@ -81,7 +81,7 @@ Status BalancerConfiguration::setBalancerMode(OperationContext* opCtx,
                                               BalancerSettingsType::BalancerMode mode) {
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
-        kSettingsNamespace.ns(),
+        kSettingsNamespace,
         BSON("_id" << BalancerSettingsType::kKey),
         BSON("$set" << BSON(kStopped << (mode == BalancerSettingsType::kOff) << kMode
                                      << BalancerSettingsType::kBalancerModes[mode])),

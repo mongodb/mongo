@@ -34,6 +34,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_id.h"
@@ -57,7 +58,7 @@ struct MigrateInfo {
 
     std::string toString() const;
 
-    std::string ns;
+    NamespaceString nss;
     ShardId to;
     ShardId from;
     BSONObj minKey;

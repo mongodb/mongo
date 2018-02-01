@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-const std::string ChunkType::ConfigNS = "config.chunks";
+const NamespaceString ChunkType::ConfigNS("config.chunks");
 const std::string ChunkType::ShardNSPrefix = "config.cache.chunks.";
 
 const BSONField<std::string> ChunkType::name("_id");
@@ -157,7 +157,7 @@ ChunkRange ChunkRange::unionWith(ChunkRange const& other) const {
 ChunkType::ChunkType() = default;
 
 ChunkType::ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId)
-    : _ns(nss.ns()),
+    : _nss(nss),
       _min(range.getMin()),
       _max(range.getMax()),
       _version(version),
@@ -171,7 +171,7 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source) {
         Status status = bsonExtractStringField(source, ns.name(), &chunkNS);
         if (!status.isOK())
             return status;
-        chunk._ns = chunkNS;
+        chunk._nss = NamespaceString(chunkNS);
     }
 
     {
@@ -217,10 +217,10 @@ StatusWith<ChunkType> ChunkType::fromConfigBSON(const BSONObj& source) {
 
 BSONObj ChunkType::toConfigBSON() const {
     BSONObjBuilder builder;
-    if (_ns && _min)
+    if (_nss && _min)
         builder.append(name.name(), getName());
-    if (_ns)
-        builder.append(ns.name(), getNS());
+    if (_nss)
+        builder.append(ns.name(), getNS().ns());
     if (_min)
         builder.append(min.name(), getMin());
     if (_max)
@@ -295,14 +295,14 @@ BSONObj ChunkType::toShardBSON() const {
 }
 
 std::string ChunkType::getName() const {
-    invariant(_ns);
+    invariant(_nss);
     invariant(_min);
-    return genID(*_ns, *_min);
+    return genID(*_nss, *_min);
 }
 
-void ChunkType::setNS(const std::string& ns) {
-    invariant(!ns.empty());
-    _ns = ns;
+void ChunkType::setNS(const NamespaceString& nss) {
+    invariant(nss.isValid());
+    _nss = nss;
 }
 
 void ChunkType::setMin(const BSONObj& min) {
@@ -329,9 +329,9 @@ void ChunkType::setJumbo(bool jumbo) {
     _jumbo = jumbo;
 }
 
-std::string ChunkType::genID(StringData ns, const BSONObj& o) {
+std::string ChunkType::genID(const NamespaceString& nss, const BSONObj& o) {
     StringBuilder buf;
-    buf << ns << "-";
+    buf << nss.ns() << "-";
 
     BSONObjIterator i(o);
     while (i.more()) {

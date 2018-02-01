@@ -99,7 +99,7 @@ StatusWith<std::string> generateNewShardName(OperationContext* opCtx) {
         opCtx,
         kConfigReadSelector,
         repl::ReadConcernLevel::kMajorityReadConcern,
-        NamespaceString(ShardType::ConfigNS),
+        ShardType::ConfigNS,
         shardNameRegex.obj(),
         BSON(ShardType::name() << -1),
         1);
@@ -739,7 +739,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
     std::string name = shardId.toString();
     auto countStatus = _runCountCommandOnConfig(
         opCtx,
-        NamespaceString(ShardType::ConfigNS),
+        ShardType::ConfigNS,
         BSON(ShardType::name() << NE << name << ShardType::draining(true)));
     if (!countStatus.isOK()) {
         return countStatus.getStatus();
@@ -749,8 +749,8 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
                       "Can't have more than one draining shard at a time");
     }
 
-    countStatus = _runCountCommandOnConfig(
-        opCtx, NamespaceString(ShardType::ConfigNS), BSON(ShardType::name() << NE << name));
+    countStatus =
+        _runCountCommandOnConfig(opCtx, ShardType::ConfigNS, BSON(ShardType::name() << NE << name));
     if (!countStatus.isOK()) {
         return countStatus.getStatus();
     }
@@ -759,10 +759,8 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
     }
 
     // Figure out if shard is already draining
-    countStatus =
-        _runCountCommandOnConfig(opCtx,
-                                 NamespaceString(ShardType::ConfigNS),
-                                 BSON(ShardType::name() << name << ShardType::draining(true)));
+    countStatus = _runCountCommandOnConfig(
+        opCtx, ShardType::ConfigNS, BSON(ShardType::name() << name << ShardType::draining(true)));
     if (!countStatus.isOK()) {
         return countStatus.getStatus();
     }
@@ -802,15 +800,15 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
 
     // Draining has already started, now figure out how many chunks and databases are still on the
     // shard.
-    countStatus = _runCountCommandOnConfig(
-        opCtx, NamespaceString(ChunkType::ConfigNS), BSON(ChunkType::shard(name)));
+    countStatus =
+        _runCountCommandOnConfig(opCtx, ChunkType::ConfigNS, BSON(ChunkType::shard(name)));
     if (!countStatus.isOK()) {
         return countStatus.getStatus();
     }
     const long long chunkCount = countStatus.getValue();
 
-    countStatus = _runCountCommandOnConfig(
-        opCtx, NamespaceString(DatabaseType::ConfigNS), BSON(DatabaseType::primary(name)));
+    countStatus =
+        _runCountCommandOnConfig(opCtx, DatabaseType::ConfigNS, BSON(DatabaseType::primary(name)));
     if (!countStatus.isOK()) {
         return countStatus.getStatus();
     }
@@ -927,17 +925,17 @@ StatusWith<ShardId> ShardingCatalogManager::_selectShardForNewDatabase(
 }
 
 StatusWith<long long> ShardingCatalogManager::_runCountCommandOnConfig(OperationContext* opCtx,
-                                                                       const NamespaceString& ns,
+                                                                       const NamespaceString& nss,
                                                                        BSONObj query) {
     BSONObjBuilder countBuilder;
-    countBuilder.append("count", ns.coll());
+    countBuilder.append("count", nss.coll());
     countBuilder.append("query", query);
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto resultStatus =
         configShard->runCommandWithFixedRetryAttempts(opCtx,
                                                       kConfigReadSelector,
-                                                      ns.db().toString(),
+                                                      nss.db().toString(),
                                                       countBuilder.done(),
                                                       Shard::kDefaultConfigCommandTimeout,
                                                       Shard::RetryPolicy::kIdempotent);

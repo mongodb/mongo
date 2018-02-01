@@ -445,7 +445,7 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
 
     if (manager) {
         if (MONGO_unlikely(shouldLog(pc))) {
-            vinfo = str::stream() << "[" << manager->getns() << " @ "
+            vinfo = str::stream() << "[" << manager->getns().ns() << " @ "
                                   << manager->getVersion().toString() << "]";
         }
 
@@ -1303,7 +1303,7 @@ BSONObj ParallelConnectionState::toBSON() const {
 
     BSONObj stateObj =
         BSON("conn" << (conn ? (conn->ok() ? conn->conn().toString() : "(done)") : "") << "vinfo"
-                    << (manager ? (str::stream() << manager->getns() << " @ "
+                    << (manager ? (str::stream() << manager->getns().ns() << " @ "
                                                  << manager->getVersion().toString())
                                 : primary->toString()));
 

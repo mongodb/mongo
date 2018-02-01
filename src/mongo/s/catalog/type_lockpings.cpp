@@ -35,7 +35,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-const std::string LockpingsType::ConfigNS = "config.lockpings";
+const NamespaceString LockpingsType::ConfigNS("config.lockpings");
 
 const BSONField<std::string> LockpingsType::process("_id");
 const BSONField<Date_t> LockpingsType::ping("ping");

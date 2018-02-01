@@ -117,7 +117,7 @@ void moveChunk(OperationContext* opCtx, const NamespaceString& nss, const BSONOb
     const auto suggestedChunk = routingInfo.cm()->findIntersectingChunkWithSimpleCollation(minKey);
 
     ChunkType chunkToMove;
-    chunkToMove.setNS(nss.ns());
+    chunkToMove.setNS(nss);
     chunkToMove.setShard(suggestedChunk->getShardId());
     chunkToMove.setMin(suggestedChunk->getMin());
     chunkToMove.setMax(suggestedChunk->getMax());
@@ -201,7 +201,7 @@ bool isAutoBalanceEnabled(OperationContext* opCtx,
     if (!balancerConfig->shouldBalanceForAutoSplit())
         return false;
 
-    auto collStatus = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss.ns());
+    auto collStatus = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
     if (!collStatus.isOK()) {
         log() << "Auto-split for " << nss << " failed to load collection metadata"
               << causedBy(redact(collStatus.getStatus()));

@@ -210,18 +210,15 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     const bool unique = true;
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    Status result =
-        configShard->createIndexOnConfig(opCtx,
-                                         NamespaceString(ChunkType::ConfigNS),
-                                         BSON(ChunkType::ns() << 1 << ChunkType::min() << 1),
-                                         unique);
+    Status result = configShard->createIndexOnConfig(
+        opCtx, ChunkType::ConfigNS, BSON(ChunkType::ns() << 1 << ChunkType::min() << 1), unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create ns_1_min_1 index on config db");
     }
 
     result = configShard->createIndexOnConfig(
         opCtx,
-        NamespaceString(ChunkType::ConfigNS),
+        ChunkType::ConfigNS,
         BSON(ChunkType::ns() << 1 << ChunkType::shard() << 1 << ChunkType::min() << 1),
         unique);
     if (!result.isOK()) {
@@ -230,7 +227,7 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
 
     result =
         configShard->createIndexOnConfig(opCtx,
-                                         NamespaceString(ChunkType::ConfigNS),
+                                         ChunkType::ConfigNS,
                                          BSON(ChunkType::ns() << 1 << ChunkType::lastmod() << 1),
                                          unique);
     if (!result.isOK()) {
@@ -239,7 +236,7 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
 
     result = configShard->createIndexOnConfig(
         opCtx,
-        NamespaceString(MigrationType::ConfigNS),
+        MigrationType::ConfigNS,
         BSON(MigrationType::ns() << 1 << MigrationType::min() << 1),
         unique);
     if (!result.isOK()) {
@@ -247,20 +244,20 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     }
 
     result = configShard->createIndexOnConfig(
-        opCtx, NamespaceString(ShardType::ConfigNS), BSON(ShardType::host() << 1), unique);
+        opCtx, ShardType::ConfigNS, BSON(ShardType::host() << 1), unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create host_1 index on config db");
     }
 
     result = configShard->createIndexOnConfig(
-        opCtx, NamespaceString(LocksType::ConfigNS), BSON(LocksType::lockID() << 1), !unique);
+        opCtx, LocksType::ConfigNS, BSON(LocksType::lockID() << 1), !unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create lock id index on config db");
     }
 
     result =
         configShard->createIndexOnConfig(opCtx,
-                                         NamespaceString(LocksType::ConfigNS),
+                                         LocksType::ConfigNS,
                                          BSON(LocksType::state() << 1 << LocksType::process() << 1),
                                          !unique);
     if (!result.isOK()) {
@@ -268,23 +265,19 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     }
 
     result = configShard->createIndexOnConfig(
-        opCtx, NamespaceString(LockpingsType::ConfigNS), BSON(LockpingsType::ping() << 1), !unique);
+        opCtx, LockpingsType::ConfigNS, BSON(LockpingsType::ping() << 1), !unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create lockping ping time index on config db");
     }
 
-    result = configShard->createIndexOnConfig(opCtx,
-                                              NamespaceString(TagsType::ConfigNS),
-                                              BSON(TagsType::ns() << 1 << TagsType::min() << 1),
-                                              unique);
+    result = configShard->createIndexOnConfig(
+        opCtx, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::min() << 1), unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create ns_1_min_1 index on config db");
     }
 
-    result = configShard->createIndexOnConfig(opCtx,
-                                              NamespaceString(TagsType::ConfigNS),
-                                              BSON(TagsType::ns() << 1 << TagsType::tag() << 1),
-                                              !unique);
+    result = configShard->createIndexOnConfig(
+        opCtx, TagsType::ConfigNS, BSON(TagsType::ns() << 1 << TagsType::tag() << 1), !unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create ns_1_tag_1 index on config db");
     }

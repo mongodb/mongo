@@ -261,7 +261,7 @@ boost::optional<CollectionType> checkIfAlreadyShardedWithSameOptions(
                             opCtx,
                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                             repl::ReadConcernLevel::kLocalReadConcern,
-                            NamespaceString(CollectionType::ConfigNS),
+                            CollectionType::ConfigNS,
                             BSON("_id" << nss.ns() << "dropped" << false),
                             BSONObj(),
                             1))
@@ -569,7 +569,7 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
         }
 
         ChunkType chunkType;
-        chunkType.setNS(nss.ns());
+        chunkType.setNS(nss);
         chunkType.setMin(chunk->getMin());
         chunkType.setMax(chunk->getMax());
         chunkType.setShard(chunk->getShardId());
@@ -881,7 +881,7 @@ public:
 
         // Step 6. Actually shard the collection.
         catalogManager->shardCollection(opCtx,
-                                        nss.ns(),
+                                        nss,
                                         uuid,
                                         shardKeyPattern,
                                         *request.getCollation(),

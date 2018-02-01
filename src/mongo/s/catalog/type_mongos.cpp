@@ -35,7 +35,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-const std::string MongosType::ConfigNS = "config.mongos";
+const NamespaceString MongosType::ConfigNS("config.mongos");
 
 const BSONField<std::string> MongosType::name("_id");
 const BSONField<Date_t> MongosType::ping("ping");

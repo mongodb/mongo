@@ -91,7 +91,7 @@ std::pair<ShardStatisticsVector, ShardToChunksMap> generateCluster(
         for (size_t i = 0; i < numChunks; i++, currentChunk++) {
             ChunkType chunk;
 
-            chunk.setNS(kNamespace.ns());
+            chunk.setNS(kNamespace);
             chunk.setMin(currentChunk == 0 ? shardKeyPattern.globalMin()
                                            : BSON("x" << currentChunk));
             chunk.setMax(currentChunk == totalNumChunks - 1 ? shardKeyPattern.globalMax()

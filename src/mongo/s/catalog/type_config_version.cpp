@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-const std::string VersionType::ConfigNS = "config.version";
+const NamespaceString VersionType::ConfigNS("config.version");
 
 const BSONField<int> VersionType::minCompatibleVersion("minCompatibleVersion");
 const BSONField<int> VersionType::currentVersion("currentVersion");

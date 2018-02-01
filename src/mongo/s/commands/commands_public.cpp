@@ -458,7 +458,7 @@ public:
         Strategy::commandOp(opCtx,
                             dbName,
                             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-                            cm->getns(),
+                            cm->getns().ns(),
                             query,
                             CollationSpec::kSimpleSpec,
                             &results);

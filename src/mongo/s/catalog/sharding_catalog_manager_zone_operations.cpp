@@ -60,17 +60,17 @@ const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::
  */
 Status checkForOveralappedZonedKeyRange(OperationContext* opCtx,
                                         Shard* configServer,
-                                        const NamespaceString& ns,
+                                        const NamespaceString& nss,
                                         const ChunkRange& range,
                                         const std::string& zoneName,
                                         const KeyPattern& shardKeyPattern) {
-    DistributionStatus chunkDist(ns, ShardToChunksMap{});
+    DistributionStatus chunkDist(nss, ShardToChunksMap{});
 
     auto tagStatus = configServer->exhaustiveFindOnConfig(opCtx,
                                                           kConfigPrimarySelector,
                                                           repl::ReadConcernLevel::kLocalReadConcern,
-                                                          NamespaceString(TagsType::ConfigNS),
-                                                          BSON(TagsType::ns(ns.ns())),
+                                                          TagsType::ConfigNS,
+                                                          BSON(TagsType::ns(nss.ns())),
                                                           BSONObj(),
                                                           0);
     if (!tagStatus.isOK()) {
@@ -108,21 +108,21 @@ Status checkForOveralappedZonedKeyRange(OperationContext* opCtx,
 /**
  * Returns a new range based on the given range with the full shard key.
  * Returns:
- * - ErrorCodes::NamespaceNotSharded if ns is not sharded.
+ * - ErrorCodes::NamespaceNotSharded if nss is not sharded.
  * - ErrorCodes::ShardKeyNotFound if range is not compatible (for example, not a prefix of shard
- * key) with the shard key of ns.
+ * key) with the shard key of nss.
  */
 StatusWith<ChunkRange> includeFullShardKey(OperationContext* opCtx,
                                            Shard* configServer,
-                                           const NamespaceString& ns,
+                                           const NamespaceString& nss,
                                            const ChunkRange& range,
                                            KeyPattern* shardKeyPatternOut) {
     auto findCollStatus =
         configServer->exhaustiveFindOnConfig(opCtx,
                                              kConfigPrimarySelector,
                                              repl::ReadConcernLevel::kLocalReadConcern,
-                                             NamespaceString(CollectionType::ConfigNS),
-                                             BSON(CollectionType::fullNs(ns.ns())),
+                                             CollectionType::ConfigNS,
+                                             BSON(CollectionType::fullNs(nss.ns())),
                                              BSONObj(),
                                              1);
 
@@ -133,7 +133,7 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* opCtx,
     const auto& findCollResult = findCollStatus.getValue().docs;
 
     if (findCollResult.size() < 1) {
-        return {ErrorCodes::NamespaceNotSharded, str::stream() << ns.ns() << " is not sharded"};
+        return {ErrorCodes::NamespaceNotSharded, str::stream() << nss.ns() << " is not sharded"};
     }
 
     auto parseStatus = CollectionType::fromBSON(findCollResult.front());
@@ -143,7 +143,7 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* opCtx,
 
     auto collDoc = parseStatus.getValue();
     if (collDoc.getDropped()) {
-        return {ErrorCodes::NamespaceNotSharded, str::stream() << ns.ns() << " is not sharded"};
+        return {ErrorCodes::NamespaceNotSharded, str::stream() << nss.ns() << " is not sharded"};
     }
 
     const auto& shardKeyPattern = collDoc.getKeyPattern();
@@ -155,7 +155,7 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* opCtx,
                 str::stream() << "min: " << range.getMin() << " is not a prefix of the shard key "
                               << shardKeyBSON
                               << " of ns: "
-                              << ns.ns()};
+                              << nss.ns()};
     }
 
     if (!range.getMax().isFieldNamePrefixOf(shardKeyBSON)) {
@@ -163,7 +163,7 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* opCtx,
                 str::stream() << "max: " << range.getMax() << " is not a prefix of the shard key "
                               << shardKeyBSON
                               << " of ns: "
-                              << ns.ns()};
+                              << nss.ns()};
     }
 
     return ChunkRange(shardKeyPattern.extendRangeBound(range.getMin(), false),
@@ -268,7 +268,7 @@ Status ShardingCatalogManager::removeShardFromZone(OperationContext* opCtx,
             configShard->exhaustiveFindOnConfig(opCtx,
                                                 kConfigPrimarySelector,
                                                 repl::ReadConcernLevel::kLocalReadConcern,
-                                                NamespaceString(TagsType::ConfigNS),
+                                                TagsType::ConfigNS,
                                                 BSON(TagsType::tag() << zoneName),
                                                 BSONObj(),
                                                 1);
@@ -310,7 +310,7 @@ Status ShardingCatalogManager::removeShardFromZone(OperationContext* opCtx,
 
 
 Status ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
-                                                    const NamespaceString& ns,
+                                                    const NamespaceString& nss,
                                                     const ChunkRange& givenRange,
                                                     const std::string& zoneName) {
     Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
@@ -319,7 +319,7 @@ Status ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
 
     KeyPattern shardKeyPattern{BSONObj()};
     auto fullShardKeyStatus =
-        includeFullShardKey(opCtx, configServer.get(), ns, givenRange, &shardKeyPattern);
+        includeFullShardKey(opCtx, configServer.get(), nss, givenRange, &shardKeyPattern);
     if (!fullShardKeyStatus.isOK()) {
         return fullShardKeyStatus.getStatus();
     }
@@ -330,7 +330,7 @@ Status ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
         configServer->exhaustiveFindOnConfig(opCtx,
                                              kConfigPrimarySelector,
                                              repl::ReadConcernLevel::kLocalReadConcern,
-                                             NamespaceString(ShardType::ConfigNS),
+                                             ShardType::ConfigNS,
                                              BSON(ShardType::tags() << zoneName),
                                              BSONObj(),
                                              1);
@@ -346,18 +346,18 @@ Status ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
     }
 
     auto overlapStatus = checkForOveralappedZonedKeyRange(
-        opCtx, configServer.get(), ns, fullShardKeyRange, zoneName, shardKeyPattern);
+        opCtx, configServer.get(), nss, fullShardKeyRange, zoneName, shardKeyPattern);
     if (!overlapStatus.isOK()) {
         return overlapStatus;
     }
 
     BSONObj updateQuery(
-        BSON("_id" << BSON(TagsType::ns(ns.ns()) << TagsType::min(fullShardKeyRange.getMin()))));
+        BSON("_id" << BSON(TagsType::ns(nss.ns()) << TagsType::min(fullShardKeyRange.getMin()))));
 
     BSONObjBuilder updateBuilder;
     updateBuilder.append("_id",
-                         BSON(TagsType::ns(ns.ns()) << TagsType::min(fullShardKeyRange.getMin())));
-    updateBuilder.append(TagsType::ns(), ns.ns());
+                         BSON(TagsType::ns(nss.ns()) << TagsType::min(fullShardKeyRange.getMin())));
+    updateBuilder.append(TagsType::ns(), nss.ns());
     updateBuilder.append(TagsType::min(), fullShardKeyRange.getMin());
     updateBuilder.append(TagsType::max(), fullShardKeyRange.getMax());
     updateBuilder.append(TagsType::tag(), zoneName);
@@ -373,7 +373,7 @@ Status ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
 }
 
 Status ShardingCatalogManager::removeKeyRangeFromZone(OperationContext* opCtx,
-                                                      const NamespaceString& ns,
+                                                      const NamespaceString& nss,
                                                       const ChunkRange& range) {
     Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
 
@@ -381,13 +381,13 @@ Status ShardingCatalogManager::removeKeyRangeFromZone(OperationContext* opCtx,
 
     KeyPattern shardKeyPattern{BSONObj()};
     auto fullShardKeyStatus =
-        includeFullShardKey(opCtx, configServer.get(), ns, range, &shardKeyPattern);
+        includeFullShardKey(opCtx, configServer.get(), nss, range, &shardKeyPattern);
     if (!fullShardKeyStatus.isOK()) {
         return fullShardKeyStatus.getStatus();
     }
 
     BSONObjBuilder removeBuilder;
-    removeBuilder.append("_id", BSON(TagsType::ns(ns.ns()) << TagsType::min(range.getMin())));
+    removeBuilder.append("_id", BSON(TagsType::ns(nss.ns()) << TagsType::min(range.getMin())));
     removeBuilder.append(TagsType::max(), range.getMax());
 
     return Grid::get(opCtx)->catalogClient()->removeConfigDocuments(

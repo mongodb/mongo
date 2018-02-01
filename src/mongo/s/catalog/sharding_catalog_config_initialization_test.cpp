@@ -84,14 +84,14 @@ TEST_F(ConfigInitializationTest, UpgradeNotNeeded) {
     version.setClusterId(OID::gen());
     version.setCurrentVersion(CURRENT_CONFIG_VERSION);
     version.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), version.toBSON()));
+    ASSERT_OK(
+        insertToConfigCollection(operationContext(), VersionType::ConfigNS, version.toBSON()));
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto versionDoc = assertGet(findOneOnConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+    auto versionDoc =
+        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
     VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
 
@@ -105,15 +105,15 @@ TEST_F(ConfigInitializationTest, InitIncompatibleVersion) {
     version.setClusterId(OID::gen());
     version.setCurrentVersion(MIN_COMPATIBLE_CONFIG_VERSION - 1);
     version.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION - 2);
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), version.toBSON()));
+    ASSERT_OK(
+        insertToConfigCollection(operationContext(), VersionType::ConfigNS, version.toBSON()));
 
     ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion,
               ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto versionDoc = assertGet(findOneOnConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+    auto versionDoc =
+        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
     VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
 
@@ -127,11 +127,11 @@ TEST_F(ConfigInitializationTest, InitClusterMultipleVersionDocs) {
     version.setClusterId(OID::gen());
     version.setCurrentVersion(MIN_COMPATIBLE_CONFIG_VERSION - 2);
     version.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION - 3);
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), version.toBSON()));
+    ASSERT_OK(
+        insertToConfigCollection(operationContext(), VersionType::ConfigNS, version.toBSON()));
 
     ASSERT_OK(insertToConfigCollection(operationContext(),
-                                       NamespaceString(VersionType::ConfigNS),
+                                       VersionType::ConfigNS,
                                        BSON("_id"
                                             << "a second document")));
 
@@ -147,8 +147,7 @@ TEST_F(ConfigInitializationTest, InitInvalidConfigVersionDoc) {
                     currentVersion: 7,
                     clusterId: ObjectId("55919cc6dbe86ce7ac056427")
                 })"));
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), versionDoc));
+    ASSERT_OK(insertToConfigCollection(operationContext(), VersionType::ConfigNS, versionDoc));
 
     ASSERT_EQ(ErrorCodes::TypeMismatch,
               ShardingCatalogManager::get(operationContext())
@@ -159,14 +158,13 @@ TEST_F(ConfigInitializationTest, InitInvalidConfigVersionDoc) {
 TEST_F(ConfigInitializationTest, InitNoVersionDocEmptyConfig) {
     // Make sure there is no existing document
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
-                  findOneOnConfigCollection(
-                      operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+                  findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto versionDoc = assertGet(findOneOnConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+    auto versionDoc =
+        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
     VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
 
@@ -180,8 +178,8 @@ TEST_F(ConfigInitializationTest, InitVersionTooHigh) {
     version.setClusterId(OID::gen());
     version.setCurrentVersion(10000);
     version.setMinCompatibleVersion(10000);
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), version.toBSON()));
+    ASSERT_OK(
+        insertToConfigCollection(operationContext(), VersionType::ConfigNS, version.toBSON()));
 
     ASSERT_EQ(ErrorCodes::IncompatibleShardingConfigVersion,
               ShardingCatalogManager::get(operationContext())
@@ -192,8 +190,8 @@ TEST_F(ConfigInitializationTest, OnlyRunsOnce) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto versionDoc = assertGet(findOneOnConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+    auto versionDoc =
+        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
     VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
 
@@ -210,8 +208,8 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto versionDoc = assertGet(findOneOnConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+    auto versionDoc =
+        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
     VersionType foundVersion = assertGet(VersionType::fromBSON(versionDoc));
 
@@ -228,7 +226,7 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
         ASSERT_OK(replicationCoordinator()->setFollowerMode(repl::MemberState::RS_ROLLBACK));
         auto opCtx = operationContext();
         repl::UnreplicatedWritesBlock uwb(opCtx);
-        auto nss = NamespaceString(VersionType::ConfigNS);
+        auto nss = VersionType::ConfigNS;
         writeConflictRetry(opCtx, "removeConfigDocuments", nss.ns(), [&] {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
             auto coll = autoColl.getCollection();
@@ -249,15 +247,14 @@ TEST_F(ConfigInitializationTest, ReRunsIfDocRolledBackThenReElected) {
 
     // Verify the document was actually removed.
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument,
-                  findOneOnConfigCollection(
-                      operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+                  findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
     // Re-create the config.version document.
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
-    auto newVersionDoc = assertGet(findOneOnConfigCollection(
-        operationContext(), NamespaceString(VersionType::ConfigNS), BSONObj()));
+    auto newVersionDoc =
+        assertGet(findOneOnConfigCollection(operationContext(), VersionType::ConfigNS, BSONObj()));
 
     VersionType newFoundVersion = assertGet(VersionType::fromBSON(newVersionDoc));
 
@@ -334,31 +331,25 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
                  << "ns"
                  << "config.tags")};
 
-    auto foundChunksIndexes =
-        assertGet(getIndexes(operationContext(), NamespaceString(ChunkType::ConfigNS)));
+    auto foundChunksIndexes = assertGet(getIndexes(operationContext(), ChunkType::ConfigNS));
     assertBSONObjsSame(expectedChunksIndexes, foundChunksIndexes);
 
-    auto foundLockpingsIndexes =
-        assertGet(getIndexes(operationContext(), NamespaceString(LockpingsType::ConfigNS)));
+    auto foundLockpingsIndexes = assertGet(getIndexes(operationContext(), LockpingsType::ConfigNS));
     assertBSONObjsSame(expectedLockpingsIndexes, foundLockpingsIndexes);
 
-    auto foundLocksIndexes =
-        assertGet(getIndexes(operationContext(), NamespaceString(LocksType::ConfigNS)));
+    auto foundLocksIndexes = assertGet(getIndexes(operationContext(), LocksType::ConfigNS));
     assertBSONObjsSame(expectedLocksIndexes, foundLocksIndexes);
 
-    auto foundShardsIndexes =
-        assertGet(getIndexes(operationContext(), NamespaceString(ShardType::ConfigNS)));
+    auto foundShardsIndexes = assertGet(getIndexes(operationContext(), ShardType::ConfigNS));
     assertBSONObjsSame(expectedShardsIndexes, foundShardsIndexes);
 
-    auto foundTagsIndexes =
-        assertGet(getIndexes(operationContext(), NamespaceString(TagsType::ConfigNS)));
+    auto foundTagsIndexes = assertGet(getIndexes(operationContext(), TagsType::ConfigNS));
     assertBSONObjsSame(expectedTagsIndexes, foundTagsIndexes);
 }
 
 TEST_F(ConfigInitializationTest, CompatibleIndexAlreadyExists) {
     getConfigShard()
-        ->createIndexOnConfig(
-            operationContext(), NamespaceString(ShardType::ConfigNS), BSON("host" << 1), true)
+        ->createIndexOnConfig(operationContext(), ShardType::ConfigNS, BSON("host" << 1), true)
         .transitional_ignore();
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
@@ -375,8 +366,7 @@ TEST_F(ConfigInitializationTest, CompatibleIndexAlreadyExists) {
                  << "config.shards")};
 
 
-    auto foundShardsIndexes =
-        assertGet(getIndexes(operationContext(), NamespaceString(ShardType::ConfigNS)));
+    auto foundShardsIndexes = assertGet(getIndexes(operationContext(), ShardType::ConfigNS));
     assertBSONObjsSame(expectedShardsIndexes, foundShardsIndexes);
 }
 
@@ -384,8 +374,7 @@ TEST_F(ConfigInitializationTest, IncompatibleIndexAlreadyExists) {
     // Make the index non-unique even though its supposed to be unique, make sure initialization
     // fails
     getConfigShard()
-        ->createIndexOnConfig(
-            operationContext(), NamespaceString(ShardType::ConfigNS), BSON("host" << 1), false)
+        ->createIndexOnConfig(operationContext(), ShardType::ConfigNS, BSON("host" << 1), false)
         .transitional_ignore();
 
     ASSERT_EQUALS(ErrorCodes::IndexOptionsConflict,

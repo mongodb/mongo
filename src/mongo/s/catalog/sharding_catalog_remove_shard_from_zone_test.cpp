@@ -108,12 +108,11 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldSucceedWhenNoChunks
 
     // Insert a chunk range document referring to a different zone
     TagsType tagDoc;
-    tagDoc.setNS("test.foo");
+    tagDoc.setNS(NamespaceString("test.foo"));
     tagDoc.setMinKey(BSON("x" << 0));
     tagDoc.setMaxKey(BSON("x" << 10));
     tagDoc.setTag("y");
-    insertToConfigCollection(
-        operationContext(), NamespaceString(TagsType::ConfigNS), tagDoc.toBSON())
+    insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON())
         .transitional_ignore();
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
@@ -149,12 +148,11 @@ TEST_F(RemoveShardFromZoneTest, RemoveLastZoneFromShardShouldFailWhenAChunkRefer
     setupShards({shardA, shardB}).transitional_ignore();
 
     TagsType tagDoc;
-    tagDoc.setNS("test.foo");
+    tagDoc.setNS(NamespaceString("test.foo"));
     tagDoc.setMinKey(BSON("x" << 0));
     tagDoc.setMaxKey(BSON("x" << 10));
     tagDoc.setTag("z");
-    insertToConfigCollection(
-        operationContext(), NamespaceString(TagsType::ConfigNS), tagDoc.toBSON())
+    insertToConfigCollection(operationContext(), TagsType::ConfigNS, tagDoc.toBSON())
         .transitional_ignore();
 
     auto status = ShardingCatalogManager::get(operationContext())
@@ -250,7 +248,7 @@ TEST_F(RemoveShardFromZoneTest, RemoveZoneFromShardShouldErrorIfShardDocIsMalfor
                                  << "z"));
 
     insertToConfigCollection(
-        operationContext(), NamespaceString(ShardType::ConfigNS), invalidShardDoc);
+        operationContext(), ShardType::ConfigNS, invalidShardDoc);
 
 
     auto status =

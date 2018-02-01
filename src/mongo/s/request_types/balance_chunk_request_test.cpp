@@ -57,7 +57,7 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandNoSecondaryThrottle) {
                                    << "lastmodEpoch"
                                    << version.epoch())));
     const auto& chunk = request.getChunk();
-    ASSERT_EQ("TestDB.TestColl", chunk.getNS());
+    ASSERT_EQ("TestDB.TestColl", chunk.getNS().ns());
     ASSERT_BSONOBJ_EQ(BSON("a" << -100LL), chunk.getMin());
     ASSERT_BSONOBJ_EQ(BSON("a" << 100LL), chunk.getMax());
     ASSERT_EQ(ShardId("TestShard0000"), chunk.getShard());
@@ -87,7 +87,7 @@ TEST(BalanceChunkRequest, ParseFromConfigCommandWithSecondaryThrottle) {
                                    << BSON("_secondaryThrottle" << true << "writeConcern"
                                                                 << BSON("w" << 2)))));
     const auto& chunk = request.getChunk();
-    ASSERT_EQ("TestDB.TestColl", chunk.getNS());
+    ASSERT_EQ("TestDB.TestColl", chunk.getNS().ns());
     ASSERT_BSONOBJ_EQ(BSON("a" << -100LL), chunk.getMin());
     ASSERT_BSONOBJ_EQ(BSON("a" << 100LL), chunk.getMax());
     ASSERT_EQ(ShardId("TestShard0000"), chunk.getShard());

@@ -93,7 +93,7 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // Decide whether to do a full or partial load based on the state of the collection
-    const auto coll = uassertStatusOK(catalogClient->getCollection(opCtx, nss.ns())).value;
+    const auto coll = uassertStatusOK(catalogClient->getCollection(opCtx, nss)).value;
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Collection " << nss.ns() << " is dropped.",
             !coll.getDropped());

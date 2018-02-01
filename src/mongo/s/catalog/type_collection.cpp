@@ -46,7 +46,7 @@ const auto kIsAssignedShardKey = "isAssignedShardKey"_sd;
 
 }  // namespace
 
-const std::string CollectionType::ConfigNS = "config.collections";
+const NamespaceString CollectionType::ConfigNS("config.collections");
 
 const BSONField<std::string> CollectionType::fullNs("_id");
 const BSONField<OID> CollectionType::epoch("lastmodEpoch");

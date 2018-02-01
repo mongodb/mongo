@@ -74,7 +74,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                                     opCtx,
                                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                     repl::ReadConcernLevel::kLocalReadConcern,
-                                    NamespaceString(DatabaseType::ConfigNS),
+                                    DatabaseType::ConfigNS,
                                     queryBuilder.obj(),
                                     BSONObj(),
                                     1))
@@ -144,7 +144,7 @@ StatusWith<std::vector<std::string>> ShardingCatalogManager::getDatabasesForShar
         opCtx,
         kConfigReadSelector,
         repl::ReadConcernLevel::kLocalReadConcern,
-        NamespaceString(DatabaseType::ConfigNS),
+        DatabaseType::ConfigNS,
         BSON(DatabaseType::primary(shardId.toString())),
         BSONObj(),
         boost::none);  // no limit

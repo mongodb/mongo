@@ -78,7 +78,7 @@ BSONArray buildMergeChunksTransactionUpdates(const std::vector<ChunkType>& chunk
         BSONObjBuilder op;
         op.append("op", "u");
         op.appendBool("b", false);  // no upsert
-        op.append("ns", ChunkType::ConfigNS);
+        op.append("ns", ChunkType::ConfigNS.ns());
 
         // expand first chunk into newly merged chunk
         ChunkType mergedChunk(chunksToMerge.front());
@@ -101,7 +101,7 @@ BSONArray buildMergeChunksTransactionUpdates(const std::vector<ChunkType>& chunk
     for (size_t i = 1; i < chunksToMerge.size(); ++i) {
         BSONObjBuilder op;
         op.append("op", "d");
-        op.append("ns", ChunkType::ConfigNS);
+        op.append("ns", ChunkType::ConfigNS.ns());
 
         op.append("o", BSON(ChunkType::name(chunksToMerge[i].getName())));
 
@@ -117,13 +117,13 @@ BSONArray buildMergeChunksTransactionPrecond(const std::vector<ChunkType>& chunk
 
     for (auto chunk : chunksToMerge) {
         BSONObjBuilder b;
-        b.append("ns", ChunkType::ConfigNS);
-        b.append(
-            "q",
-            BSON("query" << BSON(ChunkType::ns(chunk.getNS()) << ChunkType::min(chunk.getMin())
-                                                              << ChunkType::max(chunk.getMax()))
-                         << "orderby"
-                         << BSON(ChunkType::lastmod() << -1)));
+        b.append("ns", ChunkType::ConfigNS.ns());
+        b.append("q",
+                 BSON("query" << BSON(ChunkType::ns(chunk.getNS().ns())
+                                      << ChunkType::min(chunk.getMin())
+                                      << ChunkType::max(chunk.getMax()))
+                              << "orderby"
+                              << BSON(ChunkType::lastmod() << -1)));
         b.append("res",
                  BSON(ChunkType::epoch(collVersion.epoch())
                       << ChunkType::shard(chunk.getShard().toString())));
@@ -148,7 +148,7 @@ Status checkChunkIsOnShard(OperationContext* opCtx,
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
-            NamespaceString(ChunkType::ConfigNS),
+            ChunkType::ConfigNS,
             chunkQuery,
             BSONObj(),
             1);
@@ -179,10 +179,10 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         BSONObjBuilder op;
         op.append("op", "u");
         op.appendBool("b", false);  // No upserting
-        op.append("ns", ChunkType::ConfigNS);
+        op.append("ns", ChunkType::ConfigNS.ns());
 
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), ChunkType::genID(nss.ns(), migratedChunk.getMin()));
+        n.append(ChunkType::name(), ChunkType::genID(nss, migratedChunk.getMin()));
         migratedChunk.getVersion().addToBSON(n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), migratedChunk.getMin());
@@ -191,7 +191,7 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), ChunkType::genID(nss.ns(), migratedChunk.getMin()));
+        q.append(ChunkType::name(), ChunkType::genID(nss, migratedChunk.getMin()));
         q.done();
 
         updates.append(op.obj());
@@ -202,10 +202,10 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         BSONObjBuilder op;
         op.append("op", "u");
         op.appendBool("b", false);
-        op.append("ns", ChunkType::ConfigNS);
+        op.append("ns", ChunkType::ConfigNS.ns());
 
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), ChunkType::genID(nss.ns(), controlChunk->getMin()));
+        n.append(ChunkType::name(), ChunkType::genID(nss, controlChunk->getMin()));
         controlChunk->getVersion().addToBSON(n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), controlChunk->getMin());
@@ -214,7 +214,7 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         n.done();
 
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), ChunkType::genID(nss.ns(), controlChunk->getMin()));
+        q.append(ChunkType::name(), ChunkType::genID(nss, controlChunk->getMin()));
         q.done();
 
         updates.append(op.obj());
@@ -247,7 +247,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        NamespaceString(ChunkType::ConfigNS),
+        ChunkType::ConfigNS,
         BSON("ns" << nss.ns()),
         BSON(ChunkType::lastmod << -1),
         1);
@@ -326,11 +326,11 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         BSONObjBuilder op;
         op.append("op", "u");
         op.appendBool("b", true);
-        op.append("ns", ChunkType::ConfigNS);
+        op.append("ns", ChunkType::ConfigNS.ns());
 
         // add the modified (new) chunk information as the update object
         BSONObjBuilder n(op.subobjStart("o"));
-        n.append(ChunkType::name(), ChunkType::genID(nss.ns(), startKey));
+        n.append(ChunkType::name(), ChunkType::genID(nss, startKey));
         currentMaxVersion.addToBSON(n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         n.append(ChunkType::min(), startKey);
@@ -340,7 +340,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
 
         // add the chunk's _id as the query part of the update statement
         BSONObjBuilder q(op.subobjStart("o2"));
-        q.append(ChunkType::name(), ChunkType::genID(nss.ns(), startKey));
+        q.append(ChunkType::name(), ChunkType::genID(nss, startKey));
         q.done();
 
         updates.append(op.obj());
@@ -359,7 +359,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     BSONArrayBuilder preCond;
     {
         BSONObjBuilder b;
-        b.append("ns", ChunkType::ConfigNS);
+        b.append("ns", ChunkType::ConfigNS.ns());
         b.append("q",
                  BSON("query" << BSON(ChunkType::ns(nss.ns()) << ChunkType::min() << range.getMin()
                                                               << ChunkType::max()
@@ -379,7 +379,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         opCtx,
         updates.arr(),
         preCond.arr(),
-        nss.ns(),
+        nss,
         currentMaxVersion,
         WriteConcernOptions(),
         repl::ReadConcernLevel::kLocalReadConcern);
@@ -428,7 +428,7 @@ Status ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
 }
 
 Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
-                                                const NamespaceString& ns,
+                                                const NamespaceString& nss,
                                                 const OID& requestEpoch,
                                                 const std::vector<BSONObj>& chunkBoundaries,
                                                 const std::string& shardName) {
@@ -446,8 +446,8 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         repl::ReadConcernLevel::kLocalReadConcern,
-        NamespaceString(ChunkType::ConfigNS),
-        BSON("ns" << ns.ns()),
+        ChunkType::ConfigNS,
+        BSON("ns" << nss.ns()),
         BSON(ChunkType::lastmod << -1),
         1);
 
@@ -474,7 +474,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
 
     ChunkType itChunk;
     itChunk.setMax(chunkBoundaries.front());
-    itChunk.setNS(ns.ns());
+    itChunk.setNS(nss);
     itChunk.setShard(shardName);
 
     // Do not use the first chunk boundary as a max bound while building chunks
@@ -508,7 +508,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
         opCtx,
         updates,
         preCond,
-        ns.ns(),
+        nss,
         mergeVersion,
         WriteConcernOptions(),
         repl::ReadConcernLevel::kLocalReadConcern);
@@ -529,7 +529,7 @@ Status ShardingCatalogManager::commitChunkMerge(OperationContext* opCtx,
 
     Grid::get(opCtx)
         ->catalogClient()
-        ->logChange(opCtx, "merge", ns.ns(), logDetail.obj(), WriteConcernOptions())
+        ->logChange(opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions())
         .transitional_ignore();
 
     return doTxnStatus;
@@ -563,7 +563,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             repl::ReadConcernLevel::kLocalReadConcern,
-                                            NamespaceString(ChunkType::ConfigNS),
+                                            ChunkType::ConfigNS,
                                             BSON("ns" << nss.ns()),
                                             BSON(ChunkType::lastmod << -1),
                                             1);

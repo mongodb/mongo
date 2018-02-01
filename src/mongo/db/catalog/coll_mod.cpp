@@ -595,7 +595,7 @@ void updateUUIDSchemaVersion(OperationContext* opCtx, bool upgrade) {
                     opCtx,
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                     repl::ReadConcernLevel::kMajorityReadConcern,
-                    NamespaceString(CollectionType::ConfigNS),
+                    CollectionType::ConfigNS,
                     BSON("dropped" << false),  // query
                     BSONObj(),                 // sort
                     boost::none                // limit

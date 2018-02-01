@@ -120,7 +120,7 @@ TEST_F(KeyGeneratorUpdateTest, ShouldCreateAnotherKeyIfOnlyOneKeyExists) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey1.toBSON()));
+        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
 
     {
         auto allKeys = getKeys(operationContext());
@@ -167,12 +167,12 @@ TEST_F(KeyGeneratorUpdateTest, ShouldCreateAnotherKeyIfNoValidKeyAfterCurrent) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey1.toBSON()));
+        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
 
     KeysCollectionDocument origKey2(
         2, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey2.toBSON()));
+        operationContext(), KeysCollectionDocument::ConfigNS, origKey2.toBSON()));
 
     {
         auto allKeys = getKeys(operationContext());
@@ -250,12 +250,12 @@ TEST_F(KeyGeneratorUpdateTest, ShouldCreate2KeysIfAllKeysAreExpired) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey1.toBSON()));
+        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
 
     KeysCollectionDocument origKey2(
         2, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey2.toBSON()));
+        operationContext(), KeysCollectionDocument::ConfigNS, origKey2.toBSON()));
 
     {
         auto allKeys = getKeys(operationContext());
@@ -347,12 +347,12 @@ TEST_F(KeyGeneratorUpdateTest, ShouldNotCreateNewKeyIfThereAre2UnexpiredKeys) {
     KeysCollectionDocument origKey1(
         1, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey1.toBSON()));
+        operationContext(), KeysCollectionDocument::ConfigNS, origKey1.toBSON()));
 
     KeysCollectionDocument origKey2(
         2, "dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(110, 0)));
     ASSERT_OK(insertToConfigCollection(
-        operationContext(), NamespaceString(KeysCollectionDocument::ConfigNS), origKey2.toBSON()));
+        operationContext(), KeysCollectionDocument::ConfigNS, origKey2.toBSON()));
 
     {
         auto allKeys = getKeys(operationContext());

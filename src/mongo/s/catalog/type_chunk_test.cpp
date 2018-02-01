@@ -197,7 +197,7 @@ TEST(ChunkType, ToFromConfigBSON) {
 
     ASSERT_BSONOBJ_EQ(chunk.toConfigBSON(), obj);
 
-    ASSERT_EQUALS(chunk.getNS(), "test.mycol");
+    ASSERT_EQUALS(chunk.getNS().ns(), "test.mycol");
     ASSERT_BSONOBJ_EQ(chunk.getMin(), BSON("a" << 10));
     ASSERT_BSONOBJ_EQ(chunk.getMax(), BSON("a" << 20));
     ASSERT_EQUALS(chunk.getVersion().toLong(), chunkVersion.toLong());
@@ -221,7 +221,7 @@ TEST(ChunkType, Pre22Format) {
                                                                << "shard0001")));
 
     ASSERT_OK(chunk.validate());
-    ASSERT_EQUALS(chunk.getNS(), "test.mycol");
+    ASSERT_EQUALS(chunk.getNS().ns(), "test.mycol");
     ASSERT_BSONOBJ_EQ(chunk.getMin(), BSON("a" << 10));
     ASSERT_BSONOBJ_EQ(chunk.getMax(), BSON("a" << 20));
     ASSERT_EQUALS(chunk.getVersion().toLong(), 1ULL);

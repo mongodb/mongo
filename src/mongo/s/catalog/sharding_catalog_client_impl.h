@@ -56,7 +56,7 @@ public:
      * described by "coll."
      */
     static Status updateShardingCatalogEntryForCollection(OperationContext* opCtx,
-                                                          const std::string& collNs,
+                                                          const NamespaceString& nss,
                                                           const CollectionType& coll,
                                                           const bool upsert);
 
@@ -93,7 +93,7 @@ public:
 
     StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
         OperationContext* opCtx,
-        const std::string& collNs,
+        const NamespaceString& nss,
         repl::ReadConcernLevel readConcernLevel) override;
 
     StatusWith<std::vector<CollectionType>> getCollections(
@@ -112,8 +112,8 @@ public:
                                                  repl::OpTime* opTime,
                                                  repl::ReadConcernLevel readConcern) override;
 
-    StatusWith<std::vector<TagsType>> getTagsForCollection(
-        OperationContext* opCtx, const std::string& collectionNs) override;
+    StatusWith<std::vector<TagsType>> getTagsForCollection(OperationContext* opCtx,
+                                                           const NamespaceString& nss) override;
 
     StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
         OperationContext* opCtx, repl::ReadConcernLevel readConcern) override;
@@ -132,7 +132,7 @@ public:
     Status applyChunkOpsDeprecated(OperationContext* opCtx,
                                    const BSONArray& updateOps,
                                    const BSONArray& preCondition,
-                                   const std::string& nss,
+                                   const NamespaceString& nss,
                                    const ChunkVersion& lastChunkVersion,
                                    const WriteConcernOptions& writeConcern,
                                    repl::ReadConcernLevel readConcern) override;
@@ -147,19 +147,19 @@ public:
                                  BatchedCommandResponse* response) override;
 
     Status insertConfigDocument(OperationContext* opCtx,
-                                const std::string& ns,
+                                const NamespaceString& nss,
                                 const BSONObj& doc,
                                 const WriteConcernOptions& writeConcern) override;
 
     StatusWith<bool> updateConfigDocument(OperationContext* opCtx,
-                                          const std::string& ns,
+                                          const NamespaceString& nss,
                                           const BSONObj& query,
                                           const BSONObj& update,
                                           bool upsert,
                                           const WriteConcernOptions& writeConcern) override;
 
     Status removeConfigDocuments(OperationContext* opCtx,
-                                 const std::string& ns,
+                                 const NamespaceString& nss,
                                  const BSONObj& query,
                                  const WriteConcernOptions& writeConcern) override;
 
@@ -193,7 +193,7 @@ private:
      * returns whether the update command's response update.n value is > 0).
      */
     static StatusWith<bool> _updateConfigDocument(OperationContext* opCtx,
-                                                  const std::string& ns,
+                                                  const NamespaceString& nss,
                                                   const BSONObj& query,
                                                   const BSONObj& update,
                                                   bool upsert,
@@ -246,7 +246,7 @@ private:
     Status _log(OperationContext* opCtx,
                 const StringData& logCollName,
                 const std::string& what,
-                const std::string& operationNS,
+                const std::string& operationNSS,
                 const BSONObj& detail,
                 const WriteConcernOptions& writeConcern);
 

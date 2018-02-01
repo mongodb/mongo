@@ -476,7 +476,7 @@ public:
             } else {
                 // Collection is already sharded; read the collection's UUID from the config server.
                 const auto coll =
-                    uassertStatusOK(catalogClient->getCollection(opCtx, outputCollNss.ns())).value;
+                    uassertStatusOK(catalogClient->getCollection(opCtx, outputCollNss)).value;
                 shardedOutputCollUUID = coll.getUUID();
             }
 

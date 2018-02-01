@@ -39,9 +39,11 @@ namespace {
 
 using SplitChunkTest = ConfigServerTestFixture;
 
+const NamespaceString kNamespace("TestDB", "TestColl");
+
 TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -90,7 +92,7 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
 
 TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -151,8 +153,8 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
 
 TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
     ChunkType chunk, chunk2;
-    chunk.setNS("TestDB.TestColl");
-    chunk2.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
+    chunk2.setNS(kNamespace);
     auto collEpoch = OID::gen();
 
     // set up first chunk
@@ -211,7 +213,7 @@ TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {
 
 TEST_F(SplitChunkTest, PreConditionFailErrors) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -240,7 +242,7 @@ TEST_F(SplitChunkTest, PreConditionFailErrors) {
 
 TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -267,7 +269,7 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
 
 TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -294,7 +296,7 @@ TEST_F(SplitChunkTest, NonMatchingEpochsOfChunkAndRequestErrors) {
 
 TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -321,7 +323,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfOrderShouldFail) {
 
 TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
@@ -348,7 +350,7 @@ TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMinShouldFail) {
 
 TEST_F(SplitChunkTest, SplitPointsOutOfRangeAtMaxShouldFail) {
     ChunkType chunk;
-    chunk.setNS("TestDB.TestColl");
+    chunk.setNS(kNamespace);
 
     auto origVersion = ChunkVersion(1, 0, OID::gen());
     chunk.setVersion(origVersion);
