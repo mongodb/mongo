@@ -110,7 +110,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                       const QueryMessage& queryMessage,
                                       CurOp* curop,
                                       Message* response) {
-    curop->debug().exceptionInfo = exception->toStatus();
+    curop->debug().errInfo = exception->toStatus();
 
     log(LogComponent::kQuery) << "assertion " << exception->toString() << " ns:" << queryMessage.ns
                               << " query:" << (queryMessage.query.valid(BSONVersion::kLatest)
@@ -159,7 +159,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
 
 void registerError(OperationContext* opCtx, const DBException& exception) {
     LastError::get(opCtx->getClient()).setLastError(exception.code(), exception.reason());
-    CurOp::get(opCtx)->debug().exceptionInfo = exception.toStatus();
+    CurOp::get(opCtx)->debug().errInfo = exception.toStatus();
 }
 
 void generateErrorResponse(OperationContext* opCtx,
@@ -973,7 +973,7 @@ DbResponse receivedGetMore(OperationContext* opCtx,
         err.append("code", e.code());
         BSONObj errObj = err.obj();
 
-        curop.debug().exceptionInfo = e.toStatus();
+        curop.debug().errInfo = e.toStatus();
 
         dbresponse = replyToQuery(errObj, ResultFlag_ErrSet);
         curop.debug().responseLength = dbresponse.response.header().dataLen();
@@ -1085,7 +1085,7 @@ DbResponse ServiceEntryPointEmbedded::handleRequest(OperationContext* opCtx, con
             LastError::get(c).setLastError(ue.code(), ue.reason());
             LOG(3) << " Caught Assertion in " << networkOpToString(op) << ", continuing "
                    << redact(ue);
-            debug.exceptionInfo = ue.toStatus();
+            debug.errInfo = ue.toStatus();
         }
     }
     currentOp.ensureStarted();
