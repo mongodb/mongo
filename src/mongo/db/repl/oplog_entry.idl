@@ -46,12 +46,39 @@ enums:
             kNoop: "n"
 
 structs:
+    ReplOperation:
+        description: A document that represents an operation in transaction.
+        fields:
+            op:
+                cpp_name: opType
+                type: OpType
+                description: "The operation type"
+            ns:
+                cpp_name: namespace
+                type: namespacestring
+                description: "The namespace on which to apply the operation"
+            ui:
+                cpp_name: uuid
+                type: uuid
+                optional: true
+                description: "The UUID of the collection"
+            o:
+                cpp_name: object
+                type: object
+                description: "The operation applied"
+            o2:
+                cpp_name: object2
+                type: object
+                optional: true
+                description: "Additional information about the operation applied"
+
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.
         immutable: true
         inline_chained_structs: true
         chained_structs:
             OperationSessionInfo : OperationSessionInfo
+            ReplOperation: ReplOperation
         fields:
             ts:
                 cpp_name: timestamp
@@ -71,32 +98,10 @@ structs:
                 type: safeInt64
                 default: 1
                 description: "The version of the oplog"
-            op:
-                cpp_name: opType
-                type: OpType
-                description: "The operation type"
-            ns:
-                cpp_name: namespace
-                type: namespacestring
-                description: "The namespace on which to apply the operation"
-            ui:
-                cpp_name: uuid
-                type: uuid
-                optional: true
-                description: "The UUID of the collection"
             fromMigrate:
                 type: bool
                 optional: true
                 description: "An operation caused by a chunk migration"
-            o:
-                cpp_name: object
-                type: object
-                description: "The operation applied"
-            o2:
-                cpp_name: object2
-                type: object
-                optional: true
-                description: "Additional information about the operation applied"
             _id:
                 type: objectid
                 optional: true
