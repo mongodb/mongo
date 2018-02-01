@@ -14,7 +14,7 @@ yamlSuffix = '-0.5.3'
 icuSuffix = '-57.1'
 gperftoolsSuffix = '-2.5'
 timelibSuffix = '-2017.05'
-tomcryptSuffix = '-1.18.0-rc2'
+tomcryptSuffix = '-1.18.1'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
