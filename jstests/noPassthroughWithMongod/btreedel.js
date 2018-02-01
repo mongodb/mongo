@@ -1,4 +1,5 @@
 // btreedel.js
+// @tags: [SERVER-32869]
 
 t = db.foo;
 t.remove({});

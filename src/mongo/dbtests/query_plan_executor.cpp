@@ -193,12 +193,6 @@ private:
  * PlanExecutor is doing a collection scan.
  */
 TEST_F(PlanExecutorTest, DropCollScan) {
-    // SERVER-32675: Skip this test for Mobile SE.
-    // This test should run successfully after fixing the server ticket.
-    if (mongo::storageGlobalParams.engine == "mobile") {
-        return;
-    }
-
     OldClientWriteContext ctx(&_opCtx, nss.ns());
     insert(BSON("_id" << 1));
     insert(BSON("_id" << 2));
@@ -221,12 +215,6 @@ TEST_F(PlanExecutorTest, DropCollScan) {
  * Test dropping the collection while the PlanExecutor is doing an index scan.
  */
 TEST_F(PlanExecutorTest, DropIndexScan) {
-    // SERVER-32675: Skip this test for Mobile SE.
-    // This test should run successfully after fixing the server ticket.
-    if (mongo::storageGlobalParams.engine == "mobile") {
-        return;
-    }
-
     OldClientWriteContext ctx(&_opCtx, nss.ns());
     insert(BSON("_id" << 1 << "a" << 6));
     insert(BSON("_id" << 2 << "a" << 7));

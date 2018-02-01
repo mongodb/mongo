@@ -1,4 +1,3 @@
-// @tags: [SERVER-32675]
 load('jstests/libs/parallelTester.js');
 
 N = 1000;

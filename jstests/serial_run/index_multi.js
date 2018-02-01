@@ -1,5 +1,4 @@
 // Attempt to build 63 indexes simultaneously
-// @tags: [SERVER-32675]
 
 Random.setRandomSeed();
 
