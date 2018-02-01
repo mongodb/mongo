@@ -44,7 +44,9 @@
         assert.neq(cursorId, NumberLong(0));
 
         const runGetMore = function() {
-            db.runCommand({getMore: cursorId, collection: collName});
+            let response = db.runCommand({getMore: cursorId, collection: collName});
+            // We expect that the operation will get interrupted and fail.
+            assert.commandFailedWithCode(response, ErrorCodes.CursorKilled);
         };
         let code = `let cursorId = ${cursorId.toString()};`;
         code += `let collName = "${coll.getName()}";`;

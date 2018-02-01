@@ -389,6 +389,13 @@ Status ClusterCursorManager::killCursor(const NamespaceString& nss, CursorId cur
         return cursorNotFoundStatus(nss, cursorId);
     }
 
+    // Interrupt any operation currently using the cursor.
+    OperationContext* opUsingCursor = entry->getOperationUsingCursor();
+    if (opUsingCursor) {
+        stdx::lock_guard<Client> lk(*opUsingCursor->getClient());
+        opUsingCursor->getServiceContext()->killOperation(opUsingCursor, ErrorCodes::CursorKilled);
+    }
+
     entry->setKillPending();
 
     return Status::OK();

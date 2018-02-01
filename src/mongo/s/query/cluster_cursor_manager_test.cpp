@@ -104,6 +104,29 @@ protected:
         return *std::next(_cursorKilledFlags.begin(), i);
     }
 
+    void killCursorFromDifferentOpCtx(const NamespaceString& nss, CursorId cursorId) {
+        // Set up another client to kill the cursor.
+        auto killCursorClientOwned = serviceContext.makeClient("killCursorClient");
+        // Keep around a raw pointer for when we transfer ownership of killingClientOwned to the
+        // global current client.
+        Client* killCursorClient = killCursorClientOwned.get();
+
+        // Need to swap the current client in order to make an operation context.
+        auto pinningClient = Client::releaseCurrent();
+        Client::setCurrent(std::move(killCursorClientOwned));
+
+        auto killCursorOpCtx = killCursorClient->makeOperationContext();
+        invariant(killCursorOpCtx);
+        ASSERT_OK(getManager()->killCursor(nss, cursorId));
+
+        // Restore the old client. We don't need 'killCursorClient' anymore.
+        killCursorOpCtx.reset();
+        Client::releaseCurrent();
+
+        Client::setCurrent(std::move(pinningClient));
+    }
+
+
 private:
     void setUp() final {
         auto client = serviceContext.makeClient("testClient");
@@ -368,7 +391,11 @@ TEST_F(ClusterCursorManagerTest, KillCursorBasic) {
     auto pinnedCursor =
         getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
-    ASSERT_OK(getManager()->killCursor(nss, pinnedCursor.getValue().getCursorId()));
+    killCursorFromDifferentOpCtx(nss, pinnedCursor.getValue().getCursorId());
+
+    // When the cursor is pinned the operation which checked out the cursor should be interrupted.
+    ASSERT_EQ(_opCtx->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
+
     pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
     ASSERT(!isMockCursorKilled(0));
     getManager()->reapZombieCursors(nullptr);
@@ -712,7 +739,10 @@ TEST_F(ClusterCursorManagerTest, StatsKillPinnedCursor) {
     auto pinnedCursor =
         getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker);
     ASSERT_EQ(1U, getManager()->stats().cursorsPinned);
-    ASSERT_OK(getManager()->killCursor(nss, cursorId));
+
+    killCursorFromDifferentOpCtx(nss, cursorId);
+
+    ASSERT_EQ(_opCtx->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
     ASSERT_EQ(0U, getManager()->stats().cursorsPinned);
 }
 
@@ -1016,7 +1046,10 @@ TEST_F(ClusterCursorManagerTest, DoNotReapKilledPinnedCursors) {
     auto pinnedCursor =
         getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker);
     ASSERT_OK(pinnedCursor.getStatus());
-    ASSERT_OK(getManager()->killCursor(nss, cursorId));
+
+    killCursorFromDifferentOpCtx(nss, cursorId);
+
+    ASSERT_EQ(_opCtx->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
     ASSERT(!isMockCursorKilled(0));
 
     // Pinned cursor should remain alive after reaping.

@@ -120,6 +120,8 @@ selector:
   - jstests/sharding/auth_slaveok_routing.js
   # This test should not be run with a mixed cluster environment.
   - jstests/sharding/nonreplicated_uuids_on_shardservers.js
+  # Requires the ability to interrupt a pinned cursor, introduced in v4.0.
+  - jstests/sharding/kill_pinned_cursor.js
 
 executor:
   config:

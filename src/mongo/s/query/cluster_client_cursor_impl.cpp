@@ -73,16 +73,20 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
                                                  executor::TaskExecutor* executor,
                                                  ClusterClientCursorParams&& params,
                                                  boost::optional<LogicalSessionId> lsid)
-    : _params(std::move(params)), _root(buildMergerPlan(opCtx, executor, &_params)), _lsid(lsid) {
+    : _params(std::move(params)),
+      _root(buildMergerPlan(opCtx, executor, &_params)),
+      _lsid(lsid),
+      _opCtx(opCtx) {
     dassert(!_params.compareWholeSortKey ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sort == ClusterClientCursorParams::kWholeSortKeySortPattern));
 }
 
-ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock> root,
+ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
+                                                 std::unique_ptr<RouterStageMock> root,
                                                  ClusterClientCursorParams&& params,
                                                  boost::optional<LogicalSessionId> lsid)
-    : _params(std::move(params)), _root(std::move(root)), _lsid(lsid) {
+    : _params(std::move(params)), _root(std::move(root)), _lsid(lsid), _opCtx(opCtx) {
     dassert(!_params.compareWholeSortKey ||
             SimpleBSONObjComparator::kInstance.evaluate(
                 _params.sort == ClusterClientCursorParams::kWholeSortKeySortPattern));
@@ -90,6 +94,13 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(std::unique_ptr<RouterStageMock
 
 StatusWith<ClusterQueryResult> ClusterClientCursorImpl::next(
     RouterExecStage::ExecContext execContext) {
+
+    invariant(_opCtx);
+    const auto interruptStatus = _opCtx->checkForInterruptNoAssert();
+    if (!interruptStatus.isOK()) {
+        return interruptStatus;
+    }
+
     // First return stashed results, if there are any.
     if (!_stash.empty()) {
         auto front = std::move(_stash.front());
@@ -110,10 +121,12 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
 }
 
 void ClusterClientCursorImpl::reattachToOperationContext(OperationContext* opCtx) {
+    _opCtx = opCtx;
     _root->reattachToOperationContext(opCtx);
 }
 
 void ClusterClientCursorImpl::detachFromOperationContext() {
+    _opCtx = nullptr;
     _root->detachFromOperationContext();
 }
 
