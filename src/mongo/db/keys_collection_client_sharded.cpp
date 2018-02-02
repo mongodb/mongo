@@ -29,11 +29,10 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/keys_collection_client_sharded.h"
+
 #include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {
-
-namespace {}  // namespace
 
 KeysCollectionClientSharded::KeysCollectionClientSharded(ShardingCatalogClient* client)
     : _catalogClient(client) {}
@@ -50,4 +49,5 @@ Status KeysCollectionClientSharded::insertNewKey(OperationContext* opCtx, const 
     return _catalogClient->insertConfigDocument(
         opCtx, KeysCollectionDocument::ConfigNS, doc, ShardingCatalogClient::kMajorityWriteConcern);
 }
+
 }  // namespace mongo

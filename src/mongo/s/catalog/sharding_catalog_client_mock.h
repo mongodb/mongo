@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include "mongo/s/catalog/dist_lock_manager.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {

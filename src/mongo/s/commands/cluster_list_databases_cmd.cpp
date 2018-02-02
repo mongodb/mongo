@@ -29,7 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include <map>
-#include <string>
 #include <vector>
 
 #include "mongo/bson/util/bson_extract.h"
@@ -37,35 +36,28 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {
-
-using std::unique_ptr;
-using std::map;
-using std::string;
-using std::vector;
-
 namespace {
 
 class ListDatabasesCmd : public BasicCommand {
 public:
     ListDatabasesCmd() : BasicCommand("listDatabases", "listdatabases") {}
 
-    AllowedOnSecondary secondaryAllowed() const final {
+    AllowedOnSecondary secondaryAllowed() const override {
         return AllowedOnSecondary::kAlways;
     }
 
-    bool adminOnly() const final {
+    bool adminOnly() const override {
         return true;
     }
 
 
-    bool supportsWriteConcern(const BSONObj& cmd) const final {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -80,7 +72,7 @@ public:
      */
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) final {
+                               const BSONObj& cmdObj) override {
         return Status::OK();
     }
 
@@ -88,13 +80,13 @@ public:
     bool run(OperationContext* opCtx,
              const std::string& dbname_unused,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) final {
+             BSONObjBuilder& result) override {
         const bool nameOnly = cmdObj["nameOnly"].trueValue();
 
-        map<string, long long> sizes;
-        map<string, unique_ptr<BSONObjBuilder>> dbShardInfo;
+        std::map<std::string, long long> sizes;
+        std::map<std::string, std::unique_ptr<BSONObjBuilder>> dbShardInfo;
 
-        vector<ShardId> shardIds;
+        std::vector<ShardId> shardIds;
         grid.shardRegistry()->getAllShardIds(&shardIds);
         shardIds.emplace_back(ShardRegistry::kConfigServerShardId);
 
@@ -120,7 +112,7 @@ public:
             while (j.more()) {
                 BSONObj dbObj = j.next().Obj();
 
-                const string name = dbObj["name"].String();
+                const auto name = dbObj["name"].String();
 
                 // If this is the admin db, only collect its stats from the config servers.
                 if (name == "admin" && !s->isConfig()) {
@@ -143,8 +135,8 @@ public:
                     sizeSumForDbAcrossShards += size;
                 }
 
-                unique_ptr<BSONObjBuilder>& bb = dbShardInfo[name];
-                if (!bb.get()) {
+                auto& bb = dbShardInfo[name];
+                if (!bb) {
                     bb.reset(new BSONObjBuilder());
                 }
 
@@ -163,15 +155,16 @@ public:
         // Now that we have aggregated results for all the shards, convert to a response,
         // and compute total sizes.
         long long totalSize = 0;
+
         {
             BSONArrayBuilder dbListBuilder(result.subarrayStart("databases"));
-            for (map<string, long long>::iterator i = sizes.begin(); i != sizes.end(); ++i) {
-                const string name = i->first;
+            for (const auto& sizeEntry : sizes) {
+                const auto& name = sizeEntry.first;
+                const long long size = sizeEntry.second;
 
-                if (name == "local") {
-                    // We don't return local, since all shards have their own independent local
+                // Skip the local database, since all shards have their own independent local
+                if (name == NamespaceString::kLocalDb)
                     continue;
-                }
 
                 if (checkAuth && as &&
                     !as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(name),
@@ -179,8 +172,6 @@ public:
                     // We don't have listDatabases on the cluser or find on this database.
                     continue;
                 }
-
-                long long size = i->second;
 
                 BSONObjBuilder temp;
                 temp.append("name", name);
@@ -208,7 +199,7 @@ public:
         return true;
     }
 
-} clusterCmdListDatabases;
+} listDatabasesCmd;
 
 }  // namespace
 }  // namespace mongo

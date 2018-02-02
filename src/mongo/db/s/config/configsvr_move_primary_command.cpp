@@ -40,7 +40,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
@@ -52,9 +51,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
-using std::string;
-
 namespace {
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
@@ -118,7 +114,7 @@ public:
 
         auto movePrimaryRequest =
             MovePrimary::parse(IDLParserErrorContext("ConfigSvrMovePrimary"), cmdObj);
-        const string dbname = parseNs("", cmdObj);
+        const auto dbname = parseNs("", cmdObj);
 
         uassert(
             ErrorCodes::InvalidNamespace,
@@ -249,7 +245,7 @@ public:
         // reload
         catalogCache->purgeDatabase(dbname);
 
-        const string oldPrimary = fromShard->getConnString().toString();
+        const auto oldPrimary = fromShard->getConnString().toString();
 
         ScopedDbConnection fromconn(fromShard->getConnString());
         ON_BLOCK_EXIT([&fromconn] { fromconn.done(); });

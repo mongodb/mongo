@@ -28,8 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/json.h"
 #include "mongo/db/index/sort_key_generator.h"
-
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/death_test.h"

@@ -45,6 +45,7 @@ class Collection;
 class IndexCatalog;
 class IndexCatalogEntry;
 class IndexCatalogEntryContainer;
+class OperationContext;
 
 /**
  * A cache of information computed from the memory-mapped per-index data (OnDiskIndexData).

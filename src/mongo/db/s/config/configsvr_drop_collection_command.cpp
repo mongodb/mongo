@@ -35,7 +35,6 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
@@ -48,7 +47,6 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
-
 namespace {
 
 MONGO_FP_DECLARE(setDropCollDistLockWait);
@@ -205,6 +203,7 @@ private:
                 shardId, cmdDropResult.response["writeConcernError"], *result);
         }
     };
+
 } configsvrDropCollectionCmd;
 
 }  // namespace

@@ -40,6 +40,7 @@
 
 namespace mongo {
 
+class Collection;
 class IndexDescriptor;
 class OperationContext;
 

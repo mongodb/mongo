@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/sharding_task_executor.h"
+#include "mongo/s/sharding_task_executor.h"
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"

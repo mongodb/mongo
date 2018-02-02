@@ -30,7 +30,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 
 namespace mongo {
 

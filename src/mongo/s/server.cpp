@@ -70,7 +70,6 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_factory.h"
@@ -133,10 +132,13 @@ boost::optional<ShardingUptimeReporter> shardingUptimeReporter;
 static constexpr auto kRetryInterval = Seconds{1};
 
 Status waitForSigningKeys(OperationContext* opCtx) {
+    auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+
     while (true) {
-        // this should be true when shard registry is up
-        invariant(grid.shardRegistry()->isUp());
-        auto configCS = grid.shardRegistry()->getConfigServerConnectionString();
+        // This should be true when shard registry is up
+        invariant(shardRegistry->isUp());
+
+        auto configCS = shardRegistry->getConfigServerConnectionString();
         auto rsm = ReplicaSetMonitor::get(configCS.getSetName());
         // mongod will set minWireVersion == maxWireVersion for isMaster requests from
         // internalClient.

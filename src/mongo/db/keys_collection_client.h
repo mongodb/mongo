@@ -28,17 +28,17 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
+#include <vector>
 
-#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/keys_collection_document.h"
 
 namespace mongo {
 
-class OperationContext;
-class LogicalTime;
 class BSONObj;
+class LogicalTime;
+class OperationContext;
 
 class KeysCollectionClient {
 public:

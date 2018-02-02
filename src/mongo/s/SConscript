@@ -24,17 +24,17 @@ env.Library(
         'sharding_initialization.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/logical_session_cache_factory_mongos',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/network_interface_thread_pool',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_impl',
         '$BUILD_DIR/mongo/s/catalog/replset_dist_lock_manager',
-        '$BUILD_DIR/mongo/db/logical_session_cache_factory_mongos',
-        '$BUILD_DIR/mongo/db/s/sharding_task_executor',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/util/periodic_runner_factory',
         'client/sharding_connection_hook',
         'coreshard',
+        'sharding_task_executor',
     ],
 )
 
@@ -106,7 +106,6 @@ env.Library(
         '$BUILD_DIR/mongo/client/remote_command_targeter_mock',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_mock',
-        '$BUILD_DIR/mongo/db/s/sharding_task_executor',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/executor/network_test_env',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
@@ -117,6 +116,7 @@ env.Library(
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'sharding_egress_metadata_hook_for_mongos',
+        'sharding_task_executor',
     ],
 )
 
@@ -232,6 +232,20 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/update/update_common',
         'common_s',
+    ],
+)
+
+
+env.Library(
+    target='sharding_task_executor',
+    source=[
+        'sharding_task_executor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/s/cluster_last_error_info',
     ],
 )
 

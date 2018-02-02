@@ -20,19 +20,6 @@ env.Library(
 )
 
 env.Library(
-    target='sharding_task_executor',
-    source=[
-        'sharding_task_executor.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/cluster_last_error_info',
-    ],
-)
-
-env.Library(
     target='migration_types',
     source=[
         'migration_session_id.cpp',
@@ -106,11 +93,11 @@ env.Library(
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/mongo/s/sharding_initialization',
+        '$BUILD_DIR/mongo/s/sharding_task_executor',
         '$BUILD_DIR/mongo/util/elapsed_tracker',
         'balancer',
         'collection_metadata',
         'migration_types',
-        'sharding_task_executor',
         'type_shard_identity',
     ],
     LIBDEPS_TAGS=[
