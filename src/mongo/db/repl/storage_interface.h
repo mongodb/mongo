@@ -179,6 +179,15 @@ public:
                                     bool stayTemp) = 0;
 
     /**
+     * Sets the given index on the given namespace as multikey with the given paths. Does the
+     * write at the provided timestamp.
+     */
+    virtual Status setIndexIsMultikey(OperationContext* opCtx,
+                                      const NamespaceString& nss,
+                                      const std::string& indexName,
+                                      const MultikeyPaths& paths,
+                                      Timestamp ts) = 0;
+    /**
      * Drops all databases except "local".
      */
     virtual Status dropReplicatedDatabases(OperationContext* opCtx) = 0;

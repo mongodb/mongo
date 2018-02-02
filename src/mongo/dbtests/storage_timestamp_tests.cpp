@@ -45,25 +45,34 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/op_observer_impl.h"
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
+#include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_storage_engine.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
+
+const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
 class StorageTimestampTest {
 public:
@@ -80,6 +89,7 @@ public:
     const Timestamp futureTs = futureLt.asTimestamp();
     const Timestamp nullTs = Timestamp();
     const int presentTerm = 1;
+    repl::ReplicationCoordinatorMock* _coordinatorMock;
 
     StorageTimestampTest() {
         if (mongo::storageGlobalParams.engine != "wiredTiger") {
@@ -91,10 +101,19 @@ public:
         replSettings.setReplSetString("rs0");
         auto coordinatorMock =
             new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings);
+        _coordinatorMock = coordinatorMock;
         coordinatorMock->alwaysAllowWrites(true);
         setGlobalReplicationCoordinator(coordinatorMock);
         repl::StorageInterface::set(_opCtx->getServiceContext(),
                                     stdx::make_unique<repl::StorageInterfaceImpl>());
+
+        auto replicationProcess = new repl::ReplicationProcess(
+            repl::StorageInterface::get(_opCtx->getServiceContext()),
+            stdx::make_unique<repl::ReplicationConsistencyMarkersMock>(),
+            stdx::make_unique<repl::ReplicationRecoveryMock>());
+        repl::ReplicationProcess::set(
+            cc().getServiceContext(),
+            std::unique_ptr<repl::ReplicationProcess>(replicationProcess));
 
         // Since the Client object persists across tests, even though the global
         // ReplicationCoordinator does not, we need to clear the last op associated with the client
@@ -350,6 +369,50 @@ public:
         auto allIdents = kvCatalog->getAllIdents(_opCtx);
         ASSERT(std::find(allIdents.begin(), allIdents.end(), collIdent) == allIdents.end());
         ASSERT(std::find(allIdents.begin(), allIdents.end(), indexIdent) == allIdents.end());
+    }
+
+    std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
+        std::stringstream ss;
+
+        ss << "[ ";
+        for (const auto multikeyComponents : multikeyPaths) {
+            ss << "[ ";
+            for (const auto multikeyComponent : multikeyComponents) {
+                ss << multikeyComponent << " ";
+            }
+            ss << "] ";
+        }
+        ss << "]";
+
+        return ss.str();
+    }
+
+    void assertMultikeyPaths(OperationContext* opCtx,
+                             Collection* collection,
+                             StringData indexName,
+                             Timestamp ts,
+                             bool shouldBeMultikey,
+                             const MultikeyPaths& expectedMultikeyPaths) {
+        auto catalog = collection->getCatalogEntry();
+
+        auto recoveryUnit = _opCtx->recoveryUnit();
+        recoveryUnit->abandonSnapshot();
+        ASSERT_OK(recoveryUnit->selectSnapshot(ts));
+
+        MultikeyPaths actualMultikeyPaths;
+        if (!shouldBeMultikey) {
+            ASSERT_FALSE(catalog->isIndexMultikey(opCtx, indexName, &actualMultikeyPaths));
+        } else {
+            ASSERT(catalog->isIndexMultikey(opCtx, indexName, &actualMultikeyPaths));
+        }
+
+        const bool match = (expectedMultikeyPaths == actualMultikeyPaths);
+        if (!match) {
+            FAIL(str::stream() << "Expected: " << dumpMultikeyPaths(expectedMultikeyPaths)
+                               << ", Actual: "
+                               << dumpMultikeyPaths(actualMultikeyPaths));
+        }
+        ASSERT_TRUE(match);
     }
 };
 
@@ -1085,6 +1148,259 @@ public:
     }
 };
 
+class SecondarySetIndexMultikeyOnInsert : public StorageTimestampTest {
+
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // Pretend to be a secondary.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        NamespaceString nss("unittests.SecondarySetIndexMultikeyOnInsert");
+        reset(nss);
+        UUID uuid = UUID::gen();
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            uuid = autoColl.getCollection()->uuid().get();
+        }
+        auto indexName = "a_1";
+        auto indexSpec =
+            BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
+                        << static_cast<int>(kIndexVersion));
+        ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+
+        _coordinatorMock->alwaysAllowWrites(false);
+
+        const LogicalTime pastTime = _clock->reserveTicks(1);
+        const LogicalTime insertTime0 = _clock->reserveTicks(1);
+        const LogicalTime insertTime1 = _clock->reserveTicks(1);
+        const LogicalTime insertTime2 = _clock->reserveTicks(1);
+
+        BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
+        BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
+        BSONObj doc2 = BSON("_id" << 2 << "a" << BSON_ARRAY(1 << 2));
+        auto op0 = repl::OplogEntry(
+            BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
+                      << "op"
+                      << "i"
+                      << "ns"
+                      << nss.ns()
+                      << "ui"
+                      << uuid
+                      << "o"
+                      << doc0));
+        auto op1 = repl::OplogEntry(
+            BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
+                      << "op"
+                      << "i"
+                      << "ns"
+                      << nss.ns()
+                      << "ui"
+                      << uuid
+                      << "o"
+                      << doc1));
+        auto op2 = repl::OplogEntry(
+            BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
+                      << "op"
+                      << "i"
+                      << "ns"
+                      << nss.ns()
+                      << "ui"
+                      << uuid
+                      << "o"
+                      << doc2));
+        std::vector<repl::OplogEntry> ops = {op0, op1, op2};
+
+        repl::SyncTail(nullptr, repl::multiSyncApply).multiApply_forTest(_opCtx, ops);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, pastTime.asTimestamp(), false, {{}});
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, insertTime0.asTimestamp(), true, {{0}});
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, insertTime1.asTimestamp(), true, {{0}});
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, insertTime2.asTimestamp(), true, {{0}});
+    }
+};
+
+class InitialSyncSetIndexMultikeyOnInsert : public StorageTimestampTest {
+
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // Pretend to be a secondary.
+        repl::UnreplicatedWritesBlock uwb(_opCtx);
+
+        NamespaceString nss("unittests.InitialSyncSetIndexMultikeyOnInsert");
+        reset(nss);
+        UUID uuid = UUID::gen();
+        {
+            AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+            uuid = autoColl.getCollection()->uuid().get();
+        }
+        auto indexName = "a_1";
+        auto indexSpec =
+            BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
+                        << static_cast<int>(kIndexVersion));
+        ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+
+        _coordinatorMock->alwaysAllowWrites(false);
+
+        const LogicalTime pastTime = _clock->reserveTicks(1);
+        const LogicalTime insertTime0 = _clock->reserveTicks(1);
+        const LogicalTime indexBuildTime = _clock->reserveTicks(1);
+        const LogicalTime insertTime1 = _clock->reserveTicks(1);
+        const LogicalTime insertTime2 = _clock->reserveTicks(1);
+
+        BSONObj doc0 = BSON("_id" << 0 << "a" << 3);
+        BSONObj doc1 = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
+        BSONObj doc2 = BSON("_id" << 2 << "a" << BSON_ARRAY(1 << 2));
+        auto op0 = repl::OplogEntry(
+            BSON("ts" << insertTime0.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
+                      << "op"
+                      << "i"
+                      << "ns"
+                      << nss.ns()
+                      << "ui"
+                      << uuid
+                      << "o"
+                      << doc0));
+        auto op1 = repl::OplogEntry(
+            BSON("ts" << insertTime1.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
+                      << "op"
+                      << "i"
+                      << "ns"
+                      << nss.ns()
+                      << "ui"
+                      << uuid
+                      << "o"
+                      << doc1));
+        auto op2 = repl::OplogEntry(
+            BSON("ts" << insertTime2.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
+                      << "op"
+                      << "i"
+                      << "ns"
+                      << nss.ns()
+                      << "ui"
+                      << uuid
+                      << "o"
+                      << doc2));
+        auto indexSpec2 = BSON("createIndexes" << nss.coll() << "ns" << nss.ns() << "v"
+                                               << static_cast<int>(kIndexVersion)
+                                               << "key"
+                                               << BSON("b" << 1)
+                                               << "name"
+                                               << "b_1");
+        auto createIndexOp = repl::OplogEntry(BSON(
+            "ts" << indexBuildTime.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
+                 << "op"
+                 << "c"
+                 << "ns"
+                 << nss.getCommandNS().ns()
+                 << "ui"
+                 << uuid
+                 << "o"
+                 << indexSpec2));
+
+        // We add in an index creation op to test that we restart tracking multikey path info
+        // after bulk index builds.
+        std::vector<const repl::OplogEntry*> ops = {&op0, &createIndexOp, &op1, &op2};
+
+        repl::SyncTail syncTail(nullptr, repl::SyncTail::MultiSyncApplyFunc(), nullptr);
+        AtomicUInt32 fetchCount(0);
+        ASSERT_OK(repl::multiInitialSyncApply_noAbort(_opCtx, &ops, &syncTail, &fetchCount));
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, pastTime.asTimestamp(), false, {{}});
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, insertTime0.asTimestamp(), true, {{0}});
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, insertTime1.asTimestamp(), true, {{0}});
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, insertTime2.asTimestamp(), true, {{0}});
+    }
+};
+
+class PrimarySetIndexMultikeyOnInsert : public StorageTimestampTest {
+
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        NamespaceString nss("unittests.PrimarySetIndexMultikeyOnInsert");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        auto indexName = "a_1";
+        auto indexSpec =
+            BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
+                        << static_cast<int>(kIndexVersion));
+        ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+
+        const LogicalTime pastTime = _clock->reserveTicks(1);
+        const LogicalTime insertTime = pastTime.addTicks(1);
+
+        BSONObj doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
+        WriteUnitOfWork wunit(_opCtx);
+        insertDocument(autoColl.getCollection(), InsertStatement(doc));
+        wunit.commit();
+
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, pastTime.asTimestamp(), false, {{}});
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, insertTime.asTimestamp(), true, {{0}});
+    }
+};
+
+class PrimarySetIndexMultikeyOnInsertUnreplicated : public StorageTimestampTest {
+
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        // Use an unreplicated collection.
+        NamespaceString nss("unittests.system.profile");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
+        auto indexName = "a_1";
+        auto indexSpec =
+            BSON("name" << indexName << "ns" << nss.ns() << "key" << BSON("a" << 1) << "v"
+                        << static_cast<int>(kIndexVersion));
+        ASSERT_OK(dbtests::createIndexFromSpec(_opCtx, nss.ns(), indexSpec));
+
+        const LogicalTime pastTime = _clock->reserveTicks(1);
+        const LogicalTime insertTime = pastTime.addTicks(1);
+
+        BSONObj doc = BSON("_id" << 1 << "a" << BSON_ARRAY(1 << 2));
+        WriteUnitOfWork wunit(_opCtx);
+        insertDocument(autoColl.getCollection(), InsertStatement(doc));
+        wunit.commit();
+
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, pastTime.asTimestamp(), true, {{0}});
+        assertMultikeyPaths(
+            _opCtx, autoColl.getCollection(), indexName, insertTime.asTimestamp(), true, {{0}});
+    }
+};
+
 class InitializeMinValid : public StorageTimestampTest {
 public:
     void run() {
@@ -1474,6 +1790,10 @@ public:
         add<SecondaryCreateTwoCollections>();
         add<SecondaryCreateCollectionBetweenInserts>();
         add<PrimaryCreateCollectionInApplyOps>();
+        add<SecondarySetIndexMultikeyOnInsert>();
+        add<InitialSyncSetIndexMultikeyOnInsert>();
+        add<PrimarySetIndexMultikeyOnInsert>();
+        add<PrimarySetIndexMultikeyOnInsertUnreplicated>();
         add<InitializeMinValid>();
         add<SetMinValidInitialSyncFlag>();
         add<SetMinValidToAtLeast>();

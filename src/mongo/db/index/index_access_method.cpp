@@ -46,12 +46,14 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -471,6 +473,13 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
                                      bool mayInterrupt,
                                      bool dupsAllowed,
                                      set<RecordId>* dupsToDrop) {
+    // Do not track multikey path info for index builds.
+    ScopeGuard restartTracker =
+        MakeGuard([opCtx] { MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo(); });
+    if (!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
+        restartTracker.Dismiss();
+    }
+    MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo();
     Timer timer;
 
     std::unique_ptr<BulkBuilder::Sorter::Iterator> i(bulk->_sorter->done());
@@ -549,6 +558,10 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     builder->commit(mayInterrupt);
     return Status::OK();
+}
+
+void IndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx, MultikeyPaths paths) {
+    _btreeState->setMultikey(opCtx, paths);
 }
 
 void IndexAccessMethod::getKeys(const BSONObj& obj,

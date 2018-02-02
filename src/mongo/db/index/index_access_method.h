@@ -190,6 +190,11 @@ public:
      */
     Status compact(OperationContext* opCtx);
 
+    /**
+     * Sets this index as multikey with the provided paths.
+     */
+    void setIndexIsMultikey(OperationContext* opCtx, MultikeyPaths paths);
+
     //
     // Bulk operations support
     //

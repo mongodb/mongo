@@ -451,6 +451,7 @@ env.Library(
     target='service_context',
     source=[
         'client.cpp',
+        'multi_key_path_tracker.cpp',
         'operation_context.cpp',
         'service_context.cpp',
         'service_context_noop.cpp',
