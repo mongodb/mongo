@@ -73,12 +73,18 @@ intrusive_ptr<DocumentSource> DocumentSourceSingleDocumentTransformation::optimi
 }
 
 void DocumentSourceSingleDocumentTransformation::doDispose() {
-    _parsedTransform.reset();
+    if (_parsedTransform) {
+        // Cache the stage options document in case this stage is serialized after disposing.
+        _cachedStageOptions = _parsedTransform->serializeStageOptions(pExpCtx->explain);
+        _parsedTransform.reset();
+    }
 }
 
 Value DocumentSourceSingleDocumentTransformation::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(Document{{getSourceName(), _parsedTransform->serializeStageOptions(explain)}});
+    return Value(Document{{getSourceName(),
+                           _parsedTransform ? _parsedTransform->serializeStageOptions(explain)
+                                            : _cachedStageOptions}});
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceSingleDocumentTransformation::doOptimizeAt(

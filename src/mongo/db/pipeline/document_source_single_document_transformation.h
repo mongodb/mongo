@@ -142,6 +142,10 @@ private:
 
     // Specific name of the transformation.
     std::string _name;
+
+    // Cached stage options in case this DocumentSource is disposed before serialized (e.g. explain
+    // with a sort which will auto-dispose of the pipeline).
+    Document _cachedStageOptions;
 };
 
 }  // namespace mongo
