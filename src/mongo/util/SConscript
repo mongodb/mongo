@@ -711,3 +711,24 @@ icuEnv.Library(
     ],
 )
 
+icuEnv.Library(
+    target='icu',
+    source=[
+        'icu.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'icu_init',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/shim_icu',
+    ],
+)
+
+icuEnv.CppUnitTest(
+    target='icu_test',
+    source=[
+        'icu_test.cpp',
+    ],
+    LIBDEPS=[
+        'icu',
+    ],
+)
