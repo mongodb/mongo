@@ -1868,16 +1868,6 @@ Examples:
                               help="Set the FeatureCompatibilityVersion of mongod.",
                               default=None)
 
-    # Program options
-    program_options.add_option("--remotePython",
-                               dest="remote_python",
-                               help="The python intepreter to use on the remote host"
-                                    " [default: '%default']."
-                                    " To be able to use a python virtual environment,"
-                                    " which has already been provisioned on the remote"
-                                    " host, specify something similar to this:"
-                                    " 'source venv/bin/activate;  python'",
-                               default="python")
     mongod_options.add_option("--removeLockFile",
                               dest="remove_lock_file",
                               help="If specified, the mongod.lock file will be deleted after a"
