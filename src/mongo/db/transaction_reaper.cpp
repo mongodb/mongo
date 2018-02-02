@@ -154,7 +154,10 @@ int handleBatchHelper(SessionsCollection* sessionsCollection,
     Locker::LockSnapshot snapshot;
     invariant(locker->saveLockStateAndUnlock(&snapshot));
 
-    const auto guard = MakeGuard([&] { locker->restoreLockState(snapshot); });
+    const auto guard = MakeGuard([&] {
+        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        locker->restoreLockState(opCtx, snapshot);
+    });
 
     // Top-level locks are freed, release any potential low-level (storage engine-specific
     // locks). If we are yielding, we are at a safe place to do so.

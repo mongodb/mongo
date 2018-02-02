@@ -1042,7 +1042,7 @@ bool WiredTigerRecordStore::yieldAndAwaitOplogDeletionRequest(OperationContext* 
     oplogStones->awaitHasExcessStonesOrDead();
 
     // Reacquire the locks that were released.
-    locker->restoreLockState(snapshot);
+    locker->restoreLockState(opCtx, snapshot);
 
     return !oplogStones->isDead();
 }

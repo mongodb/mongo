@@ -262,6 +262,7 @@ Message getMore(OperationContext* opCtx,
     // Note that we acquire our locks before our ClientCursorPin, in order to ensure that the pin's
     // destructor is called before the lock's destructor (if there is one) so that the cursor
     // cleanup can occur under the lock.
+    UninterruptableLockGuard noInterrupt(opCtx->lockState());
     boost::optional<AutoGetCollectionForRead> readLock;
     boost::optional<AutoStatsTracker> statsTracker;
     CursorManager* cursorManager;

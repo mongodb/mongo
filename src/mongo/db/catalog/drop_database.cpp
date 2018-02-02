@@ -117,6 +117,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     using Result = boost::optional<Status>;
     // Get an optional result--if it's there, early return; otherwise, wait for collections to drop.
     auto result = writeConflictRetry(opCtx, "dropDatabase_collection", dbName, [&] {
+        UninterruptableLockGuard noInterrupt(opCtx->lockState());
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
         Database* const db = autoDB.getDb();
@@ -197,6 +198,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     // If waitForWriteConcern() returns an error or throws an exception, we should reset the
     // drop-pending state on Database.
     auto dropPendingGuardWhileAwaitingReplication = MakeGuard([dbName, opCtx] {
+        UninterruptableLockGuard noInterrupt(opCtx->lockState());
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
         if (auto db = autoDB.getDb()) {
@@ -247,6 +249,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     dropPendingGuardWhileAwaitingReplication.Dismiss();
 
     return writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
+        UninterruptableLockGuard noInterrupt(opCtx->lockState());
         Lock::GlobalWrite lk(opCtx);
         AutoGetDb autoDB(opCtx, dbName, MODE_X);
         auto db = autoDB.getDb();

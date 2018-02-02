@@ -882,6 +882,9 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
     bool tailing = true;
     oplogReader.tailCheck();
 
+    // Due to the lack of exception handlers, don't allow lock interrupts.
+    UninterruptableLockGuard noInterrupt(opCtx->lockState());
+
     bool initial = syncedTo.isNull();
 
     if (!oplogReader.haveCursor() || initial) {
@@ -1301,6 +1304,7 @@ static void replMasterThread() {
         OperationContext& opCtx = *opCtxPtr;
         AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization();
 
+        UninterruptableLockGuard noInterrupt(opCtx.lockState());
         Lock::GlobalWrite globalWrite(&opCtx, Date_t::now() + Milliseconds(1));
         if (globalWrite.isLocked()) {
             toSleep = 10;

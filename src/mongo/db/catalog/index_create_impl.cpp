@@ -460,7 +460,7 @@ Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* d
         }
 
         if (_buildInBackground) {
-            _opCtx->lockState()->restoreLockState(lockInfo);
+            _opCtx->lockState()->restoreLockState(_opCtx, lockInfo);
             _opCtx->recoveryUnit()->abandonSnapshot();
             return Status(ErrorCodes::OperationFailed,
                           "background index build aborted due to failpoint");

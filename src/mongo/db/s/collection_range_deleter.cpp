@@ -102,6 +102,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
     auto notification = DeleteNotification();
 
     {
+        UninterruptableLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
 
         auto* const collection = autoColl.getCollection();
@@ -240,6 +241,8 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
         LOG(0) << "Error when waiting for write concern after removing " << nss << " range "
                << redact(range->toString()) << " : " << redact(status.reason());
 
+        // Don't allow lock interrupts while cleaning up.
+        UninterruptableLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         auto* const css = CollectionShardingState::get(opCtx, nss);
 

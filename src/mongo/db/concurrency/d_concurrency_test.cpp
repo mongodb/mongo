@@ -39,6 +39,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
@@ -46,6 +47,7 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -108,6 +110,26 @@ public:
             clients.emplace_back(std::move(client), std::move(opCtx));
         }
         return clients;
+    }
+
+    stdx::future<void> runTaskAndKill(OperationContext* opCtx,
+                                      stdx::function<void()> fn,
+                                      stdx::function<void()> postKill = nullptr) {
+        auto task = stdx::packaged_task<void()>(fn);
+        auto result = task.get_future();
+        stdx::thread taskThread{std::move(task)};
+
+        auto taskThreadJoiner = MakeGuard([&] { taskThread.join(); });
+
+        {
+            stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+            opCtx->markKilled();
+        }
+
+        if (postKill)
+            postKill();
+
+        return result;
     }
 
     /**
@@ -633,6 +655,101 @@ TEST_F(DConcurrencyTestFixture, TempReleaseRecursive) {
 
     ASSERT(lockState->isW());
 }
+
+TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptable) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
+    // to acquire a conflicting lock.
+    Lock::GlobalLock GlobalLock(opCtx1, MODE_X, Date_t::max());
+
+    auto result = runTaskAndKill(opCtx2, [&]() {
+        // Killing the lock wait should throw an exception.
+        Lock::GlobalLock g(opCtx2, MODE_S, Date_t::max());
+    });
+
+    ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptableMMAP) {
+    auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
+
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
+    // to acquire a conflicting lock.
+    Lock::GlobalLock GlobalLock(opCtx1, MODE_X, Date_t::max());
+
+    // This thread attemps to acquire a conflicting lock, which will block until the first
+    // unlocks.
+    auto result = runTaskAndKill(opCtx2, [&]() {
+        // Killing the lock wait should throw an exception.
+        Lock::GlobalLock g(opCtx2, MODE_S, Date_t::max());
+    });
+
+    ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockWaitIsInterruptable) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
+    // to acquire a conflicting lock.
+    Lock::DBLock dbLock(opCtx1, "db", MODE_X);
+
+    auto result = runTaskAndKill(opCtx2, [&]() {
+        // This lock conflicts with the other DBLock.
+        Lock::DBLock d(opCtx2, "db", MODE_S);
+    });
+
+    ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
+}
+
+TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsNotInterruptableWithLockGuard) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
+
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+    // The main thread takes an exclusive lock, causing the spawned thread wait when it attempts to
+    // acquire a conflicting lock.
+    boost::optional<Lock::GlobalLock> globalLock = Lock::GlobalLock(opCtx1, MODE_X, Date_t::max());
+
+    // Killing the lock wait should not interrupt it.
+    auto result = runTaskAndKill(opCtx2,
+                                 [&]() {
+                                     UninterruptableLockGuard noInterrupt(opCtx2->lockState());
+                                     Lock::GlobalLock g(opCtx2, MODE_S, Date_t::max());
+                                 },
+                                 [&]() { globalLock.reset(); });
+    // Should not throw an exception.
+    result.get();
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockWaitIsNotInterruptableWithLockGuard) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opCtx1 = clients[0].second.get();
+    auto opCtx2 = clients[1].second.get();
+
+    // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
+    // to acquire a conflicting lock.
+    boost::optional<Lock::DBLock> dbLock = Lock::DBLock(opCtx1, "db", MODE_X);
+
+    // Killing the lock wait should not interrupt it.
+    auto result = runTaskAndKill(opCtx2,
+                                 [&]() {
+                                     UninterruptableLockGuard noInterrupt(opCtx2->lockState());
+                                     Lock::DBLock d(opCtx2, "db", MODE_S);
+                                 },
+                                 [&] { dbLock.reset(); });
+    // Should not throw an exception.
+    result.get();
+}
+
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesS) {
     auto opCtx = makeOpCtx();

@@ -37,8 +37,8 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/condition_variable.h"
@@ -529,84 +529,6 @@ private:
     // When true, the cursor used by this operation will be stashed for use by a subsequent network
     // operation.
     bool _hasStashedCursor = false;
-};
-
-class WriteUnitOfWork {
-    MONGO_DISALLOW_COPYING(WriteUnitOfWork);
-
-public:
-    WriteUnitOfWork() = default;
-
-    WriteUnitOfWork(OperationContext* opCtx)
-        : _opCtx(opCtx), _toplevel(opCtx->_ruState == OperationContext::kNotInUnitOfWork) {
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot execute a write operation in read-only mode",
-                !storageGlobalParams.readOnly);
-        _opCtx->lockState()->beginWriteUnitOfWork();
-        if (_toplevel) {
-            _opCtx->recoveryUnit()->beginUnitOfWork(_opCtx);
-            _opCtx->_ruState = OperationContext::kActiveUnitOfWork;
-        }
-    }
-
-    ~WriteUnitOfWork() {
-        dassert(!storageGlobalParams.readOnly);
-        if (!_released && !_committed) {
-            invariant(_opCtx->_ruState != OperationContext::kNotInUnitOfWork);
-            if (_toplevel) {
-                _opCtx->recoveryUnit()->abortUnitOfWork();
-                _opCtx->_ruState = OperationContext::kNotInUnitOfWork;
-            } else {
-                _opCtx->_ruState = OperationContext::kFailedUnitOfWork;
-            }
-            _opCtx->lockState()->endWriteUnitOfWork();
-        }
-    }
-
-    /**
-     * Creates a top-level WriteUnitOfWork without changing RecoveryUnit or Locker state. For use
-     * when the RecoveryUnit and Locker are already in an active state.
-     */
-    static std::unique_ptr<WriteUnitOfWork> createForSnapshotResume(OperationContext* opCtx) {
-        auto wuow = stdx::make_unique<WriteUnitOfWork>();
-        wuow->_opCtx = opCtx;
-        wuow->_toplevel = true;
-        wuow->_opCtx->_ruState = OperationContext::kActiveUnitOfWork;
-        return wuow;
-    }
-
-    /**
-     * Releases the OperationContext RecoveryUnit and Locker objects from management without
-     * changing state. Allows for use of these objects beyond the WriteUnitOfWork lifespan.
-     */
-    void release() {
-        invariant(_opCtx->_ruState == OperationContext::kActiveUnitOfWork);
-        invariant(!_committed);
-        invariant(_toplevel);
-
-        _released = true;
-        _opCtx->_ruState = OperationContext::kNotInUnitOfWork;
-    }
-
-    void commit() {
-        invariant(!_committed);
-        invariant(!_released);
-        invariant(_opCtx->_ruState == OperationContext::kActiveUnitOfWork);
-        if (_toplevel) {
-            _opCtx->recoveryUnit()->commitUnitOfWork();
-            _opCtx->_ruState = OperationContext::kNotInUnitOfWork;
-        }
-        _opCtx->lockState()->endWriteUnitOfWork();
-        _committed = true;
-    }
-
-private:
-    OperationContext* _opCtx;
-
-    bool _toplevel;
-
-    bool _committed = false;
-    bool _released = false;
 };
 
 namespace repl {

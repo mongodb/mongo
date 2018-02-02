@@ -887,6 +887,7 @@ var ReplSetTest = function(opts) {
             // if a heartbeat times out during the quorum check.
             // They may also fail with NewReplicaSetConfigurationIncompatible on similar timeout
             // during the config validation stage while deducing isSelf().
+            // This can fail with an InterruptedDueToReplStateChange error when interrupted.
             // We retry three times to reduce the chance of failing this way.
             assert.retry(() => {
                 var res;
@@ -905,10 +906,13 @@ var ReplSetTest = function(opts) {
                     throw e;
                 }
 
-                assert.commandFailedWithCode(
-                    res,
-                    [ErrorCodes.NodeNotFound, ErrorCodes.NewReplicaSetConfigurationIncompatible],
-                    "replSetReconfig during initiate failed");
+                assert.commandFailedWithCode(res,
+                                             [
+                                               ErrorCodes.NodeNotFound,
+                                               ErrorCodes.NewReplicaSetConfigurationIncompatible,
+                                               ErrorCodes.InterruptedDueToReplStateChange
+                                             ],
+                                             "replSetReconfig during initiate failed");
                 return false;
             }, "replSetReconfig during initiate failed", 3, 5 * 1000);
         }

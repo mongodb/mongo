@@ -187,6 +187,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="write_unit_of_work",
+    source=[
+        "write_unit_of_work.cpp",
+    ],
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/storage/storage_options",
+    ],
+)
+
 env.CppUnitTest(
     target= 'storage_engine_lock_file_test',
     source = 'storage_engine_lock_file_test.cpp',

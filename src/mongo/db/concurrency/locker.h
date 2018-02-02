@@ -33,6 +33,7 @@
 
 #include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/concurrency/lock_stats.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
@@ -45,6 +46,8 @@ namespace mongo {
  */
 class Locker {
     MONGO_DISALLOW_COPYING(Locker);
+
+    friend class UninterruptableLockGuard;
 
 public:
     virtual ~Locker() {}
@@ -108,6 +111,7 @@ public:
      * This method can be called recursively, but each call to lockGlobal must be accompanied
      * by a call to unlockGlobal.
      *
+     * @param opCtx OperationContext used to interrupt the lock waiting, if provided.
      * @param mode Mode in which the global lock should be acquired. Also indicates the intent
      *              of the operation.
      *
@@ -115,6 +119,7 @@ public:
      *          acquired within the specified time bound. Otherwise, the respective failure
      *          code and neither lock will be acquired.
      */
+    virtual LockResult lockGlobal(OperationContext* opCtx, LockMode mode) = 0;
     virtual LockResult lockGlobal(LockMode mode) = 0;
 
     /**
@@ -126,6 +131,12 @@ public:
      * method has a deadline for use with the TicketHolder, if there is one.
      */
     virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) = 0;
+
+    /**
+     * Calling lockGlobalComplete without an OperationContext does not allow the lock acquisition
+     * to be interrupted.
+     */
+    virtual LockResult lockGlobalComplete(OperationContext* opCtx, Date_t deadline) = 0;
     virtual LockResult lockGlobalComplete(Date_t deadline) = 0;
 
     /**
@@ -175,6 +186,7 @@ public:
      * of the lock. Therefore, each call, which returns LOCK_OK must be matched with a
      * corresponding call to unlock.
      *
+     * @param opCtx If provided, will be used to interrupt a LOCK_WAITING state.
      * @param resId Id of the resource to be locked.
      * @param mode Mode in which the resource should be locked. Lock upgrades are allowed.
      * @param deadline How long to wait for the lock to be granted, before
@@ -186,6 +198,16 @@ public:
      *              which acquire locks.
      *
      * @return All LockResults except for LOCK_WAITING, because it blocks.
+     */
+    virtual LockResult lock(OperationContext* opCtx,
+                            ResourceId resId,
+                            LockMode mode,
+                            Date_t deadline = Date_t::max(),
+                            bool checkDeadlock = false) = 0;
+
+    /**
+     * Calling lock without an OperationContext does not allow LOCK_WAITING states to be
+     * interrupted.
      */
     virtual LockResult lock(ResourceId resId,
                             LockMode mode,
@@ -297,7 +319,9 @@ public:
 
     /**
      * Re-locks all locks whose state was stored in 'stateToRestore'.
+     * @param opCtx An operation context that enables the restoration to be interrupted.
      */
+    virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore) = 0;
     virtual void restoreLockState(const LockSnapshot& stateToRestore) = 0;
 
     /**
@@ -362,9 +386,50 @@ public:
 protected:
     Locker() {}
 
+    /**
+     * The number of callers that are guarding from lock interruptions.
+     * When 0, all lock acquisitions are interruptable. When positive, no lock acquisitions
+     * are interruptable. This is only true for database and global locks. Collection locks are
+     * never interruptable.
+     */
+    int _uninterruptableLocksRequested = 0;
+
 private:
     bool _shouldConflictWithSecondaryBatchApplication = true;
     bool _shouldAcquireTicket = true;
+};
+
+/**
+ * This class prevents lock acquisitions from being interrupted when it is in scope.
+ * The default behavior of acquisitions depends on the type of lock that is being requested.
+ * Use this in the unlikely case that waiting for a lock can't be interrupted.
+ *
+ * Lock acquisitions can still return LOCK_TIMEOUT, just not if the parent operation
+ * context is killed first.
+ *
+ * It is possible that multiple callers are requesting uninterruptable behavior, so the guard
+ * increments a counter on the Locker class to indicate how may guards are active.
+ */
+class UninterruptableLockGuard {
+public:
+    /*
+     * Accepts a Locker, and increments the _uninterruptableLocksRequested. Decrements the
+     * counter when destoyed.
+     */
+    explicit UninterruptableLockGuard(Locker* locker) : _locker(locker) {
+        invariant(_locker);
+        invariant(_locker->_uninterruptableLocksRequested >= 0);
+        invariant(_locker->_uninterruptableLocksRequested < std::numeric_limits<int>::max());
+        _locker->_uninterruptableLocksRequested += 1;
+    }
+
+    ~UninterruptableLockGuard() {
+        invariant(_locker->_uninterruptableLocksRequested > 0);
+        _locker->_uninterruptableLocksRequested -= 1;
+    }
+
+private:
+    Locker* const _locker;
 };
 
 }  // namespace mongo

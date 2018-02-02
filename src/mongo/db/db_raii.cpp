@@ -167,9 +167,13 @@ OldClientContext::OldClientContext(
 }
 
 OldClientContext::~OldClientContext() {
-    // Lock must still be held
-    invariant(_opCtx->lockState()->isLocked());
+    // If in an interrupt, don't record any stats.
+    // It is possible to have no lock after saving the lock state and being interrupted while
+    // waiting to restore.
+    if (_opCtx->getKillStatus() != ErrorCodes::OK)
+        return;
 
+    invariant(_opCtx->lockState()->isLocked());
     auto currentOp = CurOp::get(_opCtx);
     Top::get(_opCtx->getClient()->getServiceContext())
         .record(_opCtx,

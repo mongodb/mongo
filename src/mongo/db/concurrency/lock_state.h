@@ -32,6 +32,7 @@
 
 #include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/spin_lock.h"
 
@@ -58,6 +59,15 @@ public:
      * @param timeout How many milliseconds to wait before returning LOCK_TIMEOUT.
      */
     LockResult wait(Milliseconds timeout);
+
+    /**
+     * Interruptible blocking method, which waits for the notification to fire or an interrupt from
+     * the operation context.
+     *
+     * @param opCtx OperationContext to wait on for an interrupt.
+     * @param timeout How many milliseconds to wait before returning LOCK_TIMEOUT.
+     */
+    LockResult wait(OperationContext* opCtx, Milliseconds timeout);
 
 private:
     virtual void notify(ResourceId resId, LockResult result);
@@ -105,11 +115,17 @@ public:
         _sharedLocksShouldTwoPhaseLock = sharedLocksShouldTwoPhaseLock;
     }
 
-    virtual LockResult lockGlobal(LockMode mode);
+    virtual LockResult lockGlobal(OperationContext* opCtx, LockMode mode);
+    virtual LockResult lockGlobal(LockMode mode) {
+        return lockGlobal(nullptr, mode);
+    }
     virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) {
         return _lockGlobalBegin(mode, deadline);
     }
-    virtual LockResult lockGlobalComplete(Date_t deadline);
+    virtual LockResult lockGlobalComplete(OperationContext* opCtx, Date_t deadline);
+    virtual LockResult lockGlobalComplete(Date_t deadline) {
+        return lockGlobalComplete(nullptr, deadline);
+    }
     virtual void lockMMAPV1Flush();
 
     virtual void downgradeGlobalXtoSForMMAPV1();
@@ -122,10 +138,24 @@ public:
         return _wuowNestingLevel > 0;
     }
 
-    virtual LockResult lock(ResourceId resId,
+    /**
+     * Requests a lock for resource 'resId' with mode 'mode'. An OperationContext 'opCtx' must be
+     * provided to interrupt waiting on the locker condition variable that indicates status of
+     * the lock acquisition. A lock operation would otherwise wait until a timeout or the lock is
+     * granted.
+     */
+    virtual LockResult lock(OperationContext* opCtx,
+                            ResourceId resId,
                             LockMode mode,
                             Date_t deadline = Date_t::max(),
                             bool checkDeadlock = false);
+
+    virtual LockResult lock(ResourceId resId,
+                            LockMode mode,
+                            Date_t deadline = Date_t::max(),
+                            bool checkDeadlock = false) {
+        return lock(nullptr, resId, mode, deadline, checkDeadlock);
+    }
 
     virtual void downgrade(ResourceId resId, LockMode newMode);
 
@@ -142,7 +172,10 @@ public:
 
     virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut);
 
-    virtual void restoreLockState(const LockSnapshot& stateToRestore);
+    virtual void restoreLockState(OperationContext* opCtx, const LockSnapshot& stateToRestore);
+    virtual void restoreLockState(const LockSnapshot& stateToRestore) {
+        restoreLockState(nullptr, stateToRestore);
+    }
 
     virtual void releaseTicket();
 
@@ -175,13 +208,23 @@ public:
      * Waits for the completion of a lock, previously requested through lockBegin or
      * lockGlobalBegin. Must only be called, if lockBegin returned LOCK_WAITING.
      *
+     * @param opCtx Operation context that, if not null, will be used to allow interruptable lock
+     * acquisition.
      * @param resId Resource id which was passed to an earlier lockBegin call. Must match.
      * @param mode Mode which was passed to an earlier lockBegin call. Must match.
      * @param deadline The absolute time point when this lock acquisition will time out, if not yet
      * granted.
      * @param checkDeadlock whether to perform deadlock detection while waiting.
      */
-    LockResult lockComplete(ResourceId resId, LockMode mode, Date_t deadline, bool checkDeadlock);
+    LockResult lockComplete(OperationContext* opCtx,
+                            ResourceId resId,
+                            LockMode mode,
+                            Date_t deadline,
+                            bool checkDeadlock);
+
+    LockResult lockComplete(ResourceId resId, LockMode mode, Date_t deadline, bool checkDeadlock) {
+        return lockComplete(nullptr, resId, mode, deadline, checkDeadlock);
+    }
 
 private:
     friend class AutoYieldFlushLockForMMAPV1Commit;

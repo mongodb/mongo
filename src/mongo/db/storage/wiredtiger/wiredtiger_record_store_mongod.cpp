@@ -103,6 +103,8 @@ public:
                 return false;  // Oplog went away.
             }
             rs->reclaimOplog(&opCtx);
+        } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+            return false;
         } catch (const std::exception& e) {
             severe() << "error in WiredTigerRecordStoreThread: " << e.what();
             fassertFailedNoTrace(!"error in WiredTigerRecordStoreThread");

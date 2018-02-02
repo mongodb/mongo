@@ -1585,6 +1585,7 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     const Date_t stepDownUntil = startTime + stepdownTime;
     const Date_t waitUntil = startTime + waitTime;
 
+    UninterruptableLockGuard noInterrupt(opCtx->lockState());
     if (!getMemberState().primary()) {
         // Note this check is inherently racy - it's always possible for the node to
         // stepdown from some other path before we acquire the global exclusive lock.  This check
