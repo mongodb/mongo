@@ -93,6 +93,7 @@ NEW_DATA_LIST="${DATA_DIR}/icudt${MAJOR_VERSION}l.lst"
 LD_LIBRARY_PATH= eval $("${INSTALL_DIR}/bin/icu-config" --invoke=icupkg) -l "$ORIGINAL_DATA_FILE" \
     > "$ORIGINAL_DATA_LIST"
 
+# Collation data sets
 DESIRED_DATA_DIRECTORIES="coll"
 BASE_FILES="root.res
 ucadata.icu"
@@ -107,6 +108,10 @@ for DESIRED_DATA_DIRECTORY in $DESIRED_DATA_DIRECTORIES; do
             >> "$NEW_DATA_LIST"
     done
 done
+
+# UStringPrepProfile: USPREP_RFC4013_SASLPREP and NFKC normalization.
+grep -E "^rfc4013.spp$" "$ORIGINAL_DATA_LIST" >> "$NEW_DATA_LIST"
+grep -E "^nfkc.nrm$" "$ORIGINAL_DATA_LIST" >> "$NEW_DATA_LIST"
 
 #
 # Extract desired data, and use it to build custom data files.
