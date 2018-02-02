@@ -59,7 +59,6 @@
 #include "mongo/db/ttl.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -147,11 +146,6 @@ void shutdown() {
     if (serviceContext->getGlobalStorageEngine()) {
         serviceContext->shutdownGlobalStorageEngineCleanly();
     }
-
-    // We drop the scope cache because leak sanitizer can't see across the
-    // thread we use for proxying MozJS requests. Dropping the cache cleans up
-    // the memory and makes leak sanitizer happy.
-    ScriptEngine::dropScopeCache();
 
     log(LogComponent::kControl) << "now exiting";
 }
@@ -252,10 +246,6 @@ int initialize(int argc, char* argv[], char** envp) {
 
     if (!storageGlobalParams.readOnly) {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
-    }
-
-    if (mongodGlobalParams.scriptingEnabled) {
-        ScriptEngine::setup();
     }
 
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());
