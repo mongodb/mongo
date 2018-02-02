@@ -584,6 +584,13 @@ functions:
           # activate the virtualenv if it has been set up
           ${activate_virtualenv}
 
+          # Set the TMPDIR environment variable to be a directory in the task's working
+          # directory so that temporary files created by processes spawned by resmoke.py get
+          # cleaned up after the task completes. This also ensures the spawned processes
+          # aren't impacted by limited space in the mount point for the /tmp directory.
+          export TMPDIR="${workdir}/tmp"
+          mkdir -p $TMPDIR
+
           if [ -f /proc/self/coredump_filter ]; then
             # Set the shell process (and its children processes) to dump ELF headers (bit 4),
             # anonymous shared mappings (bit 1), and anonymous private mappings (bit 0).
