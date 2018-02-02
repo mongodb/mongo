@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/cursor_manager.h"
@@ -51,6 +53,7 @@
 #include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/log.h"
 #include "mongo/util/startup_test.h"
 
 namespace mongo {
@@ -420,7 +423,7 @@ void CursorManager::invalidateAll(OperationContext* opCtx,
         for (auto&& exec : partition) {
             // The PlanExecutor is owned elsewhere, so we just mark it as killed and let it be
             // cleaned up later.
-            exec->markAsKilled(reason);
+            exec->markAsKilled({ErrorCodes::QueryPlanKilled, reason});
         }
     }
     allExecPartitions.clear();
@@ -431,7 +434,7 @@ void CursorManager::invalidateAll(OperationContext* opCtx,
     for (auto&& partition : allCurrentPartitions) {
         for (auto it = partition.begin(); it != partition.end();) {
             auto* cursor = it->second;
-            cursor->markAsKilled(reason);
+            cursor->markAsKilled({ErrorCodes::QueryPlanKilled, reason});
 
             // If there's an operation actively using the cursor, then that operation is now
             // responsible for cleaning it up.  Otherwise we can immediately dispose of it.
@@ -541,9 +544,7 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(OperationContext* opCtx,
             !cursor->_operationUsingCursor);
     if (cursor->getExecutor()->isMarkedAsKilled()) {
         // This cursor was killed while it was idle.
-        Status error{ErrorCodes::QueryPlanKilled,
-                     str::stream() << "cursor killed because: "
-                                   << cursor->getExecutor()->getKillReason()};
+        Status error = cursor->getExecutor()->getKillStatus();
         lockedPartition->erase(cursor->cursorid());
         cursor->dispose(opCtx);
         delete cursor;
@@ -572,10 +573,24 @@ void CursorManager::unpin(OperationContext* opCtx, ClientCursor* cursor) {
     // Avoid computing the current time within the critical section.
     auto now = opCtx->getServiceContext()->getPreciseClockSource()->now();
 
-    auto partitionLock = _cursorMap->lockOnePartition(cursor->cursorid());
+    auto partition = _cursorMap->lockOnePartition(cursor->cursorid());
     invariant(cursor->_operationUsingCursor);
+
+    // We must verify that no interrupts have occurred since we finished building the current
+    // batch. Otherwise, the cursor will be checked back in, the interrupted opCtx will be
+    // destroyed, and subsequent getMores with a fresh opCtx will succeed.
+    auto interruptStatus = cursor->_operationUsingCursor->checkForInterruptNoAssert();
     cursor->_operationUsingCursor = nullptr;
     cursor->_lastUseDate = now;
+    if (!interruptStatus.isOK()) {
+        // If an interrupt occurred after the batch was completed, we remove the now-unpinned cursor
+        // from the CursorManager, then dispose of and delete it.
+        LOG(0) << "removing cursor " << cursor->cursorid()
+               << " after completing batch: " << interruptStatus;
+        partition->erase(cursor->cursorid());
+        cursor->dispose(opCtx);
+        delete cursor;
+    }
 }
 
 void CursorManager::getCursorIds(std::set<CursorId>* openCursors) const {

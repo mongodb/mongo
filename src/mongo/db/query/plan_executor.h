@@ -374,10 +374,12 @@ public:
     /**
      * If we're yielding locks, the database we're operating over or any collection we're relying on
      * may be dropped. Plan executors are notified of such events by calling markAsKilled().
-     * Callers must specify the 'reason' for why this executor is being killed. Subsequent calls to
-     * getNext() will return DEAD, and fill 'objOut' with an error detail including 'reason'.
+     * Callers must specify the reason for why this executor is being killed. Subsequent calls to
+     * getNext() will return DEAD, and fill 'objOut' with an error reflecting 'killStatus'. If this
+     * method is called multiple times, only the first 'killStatus' will be retained. It is an error
+     * to call this method with Status::OK.
      */
-    void markAsKilled(std::string reason);
+    void markAsKilled(Status killStatus);
 
     /**
      * Cleans up any state associated with this PlanExecutor. Must be called before deleting this
@@ -446,12 +448,12 @@ public:
     }
 
     bool isMarkedAsKilled() const {
-        return static_cast<bool>(_killReason);
+        return !_killStatus.isOK();
     }
 
-    const std::string& getKillReason() {
+    Status getKillStatus() {
         invariant(isMarkedAsKilled());
-        return *_killReason;
+        return _killStatus;
     }
 
     bool isDisposed() const {
@@ -550,9 +552,9 @@ private:
     std::unique_ptr<QuerySolution> _qs;
     std::unique_ptr<PlanStage> _root;
 
-    // If _killReason has a value, then we have been killed and the value represents the reason for
-    // the kill.
-    boost::optional<std::string> _killReason;
+    // If _killStatus has a non-OK value, then we have been killed and the value represents the
+    // reason for the kill.
+    Status _killStatus = Status::OK();
 
     // What namespace are we operating over?
     NamespaceString _nss;

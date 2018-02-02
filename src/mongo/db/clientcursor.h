@@ -268,10 +268,10 @@ private:
     ~ClientCursor();
 
     /**
-     * Marks this cursor as killed, so any future uses will return an error status including
-     * 'reason'.
+     * Marks this cursor as killed, so any future uses will return 'killStatus'. It is an error to
+     * call this method with Status::OK.
      */
-    void markAsKilled(const std::string& reason);
+    void markAsKilled(Status killStatus);
 
     /**
      * Disposes this ClientCursor's PlanExecutor. Must be called before deleting a ClientCursor to

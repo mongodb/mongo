@@ -115,8 +115,8 @@ ClientCursor::~ClientCursor() {
     }
 }
 
-void ClientCursor::markAsKilled(const std::string& reason) {
-    _exec->markAsKilled(reason);
+void ClientCursor::markAsKilled(Status killStatus) {
+    _exec->markAsKilled(killStatus);
 }
 
 void ClientCursor::dispose(OperationContext* opCtx) {

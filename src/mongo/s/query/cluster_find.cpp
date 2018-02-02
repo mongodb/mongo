@@ -405,7 +405,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     invariant(request.cursorid == pinnedCursor.getValue().getCursorId());
 
     // If the fail point is enabled, busy wait until it is disabled.
-    while (MONGO_FAIL_POINT(keepCursorPinnedDuringGetMore)) {
+    while (MONGO_FAIL_POINT(waitAfterPinningCursorBeforeGetMoreBatch)) {
     }
 
     if (auto readPref = pinnedCursor.getValue().getReadPreference()) {

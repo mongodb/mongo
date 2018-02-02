@@ -9,7 +9,7 @@
 (function() {
     "use strict";
 
-    const kFailPointName = "keepCursorPinnedDuringGetMore";
+    const kFailPointName = "waitAfterPinningCursorBeforeGetMoreBatch";
 
     const st = new ShardingTest({shards: 2});
     const kDBName = "test";

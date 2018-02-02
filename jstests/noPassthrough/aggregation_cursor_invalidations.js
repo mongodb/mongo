@@ -311,7 +311,7 @@
 
     // Use a failpoint to cause a getMore to hang indefinitely.
     assert.commandWorked(testDB.adminCommand(
-        {configureFailPoint: 'keepCursorPinnedDuringGetMore', mode: 'alwaysOn'}));
+        {configureFailPoint: 'waitAfterPinningCursorBeforeGetMoreBatch', mode: 'alwaysOn'}));
     const curOpFilter = {'command.getMore': res.cursor.id};
     assert.eq(0, testDB.currentOp(curOpFilter).inprog.length);
 
@@ -330,8 +330,8 @@
     // Kill the operation.
     const opId = assert.commandWorked(testDB.currentOp(curOpFilter)).inprog[0].opid;
     assert.commandWorked(testDB.killOp(opId));
-    assert.commandWorked(
-        testDB.adminCommand({configureFailPoint: 'keepCursorPinnedDuringGetMore', mode: 'off'}));
+    assert.commandWorked(testDB.adminCommand(
+        {configureFailPoint: 'waitAfterPinningCursorBeforeGetMoreBatch', mode: 'off'}));
     assert.eq(0, awaitParallelShell());
 
     serverStatus = assert.commandWorked(testDB.adminCommand({serverStatus: 1}));

@@ -370,9 +370,7 @@ Status PlanExecutor::restoreStateWithoutRetrying() {
     }
 
     _currentState = kUsable;
-    return isMarkedAsKilled()
-        ? Status{ErrorCodes::QueryPlanKilled, "query killed during yield: " + *_killReason}
-        : Status::OK();
+    return _killStatus;
 }
 
 void PlanExecutor::detachFromOperationContext() {
@@ -501,10 +499,8 @@ PlanExecutor::ExecState PlanExecutor::getNextImpl(Snapshotted<BSONObj>* objOut, 
     invariant(_currentState == kUsable);
     if (isMarkedAsKilled()) {
         if (NULL != objOut) {
-            Status status(ErrorCodes::OperationFailed,
-                          str::stream() << "Operation aborted because: " << *_killReason);
             *objOut = Snapshotted<BSONObj>(SnapshotId(),
-                                           WorkingSetCommon::buildMemberStatusObject(status));
+                                           WorkingSetCommon::buildMemberStatusObject(_killStatus));
         }
         return PlanExecutor::DEAD;
     }
@@ -646,8 +642,12 @@ bool PlanExecutor::isEOF() {
     return isMarkedAsKilled() || (_stash.empty() && _root->isEOF());
 }
 
-void PlanExecutor::markAsKilled(string reason) {
-    _killReason = std::move(reason);
+void PlanExecutor::markAsKilled(Status killStatus) {
+    invariant(!killStatus.isOK());
+    // If killed multiple times, only retain the first status.
+    if (_killStatus.isOK()) {
+        _killStatus = killStatus;
+    }
 }
 
 void PlanExecutor::dispose(OperationContext* opCtx, CursorManager* cursorManager) {
@@ -678,8 +678,7 @@ Status PlanExecutor::executePlan() {
 
     if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
         if (isMarkedAsKilled()) {
-            return Status(ErrorCodes::QueryPlanKilled,
-                          str::stream() << "Operation aborted because: " << *_killReason);
+            return _killStatus;
         }
 
         auto errorStatus = WorkingSetCommon::getMemberObjectStatus(obj);

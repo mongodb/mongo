@@ -202,14 +202,22 @@ void generateBatch(int ntoreturn,
     }
 
     // Propagate any errors to the caller.
-    if (PlanExecutor::FAILURE == *state) {
-        error() << "getMore executor error, stats: " << redact(Explain::getWinningPlanStats(exec));
-        uasserted(17406, "getMore executor error: " + WorkingSetCommon::toStatusString(obj));
-    } else if (PlanExecutor::DEAD == *state) {
-        uasserted(ErrorCodes::QueryPlanKilled,
-                  str::stream() << "PlanExecutor killed: "
-                                << WorkingSetCommon::toStatusString(obj));
+    switch (*state) {
+        // Log an error message and then perform the same cleanup as DEAD.
+        case PlanExecutor::FAILURE:
+            error() << "getMore executor error, stats: "
+                    << redact(Explain::getWinningPlanStats(exec));
+        case PlanExecutor::DEAD: {
+            // We should always have a valid status object by this point.
+            auto status = WorkingSetCommon::getMemberObjectStatus(obj);
+            invariant(!status.isOK());
+            uassertStatusOK(status);
+        }
+        default:
+            return;
     }
+
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace
@@ -324,7 +332,6 @@ Message getMore(OperationContext* opCtx,
             cursorid = 0;
             resultFlags = ResultFlag_CursorNotFound;
         } else {
-            invariant(ccPin == ErrorCodes::QueryPlanKilled || ccPin == ErrorCodes::Unauthorized);
             uassertStatusOK(ccPin.getStatus());
         }
     } else {

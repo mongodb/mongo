@@ -54,13 +54,21 @@ extern const OperationContext::Decoration<AwaitDataState> awaitDataState;
 class BSONObj;
 class QueryRequest;
 
-// Enabling this fail point will cause the getMore command to busy wait after pinning the cursor,
-// until the fail point is disabled.
-MONGO_FP_FORWARD_DECLARE(keepCursorPinnedDuringGetMore);
-
 // Failpoint for making getMore not wait for an awaitdata cursor. Allows us to avoid waiting during
 // tests.
 MONGO_FP_FORWARD_DECLARE(disableAwaitDataForGetMoreCmd);
+
+// Enabling this fail point will cause the getMore command to busy wait after pinning the cursor but
+// before we have started building the batch, until the fail point is disabled.
+MONGO_FP_FORWARD_DECLARE(waitAfterPinningCursorBeforeGetMoreBatch);
+
+// Enabling this fail point will cause the getMore command to busy wait with its cursor pinned while
+// building the batch, until the fail point is disabled.
+MONGO_FP_FORWARD_DECLARE(waitWithPinnedCursorDuringGetMoreBatch);
+
+// Enabling this failpoint will cause the getMore to wait just before it unpins its cursor after it
+// has completed building the current batch.
+MONGO_FP_FORWARD_DECLARE(waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch);
 
 /**
  * Suite of find/getMore related functions used in both the mongod and mongos query paths.
