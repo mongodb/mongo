@@ -1,3 +1,4 @@
+// @tags: [requires_replication]
 (function() {
     "use strict";
 
