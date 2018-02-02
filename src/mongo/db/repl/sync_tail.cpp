@@ -625,15 +625,10 @@ private:
  * ops - This only modifies the isForCappedCollection field on each op. It does not alter the ops
  *      vector in any other way.
  * writerVectors - Set of operations for each worker thread to apply.
- * latestSessionRecords - Populated map of the "latest" transaction table records for each logical
- *      session id present in the given operations. Each record represents the final state of the
- *      transaction table entry for that session id after the operations are applied.
  */
-void fillWriterVectorsAndLatestSessionRecords(
-    OperationContext* opCtx,
-    MultiApplier::Operations* ops,
-    std::vector<MultiApplier::OperationPtrs>* writerVectors,
-    SessionRecordMap* latestSessionRecords) {
+void fillWriterVectors(OperationContext* opCtx,
+                       MultiApplier::Operations* ops,
+                       std::vector<MultiApplier::OperationPtrs>* writerVectors) {
     const auto serviceContext = opCtx->getServiceContext();
     const auto storageEngine = serviceContext->getGlobalStorageEngine();
 
@@ -669,6 +664,23 @@ void fillWriterVectorsAndLatestSessionRecords(
             }
         }
 
+        auto& writer = (*writerVectors)[hash % numWriters];
+        if (writer.empty()) {
+            writer.reserve(8);  // Skip a few growth rounds
+        }
+        writer.push_back(&op);
+    }
+}
+
+/**
+ * Returns a map of the "latest" transaction table records for each logical session id present in
+ * the given operations. Each record represents the final state of the transaction table entry for
+ * that session id after the operations are applied.
+ */
+SessionRecordMap getLatestSessionRecords(const MultiApplier::Operations& ops) {
+    SessionRecordMap latestSessionRecords;
+
+    for (auto&& op : ops) {
         const auto& sessionInfo = op.getOperationSessionInfo();
         if (sessionInfo.getTxnNumber()) {
             const auto& lsid = *sessionInfo.getSessionId();
@@ -680,20 +692,16 @@ void fillWriterVectorsAndLatestSessionRecords(
             invariant(op.getWallClockTime());
             record.setLastWriteDate(*op.getWallClockTime());
 
-            auto it = latestSessionRecords->find(lsid);
-            if (it == latestSessionRecords->end()) {
-                latestSessionRecords->emplace(lsid, std::move(record));
+            auto it = latestSessionRecords.find(lsid);
+            if (it == latestSessionRecords.end()) {
+                latestSessionRecords.emplace(lsid, std::move(record));
             } else if (isSessionTxnRecordLaterThan(record, it->second)) {
-                (*latestSessionRecords)[lsid] = std::move(record);
+                latestSessionRecords[lsid] = std::move(record);
             }
         }
-
-        auto& writer = (*writerVectors)[hash % numWriters];
-        if (writer.empty()) {
-            writer.reserve(8);  // Skip a few growth rounds
-        }
-        writer.push_back(&op);
     }
+
+    return latestSessionRecords;
 }
 
 }  // namespace
@@ -1519,9 +1527,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         scheduleWritesToOplog(opCtx, workerPool, ops);
 
         std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
-        SessionRecordMap latestSessionRecords;
-        fillWriterVectorsAndLatestSessionRecords(
-            opCtx, &ops, &writerVectors, &latestSessionRecords);
+        fillWriterVectors(opCtx, &ops, &writerVectors);
 
         // Wait for writes to finish before applying ops.
         workerPool->join();
@@ -1534,6 +1540,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         workerPool->join();
 
         // Update the transaction table to point to the latest oplog entries for each session id.
+        const auto latestSessionRecords = getLatestSessionRecords(ops);
         scheduleTxnTableUpdates(opCtx, workerPool, latestSessionRecords);
         workerPool->join();
 
