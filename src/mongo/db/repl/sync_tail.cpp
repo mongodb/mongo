@@ -29,7 +29,6 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
 
 #include "mongo/platform/basic.h"
-#include "mongo/platform/bits.h"
 
 #include "mongo/db/repl/sync_tail.h"
 
@@ -92,17 +91,10 @@ AtomicInt32 SyncTail::replBatchLimitOperations{50 * 1000};
 namespace {
 
 /**
- * This variable determines the number of writer threads SyncTail will have. It has a default value,
- * which varies based on architecture and can be overridden using the "replWriterThreadCount" server
- * parameter.
+ * This variable determines the number of writer threads SyncTail will have. It can be overridden
+ * using the "replWriterThreadCount" server parameter.
  */
-#if defined(MONGO_PLATFORM_64)
 int replWriterThreadCount = 16;
-#elif defined(MONGO_PLATFORM_32)
-int replWriterThreadCount = 2;
-#else
-#error need to include something that defines MONGO_PLATFORM_XX
-#endif
 
 class ExportedWriterThreadCountParameter
     : public ExportedServerParameter<int, ServerParameterType::kStartupOnly> {
