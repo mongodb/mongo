@@ -26,7 +26,7 @@ def make_fixture(class_name, *args, **kwargs):
     """
 
     if class_name not in _FIXTURES:
-        raise ValueError("Unknown fixture class '%s'" % (class_name))
+        raise ValueError("Unknown fixture class '%s'" % class_name)
     return _FIXTURES[class_name](*args, **kwargs)
 
 
@@ -75,15 +75,17 @@ class Fixture(object):
 
     def teardown(self, finished=False):
         """
-        Destroys the fixture. Return true if was successful, and false
-        otherwise.
+        Destroys the fixture.
 
         The fixture's logging handlers are closed if 'finished' is true,
         which should happen when setup() won't be called again.
+
+        Raises:
+            errors.ServerFailure: If the teardown is not successful.
         """
 
         try:
-            return self._do_teardown()
+            self._do_teardown()
         finally:
             if finished:
                 for handler in self.logger.handlers:
@@ -93,10 +95,14 @@ class Fixture(object):
 
     def _do_teardown(self):
         """
-        Destroys the fixture. Return true if was successful, and false
-        otherwise.
+        Destroys the fixture.
+
+        This method must be implemented by subclasses.
+
+        Raises:
+            errors.ServerFailure: If the teardown is not successful.
         """
-        return True
+        pass
 
     def is_running(self):
         """
@@ -193,8 +199,18 @@ class ReplFixture(Fixture):
             except pymongo.errors.ConnectionFailure:
                 remaining = deadline - time.time()
                 if remaining <= 0.0:
-                    raise errors.ServerFailure(
-                        "Failed to connect to ".format(self.get_driver_connection_url()))
+                    message = "Failed to connect to {} within {} minutes".format(
+                        self.get_driver_connection_url(), ReplFixture.AWAIT_REPL_TIMEOUT_MINS)
+                    self.logger.error(message)
+                    raise errors.ServerFailure(message)
+            except pymongo.errors.WTimeoutError:
+                message = "Replication of write operation timed out."
+                self.logger.error(message)
+                raise errors.ServerFailure(message)
+            except pymongo.errors.PyMongoError as err:
+                message = "Write operation on {} failed: {}".format(
+                    self.get_driver_connection_url(), err)
+                raise errors.ServerFailure(message)
 
 
 class NoOpFixture(Fixture):
@@ -211,3 +227,56 @@ class NoOpFixture(Fixture):
 
     def get_driver_connection_url(self):
         return None
+
+
+class FixtureTeardownHandler(object):
+    """A helper class used to teardown nodes inside a cluster and keep track of errors."""
+
+    def __init__(self, logger):
+        """Initializes a FixtureTeardownHandler.
+
+        Args:
+            logger: A logger to use to log teardown activity.
+        """
+        self._logger = logger
+        self._success = True
+        self._message = None
+
+    def was_successful(self):
+        """Indicates whether the teardowns performed by this instance were all successful."""
+        return self._success
+
+    def get_error_message(self):
+        """
+        Retrieves the combined error message for all the teardown failures or None if all the
+        teardowns were successful.
+        """
+        return self._message
+
+    def teardown(self, fixture, name):
+        """
+        Tears down the given fixture and logs errors instead of raising a ServerFailure exception.
+
+        Args:
+            fixture: The fixture to tear down.
+            name: The name of the fixture.
+        Returns:
+            True if the teardown is successful, False otherwise.
+        """
+        try:
+            self._logger.info("Stopping %s...", name)
+            fixture.teardown()
+            self._logger.info("Successfully stopped %s.", name)
+            return True
+        except errors.ServerFailure as err:
+            msg = "Error while stopping {}: {}".format(name, err)
+            self._logger.warning(msg)
+            self._add_error_message(msg)
+            self._success = False
+            return False
+
+    def _add_error_message(self, message):
+        if not self._message:
+            self._message = message
+        else:
+            self._message = "{} - {}".format(self._message, message)

@@ -58,8 +58,7 @@ class BackgroundInitialSync(jsfile.JSHook):
             sync_node_conn.admin.command(cmd)
         else:
             # Tear down and restart the initial sync node to start initial sync again.
-            if not sync_node.teardown():
-                raise errors.ServerFailure("%s did not exit cleanly" % (sync_node))
+            sync_node.teardown()
 
             self.hook_test_case.logger.info("Starting the initial sync node back up again...")
             sync_node.setup()
@@ -169,8 +168,7 @@ class IntermediateInitialSync(jsfile.JSHook):
             cmd = bson.SON([("resync", 1)])
             sync_node_conn.admin.command(cmd)
         else:
-            if not sync_node.teardown():
-                raise errors.ServerFailure("%s did not exit cleanly" % (sync_node))
+            sync_node.teardown()
 
             self.hook_test_case.logger.info("Starting the initial sync node back up again...")
             sync_node.setup()

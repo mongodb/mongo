@@ -130,9 +130,12 @@ class PeriodicKillSecondaries(interface.Hook):
                 "Killing the secondary on port %d...", secondary.port)
             secondary.mongod.stop(kill=True)
 
-        # Teardown may or may not be considered a success as a result of killing a secondary, so we
-        # ignore the return value of Fixture.teardown().
-        self.fixture.teardown()
+        try:
+            self.fixture.teardown()
+        except errors.ServerFailure:
+            # Teardown may or may not be considered a success as a result of killing a secondary,
+            # so we ignore ServerFailure raised during teardown.
+            pass
 
     def _check_secondaries_and_restart_fixture(self):
         preserve_dbpaths = []
@@ -149,8 +152,9 @@ class PeriodicKillSecondaries(interface.Hook):
             secondary.await_ready()
             self._await_secondary_state(secondary)
 
-            teardown_success = secondary.teardown()
-            if not teardown_success:
+            try:
+                secondary.teardown()
+            except errors.ServerFailure:
                 raise errors.ServerFailure(
                     "{} did not exit cleanly after reconciling the end of its oplog".format(
                         secondary))
@@ -188,8 +192,9 @@ class PeriodicKillSecondaries(interface.Hook):
         self.hook_test_case.logger.info(
             "Finished verifying data consistency, stopping the fixture...")
 
-        teardown_success = self.fixture.teardown()
-        if not teardown_success:
+        try:
+            self.fixture.teardown()
+        except errors.ServerFailure:
             raise errors.ServerFailure(
                 "{} did not exit cleanly after verifying data consistency".format(self.fixture))
 
@@ -336,8 +341,9 @@ class PeriodicKillSecondaries(interface.Hook):
                             minvalid_ts, latest_oplog_entry_ts, minvalid_doc,
                             latest_oplog_doc))
 
-            teardown_success = secondary.teardown()
-            if not teardown_success:
+            try:
+                secondary.teardown()
+            except errors.ServerFailure:
                 raise errors.ServerFailure(
                     "{} did not exit cleanly after being started up as a standalone".format(
                         secondary))

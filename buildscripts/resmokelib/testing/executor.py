@@ -221,9 +221,10 @@ class TestSuiteExecutor(object):
         success = True
         for job in self._jobs:
             try:
-                if not job.fixture.teardown(finished=True):
-                    self.logger.warn("Teardown of %s was not successful.", job.fixture)
-                    success = False
+                job.fixture.teardown(finished=True)
+            except errors.ServerFailure as err:
+                self.logger.warn("Teardown of %s was not successful: %s", job.fixture, err)
+                success = False
             except:
                 self.logger.exception("Encountered an error while tearing down %s.", job.fixture)
                 success = False

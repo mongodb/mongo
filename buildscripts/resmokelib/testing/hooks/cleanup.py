@@ -9,7 +9,6 @@ import sys
 
 from . import interface
 from ..testcases import interface as testcase
-from ... import errors
 
 
 class CleanEveryN(interface.Hook):
@@ -48,8 +47,7 @@ class CleanEveryN(interface.Hook):
                 self.tests_run)
             self.tests_run = 0
 
-            if not self.fixture.teardown():
-                raise errors.ServerFailure("%s did not exit cleanly" % self.fixture)
+            self.fixture.teardown()
 
             self.hook_test_case.logger.info("Starting the fixture back up again...")
             self.fixture.setup()
