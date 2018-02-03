@@ -51,28 +51,23 @@ namespace {
 
 class ParallelCollectionScanCmd : public BasicCommand {
 public:
-    struct ExtentInfo {
-        ExtentInfo(RecordId dl, size_t s) : diskLoc(dl), size(s) {}
-        RecordId diskLoc;
-        size_t size;
-    };
-
     ParallelCollectionScanCmd() : BasicCommand("parallelCollectionScan") {}
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
+
     AllowedOnSecondary secondaryAllowed() const override {
         return AllowedOnSecondary::kAlways;
     }
 
     bool supportsReadConcern(const std::string& dbName,
                              const BSONObj& cmdObj,
-                             repl::ReadConcernLevel level) const final {
+                             repl::ReadConcernLevel level) const override {
         return true;
     }
 
-    ReadWriteType getReadWriteType() const {
+    ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kCommand;
     }
 
@@ -93,10 +88,10 @@ public:
         return Status::OK();
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
         const NamespaceString ns(CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj));
 
@@ -156,36 +151,34 @@ public:
             mis->addIterator(std::move(iterators[i]));
         }
 
-        {
-            BSONArrayBuilder bucketsBuilder;
-            for (auto&& exec : execs) {
-                // Need to save state while yielding locks between now and getMore().
-                exec->saveState();
-                exec->detachFromOperationContext();
+        BSONArrayBuilder bucketsBuilder;
+        for (auto&& exec : execs) {
+            // Need to save state while yielding locks between now and getMore().
+            exec->saveState();
+            exec->detachFromOperationContext();
 
-                // Create and register a new ClientCursor.
-                auto pinnedCursor = collection->getCursorManager()->registerCursor(
-                    opCtx,
-                    {std::move(exec),
-                     ns,
-                     AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-                     opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
-                     cmdObj});
-                pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(
-                    opCtx->getRemainingMaxTimeMicros());
+            // Create and register a new ClientCursor.
+            auto pinnedCursor = collection->getCursorManager()->registerCursor(
+                opCtx,
+                {std::move(exec),
+                 ns,
+                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
+                 opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+                 cmdObj});
+            pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
 
-                BSONObjBuilder threadResult;
-                appendCursorResponseObject(
-                    pinnedCursor.getCursor()->cursorid(), ns.ns(), BSONArray(), &threadResult);
-                threadResult.appendBool("ok", 1);
+            BSONObjBuilder threadResult;
+            appendCursorResponseObject(
+                pinnedCursor.getCursor()->cursorid(), ns.ns(), BSONArray(), &threadResult);
+            threadResult.appendBool("ok", 1);
 
-                bucketsBuilder.append(threadResult.obj());
-            }
-            result.appendArray("cursors", bucketsBuilder.obj());
+            bucketsBuilder.append(threadResult.obj());
         }
+        result.appendArray("cursors", bucketsBuilder.obj());
 
         return true;
     }
+
 } parallelCollectionScanCmd;
 
 }  // namespace

@@ -228,7 +228,7 @@ TEST_F(DatabaseTest,
     // Replicated collection is renamed with a special drop-pending names in the <db>.system.drop.*
     // namespace.
     auto dpns = _nss.makeDropPendingNamespace(dropOpTime);
-    ASSERT_TRUE(mongo::AutoGetCollectionForRead(_opCtx.get(), dpns).getCollection());
+    ASSERT_TRUE(AutoGetCollectionForRead(_opCtx.get(), dpns).getCollection());
 
     // Reaper should have the drop optime of the collection.
     auto reaperEarliestDropOpTime =

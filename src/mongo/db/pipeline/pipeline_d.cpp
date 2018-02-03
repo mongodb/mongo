@@ -705,11 +705,14 @@ Status PipelineD::MongoDInterface::attachCursorSourceToPipeline(
 
     boost::optional<AutoGetCollectionForReadCommand> autoColl;
     if (expCtx->uuid) {
-        autoColl.emplace(expCtx->opCtx, expCtx->ns.db(), *expCtx->uuid);
-        if (autoColl->getCollection() == nullptr) {
-            // The UUID doesn't exist anymore.
-            return {ErrorCodes::NamespaceNotFound,
-                    "No namespace with UUID " + expCtx->uuid->toString()};
+        try {
+            autoColl.emplace(expCtx->opCtx, expCtx->ns.db(), *expCtx->uuid);
+            uassert(ErrorCodes::NamespaceNotFound,
+                    "No namespace with UUID " + expCtx->uuid->toString(),
+                    autoColl->getCollection());
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+            // The UUID doesn't exist anymore
+            return ex.toStatus();
         }
     } else {
         autoColl.emplace(expCtx->opCtx, expCtx->ns);
@@ -864,14 +867,17 @@ boost::optional<Document> PipelineD::MongoDInterface::lookupSingleDocument(
     invariant(!readConcern);  // We don't currently support a read concern on mongod - it's only
                               // expected to be necessary on mongos.
 
-    // Be sure to do the lookup using the collection default collation.
-    auto foreignExpCtx = expCtx->copyWith(
-        nss, collectionUUID, _getCollectionDefaultCollator(expCtx->opCtx, nss, collectionUUID));
-    auto swPipeline = makePipeline({BSON("$match" << documentKey)}, foreignExpCtx);
-    if (swPipeline == ErrorCodes::NamespaceNotFound) {
+    std::unique_ptr<Pipeline, PipelineDeleter> pipeline;
+    try {
+        // Be sure to do the lookup using the collection default collation
+        auto foreignExpCtx = expCtx->copyWith(
+            nss,
+            collectionUUID,
+            _getCollectionDefaultCollator(expCtx->opCtx, nss.db(), collectionUUID));
+        pipeline = uassertStatusOK(makePipeline({BSON("$match" << documentKey)}, foreignExpCtx));
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         return boost::none;
     }
-    auto pipeline = uassertStatusOK(std::move(swPipeline));
 
     auto lookedUpDocument = pipeline->getNext();
     if (auto next = pipeline->getNext()) {
@@ -888,21 +894,27 @@ boost::optional<Document> PipelineD::MongoDInterface::lookupSingleDocument(
 }
 
 std::unique_ptr<CollatorInterface> PipelineD::MongoDInterface::_getCollectionDefaultCollator(
-    OperationContext* opCtx, const NamespaceString& nss, UUID collectionUUID) {
-    if (_collatorCache.find(collectionUUID) == _collatorCache.end()) {
-        AutoGetCollection autoColl(opCtx, NamespaceStringOrUUID(nss.db(), collectionUUID), MODE_IS);
-        if (!autoColl.getCollection()) {
-            // This collection doesn't exist - since we looked up by UUID, it will never exist in
-            // the future, so we cache a null pointer as the default collation.
-            _collatorCache[collectionUUID] = nullptr;
-        } else {
-            auto defaultCollator = autoColl.getCollection()->getDefaultCollator();
-            // Clone the collator so that we can safely use the pointer if the collection
-            // disappears right after we release the lock.
-            _collatorCache[collectionUUID] = defaultCollator ? defaultCollator->clone() : nullptr;
-        }
+    OperationContext* opCtx, StringData dbName, UUID collectionUUID) {
+    auto it = _collatorCache.find(collectionUUID);
+    if (it == _collatorCache.end()) {
+        auto collator = [&]() -> std::unique_ptr<CollatorInterface> {
+            AutoGetCollection autoColl(opCtx, {dbName, collectionUUID}, MODE_IS);
+            if (!autoColl.getCollection()) {
+                // This collection doesn't exist, so assume a nullptr default collation
+                return nullptr;
+            } else {
+                auto defaultCollator = autoColl.getCollection()->getDefaultCollator();
+                // Clone the collator so that we can safely use the pointer if the collection
+                // disappears right after we release the lock.
+                return defaultCollator ? defaultCollator->clone() : nullptr;
+            }
+        }();
+
+        it = _collatorCache.emplace(collectionUUID, std::move(collator)).first;
     }
-    return _collatorCache[collectionUUID] ? _collatorCache[collectionUUID]->clone() : nullptr;
+
+    auto& collator = it->second;
+    return collator ? collator->clone() : nullptr;
 }
 
 }  // namespace mongo

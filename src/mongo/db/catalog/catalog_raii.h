@@ -73,7 +73,7 @@ private:
  * RAII-style class, which acquires a locks on the specified database and collection in the
  * requested modes and obtains references to both.
  *
- * NOTE: If the collection cannot be resolved to a name, the collection lock will not be held.
+ * NOTE: Throws NamespaceNotFound if the collection UUID cannot be resolved to a name.
  *
  * Any acquired locks may be released when this object goes out of scope, therefore the database
  * and the collection references returned by this class should not be retained.
@@ -124,6 +124,13 @@ public:
         return _view.get();
     }
 
+    /**
+     * Returns the resolved namespace of the collection or view.
+     */
+    const NamespaceString& getNss() const {
+        return _nsAndLock.nss;
+    }
+
 private:
     struct NamespaceAndCollectionLock {
         Lock::CollectionLock lock;
@@ -131,9 +138,7 @@ private:
     };
 
     AutoGetDb _autoDb;
-
-    // This value will be initialized if the UUID can be resolved to a collection name
-    boost::optional<NamespaceAndCollectionLock> _nsAndLock;
+    const NamespaceAndCollectionLock _nsAndLock;
 
     Collection* _coll = nullptr;
     std::shared_ptr<ViewDefinition> _view;

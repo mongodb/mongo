@@ -64,32 +64,33 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
 
-using std::unique_ptr;
-using std::string;
-using std::stringstream;
-
-namespace dps = ::mongo::dotted_path_support;
+namespace dps = dotted_path_support;
 
 class DistinctCommand : public BasicCommand {
 public:
     DistinctCommand() : BasicCommand("distinct") {}
 
+    std::string help() const override {
+        return "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
+    }
+
     AllowedOnSecondary secondaryAllowed() const override {
         return AllowedOnSecondary::kOptIn;
     }
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
     bool supportsReadConcern(const std::string& dbName,
                              const BSONObj& cmdObj,
-                             repl::ReadConcernLevel level) const final {
+                             repl::ReadConcernLevel level) const override {
         return true;
     }
 
-    ReadWriteType getReadWriteType() const {
+    ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
     }
 
@@ -97,30 +98,24 @@ public:
         return FindCommon::kInitReplyBufferSize;
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) override {
         ActionSet actions;
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    std::string help() const override {
-        return "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
-    }
-
-    virtual Status explain(OperationContext* opCtx,
-                           const std::string& dbname,
-                           const BSONObj& cmdObj,
-                           ExplainOptions::Verbosity verbosity,
-                           BSONObjBuilder* out) const {
+    Status explain(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   ExplainOptions::Verbosity verbosity,
+                   BSONObjBuilder* out) const override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-        auto parsedDistinct = ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true);
-        if (!parsedDistinct.isOK()) {
-            return parsedDistinct.getStatus();
-        }
+        auto parsedDistinct =
+            uassertStatusOK(ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true));
 
         AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
@@ -128,7 +123,7 @@ public:
         if (ctx.getView()) {
             ctx.releaseLocksForView();
 
-            auto viewAggregation = parsedDistinct.getValue().asAggregationCommand();
+            auto viewAggregation = parsedDistinct.asAggregationCommand();
             if (!viewAggregation.isOK()) {
                 return viewAggregation.getStatus();
             }
@@ -143,27 +138,22 @@ public:
                 opCtx, nss, viewAggRequest.getValue(), viewAggregation.getValue(), *out);
         }
 
-        auto executor = getExecutorDistinct(
-            opCtx, collection, nss.ns(), &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
-        if (!executor.isOK()) {
-            return executor.getStatus();
-        }
+        auto executor = uassertStatusOK(getExecutorDistinct(
+            opCtx, collection, nss.ns(), &parsedDistinct, PlanExecutor::YIELD_AUTO));
 
-        Explain::explainStages(executor.getValue().get(), collection, verbosity, out);
+        Explain::explainStages(executor.get(), collection, verbosity, out);
         return Status::OK();
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const std::string& dbname,
              const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
+             BSONObjBuilder& result) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-        auto parsedDistinct = ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false);
-        if (!parsedDistinct.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, parsedDistinct.getStatus());
-        }
+        auto parsedDistinct =
+            uassertStatusOK(ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false));
 
         AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
         Collection* collection = ctx.getCollection();
@@ -171,7 +161,7 @@ public:
         if (ctx.getView()) {
             ctx.releaseLocksForView();
 
-            auto viewAggregation = parsedDistinct.getValue().asAggregationCommand();
+            auto viewAggregation = parsedDistinct.asAggregationCommand();
             if (!viewAggregation.isOK()) {
                 return CommandHelpers::appendCommandStatus(result, viewAggregation.getStatus());
             }
@@ -183,7 +173,7 @@ public:
         }
 
         auto executor = getExecutorDistinct(
-            opCtx, collection, nss.ns(), &parsedDistinct.getValue(), PlanExecutor::YIELD_AUTO);
+            opCtx, collection, nss.ns(), &parsedDistinct, PlanExecutor::YIELD_AUTO);
         if (!executor.isOK()) {
             return CommandHelpers::appendCommandStatus(result, executor.getStatus());
         }
@@ -194,7 +184,7 @@ public:
                 Explain::getPlanSummary(executor.getValue().get()));
         }
 
-        string key = cmdObj[ParsedDistinct::kKeyField].valuestrsafe();
+        const auto key = cmdObj[ParsedDistinct::kKeyField].valuestrsafe();
 
         int bufSize = BSONObjMaxUserSize - 4096;
         BufBuilder bb(bufSize);
@@ -267,6 +257,8 @@ public:
 
         return true;
     }
+
 } distinctCmd;
 
+}  // namespace
 }  // namespace mongo

@@ -37,12 +37,6 @@
 namespace mongo {
 namespace {
 
-StringData getDBNameToLock(const NamespaceStringOrUUID& nsOrUUID) {
-    if (nsOrUUID.nss())
-        return nsOrUUID.nss()->db();
-    return nsOrUUID.dbAndUUID()->dbName;
-}
-
 MONGO_FP_DECLARE(setAutoGetCollectionWait);
 
 }  // namespace
@@ -58,36 +52,33 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      LockMode modeDB,
                                      LockMode modeColl,
                                      ViewMode viewMode)
-    : AutoGetCollection(opCtx,
-                        nsOrUUID,
-                        Lock::DBLock(opCtx, getDBNameToLock(nsOrUUID), modeDB),
-                        modeColl,
-                        viewMode) {}
+    : AutoGetCollection(
+          opCtx, nsOrUUID, Lock::DBLock(opCtx, nsOrUUID.db(), modeDB), modeColl, viewMode) {}
 
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,
                                      Lock::DBLock dbLock,
                                      LockMode modeColl,
                                      ViewMode viewMode)
-    : _autoDb(opCtx, getDBNameToLock(nsOrUUID), std::move(dbLock)) {
-    if (nsOrUUID.nss()) {
-        _nsAndLock.emplace(NamespaceAndCollectionLock{
-            Lock::CollectionLock(opCtx->lockState(), nsOrUUID.nss()->ns(), modeColl),
-            *nsOrUUID.nss()});
-    } else {
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-        auto resolvedNss = catalog.lookupNSSByUUID(nsOrUUID.dbAndUUID()->uuid);
+    : _autoDb(opCtx, nsOrUUID.db(), std::move(dbLock)),
+      _nsAndLock([&]() -> NamespaceAndCollectionLock {
+          if (nsOrUUID.nss()) {
+              return {Lock::CollectionLock(opCtx->lockState(), nsOrUUID.nss()->ns(), modeColl),
+                      *nsOrUUID.nss()};
+          } else {
+              UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
+              auto resolvedNss = catalog.lookupNSSByUUID(nsOrUUID.dbAndUUID()->uuid);
 
-        // If the collection UUID cannot be resolved, we can't obtain a collection or check for
-        // views
-        if (!resolvedNss.isValid())
-            return;
+              // If the collection UUID cannot be resolved, we can't obtain a collection or check
+              // for vews
+              uassert(ErrorCodes::NamespaceNotFound,
+                      str::stream() << "Unable to resolve " << nsOrUUID.toString(),
+                      resolvedNss.isValid());
 
-        _nsAndLock.emplace(NamespaceAndCollectionLock{
-            Lock::CollectionLock(opCtx->lockState(), resolvedNss.ns(), modeColl),
-            std::move(resolvedNss)});
-    }
-
+              return {Lock::CollectionLock(opCtx->lockState(), resolvedNss.ns(), modeColl),
+                      std::move(resolvedNss)};
+          }
+      }()) {
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
     MONGO_FAIL_POINT_BLOCK(setAutoGetCollectionWait, customWait) {
         const BSONObj& data = customWait.getData();
@@ -100,7 +91,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     if (!db)
         return;
 
-    _coll = db->getCollection(opCtx, _nsAndLock->nss);
+    _coll = db->getCollection(opCtx, _nsAndLock.nss);
 
     // If the collection exists, there is no need to check for views and we must keep the collection
     // lock
@@ -108,9 +99,9 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         return;
     }
 
-    _view = db->getViewCatalog()->lookup(opCtx, _nsAndLock->nss.ns());
+    _view = db->getViewCatalog()->lookup(opCtx, _nsAndLock.nss.ns());
     uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "Namespace " << _nsAndLock->nss.ns() << " is a view, not a collection",
+            str::stream() << "Namespace " << _nsAndLock.nss.ns() << " is a view, not a collection",
             !_view || viewMode == kViewsPermitted);
 }
 

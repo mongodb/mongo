@@ -143,8 +143,7 @@ public:
         }
 
         // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
-
-        ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx,
@@ -262,7 +261,7 @@ public:
         beginQueryOp(opCtx, nss, cmdObj, ntoreturn, ntoskip);
 
         // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
-        ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx,

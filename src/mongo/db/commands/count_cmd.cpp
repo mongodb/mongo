@@ -59,7 +59,11 @@ class CmdCount : public BasicCommand {
 public:
     CmdCount() : BasicCommand("count") {}
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    std::string help() const override {
+        return "count objects in collection";
+    }
+
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -71,26 +75,22 @@ public:
         return Command::AllowedOnSecondary::kOptIn;
     }
 
-    virtual bool maintenanceOk() const {
+    bool maintenanceOk() const override {
         return false;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const override {
         return false;
     }
 
     bool supportsReadConcern(const std::string& dbName,
                              const BSONObj& cmdObj,
-                             repl::ReadConcernLevel level) const final {
+                             repl::ReadConcernLevel level) const override {
         return true;
     }
 
-    ReadWriteType getReadWriteType() const {
+    ReadWriteType getReadWriteType() const override {
         return ReadWriteType::kRead;
-    }
-
-    std::string help() const override {
-        return "count objects in collection";
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
@@ -110,11 +110,11 @@ public:
         return Status::OK();
     }
 
-    virtual Status explain(OperationContext* opCtx,
-                           const std::string& dbname,
-                           const BSONObj& cmdObj,
-                           ExplainOptions::Verbosity verbosity,
-                           BSONObjBuilder* out) const {
+    Status explain(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   ExplainOptions::Verbosity verbosity,
+                   BSONObjBuilder* out) const override {
         const bool isExplain = true;
         Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
         auto nss = CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj);
@@ -169,10 +169,10 @@ public:
         return Status::OK();
     }
 
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const BSONObj& cmdObj,
-                     BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const string& dbname,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         const bool isExplain = false;
         Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
         auto nss = CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj);

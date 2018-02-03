@@ -79,8 +79,10 @@ struct CommandHelpers {
     static void appendCommandStatus(BSONObjBuilder& result,
                                     bool ok,
                                     const std::string& errmsg = {});
+
     // @return s.isOK()
     static bool appendCommandStatus(BSONObjBuilder& result, const Status& status);
+
     /**
      * Helper for setting a writeConcernError field in the command result object if
      * a writeConcern error occurs.
@@ -95,15 +97,18 @@ struct CommandHelpers {
     static void appendCommandWCStatus(BSONObjBuilder& result,
                                       const Status& awaitReplicationStatus,
                                       const WriteConcernResult& wcResult = WriteConcernResult());
+
     /**
      * Appends passthrough fields from a cmdObj to a given request.
      */
     static BSONObj appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
                                            const BSONObj& request);
+
     /**
      * Returns a copy of 'cmdObj' with a majority writeConcern appended.
      */
     static BSONObj appendMajorityWriteConcern(const BSONObj& cmdObj);
+
     /**
      * Returns true if the provided argument is one that is handled by the command processing layer
      * and should generally be ignored by individual command implementations. In particular,

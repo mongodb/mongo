@@ -457,6 +457,8 @@ public:
     NamespaceStringOrUUID(NamespaceString nss) : _nss(std::move(nss)) {}
     NamespaceStringOrUUID(StringData dbName, UUID uuid) : _dbAndUUID({dbName.toString(), uuid}) {}
 
+    StringData db() const;
+
     const boost::optional<NamespaceString>& nss() const {
         return _nss;
     }

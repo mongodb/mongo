@@ -245,6 +245,12 @@ bool NamespaceString::isReplicated() const {
     return true;
 }
 
+StringData NamespaceStringOrUUID::db() const {
+    if (_nss)
+        return _nss->db();
+    return _dbAndUUID->dbName;
+}
+
 std::string NamespaceStringOrUUID::toString() const {
     if (_nss)
         return _nss->toString();
