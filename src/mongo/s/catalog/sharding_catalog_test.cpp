@@ -45,7 +45,6 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database.h"
@@ -53,6 +52,7 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/sharding_test_fixture.h"
 #include "mongo/s/versioning.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/future.h"
@@ -72,7 +72,7 @@ using std::string;
 using std::vector;
 using unittest::assertGet;
 
-using ShardingCatalogClientTest = ShardingCatalogTestFixture;
+using ShardingCatalogClientTest = ShardingTestFixture;
 
 const int kMaxCommandRetry = 3;
 const NamespaceString kNamespace("TestDB", "TestColl");

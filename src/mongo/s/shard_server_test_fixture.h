@@ -58,8 +58,6 @@ public:
 
     void expectFindOnConfigSendErrorCode(ErrorCodes::Error code);
 
-    void expectFindOnConfigSendBSONObjVector(std::vector<BSONObj> obj);
-
 protected:
     /**
      * Sets up a ClusterRole::ShardServer replica set with a real catalog client and mock dist lock

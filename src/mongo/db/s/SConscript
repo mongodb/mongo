@@ -88,7 +88,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager',
         '$BUILD_DIR/mongo/s/client/shard_local',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/is_mongos',
@@ -147,6 +146,28 @@ env.CppUnitTest(
 )
 
 env.Library(
+    target='sharding_catalog_manager',
+    source=[
+        'config/sharding_catalog_manager_chunk_operations.cpp',
+        'config/sharding_catalog_manager_collection_operations.cpp',
+        'config/sharding_catalog_manager.cpp',
+        'config/sharding_catalog_manager_database_operations.cpp',
+        'config/sharding_catalog_manager_shard_operations.cpp',
+        'config/sharding_catalog_manager_zone_operations.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_raii',
+        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
+        '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/db/s/balancer',
+        '$BUILD_DIR/mongo/executor/network_interface',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
+        '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/s/coreshard',
+    ],
+)
+
+env.Library(
     target='commands_db_s',
     source=[
         'check_sharding_index_command.cpp',
@@ -189,11 +210,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_d',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/db/rw_concern_d',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         'balancer',
         'collection_metadata',
         'sharding',
+        'sharding_catalog_manager',
     ],
 )
 
@@ -232,7 +253,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
     ],
 )
@@ -296,8 +317,31 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/shard_server_test_fixture',
         'sharding',
+    ]
+)
+
+env.CppUnitTest(
+    target='sharding_catalog_manager_test',
+    source=[
+        'config/sharding_catalog_manager_add_shard_test.cpp',
+        'config/sharding_catalog_manager_add_shard_to_zone_test.cpp',
+        'config/sharding_catalog_manager_assign_key_range_to_zone_test.cpp',
+        'config/sharding_catalog_manager_commit_chunk_migration_test.cpp',
+        'config/sharding_catalog_manager_config_initialization_test.cpp',
+        'config/sharding_catalog_manager_create_database_test.cpp',
+        'config/sharding_catalog_manager_drop_coll_test.cpp',
+        'config/sharding_catalog_manager_enable_sharding_test.cpp',
+        'config/sharding_catalog_manager_merge_chunks_test.cpp',
+        'config/sharding_catalog_manager_remove_shard_from_zone_test.cpp',
+        'config/sharding_catalog_manager_remove_shard_test.cpp',
+        'config/sharding_catalog_manager_shard_collection_test.cpp',
+        'config/sharding_catalog_manager_split_chunk_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/config_server_test_fixture',
+        '$BUILD_DIR/mongo/util/version_impl',
     ]
 )

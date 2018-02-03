@@ -31,7 +31,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"

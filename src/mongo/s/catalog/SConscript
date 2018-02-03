@@ -16,17 +16,6 @@ env.Library(
 )
 
 env.Library(
-    target='sharding_catalog_mock',
-    source=[
-        'sharding_catalog_client_mock.cpp',
-    ],
-    LIBDEPS=[
-        'dist_lock_manager_mock',
-        'sharding_catalog_client',
-    ]
-)
-
-env.Library(
     target='dist_lock_manager',
     source=[
         'dist_lock_manager.cpp',
@@ -38,17 +27,6 @@ env.Library(
 )
 
 env.Library(
-    target='dist_lock_manager_mock',
-    source=[
-        'dist_lock_manager_mock.cpp',
-    ],
-    LIBDEPS=[
-        'dist_lock_manager',
-        '$BUILD_DIR/mongo/unittest/unittest',
-    ],
-)
-
-env.Library(
     target='dist_lock_catalog_interface',
     source=[
         'dist_lock_catalog.cpp',
@@ -56,18 +34,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/write_concern_options',
     ],
-)
-
-env.Library(
-    target='dist_lock_catalog_mock',
-    source=[
-        'dist_lock_catalog_mock.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/s/common_s',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        'dist_lock_catalog_interface',
-    ]
 )
 
 env.Library(
@@ -105,21 +71,6 @@ env.Library(
     ],
 )
 
-env.CppUnitTest(
-    target='replset_dist_lock_manager_test',
-    source=[
-        'dist_lock_catalog_impl_test.cpp',
-        'replset_dist_lock_manager_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_mock',
-        '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
-        'dist_lock_catalog_impl',
-        'replset_dist_lock_manager',
-    ]
-)
-
 env.Library(
     target='sharding_catalog_client_impl',
     source=[
@@ -129,70 +80,64 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/s/type_shard_identity',
         '$BUILD_DIR/mongo/executor/network_interface',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         '$BUILD_DIR/mongo/s/coreshard',
-    ],
-)
-
-env.Library(
-    target='sharding_catalog_manager',
-    source=[
-        'sharding_catalog_manager_chunk_operations.cpp',
-        'sharding_catalog_manager_collection_operations.cpp',
-        'sharding_catalog_manager.cpp',
-        'sharding_catalog_manager_database_operations.cpp',
-        'sharding_catalog_manager_shard_operations.cpp',
-        'sharding_catalog_manager_zone_operations.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/catalog_raii',
-        '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
-        '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/db/s/balancer',
-        '$BUILD_DIR/mongo/executor/network_interface',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/coreshard',
+        'dist_lock_manager',
         'sharding_catalog_client',
     ],
 )
 
 env.Library(
-    target='sharding_catalog_test_fixture',
+    target='dist_lock_manager_mock',
     source=[
-        'sharding_catalog_test_fixture.cpp',
+        'dist_lock_manager_mock.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/sharding_test_fixture',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'dist_lock_manager',
     ],
 )
 
-env.CppUnitTest(
-    target='config_server_catalog_test',
+env.Library(
+    target='dist_lock_catalog_mock',
     source=[
-        'sharding_catalog_add_shard_test.cpp',
-        'sharding_catalog_add_shard_to_zone_test.cpp',
-        'sharding_catalog_assign_key_range_to_zone_test.cpp',
-        'sharding_catalog_commit_chunk_migration_test.cpp',
-        'sharding_catalog_config_initialization_test.cpp',
-        'sharding_catalog_create_database_test.cpp',
-        'sharding_catalog_enable_sharding_test.cpp',
-        'sharding_catalog_merge_chunks_test.cpp',
-        'sharding_catalog_remove_shard_from_zone_test.cpp',
-        'sharding_catalog_remove_shard_test.cpp',
-        'sharding_catalog_shard_collection_test.cpp',
-        'sharding_catalog_split_chunk_test.cpp',
-        'sharding_catalog_drop_coll_test.cpp',
+        'dist_lock_catalog_mock.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/config_server_test_fixture',
-        '$BUILD_DIR/mongo/util/version_impl',
+        '$BUILD_DIR/mongo/s/common_s',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'dist_lock_catalog_interface',
+    ]
+)
+
+env.Library(
+    target='sharding_catalog_client_mock',
+    source=[
+        'sharding_catalog_client_mock.cpp',
+    ],
+    LIBDEPS=[
+        'dist_lock_manager_mock',
+        'sharding_catalog_client',
     ]
 )
 
 env.CppUnitTest(
-    target='sharding_catalog_test',
+    target='replset_dist_lock_manager_test',
+    source=[
+        'dist_lock_catalog_impl_test.cpp',
+        'replset_dist_lock_manager_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_catalog_mock',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
+        '$BUILD_DIR/mongo/s/sharding_mongod_test_fixture',
+        'dist_lock_catalog_impl',
+        'replset_dist_lock_manager',
+    ]
+)
+
+env.CppUnitTest(
+    target='sharding_catalog_client_test',
     source=[
         'sharding_catalog_log_change_test.cpp',
         'sharding_catalog_test.cpp',
@@ -200,6 +145,5 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/sharding_test_fixture',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_test_fixture',
     ]
 )

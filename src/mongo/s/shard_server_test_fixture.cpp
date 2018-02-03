@@ -67,14 +67,6 @@ void ShardServerTestFixture::expectFindOnConfigSendErrorCode(ErrorCodes::Error c
     });
 }
 
-void ShardServerTestFixture::expectFindOnConfigSendBSONObjVector(std::vector<BSONObj> obj) {
-    onFindCommand([&, obj](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, kConfigHostAndPort);
-        ASSERT_EQ(request.dbname, "config");
-        return obj;
-    });
-}
-
 void ShardServerTestFixture::setUp() {
     ShardingMongodTestFixture::setUp();
 

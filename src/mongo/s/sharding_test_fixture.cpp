@@ -522,6 +522,15 @@ void ShardingTestFixture::expectCount(const HostAndPort& configHost,
     });
 }
 
+void ShardingTestFixture::expectFindSendBSONObjVector(const HostAndPort& configHost,
+                                                      std::vector<BSONObj> obj) {
+    onFindCommand([&, obj](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, configHost);
+        ASSERT_EQ(request.dbname, "config");
+        return obj;
+    });
+}
+
 void ShardingTestFixture::setRemote(const HostAndPort& remote) {
     _transportSession = transport::MockSession::create(remote, HostAndPort{}, _transportLayer);
 }
