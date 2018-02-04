@@ -284,9 +284,9 @@ NamespaceString parseUUIDOrNs(OperationContext* opCtx, const OplogEntry& oplogEn
 
 NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const BSONObj& op) {
     if (auto ui = op["ui"]) {
-        return {nss.db(), uassertStatusOK(UUID::parse(ui))};
+        return uassertStatusOK(UUID::parse(ui));
     }
-    return {nss};
+    return nss;
 }
 
 }  // namespace
@@ -364,7 +364,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
                 uassert(ErrorCodes::NamespaceNotFound,
                         str::stream() << "missing database (" << nss.db() << ")",
                         db);
-                OldClientContext ctx(opCtx, autoColl.getNss().ns(), db, /*justCreated*/ false);
+                OldClientContext ctx(opCtx, autoColl.getNss().ns(), db);
                 return applyOp(ctx.db());
             } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
                 // Delete operations on non-existent namespaces can be treated as successful for

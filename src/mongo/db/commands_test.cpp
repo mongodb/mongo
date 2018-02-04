@@ -28,13 +28,13 @@
 
 #include "mongo/db/commands.h"
 #include "mongo/db/catalog/collection_mock.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/platform/basic.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
 
 TEST(Commands, appendCommandStatusOK) {
     BSONObjBuilder actualResult;
@@ -109,48 +109,36 @@ public:
 TEST_F(ParseNsOrUUID, FailWrongType) {
     auto cmd = BSON("query" << BSON("a" << BSON("$gte" << 11)));
     ASSERT_THROWS_CODE(
-        CommandHelpers::parseNsOrUUID(opCtx, "db", cmd), DBException, ErrorCodes::InvalidNamespace);
+        CommandHelpers::parseNsOrUUID("db", cmd), DBException, ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ParseNsOrUUID, FailEmptyDbName) {
     auto cmd = BSON("query"
                     << "coll");
     ASSERT_THROWS_CODE(
-        CommandHelpers::parseNsOrUUID(opCtx, "", cmd), DBException, ErrorCodes::InvalidNamespace);
+        CommandHelpers::parseNsOrUUID("", cmd), DBException, ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ParseNsOrUUID, FailInvalidDbName) {
     auto cmd = BSON("query"
                     << "coll");
-    ASSERT_THROWS_CODE(CommandHelpers::parseNsOrUUID(opCtx, "test.coll", cmd),
-                       DBException,
-                       ErrorCodes::InvalidNamespace);
-}
-
-TEST_F(ParseNsOrUUID, ParseUnknownUUID) {
-    auto cmd = BSON("query" << UUID::gen());
-    ASSERT_THROWS_CODE(CommandHelpers::parseNsOrUUID(opCtx, "test.coll", cmd),
-                       DBException,
-                       ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(
+        CommandHelpers::parseNsOrUUID("test.coll", cmd), DBException, ErrorCodes::InvalidNamespace);
 }
 
 TEST_F(ParseNsOrUUID, ParseValidColl) {
     auto cmd = BSON("query"
                     << "coll");
-    auto parsedNss = CommandHelpers::parseNsOrUUID(opCtx, "test", cmd);
-    ASSERT_EQ(parsedNss, NamespaceString("test.coll"));
+    auto parsedNss = CommandHelpers::parseNsOrUUID("test", cmd);
+    ASSERT_EQ(*parsedNss.nss(), NamespaceString("test.coll"));
 }
 
 TEST_F(ParseNsOrUUID, ParseValidUUID) {
-    // Register a UUID/Collection pair in the UUIDCatalog.
     const CollectionUUID uuid = UUID::gen();
-    const NamespaceString nss("test.coll");
-    Collection coll(stdx::make_unique<CollectionMock>(nss));
-    UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-    catalog.onCreateCollection(opCtx, &coll, uuid);
-
     auto cmd = BSON("query" << uuid);
-    auto parsedNss = CommandHelpers::parseNsOrUUID(opCtx, "test", cmd);
-    ASSERT_EQUALS(nss, parsedNss);
+    auto parsedNsOrUUID = CommandHelpers::parseNsOrUUID("test", cmd);
+    ASSERT_EQUALS(uuid, *parsedNsOrUUID.uuid());
 }
+
+}  // namespace
 }  // namespace mongo

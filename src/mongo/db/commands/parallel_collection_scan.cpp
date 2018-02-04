@@ -80,39 +80,31 @@ public:
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
-        const NamespaceString ns(CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj));
-        if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        return Status::OK();
+        const auto hasTerm = false;
+        return authSession->checkAuthForFind(
+            AutoGetCollection::resolveNamespaceStringOrUUID(
+                opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj)),
+            hasTerm);
     }
 
     bool run(OperationContext* opCtx,
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
-        const NamespaceString ns(CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj));
+        AutoGetCollectionForReadCommand ctx(opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj));
+        const auto nss = ctx.getNss();
 
-        AutoGetCollectionForReadCommand ctx(opCtx, ns, std::move(dbSLock));
-
-        Collection* collection = ctx.getCollection();
-        if (!collection)
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::NamespaceNotFound,
-                       str::stream() << "ns does not exist: " << ns.ns()));
+        Collection* const collection = ctx.getCollection();
+        uassert(ErrorCodes::NamespaceNotFound,
+                str::stream() << "ns does not exist: " << nss.ns(),
+                collection);
 
         size_t numCursors = static_cast<size_t>(cmdObj["numCursors"].numberInt());
-
-        if (numCursors == 0 || numCursors > 10000)
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::BadValue,
-                       str::stream() << "numCursors has to be between 1 and 10000"
-                                     << " was: "
-                                     << numCursors));
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "numCursors has to be between 1 and 10000"
+                              << " was: "
+                              << numCursors,
+                numCursors >= 1 && numCursors <= 10000);
 
         std::vector<std::unique_ptr<RecordCursor>> iterators;
         // Opening multiple cursors on a capped collection and reading them in parallel can produce
@@ -161,7 +153,7 @@ public:
             auto pinnedCursor = collection->getCursorManager()->registerCursor(
                 opCtx,
                 {std::move(exec),
-                 ns,
+                 nss,
                  AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
                  opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
                  cmdObj});
@@ -169,7 +161,7 @@ public:
 
             BSONObjBuilder threadResult;
             appendCursorResponseObject(
-                pinnedCursor.getCursor()->cursorid(), ns.ns(), BSONArray(), &threadResult);
+                pinnedCursor.getCursor()->cursorid(), nss.ns(), BSONArray(), &threadResult);
             threadResult.appendBool("ok", 1);
 
             bucketsBuilder.append(threadResult.obj());

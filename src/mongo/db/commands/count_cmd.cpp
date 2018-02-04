@@ -102,12 +102,11 @@ public:
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
-        const NamespaceString nss(CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj));
-        if (!authSession->isAuthorizedForActionsOnNamespace(nss, ActionType::find)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        return Status::OK();
+        const auto hasTerm = false;
+        return authSession->checkAuthForFind(
+            AutoGetCollection::resolveNamespaceStringOrUUID(
+                opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj)),
+            hasTerm);
     }
 
     Status explain(OperationContext* opCtx,
@@ -115,21 +114,23 @@ public:
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
+        // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
+        // of a view, the locks need to be released.
+        boost::optional<AutoGetCollectionForReadCommand> ctx;
+        ctx.emplace(opCtx,
+                    CommandHelpers::parseNsOrUUID(dbname, cmdObj),
+                    AutoGetCollection::ViewMode::kViewsPermitted);
+        const auto nss = ctx->getNss();
+
         const bool isExplain = true;
-        Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
-        auto nss = CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj);
         auto request = CountRequest::parseFromBSON(nss, cmdObj, isExplain);
         if (!request.isOK()) {
             return request.getStatus();
         }
 
-        // Acquire the db read lock.
-        AutoGetCollectionOrViewForReadCommand ctx(
-            opCtx, request.getValue().getNs(), std::move(dbLock));
-        Collection* collection = ctx.getCollection();
-
-        if (ctx.getView()) {
-            ctx.releaseLocksForView();
+        if (ctx->getView()) {
+            // Relinquish locks. The aggregation command will re-acquire them.
+            ctx.reset();
 
             auto viewAggregation = request.getValue().asAggregationCommand();
             if (!viewAggregation.isOK()) {
@@ -149,10 +150,11 @@ public:
                                 *out);
         }
 
+        Collection* const collection = ctx->getCollection();
+
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto rangePreserver =
-            CollectionShardingState::get(opCtx, request.getValue().getNs())->getMetadata();
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
 
         auto statusWithPlanExecutor = getExecutorCount(opCtx,
                                                        collection,
@@ -173,20 +175,23 @@ public:
              const string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
+        // of a view, the locks need to be released.
+        boost::optional<AutoGetCollectionForReadCommand> ctx;
+        ctx.emplace(opCtx,
+                    CommandHelpers::parseNsOrUUID(dbname, cmdObj),
+                    AutoGetCollection::ViewMode::kViewsPermitted);
+        const auto nss = ctx->getNss();
+
         const bool isExplain = false;
-        Lock::DBLock dbLock(opCtx, dbname, MODE_IS);
-        auto nss = CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj);
         auto request = CountRequest::parseFromBSON(nss, cmdObj, isExplain);
         if (!request.isOK()) {
             return CommandHelpers::appendCommandStatus(result, request.getStatus());
         }
 
-        AutoGetCollectionOrViewForReadCommand ctx(
-            opCtx, request.getValue().getNs(), std::move(dbLock));
-        Collection* collection = ctx.getCollection();
-
-        if (ctx.getView()) {
-            ctx.releaseLocksForView();
+        if (ctx->getView()) {
+            // Relinquish locks. The aggregation command will re-acquire them.
+            ctx.reset();
 
             auto viewAggregation = request.getValue().asAggregationCommand();
             if (!viewAggregation.isOK()) {
@@ -200,10 +205,11 @@ public:
             return true;
         }
 
+        Collection* const collection = ctx->getCollection();
+
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto rangePreserver =
-            CollectionShardingState::get(opCtx, request.getValue().getNs())->getMetadata();
+        auto rangePreserver = CollectionShardingState::get(opCtx, nss)->getMetadata();
 
         auto statusWithPlanExecutor = getExecutorCount(opCtx,
                                                        collection,

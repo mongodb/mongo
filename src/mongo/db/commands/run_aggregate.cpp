@@ -376,10 +376,10 @@ Status runAggregate(OperationContext* opCtx,
 
         const auto& pipelineInvolvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 
-        // If emplaced, AutoGetCollectionOrViewForReadCommand will throw if the sharding version for
-        // this connection is out of date. If the namespace is a view, the lock will be released
-        // before re-running the expanded aggregation.
-        boost::optional<AutoGetCollectionOrViewForReadCommand> ctx;
+        // If emplaced, AutoGetCollectionForReadCommand will throw if the sharding version for this
+        // connection is out of date. If the namespace is a view, the lock will be released before
+        // re-running the expanded aggregation.
+        boost::optional<AutoGetCollectionForReadCommand> ctx;
 
         // If this is a collectionless aggregation, we won't create 'ctx' but will still need an
         // AutoStatsTracker to record CurOp and Top entries.
@@ -390,7 +390,7 @@ Status runAggregate(OperationContext* opCtx,
         if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
             statsTracker.emplace(opCtx, nss, Top::LockType::NotLocked, 0);
         } else {
-            ctx.emplace(opCtx, nss);
+            ctx.emplace(opCtx, nss, AutoGetCollection::ViewMode::kViewsPermitted);
         }
 
         Collection* collection = ctx ? ctx->getCollection() : nullptr;
@@ -428,7 +428,7 @@ Status runAggregate(OperationContext* opCtx,
             }
 
             // With the view & collation resolved, we can relinquish locks.
-            ctx->releaseLocksForView();
+            ctx.reset();
 
             // Parse the resolved view into a new aggregation request.
             auto newRequest = resolvedView.getValue().asExpandedViewAggregation(request);

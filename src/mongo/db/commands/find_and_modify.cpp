@@ -189,6 +189,10 @@ void assertCanWrite(OperationContext* opCtx, const NamespaceString& nsString) {
             str::stream() << "Not primary while running findAndModify command on collection "
                           << nsString.ns(),
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nsString));
+
+    // Check for shard version match
+    auto css = CollectionShardingState::get(opCtx, nsString);
+    css->checkShardVersionOrThrow(opCtx);
 }
 
 void recordStatsForTopCommand(OperationContext* opCtx) {
@@ -246,11 +250,10 @@ public:
                    const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
-        uassertStatusOK(userAllowedWriteNS(fullNs.ns()));
-
-        const auto args(uassertStatusOK(FindAndModifyRequest::parseFromBSON(fullNs, cmdObj)));
+        const auto args(uassertStatusOK(FindAndModifyRequest::parseFromBSON(
+            CommandHelpers::parseNsCollectionRequired(dbName, cmdObj), cmdObj)));
         const NamespaceString& nsString = args.getNamespaceString();
+        uassertStatusOK(userAllowedWriteNS(nsString));
         auto const curOp = CurOp::get(opCtx);
         OpDebug* const opDebug = &curOp->debug();
 
@@ -310,14 +313,10 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        // findAndModify command is not replicated directly.
-        invariant(opCtx->writesAreReplicated());
-
-        const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
-        uassertStatusOK(userAllowedWriteNS(fullNs.ns()));
-
-        const auto args(uassertStatusOK(FindAndModifyRequest::parseFromBSON(fullNs, cmdObj)));
+        const auto args(uassertStatusOK(FindAndModifyRequest::parseFromBSON(
+            CommandHelpers::parseNsCollectionRequired(dbName, cmdObj), cmdObj)));
         const NamespaceString& nsString = args.getNamespaceString();
+        uassertStatusOK(userAllowedWriteNS(nsString));
         auto const curOp = CurOp::get(opCtx);
         OpDebug* const opDebug = &curOp->debug();
 
@@ -353,27 +352,20 @@ public:
                 ParsedDelete parsedDelete(opCtx, &request);
                 uassertStatusOK(parsedDelete.parseRequest());
 
-                AutoGetOrCreateDb autoDb(opCtx, dbName, MODE_IX);
-                Lock::CollectionLock collLock(opCtx->lockState(), nsString.ns(), MODE_IX);
+                AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
 
                 {
-                    stdx::lock_guard<Client> lk(*opCtx->getClient());
-                    CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(),
-                                                    autoDb.getDb()->getProfilingLevel());
-                }
+                    boost::optional<int> dbProfilingLevel;
+                    if (autoColl.getDb())
+                        dbProfilingLevel = autoColl.getDb()->getProfilingLevel();
 
-                auto css = CollectionShardingState::get(opCtx, nsString);
-                css->checkShardVersionOrThrow(opCtx);
+                    stdx::lock_guard<Client> lk(*opCtx->getClient());
+                    CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(), dbProfilingLevel);
+                }
 
                 assertCanWrite(opCtx, nsString);
 
-                Collection* const collection = autoDb.getDb()->getCollection(opCtx, nsString);
-                if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
-                    CommandHelpers::appendCommandStatus(result,
-                                                        {ErrorCodes::CommandNotSupportedOnView,
-                                                         "findAndModify not supported on a view"});
-                    return false;
-                }
+                Collection* const collection = autoColl.getCollection();
                 const auto exec =
                     uassertStatusOK(getExecutorDelete(opCtx, opDebug, collection, &parsedDelete));
 
@@ -418,53 +410,56 @@ public:
                 ParsedUpdate parsedUpdate(opCtx, &request);
                 uassertStatusOK(parsedUpdate.parseRequest());
 
-                AutoGetOrCreateDb autoDb(opCtx, dbName, MODE_IX);
-                Lock::CollectionLock collLock(opCtx->lockState(), nsString.ns(), MODE_IX);
+                // These are boost::optionap, because if the database or collection does not exist,
+                // they will have to be reacquired in MODE_X
+                boost::optional<AutoGetOrCreateDb> autoDb;
+                boost::optional<Lock::CollectionLock> collLock;
+
+                autoDb.emplace(opCtx, dbName, MODE_IX);
+                collLock.emplace(opCtx->lockState(), nsString.ns(), MODE_IX);
 
                 {
                     stdx::lock_guard<Client> lk(*opCtx->getClient());
                     CurOp::get(opCtx)->enter_inlock(nsString.ns().c_str(),
-                                                    autoDb.getDb()->getProfilingLevel());
+                                                    autoDb->getDb()->getProfilingLevel());
                 }
-
-                auto css = CollectionShardingState::get(opCtx, nsString);
-                css->checkShardVersionOrThrow(opCtx);
 
                 assertCanWrite(opCtx, nsString);
 
-                Collection* collection = autoDb.getDb()->getCollection(opCtx, nsString.ns());
-                if (!collection && autoDb.getDb()->getViewCatalog()->lookup(opCtx, nsString.ns())) {
-                    CommandHelpers::appendCommandStatus(result,
-                                                        {ErrorCodes::CommandNotSupportedOnView,
-                                                         "findAndModify not supported on a view"});
-                    return false;
-                }
+                Collection* collection = autoDb->getDb()->getCollection(opCtx, nsString);
 
-                // Create the collection if it does not exist when performing an upsert
-                // because the update stage does not create its own collection.
+                // Create the collection if it does not exist when performing an upsert because the
+                // update stage does not create its own collection
                 if (!collection && args.isUpsert()) {
-                    // Release the collection lock and reacquire a lock on the database
-                    // in exclusive mode in order to create the collection.
-                    collLock.relockAsDatabaseExclusive(autoDb.lock());
-                    collection = autoDb.getDb()->getCollection(opCtx, nsString);
+                    // Release the collection lock and reacquire a lock on the database in exclusive
+                    // mode in order to create the collection
+                    collLock.reset();
+                    autoDb.reset();
+                    autoDb.emplace(opCtx, dbName, MODE_X);
+
                     assertCanWrite(opCtx, nsString);
 
-                    if (collection) {
-                        // Someone else beat us to creating the collection, do nothing.
-                    } else {
+                    collection = autoDb->getDb()->getCollection(opCtx, nsString);
+
+                    // If someone else beat us to creating the collection, do nothing
+                    if (!collection) {
                         WriteUnitOfWork wuow(opCtx);
-                        Status createCollStatus =
-                            userCreateNS(opCtx, autoDb.getDb(), nsString.ns(), BSONObj());
-                        if (!createCollStatus.isOK()) {
-                            CommandHelpers::appendCommandStatus(result, createCollStatus);
-                            return false;
-                        }
+                        uassertStatusOK(
+                            userCreateNS(opCtx, autoDb->getDb(), nsString.ns(), BSONObj()));
                         wuow.commit();
 
-                        collection = autoDb.getDb()->getCollection(opCtx, nsString);
-                        invariant(collection);
+                        collection = autoDb->getDb()->getCollection(opCtx, nsString);
                     }
+
+                    invariant(collection);
                 }
+
+                // Perform an explicit check for "not a view" because the update path doesn't use
+                // AutoGetCollection
+                uassert(ErrorCodes::CommandNotSupportedOnView,
+                        "findAndModify not supported on a view",
+                        collection ||
+                            !autoDb->getDb()->getViewCatalog()->lookup(opCtx, nsString.ns()));
 
                 const auto exec =
                     uassertStatusOK(getExecutorUpdate(opCtx, opDebug, collection, &parsedUpdate));

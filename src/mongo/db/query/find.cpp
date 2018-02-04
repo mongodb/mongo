@@ -554,17 +554,8 @@ std::string runQuery(OperationContext* opCtx,
     LOG(2) << "Running query: " << redact(cq->toStringShort());
 
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
-    AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss);
-    Collection* collection = ctx.getCollection();
-
-    if (ctx.getView()) {
-        uasserted(ErrorCodes::CommandNotSupportedOnView,
-                  str::stream()
-                      << "Namespace "
-                      << nss.ns()
-                      << " is a view. Legacy find operations are not supported on views. "
-                      << "Only clients which support the find command can be used to query views.");
-    }
+    AutoGetCollectionForReadCommand ctx(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden);
+    Collection* const collection = ctx.getCollection();
 
     {
         const QueryRequest& qr = cq->getQueryRequest();

@@ -43,7 +43,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
@@ -122,23 +121,10 @@ NamespaceString CommandHelpers::parseNsCollectionRequired(StringData dbname,
     return nss;
 }
 
-NamespaceString CommandHelpers::parseNsOrUUID(OperationContext* opCtx,
-                                              StringData dbname,
-                                              const BSONObj& cmdObj) {
+NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(StringData dbname, const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx);
-        UUID uuid = uassertStatusOK(UUID::parse(first));
-        NamespaceString nss = catalog.lookupNSSByUUID(uuid);
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "UUID " << uuid << " specified in "
-                              << cmdObj.firstElement().fieldNameStringData()
-                              << " command not found in "
-                              << dbname
-                              << " database",
-                nss.isValid() && nss.db() == dbname);
-
-        return nss;
+        return uassertStatusOK(UUID::parse(first));
     } else {
         // Ensure collection identifier is not a Command
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));

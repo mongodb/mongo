@@ -33,7 +33,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/find_and_modify_result.h"
-#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/logger/redaction.h"
 

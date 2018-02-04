@@ -525,11 +525,10 @@ env.Library(
         '$BUILD_DIR/mongo/rpc/rpc',
         'audit',
         'auth/authcore',
+        'command_can_run_here',
         'commands/server_status_core',
         'commands/test_commands_enabled',
-        'command_can_run_here',
         'service_context',
-        '$BUILD_DIR/mongo/db/catalog/uuid_catalog',
     ],
 )
 
@@ -638,7 +637,6 @@ env.Library(
         'rw_concern_d',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/commands/fsync_locked',
         '$BUILD_DIR/mongo/db/service_entry_point_common',
     ],

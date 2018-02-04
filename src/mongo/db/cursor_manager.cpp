@@ -261,14 +261,14 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t 
 
     // For each collection, time out its cursors under the collection lock (to prevent the
     // collection from going away during the erase).
-    for (unsigned i = 0; i < todo.size(); i++) {
-        AutoGetCollectionOrViewForReadCommand ctx(opCtx, NamespaceString(todo[i]));
+    for (const auto& nsTodo : todo) {
+        AutoGetCollectionForReadCommand ctx(opCtx, nsTodo);
         if (!ctx.getDb()) {
             continue;
         }
 
-        Collection* collection = ctx.getCollection();
-        if (collection == NULL) {
+        Collection* const collection = ctx.getCollection();
+        if (!collection) {
             continue;
         }
 
@@ -277,6 +277,7 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t 
 
     return totalTimedOut;
 }
+
 }  // namespace
 
 template <typename Visitor>

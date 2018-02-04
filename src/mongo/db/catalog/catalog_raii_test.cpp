@@ -57,7 +57,7 @@ public:
     }
 
     const NamespaceString nss = NamespaceString("test", "coll");
-    const Milliseconds timeoutMs = Milliseconds(1500);
+    const Milliseconds timeoutMs = Seconds(1);
     const ClientAndCtx client1 = makeClientWithLocker("client1");
     const ClientAndCtx client2 = makeClientWithLocker("client2");
 };
