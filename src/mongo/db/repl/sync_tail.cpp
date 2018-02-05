@@ -467,7 +467,6 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
               const MultiApplier::ApplyOperationFn& func,
               std::vector<Status>* statusVector) {
     invariant(writerVectors.size() == statusVector->size());
-    TimerHolder timer(&applyBatchStats);
     for (size_t i = 0; i < writerVectors.size(); i++) {
         if (!writerVectors[i].empty()) {
             writerPool->schedule([&func, &writerVectors, statusVector, i] {
@@ -1511,6 +1510,9 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
 
     std::vector<Status> statusVector(workerPool->getNumThreads(), Status::OK());
     {
+        // Each node records cumulative batch application stats for itself using this timer.
+        TimerHolder timer(&applyBatchStats);
+
         const bool pinOldestTimestamp = !serverGlobalParams.enableMajorityReadConcern;
         std::unique_ptr<RecoveryUnit> pinningTransaction;
         if (pinOldestTimestamp) {
