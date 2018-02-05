@@ -34,6 +34,7 @@
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/database_version_gen.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/notification.h"
@@ -171,6 +172,9 @@ private:
         bool shardingEnabled;
 
         StringMap<CollectionRoutingInfoEntry> collections;
+
+        // Optional while featureCompatibilityVersion 3.6 is supported.
+        boost::optional<DatabaseVersion> databaseVersion;
     };
 
     using DatabaseInfoMap = StringMap<std::shared_ptr<DatabaseInfoEntry>>;
@@ -244,6 +248,8 @@ public:
     const ShardId& primaryId() const;
 
     bool shardingEnabled() const;
+
+    boost::optional<DatabaseVersion> databaseVersion() const;
 
 private:
     friend class CatalogCache;

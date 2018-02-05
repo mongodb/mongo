@@ -5,33 +5,59 @@
 (function() {
     'use strict';
 
-    function createDatabase(st, dbName) {
+    function createDatabase(mongos, dbName) {
         // A database is implicitly created when a collection inside it is created.
-        assert.commandWorked(st.s.getDB(dbName).runCommand({create: collName}));
+        assert.commandWorked(mongos.getDB(dbName).runCommand({create: collName}));
     }
 
-    function cleanUp(st, dbName) {
-        assert.commandWorked(st.s.getDB(dbName).runCommand({dropDatabase: 1}));
+    function cleanUp(mongos, dbName) {
+        assert.commandWorked(mongos.getDB(dbName).runCommand({dropDatabase: 1}));
     }
 
-    function assertHasDbVersion(dbEntry) {
+    function assertDbVersionAssigned(mongos, dbName) {
+        createDatabase(mongos, dbName);
+
+        // Check that the entry in the sharding catalog contains a dbVersion.
+        const dbEntry = mongos.getDB("config").getCollection("databases").findOne({_id: dbName});
         assert.neq(null, dbEntry);
         assert.neq(null, dbEntry.version);
         assert.neq(null, dbEntry.version.uuid);
         assert.eq(1, dbEntry.version.lastMod);
+
+        // Check that the catalog cache on the mongos contains the same dbVersion.
+        const cachedDbEntry = mongos.adminCommand({getShardVersion: dbName});
+        assert.commandWorked(cachedDbEntry);
+        assert.eq(dbEntry.version.uuid, cachedDbEntry.version.uuid);
+        assert.eq(dbEntry.version.lastMod, cachedDbEntry.version.lastMod);
+
+        cleanUp(mongos, dbName);
+
+        return dbEntry;
     }
 
-    function assertDoesntHaveDbVersion(dbEntry) {
+    function assertDbVersionNotAssigned(mongos, dbName) {
+        createDatabase(mongos, dbName);
+
+        // Check that the entry in the sharding catalog *does not* contain a dbVersion.
+        const dbEntry = mongos.getDB("config").getCollection("databases").findOne({_id: dbName});
         assert.neq(null, dbEntry);
         assert.eq(null, dbEntry.version);
+
+        // Check that the catalog cache on the mongos *does not* contain a dbVersion.
+        const cachedDbEntry = mongos.adminCommand({getShardVersion: dbName});
+        assert.commandWorked(cachedDbEntry);
+        assert.eq(null, cachedDbEntry.version);
+
+        cleanUp(mongos, dbName);
+
+        return dbEntry;
     }
 
     const dbName = "db1";
     const collName = "foo";
+    const ns = dbName + "." + collName;
 
     var st = new ShardingTest({shards: 1});
-
-    let dbEntry;
 
     //
     // FCV 4.0
@@ -40,40 +66,24 @@
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
 
     // A new database is given a databaseVersion.
-    createDatabase(st, dbName);
-    let dbEntry1 = st.s.getDB("config").getCollection("databases").findOne({_id: dbName});
-    assertHasDbVersion(dbEntry1);
-    cleanUp(st, dbName);
+    let dbEntry1 = assertDbVersionAssigned(st.s, dbName);
 
     // A new incarnation of a database that was previously dropped is given a fresh databaseVersion.
-    createDatabase(st, dbName);
-    let dbEntry2 = st.s.getDB("config").getCollection("databases").findOne({_id: dbName});
-    assertHasDbVersion(dbEntry2);
+    let dbEntry2 = assertDbVersionAssigned(st.s, dbName);
     assert.neq(dbEntry1.version.uuid, dbEntry2.version.uuid);
-    cleanUp(st, dbName);
 
     //
     // FCV 3.6
     //
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
-
-    // A new database is not given a databaseVersion.
-    createDatabase(st, dbName);
-    dbEntry = st.s.getDB("config").getCollection("databases").findOne({_id: dbName});
-    assertDoesntHaveDbVersion(dbEntry);
-    cleanUp(st, dbName);
+    assertDbVersionNotAssigned(st.s, dbName);
 
     //
     // FCV 3.4 (This section can be deleted once FCV 3.4 is removed).
     //
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
-
-    // A new database is not given a databaseVersion.
-    createDatabase(st, dbName);
-    dbEntry = st.s.getDB("config").getCollection("databases").findOne({_id: dbName});
-    assertDoesntHaveDbVersion(dbEntry);
-    cleanUp(st, dbName);
+    assertDbVersionNotAssigned(st.s, dbName);
 
 })();
