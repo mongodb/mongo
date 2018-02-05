@@ -6469,7 +6469,9 @@ buildvariants:
   - name: compile
     distros:
     - windows-64-vs2015-large
-  # - name: jsCore TODO SERVER-32036: Replace jsCore with jsCore_WT.
+  - name: jsCore_WT
+  - name: replica_sets_WT
+  - name: sharding_WT
 
 - name: windows-64-2k8-ssl-legacy-transportlayer
   display_name: SSL Windows 2008R2 Legacy Transport
