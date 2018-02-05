@@ -74,11 +74,14 @@ std::vector<ClusterClientCursorParams::RemoteCursor> establishCursors(
         while (!ars.done()) {
             try {
                 auto response = ars.next();
-                remoteCursors.emplace_back(
-                    std::move(response.shardId),
-                    std::move(*response.shardHostAndPort),
-                    uassertStatusOK(CursorResponse::parseFromBSON(
-                        uassertStatusOK(std::move(response.swResponse)).data)));
+
+                // uasserts must happen before attempting to access the optional shardHostAndPort.
+                auto cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(
+                    uassertStatusOK(std::move(response.swResponse)).data));
+
+                remoteCursors.emplace_back(std::move(response.shardId),
+                                           std::move(*response.shardHostAndPort),
+                                           std::move(cursorResponse));
             } catch (const DBException& ex) {
                 // Retriable errors are swallowed if 'allowPartialResults' is true.
                 if (allowPartialResults &&
