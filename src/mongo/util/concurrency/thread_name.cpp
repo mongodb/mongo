@@ -55,8 +55,6 @@
 
 namespace mongo {
 
-using std::string;
-
 namespace {
 
 #ifdef _WIN32
@@ -104,37 +102,33 @@ MONGO_INITIALIZER(ThreadNameInitializer)(InitializerContext*) {
     return Status::OK();
 }
 
-// TODO consider making threadName std::string and removing the size limit once we get real
-// thread_local.
-constexpr size_t kMaxThreadNameSize = 63;
-thread_local char threadNameStorage[kMaxThreadNameSize + 1];
-
+thread_local std::string threadNameStorage;
 }  // namespace
 
 namespace for_debuggers {
 // This needs external linkage to ensure that debuggers can use it.
 thread_local StringData threadName;
-}
+}  // namespace for_debuggers
 using for_debuggers::threadName;
 
 void setThreadName(StringData name) {
     invariant(mongoInitializersHaveRun);
-    if (name.size() > kMaxThreadNameSize) {
-        // Truncate unreasonably long thread names.
-        name = name.substr(0, kMaxThreadNameSize);
-    }
-    name.copyTo(threadNameStorage, /*null terminate=*/true);
-    threadName = StringData(threadNameStorage, name.size());
+    threadNameStorage = name.toString();
+    threadName = threadNameStorage;
 
 #if defined(_WIN32)
     // Naming should not be expensive compared to thread creation and connection set up, but if
     // testing shows otherwise we should make this depend on DEBUG again.
-    setWindowsThreadName(GetCurrentThreadId(), threadName.rawData());
+    setWindowsThreadName(GetCurrentThreadId(), threadNameStorage.c_str());
 #elif defined(__APPLE__)
     // Maximum thread name length on OS X is MAXTHREADNAMESIZE (64 characters). This assumes
     // OS X 10.6 or later.
-    MONGO_STATIC_ASSERT(MAXTHREADNAMESIZE >= kMaxThreadNameSize + 1);
-    int error = pthread_setname_np(threadName.rawData());
+    std::string threadNameCopy = threadNameStorage;
+    if (threadNameCopy.size() > MAXTHREADNAMESIZE) {
+        threadNameCopy.resize(MAXTHREADNAMESIZE - 4);
+        threadNameCopy += "...";
+    }
+    int error = pthread_setname_np(threadNameCopy.c_str());
     if (error) {
         log() << "Ignoring error from setting thread name: " << errnoWithDescription(error);
     }
