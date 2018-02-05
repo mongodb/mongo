@@ -59,7 +59,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         // Require no auth since this command isn't supported in mongos
         return Status::OK();
     }

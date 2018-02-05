@@ -41,7 +41,7 @@ namespace mongo {
 
 Status KillCursorsCmdBase::checkAuthForCommand(Client* client,
                                                const std::string& dbname,
-                                               const BSONObj& cmdObj) {
+                                               const BSONObj& cmdObj) const {
     const auto statusWithRequest = KillCursorsRequest::parseFromBSON(dbname, cmdObj);
     if (!statusWithRequest.isOK()) {
         return statusWithRequest.getStatus();

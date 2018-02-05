@@ -85,7 +85,7 @@ public:
     // no privs because it's a test command
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {}
+                               std::vector<Privilege>* out) const override {}
 
     bool run(OperationContext* opCtx,
              const std::string& dbname,

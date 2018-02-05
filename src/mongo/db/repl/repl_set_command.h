@@ -61,7 +61,7 @@ protected:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) override;
+                               const BSONObj& cmdObj) const override;
 
     virtual ActionSet getAuthActionSet() const {
         return ActionSet{ActionType::internal};

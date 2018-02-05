@@ -349,20 +349,21 @@ Status Command::explain(OperationContext* opCtx,
     return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
 }
 
-Status BasicCommand::checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) {
+Status BasicCommand::checkAuthForRequest(OperationContext* opCtx,
+                                         const OpMsgRequest& request) const {
     uassertNoDocumentSequences(request);
     return checkAuthForOperation(opCtx, request.getDatabase().toString(), request.body);
 }
 
 Status BasicCommand::checkAuthForOperation(OperationContext* opCtx,
                                            const std::string& dbname,
-                                           const BSONObj& cmdObj) {
+                                           const BSONObj& cmdObj) const {
     return checkAuthForCommand(opCtx->getClient(), dbname, cmdObj);
 }
 
 Status BasicCommand::checkAuthForCommand(Client* client,
                                          const std::string& dbname,
-                                         const BSONObj& cmdObj) {
+                                         const BSONObj& cmdObj) const {
     std::vector<Privilege> privileges;
     this->addRequiredPrivileges(dbname, cmdObj, &privileges);
     if (AuthorizationSession::get(client)->isAuthorizedForPrivileges(privileges))
@@ -458,7 +459,7 @@ void Command::generateHelpResponse(OperationContext* opCtx,
     replyBuilder->setMetadata(rpc::makeEmptyMetadata());
 }
 
-void BasicCommand::uassertNoDocumentSequences(const OpMsgRequest& request) {
+void BasicCommand::uassertNoDocumentSequences(const OpMsgRequest& request) const {
     uassert(40472,
             str::stream() << "The " << getName() << " command does not support document sequences.",
             request.sequences.empty());

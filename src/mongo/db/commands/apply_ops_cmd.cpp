@@ -217,7 +217,7 @@ public:
 
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
-                                 const BSONObj& cmdObj) override {
+                                 const BSONObj& cmdObj) const override {
         OplogApplicationValidity validity = validateApplyOpsCommand(cmdObj);
         return OplogApplicationChecks::checkAuthForCommand(opCtx, dbname, cmdObj, validity);
     }

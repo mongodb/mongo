@@ -80,7 +80,7 @@ public:
      */
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj);
+                                       const BSONObj& cmdObj) const;
 
     /**
      * Subset of command arguments used by index filter commands

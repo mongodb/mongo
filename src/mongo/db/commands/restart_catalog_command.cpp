@@ -49,7 +49,7 @@ public:
 
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
-                                 const BSONObj& cmdObj) final {
+                                 const BSONObj& cmdObj) const final {
         // No auth checks as this is a testing-only command.
         return Status::OK();
     }

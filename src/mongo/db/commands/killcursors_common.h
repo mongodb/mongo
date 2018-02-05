@@ -67,7 +67,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) final;
+                               const BSONObj& cmdObj) const final;
 
     bool run(OperationContext* opCtx,
              const std::string& dbname,

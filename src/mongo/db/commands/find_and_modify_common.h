@@ -40,7 +40,7 @@ class Command;
 
 namespace find_and_modify {
 
-void addPrivilegesRequiredForFindAndModify(Command* commandTemplate,
+void addPrivilegesRequiredForFindAndModify(const Command* commandTemplate,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out);

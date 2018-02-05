@@ -250,7 +250,7 @@ public:
         return "insert documents";
     }
 
-    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) final {
+    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final {
         return checkAuthForWriteCommand(
             opCtx->getClient(), BatchedCommandRequest::BatchType_Insert, request);
     }
@@ -281,7 +281,7 @@ public:
         return "update documents";
     }
 
-    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) final {
+    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final {
         return checkAuthForWriteCommand(
             opCtx->getClient(), BatchedCommandRequest::BatchType_Update, request);
     }
@@ -348,7 +348,7 @@ public:
         return "delete documents";
     }
 
-    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) final {
+    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final {
         return checkAuthForWriteCommand(
             opCtx->getClient(), BatchedCommandRequest::BatchType_Delete, request);
     }

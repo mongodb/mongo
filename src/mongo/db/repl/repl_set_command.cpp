@@ -37,7 +37,7 @@ namespace repl {
 
 Status ReplSetCommand::checkAuthForCommand(Client* client,
                                            const std::string& dbname,
-                                           const BSONObj& cmdObj) {
+                                           const BSONObj& cmdObj) const {
     if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
             ResourcePattern::forClusterResource(), getAuthActionSet())) {
         return {ErrorCodes::Unauthorized, "Unauthorized"};

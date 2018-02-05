@@ -132,7 +132,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         // Command is testing-only, and can only be enabled at command line.  Hence, no auth
         // check needed.
     }

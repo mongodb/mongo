@@ -515,7 +515,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         // For now, just use `find` permissions.
         const NamespaceString nss(parseNs(dbname, cmdObj));
 

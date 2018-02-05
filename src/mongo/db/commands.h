@@ -310,7 +310,8 @@ public:
      * Checks if the client associated with the given OperationContext is authorized to run this
      * command.
      */
-    virtual Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) = 0;
+    virtual Status checkAuthForRequest(OperationContext* opCtx,
+                                       const OpMsgRequest& request) const = 0;
 
     /**
      * Redacts "cmdObj" in-place to a form suitable for writing to logs.
@@ -502,7 +503,7 @@ public:
      */
     virtual Status checkAuthForOperation(OperationContext* opCtx,
                                          const std::string& dbname,
-                                         const BSONObj& cmdObj);
+                                         const BSONObj& cmdObj) const;
 
 private:
     //
@@ -517,7 +518,7 @@ private:
      */
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj);
+                                       const BSONObj& cmdObj) const;
 
     /**
      * Appends to "*out" the privileges required to run this command on database "dbname" with
@@ -526,7 +527,7 @@ private:
      */
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         // The default implementation of addRequiredPrivileges should never be hit.
         fassertFailed(16940);
     }
@@ -545,9 +546,9 @@ private:
     /**
      * Calls checkAuthForOperation.
      */
-    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) final;
+    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final;
 
-    void uassertNoDocumentSequences(const OpMsgRequest& request);
+    void uassertNoDocumentSequences(const OpMsgRequest& request) const;
 };
 
 /**

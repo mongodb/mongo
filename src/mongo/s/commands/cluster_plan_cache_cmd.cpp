@@ -70,7 +70,9 @@ public:
         return CommandHelpers::parseNsCollectionRequired(dbname, cmdObj).ns();
     }
 
-    Status checkAuthForCommand(Client* client, const std::string& dbname, const BSONObj& cmdObj) {
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
         ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 

@@ -77,7 +77,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         std::string ns = parseNs(dbname, cmdObj);
 
         ActionSet actions;

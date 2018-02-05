@@ -51,7 +51,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
+                                       std::vector<Privilege>* out) const {}  // No auth required
 
     CmdAuthenticate() : BasicCommand("authenticate") {}
     bool run(OperationContext* opCtx,

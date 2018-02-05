@@ -63,7 +63,7 @@ public:
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::removeShard);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
