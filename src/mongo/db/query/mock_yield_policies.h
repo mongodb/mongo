@@ -45,16 +45,16 @@ public:
     AlwaysTimeOutYieldPolicy(ClockSource* cs)
         : PlanYieldPolicy(PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, cs) {}
 
-    bool shouldYield() override {
+    bool shouldYieldOrInterrupt() override {
         return true;
     }
 
-    Status yield(RecordFetcher* recordFetcher) override {
+    Status yieldOrInterrupt(RecordFetcher* recordFetcher) override {
         return {ErrorCodes::ExceededTimeLimit, "Using AlwaysTimeOutYieldPolicy"};
     }
 
-    Status yield(stdx::function<void()> beforeYieldingFn,
-                 stdx::function<void()> whileYieldingFn) override {
+    Status yieldOrInterrupt(stdx::function<void()> beforeYieldingFn,
+                            stdx::function<void()> whileYieldingFn) override {
         return {ErrorCodes::ExceededTimeLimit, "Using AlwaysTimeOutYieldPolicy"};
     }
 };
@@ -71,16 +71,16 @@ public:
     AlwaysPlanKilledYieldPolicy(ClockSource* cs)
         : PlanYieldPolicy(PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED, cs) {}
 
-    bool shouldYield() override {
+    bool shouldYieldOrInterrupt() override {
         return true;
     }
 
-    Status yield(RecordFetcher* recordFetcher) override {
+    Status yieldOrInterrupt(RecordFetcher* recordFetcher) override {
         return {ErrorCodes::QueryPlanKilled, "Using AlwaysPlanKilledYieldPolicy"};
     }
 
-    Status yield(stdx::function<void()> beforeYieldingFn,
-                 stdx::function<void()> whileYieldingFn) override {
+    Status yieldOrInterrupt(stdx::function<void()> beforeYieldingFn,
+                            stdx::function<void()> whileYieldingFn) override {
         return {ErrorCodes::QueryPlanKilled, "Using AlwaysPlanKilledYieldPolicy"};
     }
 };

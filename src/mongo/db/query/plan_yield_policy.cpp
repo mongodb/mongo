@@ -36,10 +36,15 @@
 #include "mongo/db/query/query_knobs.h"
 #include "mongo/db/query/query_yield.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+namespace {
+MONGO_FP_DECLARE(setCheckForInterruptHang);
+}  // namespace
 
 PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy)
     : _policy(exec->getOpCtx()->lockState()->isGlobalLockedRecursively() ? PlanExecutor::NO_YIELD
@@ -59,6 +64,13 @@ PlanYieldPolicy::PlanYieldPolicy(PlanExecutor::YieldPolicy policy, ClockSource* 
                       Milliseconds(internalQueryExecYieldPeriodMS.load())),
       _planYielding(nullptr) {}
 
+bool PlanYieldPolicy::shouldYieldOrInterrupt() {
+    if (_policy == PlanExecutor::INTERRUPT_ONLY) {
+        return _elapsedTracker.intervalHasElapsed();
+    }
+    return shouldYield();
+}
+
 bool PlanYieldPolicy::shouldYield() {
     if (!canAutoYield())
         return false;
@@ -72,15 +84,28 @@ void PlanYieldPolicy::resetTimer() {
     _elapsedTracker.resetLastTime();
 }
 
-Status PlanYieldPolicy::yield(RecordFetcher* recordFetcher) {
+Status PlanYieldPolicy::yieldOrInterrupt(RecordFetcher* recordFetcher) {
     invariant(_planYielding);
     if (recordFetcher) {
         OperationContext* opCtx = _planYielding->getOpCtx();
-        return yield([recordFetcher, opCtx] { recordFetcher->setup(opCtx); },
-                     [recordFetcher] { recordFetcher->fetch(); });
+        return yieldOrInterrupt([recordFetcher, opCtx] { recordFetcher->setup(opCtx); },
+                                [recordFetcher] { recordFetcher->fetch(); });
     } else {
-        return yield(nullptr, nullptr);
+        return yieldOrInterrupt(nullptr, nullptr);
     }
+}
+
+Status PlanYieldPolicy::yieldOrInterrupt(stdx::function<void()> beforeYieldingFn,
+                                         stdx::function<void()> whileYieldingFn) {
+    if (_policy == PlanExecutor::INTERRUPT_ONLY) {
+        ON_BLOCK_EXIT([this]() { resetTimer(); });
+        OperationContext* opCtx = _planYielding->getOpCtx();
+        invariant(opCtx);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(setCheckForInterruptHang);
+        return opCtx->checkForInterruptNoAssert();
+    }
+
+    return yield(beforeYieldingFn, whileYieldingFn);
 }
 
 Status PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
@@ -106,6 +131,8 @@ Status PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
             // that it's time to yield. Whether or not we will actually yield, we need to check
             // if this operation has been interrupted.
             if (_policy == PlanExecutor::YIELD_AUTO) {
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(setCheckForInterruptHang);
+
                 auto interruptStatus = opCtx->checkForInterruptNoAssert();
                 if (!interruptStatus.isOK()) {
                     return interruptStatus;

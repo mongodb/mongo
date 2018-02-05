@@ -122,6 +122,9 @@ public:
         //    which is being used to execute an aggregation pipeline.
         NO_YIELD,
 
+        // Will not yield locks or storage engine resources, but will check for interrupt.
+        INTERRUPT_ONLY,
+
         // Used for testing, this yield policy will cause the PlanExecutor to time out on the first
         // yield, returning DEAD with an error object encoding a ErrorCodes::ExceededTimeLimit
         // message.

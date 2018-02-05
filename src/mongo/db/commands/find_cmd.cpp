@@ -196,8 +196,13 @@ public:
         Collection* collection = ctx.getCollection();
 
         // We have a parsed query. Time to get the execution plan for it.
+        auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        auto yieldPolicy =
+            readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+            ? PlanExecutor::INTERRUPT_ONLY
+            : PlanExecutor::YIELD_AUTO;
         auto statusWithPlanExecutor =
-            getExecutorFind(opCtx, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO);
+            getExecutorFind(opCtx, collection, nss, std::move(cq), yieldPolicy);
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -305,8 +310,13 @@ public:
         }
 
         // Get the execution plan for the query.
+        auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        auto yieldPolicy =
+            readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+            ? PlanExecutor::INTERRUPT_ONLY
+            : PlanExecutor::YIELD_AUTO;
         auto statusWithPlanExecutor =
-            getExecutorFind(opCtx, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO);
+            getExecutorFind(opCtx, collection, nss, std::move(cq), yieldPolicy);
         if (!statusWithPlanExecutor.isOK()) {
             return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }
