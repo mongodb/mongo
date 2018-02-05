@@ -220,7 +220,9 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
-        ShardingState::get(txn)->migrationDestinationManager()->report(result);
+        bool waitForSteadyOrDone = cmdObj["waitForSteadyOrDone"].boolean();
+        ShardingState::get(txn)->migrationDestinationManager()->report(
+            result, txn, waitForSteadyOrDone);
         return true;
     }
 
@@ -261,12 +263,13 @@ public:
              int,
              string& errmsg,
              BSONObjBuilder& result) {
+
         const MigrationSessionId migrationSessionid(
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
         const bool ok =
             ShardingState::get(txn)->migrationDestinationManager()->startCommit(migrationSessionid);
 
-        ShardingState::get(txn)->migrationDestinationManager()->report(result);
+        ShardingState::get(txn)->migrationDestinationManager()->report(result, txn, false);
         return ok;
     }
 
@@ -313,11 +316,11 @@ public:
 
         if (migrationSessionIdStatus.isOK()) {
             const bool ok = mdm->abort(migrationSessionIdStatus.getValue());
-            mdm->report(result);
+            mdm->report(result, txn, false);
             return ok;
         } else if (migrationSessionIdStatus == ErrorCodes::NoSuchKey) {
             mdm->abortWithoutSessionIdCheck();
-            mdm->report(result);
+            mdm->report(result, txn, false);
             return true;
         }
 

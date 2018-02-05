@@ -202,6 +202,40 @@ public:
     }
 
     /**
+     * Waits on condition "cv" for "pred" until "pred" returns true, or the given "deadline"
+     * expires, or this operation is interrupted, or this operation's own deadline expires.
+     *
+     *
+     * If the operation deadline expires or the operation is interrupted, throws a DBException.  If
+     * the given "deadline" expires, returns pred. Otherwise, returns true.
+     */
+    template <typename Pred>
+    bool waitForConditionOrInterruptUntilPred(stdx::condition_variable& cv,
+                                              stdx::unique_lock<stdx::mutex>& m,
+                                              Date_t deadline,
+                                              Pred pred) {
+        while (!pred()) {
+            if (stdx::cv_status::timeout == waitForConditionOrInterruptUntil(cv, m, deadline)) {
+                return pred();
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Same as the predicate form of waitForConditionOrInterruptUntilPred, but takes a relative
+     * amount of time to wait instead of an absolute time point.
+     */
+    template <typename Pred>
+    bool waitForConditionOrInterruptFor(stdx::condition_variable& cv,
+                                        stdx::unique_lock<stdx::mutex>& m,
+                                        Milliseconds duration,
+                                        Pred pred) {
+        return waitForConditionOrInterruptUntilPred(
+            cv, m, getServiceContext()->getPreciseClockSource()->now() + duration, pred);
+    }
+
+    /**
      * Same as waitForConditionOrInterruptUntil, except returns StatusWith<stdx::cv_status> and
      * non-ok status indicates the error instead of a DBException.
      */

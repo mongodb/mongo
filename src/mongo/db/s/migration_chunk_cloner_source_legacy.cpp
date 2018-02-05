@@ -75,9 +75,11 @@ bool isInRange(const BSONObj& obj,
 
 BSONObj createRequestWithSessionId(StringData commandName,
                                    const NamespaceString& nss,
-                                   const MigrationSessionId& sessionId) {
+                                   const MigrationSessionId& sessionId,
+                                   bool waitForSteadyOrDone = false) {
     BSONObjBuilder builder;
     builder.append(commandName, nss.ns());
+    builder.append("waitForSteadyOrDone", waitForSteadyOrDone);
     sessionId.append(&builder);
     return builder.obj();
 }
@@ -231,13 +233,8 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
 
     int iteration = 0;
     while ((Date_t::now() - startTime) < maxTimeToWait) {
-        // Exponential sleep backoff, up to 1024ms. Don't sleep much on the first few iterations,
-        // since we want empty chunk migrations to be fast.
-        sleepmillis(1LL << std::min(iteration, 10));
-        iteration++;
-
         auto responseStatus = _callRecipient(
-            createRequestWithSessionId(kRecvChunkStatus, _args.getNss(), _sessionId));
+            createRequestWithSessionId(kRecvChunkStatus, _args.getNss(), _sessionId, true));
         if (!responseStatus.isOK()) {
             return {responseStatus.getStatus().code(),
                     str::stream()
@@ -246,6 +243,11 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
         }
 
         const BSONObj& res = responseStatus.getValue();
+
+        if (!res["waited"].boolean()) {
+            sleepmillis(1LL << std::min(iteration, 10));
+        }
+        iteration++;
 
         stdx::lock_guard<stdx::mutex> sl(_mutex);
 
