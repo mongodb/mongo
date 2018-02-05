@@ -198,7 +198,7 @@ Status RollbackImpl::_awaitBgIndexCompletion(OperationContext* opCtx) {
     StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
     std::vector<std::string> dbs;
     {
-        Lock::GlobalLock lk(opCtx, MODE_IS, UINT_MAX);
+        Lock::GlobalLock lk(opCtx, MODE_IS, Milliseconds::max());
         storageEngine->listDatabases(&dbs);
     }
 

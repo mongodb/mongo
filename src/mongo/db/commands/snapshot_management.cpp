@@ -76,7 +76,7 @@ public:
                                                        {ErrorCodes::CommandNotSupported, ""});
         }
 
-        Lock::GlobalLock lk(opCtx, MODE_IX, UINT_MAX);
+        Lock::GlobalLock lk(opCtx, MODE_IX, Milliseconds::max());
 
         auto status = snapshotManager->prepareForCreateSnapshot(opCtx);
         if (status.isOK()) {
@@ -124,7 +124,7 @@ public:
                                                        {ErrorCodes::CommandNotSupported, ""});
         }
 
-        Lock::GlobalLock lk(opCtx, MODE_IX, UINT_MAX);
+        Lock::GlobalLock lk(opCtx, MODE_IX, Milliseconds::max());
         auto timestamp = Timestamp(cmdObj.firstElement().Long());
         snapshotManager->setCommittedSnapshot(timestamp);
         return true;

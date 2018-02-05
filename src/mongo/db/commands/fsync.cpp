@@ -147,7 +147,7 @@ public:
             }
 
             // Take a global IS lock to ensure the storage engine is not shutdown
-            Lock::GlobalLock global(opCtx, MODE_IS, UINT_MAX);
+            Lock::GlobalLock global(opCtx, MODE_IS, Milliseconds::max());
             StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
             result.append("numFiles", storageEngine->flushAllFiles(opCtx, sync));
             return true;

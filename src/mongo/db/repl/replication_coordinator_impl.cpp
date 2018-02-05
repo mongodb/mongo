@@ -1588,14 +1588,14 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     }
 
     auto globalLock = stdx::make_unique<Lock::GlobalLock>(
-        opCtx, MODE_X, durationCount<Milliseconds>(stepdownTime), Lock::GlobalLock::EnqueueOnly());
+        opCtx, MODE_X, stepdownTime, Lock::GlobalLock::EnqueueOnly());
 
     // We've requested the global exclusive lock which will stop new operations from coming in,
     // but existing operations could take a long time to finish, so kill all user operations
     // to help us get the global lock faster.
     _externalState->killAllUserOperations(opCtx);
 
-    globalLock->waitForLock(durationCount<Milliseconds>(stepdownTime));
+    globalLock->waitForLock(stepdownTime);
     if (!globalLock->isLocked()) {
         return {ErrorCodes::ExceededTimeLimit,
                 "Could not acquire the global shared lock within the amount of time "
@@ -1695,7 +1695,7 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
                 // failed stepdown attempt, we might as well spend whatever time we need to acquire
                 // it
                 // now.
-                globalLock.reset(new Lock::GlobalLock(opCtx, MODE_X, UINT_MAX));
+                globalLock.reset(new Lock::GlobalLock(opCtx, MODE_X, Milliseconds::max()));
                 invariant(globalLock->isLocked());
                 lk.lock();
             });

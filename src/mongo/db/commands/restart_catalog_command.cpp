@@ -84,7 +84,7 @@ public:
              const std::string& db,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
-        Lock::GlobalLock global(opCtx, MODE_X, UINT_MAX);
+        Lock::GlobalLock global(opCtx, MODE_X, Milliseconds::max());
 
         log() << "Closing database catalog";
         catalog::closeCatalog(opCtx);

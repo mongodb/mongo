@@ -57,7 +57,7 @@ Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData not
     // Use GlobalLock + lockMMAPV1Flush instead of DBLock to allow return when the lock is not
     // available. It may happen when the primary steps down and a shared global lock is
     // acquired.
-    Lock::GlobalLock lock(opCtx, MODE_IX, 1);
+    Lock::GlobalLock lock(opCtx, MODE_IX, Milliseconds(1));
 
     if (!lock.isLocked()) {
         LOG(1) << "Global lock is not available skipping noopWrite";

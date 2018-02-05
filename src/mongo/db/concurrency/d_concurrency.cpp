@@ -136,14 +136,14 @@ bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
     return locker->isLockHeldForMode(_rid, MODE_IS);
 }
 
-Lock::GlobalLock::GlobalLock(OperationContext* opCtx, LockMode lockMode, unsigned timeoutMs)
+Lock::GlobalLock::GlobalLock(OperationContext* opCtx, LockMode lockMode, Milliseconds timeoutMs)
     : GlobalLock(opCtx, lockMode, timeoutMs, EnqueueOnly()) {
     waitForLock(timeoutMs);
 }
 
 Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
                              LockMode lockMode,
-                             unsigned timeoutMs,
+                             Milliseconds timeoutMs,
                              EnqueueOnly enqueueOnly)
     : _opCtx(opCtx),
       _result(LOCK_INVALID),
@@ -161,17 +161,17 @@ Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
     otherLock._result = LOCK_INVALID;
 }
 
-void Lock::GlobalLock::_enqueue(LockMode lockMode, unsigned timeoutMs) {
+void Lock::GlobalLock::_enqueue(LockMode lockMode, Milliseconds timeoutMs) {
     if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.lock(MODE_IS);
     }
 
-    _result = _opCtx->lockState()->lockGlobalBegin(lockMode, Milliseconds(timeoutMs));
+    _result = _opCtx->lockState()->lockGlobalBegin(lockMode, timeoutMs);
 }
 
-void Lock::GlobalLock::waitForLock(unsigned timeoutMs) {
+void Lock::GlobalLock::waitForLock(Milliseconds timeoutMs) {
     if (_result == LOCK_WAITING) {
-        _result = _opCtx->lockState()->lockGlobalComplete(Milliseconds(timeoutMs));
+        _result = _opCtx->lockState()->lockGlobalComplete(timeoutMs);
     }
 
     if (_result != LOCK_OK && _opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
@@ -194,7 +194,7 @@ Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode)
     : _id(RESOURCE_DATABASE, db),
       _opCtx(opCtx),
       _mode(mode),
-      _globalLock(opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, UINT_MAX) {
+      _globalLock(opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, Milliseconds::max()) {
     massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
 
     // Need to acquire the flush lock

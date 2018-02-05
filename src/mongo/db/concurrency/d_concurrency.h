@@ -181,7 +181,7 @@ public:
     public:
         class EnqueueOnly {};
 
-        GlobalLock(OperationContext* opCtx, LockMode lockMode, unsigned timeoutMs);
+        GlobalLock(OperationContext* opCtx, LockMode lockMode, Milliseconds timeoutMs);
         GlobalLock(GlobalLock&&);
 
         /**
@@ -193,7 +193,7 @@ public:
          */
         GlobalLock(OperationContext* opCtx,
                    LockMode lockMode,
-                   unsigned timeoutMs,
+                   Milliseconds timeoutMs,
                    EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
@@ -209,14 +209,14 @@ public:
          * Waits for lock to be granted. Sets that the global lock was taken on the
          * GlobalLockAcquisitionTracker.
          */
-        void waitForLock(unsigned timeoutMs);
+        void waitForLock(Milliseconds timeoutMs);
 
         bool isLocked() const {
             return _result == LOCK_OK;
         }
 
     private:
-        void _enqueue(LockMode lockMode, unsigned timeoutMs);
+        void _enqueue(LockMode lockMode, Milliseconds timeoutMs);
         void _unlock();
 
         OperationContext* const _opCtx;
@@ -234,7 +234,7 @@ public:
      */
     class GlobalWrite : public GlobalLock {
     public:
-        explicit GlobalWrite(OperationContext* opCtx, unsigned timeoutMs = UINT_MAX)
+        explicit GlobalWrite(OperationContext* opCtx, Milliseconds timeoutMs = Milliseconds::max())
             : GlobalLock(opCtx, MODE_X, timeoutMs) {
             if (isLocked()) {
                 opCtx->lockState()->lockMMAPV1Flush();
@@ -251,7 +251,7 @@ public:
      */
     class GlobalRead : public GlobalLock {
     public:
-        explicit GlobalRead(OperationContext* opCtx, unsigned timeoutMs = UINT_MAX)
+        explicit GlobalRead(OperationContext* opCtx, Milliseconds timeoutMs = Milliseconds::max())
             : GlobalLock(opCtx, MODE_S, timeoutMs) {
             if (isLocked()) {
                 opCtx->lockState()->lockMMAPV1Flush();
