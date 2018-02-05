@@ -19,6 +19,7 @@ selector:
   # 3.6 becomes 'last-stable'.
   - jstests/sharding/covered_shard_key_indexes.js
   # Enable when 3.8 becomes last-stable.
+  - jstests/sharding/create_database.js
   - jstests/sharding/dump_coll_metadata.js
   - jstests/sharding/geo_near_random1.js
   - jstests/sharding/geo_near_random2.js

@@ -36,7 +36,7 @@ namespace mongo {
 
 DatabaseVersion Versioning::newDatabaseVersion() {
     DatabaseVersion dbv;
-    dbv.setLastMod(0);
+    dbv.setLastMod(1);
     dbv.setUuid(UUID::gen());
     return dbv;
 }
