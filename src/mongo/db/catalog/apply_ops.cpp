@@ -43,6 +43,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/extensions_callback_disallow_extensions.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/op_observer.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -114,64 +116,86 @@ Status _applyOps(OperationContext* opCtx,
         applyOpCmd.hasField("alwaysUpsert") ? applyOpCmd["alwaysUpsert"].trueValue() : true;
     const bool haveWrappingWUOW = opCtx->lockState()->inAWriteUnitOfWork();
 
-    {
-        repl::UnreplicatedWritesBlock uwb(opCtx);
+    while (i.more()) {
+        BSONElement e = i.next();
+        const BSONObj& opObj = e.Obj();
 
-        while (i.more()) {
-            BSONElement e = i.next();
-            const BSONObj& opObj = e.Obj();
+        // Ignore 'n' operations.
+        const char* opType = opObj["op"].valuestrsafe();
+        if (*opType == 'n')
+            continue;
 
-            // Ignore 'n' operations.
-            const char* opType = opObj["op"].valuestrsafe();
-            if (*opType == 'n')
-                continue;
+        const NamespaceString nss(opObj["ns"].String());
 
-            const NamespaceString nss(opObj["ns"].String());
+        // Need to check this here, or OldClientContext may fail an invariant.
+        if (*opType != 'c' && !nss.isValid())
+            return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
 
-            // Need to check this here, or OldClientContext may fail an invariant.
-            if (*opType != 'c' && !nss.isValid())
-                return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
+        Status status(ErrorCodes::InternalError, "");
 
-            Status status(ErrorCodes::InternalError, "");
+        if (haveWrappingWUOW) {
+            invariant(opCtx->lockState()->isW());
+            invariant(*opType != 'c');
+            auto db = dbHolder().get(opCtx, nss.ns());
+            if (!db) {
+                throw DBException(
+                    "cannot create a database in atomic applyOps mode; will retry without "
+                    "atomicity",
+                    ErrorCodes::NamespaceNotFound);
+            }
 
-            if (haveWrappingWUOW) {
-                invariant(opCtx->lockState()->isW());
-                invariant(*opType != 'c');
+            // When processing an update on a non-existent collection, applyOperation_inlock()
+            // returns UpdateOperationFailed on updates and allows the collection to be
+            // implicitly created on upserts. We detect both cases here and fail early with
+            // NamespaceNotFound.
+            auto collection = db->getCollection(nss);
+            if (!collection && !nss.isSystemDotIndexes() && (*opType == 'i' || *opType == 'u')) {
+                throw DBException(str::stream() << "cannot apply insert or update operation on "
+                                                   "a non-existent namespace "
+                                                << nss.ns()
+                                                << ": "
+                                                << redact(opObj),
+                                  ErrorCodes::NamespaceNotFound);
+            }
 
-                auto db = dbHolder().get(opCtx, nss.ns());
-                if (!db) {
-                    throw DBException(
-                        "cannot create a database in atomic applyOps mode; will retry without "
-                        "atomicity",
-                        ErrorCodes::NamespaceNotFound);
-                }
+            OldClientContext ctx(opCtx, nss.ns());
+            status = repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
+            if (!status.isOK())
+                return status;
+            logOpForDbHash(opCtx, nss.ns().c_str());
+        } else {
+            try {
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
+                    if (*opType == 'c') {
+                        invariant(opCtx->lockState()->isW());
+                        status = repl::applyCommand_inlock(opCtx, opObj, true);
+                    } else {
+                        const char* names[] = {"o", "ns"};
+                        BSONElement fields[2];
+                        opObj.getFields(2, names, fields);
+                        BSONElement& fieldO = fields[0];
+                        BSONElement& fieldNs = fields[1];
+                        const StringData ns = fieldNs.valueStringData();
+                        NamespaceString requestNss{ns};
 
-                // When processing an update on a non-existent collection, applyOperation_inlock()
-                // returns UpdateOperationFailed on updates and allows the collection to be
-                // implicitly created on upserts. We detect both cases here and fail early with
-                // NamespaceNotFound.
-                auto collection = db->getCollection(nss);
-                if (!collection && !nss.isSystemDotIndexes() &&
-                    (*opType == 'i' || *opType == 'u')) {
-                    throw DBException(str::stream() << "cannot apply insert or update operation on "
-                                                       "a non-existent namespace "
-                                                    << nss.ns()
-                                                    << ": "
-                                                    << redact(opObj),
-                                      ErrorCodes::NamespaceNotFound);
-                }
+                        if (nss.isSystemDotIndexes()) {
+                            BSONObj indexSpec;
+                            NamespaceString indexNss;
+                            std::tie(indexSpec, indexNss) =
+                                repl::prepForApplyOpsIndexInsert(fieldO, opObj, requestNss);
+                            BSONObjBuilder command;
+                            command.append("createIndexes", indexNss.coll());
+                            {
+                                BSONArrayBuilder indexes(command.subarrayStart("indexes"));
+                                indexes.append(indexSpec);
+                                indexes.doneFast();
+                            }
+                            const BSONObj commandObj = command.done();
 
-                OldClientContext ctx(opCtx, nss.ns());
-                status = repl::applyOperation_inlock(opCtx, ctx.db(), opObj, alwaysUpsert);
-                if (!status.isOK())
-                    return status;
-                logOpForDbHash(opCtx, nss.ns().c_str());
-            } else {
-                try {
-                    MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
-                        if (*opType == 'c') {
-                            invariant(opCtx->lockState()->isW());
-                            status = repl::applyCommand_inlock(opCtx, opObj, true);
+                            DBDirectClient client(opCtx);
+                            BSONObj infoObj;
+                            client.runCommand(nsToDatabase(ns), commandObj, infoObj);
+                            status = getStatusFromCommandResult(infoObj);
                         } else {
                             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
                             if (!autoColl.getCollection() && !nss.isSystemDotIndexes()) {
@@ -190,99 +214,52 @@ Status _applyOps(OperationContext* opCtx,
                                 }
                             } else {
                                 OldClientContext ctx(opCtx, nss.ns());
-
                                 status = repl::applyOperation_inlock(
                                     opCtx, ctx.db(), opObj, alwaysUpsert);
                             }
                         }
                     }
-                    MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "applyOps", nss.ns());
-                } catch (const DBException& ex) {
-                    ab.append(false);
-                    result->append("applied", ++(*numApplied));
-                    result->append("code", ex.getCode());
-                    result->append("codeName",
-                                   ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode())));
-                    result->append("errmsg", ex.what());
-                    result->append("results", ab.arr());
-                    return Status(ErrorCodes::UnknownError, ex.what());
                 }
-                WriteUnitOfWork wuow(opCtx);
-                logOpForDbHash(opCtx, nss.ns().c_str());
-                wuow.commit();
+                MONGO_WRITE_CONFLICT_RETRY_LOOP_END(opCtx, "applyOps", nss.ns());
+            } catch (const DBException& ex) {
+                ab.append(false);
+                result->append("applied", ++(*numApplied));
+                result->append("code", ex.getCode());
+                result->append("codeName",
+                               ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode())));
+                result->append("errmsg", ex.what());
+                result->append("results", ab.arr());
+                return Status(ErrorCodes::UnknownError, ex.what());
             }
-
-            ab.append(status.isOK());
-            if (!status.isOK()) {
-                log() << "applyOps error applying: " << status;
-                errors++;
-            }
-
-            (*numApplied)++;
-
-            if (MONGO_FAIL_POINT(applyOpsPauseBetweenOperations)) {
-                // While holding a database lock under MMAPv1, we would be implicitly holding the
-                // flush lock here. This would prevent other threads from acquiring the global
-                // lock or any database locks. We release all locks temporarily while the fail
-                // point is enabled to allow other threads to make progress.
-                boost::optional<Lock::TempRelease> release;
-                auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
-                if (storageEngine->isMmapV1() && !opCtx->lockState()->isW()) {
-                    release.emplace(opCtx->lockState());
-                }
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET(applyOpsPauseBetweenOperations);
-            }
+            WriteUnitOfWork wuow(opCtx);
+            logOpForDbHash(opCtx, nss.ns().c_str());
+            wuow.commit();
         }
 
-        result->append("applied", *numApplied);
-        result->append("results", ab.arr());
-    }  // set replicatedWrites back to original value
-
-    if (opCtx->writesAreReplicated()) {
-        // We want this applied atomically on slaves
-        // so we re-wrap without the pre-condition for speed
-
-        std::string tempNS = str::stream() << dbName << ".$cmd";
-
-        // TODO: possibly use mutable BSON to remove preCondition field
-        // once it is available
-        BSONObjBuilder cmdBuilder;
-
-        for (auto elem : applyOpCmd) {
-            auto name = elem.fieldNameStringData();
-            if (name == kPreconditionFieldName)
-                continue;
-            if (name == "bypassDocumentValidation")
-                continue;
-            cmdBuilder.append(elem);
+        ab.append(status.isOK());
+        if (!status.isOK()) {
+            log() << "applyOps error applying: " << status;
+            errors++;
         }
 
-        const BSONObj cmdRewritten = cmdBuilder.done();
+        (*numApplied)++;
 
-        auto opObserver = getGlobalServiceContext()->getOpObserver();
-        invariant(opObserver);
-        if (haveWrappingWUOW) {
-            opObserver->onApplyOps(opCtx, tempNS, cmdRewritten);
-        } else {
-            // When executing applyOps outside of a wrapping WriteUnitOfWOrk, always logOp the
-            // command regardless of whether the individial ops succeeded and rely on any
-            // failures to also on secondaries. This isn't perfect, but it's what the command
-            // has always done and is part of its "correct" behavior.
-            while (true) {
-                try {
-                    WriteUnitOfWork wunit(opCtx);
-                    opObserver->onApplyOps(opCtx, tempNS, cmdRewritten);
-
-                    wunit.commit();
-                    break;
-                } catch (const WriteConflictException& wce) {
-                    LOG(2) << "WriteConflictException while logging applyOps command, retrying.";
-                    opCtx->recoveryUnit()->abandonSnapshot();
-                    continue;
-                }
+        if (MONGO_FAIL_POINT(applyOpsPauseBetweenOperations)) {
+            // While holding a database lock under MMAPv1, we would be implicitly holding the
+            // flush lock here. This would prevent other threads from acquiring the global
+            // lock or any database locks. We release all locks temporarily while the fail
+            // point is enabled to allow other threads to make progress.
+            boost::optional<Lock::TempRelease> release;
+            auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
+            if (storageEngine->isMmapV1() && !opCtx->lockState()->isW()) {
+                release.emplace(opCtx->lockState());
             }
+            MONGO_FAIL_POINT_PAUSE_WHILE_SET(applyOpsPauseBetweenOperations);
         }
     }
+
+    result->append("applied", *numApplied);
+    result->append("results", ab.arr());
 
     if (errors != 0) {
         return Status(ErrorCodes::UnknownError, "applyOps had one or more errors applying ops");
@@ -390,7 +367,36 @@ Status applyOps(OperationContext* opCtx,
             BSONObjBuilder intermediateResult;
             WriteUnitOfWork wunit(opCtx);
             numApplied = 0;
-            uassertStatusOK(_applyOps(opCtx, dbName, applyOpCmd, &intermediateResult, &numApplied));
+            {
+                // Suppress replication for atomic operations until end of applyOps.
+                repl::UnreplicatedWritesBlock uwb(opCtx);
+                uassertStatusOK(
+                    _applyOps(opCtx, dbName, applyOpCmd, &intermediateResult, &numApplied));
+            }
+            // Generate oplog entry for all atomic ops collectively.
+            if (opCtx->writesAreReplicated()) {
+                // We want this applied atomically on slaves so we rewrite the oplog entry without
+                // the pre-condition for speed.
+
+                std::string tempNS = str::stream() << dbName << ".$cmd";
+
+                BSONObjBuilder cmdBuilder;
+
+                for (auto elem : applyOpCmd) {
+                    auto name = elem.fieldNameStringData();
+                    if (name == kPreconditionFieldName)
+                        continue;
+                    if (name == "bypassDocumentValidation")
+                        continue;
+                    cmdBuilder.append(elem);
+                }
+
+                const BSONObj cmdRewritten = cmdBuilder.done();
+
+                auto opObserver = getGlobalServiceContext()->getOpObserver();
+                invariant(opObserver);
+                opObserver->onApplyOps(opCtx, tempNS, cmdRewritten);
+            }
             wunit.commit();
             result->appendElements(intermediateResult.obj());
         }

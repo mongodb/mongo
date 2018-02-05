@@ -127,14 +127,11 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
 
     /**
      * Returns number of insert operations reported by serverStatus.
-     * Depending on the server version, applyOps may increment either 'opcounters' or
-     * 'opcountersRepl':
-     *     since 3.6: 'opcounters.insert'
-     *     3.4 and older: 'opcountersRepl.insert'
+     * In 3.4 'opcountersRepl', not 'opcounters' was previously the correct field. Now non-atomic
+     * ops are now replicated as they are applied and are counted toward the global op counter.
      */
     function getInsertOpCount(serverStatus) {
-        return (serverStatus.version.substr(0, 3) === "3.4") ? serverStatus.opcountersRepl.insert
-                                                             : serverStatus.opcounters.insert;
+        return serverStatus.opcounters.insert;
     }
 
     /**
