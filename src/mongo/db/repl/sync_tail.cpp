@@ -452,7 +452,6 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
               std::vector<Status>* statusVector,
               std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo) {
     invariant(writerVectors.size() == statusVector->size());
-    TimerHolder timer(&applyBatchStats);
     for (size_t i = 0; i < writerVectors.size(); i++) {
         if (!writerVectors[i].empty()) {
             writerPool->schedule([&func, &writerVectors, statusVector, workerMultikeyPathInfo, i] {
@@ -1540,6 +1539,9 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
     std::vector<Status> statusVector(workerPool->getNumThreads(), Status::OK());
     std::vector<WorkerMultikeyPathInfo> multikeyVector(workerPool->getNumThreads());
     {
+        // Each node records cumulative batch application stats for itself using this timer.
+        TimerHolder timer(&applyBatchStats);
+
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on the stack
         ON_BLOCK_EXIT([&] { workerPool->join(); });
