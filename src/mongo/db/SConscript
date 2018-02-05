@@ -611,21 +611,22 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authmongod',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/commands/dcommands_fsync',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/s/sharding',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/transport/service_entry_point',
-        'auth/authmongod',
         'command_can_run_here',
-        'commands/dcommands_fsync',
-        'concurrency/lock_manager',
         'curop',
         'curop_metrics',
         'lasterror',
-        'ops/write_ops_parsers',
         'rw_concern_d',
-        's/sharding',
-        'storage/storage_options',
     ],
     LIBDEPS_PRIVATE=[
-        'ops/write_ops_exec',
+        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
+        '$BUILD_DIR/mongo/db/commands/fsync_locked',
     ],
 )
 
@@ -741,14 +742,17 @@ env.Library(
         "repair_database.cpp",
     ],
     LIBDEPS=[
-        "background",
-        "catalog/index_key_validate",
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/database',
-        "$BUILD_DIR/mongo/db/storage/mmap_v1/storage_mmapv1",
+        '$BUILD_DIR/mongo/db/storage/mmap_v1/repair_database_interface',
+        'background',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/repl/oplog",
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/catalog/index_create',
+        '$BUILD_DIR/mongo/db/catalog/index_key_validate',
+        '$BUILD_DIR/mongo/db/repl/oplog',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
     ],
 )
 
@@ -758,11 +762,14 @@ env.Library(
         "ttl.cpp",
     ],
     LIBDEPS=[
-        "commands/dcommands_fsync",
-        "db_raii",
-        "query_exec",
-        "ttl_collection_cache",
+        'db_raii',
+        'query_exec',
+        'ttl_collection_cache',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/fsync_locked',
+        'write_ops',
+    ]
 )
 
 env.Library(

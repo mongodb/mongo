@@ -33,7 +33,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/fsync.h"
+#include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/stats/fill_locker_info.h"

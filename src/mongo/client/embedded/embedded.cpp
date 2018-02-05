@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_rebuilder.h"
@@ -105,6 +106,11 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     auto replCoord = stdx::make_unique<ReplicationCoordinatorEmbedded>(serviceContext);
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
     repl::setOplogCollectionName(serviceContext);
+    return Status::OK();
+}
+
+MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
+    setLockedForWritingImpl([]() { return false; });
     return Status::OK();
 }
 }  // namespace

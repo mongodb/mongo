@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2018 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,15 +26,18 @@
 *    it in the license file.
 */
 
-#pragma once
-
-#include "mongo/util/concurrency/mutex.h"
+#include "mongo/db/commands/fsync_locked.h"
 
 namespace mongo {
+namespace {
+stdx::function<bool()> lockedForWritingImpl;
+}  // namespace
 
-/**
- * Allows holders to block on an active fsyncLock.
- */
-extern SimpleMutex filesLockedFsync;
+bool lockedForWriting() {
+    return lockedForWritingImpl();
+}
 
+void setLockedForWritingImpl(stdx::function<bool()> impl) {
+    lockedForWritingImpl = std::move(impl);
+}
 }  // namespace mongo

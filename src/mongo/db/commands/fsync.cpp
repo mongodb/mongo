@@ -43,6 +43,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
@@ -391,7 +392,8 @@ void FSyncLockThread::run() {
     }
 }
 
-bool lockedForWriting() {
-    return fsyncCmd.fsyncLocked();
+MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
+    setLockedForWritingImpl([]() { return fsyncCmd.fsyncLocked(); });
+    return Status::OK();
 }
 }

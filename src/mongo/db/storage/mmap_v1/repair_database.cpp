@@ -50,6 +50,7 @@
 #include "mongo/db/storage/mmap_v1/mmap.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
+#include "mongo/db/storage/mmap_v1/repair_database_interface.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -481,6 +482,18 @@ Status MMAPV1Engine::repairDatabase(OperationContext* opCtx,
     // Reopen the database so it's discoverable
     dbHolder().openDb(opCtx, dbName);
 
+    return Status::OK();
+}
+
+MONGO_INITIALIZER(RepairDatabaseMMapV1)(InitializerContext* context) {
+    setRepairDatabaseMmapv1Impl([](StorageEngine* engine,
+                                   OperationContext* opCtx,
+                                   const std::string& dbName,
+                                   bool preserveClonedFilesOnFailure,
+                                   bool backupOriginalFiles) {
+        return static_cast<MMAPV1Engine*>(engine)->repairDatabase(
+            opCtx, dbName, preserveClonedFilesOnFailure, backupOriginalFiles);
+    });
     return Status::OK();
 }
 }
