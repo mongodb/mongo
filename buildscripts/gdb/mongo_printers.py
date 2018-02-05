@@ -22,7 +22,6 @@ def get_unique_ptr(obj):
     return obj["_M_t"]['_M_head_impl']
 
 
-
 ###################################################################################################
 #
 # Pretty-Printers
@@ -46,12 +45,8 @@ class StatusPrinter(object):
         code = str(code).split('::')[-1]
 
         info = self.val['_error'].dereference()
-        location = info['location']
         reason = info['reason']
-        if location:
-            return 'Status(%s, %s, %s)' % (code, reason, location)
-        else:
-            return 'Status(%s, %s)' % (code, reason)
+        return 'Status(%s, %s)' % (code, reason)
 
 
 class StatusWithPrinter:
@@ -69,12 +64,8 @@ class StatusWithPrinter:
         code = str(code).split('::')[-1]
 
         info = self.val['_status']['_error'].dereference()
-        location = info['location']
         reason = info['reason']
-        if location:
-            return 'StatusWith(%s, %s, %s)' % (code, reason, location)
-        else:
-            return 'StatusWith(%s, %s)' % (code, reason)
+        return 'StatusWith(%s, %s)' % (code, reason)
 
 
 class StringDataPrinter:
