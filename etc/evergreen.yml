@@ -5863,6 +5863,8 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: jsCore
+  - name: replica_sets
+  - name: sharding
 
 - name: enterprise-windows-64-2k8-inmem
   display_name: Enterprise Windows 2008R2 (inMemory)

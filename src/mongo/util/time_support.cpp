@@ -943,12 +943,8 @@ Nanoseconds getMinimumTimerResolution() {
     // see https://msdn.microsoft.com/en-us/library/windows/desktop/dd743626(v=vs.85).aspx
     TIMECAPS tc;
     Milliseconds resMillis;
-    if (timeGetDevCaps(&tc, sizeof(TIMECAPS)) != TIMERR_NOERROR) {
-        // failed to grab resolution range
-        resMillis = Milliseconds{1};
-    } else {
-        resMillis = Milliseconds{std::max(std::min(1, int(tc.wPeriodMin)), int(tc.wPeriodMax))};
-    }
+    invariant(timeGetDevCaps(&tc, sizeof(tc)) == MMSYSERR_NOERROR);
+    resMillis = Milliseconds{static_cast<int64_t>(tc.wPeriodMin)};
     minTimerResolution = duration_cast<Nanoseconds>(resMillis);
 #elif defined(__APPLE__)
     // see "Mac OSX Internals: a Systems Approach" for functions and types
