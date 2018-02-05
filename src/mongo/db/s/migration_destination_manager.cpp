@@ -222,6 +222,7 @@ MigrationDestinationManager::State MigrationDestinationManager::getState() const
 void MigrationDestinationManager::setState(State newState) {
     stdx::lock_guard<stdx::mutex> sl(_mutex);
     _state = newState;
+    _stateChangedCV.notify_all();
 }
 
 void MigrationDestinationManager::setStateFail(std::string msg) {
@@ -230,6 +231,7 @@ void MigrationDestinationManager::setStateFail(std::string msg) {
         stdx::lock_guard<stdx::mutex> sl(_mutex);
         _errmsg = std::move(msg);
         _state = FAIL;
+        _stateChangedCV.notify_all();
     }
 
     _sessionMigration->forceFail(msg);
@@ -241,6 +243,7 @@ void MigrationDestinationManager::setStateFailWarn(std::string msg) {
         stdx::lock_guard<stdx::mutex> sl(_mutex);
         _errmsg = std::move(msg);
         _state = FAIL;
+        _stateChangedCV.notify_all();
     }
 
     _sessionMigration->forceFail(msg);
@@ -255,7 +258,21 @@ bool MigrationDestinationManager::_isActive(WithLock) const {
     return _sessionId.is_initialized();
 }
 
-void MigrationDestinationManager::report(BSONObjBuilder& b) {
+void MigrationDestinationManager::report(BSONObjBuilder& b,
+                                         OperationContext* opCtx,
+                                         bool waitForSteadyOrDone) {
+    if (waitForSteadyOrDone) {
+        stdx::unique_lock<stdx::mutex> lock(_mutex);
+        try {
+            opCtx->waitForConditionOrInterruptFor(_stateChangedCV, lock, Seconds(1), [&]() -> bool {
+                return _state != READY && _state != CLONE && _state != CATCHUP;
+            });
+        } catch (...) {
+            // Ignoring this error because this is an optional parameter and we catch timeout
+            // exceptions later.
+        }
+        b.append("waited", true);
+    }
     stdx::lock_guard<stdx::mutex> sl(_mutex);
 
     b.appendBool("active", _sessionId.is_initialized());
@@ -311,6 +328,7 @@ Status MigrationDestinationManager::start(const NamespaceString& nss,
     invariant(!_scopedRegisterReceiveChunk);
 
     _state = READY;
+    _stateChangedCV.notify_all();
     _errmsg = "";
 
     _nss = nss;
@@ -366,6 +384,7 @@ Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
     }
 
     _state = ABORT;
+    _stateChangedCV.notify_all();
     _errmsg = "aborted";
 
     return Status::OK();
@@ -374,6 +393,7 @@ Status MigrationDestinationManager::abort(const MigrationSessionId& sessionId) {
 void MigrationDestinationManager::abortWithoutSessionIdCheck() {
     stdx::lock_guard<stdx::mutex> sl(_mutex);
     _state = ABORT;
+    _stateChangedCV.notify_all();
     _errmsg = "aborted without session id check";
 }
 
@@ -406,6 +426,7 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
 
     _sessionMigration->finish();
     _state = COMMIT_START;
+    _stateChangedCV.notify_all();
 
     auto const deadline = Date_t::now() + Seconds(30);
     while (_sessionId) {
@@ -413,6 +434,7 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
             _isActiveCV.wait_until(lock, deadline.toSystemTimePoint())) {
             _errmsg = str::stream() << "startCommit timed out waiting, " << _sessionId->toString();
             _state = FAIL;
+            _stateChangedCV.notify_all();
             return {ErrorCodes::CommandFailed, _errmsg};
         }
     }
