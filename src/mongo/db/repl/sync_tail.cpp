@@ -448,7 +448,6 @@ void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
               const MultiApplier::ApplyOperationFn& func,
               std::vector<Status>* statusVector) {
     invariant(writerVectors.size() == statusVector->size());
-    TimerHolder timer(&applyBatchStats);
     for (size_t i = 0; i < writerVectors.size(); i++) {
         if (!writerVectors[i].empty()) {
             writerPool->schedule([&func, &writerVectors, statusVector, i] {
@@ -1323,6 +1322,9 @@ StatusWith<OpTime> multiApply(OperationContext* txn,
 
     std::vector<Status> statusVector(workerPool->getNumThreads(), Status::OK());
     {
+        // Each node records cumulative batch application stats for itself using this timer.
+        TimerHolder timer(&applyBatchStats);
+
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on our stack, including writerVectors.
         std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
