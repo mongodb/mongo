@@ -94,7 +94,7 @@ public:
     /**
      * Reports the state of the migration manager as a BSON document.
      */
-    void report(BSONObjBuilder& b);
+    void report(BSONObjBuilder& b, OperationContext* opCtx, bool waitForSteadyOrDone);
 
     /**
      * Returns a report on the active migration, if the migration is active. Otherwise return an
@@ -223,6 +223,9 @@ private:
     std::string _errmsg;
 
     std::unique_ptr<SessionCatalogMigrationDestination> _sessionMigration;
+
+    // Condition variable, which is signalled every time the state of the migration changes.
+    stdx::condition_variable _stateChangedCV;
 };
 
 }  // namespace mongo
