@@ -55,7 +55,7 @@ public:
     AutoGetDb(OperationContext* opCtx,
               StringData dbName,
               LockMode mode,
-              Milliseconds timeoutMs = Milliseconds::max());
+              Date_t deadline = Date_t::max());
 
     // TODO (SERVER-32367): Do not use this constructor, it is for internal purposes only
     AutoGetDb(OperationContext* opCtx, StringData dbName, Lock::DBLock dbLock);
@@ -92,14 +92,14 @@ public:
                       LockMode modeDB,
                       LockMode modeColl,
                       ViewMode viewMode = kViewsForbidden,
-                      Milliseconds timeoutMs = Milliseconds::max());
+                      Date_t deadline = Date_t::max());
 
     AutoGetCollection(OperationContext* opCtx,
                       const NamespaceStringOrUUID& nsOrUUID,
                       LockMode modeAll,
                       ViewMode viewMode = kViewsForbidden,
-                      Milliseconds timeoutMs = Milliseconds::max())
-        : AutoGetCollection(opCtx, nsOrUUID, modeAll, modeAll, viewMode, timeoutMs) {}
+                      Date_t deadline = Date_t::max())
+        : AutoGetCollection(opCtx, nsOrUUID, modeAll, modeAll, viewMode, deadline) {}
 
     // TODO (SERVER-32367): Do not use this constructor, it is for internal purposes only
     AutoGetCollection(OperationContext* opCtx,
@@ -107,7 +107,7 @@ public:
                       Lock::DBLock dbLock,
                       LockMode modeColl,
                       ViewMode viewMode,
-                      Milliseconds timeoutMs = Milliseconds::max());
+                      Date_t deadline = Date_t::max());
 
     /**
      * Returns nullptr if the database didn't exist.
@@ -170,7 +170,7 @@ public:
     AutoGetOrCreateDb(OperationContext* opCtx,
                       StringData ns,
                       LockMode mode,
-                      Milliseconds timeoutMs = Milliseconds::max());
+                      Date_t deadline = Date_t::max());
 
     Database* getDb() const {
         return _db;

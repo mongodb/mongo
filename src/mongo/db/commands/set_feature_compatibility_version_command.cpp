@@ -249,7 +249,7 @@ public:
                     // Otherwise createCollection may determine not to add a UUID before the FCV
                     // change, but then actually create the collection after the update below
                     // identifies all of the databases to update with UUIDs.
-                    Lock::GlobalLock lk(opCtx, MODE_S, Milliseconds::max());
+                    Lock::GlobalLock lk(opCtx, MODE_S, Date_t::max());
                 }
 
                 // First put UUIDs in the storage layer metadata. UUIDs will be generated for
@@ -330,7 +330,7 @@ public:
                 // Otherwise createCollection may determine to add a UUID before the FCV change, but
                 // then actually create the collection after the update below identifies all of the
                 // databases from which to remove UUIDs.
-                Lock::GlobalLock lk(opCtx, MODE_S, Milliseconds::max());
+                Lock::GlobalLock lk(opCtx, MODE_S, Date_t::max());
             }
 
             // Fail after updating the FCV document but before removing UUIDs.

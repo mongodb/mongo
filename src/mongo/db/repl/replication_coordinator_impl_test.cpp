@@ -2118,7 +2118,7 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     // This is the important check, that we didn't accidentally step back up when aborting the
     // stepdown command attempt.
     const auto opCtx = makeOperationContext();
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Milliseconds::max());
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
 }
 
@@ -2174,7 +2174,7 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
 
     // This is the important check, that we didn't accidentally step back up when aborting the
     // stepdown command attempt.
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Milliseconds::max());
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
 }
 

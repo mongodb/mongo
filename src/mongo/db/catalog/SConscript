@@ -140,6 +140,7 @@ env.CppUnitTest(
         'catalog_raii_test.cpp',
     ],
     LIBDEPS=[
+        'database_holder_mock',
         '$BUILD_DIR/mongo/db/catalog/catalog_raii',
         '$BUILD_DIR/mongo/db/service_context_noop_init',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
@@ -228,6 +229,17 @@ env.CppUnitTest(
         'uuid_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context',
+    ],
+)
+
+env.Library(
+    target='database_holder_mock',
+    source=[
+        'database_holder_mock.cpp',
+    ],
+    LIBDEPS=[
+	'database_holder',
+        '$BUILD_DIR/mongo/base',
     ],
 )
 

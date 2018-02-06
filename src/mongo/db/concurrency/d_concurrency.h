@@ -181,24 +181,24 @@ public:
     public:
         class EnqueueOnly {};
 
-        GlobalLock(OperationContext* opCtx, LockMode lockMode, Milliseconds timeoutMs);
+        GlobalLock(OperationContext* opCtx, LockMode lockMode, Date_t deadline);
         GlobalLock(GlobalLock&&);
 
         /**
          * Enqueues lock but does not block on lock acquisition.
-         * Call waitForLock() to complete locking process.
+         * Call waitForLockUntil() to complete locking process.
          *
          * Does not set that the global lock was taken on the GlobalLockAcquisitionTracker. Call
-         * waitForLock to do so.
+         * waitForLockUntil to do so.
          */
         GlobalLock(OperationContext* opCtx,
                    LockMode lockMode,
-                   Milliseconds timeoutMs,
+                   Date_t deadline,
                    EnqueueOnly enqueueOnly);
 
         ~GlobalLock() {
-            if (_result != LOCK_INVALID) {
-                if (isLocked() && _isOutermostLock) {
+            if (isLocked()) {
+                if (_isOutermostLock) {
                     _opCtx->recoveryUnit()->abandonSnapshot();
                 }
                 _unlock();
@@ -209,14 +209,14 @@ public:
          * Waits for lock to be granted. Sets that the global lock was taken on the
          * GlobalLockAcquisitionTracker.
          */
-        void waitForLock(Milliseconds timeoutMs);
+        void waitForLockUntil(Date_t deadline);
 
         bool isLocked() const {
             return _result == LOCK_OK;
         }
 
     private:
-        void _enqueue(LockMode lockMode, Milliseconds timeoutMs);
+        void _enqueue(LockMode lockMode, Date_t deadline);
         void _unlock();
 
         OperationContext* const _opCtx;
@@ -234,8 +234,8 @@ public:
      */
     class GlobalWrite : public GlobalLock {
     public:
-        explicit GlobalWrite(OperationContext* opCtx, Milliseconds timeoutMs = Milliseconds::max())
-            : GlobalLock(opCtx, MODE_X, timeoutMs) {
+        explicit GlobalWrite(OperationContext* opCtx, Date_t deadline = Date_t::max())
+            : GlobalLock(opCtx, MODE_X, deadline) {
             if (isLocked()) {
                 opCtx->lockState()->lockMMAPV1Flush();
             }
@@ -251,8 +251,8 @@ public:
      */
     class GlobalRead : public GlobalLock {
     public:
-        explicit GlobalRead(OperationContext* opCtx, Milliseconds timeoutMs = Milliseconds::max())
-            : GlobalLock(opCtx, MODE_S, timeoutMs) {
+        explicit GlobalRead(OperationContext* opCtx, Date_t deadline = Date_t::max())
+            : GlobalLock(opCtx, MODE_S, deadline) {
             if (isLocked()) {
                 opCtx->lockState()->lockMMAPV1Flush();
             }
@@ -278,7 +278,7 @@ public:
         DBLock(OperationContext* opCtx,
                StringData db,
                LockMode mode,
-               Milliseconds timeoutMs = Milliseconds::max());
+               Date_t deadline = Date_t::max());
         DBLock(DBLock&&);
         ~DBLock();
 
@@ -290,9 +290,14 @@ public:
          */
         void relockWithMode(LockMode newMode);
 
+        bool isLocked() const {
+            return _result == LOCK_OK;
+        }
+
     private:
         const ResourceId _id;
         OperationContext* const _opCtx;
+        LockResult _result;
 
         // May be changed through relockWithMode. The global lock mode won't change though,
         // because we never change from IS/S to IX/X or vice versa, just convert locks from
@@ -324,7 +329,7 @@ public:
         CollectionLock(Locker* lockState,
                        StringData ns,
                        LockMode mode,
-                       Milliseconds timeoutMs = Milliseconds::max());
+                       Date_t deadline = Date_t::max());
         CollectionLock(CollectionLock&&);
         ~CollectionLock();
 
@@ -339,8 +344,13 @@ public:
          */
         void relockAsDatabaseExclusive(Lock::DBLock& dbLock);
 
+        bool isLocked() const {
+            return _result == LOCK_OK;
+        }
+
     private:
         const ResourceId _id;
+        LockResult _result;
         Locker* _lockState;
     };
 

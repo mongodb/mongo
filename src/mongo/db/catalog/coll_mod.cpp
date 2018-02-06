@@ -618,7 +618,7 @@ void updateUUIDSchemaVersion(OperationContext* opCtx, bool upgrade) {
     std::vector<std::string> dbNames;
     StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
     {
-        Lock::GlobalLock lk(opCtx, MODE_IS, Milliseconds::max());
+        Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::max());
         storageEngine->listDatabases(&dbNames);
     }
 
@@ -661,7 +661,7 @@ Status updateUUIDSchemaVersionNonReplicated(OperationContext* opCtx, bool upgrad
     std::vector<std::string> dbNames;
     StorageEngine* storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
     {
-        Lock::GlobalLock lk(opCtx, MODE_IS, Milliseconds::max());
+        Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::max());
         storageEngine->listDatabases(&dbNames);
     }
     for (auto it = dbNames.begin(); it != dbNames.end(); ++it) {

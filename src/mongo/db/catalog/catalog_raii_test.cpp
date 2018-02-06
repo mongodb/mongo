@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <string>
@@ -35,6 +37,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -54,57 +57,87 @@ public:
     }
 
     const NamespaceString nss = NamespaceString("test", "coll");
-    const Milliseconds timeoutMs = Milliseconds(30000);
-    const Milliseconds maxExecMs = Milliseconds(1500);
+    const Milliseconds timeoutMs = Milliseconds(30'000);
     const ClientAndCtx client1 = makeClientWithLocker("client1");
     const ClientAndCtx client2 = makeClientWithLocker("client2");
 };
 
-void failsWithLockTimeout(stdx::function<void()> func,
-                          Milliseconds timeoutMillis,
-                          Milliseconds maxExecMs) {
+void failsWithLockTimeout(stdx::function<void()> func, Milliseconds timeoutMillis) {
     Date_t t1 = Date_t::now();
     try {
         func();
         FAIL("Should have gotten an exception due to timeout");
-    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
+        log() << ex;
         Date_t t2 = Date_t::now();
         ASSERT_GTE(t2 - t1, timeoutMillis);
-        ASSERT_LTE(t2 - t1, timeoutMillis + maxExecMs);
     }
 }
 
-TEST_F(CatalogRAIITestFixture, AutoGetDBTimeout) {
-    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
-    failsWithLockTimeout([&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, timeoutMs); },
-                         timeoutMs,
-                         maxExecMs);
-}
-
-TEST_F(CatalogRAIITestFixture, AutoGetDBTimeout0) {
+TEST_F(CatalogRAIITestFixture, AutoGetDBDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_X);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     failsWithLockTimeout(
-        [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Milliseconds(0)); },
-        Milliseconds(0),
-        maxExecMs);
+        [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now() + timeoutMs); },
+        timeoutMs);
 }
 
-TEST_F(CatalogRAIITestFixture, AutoGetOrCreateDbTimeout) {
+TEST_F(CatalogRAIITestFixture, AutoGetDBGlobalLockDeadline) {
+    Lock::GlobalLock gLock1(client1.second.get(), MODE_X, Date_t::now());
+    ASSERT(gLock1.isLocked());
+    failsWithLockTimeout(
+        [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now() + timeoutMs); },
+        timeoutMs);
+}
+
+TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineNow) {
+    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    AutoGetDb db(client2.second.get(), nss.db(), MODE_IX, Date_t::now());
+    failsWithLockTimeout(
+        [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now()); },
+        Milliseconds(0));
+}
+
+TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineMin) {
+    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    AutoGetDb db(client2.second.get(), nss.db(), MODE_IX, Date_t::now());
+    failsWithLockTimeout(
+        [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now()); },
+        Milliseconds(0));
+}
+
+TEST_F(CatalogRAIITestFixture, AutoGetOrCreateDbDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_X);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     failsWithLockTimeout(
-        [&] { AutoGetOrCreateDb db(client2.second.get(), nss.db(), MODE_X, timeoutMs); },
-        timeoutMs,
-        maxExecMs);
+        [&] {
+            AutoGetOrCreateDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now() + timeoutMs);
+        },
+        timeoutMs);
 }
 
-TEST_F(CatalogRAIITestFixture, AutoGetCollectionTimeout) {
-    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionCollLockDeadline) {
+    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get()->lockState(), nss.toString(), MODE_X);
     ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss.toString(), MODE_X));
+    failsWithLockTimeout(
+        [&] {
+            AutoGetCollection coll(client2.second.get(),
+                                   nss,
+                                   MODE_IX,
+                                   MODE_X,
+                                   AutoGetCollection::ViewMode::kViewsForbidden,
+                                   Date_t::now() + timeoutMs);
+        },
+        timeoutMs);
+}
+
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockDeadline) {
+    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_X);
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     failsWithLockTimeout(
         [&] {
             AutoGetCollection coll(client2.second.get(),
@@ -112,17 +145,14 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionTimeout) {
                                    MODE_X,
                                    MODE_X,
                                    AutoGetCollection::ViewMode::kViewsForbidden,
-                                   timeoutMs);
+                                   Date_t::now() + timeoutMs);
         },
-        timeoutMs,
-        maxExecMs);
+        timeoutMs);
 }
 
-TEST_F(CatalogRAIITestFixture, AutoGetCollectionTimeout0) {
-    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
-    Lock::CollectionLock collLock1(client1.second.get()->lockState(), nss.toString(), MODE_X);
-    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss.toString(), MODE_X));
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionGlobalLockDeadline) {
+    Lock::GlobalLock gLock1(client1.second.get(), MODE_X, Date_t::now());
+    ASSERT(client1.second->lockState()->isLocked());
     failsWithLockTimeout(
         [&] {
             AutoGetCollection coll(client2.second.get(),
@@ -130,10 +160,46 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionTimeout0) {
                                    MODE_X,
                                    MODE_X,
                                    AutoGetCollection::ViewMode::kViewsForbidden,
-                                   Milliseconds(0));
+                                   Date_t::now() + timeoutMs);
         },
-        Milliseconds(0),
-        maxExecMs);
+        timeoutMs);
 }
+
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineNow) {
+    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    Lock::CollectionLock collLock1(client1.second.get()->lockState(), nss.toString(), MODE_X);
+    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss.toString(), MODE_X));
+
+    failsWithLockTimeout(
+        [&] {
+            AutoGetCollection coll(client2.second.get(),
+                                   nss,
+                                   MODE_IX,
+                                   MODE_X,
+                                   AutoGetCollection::ViewMode::kViewsForbidden,
+                                   Date_t::now());
+        },
+        Milliseconds(0));
+}
+
+TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineMin) {
+    Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    Lock::CollectionLock collLock1(client1.second.get()->lockState(), nss.toString(), MODE_X);
+    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss.toString(), MODE_X));
+
+    failsWithLockTimeout(
+        [&] {
+            AutoGetCollection coll(client2.second.get(),
+                                   nss,
+                                   MODE_IX,
+                                   MODE_X,
+                                   AutoGetCollection::ViewMode::kViewsForbidden,
+                                   Date_t::min());
+        },
+        Milliseconds(0));
+}
+
 }  // namespace
 }  // namespace mongo

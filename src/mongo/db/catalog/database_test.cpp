@@ -564,28 +564,51 @@ TEST_F(DatabaseTest, DBLockCanBePassedToAutoGetCollectionOrViewForReadCommand) {
     ASSERT_FALSE(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
 }
 
-TEST_F(DatabaseTest, AutoGetDBSucceedsWithTimeout) {
+TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineNow) {
     NamespaceString nss("test", "coll");
-    const Milliseconds timeoutMs = Milliseconds(0);
     Lock::DBLock lock(_opCtx.get(), nss.db(), MODE_X);
     ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     try {
-        AutoGetDb db(_opCtx.get(), nss.db(), MODE_X, timeoutMs);
+        AutoGetDb db(_opCtx.get(), nss.db(), MODE_X, Date_t::now());
         ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         FAIL("Should get the db within the timeout");
     }
 }
 
-TEST_F(DatabaseTest, AutoGetCollectionOrViewForReadCommandSucceedsWithTimeout) {
+TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
     NamespaceString nss("test", "coll");
-    const Milliseconds timeoutMs = Milliseconds(0);
+    Lock::DBLock lock(_opCtx.get(), nss.db(), MODE_X);
+    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    try {
+        AutoGetDb db(_opCtx.get(), nss.db(), MODE_X, Date_t::min());
+        ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+        FAIL("Should get the db within the timeout");
+    }
+}
+
+TEST_F(DatabaseTest, AutoGetCollectionOrViewForReadCommandSucceedsWithDeadlineNow) {
+    NamespaceString nss("test", "coll");
     Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_X);
     ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     Lock::CollectionLock collLock(_opCtx.get()->lockState(), nss.toString(), MODE_X);
     ASSERT(_opCtx.get()->lockState()->isCollectionLockedForMode(nss.toString(), MODE_X));
     try {
-        AutoGetCollectionOrViewForReadCommand db(_opCtx.get(), nss, timeoutMs);
+        AutoGetCollectionOrViewForReadCommand db(_opCtx.get(), nss, Date_t::now());
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
+        FAIL("Should get the db within the timeout");
+    }
+}
+
+TEST_F(DatabaseTest, AutoGetCollectionOrViewForReadCommandSucceedsWithDeadlineMin) {
+    NamespaceString nss("test", "coll");
+    Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_X);
+    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    Lock::CollectionLock collLock(_opCtx.get()->lockState(), nss.toString(), MODE_X);
+    ASSERT(_opCtx.get()->lockState()->isCollectionLockedForMode(nss.toString(), MODE_X));
+    try {
+        AutoGetCollectionOrViewForReadCommand db(_opCtx.get(), nss, Date_t::min());
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         FAIL("Should get the db within the timeout");
     }

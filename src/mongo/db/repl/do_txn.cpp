@@ -304,7 +304,7 @@ Status doTxn(OperationContext* opCtx,
     auto hasPrecondition = _hasPrecondition(doTxnCmd);
 
     // Acquire global lock in IX mode so that the replication state check will remain valid.
-    Lock::GlobalLock globalLock(opCtx, MODE_IX, Milliseconds::max());
+    Lock::GlobalLock globalLock(opCtx, MODE_IX, Date_t::max());
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     bool userInitiatedWritesAndNotPrimary =

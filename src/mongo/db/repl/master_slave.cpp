@@ -1301,7 +1301,7 @@ static void replMasterThread() {
         OperationContext& opCtx = *opCtxPtr;
         AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization();
 
-        Lock::GlobalWrite globalWrite(&opCtx, Milliseconds(1));
+        Lock::GlobalWrite globalWrite(&opCtx, Date_t::now() + Milliseconds(1));
         if (globalWrite.isLocked()) {
             toSleep = 10;
 

@@ -289,10 +289,10 @@ Locker::ClientState LockerImpl<IsForMMAPV1>::getClientState() const {
 
 template <bool IsForMMAPV1>
 LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode) {
-    LockResult result = _lockGlobalBegin(mode, Milliseconds::max());
+    LockResult result = _lockGlobalBegin(mode, Date_t::max());
 
     if (result == LOCK_WAITING) {
-        result = lockGlobalComplete(Milliseconds::max());
+        result = lockGlobalComplete(Date_t::max());
     }
 
     if (result == LOCK_OK) {
@@ -303,16 +303,16 @@ LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode) {
 }
 
 template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(LockMode mode, Milliseconds timeout) {
+LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(LockMode mode, Date_t deadline) {
     dassert(isLocked() == (_modeForTicket != MODE_NONE));
     if (_modeForTicket == MODE_NONE) {
         const bool reader = isSharedLockMode(mode);
         auto holder = shouldAcquireTicket() ? ticketHolders[mode] : nullptr;
         if (holder) {
             _clientState.store(reader ? kQueuedReader : kQueuedWriter);
-            if (timeout == Milliseconds::max()) {
+            if (deadline == Date_t::max()) {
                 holder->waitForTicket();
-            } else if (!holder->waitForTicketUntil(Date_t::now() + timeout)) {
+            } else if (!holder->waitForTicketUntil(deadline)) {
                 _clientState.store(kInactive);
                 return LOCK_TIMEOUT;
             }
@@ -332,8 +332,8 @@ LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(LockMode mode, Milliseconds
 }
 
 template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::lockGlobalComplete(Milliseconds timeout) {
-    return lockComplete(resourceIdGlobal, getLockMode(resourceIdGlobal), timeout, false);
+LockResult LockerImpl<IsForMMAPV1>::lockGlobalComplete(Date_t deadline) {
+    return lockComplete(resourceIdGlobal, getLockMode(resourceIdGlobal), deadline, false);
 }
 
 template <bool IsForMMAPV1>
@@ -431,7 +431,7 @@ void LockerImpl<IsForMMAPV1>::endWriteUnitOfWork() {
 template <bool IsForMMAPV1>
 LockResult LockerImpl<IsForMMAPV1>::lock(ResourceId resId,
                                          LockMode mode,
-                                         Milliseconds timeout,
+                                         Date_t deadline,
                                          bool checkDeadlock) {
     const LockResult result = lockBegin(resId, mode);
 
@@ -443,7 +443,7 @@ LockResult LockerImpl<IsForMMAPV1>::lock(ResourceId resId,
     // unsuccessful result that the lock manager would return is LOCK_WAITING.
     invariant(result == LOCK_WAITING);
 
-    return lockComplete(resId, mode, timeout, checkDeadlock);
+    return lockComplete(resId, mode, deadline, checkDeadlock);
 }
 
 template <bool IsForMMAPV1>
@@ -721,7 +721,7 @@ LockResult LockerImpl<IsForMMAPV1>::lockBegin(ResourceId resId, LockMode mode) {
 template <bool IsForMMAPV1>
 LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
                                                  LockMode mode,
-                                                 Milliseconds timeout,
+                                                 Date_t deadline,
                                                  bool checkDeadlock) {
     // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on
     // DB lock, while holding the flush lock, so it has to be released. This is only
@@ -734,6 +734,14 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
     }
 
     LockResult result;
+    Milliseconds timeout;
+    if (deadline == Date_t::max()) {
+        timeout = Milliseconds::max();
+    } else if (deadline == Date_t::min()) {
+        timeout = Milliseconds(0);
+    } else {
+        timeout = deadline - Date_t::now();
+    }
 
     // Don't go sleeping without bound in order to be able to report long waits or wake up for
     // deadlock detection.
@@ -888,7 +896,7 @@ AutoAcquireFlushLockForMMAPV1Commit::AutoAcquireFlushLockForMMAPV1Commit(Locker*
     // due to too much uncommitted in-memory journal, but won't have corruption.
 
     while (true) {
-        LockResult result = _locker->lock(resourceIdMMAPV1Flush, MODE_S, Milliseconds::max(), true);
+        LockResult result = _locker->lock(resourceIdMMAPV1Flush, MODE_S, Date_t::max(), true);
         if (result == LOCK_OK) {
             break;
         }
@@ -905,7 +913,7 @@ void AutoAcquireFlushLockForMMAPV1Commit::upgradeFlushLockToExclusive() {
     // This should not be able to deadlock, since we already hold the S journal lock, which
     // means all writers are kicked out. Readers always yield the journal lock if they block
     // waiting on any other lock.
-    invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, Milliseconds::max(), false));
+    invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, Date_t::max(), false));
 
     // Lock bumps the recursive count. Drop it back down so that the destructor doesn't
     // complain.

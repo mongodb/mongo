@@ -136,20 +136,20 @@ bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
     return locker->isLockHeldForMode(_rid, MODE_IS);
 }
 
-Lock::GlobalLock::GlobalLock(OperationContext* opCtx, LockMode lockMode, Milliseconds timeoutMs)
-    : GlobalLock(opCtx, lockMode, timeoutMs, EnqueueOnly()) {
-    waitForLock(timeoutMs);
+Lock::GlobalLock::GlobalLock(OperationContext* opCtx, LockMode lockMode, Date_t deadline)
+    : GlobalLock(opCtx, lockMode, deadline, EnqueueOnly()) {
+    waitForLockUntil(deadline);
 }
 
 Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
                              LockMode lockMode,
-                             Milliseconds timeoutMs,
+                             Date_t deadline,
                              EnqueueOnly enqueueOnly)
     : _opCtx(opCtx),
       _result(LOCK_INVALID),
       _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode),
       _isOutermostLock(!opCtx->lockState()->isLocked()) {
-    _enqueue(lockMode, timeoutMs);
+    _enqueue(lockMode, deadline);
 }
 
 Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
@@ -161,17 +161,17 @@ Lock::GlobalLock::GlobalLock(GlobalLock&& otherLock)
     otherLock._result = LOCK_INVALID;
 }
 
-void Lock::GlobalLock::_enqueue(LockMode lockMode, Milliseconds timeoutMs) {
+void Lock::GlobalLock::_enqueue(LockMode lockMode, Date_t deadline) {
     if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         _pbwm.lock(MODE_IS);
     }
 
-    _result = _opCtx->lockState()->lockGlobalBegin(lockMode, timeoutMs);
+    _result = _opCtx->lockState()->lockGlobalBegin(lockMode, deadline);
 }
 
-void Lock::GlobalLock::waitForLock(Milliseconds timeoutMs) {
+void Lock::GlobalLock::waitForLockUntil(Date_t deadline) {
     if (_result == LOCK_WAITING) {
-        _result = _opCtx->lockState()->lockGlobalComplete(timeoutMs);
+        _result = _opCtx->lockState()->lockGlobalComplete(deadline);
     }
 
     if (_result != LOCK_OK && _opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
@@ -184,18 +184,20 @@ void Lock::GlobalLock::waitForLock(Milliseconds timeoutMs) {
 }
 
 void Lock::GlobalLock::_unlock() {
-    if (isLocked()) {
-        _opCtx->lockState()->unlockGlobal();
-        _result = LOCK_INVALID;
-    }
+    _opCtx->lockState()->unlockGlobal();
+    _result = LOCK_INVALID;
 }
 
-Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode, Milliseconds timeoutMs)
+Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode, Date_t deadline)
     : _id(RESOURCE_DATABASE, db),
       _opCtx(opCtx),
+      _result(LOCK_INVALID),
       _mode(mode),
-      _globalLock(opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, timeoutMs) {
+      _globalLock(opCtx, isSharedLockMode(_mode) ? MODE_IS : MODE_IX, deadline) {
     massert(28539, "need a valid database name", !db.empty() && nsIsDbOnly(db));
+
+    if (!_globalLock.isLocked())
+        return;
 
     // Need to acquire the flush lock
     _opCtx->lockState()->lockMMAPV1Flush();
@@ -206,25 +208,22 @@ Lock::DBLock::DBLock(OperationContext* opCtx, StringData db, LockMode mode, Mill
         _mode = MODE_X;
     }
 
-    uassert(ErrorCodes::LockTimeout,
-            str::stream() << "Failed to acqure database '" << db << "' in " << modeName(_mode)
-                          << " after waiting for "
-                          << timeoutMs
-                          << " ms.",
-            LOCK_OK == _opCtx->lockState()->lock(_id, _mode, timeoutMs));
+    _result = _opCtx->lockState()->lock(_id, _mode, deadline);
+    invariant(_result == LOCK_OK || deadline != Date_t::max());
 }
 
 Lock::DBLock::DBLock(DBLock&& otherLock)
     : _id(otherLock._id),
       _opCtx(otherLock._opCtx),
+      _result(otherLock._result),
       _mode(otherLock._mode),
       _globalLock(std::move(otherLock._globalLock)) {
     // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
-    otherLock._mode = MODE_NONE;
+    otherLock._result = LOCK_INVALID;
 }
 
 Lock::DBLock::~DBLock() {
-    if (_mode != MODE_NONE) {
+    if (isLocked()) {
         _opCtx->lockState()->unlock(_id);
     }
 }
@@ -246,8 +245,8 @@ void Lock::DBLock::relockWithMode(LockMode newMode) {
 Lock::CollectionLock::CollectionLock(Locker* lockState,
                                      StringData ns,
                                      LockMode mode,
-                                     Milliseconds timeoutMs)
-    : _id(RESOURCE_COLLECTION, ns), _lockState(lockState) {
+                                     Date_t deadline)
+    : _id(RESOURCE_COLLECTION, ns), _result(LOCK_INVALID), _lockState(lockState) {
     massert(28538, "need a non-empty collection name", nsIsFull(ns));
 
     dassert(_lockState->isDbLockedForMode(nsToDatabaseSubstring(ns),
@@ -256,21 +255,19 @@ Lock::CollectionLock::CollectionLock(Locker* lockState,
     if (!supportsDocLocking()) {
         actualLockMode = isSharedLockMode(mode) ? MODE_S : MODE_X;
     }
-    uassert(ErrorCodes::LockTimeout,
-            str::stream() << "Failed to acquire collection '" << ns << "' in " << modeName(mode)
-                          << " after waiting for "
-                          << timeoutMs
-                          << " ms.",
-            LOCK_OK == _lockState->lock(_id, actualLockMode, timeoutMs));
+
+    _result = _lockState->lock(_id, actualLockMode, deadline);
+    invariant(_result == LOCK_OK || deadline != Date_t::max());
 }
 
 Lock::CollectionLock::CollectionLock(CollectionLock&& otherLock)
-    : _id(otherLock._id), _lockState(otherLock._lockState) {
+    : _id(otherLock._id), _result(otherLock._result), _lockState(otherLock._lockState) {
     otherLock._lockState = nullptr;
+    otherLock._result = LOCK_INVALID;
 }
 
 Lock::CollectionLock::~CollectionLock() {
-    if (_lockState) {
+    if (isLocked()) {
         _lockState->unlock(_id);
     }
 }
