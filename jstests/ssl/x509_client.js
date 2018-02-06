@@ -10,7 +10,7 @@ conn.getDB('admin').createUser({user: "root", pwd: "pass", roles: ["root"]});
 conn.getDB('admin').auth("root", "pass");
 var cmdOut = conn.getDB('admin').runCommand({getParameter: 1, authenticationMechanisms: 1});
 if (cmdOut.ok) {
-    TestData.authMechanism = "MONGODB-X509";  // SERVER-10353
+    TestData.authMechanism = "MONGODB-X509,SCRAM-SHA-1";  // SERVER-10353
 }
 conn.getDB('admin').dropAllUsers();
 conn.getDB('admin').logout();

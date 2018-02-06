@@ -165,7 +165,7 @@ Status checkAuthForUpdateUserCommand(Client* client,
         return status;
     }
 
-    if (args.hasHashedPassword) {
+    if (args.hasPassword) {
         if (!authzSession->isAuthorizedToChangeOwnPasswordAsUser(args.userName) &&
             !authzSession->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(args.userName.getDB()),

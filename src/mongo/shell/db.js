@@ -1386,7 +1386,7 @@ var DB;
                 "Cannot specify 'digestPassword' through the user management shell helpers, " +
                 "use 'passwordDigestor' instead");
         }
-        var passwordDigestor = cmdObj["passwordDigestor"] ? cmdObj["passwordDigestor"] : "client";
+        var passwordDigestor = cmdObj["passwordDigestor"] ? cmdObj["passwordDigestor"] : "server";
         if (passwordDigestor == "server") {
             cmdObj["digestPassword"] = true;
         } else if (passwordDigestor == "client") {

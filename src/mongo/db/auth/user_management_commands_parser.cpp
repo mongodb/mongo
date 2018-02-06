@@ -47,7 +47,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/password_digest.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
@@ -193,6 +192,7 @@ Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
     validFieldNames.insert("pwd");
     validFieldNames.insert("roles");
     validFieldNames.insert("authenticationRestrictions");
+    validFieldNames.insert("mechanisms");
 
     Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
     if (!status.isOK()) {
@@ -213,30 +213,41 @@ Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
 
     parsedArgs->userName = UserName(userName, dbname);
 
+    // Parse mechanisms
+    if (cmdObj.hasField("mechanisms")) {
+        const auto mechsElem = cmdObj["mechanisms"];
+        if (mechsElem.type() != Array) {
+            return {ErrorCodes::UnsupportedFormat, "mechanisms field must be an array"};
+        }
+        const auto mechs = mechsElem.Obj();
+        if (mechs.nFields() == 0) {
+            return {ErrorCodes::UnsupportedFormat, "mechanisms field must not be empty"};
+        }
+        for (auto elem : mechs) {
+            if (elem.type() != String) {
+                return {ErrorCodes::BadValue, "mechanisms field must be an array of strings"};
+            }
+            parsedArgs->mechanisms.push_back(elem.String());
+        }
+    }
+
     // Parse password
     if (cmdObj.hasField("pwd")) {
-        std::string password;
-        status = bsonExtractStringField(cmdObj, "pwd", &password);
+        status = bsonExtractStringField(cmdObj, "pwd", &parsedArgs->password);
         if (!status.isOK()) {
             return status;
         }
-        if (password.empty()) {
+        if (parsedArgs->password.empty()) {
             return Status(ErrorCodes::BadValue, "User passwords must not be empty");
         }
+        parsedArgs->hasPassword = true;
 
-        bool digestPassword;  // True if the server should digest the password
-        status =
-            bsonExtractBooleanFieldWithDefault(cmdObj, "digestPassword", true, &digestPassword);
+        // True if the server should digest the password
+        status = bsonExtractBooleanFieldWithDefault(
+            cmdObj, "digestPassword", true, &parsedArgs->digestPassword);
         if (!status.isOK()) {
             return status;
         }
-
-        if (digestPassword) {
-            parsedArgs->hashedPassword = mongo::createPasswordDigest(userName, password);
-        } else {
-            parsedArgs->hashedPassword = password;
-        }
-        parsedArgs->hasHashedPassword = true;
     }
 
     // Parse custom data
