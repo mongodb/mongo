@@ -508,6 +508,10 @@ struct handler_type_requirements
     handler_type, handler) \
   typedef int ASIO_UNUSED_TYPEDEF
 
+#define ASIO_MOVE_ACCEPT_HANDLER_CHECK( \
+    handler_type, handler, socket_type) \
+  typedef int ASIO_UNUSED_TYPEDEF
+
 #define ASIO_CONNECT_HANDLER_CHECK( \
     handler_type, handler) \
   typedef int ASIO_UNUSED_TYPEDEF

@@ -29,6 +29,36 @@ namespace asio {
 /**
  * The thread pool class is an execution context where functions are permitted
  * to run on one of a fixed number of threads.
+ *
+ * @par Submitting tasks to the pool
+ *
+ * To submit functions to the io_context, use the @ref asio::dispatch,
+ * @ref asio::post or @ref asio::defer free functions.
+ *
+ * For example:
+ *
+ * @code void my_task()
+ * {
+ *   ...
+ * }
+ *
+ * ...
+ *
+ * // Launch the pool with four threads.
+ * asio::thread_pool pool(4);
+ *
+ * // Submit a function to the pool.
+ * asio::post(pool, my_task);
+ *
+ * // Submit a lambda object to the pool.
+ * asio::post(pool,
+ *     []()
+ *     {
+ *       ...
+ *     });
+ *
+ * // Wait for all tasks in the pool to complete.
+ * pool.join(); @endcode
  */
 class thread_pool
   : public execution_context

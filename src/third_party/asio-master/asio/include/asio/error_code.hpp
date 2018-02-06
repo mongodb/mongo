@@ -101,6 +101,20 @@ public:
     *this = make_error_code(e);
   }
 
+  /// Clear the error value to the default.
+  void clear()
+  {
+    value_ = 0;
+    category_ = &system_category();
+  }
+
+  /// Assign a new error value.
+  void assign(int v, const error_category& c)
+  {
+    value_ = v;
+    category_ = &c;
+  }
+
   /// Get the error value.
   int value() const
   {

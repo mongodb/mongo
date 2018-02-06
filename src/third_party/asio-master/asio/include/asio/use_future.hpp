@@ -118,17 +118,33 @@ public:
   operator()(ASIO_MOVE_ARG(Function) f) const;
 
 private:
-  Allocator allocator_;
+  // Helper type to ensure that use_future can be constexpr default-constructed
+  // even when std::allocator<void> can't be.
+  struct std_allocator_void
+  {
+    ASIO_CONSTEXPR std_allocator_void()
+    {
+    }
+
+    operator std::allocator<void>() const
+    {
+      return std::allocator<void>();
+    }
+  };
+
+  typename conditional<
+    is_same<std::allocator<void>, Allocator>::value,
+    std_allocator_void, Allocator>::type allocator_;
 };
 
 /// A special value, similar to std::nothrow.
 /**
  * See the documentation for asio::use_future_t for a usage example.
  */
-#if defined(ASIO_MSVC)
-__declspec(selectany) use_future_t<> use_future;
-#elif defined(ASIO_HAS_CONSTEXPR) || defined(GENERATING_DOCUMENTATION)
+#if defined(ASIO_HAS_CONSTEXPR) || defined(GENERATING_DOCUMENTATION)
 constexpr use_future_t<> use_future;
+#elif defined(ASIO_MSVC)
+__declspec(selectany) use_future_t<> use_future;
 #endif
 
 } // namespace asio

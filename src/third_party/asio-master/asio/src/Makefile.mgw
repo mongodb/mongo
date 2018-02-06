@@ -77,9 +77,19 @@ UNIT_TEST_EXES = \
 	tests/unit/strand.exe \
 	tests/unit/stream_socket_service.exe \
 	tests/unit/streambuf.exe \
+	tests/unit/system_executor.exe \
+	tests/unit/system_context.exe \
 	tests/unit/system_timer.exe \
 	tests/unit/thread.exe \
 	tests/unit/time_traits.exe \
+	tests/unit/ts/buffer.exe \
+	tests/unit/ts/executor.exe \
+	tests/unit/ts/internet.exe \
+	tests/unit/ts/io_context.exe \
+	tests/unit/ts/net.exe \
+	tests/unit/ts/netfwd.exe \
+	tests/unit/ts/socket.exe \
+	tests/unit/ts/timer.exe \
 	tests/unit/waitable_timer_service.exe \
 	tests/unit/windows/basic_handle.exe \
 	tests/unit/windows/basic_object_handle.exe \

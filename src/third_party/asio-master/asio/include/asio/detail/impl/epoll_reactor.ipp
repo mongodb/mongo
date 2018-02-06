@@ -384,6 +384,15 @@ void epoll_reactor::deregister_descriptor(socket_type descriptor,
           reinterpret_cast<uintmax_t>(descriptor_data)));
 
     scheduler_.post_deferred_completions(ops);
+
+    // Leave descriptor_data set so that it will be freed by the subsequent
+    // call to cleanup_descriptor_data.
+  }
+  else
+  {
+    // We are shutting down, so prevent cleanup_descriptor_data from freeing
+    // the descriptor_data object and let the destructor free it instead.
+    descriptor_data = 0;
   }
 }
 
@@ -412,6 +421,15 @@ void epoll_reactor::deregister_internal_descriptor(socket_type descriptor,
     ASIO_HANDLER_REACTOR_DEREGISTRATION((
           context(), static_cast<uintmax_t>(descriptor),
           reinterpret_cast<uintmax_t>(descriptor_data)));
+
+    // Leave descriptor_data set so that it will be freed by the subsequent
+    // call to cleanup_descriptor_data.
+  }
+  else
+  {
+    // We are shutting down, so prevent cleanup_descriptor_data from freeing
+    // the descriptor_data object and let the destructor free it instead.
+    descriptor_data = 0;
   }
 }
 
