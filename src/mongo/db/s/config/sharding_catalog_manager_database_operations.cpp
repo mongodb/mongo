@@ -33,12 +33,15 @@
 #include <pcrecpp.h>
 
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/server_options.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/versioning.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -101,13 +104,32 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
         return uassertStatusOK(DatabaseType::fromBSON(dbObj));
     }
 
-    // The database does not exist. Pick a primary shard to place it on.
-    auto const primaryShardId =
+    // The database does not exist. Insert an entry for the new database into the sharding catalog.
+
+    // Pick a primary shard for the new database.
+    const auto primaryShardId =
         uassertStatusOK(_selectShardForNewDatabase(opCtx, Grid::get(opCtx)->shardRegistry()));
-    log() << "Placing [" << dbName << "] on: " << primaryShardId;
+
+    // Take the fcvLock to prevent the fcv from changing from the point we decide whether to include
+    // a databaseVersion until after we finish writing the database entry. Otherwise, we may end up
+    // in fcv>3.6, but without a databaseVersion.
+    invariant(!opCtx->lockState()->isLocked());
+    Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+
+    // If in FCV>3.6, generate a databaseVersion, including a UUID, for the new database.
+    boost::optional<DatabaseVersion> dbVersion = boost::none;
+    if (serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40 ||
+        serverGlobalParams.featureCompatibility.getVersion() ==
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+        dbVersion = Versioning::newDatabaseVersion();
+    }
 
     // Insert an entry for the new database into the sharding catalog.
-    DatabaseType db(dbName, primaryShardId, false);
+    DatabaseType db(dbName, std::move(primaryShardId), false, std::move(dbVersion));
+
+    log() << "Registering new database " << db << " in sharding catalog";
+
     uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
         opCtx, DatabaseType::ConfigNS, db.toBSON(), ShardingCatalogClient::kMajorityWriteConcern));
 
