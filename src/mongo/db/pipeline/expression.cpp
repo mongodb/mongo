@@ -3146,8 +3146,9 @@ Value ExpressionPow::evaluate(const Document& root) const {
     long long result = 1;
     // Use repeated multiplication, since pow() casts args to doubles which could result in loss of
     // precision if arguments are very large.
+    
     for (int i = 0; i < expLong; i++) {
-        result *= baseLong;
+            result *= baseLong;
     }
 
     if (baseType == NumberLong || expType == NumberLong) {

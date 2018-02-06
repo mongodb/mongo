@@ -27,7 +27,7 @@
  */
 
 #include "mongo/platform/basic.h"
-
+#include <iostream>
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
@@ -2177,6 +2177,15 @@ TEST(ExpressionFromAccumulators, StdDevSamp) {
          {{Value(1LL), Value(2LL), Value(3LL)}, Value(1.0)},
          // $stdDevSamp returns null when no arguments are provided.
          {{}, Value(BSONNULL)}});
+}
+
+TEST(ExpressionFromAccumulators, Power) {
+    std::cout << " \n\n\nMaster \n \n\n\n\n"; 
+    assertExpectedResults(
+        "$pow",
+        {
+          {{Value(-1LL), Value(-5LL)}, Value(-1)}
+        });
 }
 
 namespace FieldPath {
