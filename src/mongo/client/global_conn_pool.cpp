@@ -30,7 +30,43 @@
 
 #include "mongo/client/global_conn_pool.h"
 
+#include "mongo/base/init.h"
+#include "mongo/db/server_parameters.h"
+
 namespace mongo {
+namespace {
+
+// Maximum connections per host the connection pool should store
+int maxConnsPerHost(200);
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
+    maxConnsPerHostParameter(ServerParameterSet::getGlobal(),
+                             "connPoolMaxConnsPerHost",
+                             &maxConnsPerHost);
+
+// Maximum in-use connections per host in the global connection pool
+int maxInUseConnsPerHost(std::numeric_limits<int>::max());
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
+    maxInUseConnsPerHostParameter(ServerParameterSet::getGlobal(),
+                                  "connPoolMaxInUseConnsPerHost",
+                                  &maxInUseConnsPerHost);
+
+// Amount of time, in minutes, to keep idle connections in the global connection pool
+int globalConnPoolIdleTimeout(std::numeric_limits<int>::max());
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
+    globalConnPoolIdleTimeoutParameter(ServerParameterSet::getGlobal(),
+                                       "globalConnPoolIdleTimeoutMinutes",
+                                       &globalConnPoolIdleTimeout);
+
+MONGO_INITIALIZER(InitializeGlobalConnectionPool)(InitializerContext* context) {
+    globalConnPool.setName("connection pool");
+    globalConnPool.setMaxPoolSize(maxConnsPerHost);
+    globalConnPool.setMaxInUse(maxInUseConnsPerHost);
+    globalConnPool.setIdleTimeout(globalConnPoolIdleTimeout);
+
+    return Status::OK();
+}
+
+}  // namespace
 
 DBConnectionPool globalConnPool;
 

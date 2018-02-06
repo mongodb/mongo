@@ -34,7 +34,9 @@
 
 #include <set>
 
+#include "mongo/base/init.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -338,6 +340,36 @@ void ActiveClientConnections::appendInfo(BSONObjBuilder* b) const {
 }
 
 thread_local std::unique_ptr<ClientConnections> ClientConnections::_perThread;
+
+// Maximum connections per host the sharded conn pool should store
+int maxShardedConnsPerHost(200);
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
+    maxShardedConnsPerHostParameter(ServerParameterSet::getGlobal(),
+                                    "connPoolMaxShardedConnsPerHost",
+                                    &maxShardedConnsPerHost);
+
+// Maximum in-use connections per host in the sharded connection pool
+int maxShardedInUseConnsPerHost(std::numeric_limits<int>::max());
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
+    maxShardedInUseConnsPerHostParameter(ServerParameterSet::getGlobal(),
+                                         "connPoolMaxShardedInUseConnsPerHost",
+                                         &maxShardedInUseConnsPerHost);
+
+// Amount of time, in minutes, to keep idle connections in the sharded connection pool
+int shardedConnPoolIdleTimeout(std::numeric_limits<int>::max());
+ExportedServerParameter<int, ServerParameterType::kStartupOnly>  //
+    shardedConnPoolIdleTimeoutParameter(ServerParameterSet::getGlobal(),
+                                        "shardedConnPoolIdleTimeoutMinutes",
+                                        &shardedConnPoolIdleTimeout);
+
+MONGO_INITIALIZER(InitializeShardedConnectionPool)(InitializerContext* context) {
+    shardConnectionPool.setName("sharded connection pool");
+    shardConnectionPool.setMaxPoolSize(maxShardedConnsPerHost);
+    shardConnectionPool.setMaxInUse(maxShardedInUseConnsPerHost);
+    shardConnectionPool.setIdleTimeout(shardedConnPoolIdleTimeout);
+
+    return Status::OK();
+}
 
 }  // namespace
 

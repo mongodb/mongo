@@ -17,6 +17,54 @@ env.SConscript(
     ],
 )
 
+# This is the main library to use for consumers of sharding. It will pull the routing and targeting
+# functionality.
+#
+# This is the only library, which should be referenced directly outside of mongo/s/ and mongo/db/s/
+env.Library(
+    target='sharding_api',
+    source=[
+
+    ],
+    LIBDEPS=[
+        'sharding_routing_table',
+    ],
+)
+
+# This library contains legacy sharding functionality, which should not be included in any new
+# development.
+env.Library(
+    target='sharding_legacy_api',
+    source=[
+        'client/parallel.cpp',
+        'client/shard_connection.cpp',
+        'client/version_manager.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver',
+        '$BUILD_DIR/mongo/db/lasterror',
+        'cluster_last_error_info',
+        'grid',
+        'sharding_api',
+    ],
+)
+
+env.Library(
+    target='sharding_routing_table',
+    source=[
+        'chunk.cpp',
+        'chunk_manager.cpp',
+        'shard_key_pattern.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/query/query_planner',
+        '$BUILD_DIR/mongo/db/storage/key_string',
+        '$BUILD_DIR/mongo/db/update/update_common',
+        'common_s',
+    ],
+)
+
 # Functionality for initializing global sharding state
 env.Library(
     target='sharding_initialization',
@@ -221,23 +269,6 @@ env.CppUnitTest('request_types_test',
 )
 
 env.Library(
-    target='routing_table',
-    source=[
-        'chunk.cpp',
-        'chunk_manager.cpp',
-        'shard_key_pattern.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/query/query_planner',
-        '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/mongo/db/update/update_common',
-        'common_s',
-    ],
-)
-
-
-env.Library(
     target='sharding_task_executor',
     source=[
         'sharding_task_executor.cpp',
@@ -246,7 +277,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/cluster_last_error_info',
+        'cluster_last_error_info',
     ],
 )
 
@@ -275,7 +306,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
         'client/shard_interface',
         'query/cluster_cursor_manager',
-        'routing_table',
+        'sharding_routing_table',
     ],
 )
 
@@ -299,7 +330,7 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target='routing_table_test',
+    target='sharding_routing_table_test',
     source=[
         'catalog_cache_refresh_test.cpp',
         'catalog_cache_test_fixture.cpp',
@@ -365,5 +396,19 @@ env.CppUnitTest(
     LIBDEPS=[
         'coreshard',
         'sharding_test_fixture',
+    ]
+)
+
+env.CppUnitTest(
+    target='sharding_legacy_api_test',
+    source=[
+        'client/shard_connection_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        '$BUILD_DIR/mongo/dbtests/mocklib',
+        '$BUILD_DIR/mongo/util/net/network',
+        'client/sharding_connection_hook',
+        'sharding_legacy_api',
     ]
 )
