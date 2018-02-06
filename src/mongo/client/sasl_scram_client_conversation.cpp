@@ -94,8 +94,13 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
     binaryNonce[1] = sr->nextInt64();
     binaryNonce[2] = sr->nextInt64();
 
-    std::string user =
-        _saslClientSession->getParameter(SaslClientSession::parameterUser).toString();
+    auto swUser =
+        saslPrep(_saslClientSession->getParameter(SaslClientSession::parameterUser).toString());
+    if (!swUser.isOK()) {
+        return swUser.getStatus();
+    }
+    auto user = swUser.getValue();
+
     encodeSCRAMUsername(user);
     _clientNonce = base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));
 
@@ -160,15 +165,14 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(const std::vector<stri
     // Append client-final-message-without-proof to _authMessage
     _authMessage += "c=biws,r=" + nonce;
 
-    std::string decodedSalt;
+    std::string decodedSalt, clientProof;
     try {
         decodedSalt = base64::decode(salt);
+        clientProof = generateClientProof(
+            std::vector<std::uint8_t>(decodedSalt.begin(), decodedSalt.end()), iterationCount);
     } catch (const DBException& ex) {
         return StatusWith<bool>(ex.toStatus());
     }
-
-    auto clientProof = generateClientProof(
-        std::vector<std::uint8_t>(decodedSalt.begin(), decodedSalt.end()), iterationCount);
 
     StringBuilder sb;
     sb << "c=biws,r=" << nonce << ",p=" << clientProof;

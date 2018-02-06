@@ -33,9 +33,11 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/sasl_server_conversation.h"
+#include "mongo/util/icu.h"
 
 namespace mongo {
 /**
@@ -82,6 +84,11 @@ public:
      * Generate a signature to prove ourselves.
      */
     virtual std::string generateServerSignature() const = 0;
+
+    /**
+     * Runs saslPrep except on SHA-1.
+     */
+    virtual StatusWith<std::string> saslPrep(StringData str) const = 0;
 
 private:
     /**
@@ -136,6 +143,14 @@ public:
 
     std::string generateServerSignature() const final {
         return _credentials.generateServerSignature(_authMessage);
+    }
+
+    StatusWith<std::string> saslPrep(StringData str) const final {
+        if (std::is_same<SHA1Block, HashBlock>::value) {
+            return str.toString();
+        } else {
+            return mongo::saslPrep(str);
+        }
     }
 
 private:

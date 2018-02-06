@@ -144,6 +144,12 @@ StatusWith<bool> SaslSCRAMServerConversation::_firstStep(std::vector<string>& in
 
     decodeSCRAMUsername(_user);
 
+    auto swUser = saslPrep(_user);
+    if (!swUser.isOK()) {
+        return swUser.getStatus();
+    }
+    _user = std::move(swUser.getValue());
+
     // SERVER-16534, SCRAM-SHA-1 must be enabled for authenticating the internal user, so that
     // cluster members may communicate with each other. Hence ignore disabled auth mechanism
     // for the internal user.

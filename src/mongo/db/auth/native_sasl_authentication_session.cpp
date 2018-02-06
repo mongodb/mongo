@@ -80,7 +80,8 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(PostSaslCommands, ("NativeSaslServerCore"))
 
     for (size_t i = 0; i < saslGlobalParams.authenticationMechanisms.size(); ++i) {
         const std::string& mechanism = saslGlobalParams.authenticationMechanisms[i];
-        if (mechanism == "MONGODB-CR" || mechanism == "MONGODB-X509") {
+        if (mechanism == "SCRAM-SHA-1" || mechanism == "SCRAM-SHA-256" ||
+            mechanism == "MONGODB-X509") {
             // Not a SASL mechanism; no need to smoke test built-in mechanisms.
             continue;
         }
@@ -124,7 +125,9 @@ Status NativeSaslAuthenticationSession::start(StringData authenticationDatabase,
     if (mechanism == "PLAIN") {
         _saslConversation.reset(new SaslPLAINServerConversation(this));
     } else if (mechanism == "SCRAM-SHA-1") {
-        _saslConversation.reset(new SaslSCRAMSHA1ServerConversation(this));
+        _saslConversation.reset(new SaslSCRAMServerConversationImpl<SHA1Block>(this));
+    } else if (mechanism == "SCRAM-SHA-256") {
+        _saslConversation.reset(new SaslSCRAMServerConversationImpl<SHA256Block>(this));
     } else {
         return Status(ErrorCodes::BadValue,
                       mongoutils::str::stream() << "SASL mechanism " << mechanism

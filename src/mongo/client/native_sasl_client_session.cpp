@@ -48,8 +48,9 @@ MONGO_INITIALIZER(NativeSaslClientContext)(InitializerContext* context) {
     return Status::OK();
 }
 
-// Global cache for SCRAM-SHA-1 credentials
-SCRAMSHA1ClientCache* scramsha1ClientCache = new SCRAMSHA1ClientCache;
+// Global cache for SCRAM-SHA-1/256 credentials
+auto* scramsha1ClientCache = new SCRAMClientCache<SHA1Block>;
+auto* scramsha256ClientCache = new SCRAMClientCache<SHA256Block>;
 
 }  // namespace
 
@@ -67,7 +68,11 @@ Status NativeSaslClientSession::initialize() {
     if (mechanism == "PLAIN") {
         _saslConversation.reset(new SaslPLAINClientConversation(this));
     } else if (mechanism == "SCRAM-SHA-1") {
-        _saslConversation.reset(new SaslSCRAMSHA1ClientConversation(this, scramsha1ClientCache));
+        _saslConversation.reset(
+            new SaslSCRAMClientConversationImpl<SHA1Block>(this, scramsha1ClientCache));
+    } else if (mechanism == "SCRAM-SHA-256") {
+        _saslConversation.reset(
+            new SaslSCRAMClientConversationImpl<SHA256Block>(this, scramsha256ClientCache));
     } else {
         return Status(ErrorCodes::BadValue,
                       mongoutils::str::stream() << "SASL mechanism " << mechanism

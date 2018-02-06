@@ -76,7 +76,6 @@ private:
                          const std::string& mechanism,
                          const UserName& user,
                          const BSONObj& cmdObj);
-    Status _authenticateCR(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj);
     Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj);
 };
 

@@ -56,6 +56,7 @@ SASLGlobalParams::SASLGlobalParams() {
     // Authentication mechanisms supported by default.
     authenticationMechanisms.push_back("MONGODB-X509");
     authenticationMechanisms.push_back("SCRAM-SHA-1");
+    authenticationMechanisms.push_back("SCRAM-SHA-256");
 
     // Default iteration count for SCRAM authentication.
     scramSHA1IterationCount.store(defaultScramSHA1IterationCount);

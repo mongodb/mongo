@@ -77,9 +77,17 @@ SaslConversation::SaslConversation(std::string mech)
         true,
         BSONObj()));
 
-    const auto authHash = (mech == "SCRAM-SHA-1") ? "frim" : createPasswordDigest("andy", "frim");
-    const auto creds = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
-                                authHash, saslGlobalParams.scramSHA1IterationCount.load()));
+    // PLAIN mechanism uses the same hashed password as SCRAM-SHA-1,
+    // but SCRAM-SHA-1's implementation makes the assumption the hashing has already
+    // happened at both ends.
+    // SCRAM-SHA-256 doesn't have this problem and always uses a pure password as input.
+    const auto pwHash = (mech == "PLAIN") ? createPasswordDigest("andy", "frim") : "frim";
+    const auto creds =
+        BSON("SCRAM-SHA-1" << scram::Secrets<SHA1Block>::generateCredentials(
+                                  pwHash, saslGlobalParams.scramSHA1IterationCount.load())
+                           << "SCRAM-SHA-256"
+                           << scram::Secrets<SHA256Block>::generateCredentials(
+                                  "frim", saslGlobalParams.scramSHA256IterationCount.load()));
 
     ASSERT_OK(authManagerExternalState->insert(&opCtx,
                                                NamespaceString("admin.system.users"),
@@ -213,6 +221,7 @@ void SaslConversation::testWrongServerMechanism() {
     DEFINE_ALL_MECHANISM_TESTS(SaslConversation##CLASS_SUFFIX)
 
 TEST_MECHANISM(SCRAMSHA1, "SCRAM-SHA-1")
+TEST_MECHANISM(SCRAMSHA256, "SCRAM-SHA-256")
 TEST_MECHANISM(PLAIN, "PLAIN")
 
 TEST_F(SaslIllegalConversation, IllegalClientMechanism) {
