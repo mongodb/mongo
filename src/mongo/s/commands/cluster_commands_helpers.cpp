@@ -393,6 +393,17 @@ bool appendEmptyResultSet(BSONObjBuilder& result, Status status, const std::stri
     return CommandHelpers::appendCommandStatus(result, status);
 }
 
+CachedCollectionRoutingInfo getShardedCollection(OperationContext* opCtx,
+                                                 const NamespaceString& nss) {
+    auto routingInfo =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Collection " << nss.ns() << " is not sharded.",
+            routingInfo.cm());
+
+    return routingInfo;
+}
+
 StatusWith<CachedDatabaseInfo> createShardDatabase(OperationContext* opCtx, StringData dbName) {
     auto dbStatus = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName);
     if (dbStatus == ErrorCodes::NamespaceNotFound) {
