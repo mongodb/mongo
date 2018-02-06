@@ -157,6 +157,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_raii',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/commands/dcommands_fcv',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/s/balancer',
@@ -332,6 +333,7 @@ env.CppUnitTest(
         'config/sharding_catalog_manager_assign_key_range_to_zone_test.cpp',
         'config/sharding_catalog_manager_commit_chunk_migration_test.cpp',
         'config/sharding_catalog_manager_config_initialization_test.cpp',
+        'config/sharding_catalog_manager_create_collection_test.cpp',
         'config/sharding_catalog_manager_create_database_test.cpp',
         'config/sharding_catalog_manager_drop_coll_test.cpp',
         'config/sharding_catalog_manager_enable_sharding_test.cpp',
