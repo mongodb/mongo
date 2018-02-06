@@ -3154,14 +3154,23 @@ Value ExpressionPow::evaluate(const Document& root) const {
     long long baseLong = baseVal.getLong();
     long long expLong = expVal.getLong();
 
-    // If the result cannot be represented as a long, return a double. Otherwise if either number
-    // is a long, return a long. If both numbers are ints, then return an int if the result fits or
-    // a long if it is too big.
+    // If the result cannot be represented as a long, return a double. Otherwise if either number is
+    // a long, return a long. If both numbers are ints, then return an int if the result fits or a
+    // long if it is too big.
     if (!representableAsLong(baseLong, expLong)) {
         return Value(std::pow(baseLong, expLong));
     }
 
     long long result = 1;
+
+    // When 'baseLong' == -1 and 'expLong' is < 0 the following for loop will never run because
+    // 'expLong' will always be less than 0 so result will always be 1. This is not always correct
+    // because the result can potentially be -1. ex: 'baselong' = -1 'expLong' = -5 then result
+    // should be -1.
+    if (baseLong == -1 && expLong < 0) {
+        expLong = expLong % 2 == 0 ? 2 : 1;
+    }
+
     // Use repeated multiplication, since pow() casts args to doubles which could result in loss of
     // precision if arguments are very large.
     for (int i = 0; i < expLong; i++) {
