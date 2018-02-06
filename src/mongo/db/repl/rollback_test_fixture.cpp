@@ -172,6 +172,13 @@ Collection* RollbackTest::_createCollection(OperationContext* opCtx,
     return _createCollection(opCtx, NamespaceString(nss), options);
 }
 
+Status RollbackTest::_insertOplogEntry(const BSONObj& doc) {
+    TimestampedBSONObj obj;
+    obj.obj = doc;
+    return _storageInterface.insertDocument(
+        _opCtx.get(), NamespaceString::kRsOplogNamespace, obj, 0);
+}
+
 RollbackSourceMock::RollbackSourceMock(std::unique_ptr<OplogInterface> oplog)
     : _oplog(std::move(oplog)) {}
 
