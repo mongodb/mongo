@@ -280,6 +280,11 @@ public:
                     result, {ErrorCodes::CommandNotSupportedOnView, errmsg});
             }
 
+            status = userAllowedCreateNS(ns.db(), ns.coll());
+            if (!status.isOK()) {
+                return CommandHelpers::appendCommandStatus(result, status);
+            }
+
             writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
                 collection = db->createCollection(opCtx, ns.ns(), CollectionOptions());

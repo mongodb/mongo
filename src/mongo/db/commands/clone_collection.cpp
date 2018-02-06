@@ -125,8 +125,18 @@ public:
             }
         }
 
-        string collection = parseNs(dbname, cmdObj);
-        Status allowedWriteStatus = userAllowedWriteNS(dbname, collection);
+        auto ns = parseNs(dbname, cmdObj);
+
+        // In order to clone a namespace, a user must be allowed to both create and write to that
+        // namespace. There exist namespaces that are legal to create but not write to (e.g.
+        // system.profile), and there exist namespaces that are legal to write to but not create
+        // (e.g. system.indexes), so we must check that it is legal to both create and write to the
+        // namespace.
+        auto allowedCreateStatus = userAllowedCreateNS(dbname, nsToCollectionSubstring(ns));
+        if (!allowedCreateStatus.isOK()) {
+            return CommandHelpers::appendCommandStatus(result, allowedCreateStatus);
+        }
+        auto allowedWriteStatus = userAllowedWriteNS(dbname, nsToCollectionSubstring(ns));
         if (!allowedWriteStatus.isOK()) {
             return CommandHelpers::appendCommandStatus(result, allowedWriteStatus);
         }
@@ -138,9 +148,8 @@ public:
         BSONElement copyIndexesSpec = cmdObj.getField("copyindexes");
         bool copyIndexes = copyIndexesSpec.isBoolean() ? copyIndexesSpec.boolean() : true;
 
-        log() << "cloneCollection.  db:" << dbname << " collection:" << collection
-              << " from: " << fromhost << " query: " << redact(query) << " "
-              << (copyIndexes ? "" : ", not copying indexes");
+        log() << "cloneCollection.  collection: " << ns << " from: " << fromhost
+              << " query: " << redact(query) << " " << (copyIndexes ? "" : ", not copying indexes");
 
         Cloner cloner;
         auto myconn = stdx::make_unique<DBClientConnection>();
@@ -150,7 +159,7 @@ public:
         cloner.setConnection(std::move(myconn));
 
         return cloner.copyCollection(
-            opCtx, collection, query, errmsg, copyIndexes, CollectionOptions::parseForCommand);
+            opCtx, ns, query, errmsg, copyIndexes, CollectionOptions::parseForCommand);
     }
 
 } cmdCloneCollection;
