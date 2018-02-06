@@ -37,6 +37,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
+#include "mongo/s/database_version_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
@@ -76,7 +77,12 @@ public:
     }
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
+        BSONElement first = cmdObj.firstElement();
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "namespace has invalid type " << typeName(first.type()),
+                first.canonicalType() == canonicalizeBSONType(mongo::String));
+        const NamespaceString nss(first.valueStringData());
+        return nss.ns();
     }
 
     bool run(OperationContext* opCtx,
@@ -85,14 +91,31 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
-        auto routingInfo = getShardedCollection(opCtx, nss);
-        const auto cm = routingInfo.cm();
+        const auto catalogCache = Grid::get(opCtx)->catalogCache();
 
-        for (const auto& chunk : cm->chunks()) {
-            log() << redact(chunk->toString());
+        if (nss.coll().empty()) {
+            // Return the database's information.
+            auto cachedDbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.ns()));
+            result.append("primaryShard", cachedDbInfo.primaryId().toString());
+            result.append("shardingEnabled", cachedDbInfo.shardingEnabled());
+            if (cachedDbInfo.databaseVersion()) {
+                result.append("version", cachedDbInfo.databaseVersion()->toBSON());
+            }
+        } else {
+            // Return the collection's information.
+            auto cachedCollInfo =
+                uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            uassert(ErrorCodes::NamespaceNotSharded,
+                    str::stream() << "Collection " << nss.ns() << " is not sharded.",
+                    cachedCollInfo.cm());
+            const auto cm = cachedCollInfo.cm();
+
+            for (const auto& chunk : cm->chunks()) {
+                log() << redact(chunk->toString());
+            }
+
+            cm->getVersion().addToBSON(result, "version");
         }
-
-        cm->getVersion().addToBSON(result, "version");
 
         return true;
     }

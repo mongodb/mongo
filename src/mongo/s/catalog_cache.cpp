@@ -337,8 +337,11 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(Oper
         collectionEntries[coll.getNs().ns()].needsRefresh = true;
     }
 
-    return _databases[dbName] = std::shared_ptr<DatabaseInfoEntry>(new DatabaseInfoEntry{
-               dbDesc.getPrimary(), dbDesc.getSharded(), std::move(collectionEntries)});
+    return _databases[dbName] =
+               std::make_shared<DatabaseInfoEntry>(DatabaseInfoEntry{dbDesc.getPrimary(),
+                                                                     dbDesc.getSharded(),
+                                                                     std::move(collectionEntries),
+                                                                     dbDesc.getVersion()});
 }
 
 void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
@@ -482,6 +485,10 @@ const ShardId& CachedDatabaseInfo::primaryId() const {
 
 bool CachedDatabaseInfo::shardingEnabled() const {
     return _db->shardingEnabled;
+}
+
+boost::optional<DatabaseVersion> CachedDatabaseInfo::databaseVersion() const {
+    return _db->databaseVersion;
 }
 
 CachedCollectionRoutingInfo::CachedCollectionRoutingInfo(ShardId primaryId,
