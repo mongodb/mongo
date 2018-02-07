@@ -4,11 +4,9 @@
 // not use this file except in compliance with the License. You may obtain
 // a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
 
-// +build sasl
-
 package db
 
-// This file runs Kerberos tests if build with sasl is enabled
+// This file runs Kerberos tests if the test.types includes 'kerberos'
 
 import (
 	"fmt"
@@ -28,6 +26,8 @@ var (
 )
 
 func TestKerberosAuthMechanism(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.KerberosTestType)
+
 	Convey("should be able to successfully connect", t, func() {
 		connector := &VanillaDBConnector{}
 

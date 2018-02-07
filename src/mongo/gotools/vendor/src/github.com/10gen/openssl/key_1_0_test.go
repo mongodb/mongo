@@ -28,6 +28,10 @@ import (
 )
 
 func TestMarshalEC(t *testing.T) {
+	if !HasECDH() {
+		t.Skip("ECDH not available")
+	}
+
 	key, err := LoadPrivateKeyFromPEM(prime256v1KeyBytes)
 	if err != nil {
 		t.Fatal(err)

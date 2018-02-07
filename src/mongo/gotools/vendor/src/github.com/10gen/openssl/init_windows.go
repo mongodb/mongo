@@ -17,6 +17,7 @@
 package openssl
 
 /*
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 #include <errno.h>
 #include <openssl/crypto.h>
 #include <windows.h>
@@ -49,7 +50,7 @@ void go_thread_locking_callback(int mode, int n, const char *file,
 		LeaveCriticalSection(&goopenssl_locks[n]);
 	}
 }
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+
 unsigned long go_thread_id_callback() {
 	return (unsigned long) GetCurrentThreadId();
 }

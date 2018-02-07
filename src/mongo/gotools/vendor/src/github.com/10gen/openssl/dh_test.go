@@ -23,6 +23,9 @@ import (
 
 func TestECDH(t *testing.T) {
 	t.Parallel()
+	if !HasECDH() {
+		t.Skip("ECDH not available")
+	}
 
 	myKey, err := GenerateECKey(Prime256v1)
 	if err != nil {

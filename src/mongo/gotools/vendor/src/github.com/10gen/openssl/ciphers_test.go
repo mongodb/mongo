@@ -90,6 +90,10 @@ func doDecryption(key, iv, aad, ciphertext, tag []byte, blocksize,
 	if err != nil {
 		return nil, fmt.Errorf("Failed making GCM decryption ctx: %s", err)
 	}
+	err = dctx.SetTag(tag)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to set expected GCM tag: %s", err)
+	}
 	aadbuf := bytes.NewBuffer(aad)
 	for aadbuf.Len() > 0 {
 		err = dctx.ExtraData(aadbuf.Next(bufsize))
@@ -105,10 +109,6 @@ func doDecryption(key, iv, aad, ciphertext, tag []byte, blocksize,
 			return nil, fmt.Errorf("Failed to perform a decryption: %s", err)
 		}
 		plainb.Write(moar)
-	}
-	err = dctx.SetTag(tag)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to set expected GCM tag: %s", err)
 	}
 	moar, err := dctx.DecryptFinal()
 	if err != nil {

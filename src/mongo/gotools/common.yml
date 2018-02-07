@@ -16,8 +16,9 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy28
-      - name: legacy26
+      - name: legacy30
+#      No SSL on 2.6 for osx
+#      - name: legacy26
       - name: qa-tests
       - name: qa-tests-3.2
       - name: qa-tests-3.4
@@ -43,8 +44,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy28
-      - name: legacy28-wt
+      - name: legacy30
       - name: lint-go
       - name: lint-js
       - name: qa-tests
@@ -68,7 +68,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy28
+      - name: legacy30
       - name: qa-tests
       - name: qa-tests-unstable
       - name: native-cert-ssl
@@ -78,7 +78,7 @@ mongo_tools_variables:
       - name: integration
       - name: integration-auth
       - name: kerberos
-      - name: legacy28
+      - name: legacy30
       - name: legacy26
       - name: qa-tests
       - name: native-cert-ssl
@@ -94,8 +94,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy28
-      - name: legacy28-wt
+      - name: legacy30
       - name: legacy26
       - name: qa-tests
       - name: unit
@@ -111,7 +110,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy28
+      - name: legacy30
         distros:
         - windows-64-vs2013-test
       - name: qa-tests
@@ -141,7 +140,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: integration-auth
-      - name: legacy28
+      - name: legacy30
       - name: qa-tests
       - name: native-cert-ssl
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
@@ -150,7 +149,7 @@ mongo_tools_variables:
       - name: integration
       - name: integration-auth
       - name: kerberos
-      - name: legacy28
+      - name: legacy30
         distros:
         - windows-64-vs2013-test
       - name: qa-tests
@@ -288,6 +287,8 @@ functions:
         sed -i.bak "s/built-without-git-spec/$(git rev-parse HEAD)/" common/options/options.go
 
         . ./set_gopath.sh
+        ${gorootvars} go version
+        ${gorootvars} env | grep ^GO
         ${gorootvars} go build ${args} -tags "failpoints ${build_tags}" -o bin/${tool} ${tool}/main/${tool}.go
         ./bin/${tool} --version
 
@@ -940,7 +941,7 @@ tasks:
     - func: "setup integration test"
     - func: "run tool integration tests"
 
-- name: legacy28
+- name: legacy30
   depends_on:
   - name: dist
   commands:
@@ -970,41 +971,8 @@ tasks:
         tool: mongofiles
     - func: "run legacy tests"
       vars:
-        test_path: "test/legacy28"
+        test_path: "test/legacy30"
         smoke_args: "--authMechanism SCRAM-SHA-1"
-
-- name: legacy28-wt
-  depends_on:
-  - name: dist
-  commands:
-    - func: "fetch source"
-    - func: "get buildnumber"
-    - func: "setup credentials"
-    - func: "download mongod"
-      vars:
-        mongo_version: "3.0"
-    - func: "fetch tool"
-      vars:
-        tool: mongoimport
-    - func: "fetch tool"
-      vars:
-        tool: mongoexport
-    - func: "fetch tool"
-      vars:
-        tool: mongodump
-    - func: "fetch tool"
-      vars:
-        tool: mongostat
-    - func: "fetch tool"
-      vars:
-        tool: mongorestore
-    - func: "fetch tool"
-      vars:
-        tool: mongofiles
-    - func: "run legacy tests"
-      vars:
-        test_path: "test/legacy28"
-        smoke_args: "--authMechanism SCRAM-SHA-1 --storageEngine=wiredTiger"
 
 - name: legacy26
   depends_on:
@@ -1597,6 +1565,19 @@ tasks:
 buildvariants:
 
 #######################################
+#     Amazon Buildvariants            #
+#######################################
+
+- name: amazonlinux64
+  display_name: Amazon Linux 64
+  run_on:
+  - linux-64-amzn-test
+  expansions:
+    build_tags: "sasl ssl"
+  tasks:
+  - name: dist
+
+#######################################
 #     Debian Buildvariants            #
 #######################################
 
@@ -1894,6 +1875,52 @@ buildvariants:
     build_tags: "sasl ssl"
     resmoke_use_ssl: _ssl
     gorootvars: PATH="/opt/mongodbtoolchain/v2/bin/:$PATH"
+    excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
+    resmoke_args: -j 2
+    multiversion_override: "skip"
+    arch: "linux/s390x"
+    edition: enterprise
+    run_kinit: true
+    integration_test_args: integration
+  tasks: *rhel72_enterprise_tasks
+
+- name: rhel72-s390x-enterprise-go1.7
+  display_name: ZAP s390x RHEL 7.2 Enterprise (Go 1.7)
+  run_on:
+  - rhel72-zseries-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel72"
+    mongo_edition: "enterprise"
+    mongo_arch: "s390x"
+    args: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)"
+    build_tags: "sasl ssl"
+    resmoke_use_ssl: _ssl
+    gorootvars: 'PATH="/opt/go1.7/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.7/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
+    excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
+    resmoke_args: -j 2
+    multiversion_override: "skip"
+    arch: "linux/s390x"
+    edition: enterprise
+    run_kinit: true
+    integration_test_args: integration
+  tasks: *rhel72_enterprise_tasks
+
+- name: rhel72-s390x-enterprise-go1.8
+  display_name: ZAP s390x RHEL 7.2 Enterprise (Go 1.8)
+  run_on:
+  - rhel72-zseries-test
+  expansions:
+    <<: *mongod_default_startup_args
+    <<: *mongo_default_startup_args
+    mongo_os: "rhel72"
+    mongo_edition: "enterprise"
+    mongo_arch: "s390x"
+    args: -gccgoflags "$(pkg-config --libs --cflags libssl libsasl2)"
+    build_tags: "sasl ssl"
+    resmoke_use_ssl: _ssl
+    gorootvars: 'PATH="/opt/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/opt/go1.8/go CC=/opt/mongodbtoolchain/v2/bin/s390x-mongodb-linux-gcc'
     excludes: requires_mmap_available,requires_mongo_24,requires_mongo_26,requires_mongo_30
     resmoke_args: -j 2
     multiversion_override: "skip"

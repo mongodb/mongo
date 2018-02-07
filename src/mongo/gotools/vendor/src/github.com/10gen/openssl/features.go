@@ -1,4 +1,4 @@
-// Copyright (C) 2014 Space Monkey, Inc.
+// Copyright (C) 2017. See AUTHORS.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build cgo
-
 package openssl
 
-// #include <openssl/opensslv.h>
-// #include <openssl/crypto.h>
+// #include "shim.h"
 import "C"
 
-const BuildVersion string = C.OPENSSL_VERSION_TEXT
-
-var Version string = C.GoString(C.SSLeay_version(C.SSLEAY_VERSION))
-
-var VersionNumber uint32 = uint32(C.SSLeay())
+func HasECDH() bool {
+	return C.X_OPENSSL_NO_ECDH() == 0
+}
