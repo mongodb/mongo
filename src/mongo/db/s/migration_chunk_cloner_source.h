@@ -93,6 +93,9 @@ public:
      * This must only be called once and no more methods on the cloner must be used afterwards
      * regardless of whether it succeeds or not.
      *
+     * Returns statistics about the move. These are informational only and should not be
+     * interpreted by the caller for any means other than reporting.
+     *
      * NOTE: Must be called without any locks.
      */
     virtual StatusWith<BSONObj> commitClone(OperationContext* opCtx) = 0;

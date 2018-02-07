@@ -369,9 +369,7 @@ Status MigrationSourceManager::commitChunkOnRecipient(OperationContext* opCtx) {
         return commitCloneStatus.getStatus().withContext("commit clone failed");
     }
 
-    if (commitCloneStatus.getValue()["counts"].type() == BSONType::Object) {
-        _recipientCloneCounts = commitCloneStatus.getValue()["counts"].Obj().getOwned();
-    }
+    _recipientCloneCounts = commitCloneStatus.getValue()["counts"].Obj().getOwned();
 
     _state = kCloneCompleted;
     scopedGuard.Dismiss();
