@@ -17,7 +17,9 @@
 
 #include "asio/detail/config.hpp"
 #include "asio/error_code.hpp"
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #include "asio/ssl/detail/openssl_types.hpp"
+#endif
 
 #include "asio/detail/push_options.hpp"
 
@@ -45,7 +47,7 @@ enum stream_errors
 #if defined(GENERATING_DOCUMENTATION)
   /// The underlying stream closed before the ssl stream gracefully shut down.
   stream_truncated
-#elif (OPENSSL_VERSION_NUMBER < 0x10100000L) && !defined(OPENSSL_IS_BORINGSSL)
+#elif (OPENSSL_VERSION_NUMBER < 0x10100000L) && !defined(OPENSSL_IS_BORINGSSL) && MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
   stream_truncated = ERR_PACK(ERR_LIB_SSL, 0, SSL_R_SHORT_READ)
 #else
   stream_truncated = 1

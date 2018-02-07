@@ -26,6 +26,12 @@
 
 #include "asio/detail/push_options.hpp"
 
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+
+#include "asio/ssl/impl/context_schannel.ipp"
+
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+
 namespace asio {
 namespace ssl {
 
@@ -1150,6 +1156,9 @@ BIO* context::make_buffer_bio(const const_buffer& b)
 
 } // namespace ssl
 } // namespace asio
+#else
+#error "Unknown SSL Provider"
+#endif
 
 #include "asio/detail/pop_options.hpp"
 

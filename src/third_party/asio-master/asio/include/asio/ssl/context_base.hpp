@@ -16,7 +16,10 @@
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
+
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #include "asio/ssl/detail/openssl_types.hpp"
+#endif
 
 #include "asio/detail/push_options.hpp"
 
@@ -98,6 +101,7 @@ public:
   /// Bitmask type for SSL options.
   typedef long options;
 
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #if defined(GENERATING_DOCUMENTATION)
   /// Implement various bug workarounds.
   static const long default_workarounds = implementation_defined;
@@ -144,6 +148,7 @@ public:
   ASIO_STATIC_CONSTANT(long, no_compression = 0x20000L);
 # endif // defined(SSL_OP_NO_COMPRESSION)
 #endif
+#endif
 
   /// File format types.
   enum file_format
@@ -155,6 +160,7 @@ public:
     pem
   };
 
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #if !defined(GENERATING_DOCUMENTATION)
   // The following types and constants are preserved for backward compatibility.
   // New programs should use the equivalents of the same names that are defined
@@ -165,6 +171,7 @@ public:
   ASIO_STATIC_CONSTANT(int,
       verify_fail_if_no_peer_cert = SSL_VERIFY_FAIL_IF_NO_PEER_CERT);
   ASIO_STATIC_CONSTANT(int, verify_client_once = SSL_VERIFY_CLIENT_ONCE);
+#endif
 #endif
 
   /// Purpose of PEM password.

@@ -22,7 +22,10 @@
 #include "asio/ssl/impl/context.ipp"
 #include "asio/ssl/impl/error.ipp"
 #include "asio/ssl/detail/impl/engine.ipp"
+
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #include "asio/ssl/detail/impl/openssl_init.ipp"
 #include "asio/ssl/impl/rfc2818_verification.ipp"
+#endif
 
 #endif // ASIO_SSL_IMPL_SRC_HPP

@@ -18,7 +18,9 @@
 #include "asio/detail/config.hpp"
 
 #include "asio/detail/noncopyable.hpp"
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #include "asio/ssl/detail/openssl_types.hpp"
+#endif
 
 #include "asio/detail/push_options.hpp"
 
@@ -35,7 +37,13 @@ class verify_context
 {
 public:
   /// The native handle type of the verification context.
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
   typedef X509_STORE_CTX* native_handle_type;
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+  typedef float native_handle_type;
+#else
+#error "Unknown SSL Provider"
+#endif
 
   /// Constructor.
   explicit verify_context(native_handle_type handle)
