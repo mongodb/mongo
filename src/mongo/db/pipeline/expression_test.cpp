@@ -27,7 +27,6 @@
  */
 
 #include "mongo/platform/basic.h"
-#include <iostream>
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
@@ -2179,12 +2178,11 @@ TEST(ExpressionFromAccumulators, StdDevSamp) {
          {{}, Value(BSONNULL)}});
 }
 
-TEST(ExpressionFromAccumulators, Power) {
-    std::cout << " \n\n\nMaster \n \n\n\n\n"; 
+TEST(ExpressionFromAccumulators, Pow) {
     assertExpectedResults(
         "$pow",
         {
-          {{Value(-1LL), Value(-5LL)}, Value(-1)}
+          {{Value(-1LL), Value(-5LL)}, Value(-1LL)}
         });
 }
 
