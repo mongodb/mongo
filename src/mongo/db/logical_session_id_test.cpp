@@ -334,5 +334,16 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SupportsDocLockingFa
         ErrorCodes::IllegalOperation);
 }
 
+TEST_F(LogicalSessionIdTest, ConstructorFromClientWithTooLongName) {
+    auto id = UUID::gen();
+
+    addSimpleUser(UserName(std::string(kMaximumUserNameLengthForLogicalSessions + 1, 'x'), "test"));
+
+    LogicalSessionFromClient req;
+    req.setId(id);
+
+    ASSERT_THROWS(makeLogicalSessionId(req, _opCtx.get()), AssertionException);
+}
+
 }  // namespace
 }  // namespace mongo

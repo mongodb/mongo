@@ -55,6 +55,10 @@ SHA256Block getLogicalSessionUserDigestForLoggedInUser(const OperationContext* o
         const auto user = AuthorizationSession::get(client)->getSingleUser();
         invariant(user);
 
+        uassert(ErrorCodes::BadValue,
+                "Username too long to use with logical sessions",
+                user->getName().getFullName().length() < kMaximumUserNameLengthForLogicalSessions);
+
         return user->getDigest();
     } else {
         return kNoAuthDigest;
