@@ -261,6 +261,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 if (responseStatus.isOK()) {
                     TrackedErrors trackedErrors;
                     trackedErrors.startTracking(ErrorCodes::StaleShardVersion);
+                    trackedErrors.startTracking(ErrorCodes::CannotImplicitlyCreateCollection);
 
                     LOG(4) << "Write results received from " << shardHost.toString() << ": "
                            << redact(batchedCommandResponse.toString());
@@ -274,6 +275,14 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     if (!staleErrors.empty()) {
                         noteStaleResponses(staleErrors, &targeter);
                         ++stats->numStaleBatches;
+                    }
+
+                    const auto& cannotImplicitlyCreateErrors =
+                        trackedErrors.getErrors(ErrorCodes::CannotImplicitlyCreateCollection);
+                    if (!cannotImplicitlyCreateErrors.empty()) {
+                        // This forces the chunk manager to reload so we can attach the correct
+                        // version on retry and make sure we route to the correct shard.
+                        targeter.noteCouldNotTarget();
                     }
 
                     // Remember that we successfully wrote to this shard

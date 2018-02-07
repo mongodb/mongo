@@ -285,6 +285,7 @@ env.Library(
 env.Library(
     target='stale_config',
     source=[
+        'cannot_implicitly_create_collection_info.cpp',
         'stale_exception.cpp',
     ],
     LIBDEPS=[

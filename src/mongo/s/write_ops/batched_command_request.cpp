@@ -36,6 +36,7 @@ namespace mongo {
 namespace {
 
 const auto kWriteConcern = "writeConcern"_sd;
+const auto kAllowImplicitCollectionCreation = "allowImplicitCollectionCreation"_sd;
 
 template <class T>
 BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request) {
@@ -49,6 +50,10 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
     auto writeConcernField = request.body[kWriteConcern];
     if (!writeConcernField.eoo()) {
         batchRequest.setWriteConcern(writeConcernField.Obj());
+    }
+
+    if (auto allowImplicitElement = request.body[kAllowImplicitCollectionCreation]) {
+        batchRequest.setAllowImplicitCreate(allowImplicitElement.boolean());
     }
 
     return batchRequest;
@@ -161,6 +166,8 @@ void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
     if (_writeConcern) {
         builder->append(kWriteConcern, *_writeConcern);
     }
+
+    builder->append(kAllowImplicitCollectionCreation, _allowImplicitCollectionCreation);
 }
 
 BSONObj BatchedCommandRequest::toBSON() const {

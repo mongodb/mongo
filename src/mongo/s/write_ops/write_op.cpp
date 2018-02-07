@@ -117,7 +117,8 @@ size_t WriteOp::getNumTargeted() {
 }
 
 static bool isRetryErrCode(int errCode) {
-    return errCode == ErrorCodes::StaleShardVersion;
+    return errCode == ErrorCodes::StaleShardVersion ||
+        errCode == ErrorCodes::CannotImplicitlyCreateCollection;
 }
 
 // Aggregate a bunch of errors for a single op together

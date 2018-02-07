@@ -109,7 +109,9 @@ public:
             IDLParserErrorContext("ConfigsvrCreateCollection"), cmdObj);
 
         CollectionOptions options;
-        uassertStatusOK(options.parse(createCmd.getOptions()));
+        if (auto requestOptions = createCmd.getOptions()) {
+            uassertStatusOK(options.parse(*requestOptions));
+        }
 
         ShardingCatalogManager::get(opCtx)->createCollection(opCtx, createCmd.getNs(), options);
 

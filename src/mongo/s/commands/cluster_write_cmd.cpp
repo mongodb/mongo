@@ -196,7 +196,12 @@ public:
     bool enhancedRun(OperationContext* opCtx,
                      const OpMsgRequest& request,
                      BSONObjBuilder& result) final {
-        const auto batchedRequest(parseRequest(_writeType, request));
+        auto batchedRequest(parseRequest(_writeType, request));
+
+        auto db = batchedRequest.getNS().db();
+        if (db != NamespaceString::kAdminDb && db != NamespaceString::kConfigDb) {
+            batchedRequest.setAllowImplicitCreate(false);
+        }
 
         BatchWriteExecStats stats;
         BatchedCommandResponse response;

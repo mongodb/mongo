@@ -99,13 +99,16 @@ void serializeReply(OperationContext* opCtx,
     if (shouldSkipOutput(opCtx))
         return;
 
-    if (continueOnError && !result.results.empty() &&
-        result.results.back() == ErrorCodes::StaleConfig) {
-        // For ordered:false commands we need to duplicate the StaleConfig result for all ops
-        // after we stopped. See handleError() in write_ops_exec.cpp for more info.
-        auto err = result.results.back();
-        while (result.results.size() < opsInBatch) {
-            result.results.emplace_back(err);
+    if (continueOnError && !result.results.empty()) {
+        const auto& lastResult = result.results.back();
+        if (lastResult == ErrorCodes::StaleConfig ||
+            lastResult == ErrorCodes::CannotImplicitlyCreateCollection) {
+            // For ordered:false commands we need to duplicate these error results for all ops
+            // after we stopped. See handleError() in write_ops_exec.cpp for more info.
+            auto err = result.results.back();
+            while (result.results.size() < opsInBatch) {
+                result.results.emplace_back(err);
+            }
         }
     }
 

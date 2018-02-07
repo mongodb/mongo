@@ -22,6 +22,7 @@ env.Library(
 env.Library(
     target='sharding_runtime_d',
     source=[
+        'implicit_create_collection.cpp',
         'migration_destination_manager.cpp',
         'session_catalog_migration_destination.cpp',
         'shard_filtering_metadata_refresh.cpp',

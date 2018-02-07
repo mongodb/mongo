@@ -43,4 +43,5 @@ structs:
                 description: "The namespace of the collection to be created."
             options:
                 type: object
+                optional: true
                 description: "collection creation options"

@@ -71,6 +71,7 @@
 #include "mongo/db/system_index.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/platform/random.h"
+#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
@@ -766,7 +767,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     invariant(!options.isView());
     NamespaceString nss(ns);
 
-    uassert(ErrorCodes::CannotImplicitlyCreateCollection,
+    uassert(CannotImplicitlyCreateCollectionInfo(nss),
             "request doesn't allow collection to be created implicitly",
             OperationShardingState::get(opCtx).allowImplicitCollectionCreation());
 

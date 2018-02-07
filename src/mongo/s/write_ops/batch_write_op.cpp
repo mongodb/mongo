@@ -451,6 +451,8 @@ BatchedCommandRequest BatchWriteOp::buildBatchRequest(
         }
     }
 
+    request.setAllowImplicitCreate(_clientRequest.isImplicitCreateAllowed());
+
     return request;
 }
 
