@@ -1772,6 +1772,74 @@ public:
 };
 
 
+/**
+ * This class is used to implement all three trim expressions: $trim, $ltrim, and $rtrim.
+ */
+class ExpressionTrim final : public Expression {
+private:
+    enum class TrimType {
+        kBoth,
+        kLeft,
+        kRight,
+    };
+
+public:
+    ExpressionTrim(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                   TrimType trimType,
+                   StringData name,
+                   const boost::intrusive_ptr<Expression>& input,
+                   const boost::intrusive_ptr<Expression>& charactersToTrim)
+        : Expression(expCtx),
+          _trimType(trimType),
+          _name(name.toString()),
+          _input(input),
+          _characters(charactersToTrim) {}
+
+    Value evaluate(const Document& root) const final;
+    boost::intrusive_ptr<Expression> optimize() final;
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vpsIn);
+    Value serialize(bool explain) const final;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
+
+private:
+    /**
+     * Returns true if the unicode character found at index 'indexIntoInput' of 'input' is equal to
+     * 'testCP'.
+     */
+    static bool codePointMatchesAtIndex(const StringData& input,
+                                        std::size_t indexIntoInput,
+                                        const StringData& testCP);
+
+    /**
+     * Given the input string and the code points to trim from that string, returns a substring of
+     * 'input' with any code point from 'trimCPs' trimmed from the left.
+     */
+    static StringData trimFromLeft(StringData input, const std::vector<StringData>& trimCPs);
+
+    /**
+     * Given the input string and the code points to trim from that string, returns a substring of
+     * 'input' with any code point from 'trimCPs' trimmed from the right.
+     */
+    static StringData trimFromRight(StringData input, const std::vector<StringData>& trimCPs);
+
+    /**
+     * Returns the trimmed version of 'input', with all code points in 'trimCPs' removed from the
+     * front, back, or both - depending on _trimType.
+     */
+    StringData doTrim(StringData input, const std::vector<StringData>& trimCPs) const;
+
+    TrimType _trimType;
+    std::string _name;  // "$trim", "$ltrim", or "$rtrim".
+    boost::intrusive_ptr<Expression> _input;
+    boost::intrusive_ptr<Expression> _characters;  // Optional, null if not specified.
+};
+
+
 class ExpressionTrunc final : public ExpressionSingleNumericArg<ExpressionTrunc> {
 public:
     explicit ExpressionTrunc(const boost::intrusive_ptr<ExpressionContext>& expCtx)
