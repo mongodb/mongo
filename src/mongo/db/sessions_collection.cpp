@@ -48,6 +48,14 @@ namespace mongo {
 
 namespace {
 
+// This batch size is chosen to ensure that we don't form requests larger than the 16mb limit.
+// Especially for refreshes, the updates we send include the full user name (user@db), and user
+// names can be quite large (we enforce a max 10k limit for usernames used with sessions).
+//
+// At 1000 elements, a 16mb payload gives us a budget of 16000 bytes per user, which we should
+// comfortably be able to stay under, even with 10k user names.
+constexpr size_t kMaxBatchSize = 1000;
+
 BSONObj lsidQuery(const LogicalSessionId& lsid) {
     return BSON(LogicalSessionRecord::kIdFieldName << lsid.toBSON());
 }
@@ -94,7 +102,7 @@ Status runBulkGeneric(TFactory makeT, AddLineFn addLine, SendFn sendBatch, const
     for (const auto& item : items) {
         addLine(*thing, item);
 
-        if (++i >= write_ops::kMaxWriteBatchSize) {
+        if (++i >= kMaxBatchSize) {
             auto res = sendLocalBatch();
             if (!res.isOK()) {
                 return res;

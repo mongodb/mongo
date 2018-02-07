@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+constexpr size_t kMaximumUserNameLengthForLogicalSessions = 10000;
+
 /**
  * Get the currently logged in user's UID digest.
  */
