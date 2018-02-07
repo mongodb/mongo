@@ -43,6 +43,7 @@ const BSONField<long long> MongosType::uptime("up");
 const BSONField<bool> MongosType::waiting("waiting");
 const BSONField<std::string> MongosType::mongoVersion("mongoVersion");
 const BSONField<long long> MongosType::configVersion("configVersion");
+const BSONField<BSONArray> MongosType::advisoryHostFQDNs("advisoryHostFQDNs");
 
 StatusWith<MongosType> MongosType::fromBSON(const BSONObj& source) {
     MongosType mt;
@@ -95,6 +96,26 @@ StatusWith<MongosType> MongosType::fromBSON(const BSONObj& source) {
         mt._configVersion = mtConfigVersion;
     }
 
+    if (source.hasField(advisoryHostFQDNs.name())) {
+        mt._advisoryHostFQDNs = std::vector<std::string>();
+        BSONElement array;
+        Status status = bsonExtractTypedField(source, advisoryHostFQDNs.name(), Array, &array);
+        if (!status.isOK())
+            return status;
+
+        BSONObjIterator it(array.Obj());
+        while (it.more()) {
+            BSONElement arrayElement = it.next();
+            if (arrayElement.type() != String) {
+                return Status(ErrorCodes::TypeMismatch,
+                              str::stream() << "Elements in \"" << advisoryHostFQDNs.name()
+                                            << "\" array must be strings but found "
+                                            << typeName(arrayElement.type()));
+            }
+            mt._advisoryHostFQDNs->push_back(arrayElement.String());
+        }
+    }
+
     return mt;
 }
 
@@ -133,6 +154,8 @@ BSONObj MongosType::toBSON() const {
         builder.append(mongoVersion.name(), getMongoVersion());
     if (_configVersion)
         builder.append(configVersion.name(), getConfigVersion());
+    if (_advisoryHostFQDNs)
+        builder.append(advisoryHostFQDNs.name(), getAdvisoryHostFQDNs());
 
     return builder.obj();
 }
@@ -161,6 +184,10 @@ void MongosType::setMongoVersion(const std::string& mongoVersion) {
 
 void MongosType::setConfigVersion(const long long configVersion) {
     _configVersion = configVersion;
+}
+
+void MongosType::setAdvisoryHostFQDNs(const std::vector<std::string>& advisoryHostFQDNs) {
+    _advisoryHostFQDNs = advisoryHostFQDNs;
 }
 
 std::string MongosType::toString() const {
