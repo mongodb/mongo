@@ -16,10 +16,7 @@
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
-
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #include "asio/ssl/detail/openssl_types.hpp"
-#endif
 
 #include "asio/detail/push_options.hpp"
 
@@ -37,7 +34,6 @@ namespace ssl {
  */
 typedef int verify_mode;
 
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #if defined(GENERATING_DOCUMENTATION)
 /// No verification.
 const int verify_none = implementation_defined;
@@ -57,7 +53,6 @@ const int verify_none = SSL_VERIFY_NONE;
 const int verify_peer = SSL_VERIFY_PEER;
 const int verify_fail_if_no_peer_cert = SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 const int verify_client_once = SSL_VERIFY_CLIENT_ONCE;
-#endif
 #endif
 
 } // namespace ssl

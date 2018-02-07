@@ -19,21 +19,12 @@
 
 #include "asio/buffer.hpp"
 #include "asio/detail/static_mutex.hpp"
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #include "asio/ssl/detail/openssl_types.hpp"
-#endif
 #include "asio/ssl/detail/verify_callback.hpp"
 #include "asio/ssl/stream_base.hpp"
 #include "asio/ssl/verify_mode.hpp"
 
 #include "asio/detail/push_options.hpp"
-
-
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
-
-#include "asio/ssl/detail/engine_schannel.hpp"
-
-#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 
 namespace asio {
 namespace ssl {
@@ -159,9 +150,6 @@ private:
 } // namespace detail
 } // namespace ssl
 } // namespace asio
-#else
-#error "Unknown SSL Provider"
-#endif
 
 #include "asio/detail/pop_options.hpp"
 

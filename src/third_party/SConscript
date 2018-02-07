@@ -394,7 +394,6 @@ if use_system_version_of_library("asio"):
 else:
     asioEnv = env.Clone()
     asioEnv.InjectThirdPartyIncludePaths(libraries=['asio'])
-    asioEnv.InjectMongoIncludePaths()
     asioEnv.SConscript('asio-master/SConscript', exports={ 'env' : asioEnv })
     asioEnv = asioEnv.Clone(
         LIBDEPS_INTERFACE=[

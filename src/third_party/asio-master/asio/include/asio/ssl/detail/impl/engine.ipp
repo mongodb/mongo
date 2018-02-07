@@ -25,12 +25,6 @@
 
 #include "asio/detail/push_options.hpp"
 
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
-
-#include "asio/ssl/detail/impl/engine_schannel.ipp"
-
-#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
-
 namespace asio {
 namespace ssl {
 namespace detail {
@@ -322,11 +316,6 @@ int engine::do_write(void* data, std::size_t length)
 } // namespace detail
 } // namespace ssl
 } // namespace asio
-
-#else
-#error "Unknown SSL Provider"
-#endif
-
 
 #include "asio/detail/pop_options.hpp"
 

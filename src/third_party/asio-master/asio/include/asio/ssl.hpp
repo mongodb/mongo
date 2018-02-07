@@ -18,9 +18,7 @@
 #include "asio/ssl/context.hpp"
 #include "asio/ssl/context_base.hpp"
 #include "asio/ssl/error.hpp"
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #include "asio/ssl/rfc2818_verification.hpp"
-#endif
 #include "asio/ssl/stream.hpp"
 #include "asio/ssl/stream_base.hpp"
 #include "asio/ssl/verify_context.hpp"
