@@ -74,7 +74,8 @@ static Value serializeConstant(Value val) {
 string Expression::removeFieldPrefix(const string& prefixedField) {
     uassert(16419,
             str::stream() << "field path must not contain embedded null characters"
-                          << prefixedField.find("\0") << ",",
+                          << prefixedField.find("\0")
+                          << ",",
             prefixedField.find('\0') == string::npos);
 
     const char* pPrefixedField = prefixedField.c_str();
@@ -478,11 +479,13 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
             array.isArray());
     uassert(28690,
             str::stream() << getOpName() << "'s second argument must be a numeric value,"
-                          << " but is " << typeName(indexArg.getType()),
+                          << " but is "
+                          << typeName(indexArg.getType()),
             indexArg.numeric());
     uassert(28691,
             str::stream() << getOpName() << "'s second argument must be representable as"
-                          << " a 32-bit integer: " << indexArg.coerceToDouble(),
+                          << " a 32-bit integer: "
+                          << indexArg.coerceToDouble(),
             indexArg.integral());
 
     long long i = indexArg.coerceToLong();
@@ -763,7 +766,7 @@ static const CmpLookup cmpLookup[7] = {
     // CMP is special. Only name is used.
     /* CMP */ {{false, false, false}, ExpressionCompare::CMP, "$cmp"},
 };
-}  // namespace
+}
 
 Value ExpressionCompare::evaluate(const Document& root) const {
     Value pLeft(vpOperand[0]->evaluate(root));
@@ -1017,8 +1020,8 @@ intrusive_ptr<Expression> ExpressionDateFromParts::parse(
             timeZoneElem = arg;
         } else {
             uasserted(40518,
-                      str::stream()
-                          << "Unrecognized argument to $dateFromParts: " << arg.fieldName());
+                      str::stream() << "Unrecognized argument to $dateFromParts: "
+                                    << arg.fieldName());
         }
     }
 
@@ -1178,7 +1181,8 @@ bool ExpressionDateFromParts::evaluateNumberWithinRange(const Document& root,
 
     uassert(40515,
             str::stream() << "'" << fieldName << "' must evaluate to an integer, found "
-                          << typeName(fieldValue.getType()) << " with value "
+                          << typeName(fieldValue.getType())
+                          << " with value "
                           << fieldValue.toString(),
             fieldValue.integral());
 
@@ -1186,7 +1190,11 @@ bool ExpressionDateFromParts::evaluateNumberWithinRange(const Document& root,
 
     uassert(40523,
             str::stream() << "'" << fieldName << "' must evaluate to an integer in the range "
-                          << minValue << " to " << maxValue << ", found " << *returnValue,
+                          << minValue
+                          << " to "
+                          << maxValue
+                          << ", found "
+                          << *returnValue,
             *returnValue >= minValue && *returnValue <= maxValue);
 
     return true;
@@ -1302,8 +1310,8 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(
             timeZoneElem = arg;
         } else {
             uasserted(40541,
-                      str::stream()
-                          << "Unrecognized argument to $dateFromString: " << arg.fieldName());
+                      str::stream() << "Unrecognized argument to $dateFromString: "
+                                    << arg.fieldName());
         }
     }
 
@@ -1352,7 +1360,8 @@ Value ExpressionDateFromString::evaluate(const Document& root) const {
 
     uassert(40543,
             str::stream() << "$dateFromString requires that 'dateString' be a string, found: "
-                          << typeName(dateString.getType()) << " with value "
+                          << typeName(dateString.getType())
+                          << " with value "
                           << dateString.toString(),
             dateString.getType() == BSONType::String);
     const std::string& dateTimeString = dateString.getString();
@@ -1395,8 +1404,8 @@ intrusive_ptr<Expression> ExpressionDateToParts::parse(
             isoDateElem = arg;
         } else {
             uasserted(40520,
-                      str::stream()
-                          << "Unrecognized argument to $dateToParts: " << arg.fieldName());
+                      str::stream() << "Unrecognized argument to $dateToParts: "
+                                    << arg.fieldName());
         }
     }
 
@@ -1537,8 +1546,8 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(
             timeZoneElem = arg;
         } else {
             uasserted(18534,
-                      str::stream()
-                          << "Unrecognized argument to $dateToString: " << arg.fieldName());
+                      str::stream() << "Unrecognized argument to $dateToString: "
+                                    << arg.fieldName());
         }
     }
 
@@ -1638,7 +1647,9 @@ Value ExpressionDivide::evaluate(const Document& root) const {
     } else {
         uasserted(16609,
                   str::stream() << "$divide only supports numeric types, not "
-                                << typeName(lhs.getType()) << " and " << typeName(rhs.getType()));
+                                << typeName(lhs.getType())
+                                << " and "
+                                << typeName(rhs.getType()));
     }
 }
 
@@ -1972,8 +1983,9 @@ intrusive_ptr<Expression> ExpressionFilter::optimize() {
 }
 
 Value ExpressionFilter::serialize(bool explain) const {
-    return Value(DOC("$filter" << DOC("input" << _input->serialize(explain) << "as" << _varName
-                                              << "cond" << _filter->serialize(explain))));
+    return Value(
+        DOC("$filter" << DOC("input" << _input->serialize(explain) << "as" << _varName << "cond"
+                                     << _filter->serialize(explain))));
 }
 
 Value ExpressionFilter::evaluate(const Document& root) const {
@@ -2360,7 +2372,9 @@ Value ExpressionMod::evaluate(const Document& root) const {
     } else {
         uasserted(16611,
                   str::stream() << "$mod only supports numeric types, not "
-                                << typeName(lhs.getType()) << " and " << typeName(rhs.getType()));
+                                << typeName(lhs.getType())
+                                << " and "
+                                << typeName(rhs.getType()));
     }
 }
 
@@ -2480,12 +2494,15 @@ void uassertIfNotIntegralAndNonNegative(Value val,
                                         StringData argumentName) {
     uassert(40096,
             str::stream() << expressionName << "requires an integral " << argumentName
-                          << ", found a value of type: " << typeName(val.getType())
-                          << ", with value: " << val.toString(),
+                          << ", found a value of type: "
+                          << typeName(val.getType())
+                          << ", with value: "
+                          << val.toString(),
             val.integral());
     uassert(40097,
             str::stream() << expressionName << " requires a nonnegative " << argumentName
-                          << ", found: " << val.toString(),
+                          << ", found: "
+                          << val.toString(),
             val.coerceToInt() >= 0);
 }
 
@@ -3336,7 +3353,7 @@ ValueSet arrayToSet(const Value& val, const ValueComparator& valueComparator) {
     valueSet.insert(array.begin(), array.end());
     return valueSet;
 }
-}  // namespace
+}
 
 /* ----------------------- ExpressionSetDifference ---------------------------- */
 
@@ -3350,11 +3367,13 @@ Value ExpressionSetDifference::evaluate(const Document& root) const {
 
     uassert(17048,
             str::stream() << "both operands of $setDifference must be arrays. First "
-                          << "argument is of type: " << typeName(lhs.getType()),
+                          << "argument is of type: "
+                          << typeName(lhs.getType()),
             lhs.isArray());
     uassert(17049,
             str::stream() << "both operands of $setDifference must be arrays. Second "
-                          << "argument is of type: " << typeName(rhs.getType()),
+                          << "argument is of type: "
+                          << typeName(rhs.getType()),
             rhs.isArray());
 
     ValueSet rhsSet = arrayToSet(rhs, getExpressionContext()->getValueComparator());
@@ -3393,7 +3412,8 @@ Value ExpressionSetEquals::evaluate(const Document& root) const {
         const Value nextEntry = vpOperand[i]->evaluate(root);
         uassert(17044,
                 str::stream() << "All operands of $setEquals must be arrays. One "
-                              << "argument is of type: " << typeName(nextEntry.getType()),
+                              << "argument is of type: "
+                              << typeName(nextEntry.getType()),
                 nextEntry.isArray());
 
         if (i == 0) {
@@ -3431,7 +3451,8 @@ Value ExpressionSetIntersection::evaluate(const Document& root) const {
         }
         uassert(17047,
                 str::stream() << "All operands of $setIntersection must be arrays. One "
-                              << "argument is of type: " << typeName(nextEntry.getType()),
+                              << "argument is of type: "
+                              << typeName(nextEntry.getType()),
                 nextEntry.isArray());
 
         if (i == 0) {
@@ -3478,7 +3499,7 @@ Value setIsSubsetHelper(const vector<Value>& lhs, const ValueSet& rhs) {
     }
     return Value(true);
 }
-}  // namespace
+}
 
 Value ExpressionSetIsSubset::evaluate(const Document& root) const {
     const Value lhs = vpOperand[0]->evaluate(root);
@@ -3486,11 +3507,13 @@ Value ExpressionSetIsSubset::evaluate(const Document& root) const {
 
     uassert(17046,
             str::stream() << "both operands of $setIsSubset must be arrays. First "
-                          << "argument is of type: " << typeName(lhs.getType()),
+                          << "argument is of type: "
+                          << typeName(lhs.getType()),
             lhs.isArray());
     uassert(17042,
             str::stream() << "both operands of $setIsSubset must be arrays. Second "
-                          << "argument is of type: " << typeName(rhs.getType()),
+                          << "argument is of type: "
+                          << typeName(rhs.getType()),
             rhs.isArray());
 
     return setIsSubsetHelper(lhs.getArray(),
@@ -3518,7 +3541,8 @@ public:
 
         uassert(17310,
                 str::stream() << "both operands of $setIsSubset must be arrays. First "
-                              << "argument is of type: " << typeName(lhs.getType()),
+                              << "argument is of type: "
+                              << typeName(lhs.getType()),
                 lhs.isArray());
 
         return setIsSubsetHelper(lhs.getArray(), _cachedRhsSet);
@@ -3540,7 +3564,8 @@ intrusive_ptr<Expression> ExpressionSetIsSubset::optimize() {
         const Value rhs = ec->getValue();
         uassert(17311,
                 str::stream() << "both operands of $setIsSubset must be arrays. Second "
-                              << "argument is of type: " << typeName(rhs.getType()),
+                              << "argument is of type: "
+                              << typeName(rhs.getType()),
                 rhs.isArray());
 
         intrusive_ptr<Expression> optimizedWithConstant(
@@ -3569,7 +3594,8 @@ Value ExpressionSetUnion::evaluate(const Document& root) const {
         }
         uassert(17043,
                 str::stream() << "All operands of $setUnion must be arrays. One argument"
-                              << " is of type: " << typeName(newEntries.getType()),
+                              << " is of type: "
+                              << typeName(newEntries.getType()),
                 newEntries.isArray());
 
         unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
@@ -3609,15 +3635,18 @@ Value ExpressionSlice::evaluate(const Document& root) const {
 
     uassert(28724,
             str::stream() << "First argument to $slice must be an array, but is"
-                          << " of type: " << typeName(arrayVal.getType()),
+                          << " of type: "
+                          << typeName(arrayVal.getType()),
             arrayVal.isArray());
     uassert(28725,
             str::stream() << "Second argument to $slice must be a numeric value,"
-                          << " but is of type: " << typeName(arg2.getType()),
+                          << " but is of type: "
+                          << typeName(arg2.getType()),
             arg2.numeric());
     uassert(28726,
             str::stream() << "Second argument to $slice can't be represented as"
-                          << " a 32-bit integer: " << arg2.coerceToDouble(),
+                          << " a 32-bit integer: "
+                          << arg2.coerceToDouble(),
             arg2.integral());
 
     const auto& array = arrayVal.getArray();
@@ -3657,11 +3686,13 @@ Value ExpressionSlice::evaluate(const Document& root) const {
 
         uassert(28727,
                 str::stream() << "Third argument to $slice must be numeric, but "
-                              << "is of type: " << typeName(countVal.getType()),
+                              << "is of type: "
+                              << typeName(countVal.getType()),
                 countVal.numeric());
         uassert(28728,
                 str::stream() << "Third argument to $slice can't be represented"
-                              << " as a 32-bit integer: " << countVal.coerceToDouble(),
+                              << " as a 32-bit integer: "
+                              << countVal.coerceToDouble(),
                 countVal.integral());
         uassert(28729,
                 str::stream() << "Third argument to $slice must be positive: "
@@ -3810,12 +3841,14 @@ Value ExpressionSubstrBytes::evaluate(const Document& root) const {
     uassert(16034,
             str::stream() << getOpName()
                           << ":  starting index must be a numeric type (is BSON type "
-                          << typeName(pLower.getType()) << ")",
+                          << typeName(pLower.getType())
+                          << ")",
             (pLower.getType() == NumberInt || pLower.getType() == NumberLong ||
              pLower.getType() == NumberDouble));
     uassert(16035,
             str::stream() << getOpName() << ":  length must be a numeric type (is BSON type "
-                          << typeName(pLength.getType()) << ")",
+                          << typeName(pLength.getType())
+                          << ")",
             (pLength.getType() == NumberInt || pLength.getType() == NumberLong ||
              pLength.getType() == NumberDouble));
 
@@ -3860,7 +3893,8 @@ Value ExpressionSubstrCP::evaluate(const Document& root) const {
     std::string str = inputVal.coerceToString();
     uassert(34450,
             str::stream() << getOpName() << ": starting index must be a numeric type (is BSON type "
-                          << typeName(lowerVal.getType()) << ")",
+                          << typeName(lowerVal.getType())
+                          << ")",
             lowerVal.numeric());
     uassert(34451,
             str::stream() << getOpName()
@@ -3869,7 +3903,8 @@ Value ExpressionSubstrCP::evaluate(const Document& root) const {
             lowerVal.integral());
     uassert(34452,
             str::stream() << getOpName() << ": length must be a numeric type (is BSON type "
-                          << typeName(lengthVal.getType()) << ")",
+                          << typeName(lengthVal.getType())
+                          << ")",
             lengthVal.numeric());
     uassert(34453,
             str::stream() << getOpName()
@@ -4004,8 +4039,8 @@ Value ExpressionSubtract::evaluate(const Document& root) const {
             return Value(lhs.getDate() - Milliseconds(rhs.coerceToLong()));
         } else {
             uasserted(16613,
-                      str::stream()
-                          << "cant $subtract a " << typeName(rhs.getType()) << " from a Date");
+                      str::stream() << "cant $subtract a " << typeName(rhs.getType())
+                                    << " from a Date");
         }
     } else {
         uasserted(16556,
@@ -4364,7 +4399,8 @@ Value ExpressionZip::serialize(bool explain) const {
     }
 
     return Value(DOC("$zip" << DOC("inputs" << Value(serializedInput) << "defaults"
-                                            << Value(serializedDefaults) << "useLongestLength"
+                                            << Value(serializedDefaults)
+                                            << "useLongestLength"
                                             << serializedUseLongestLength)));
 }
 
