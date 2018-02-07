@@ -42,6 +42,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/hostname_canonicalization.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/version.h"
 
@@ -50,8 +51,8 @@ namespace {
 
 const Seconds kUptimeReportInterval(10);
 
-std::string constructInstanceIdString() {
-    return str::stream() << getHostNameCached() << ":" << serverGlobalParams.port;
+std::string constructInstanceIdString(const std::string& hostName) {
+    return str::stream() << hostName << ":" << serverGlobalParams.port;
 }
 
 /**
@@ -60,6 +61,7 @@ std::string constructInstanceIdString() {
  */
 void reportStatus(OperationContext* opCtx,
                   const std::string& instanceId,
+                  const std::string& hostName,
                   const Timer& upTimeTimer) {
     MongosType mType;
     mType.setName(instanceId);
@@ -68,6 +70,8 @@ void reportStatus(OperationContext* opCtx,
     // balancer is never active in mongos. Here for backwards compatibility only.
     mType.setWaiting(true);
     mType.setMongoVersion(VersionInfoInterface::instance().version().toString());
+    mType.setAdvisoryHostFQDNs(
+        getHostFQDNs(hostName, HostnameCanonicalizationMode::kForwardAndReverse));
 
     try {
         Grid::get(opCtx)
@@ -99,13 +103,14 @@ void ShardingUptimeReporter::startPeriodicThread() {
     _thread = stdx::thread([this] {
         Client::initThread("Uptime reporter");
 
-        const std::string instanceId(constructInstanceIdString());
+        const std::string hostName(getHostNameCached());
+        const std::string instanceId(constructInstanceIdString(hostName));
         const Timer upTimeTimer;
 
         while (!globalInShutdownDeprecated()) {
             {
                 auto opCtx = cc().makeOperationContext();
-                reportStatus(opCtx.get(), instanceId, upTimeTimer);
+                reportStatus(opCtx.get(), instanceId, hostName, upTimeTimer);
 
                 auto status = Grid::get(opCtx.get())
                                   ->getBalancerConfiguration()
