@@ -2179,11 +2179,7 @@ TEST(ExpressionFromAccumulators, StdDevSamp) {
 }
 
 TEST(ExpressionFromAccumulators, Pow) {
-    assertExpectedResults(
-        "$pow",
-        {
-          {{Value(-1LL), Value(-5LL)}, Value(-1LL)}
-        });
+    assertExpectedResults("$pow", {{{Value(-1LL), Value(-5LL)}, Value(-1LL)}});
 }
 
 namespace FieldPath {
