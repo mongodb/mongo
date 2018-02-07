@@ -120,6 +120,8 @@ selector:
   - jstests/sharding/pending_chunk.js
   # New failpoint in v4.0 mongos.
   - jstests/sharding/crash_mongos_against_upgraded_cluster.js
+  # New failpoint in v4.0 mongod.
+  - jstests/sharding/move_primary_clone_test.js
   # New waitForClusterTime
   - jstests/sharding/auth_slaveok_routing.js
   # This test should not be run with a mixed cluster environment.

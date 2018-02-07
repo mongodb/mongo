@@ -41,7 +41,7 @@
     var rsOpts = {oplogSize: 50};
     // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     var st = new ShardingTest(
-        {shards: 1, rs: rsOpts, other: {keyFile: 'jstests/libs/key1', ShardAsReplicaSet: false}});
+        {shards: 1, rs: rsOpts, other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}});
 
     var mongos = st.s;
     var replTest = st.rs0;

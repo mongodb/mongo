@@ -1,7 +1,8 @@
 (function() {
     'use strict';
 
-    var s = new ShardingTest({shards: 2});
+    // TODO: SERVER-34093 Remove shardAsReplicaSet: false
+    var s = new ShardingTest({shards: 2, other: {shardAsReplicaSet: false}});
 
     var db = s.getDB('test1');
     var c = db.foo;

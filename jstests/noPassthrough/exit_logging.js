@@ -91,7 +91,7 @@
     (function testMongos() {
         print("********************\nTesting exit logging in mongos\n********************");
 
-        var st = new ShardingTest({shards: 1, other: {shardOptions: {nojournal: ""}}});
+        var st = new ShardingTest({shards: 1});
         var mongosLauncher = {
             start: function(opts) {
                 var actualOpts = {configdb: st._configDB};
