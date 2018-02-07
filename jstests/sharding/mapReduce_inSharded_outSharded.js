@@ -9,13 +9,17 @@
         assert.eq(out.counts.output, 512, "output count is wrong");
     };
 
-    var st = new ShardingTest(
-        {shards: 2, verbose: 1, mongos: 1, other: {chunkSize: 1, enableBalancer: true}});
+    var st = new ShardingTest({
+        shards: 2,
+        verbose: 1,
+        mongos: 1,
+        other: {chunkSize: 1, enableBalancer: true, shardAsReplicaSet: false}
+    });
 
     var admin = st.s0.getDB('admin');
 
     assert.commandWorked(admin.runCommand({enablesharding: "mrShard"}));
-    st.ensurePrimaryShard('mrShard', 'shard0001');
+    st.ensurePrimaryShard('mrShard', st.shard1.shardName);
     assert.commandWorked(
         admin.runCommand({shardcollection: "mrShard.srcSharded", key: {"_id": 1}}));
 

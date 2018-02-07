@@ -27,7 +27,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.commandWorked(st.splitAt('TestDB.TestColl', {Key: 20}));
     assert.commandWorked(st.splitAt('TestDB.TestColl', {Key: 30}));
 
-    // Move two of the chunks to shard0001 so we have option to do parallel balancing
+    // Move two of the chunks to st.shard1.shardName so we have option to do parallel balancing
     assert.commandWorked(st.moveChunk('TestDB.TestColl', {Key: 20}, st.shard1.shardName));
     assert.commandWorked(st.moveChunk('TestDB.TestColl', {Key: 30}, st.shard1.shardName));
 

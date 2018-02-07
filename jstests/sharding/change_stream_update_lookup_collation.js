@@ -27,7 +27,7 @@
     const mongosDB = st.s0.getDB(jsTestName());
     const mongosColl = mongosDB[jsTestName()];
 
-    // Enable sharding on the test DB and ensure its primary is shard0000.
+    // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
     assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
     st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
 
@@ -48,7 +48,7 @@
     assert.commandWorked(
         mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {shardKey: "aBC"}}));
 
-    // Move the [MinKey, 'aBC') chunk to shard0001.
+    // Move the [MinKey, 'aBC') chunk to st.shard1.shardName.
     assert.commandWorked(mongosDB.adminCommand(
         {moveChunk: mongosColl.getFullName(), find: {shardKey: "ABC"}, to: st.rs1.getURL()}));
 

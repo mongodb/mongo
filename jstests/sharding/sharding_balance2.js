@@ -64,7 +64,7 @@
     s.awaitBalancerRound();
 
     var chunkCounts = s.chunkCounts('foo', 'test');
-    assert.eq(0, chunkCounts.shard0001);
+    assert.eq(0, chunkCounts[s.rs1.name]);
 
     s.stop();
 })();

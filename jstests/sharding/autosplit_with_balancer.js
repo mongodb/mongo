@@ -4,7 +4,7 @@
     var s = new ShardingTest({shards: 2, mongos: 2, other: {enableAutoSplit: true}});
 
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     s.adminCommand({shardcollection: "test.foo", key: {num: 1}});
 
     var bigString = "";

@@ -12,7 +12,7 @@
     });
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
 
     var bigString = "";

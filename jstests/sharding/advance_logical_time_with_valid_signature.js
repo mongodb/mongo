@@ -13,8 +13,11 @@
     st._configServers.forEach(function(configSvr) {
         configSvr.disconnect(st.s1);
     });
-    st._connections.forEach(function(conn) {
-        conn.disconnect(st.s1);
+
+    st._rsObjects.forEach(function(rsNodes) {
+        rsNodes.nodes.forEach(function(conn) {
+            conn.disconnect(st.s1);
+        });
     });
 
     let connectedDB = st.s0.getDB("test");

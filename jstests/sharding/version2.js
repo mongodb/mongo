@@ -22,7 +22,7 @@
         authoritative: true,
         version: new Timestamp(1, 0),
         versionEpoch: fooEpoch,
-        shard: "shard0000",
+        shard: s.shard0.shardName,
         shardHost: s.s.host,
     }));
 
@@ -34,7 +34,7 @@
               1);
 
     // From a different client
-    var a2 = connect(`mongodb://${s._connections[0].name}/admin`);
+    var a2 = connect(`mongodb://${s.rs0.getPrimary().name}/admin`);
 
     assert.eq(
         a2.runCommand({"getShardVersion": "alleyinsider.foo", configdb: s._configDB}).global.t,
@@ -54,7 +54,7 @@
         configdb: s._configDB,
         version: new Timestamp(1, 0),
         versionEpoch: barEpoch,
-        shard: 'shard0000',
+        shard: s.shard0.shardName,
         authoritative: true
     }),
                          "setShardVersion bar temp");

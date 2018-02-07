@@ -5,7 +5,7 @@
     var s = new ShardingTest({name: "auto1", shards: 2, mongos: 1});
 
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
 
     // repeat same tests with hashed shard key, to ensure identical behavior
     s.adminCommand({shardcollection: "test.update0", key: {key: 1}});

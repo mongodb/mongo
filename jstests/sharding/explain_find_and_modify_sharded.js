@@ -20,18 +20,20 @@
     assert.commandWorked(shardedColl.ensureIndex(shardKey));
 
     // Enable sharding on the database and shard the collection.
-    // Use "shard0000" as the primary shard.
+    // Use "st.shard0.shardName" as the primary shard.
     assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
-    st.ensurePrimaryShard(testDB.toString(), 'shard0000');
+    st.ensurePrimaryShard(testDB.toString(), st.shard0.shardName);
     assert.commandWorked(
         testDB.adminCommand({shardCollection: shardedColl.getFullName(), key: shardKey}));
 
     // Split and move the chunks so that
-    //   chunk { "a" : { "$minKey" : 1 } } -->> { "a" : 10 }                is on shard0000
-    //   chunk { "a" : 10 }                -->> { "a" : { "$maxKey" : 1 } } is on shard0001
+    //   chunk { "a" : { "$minKey" : 1 } } -->> { "a" : 10 }                is on
+    //   st.shard0.shardName
+    //   chunk { "a" : 10 }                -->> { "a" : { "$maxKey" : 1 } } is on
+    //   st.shard1.shardName
     assert.commandWorked(testDB.adminCommand({split: shardedColl.getFullName(), middle: {a: 10}}));
     assert.commandWorked(testDB.adminCommand(
-        {moveChunk: shardedColl.getFullName(), find: {a: 10}, to: 'shard0001'}));
+        {moveChunk: shardedColl.getFullName(), find: {a: 10}, to: st.shard1.shardName}));
 
     var res;
 
@@ -66,21 +68,23 @@
         assert.eq(expectedStage, shardStage.shards[0][innerKey].stage);
     }
 
-    // Test that the explain command is routed to "shard0000" when targeting the lower chunk range.
+    // Test that the explain command is routed to "st.shard0.shardName" when targeting the lower
+    // chunk range.
     res = testDB.runCommand({
         explain: {findAndModify: collName, query: {a: 0}, update: {$inc: {b: 7}}, upsert: true},
         verbosity: 'queryPlanner'
     });
     assert.commandWorked(res);
-    assertExplainResult(res, 'queryPlanner', 'winningPlan', 'shard0000', 'UPDATE');
+    assertExplainResult(res, 'queryPlanner', 'winningPlan', st.shard0.shardName, 'UPDATE');
 
-    // Test that the explain command is routed to "shard0001" when targeting the higher chunk range.
+    // Test that the explain command is routed to "st.shard1.shardName" when targeting the higher
+    // chunk range.
     res = testDB.runCommand({
         explain: {findAndModify: collName, query: {a: 20, c: 5}, remove: true},
         verbosity: 'executionStats'
     });
     assert.commandWorked(res);
-    assertExplainResult(res, 'executionStats', 'executionStages', 'shard0001', 'DELETE');
+    assertExplainResult(res, 'executionStats', 'executionStages', st.shard1.shardName, 'DELETE');
 
     st.stop();
 })();

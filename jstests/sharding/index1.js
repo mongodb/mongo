@@ -16,7 +16,7 @@
 
         if (i == 0) {
             s.adminCommand({enablesharding: "" + coll._db});
-            s.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
+            s.ensurePrimaryShard(coll.getDB().getName(), s.shard1.shardName);
         }
 
         print("\n\n\n\n\nTest # " + i);

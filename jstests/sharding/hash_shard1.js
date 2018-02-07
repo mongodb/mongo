@@ -8,7 +8,7 @@ var ns = dbname + "." + coll;
 var db = s.getDB(dbname);
 var t = db.getCollection(coll);
 db.adminCommand({enablesharding: dbname});
-s.ensurePrimaryShard(dbname, 'shard0001');
+s.ensurePrimaryShard(dbname, s.shard1.shardName);
 
 // for simplicity start by turning off balancer
 s.stopBalancer();
@@ -29,18 +29,18 @@ for (i = 0; i < numitems; i++) {
 assert.eq(t.find().count(), numitems, "count off after inserts");
 printjson(t.find().explain());
 
-// find a chunk that's not on shard0000
-var chunk = s.config.chunks.findOne({shard: {$ne: "shard0000"}});
-assert.neq(chunk, null, "all chunks on shard0000!");
+// find a chunk that's not on s.shard0.shardName
+var chunk = s.config.chunks.findOne({shard: {$ne: s.shard0.shardName}});
+assert.neq(chunk, null, "all chunks on s.shard0.shardName!");
 printjson(chunk);
 
 // try to move the chunk using an invalid specification method. should fail.
-var res =
-    db.adminCommand({movechunk: ns, find: {a: 0}, bounds: [chunk.min, chunk.max], to: "shard0000"});
+var res = db.adminCommand(
+    {movechunk: ns, find: {a: 0}, bounds: [chunk.min, chunk.max], to: s.shard0.shardName});
 assert.eq(res.ok, 0, "moveChunk shouldn't work with invalid specification method");
 
 // now move a chunk using the lower/upper bound method. should work.
-var res = db.adminCommand({movechunk: ns, bounds: [chunk.min, chunk.max], to: "shard0000"});
+var res = db.adminCommand({movechunk: ns, bounds: [chunk.min, chunk.max], to: s.shard0.shardName});
 printjson(res);
 assert.eq(res.ok, 1, "movechunk using lower/upper bound method didn't work ");
 
@@ -49,7 +49,7 @@ assert.eq(t.find().itcount(), numitems, "count off after migrate");
 printjson(t.find().explain());
 
 // move a chunk using the find method
-var res = db.adminCommand({movechunk: ns, find: {a: 2}, to: "shard0002"});
+var res = db.adminCommand({movechunk: ns, find: {a: 2}, to: s.shard2.shardName});
 printjson(res);
 assert.eq(res.ok, 1, "movechunk using find query didn't work");
 

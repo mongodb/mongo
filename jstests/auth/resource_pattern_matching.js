@@ -242,6 +242,7 @@ rst.stopSet();
 print('--- done with the rs tests ---');
 
 print('--- sharding test ---');
+// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
 var st = new ShardingTest({
     mongos: 2,
     shard: 1,
@@ -249,7 +250,8 @@ var st = new ShardingTest({
     other: {
         mongosOptions: {'auth': null},
         configOptions: {'auth': null},
-        shardOptions: {'auth': null}
+        shardOptions: {'auth': null},
+        shardAsReplicaSet: false
     }
 });
 run_tests(st.s0.getDB('admin'), st.s1.getDB('admin'));

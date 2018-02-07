@@ -8,7 +8,7 @@ var st = new ShardingTest({shards: 2});
 var testDB = st.s.getDB('test');
 
 testDB.adminCommand({enableSharding: 'test'});
-st.ensurePrimaryShard(testDB.toString(), "shard0001");
+st.ensurePrimaryShard(testDB.toString(), st.shard1.shardName);
 testDB.adminCommand({shardCollection: 'test.user', key: {x: 1}});
 
 // Test procedure:
@@ -22,20 +22,22 @@ testDB.adminCommand({split: 'test.user', middle: {x: 0}});
 testDB.adminCommand({split: 'test.user', middle: {x: 10}});
 
 // Collection does not exist, no chunk, index missing case at destination case.
-assert.commandWorked(testDB.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: 'shard0000'}));
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard0.shardName}));
 
 // Drop index since last moveChunk created this.
-st.d0.getDB('test').user.dropIndex({a: 1, b: 1});
+st.rs0.getPrimary().getDB('test').user.dropIndex({a: 1, b: 1});
 
 // Collection exist but empty, index missing at destination case.
-assert.commandWorked(testDB.adminCommand({moveChunk: 'test.user', find: {x: 10}, to: 'shard0000'}));
+assert.commandWorked(
+    testDB.adminCommand({moveChunk: 'test.user', find: {x: 10}, to: st.shard0.shardName}));
 
 // Drop index since last moveChunk created this.
-st.d0.getDB('test').user.dropIndex({a: 1, b: 1});
+st.rs0.getPrimary().getDB('test').user.dropIndex({a: 1, b: 1});
 
 // Collection not empty, index missing at destination case.
 testDB.user.insert({x: 10});
 assert.commandFailed(
-    testDB.adminCommand({moveChunk: 'test.user', find: {x: -10}, to: 'shard0000'}));
+    testDB.adminCommand({moveChunk: 'test.user', find: {x: -10}, to: st.shard0.shardName}));
 
 st.stop();

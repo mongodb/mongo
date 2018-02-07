@@ -7,8 +7,12 @@
 (function() {
     "use strict";
 
-    var st =
-        new ShardingTest({name: 'migrateBig_balancer', shards: 2, other: {enableBalancer: true}});
+    // TODO: SERVER-33444 remove shardAsReplicaSet: false
+    var st = new ShardingTest({
+        name: 'migrateBig_balancer',
+        shards: 2,
+        other: {enableBalancer: true, shardAsReplicaSet: false}
+    });
     var mongos = st.s;
 
     var admin = mongos.getDB("admin");
@@ -16,7 +20,7 @@
     var coll = db.getCollection("stuff");
 
     assert.commandWorked(admin.runCommand({enablesharding: coll.getDB().getName()}));
-    st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
+    st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
 
     var data = "x";
     var nsq = 16;

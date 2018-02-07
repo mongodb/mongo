@@ -12,7 +12,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     const collName = "foo";
     const ns = dbName + "." + collName;
 
-    const st = new ShardingTest({shards: 2});
+    // TODO: SERVER-33444 remove shardAsReplicaSet: false
+    const st = new ShardingTest({shards: 2, other: {shardAsReplicaSet: false}});
 
     jsTest.log("Insert some data.");
     const nDocs = 100;

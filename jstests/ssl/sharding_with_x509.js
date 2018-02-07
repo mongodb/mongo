@@ -15,6 +15,7 @@
     // Start ShardingTest with enableBalancer because ShardingTest attempts to turn off the balancer
     // otherwise, which it will not be authorized to do. Once SERVER-14017 is fixed the
     // "enableBalancer" line could be removed.
+    // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
     var st = new ShardingTest({
         shards: 2,
         mongos: 1,
@@ -23,7 +24,8 @@
             configOptions: x509_options,
             mongosOptions: x509_options,
             rsOptions: x509_options,
-            shardOptions: x509_options
+            shardOptions: x509_options,
+            shardAsReplicaSet: false
         }
     });
 

@@ -153,7 +153,7 @@
 
     var sharded = new ShardingTest({shards: 3, mongos: 1});
     assert.commandWorked(sharded.s0.adminCommand({enablesharding: "test"}));
-    sharded.ensurePrimaryShard('test', 'shard0001');
+    sharded.ensurePrimaryShard('test', sharded.shard1.shardName);
 
     test(sharded.getDB('test'), true, '2d');
     test(sharded.getDB('test'), true, '2dsphere');

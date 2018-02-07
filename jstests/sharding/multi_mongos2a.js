@@ -5,7 +5,7 @@
     var st = new ShardingTest({shards: 2, mongos: 2});
 
     assert.commandWorked(st.s0.adminCommand({enablesharding: "test"}));
-    st.ensurePrimaryShard('test', 'shard0001');
+    st.ensurePrimaryShard('test', st.shard1.shardName);
     assert.commandWorked(st.s0.adminCommand({shardcollection: "test.foo", key: {num: 1}}));
 
     assert.writeOK(st.s0.getDB('test').existing.insert({_id: 1}));

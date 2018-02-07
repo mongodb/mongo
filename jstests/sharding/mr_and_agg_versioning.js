@@ -10,7 +10,7 @@
     var numKeys = 1000;
 
     st.s.adminCommand({enableSharding: dbName});
-    st.ensurePrimaryShard(dbName, 'shard0000');
+    st.ensurePrimaryShard(dbName, st.shard0.shardName);
     st.s.adminCommand({shardCollection: collName, key: {key: 1}});
 
     // Load chunk data to the stale mongoses before moving a chunk
@@ -20,7 +20,7 @@
     staleMongos2.getCollection(collName).find().itcount();
 
     st.s.adminCommand({split: collName, middle: {key: numKeys / 2}});
-    st.s.adminCommand({moveChunk: collName, find: {key: 0}, to: 'shard0001'});
+    st.s.adminCommand({moveChunk: collName, find: {key: 0}, to: st.shard1.shardName});
 
     var bulk = st.s.getCollection(collName).initializeUnorderedBulkOp();
     for (var i = 0; i < numDocs; i++) {

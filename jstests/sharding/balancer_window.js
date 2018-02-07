@@ -52,7 +52,7 @@
         configDB.adminCommand({split: 'test.user', middle: {_id: x}});
     }
 
-    var shard0Chunks = configDB.chunks.find({ns: 'test.user', shard: 'shard0000'}).count();
+    var shard0Chunks = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
 
     var startDate = new Date();
     var hourMinStart = new HourAndMinute(startDate.getHours(), startDate.getMinutes());
@@ -70,7 +70,8 @@
 
     st.awaitBalancerRound();
 
-    var shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: 'shard0000'}).count();
+    var shard0ChunksAfter =
+        configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
     assert.eq(shard0Chunks, shard0ChunksAfter);
 
     assert.writeOK(configDB.settings.update(
@@ -85,7 +86,7 @@
 
     st.awaitBalancerRound();
 
-    shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: 'shard0000'}).count();
+    shard0ChunksAfter = configDB.chunks.find({ns: 'test.user', shard: st.shard0.shardName}).count();
     assert.neq(shard0Chunks, shard0ChunksAfter);
 
     st.stop();

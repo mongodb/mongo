@@ -6,6 +6,10 @@
  * A restarted standalone will lose all data when using an ephemeral storage engine.
  * @tags: [requires_persistence]
  */
+
+// This test shuts down shards.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+
 (function() {
     "use strict";
 
@@ -14,7 +18,7 @@
     var testDB = st.s.getDB('test');
 
     assert.commandWorked(testDB.adminCommand({enableSharding: 'test'}));
-    st.ensurePrimaryShard('test', 'shard0000');
+    st.ensurePrimaryShard('test', st.shard0.shardName);
     assert.commandWorked(testDB.adminCommand({shardCollection: 'test.foo', key: {x: 1}}));
 
     var inserts = [];
@@ -25,14 +29,14 @@
 
     assert.commandWorked(testDB.adminCommand({split: 'test.foo', find: {x: 50}}));
     assert.commandWorked(
-        testDB.adminCommand({moveChunk: 'test.foo', find: {x: 100}, to: 'shard0001'}));
+        testDB.adminCommand({moveChunk: 'test.foo', find: {x: 100}, to: st.shard1.shardName}));
 
     // Insert some documents directly into the shards into chunks not owned by that shard.
-    st.d0.getDB('test').foo.insert({x: 100});
-    st.d1.getDB('test').foo.insert({x: 0});
+    st.rs0.getPrimary().getDB('test').foo.insert({x: 100});
+    st.rs1.getPrimary().getDB('test').foo.insert({x: 0});
 
-    st.restartMongod(0);
-    st.restartMongod(1);
+    st.rs0.restart(0);
+    st.rs1.restart(1);
 
     var fooCount;
     for (var retries = 0; retries <= 2; retries++) {

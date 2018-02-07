@@ -8,8 +8,9 @@
     var st = new ShardingTest({mongos: 2, shards: 2});
 
     // enableSharding can run only on mongos.
-    assert.commandFailedWithCode(st.d0.getDB('admin').runCommand({enableSharding: 'db'}),
-                                 ErrorCodes.CommandNotFound);
+    assert.commandFailedWithCode(
+        st.rs0.getPrimary().getDB('admin').runCommand({enableSharding: 'db'}),
+        ErrorCodes.CommandNotFound);
 
     // enableSharding can run only against the admin database.
     assert.commandFailedWithCode(st.s0.getDB('test').runCommand({enableSharding: 'db'}),

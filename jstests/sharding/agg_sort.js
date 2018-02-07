@@ -10,7 +10,7 @@
     coll.drop();
 
     assert.commandWorked(shardingTest.s0.adminCommand({enableSharding: db.getName()}));
-    shardingTest.ensurePrimaryShard(db.getName(), 'shard0001');
+    shardingTest.ensurePrimaryShard(db.getName(), shardingTest.shard1.shardName);
     assert.commandWorked(
         shardingTest.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 

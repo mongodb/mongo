@@ -146,7 +146,8 @@
         if (Math.random() > .999)
             printjson(x);
 
-        return Math.max(x.shard0000, x.shard0001) - Math.min(x.shard0000, x.shard0001);
+        return Math.max(x[s.shard0.shardName], x[s.shard1.shardName]) -
+            Math.min(x[s.shard0.shardName], x[s.shard1.shardName]);
     }
 
     assert.lt(20, diff1(), "initial load");

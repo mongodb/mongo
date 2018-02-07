@@ -23,9 +23,9 @@ assert.writeOK(mongosA.getCollection("bar.coll2").insert({hello: "world"}));
 
 // Enable sharding
 printjson(adminA.runCommand({enableSharding: "foo"}));
-st.ensurePrimaryShard('foo', 'shard0001');
+st.ensurePrimaryShard('foo', st.shard1.shardName);
 printjson(adminA.runCommand({enableSharding: "bar"}));
-st.ensurePrimaryShard('bar', 'shard0000');
+st.ensurePrimaryShard('bar', st.shard0.shardName);
 
 // Setup three collections per-db
 // 0 : not sharded

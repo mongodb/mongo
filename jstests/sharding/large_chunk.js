@@ -20,7 +20,7 @@
 
     // Turn on sharding on the 'test.foo' collection and generate a large chunk
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
 
     var bigString = "";
     while (bigString.length < 10000) {

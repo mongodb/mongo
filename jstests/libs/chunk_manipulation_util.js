@@ -14,7 +14,7 @@ load('./jstests/libs/test_background_ops.js');
 //                 shard key values of a chunk to move. Specify either the
 //                 bounds field or the find field but not both.
 // ns:             Like 'dbName.collectionName'.
-// toShardId:      Like 'shard0001'.
+// toShardId:      Like st.shard1.shardName.
 //
 // Returns a join function; call it to wait for moveChunk to complete.
 //

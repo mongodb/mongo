@@ -37,7 +37,7 @@
     var mongosServerStatus = testDB.adminCommand({serverStatus: 1});
     checkShardingServerStatus(mongosServerStatus);
 
-    var mongodServerStatus = st.d0.getDB('admin').runCommand({serverStatus: 1});
+    var mongodServerStatus = st.rs0.getPrimary().getDB('admin').runCommand({serverStatus: 1});
     checkShardingServerStatus(mongodServerStatus);
 
     st.stop();

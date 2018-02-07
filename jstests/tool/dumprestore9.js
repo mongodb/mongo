@@ -21,7 +21,7 @@ if (0) {
         s.adminCommand({
             enablesharding: "aaa"
         });  // Make this db alphabetically before 'config' so it gets restored first
-        s.ensurePrimaryShard('aaa', 'shard0001');
+        s.ensurePrimaryShard('aaa', s.shard1.shardName);
         s.adminCommand({shardcollection: "aaa.foo", key: {x: 1}});
 
         db = s.getDB("aaa");

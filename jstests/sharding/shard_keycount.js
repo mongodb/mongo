@@ -16,7 +16,7 @@
 
     // Enable sharding on DB
     assert.commandWorked(s.s0.adminCommand({enablesharding: dbName}));
-    s.ensurePrimaryShard(dbName, 'shard0001');
+    s.ensurePrimaryShard(dbName, s.shard1.shardName);
 
     // Enable sharding on collection
     assert.commandWorked(s.s0.adminCommand({shardcollection: ns, key: {_id: 1}}));

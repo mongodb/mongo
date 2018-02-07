@@ -37,9 +37,9 @@
     assert.commandWorked(
         mongosDB.adminCommand({setParameter: 1, internalQueryAlwaysMergeOnPrimaryShard: true}));
 
-    // Enable sharding on the test DB and ensure its primary is shard0000.
+    // Enable sharding on the test DB and ensure its primary is shard0.
     assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-    st.ensurePrimaryShard(mongosDB.getName(), "shard0000");
+    st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
     // Shard the test collection on _id.
     assert.commandWorked(
@@ -59,11 +59,11 @@
     assert.commandWorked(
         mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 100}}));
 
-    // Move the [0, 100) and [100, MaxKey) chunks to shard0001.
+    // Move the [0, 100) and [100, MaxKey) chunks to shard1.
     assert.commandWorked(mongosDB.adminCommand(
-        {moveChunk: mongosColl.getFullName(), find: {_id: 50}, to: "shard0001"}));
+        {moveChunk: mongosColl.getFullName(), find: {_id: 50}, to: st.shard1.shardName}));
     assert.commandWorked(mongosDB.adminCommand(
-        {moveChunk: mongosColl.getFullName(), find: {_id: 150}, to: "shard0001"}));
+        {moveChunk: mongosColl.getFullName(), find: {_id: 150}, to: st.shard1.shardName}));
 
     // Create a random geo co-ord generator for testing.
     var georng = new GeoNearRandomTest(mongosColl);

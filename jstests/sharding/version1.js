@@ -39,7 +39,7 @@
         configdb: s._configDB,
         version: new Timestamp(2, 0),
         authoritative: true,
-        shard: "shard0000",
+        shard: "s.shard0.shardName",
         shardHost: s.s.host
     }),
                          "should have failed because version is config is 1|0");
@@ -51,7 +51,7 @@
         version: new Timestamp(1, 0),
         versionEpoch: epoch,
         authoritative: true,
-        shard: "shard0000",
+        shard: s.shard0.shardName,
         shardHost: s.s.host
     }),
                          "should have worked");

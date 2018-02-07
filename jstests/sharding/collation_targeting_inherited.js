@@ -11,7 +11,7 @@
     var st = new ShardingTest({shards: 3});
     var testDB = st.s.getDB("test");
     assert.commandWorked(testDB.adminCommand({enableSharding: testDB.getName()}));
-    st.ensurePrimaryShard(testDB.getName(), "shard0001");
+    st.ensurePrimaryShard(testDB.getName(), st.shard1.shardName);
 
     // Create a collection with a case-insensitive default collation sharded on {a: 1}.
     var collCaseInsensitive = testDB.getCollection("case_insensitive");
@@ -26,24 +26,24 @@
     }));
 
     // Split the collection.
-    // shard0000: { "a" : { "$minKey" : 1 } } -->> { "a" : 10 }
-    // shard0001: { "a" : 10 } -->> { "a" : "a"}
+    // st.shard0.shardName: { "a" : { "$minKey" : 1 } } -->> { "a" : 10 }
+    // st.shard1.shardName: { "a" : 10 } -->> { "a" : "a"}
     // shard0002: { "a" : "a" } -->> { "a" : { "$maxKey" : 1 }}
     assert.commandWorked(
         testDB.adminCommand({split: collCaseInsensitive.getFullName(), middle: {a: 10}}));
     assert.commandWorked(
         testDB.adminCommand({split: collCaseInsensitive.getFullName(), middle: {a: "a"}}));
     assert.commandWorked(testDB.adminCommand(
-        {moveChunk: collCaseInsensitive.getFullName(), find: {a: 1}, to: "shard0000"}));
+        {moveChunk: collCaseInsensitive.getFullName(), find: {a: 1}, to: st.shard0.shardName}));
     assert.commandWorked(testDB.adminCommand(
-        {moveChunk: collCaseInsensitive.getFullName(), find: {a: "FOO"}, to: "shard0001"}));
+        {moveChunk: collCaseInsensitive.getFullName(), find: {a: "FOO"}, to: st.shard1.shardName}));
     assert.commandWorked(testDB.adminCommand(
-        {moveChunk: collCaseInsensitive.getFullName(), find: {a: "foo"}, to: "shard0002"}));
+        {moveChunk: collCaseInsensitive.getFullName(), find: {a: "foo"}, to: st.shard2.shardName}));
 
     // Put data on each shard.
     // Note that the balancer is off by default, so the chunks will stay put.
-    // shard0000: {a: 1}
-    // shard0001: {a: 100}, {a: "FOO"}
+    // st.shard0.shardName: {a: 1}
+    // st.shard1.shardName: {a: 100}, {a: "FOO"}
     // shard0002: {a: "foo"}
     // Include geo field to test geoNear.
     var a_1 = {_id: 0, a: 1, geo: {type: "Point", coordinates: [0, 0]}};

@@ -6,7 +6,7 @@
     var st = new ShardingTest({shards: 3, mongos: 1});
 
     assert.commandWorked(st.s0.adminCommand({enablesharding: 'test'}));
-    st.ensurePrimaryShard('test', 'shard0001');
+    st.ensurePrimaryShard('test', st.shard1.shardName);
 
     var testDB = st.s0.getDB('test');
     var configDB = st.s0.getDB('config');
@@ -56,17 +56,18 @@
     assertBalanceCompleteAndStable(checkClusterEvenlyBalanced, 'initial');
 
     // Spread chunks correctly across zones
-    st.addShardTag('shard0000', 'a');
-    st.addShardTag('shard0001', 'a');
+    st.addShardTag(st.shard0.shardName, 'a');
+    st.addShardTag(st.shard1.shardName, 'a');
     st.addTagRange('test.foo', {_id: -100}, {_id: 100}, 'a');
 
-    st.addShardTag('shard0002', 'b');
+    st.addShardTag(st.shard2.shardName, 'b');
     st.addTagRange('test.foo', {_id: MinKey}, {_id: -100}, 'b');
     st.addTagRange('test.foo', {_id: 100}, {_id: MaxKey}, 'b');
 
     assertBalanceCompleteAndStable(function() {
-        var chunksOnShard2 =
-            configDB.chunks.find({ns: 'test.foo', shard: 'shard0002'}).sort({min: 1}).toArray();
+        var chunksOnShard2 = configDB.chunks.find({ns: 'test.foo', shard: st.shard2.shardName})
+                                 .sort({min: 1})
+                                 .toArray();
 
         jsTestLog('Chunks on shard2: ' + tojson(chunksOnShard2));
 
@@ -83,18 +84,19 @@
     st.removeTagRange('test.foo', {_id: MinKey}, {_id: -100}, 'b');
     st.removeTagRange('test.foo', {_id: 100}, {_id: MaxKey}, 'b');
 
-    st.removeShardTag('shard0001', 'a');
-    st.removeShardTag('shard0002', 'b');
+    st.removeShardTag(st.shard1.shardName, 'a');
+    st.removeShardTag(st.shard2.shardName, 'b');
     st.addTagRange('test.foo', {_id: MinKey}, {_id: MaxKey}, 'a');
 
     assertBalanceCompleteAndStable(function() {
         var counts = st.chunkCounts('foo');
         printjson(counts);
-        return counts['shard0000'] == 11 && counts['shard0001'] == 0 && counts['shard0002'] == 0;
+        return counts[st.shard0.shardName] == 11 && counts[st.shard1.shardName] == 0 &&
+            counts[st.shard2.shardName] == 0;
     }, 'all chunks to zone a');
 
     // Remove all zones and ensure collection is correctly redistributed
-    st.removeShardTag('shard0000', 'a');
+    st.removeShardTag(st.shard0.shardName, 'a');
     st.removeTagRange('test.foo', {_id: MinKey}, {_id: MaxKey}, 'a');
 
     assertBalanceCompleteAndStable(checkClusterEvenlyBalanced, 'final');

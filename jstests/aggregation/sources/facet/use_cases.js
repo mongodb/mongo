@@ -166,9 +166,10 @@
     // Make sure there is a chunk on each shard, so that our aggregations are targeted to multiple
     // shards.
     assert.commandWorked(st.admin.runCommand({split: testNs, middle: {_id: nDocs / 2}}));
-    assert.commandWorked(st.admin.runCommand({moveChunk: testNs, find: {_id: 0}, to: "shard0000"}));
     assert.commandWorked(
-        st.admin.runCommand({moveChunk: testNs, find: {_id: nDocs - 1}, to: "shard0001"}));
+        st.admin.runCommand({moveChunk: testNs, find: {_id: 0}, to: st.shard0.shardName}));
+    assert.commandWorked(
+        st.admin.runCommand({moveChunk: testNs, find: {_id: nDocs - 1}, to: st.shard1.shardName}));
 
     doExecutionTest(st.s0);
 

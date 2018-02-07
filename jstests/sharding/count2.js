@@ -4,7 +4,7 @@
     var s2 = s1._mongos[1];
 
     s1.adminCommand({enablesharding: "test"});
-    s1.ensurePrimaryShard('test', 'shard0001');
+    s1.ensurePrimaryShard('test', s1.shard1.shardName);
     s1.adminCommand({shardcollection: "test.foo", key: {name: 1}});
 
     var db1 = s1.getDB("test").foo;

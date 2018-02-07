@@ -5,7 +5,9 @@
 
     "use strict";
 
-    var st = new ShardingTest({shards: 1, other: {keyFile: 'jstests/libs/key1'}});
+    // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
+    var st = new ShardingTest(
+        {shards: 1, other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}});
 
     var adminUser = {db: "admin", username: "foo", password: "bar"};
 

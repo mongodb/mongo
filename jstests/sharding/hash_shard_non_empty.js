@@ -5,7 +5,7 @@ var dbname = "test";
 var coll = "foo";
 var db = s.getDB(dbname);
 db.adminCommand({enablesharding: dbname});
-s.ensurePrimaryShard('test', 'shard0001');
+s.ensurePrimaryShard('test', s.shard1.shardName);
 
 // for simplicity turn off balancer
 s.stopBalancer();

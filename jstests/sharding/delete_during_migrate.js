@@ -17,7 +17,7 @@
     var ns = dbname + "." + coll;
 
     assert.commandWorked(st.s0.adminCommand({enablesharding: dbname}));
-    st.ensurePrimaryShard(dbname, 'shard0001');
+    st.ensurePrimaryShard(dbname, st.shard1.shardName);
 
     var t = st.s0.getDB(dbname).getCollection(coll);
 

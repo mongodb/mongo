@@ -6,12 +6,12 @@
     var specialNS = specialDB + ".special";
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.data", key: {num: 1}}));
 
     // Test that the database will not complain "cannot have 2 database names that differs on case"
     assert.commandWorked(s.s0.adminCommand({enablesharding: specialDB}));
-    s.ensurePrimaryShard(specialDB, 'shard0000');
+    s.ensurePrimaryShard(specialDB, s.shard0.shardName);
     assert.commandWorked(s.s0.adminCommand({shardcollection: specialNS, key: {num: 1}}));
 
     var exists = s.getDB("config").collections.find({_id: specialNS}).itcount();

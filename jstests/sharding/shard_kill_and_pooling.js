@@ -53,7 +53,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         var exitCode = killWith === 9 ? MongoRunner.EXIT_SIGKILL : MongoRunner.EXIT_CLEAN;
 
-        MongoRunner.stopMongod(st.shard0, killWith, {allowedExitCode: exitCode});
+        st.rs0.stopSet(killWith, false, {allowedExitCode: exitCode});
 
         jsTest.log("Restart shard...");
 

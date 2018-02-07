@@ -58,6 +58,8 @@
  *       rs: same as above
  *       chunkSize: same as above
  *       keyFile {string}: the location of the keyFile
+ *       shardAsReplicaSet {boolean}: if true, start shards as 2 node replica sets. default
+ *          is true.
  *
  *       shardOptions {Object}: same as the shards property above.
  *          Can be used to specify options that are common all shards.
@@ -821,7 +823,6 @@ var ShardingTest = function(params) {
      */
     this.restartMongod = function(n, opts, beforeRestartCallback) {
         var mongod;
-
         if (otherParams.useBridge) {
             mongod = unbridgedConnections[n];
         } else {
@@ -1026,6 +1027,8 @@ var ShardingTest = function(params) {
     var mongosVerboseLevel = otherParams.hasOwnProperty('verbose') ? otherParams.verbose : 1;
     var numMongos = otherParams.hasOwnProperty('mongos') ? otherParams.mongos : 1;
     var numConfigs = otherParams.hasOwnProperty('config') ? otherParams.config : 3;
+    var startShardsAsRS =
+        otherParams.hasOwnProperty('shardAsReplicaSet') ? otherParams.shardAsReplicaSet : true;
 
     // Default enableBalancer to false.
     otherParams.enableBalancer =
@@ -1118,7 +1121,7 @@ var ShardingTest = function(params) {
 
     // Start the MongoD servers (shards)
     for (var i = 0; i < numShards; i++) {
-        if (otherParams.rs || otherParams["rs" + i]) {
+        if (otherParams.rs || otherParams["rs" + i] || startShardsAsRS) {
             var setName = testName + "-rs" + i;
 
             var rsDefaults = {
@@ -1129,14 +1132,27 @@ var ShardingTest = function(params) {
                 pathOpts: Object.merge(pathOpts, {shard: i}),
             };
 
-            rsDefaults = Object.merge(rsDefaults, otherParams.rs);
-            rsDefaults = Object.merge(rsDefaults, otherParams.rsOptions);
-            rsDefaults = Object.merge(rsDefaults, otherParams["rs" + i]);
-            rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas;
+            if (otherParams.rs || otherParams["rs" + i]) {
+                if (otherParams.rs) {
+                    rsDefaults = Object.merge(rsDefaults, otherParams.rs);
+                }
+                if (otherParams["rs" + i]) {
+                    rsDefaults = Object.merge(rsDefaults, otherParams["rs" + i]);
+                }
+                rsDefaults = Object.merge(rsDefaults, otherParams.rsOptions);
+                rsDefaults.nodes = rsDefaults.nodes || otherParams.numReplicas;
+            }
+
             var rsSettings = rsDefaults.settings;
             delete rsDefaults.settings;
 
-            var numReplicas = rsDefaults.nodes || 3;
+            // If both rs and startShardsAsRS are specfied, the number of nodes
+            // in the rs field should take priority.
+            if (otherParams.rs || otherParams["rs" + i]) {
+                var numReplicas = rsDefaults.nodes || 3;
+            } else if (startShardsAsRS) {
+                var numReplicas = 2;
+            }
             delete rsDefaults.nodes;
 
             var protocolVersion = rsDefaults.protocolVersion;
@@ -1242,7 +1258,7 @@ var ShardingTest = function(params) {
 
     // Do replication on replica sets if required
     for (var i = 0; i < numShards; i++) {
-        if (!otherParams.rs && !otherParams["rs" + i]) {
+        if (!otherParams.rs && !otherParams["rs" + i] && !startShardsAsRS) {
             continue;
         }
 

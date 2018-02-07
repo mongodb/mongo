@@ -5,7 +5,7 @@
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
 
     var db = s.getDB("test");
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     var primary = s.getPrimaryShard("test").getDB("test");
     var secondary = s.getOther(primary).getDB("test");
 

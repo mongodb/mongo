@@ -92,7 +92,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         var res = mongo.getDB("admin").runCommand({
             moveChunk: "test.foo",
             find: {_id: 1},
-            to: "shard0000"  // Arbitrary shard.
+            to: st.shard0.shardName  // Arbitrary shard.
         });
         assert.commandFailedWithCode(res, authorizeErrorCode, "moveChunk");
         assert.commandFailedWithCode(mongo.getDB("test").copyDatabase("admin", "admin2"),
@@ -176,7 +176,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
         print("============ enabling sharding on test.foo.");
         mongo.getDB("admin").runCommand({enableSharding: "test"});
-        shardingTest.ensurePrimaryShard('test', 'shard0001');
+        shardingTest.ensurePrimaryShard('test', st.shard1.shardName);
         mongo.getDB("admin").runCommand({shardCollection: "test.foo", key: {_id: 1}});
 
         var test = mongo.getDB("test");
@@ -186,6 +186,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     };
 
     var start = function() {
+        // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
         return new ShardingTest({
             auth: "",
             shards: numShards,
@@ -193,7 +194,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                 keyFile: keyfile,
                 chunkSize: 1,
                 useHostname:
-                    false  // Must use localhost to take advantage of the localhost auth bypass
+                    false,  // Must use localhost to take advantage of the localhost auth bypass
+                shardAsReplicaSet: false
             }
         });
     };

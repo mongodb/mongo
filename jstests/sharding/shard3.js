@@ -8,7 +8,7 @@
 
     db = s.getDB("test");
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     s.adminCommand({shardcollection: "test.foo", key: {num: 1}});
 
     // Ensure that the second mongos will see the movePrimary
@@ -163,7 +163,7 @@
     // ---- retry commands SERVER-1471 ----
 
     s.adminCommand({enablesharding: "test2"});
-    s.ensurePrimaryShard('test2', 'shard0000');
+    s.ensurePrimaryShard('test2', s.shard0.shardName);
     s.adminCommand({shardcollection: "test2.foo", key: {num: 1}});
     dba = s.getDB("test2");
     dbb = s2.getDB("test2");

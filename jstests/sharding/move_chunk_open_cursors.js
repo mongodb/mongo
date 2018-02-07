@@ -18,7 +18,7 @@
     assert.writeOK(bulk.execute());
 
     // Make sure we know which shard will host the data to begin.
-    st.ensurePrimaryShard(dbName, "shard0000");
+    st.ensurePrimaryShard(dbName, st.shard0.shardName);
     assert.commandWorked(st.admin.runCommand({enableSharding: dbName}));
     assert.commandWorked(st.admin.runCommand({shardCollection: testNs, key: {_id: 1}}));
 
@@ -32,7 +32,7 @@
     const aggCursor = new DBCommandCursor(coll.getDB(), aggResponse, getMoreBatchSize);
 
     assert(st.adminCommand({split: testNs, middle: {_id: nDocs / 2}}));
-    assert(st.adminCommand({moveChunk: testNs, find: {_id: nDocs - 1}, to: "shard0001"}));
+    assert(st.adminCommand({moveChunk: testNs, find: {_id: nDocs - 1}, to: st.shard1.shardName}));
 
     assert.eq(
         aggCursor.itcount(),
@@ -44,7 +44,7 @@
         coll.runCommand({find: collName, filter: {}, batchSize: getMoreBatchSize}));
     const findCursor = new DBCommandCursor(coll.getDB(), findResponse, getMoreBatchSize);
     assert(st.adminCommand({split: testNs, middle: {_id: nDocs / 4}}));
-    assert(st.adminCommand({moveChunk: testNs, find: {_id: 0}, to: "shard0001"}));
+    assert(st.adminCommand({moveChunk: testNs, find: {_id: 0}, to: st.shard1.shardName}));
 
     assert.eq(
         findCursor.itcount(),

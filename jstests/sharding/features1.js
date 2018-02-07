@@ -3,7 +3,7 @@
     var s = new ShardingTest({name: "features1", shards: 2, mongos: 1});
 
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
 
     // ---- can't shard system namespaces ----
 

@@ -19,7 +19,7 @@
     var staleCollB = staleMongosB.getCollection(coll + "");
 
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
-    st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
+    st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
     coll.ensureIndex({a: 1});
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {a: 1}}));
 
@@ -69,10 +69,11 @@
     coll.ensureIndex({e: 1});
     // Deletes need to be across two shards to trigger an error - this is probably an exceptional
     // case
-    st.ensurePrimaryShard(coll.getDB().getName(), 'shard0000');
+    st.ensurePrimaryShard(coll.getDB().getName(), st.shard0.shardName);
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {e: 1}}));
     assert.commandWorked(admin.runCommand({split: coll + "", middle: {e: 0}}));
-    assert.commandWorked(admin.runCommand({moveChunk: coll + "", find: {e: 0}, to: "shard0001"}));
+    assert.commandWorked(
+        admin.runCommand({moveChunk: coll + "", find: {e: 0}, to: st.shard1.shardName}));
 
     // Make sure we can successfully remove, even though we have stale state
     assert.writeOK(coll.insert({e: "e"}));

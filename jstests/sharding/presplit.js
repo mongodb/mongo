@@ -3,7 +3,7 @@
     var s = new ShardingTest({name: "presplit", shards: 2, mongos: 1, other: {chunkSize: 1}});
 
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
 
     // Insert enough data in 'test.foo' to fill several chunks, if it was sharded.
     bigString = "";

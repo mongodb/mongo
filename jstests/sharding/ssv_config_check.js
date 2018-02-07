@@ -13,7 +13,7 @@
 
     testDB.user.insert({x: 1});
 
-    var directConn = new Mongo(st.d0.host);
+    var directConn = new Mongo(st.rs0.getPrimary().host);
     var adminDB = directConn.getDB('admin');
 
     var configStr = adminDB.runCommand({getShardVersion: 'test.user'}).configServer;

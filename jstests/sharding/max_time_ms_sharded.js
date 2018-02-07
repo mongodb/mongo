@@ -39,11 +39,11 @@
     // Pre-split collection: shard 0 takes {_id: {$lt: 0}}, shard 1 takes {_id: {$gte: 0}}.
     //
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB().getName()}));
-    st.ensurePrimaryShard(coll.getDB().toString(), "shard0000");
+    st.ensurePrimaryShard(coll.getDB().toString(), st.shard0.shardName);
     assert.commandWorked(admin.runCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
     assert.commandWorked(admin.runCommand({split: coll.getFullName(), middle: {_id: 0}}));
     assert.commandWorked(
-        admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: "shard0001"}));
+        admin.runCommand({moveChunk: coll.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
 
     //
     // Insert 100 documents into sharded collection, such that each shard owns 50.
@@ -204,7 +204,7 @@
     // res = admin.runCommand({
     // moveChunk: coll.getFullName(),
     // find: {_id: 0},
-    // to: "shard0000",
+    // to: st.shard0.shardName,
     // maxTimeMS: 1000 * 60 * 60 * 24
     // });
     // assert.commandFailed(
@@ -217,7 +217,7 @@
     // assert.commandWorked(admin.runCommand({
     // moveChunk: coll.getFullName(),
     // find: {_id: 0},
-    // to: "shard0000",
+    // to: st.shard0.shardName,
     // maxTimeMS: 1000 * 60 * 60 * 24
     // }),
     // "expected moveChunk to not hit time limit in mongod");

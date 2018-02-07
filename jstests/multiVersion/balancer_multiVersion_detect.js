@@ -8,7 +8,8 @@ var options = {
     mongosOptions: {verbose: 1, useLogFiles: true},
     configOptions: {},
     shardOptions: {binVersion: ["latest", "last-stable"]},
-    enableBalancer: true
+    enableBalancer: true,
+    other: {shardAsReplicaSet: false}
 };
 
 var st = new ShardingTest({shards: 3, mongos: 1, other: options});
@@ -18,7 +19,7 @@ var admin = mongos.getDB("admin");
 var coll = mongos.getCollection("foo.bar");
 
 printjson(admin.runCommand({enableSharding: coll.getDB() + ""}));
-st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
+st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
 printjson(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 
 assert.soon(function() {

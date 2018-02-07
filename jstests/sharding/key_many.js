@@ -72,7 +72,7 @@
     var s = new ShardingTest({name: "key_many", shards: 2});
 
     assert.commandWorked(s.s0.adminCommand({enableSharding: 'test'}));
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
 
     var db = s.getDB('test');
     var primary = s.getPrimaryShard("test").getDB("test");

@@ -27,7 +27,7 @@
 
     assert.commandWorked(mongosDB.dropDatabase());
 
-    // Enable sharding on the test DB and ensure its primary is shard0000.
+    // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
     assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
     st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
 

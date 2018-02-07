@@ -21,7 +21,7 @@
         assert.eq(0, config.databases.count({"_id": "config"}));
 
         // Test that you cannot set the primary shard for config (not even to 'config')
-        assert.commandFailed(admin.runCommand({movePrimary: 'config', to: 'shard0000'}));
+        assert.commandFailed(admin.runCommand({movePrimary: 'config', to: st.shard0.shardName}));
         assert.commandFailed(admin.runCommand({movePrimary: 'config', to: 'config'}));
 
         st.stop();
@@ -79,10 +79,10 @@
 
         // Insertion and retrieval
         assert.commandWorked(st.splitAt("config.sharded", {_id: 0}));
-        assert.commandWorked(
-            admin.runCommand({moveChunk: "config.sharded", find: {_id: -10}, to: "shard0000"}));
-        assert.commandWorked(
-            admin.runCommand({moveChunk: "config.sharded", find: {_id: 10}, to: "shard0001"}));
+        assert.commandWorked(admin.runCommand(
+            {moveChunk: "config.sharded", find: {_id: -10}, to: st.shard0.shardName}));
+        assert.commandWorked(admin.runCommand(
+            {moveChunk: "config.sharded", find: {_id: 10}, to: st.shard1.shardName}));
 
         assert.writeOK(config.sharded.insert({_id: -10}));
         assert.writeOK(config.sharded.insert({_id: 10}));
@@ -135,10 +135,10 @@
         assertNoChunksOnConfig();
 
         // Test that we can move chunks between two non-config shards
-        assert.commandWorked(
-            admin.runCommand({moveChunk: "config.sharded", find: {_id: 40}, to: "shard0001"}));
-        assert.commandWorked(
-            admin.runCommand({moveChunk: "config.sharded", find: {_id: 40}, to: "shard0000"}));
+        assert.commandWorked(admin.runCommand(
+            {moveChunk: "config.sharded", find: {_id: 40}, to: st.shard1.shardName}));
+        assert.commandWorked(admin.runCommand(
+            {moveChunk: "config.sharded", find: {_id: 40}, to: st.shard0.shardName}));
         assertNoChunksOnConfig();
 
         st.stop();

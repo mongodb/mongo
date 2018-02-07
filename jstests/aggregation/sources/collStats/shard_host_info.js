@@ -47,8 +47,8 @@
                   ])
                   .toArray(),
               [
-                {_id: {shard: "shard0000", host: st.shard0.host}},
-                {_id: {shard: "shard0001", host: st.shard1.host}},
+                {_id: {shard: st.shard0.shardName, host: st.rs0.getPrimary().host}},
+                {_id: {shard: st.shard1.shardName, host: st.rs1.getPrimary().host}},
               ]);
 
     st.stop();

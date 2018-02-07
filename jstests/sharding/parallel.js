@@ -6,7 +6,7 @@
     var s = new ShardingTest({name: "parallel", shards: numShards, mongos: 2});
 
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     s.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 
     var db = s.getDB("test");

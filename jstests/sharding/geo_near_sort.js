@@ -8,13 +8,13 @@
     const caseInsensitive = {locale: "en_US", strength: 2};
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: db.getName()}));
-    st.ensurePrimaryShard(db.getName(), "shard0000");
+    st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
     assert.commandWorked(st.s0.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}}));
 
     // Split the data into 2 chunks and move the chunk with _id > 0 to shard 1.
     assert.commandWorked(st.s0.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
-    assert.commandWorked(
-        st.s0.adminCommand({movechunk: coll.getFullName(), find: {_id: 1}, to: "shard0001"}));
+    assert.commandWorked(st.s0.adminCommand(
+        {movechunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
 
     // Insert some documents. The sort order by distance from the origin is [-2, 1, -1, 2] (under 2d
     // or 2dsphere geometry). The sort order by {a: 1} under the case-insensitive collation is [2,

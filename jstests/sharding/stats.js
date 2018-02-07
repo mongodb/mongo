@@ -5,7 +5,7 @@
     s.adminCommand({enablesharding: "test"});
 
     db = s.getDB("test");
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
 
     function numKeys(o) {
         var num = 0;
@@ -52,14 +52,22 @@
     assert.eq(db.foo.count(), x.count, "coll total count match");
     assert.eq(2, x.nchunks, "coll chunk num");
     assert.eq(2, numKeys(x.shards), "coll shard num");
-    assert.eq(N / 2, x.shards.shard0000.count, "coll count on shard0000 expected");
-    assert.eq(N / 2, x.shards.shard0001.count, "coll count on shard0001 expected");
-    assert.eq(a.foo.count(), x.shards.shard0000.count, "coll count on shard0000 match");
-    assert.eq(b.foo.count(), x.shards.shard0001.count, "coll count on shard0001 match");
-    assert(!x.shards.shard0000.indexDetails,
-           'indexDetails should not be present in shard0000: ' + tojson(x.shards.shard0000));
-    assert(!x.shards.shard0001.indexDetails,
-           'indexDetails should not be present in shard0001: ' + tojson(x.shards.shard0001));
+    assert.eq(
+        N / 2, x.shards[s.shard0.shardName].count, "coll count on s.shard0.shardName expected");
+    assert.eq(
+        N / 2, x.shards[s.shard1.shardName].count, "coll count on s.shard1.shardName expected");
+    assert.eq(a.foo.count(),
+              x.shards[s.shard0.shardName].count,
+              "coll count on s.shard0.shardName match");
+    assert.eq(b.foo.count(),
+              x.shards[s.shard1.shardName].count,
+              "coll count on s.shard1.shardName match");
+    assert(!x.shards[s.shard0.shardName].indexDetails,
+           'indexDetails should not be present in s.shard0.shardName: ' +
+               tojson(x.shards[s.shard0.shardName]));
+    assert(!x.shards[s.shard1.shardName].indexDetails,
+           'indexDetails should not be present in s.shard1.shardName: ' +
+               tojson(x.shards[s.shard1.shardName]));
 
     a_extras =
         a.stats().objects - a.foo.count();  // things like system.namespaces and system.indexes
@@ -72,10 +80,16 @@
 
     assert.eq(N + (a_extras + b_extras), x.objects, "db total count expected");
     assert.eq(2, numKeys(x.raw), "db shard num");
-    assert.eq((N / 2) + a_extras, x.raw[s.shard0.name].objects, "db count on shard0000 expected");
-    assert.eq((N / 2) + b_extras, x.raw[s.shard1.name].objects, "db count on shard0001 expected");
-    assert.eq(a.stats().objects, x.raw[s.shard0.name].objects, "db count on shard0000 match");
-    assert.eq(b.stats().objects, x.raw[s.shard1.name].objects, "db count on shard0001 match");
+    assert.eq((N / 2) + a_extras,
+              x.raw[s.shard0.name].objects,
+              "db count on s.shard0.shardName expected");
+    assert.eq((N / 2) + b_extras,
+              x.raw[s.shard1.name].objects,
+              "db count on s.shard1.shardName expected");
+    assert.eq(
+        a.stats().objects, x.raw[s.shard0.name].objects, "db count on s.shard0.shardName match");
+    assert.eq(
+        b.stats().objects, x.raw[s.shard1.name].objects, "db count on s.shard1.shardName match");
 
     /* Test db.stat() and db.collection.stat() scaling */
 

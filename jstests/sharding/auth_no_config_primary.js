@@ -14,7 +14,9 @@ TestData.skipCheckDBHashes = true;
 (function() {
     'use strict';
 
-    var st = new ShardingTest({shards: 1, other: {keyFile: 'jstests/libs/key1'}});
+    // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
+    var st = new ShardingTest(
+        {shards: 1, other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}});
 
     st.s.getDB('admin').createUser({user: 'root', pwd: 'pass', roles: ['root']});
     st.s.getDB('admin').auth('root', 'pass');

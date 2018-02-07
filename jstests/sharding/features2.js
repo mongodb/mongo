@@ -5,7 +5,7 @@
     var s = new ShardingTest({name: "features2", shards: 2, mongos: 1});
 
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
 
     let a = s._connections[0].getDB("test");
     let b = s._connections[1].getDB("test");

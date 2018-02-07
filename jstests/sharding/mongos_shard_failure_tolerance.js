@@ -55,7 +55,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     mongosConnIdle = new Mongo(st.s0.host);
 
-    MongoRunner.stopMongod(st.shard2);
+    st.rs2.stopSet();
 
     jsTest.log("Testing active connection...");
 
@@ -99,8 +99,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     mongosConnIdle = new Mongo(st.s0.host);
 
-    MongoRunner.stopMongod(st.shard1);
-
+    st.rs1.stopSet();
     jsTest.log("Testing active connection...");
 
     assert.neq(null, mongosConnActive.getCollection(collSharded.toString()).findOne({_id: -1}));

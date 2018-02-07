@@ -17,18 +17,18 @@
 
     // Enable sharding.
     assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-    st.ensurePrimaryShard(db.getName(), 'shard0001');
+    st.ensurePrimaryShard(db.getName(), st.shard1.shardName);
     db.adminCommand({shardCollection: collSharded.getFullName(), key: {a: 1}});
 
     // Pre-split the collection to ensure that both shards have chunks. Explicitly
     // move chunks since the balancer is disabled.
-    for (var i = 1; i <= 2; i++) {
-        assert.commandWorked(db.adminCommand({split: collSharded.getFullName(), middle: {a: i}}));
+    assert.commandWorked(db.adminCommand({split: collSharded.getFullName(), middle: {a: 1}}));
+    printjson(db.adminCommand(
+        {moveChunk: collSharded.getFullName(), find: {a: 1}, to: st.shard0.shardName}));
 
-        var shardName = "shard000" + (i - 1);
-        printjson(
-            db.adminCommand({moveChunk: collSharded.getFullName(), find: {a: i}, to: shardName}));
-    }
+    assert.commandWorked(db.adminCommand({split: collSharded.getFullName(), middle: {a: 2}}));
+    printjson(db.adminCommand(
+        {moveChunk: collSharded.getFullName(), find: {a: 2}, to: st.shard1.shardName}));
 
     // Put data on each shard.
     for (var i = 0; i < 3; i++) {

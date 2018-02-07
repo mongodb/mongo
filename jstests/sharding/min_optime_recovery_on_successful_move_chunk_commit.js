@@ -8,7 +8,7 @@
 
     var testDB = st.s.getDB('test');
     testDB.adminCommand({enableSharding: 'test'});
-    st.ensurePrimaryShard('test', 'shard0000');
+    st.ensurePrimaryShard('test', st.shard0.shardName);
     testDB.adminCommand({shardCollection: 'test.user', key: {x: 1}});
 
     var priConn = st.configRS.getPrimary();
@@ -21,9 +21,9 @@
         }
     });
 
-    testDB.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: 'shard0001'});
+    testDB.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard1.shardName});
 
-    var shardAdmin = st.d0.getDB('admin');
+    var shardAdmin = st.rs0.getPrimary().getDB('admin');
     var minOpTimeRecoveryDoc = shardAdmin.system.version.findOne({_id: 'minOpTimeRecovery'});
 
     assert.neq(null, minOpTimeRecoveryDoc);

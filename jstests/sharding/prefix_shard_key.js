@@ -9,14 +9,15 @@
 (function() {
     'use strict';
 
-    var s = new ShardingTest({shards: 2});
+    // TODO: SERVER-33444 remove shardAsReplicaSet: false
+    var s = new ShardingTest({shards: 2, other: {shardAsReplicaSet: false}});
 
     var db = s.getDB("test");
     var admin = s.getDB("admin");
     var config = s.getDB("config");
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
 
     //******************Part 1********************
 

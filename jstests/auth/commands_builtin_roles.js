@@ -153,7 +153,12 @@ authCommandsLib.runTests(conn, impls);
 MongoRunner.stopMongod(conn);
 
 // run all tests sharded
-conn = new ShardingTest(
-    {shards: 2, mongos: 1, keyFile: "jstests/libs/key1", other: {shardOptions: opts}});
+// TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
+conn = new ShardingTest({
+    shards: 2,
+    mongos: 1,
+    keyFile: "jstests/libs/key1",
+    other: {shardOptions: opts, shardAsReplicaSet: false}
+});
 authCommandsLib.runTests(conn, impls);
 conn.stop();

@@ -20,17 +20,17 @@
     // Test dropping a sharded collection.
 
     assert.commandWorked(st.s.adminCommand({enableSharding: 'test'}));
-    st.ensurePrimaryShard('test', 'shard0000');
+    st.ensurePrimaryShard('test', st.shard0.shardName);
     st.s.adminCommand({shardCollection: 'test.user', key: {_id: 1}});
     st.s.adminCommand({split: 'test.user', middle: {_id: 0}});
     assert.commandWorked(
-        st.s.adminCommand({moveChunk: 'test.user', find: {_id: 0}, to: 'shard0001'}));
+        st.s.adminCommand({moveChunk: 'test.user', find: {_id: 0}, to: st.shard1.shardName}));
 
     assert.writeOK(testDB.user.insert({_id: 10}));
     assert.writeOK(testDB.user.insert({_id: -10}));
 
-    assert.neq(null, st.d0.getDB('test').user.findOne({_id: -10}));
-    assert.neq(null, st.d1.getDB('test').user.findOne({_id: 10}));
+    assert.neq(null, st.shard0.getDB('test').user.findOne({_id: -10}));
+    assert.neq(null, st.shard1.getDB('test').user.findOne({_id: 10}));
 
     var configDB = st.s.getDB('config');
     var collDoc = configDB.collections.findOne({_id: 'test.user'});
@@ -41,8 +41,8 @@
 
     assert.commandWorked(testDB.runCommand({drop: 'user'}));
 
-    assert.eq(null, st.d0.getDB('test').user.findOne());
-    assert.eq(null, st.d1.getDB('test').user.findOne());
+    assert.eq(null, st.shard0.getDB('test').user.findOne());
+    assert.eq(null, st.shard1.getDB('test').user.findOne());
 
     // Call drop again to verify that the command is idempotent.
     assert.commandWorked(testDB.runCommand({drop: 'user'}));

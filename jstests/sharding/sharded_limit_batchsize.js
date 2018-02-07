@@ -91,11 +91,11 @@
 
     // Enable sharding and pre-split the sharded collection.
     assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-    st.ensurePrimaryShard(db.getName(), "shard0000");
+    st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
     db.adminCommand({shardCollection: shardedCol.getFullName(), key: {_id: 1}});
     assert.commandWorked(db.adminCommand({split: shardedCol.getFullName(), middle: {_id: 0}}));
-    assert.commandWorked(
-        db.adminCommand({moveChunk: shardedCol.getFullName(), find: {_id: 0}, to: "shard0001"}));
+    assert.commandWorked(db.adminCommand(
+        {moveChunk: shardedCol.getFullName(), find: {_id: 0}, to: st.shard1.shardName}));
 
     // Write 10 documents to shard 0, and 10 documents to shard 1 inside the sharded collection.
     // Write 20 documents which all go to the primary shard in the unsharded collection.

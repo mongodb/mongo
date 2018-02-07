@@ -36,8 +36,13 @@
         assert.eq(outputDb.numbers_out.count(), 0, "map/reduce should not have succeeded");
     }
 
-    var st = new ShardingTest(
-        {name: "mrShardedOutputAuth", shards: 1, mongos: 1, other: {keyFile: 'jstests/libs/key1'}});
+    // TODO: Remove 'shardAsReplicaSet: false' when SERVER-32672 is fixed.
+    var st = new ShardingTest({
+        name: "mrShardedOutputAuth",
+        shards: 1,
+        mongos: 1,
+        other: {keyFile: 'jstests/libs/key1', shardAsReplicaSet: false}
+    });
 
     // Setup the users to the input, output and admin databases
     var mongos = st.s;

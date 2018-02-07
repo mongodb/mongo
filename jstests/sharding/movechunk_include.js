@@ -6,7 +6,7 @@ function setupMoveChunkTest(st) {
     var testcoll = testdb.foo;
 
     st.adminCommand({enablesharding: "test"});
-    st.ensurePrimaryShard('test', 'shard0001');
+    st.ensurePrimaryShard('test', st.shard1.shardName);
     st.adminCommand({shardcollection: "test.foo", key: {_id: 1}});
 
     var str = "";
@@ -33,6 +33,7 @@ function setupMoveChunkTest(st) {
             break;
         }
     }
+
     var result = st.adminCommand({
         movechunk: "test.foo",
         find: {_id: 1},

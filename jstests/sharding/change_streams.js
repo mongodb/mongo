@@ -29,7 +29,7 @@
 
     assert.commandWorked(mongosDB.dropDatabase());
 
-    // Enable sharding on the test DB and ensure its primary is shard0000.
+    // Enable sharding on the test DB and ensure its primary is st.shard0.shardName.
     assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
     st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
 
@@ -41,7 +41,7 @@
     assert.commandWorked(
         mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
 
-    // Move the [0, MaxKey) chunk to shard0001.
+    // Move the [0, MaxKey) chunk to st.shard1.shardName.
     assert.commandWorked(mongosDB.adminCommand(
         {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 
@@ -138,7 +138,7 @@
     // Split the collection into 2 chunks: [MinKey, 0), [0, MaxKey).
     assert.commandWorked(
         mongosDB.adminCommand({split: mongosColl.getFullName(), middle: {_id: 0}}));
-    // Move the [0, MaxKey) chunk to shard0001.
+    // Move the [0, MaxKey) chunk to st.shard1.shardName.
     assert.commandWorked(mongosDB.adminCommand(
         {moveChunk: mongosColl.getFullName(), find: {_id: 1}, to: st.rs1.getURL()}));
 

@@ -5,7 +5,7 @@
     const st = new ShardingTest({shards: 2, mongos: 1});
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-    st.ensurePrimaryShard('test', 'shard0001');
+    st.ensurePrimaryShard('test', st.shard1.shardName);
     assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.tag_range', key: {_id: 1}}));
 
     function countTags(num, message) {
@@ -14,9 +14,9 @@
 
     assert.eq(1, st.config.chunks.count({"ns": "test.tag_range"}));
 
-    st.addShardTag('shard0000', 'a');
-    st.addShardTag('shard0000', 'b');
-    st.addShardTag('shard0000', 'c');
+    st.addShardTag(st.shard0.shardName, 'a');
+    st.addShardTag(st.shard0.shardName, 'b');
+    st.addShardTag(st.shard0.shardName, 'c');
 
     // add two ranges, verify the additions
 

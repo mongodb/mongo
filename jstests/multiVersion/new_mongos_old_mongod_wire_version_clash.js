@@ -26,6 +26,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
         other: {
             mongosOptions: {binVersion: 'last-stable'},
             shardOptions: {binVersion: 'last-stable'},
+            shardAsReplicaSet: false
         }
     });
 

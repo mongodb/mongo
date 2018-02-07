@@ -9,7 +9,7 @@
 
     var testDB_s0 = st.s.getDB('test');
     assert.commandWorked(testDB_s0.adminCommand({enableSharding: 'test'}));
-    st.ensurePrimaryShard('test', 'shard0001');
+    st.ensurePrimaryShard('test', st.shard1.shardName);
     assert.commandWorked(testDB_s0.adminCommand({shardCollection: 'test.user', key: {x: 1}}));
 
     var checkShardMajorVersion = function(conn, expectedVersion) {
@@ -27,7 +27,7 @@
     var testDB_s1 = st.s1.getDB('test');
     assert.writeOK(testDB_s1.user.insert({x: 1}));
     assert.commandWorked(
-        testDB_s1.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: 'shard0000'}));
+        testDB_s1.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard0.shardName}));
 
     st.configRS.awaitLastOpCommitted();
 
@@ -40,15 +40,15 @@
     // shard1: 0|0|a
     // mongos0: 1|0|a
 
-    checkShardMajorVersion(st.d0, 0);
-    checkShardMajorVersion(st.d1, 0);
+    checkShardMajorVersion(st.rs0.getPrimary(), 0);
+    checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
-    // mongos0 still thinks that { x: 1 } belong to shard0001, but should be able to
+    // mongos0 still thinks that { x: 1 } belong to st.shard1.shardName, but should be able to
     // refresh it's metadata correctly.
     assert.neq(null, testDB_s0.user.findOne({x: 1}));
 
-    checkShardMajorVersion(st.d0, 2);
-    checkShardMajorVersion(st.d1, 0);
+    checkShardMajorVersion(st.rs0.getPrimary(), 2);
+    checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
     // Set mongos2 & mongos3 to version 2|0|a
     var testDB_s2 = st.s2.getDB('test');
@@ -68,15 +68,15 @@
     // shard1: 0|0|0
     // mongos0: 2|0|a
 
-    checkShardMajorVersion(st.d0, 0);
-    checkShardMajorVersion(st.d1, 0);
+    checkShardMajorVersion(st.rs0.getPrimary(), 0);
+    checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
-    // mongos0 still thinks { x: 10 } belong to shard0000, but since coll is dropped,
+    // mongos0 still thinks { x: 10 } belong to st.shard0.shardName, but since coll is dropped,
     // query should be routed to primary shard.
     assert.neq(null, testDB_s0.user.findOne({x: 10}));
 
-    checkShardMajorVersion(st.d0, 0);
-    checkShardMajorVersion(st.d1, 0);
+    checkShardMajorVersion(st.rs0.getPrimary(), 0);
+    checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
     ///////////////////////////////////////////////////////
     // Test 2 shards with 1 chunk
@@ -92,7 +92,7 @@
     testDB_s1.user.insert({x: 1});
     testDB_s1.user.insert({x: -11});
     assert.commandWorked(
-        testDB_s1.adminCommand({moveChunk: 'test.user', find: {x: -1}, to: 'shard0000'}));
+        testDB_s1.adminCommand({moveChunk: 'test.user', find: {x: -1}, to: st.shard0.shardName}));
 
     st.configRS.awaitLastOpCommitted();
 
@@ -106,21 +106,21 @@
     //
     // mongos2: 2|0|a
 
-    checkShardMajorVersion(st.d0, 0);
-    checkShardMajorVersion(st.d1, 2);
+    checkShardMajorVersion(st.rs0.getPrimary(), 0);
+    checkShardMajorVersion(st.rs1.getPrimary(), 2);
 
-    // mongos2 still thinks that { x: 1 } belong to shard0000, but should be able to
+    // mongos2 still thinks that { x: 1 } belong to st.shard0.shardName, but should be able to
     // refresh it's metadata correctly.
     assert.neq(null, testDB_s2.user.findOne({x: 1}));
 
-    checkShardMajorVersion(st.d0, 2);
-    checkShardMajorVersion(st.d1, 2);
+    checkShardMajorVersion(st.rs0.getPrimary(), 2);
+    checkShardMajorVersion(st.rs1.getPrimary(), 2);
 
     // Set shard metadata to 2|0|b
     assert.neq(null, testDB_s2.user.findOne({x: -11}));
 
-    checkShardMajorVersion(st.d0, 2);
-    checkShardMajorVersion(st.d1, 2);
+    checkShardMajorVersion(st.rs0.getPrimary(), 2);
+    checkShardMajorVersion(st.rs1.getPrimary(), 2);
 
     // Official config:
     // shard0: 2|0|b, [-inf, 0)
@@ -132,7 +132,7 @@
     //
     // mongos3: 2|0|a
 
-    // 4th mongos still thinks that { x: 1 } belong to shard0000, but should be able to
+    // 4th mongos still thinks that { x: 1 } belong to st.shard0.shardName, but should be able to
     // refresh it's metadata correctly.
     assert.neq(null, testDB_s3.user.findOne({x: 1}));
 
@@ -143,8 +143,8 @@
     // Set mongos0 to version 0|0|0
     testDB_s0.user.drop();
 
-    checkShardMajorVersion(st.d0, 0);
-    checkShardMajorVersion(st.d1, 0);
+    checkShardMajorVersion(st.rs0.getPrimary(), 0);
+    checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
     assert.eq(null, testDB_s0.user.findOne({x: 1}));
 
@@ -155,7 +155,7 @@
     testDB_s1.user.insert({x: 1});
 
     assert.commandWorked(
-        testDB_s1.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: 'shard0000'}));
+        testDB_s1.adminCommand({moveChunk: 'test.user', find: {x: 0}, to: st.shard0.shardName}));
 
     st.configRS.awaitLastOpCommitted();
 
@@ -169,14 +169,14 @@
     //
     // mongos0: 0|0|0
 
-    checkShardMajorVersion(st.d0, 0);
-    checkShardMajorVersion(st.d1, 0);
+    checkShardMajorVersion(st.rs0.getPrimary(), 0);
+    checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
     // 1st mongos thinks that collection is unshareded and will attempt to query primary shard.
     assert.neq(null, testDB_s0.user.findOne({x: 1}));
 
-    checkShardMajorVersion(st.d0, 2);
-    checkShardMajorVersion(st.d1, 0);
+    checkShardMajorVersion(st.rs0.getPrimary(), 2);
+    checkShardMajorVersion(st.rs1.getPrimary(), 0);
 
     st.stop();
 

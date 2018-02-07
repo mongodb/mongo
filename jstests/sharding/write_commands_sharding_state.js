@@ -5,13 +5,15 @@
 (function() {
     'use strict';
 
-    var st = new ShardingTest({name: "write_commands", mongos: 2, shards: 2});
+    // TODO: SERVER-33444 remove shardAsReplicaSet: false
+    var st = new ShardingTest(
+        {name: "write_commands", mongos: 2, shards: 2, other: {shardAsReplicaSet: false}});
 
     var dbTestName = 'WriteCommandsTestDB';
     var collName = dbTestName + '.TestColl';
 
     assert.commandWorked(st.s0.adminCommand({enablesharding: dbTestName}));
-    st.ensurePrimaryShard(dbTestName, 'shard0000');
+    st.ensurePrimaryShard(dbTestName, st.shard0.shardName);
 
     assert.commandWorked(
         st.s0.adminCommand({shardCollection: collName, key: {Key: 1}, unique: true}));
@@ -22,11 +24,11 @@
 
     printjson(st.config.getSiblingDB('config').chunks.find().toArray());
 
-    // Move 10 and 20 to shard00001
+    // Move 10 and 20 to st.shard0.shardName1
     assert.commandWorked(st.s0.adminCommand(
-        {moveChunk: collName, find: {Key: 19}, to: 'shard0001', _waitForDelete: true}));
+        {moveChunk: collName, find: {Key: 19}, to: st.shard1.shardName, _waitForDelete: true}));
     assert.commandWorked(st.s0.adminCommand(
-        {moveChunk: collName, find: {Key: 21}, to: 'shard0001', _waitForDelete: true}));
+        {moveChunk: collName, find: {Key: 21}, to: st.shard1.shardName, _waitForDelete: true}));
 
     printjson(st.config.getSiblingDB('config').chunks.find().toArray());
 
@@ -46,9 +48,9 @@
     assert.eq(1, st.d1.getDB(dbTestName).TestColl.find({Key: 11}).count());
     assert.eq(1, st.d1.getDB(dbTestName).TestColl.find({Key: 21}).count());
 
-    // Move chunk [0, 19] to shard0000 and make sure the documents are correctly placed
+    // Move chunk [0, 19] to st.shard0.shardName and make sure the documents are correctly placed
     assert.commandWorked(st.s0.adminCommand(
-        {moveChunk: collName, find: {Key: 19}, _waitForDelete: true, to: 'shard0000'}));
+        {moveChunk: collName, find: {Key: 19}, _waitForDelete: true, to: st.shard0.shardName}));
 
     printjson(st.config.getSiblingDB('config').chunks.find().toArray());
     printjson(st.d0.getDB(dbTestName).TestColl.find({}).toArray());
@@ -61,7 +63,8 @@
     // Now that both mongod shards are restarted, they don't know yet that they are part of a
     // sharded
     // cluster until they get a setShardVerion command. Mongos instance s1 has stale metadata and
-    // doesn't know that chunk with key 19 has moved to shard0000 so it will send it to shard0001 at
+    // doesn't know that chunk with key 19 has moved to st.shard0.shardName so it will send it to
+    // st.shard1.shardName at
     // first.
     //
     // Shard0001 would only send back a stale config exception if it receives a setShardVersion

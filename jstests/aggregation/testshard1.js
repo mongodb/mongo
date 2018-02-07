@@ -10,7 +10,7 @@ jsTestLog("Setting up sharded cluster");
 shardedAggTest.adminCommand({enablesharding: "aggShard"});
 db = shardedAggTest.getDB("aggShard");
 assert.commandWorked(db.adminCommand({setParameter: 1, logComponentVerbosity: {network: 0}}));
-shardedAggTest.ensurePrimaryShard('aggShard', 'shard0000');
+shardedAggTest.ensurePrimaryShard('aggShard', shardedAggTest.shard0.shardName);
 
 /* make sure its cleaned up */
 db.ts1.drop();

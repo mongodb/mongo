@@ -5,7 +5,8 @@
 (function() {
     "use strict";
 
-    var st = new ShardingTest({shards: 1});
+    // TODO: SERVER-33444 remove shardAsReplicaSet: false
+    var st = new ShardingTest({shards: 1, other: {shardAsReplicaSet: false}});
 
     // Insert a recovery doc with non-zero minOpTimeUpdaters to simulate a migration
     // process that crashed in the middle of the critical section.
@@ -13,7 +14,7 @@
     var recoveryDoc = {
         _id: 'minOpTimeRecovery',
         configsvrConnectionString: st.configRS.getURL(),
-        shardName: 'shard0000',
+        shardName: st.shard0.shardName,
         minOpTime: {ts: Timestamp(0, 0), t: 0},
         minOpTimeUpdaters: 2
     };

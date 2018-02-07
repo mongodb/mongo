@@ -14,7 +14,7 @@
 
     // Shard the collection
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     s.adminCommand({shardcollection: "test.limit_push", key: {x: 1}});
 
     // Now split the and move the data between the shards

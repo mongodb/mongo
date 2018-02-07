@@ -8,7 +8,7 @@ c = db['foo'];
 c.drop();
 
 s.adminCommand({enablesharding: '' + db});
-s.ensurePrimaryShard(db.getName(), 'shard0001');
+s.ensurePrimaryShard(db.getName(), s.shard1.shardName);
 s.adminCommand({shardcollection: '' + c, key: {a: 1, b: 1}});
 
 // Check query operation with some satisfiable and unsatisfiable queries.

@@ -18,7 +18,7 @@
         var shardVersion = [res.version, res.versionEpoch];
         return db.runCommand({
             splitChunk: 'test.user',
-            from: 'shard0000',
+            from: st.shard0.shardName,
             min: minKey,
             max: maxKey,
             keyPattern: {x: 1},
@@ -137,7 +137,7 @@
         }
 
         // run test
-        test(st.d0.getDB('admin'));
+        test(st.rs0.getPrimary().getDB('admin'));
 
         // teardown
         testDB.user.drop();

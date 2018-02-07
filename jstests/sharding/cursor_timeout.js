@@ -26,6 +26,7 @@
 
     const cursorMonitorFrequencySecs = 1;
 
+    // TODO: SERVER-33444 remove shardAsReplicaSet: false
     const st = new ShardingTest({
         shards: 2,
         other: {
@@ -42,7 +43,8 @@
                     cursorTimeoutMillis: mongosCursorTimeoutMs,
                     clientCursorMonitorFrequencySecs: cursorMonitorFrequencySecs
                 }
-            }
+            },
+            shardAsReplicaSet: false
         },
         enableBalancer: false
     });
@@ -55,7 +57,7 @@
     const shardColl = mongod.getCollection(routerColl.getFullName());
 
     assert.commandWorked(adminDB.runCommand({enableSharding: routerColl.getDB().getName()}));
-    st.ensurePrimaryShard(routerColl.getDB().getName(), 'shard0000');
+    st.ensurePrimaryShard(routerColl.getDB().getName(), "shard0000");
     assert.commandWorked(
         adminDB.runCommand({shardCollection: routerColl.getFullName(), key: {x: 1}}));
     assert.commandWorked(adminDB.runCommand({split: routerColl.getFullName(), middle: {x: 10}}));

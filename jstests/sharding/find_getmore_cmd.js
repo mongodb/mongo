@@ -25,11 +25,11 @@
     assert.commandWorked(coll.ensureIndex({b: "text"}));
 
     assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-    st.ensurePrimaryShard(db.getName(), "shard0000");
+    st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
     db.adminCommand({shardCollection: coll.getFullName(), key: {_id: 1}});
     assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {_id: 0}}));
     assert.commandWorked(
-        db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: "shard0001"}));
+        db.adminCommand({moveChunk: coll.getFullName(), find: {_id: 1}, to: st.shard1.shardName}));
 
     // Find with no options.
     cmdRes = db.runCommand({find: coll.getName()});

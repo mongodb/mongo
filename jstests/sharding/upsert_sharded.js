@@ -12,7 +12,7 @@
     var coll = mongos.getCollection("foo.bar");
 
     assert(admin.runCommand({enableSharding: coll.getDB() + ""}).ok);
-    st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
+    st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
 
     var upsertedResult = function(query, expr) {
         coll.remove({});

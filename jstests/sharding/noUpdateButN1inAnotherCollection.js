@@ -17,8 +17,8 @@ ns2 = "test.coll2";
 adminSA = mongosA.getDB("admin");
 adminSA.runCommand({enableSharding: "test"});
 
-adminSA.runCommand({moveprimary: "test", to: "shard0000"});
-adminSA.runCommand({moveprimary: "test2", to: "shard0001"});
+adminSA.runCommand({moveprimary: "test", to: "s.shard0.shardName"});
+adminSA.runCommand({moveprimary: "test2", to: "s.shard1.shardName"});
 
 adminSA.runCommand({shardCollection: ns, key: {_id: 1}});
 
@@ -43,7 +43,7 @@ for (var i = 1; i < numDocs; i++) {
 debug("Inserted docs, now split chunks");
 
 adminSA.runCommand({split: ns, find: {_id: 3}});
-adminSA.runCommand({movechunk: ns, find: {_id: 10}, to: "shard0001"});
+adminSA.runCommand({movechunk: ns, find: {_id: 10}, to: "s.shard1.shardName"});
 
 var command = 'printjson(db.coll.update({ _id: 9 }, { $set: { a: "9" }}, true));';
 

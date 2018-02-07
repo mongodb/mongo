@@ -5,13 +5,13 @@
     var s = new ShardingTest({shards: 2, mongos: 1});
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     assert.commandWorked(s.s0.adminCommand({shardcollection: "test.foo", key: {_id: 1, a: 1}}));
 
     assert.eq(1, s.config.chunks.find({"ns": "test.foo"}).itcount());
 
-    s.addShardTag("shard0000", "a");
-    s.addShardTag("shard0000", "b");
+    s.addShardTag(s.shard0.shardName, "a");
+    s.addShardTag(s.shard0.shardName, "b");
 
     s.addTagRange("test.foo", {_id: 5}, {_id: 10}, "a");
     s.addTagRange("test.foo", {_id: 10}, {_id: 15}, "b");

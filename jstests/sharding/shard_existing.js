@@ -24,7 +24,7 @@
     assert.lte(totalSize, dataSize);
 
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     var res = s.adminCommand({shardcollection: "test.data", key: {_id: 1}});
     printjson(res);
 

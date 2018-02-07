@@ -8,7 +8,7 @@ s.stopBalancer();
 s2 = s._mongos[1];
 
 s.adminCommand({enablesharding: "test"});
-s.ensurePrimaryShard('test', 'shard0001');
+s.ensurePrimaryShard('test', s.shard1.shardName);
 s.adminCommand({shardcollection: "test.foo", key: {num: 1}});
 if (s.configRS) {
     // Ensure that the second mongos will see the movePrimary

@@ -10,7 +10,7 @@
     var shard0 = st.shard0;
 
     assert.commandWorked(config.adminCommand({enableSharding: coll.getDB() + ""}));
-    st.ensurePrimaryShard(coll.getDB().getName(), 'shard0000');
+    st.ensurePrimaryShard(coll.getDB().getName(), st.shard0.shardName);
     assert.commandWorked(config.adminCommand({shardCollection: "" + coll, key: {a: 1}}));
 
     var getDirectShardedConn = function(st, collName) {
@@ -27,7 +27,7 @@
             authoritative: true,
             configdb: configConnStr,
             version: maxChunk.lastmod,
-            shard: 'shard0000',
+            shard: st.shard0.shardName,
             versionEpoch: maxChunk.lastmodEpoch
         };
 

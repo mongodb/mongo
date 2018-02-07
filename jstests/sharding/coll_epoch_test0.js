@@ -9,7 +9,7 @@ var coll = st.s.getCollection("foo.bar");
 
 // First enable sharding
 admin.runCommand({enableSharding: coll.getDB() + ""});
-st.ensurePrimaryShard(coll.getDB().getName(), 'shard0001');
+st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
 admin.runCommand({shardCollection: coll + "", key: {_id: 1}});
 
 var primary = config.databases.find({_id: coll.getDB() + ""}).primary;

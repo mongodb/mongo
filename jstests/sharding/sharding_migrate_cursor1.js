@@ -15,7 +15,7 @@
 
     s.adminCommand({enablesharding: "test"});
     db = s.getDB("test");
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     t = db.foo;
 
     bigString = "";

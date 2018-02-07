@@ -3,7 +3,7 @@
     var s = new ShardingTest({name: "keystring", shards: 2});
 
     s.adminCommand({enablesharding: "test"});
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
     s.adminCommand({shardcollection: "test.foo", key: {name: 1}});
 
     primary = s.getPrimaryShard("test").getDB("test");

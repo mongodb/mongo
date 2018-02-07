@@ -4,7 +4,7 @@
     var st = new ShardingTest({shards: 2, chunkSize: 1});
 
     assert.commandWorked(st.s0.adminCommand({enableSharding: 'test'}));
-    st.ensurePrimaryShard('test', 'shard0001');
+    st.ensurePrimaryShard('test', st.shard1.shardName);
     assert.commandWorked(st.s0.adminCommand({shardCollection: 'test.user', key: {x: 'hashed'}}));
 
     var configDB = st.s0.getDB('config');

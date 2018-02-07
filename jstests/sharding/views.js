@@ -45,12 +45,12 @@
     let coll = db.getCollection("coll");
 
     assert.commandWorked(config.adminCommand({enableSharding: db.getName()}));
-    st.ensurePrimaryShard(db.getName(), "shard0000");
+    st.ensurePrimaryShard(db.getName(), st.shard0.shardName);
     assert.commandWorked(config.adminCommand({shardCollection: coll.getFullName(), key: {a: 1}}));
 
     assert.commandWorked(mongos.adminCommand({split: coll.getFullName(), middle: {a: 6}}));
     assert.commandWorked(
-        db.adminCommand({moveChunk: coll.getFullName(), find: {a: 25}, to: "shard0001"}));
+        db.adminCommand({moveChunk: coll.getFullName(), find: {a: 25}, to: st.shard1.shardName}));
 
     for (let i = 0; i < 10; ++i) {
         assert.writeOK(coll.insert({a: i}));

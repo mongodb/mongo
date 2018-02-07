@@ -20,7 +20,7 @@
     assert.commandFailed(s.s0.adminCommand(shardCommand));
 
     assert.commandWorked(s.s0.adminCommand({enablesharding: "test"}));
-    s.ensurePrimaryShard('test', 'shard0001');
+    s.ensurePrimaryShard('test', s.shard1.shardName);
 
     assert.eq(3, db.foo.find().length(), "after partitioning count failed");
 
