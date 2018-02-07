@@ -42,6 +42,7 @@
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/hostname_canonicalization.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/version.h"
 
@@ -50,15 +51,18 @@ namespace {
 
 const Seconds kUptimeReportInterval(10);
 
-std::string constructInstanceIdString() {
-    return str::stream() << getHostNameCached() << ":" << serverGlobalParams.port;
+std::string constructInstanceIdString(const std::string& hostName) {
+    return str::stream() << hostName << ":" << serverGlobalParams.port;
 }
 
 /**
  * Reports the uptime status of the current instance to the config.pings collection. This method
  * is best-effort and never throws.
  */
-void reportStatus(OperationContext* txn, const std::string& instanceId, const Timer& upTimeTimer) {
+void reportStatus(OperationContext* txn,
+                  const std::string& instanceId,
+                  const std::string& hostName,
+                  const Timer& upTimeTimer) {
     MongosType mType;
     mType.setName(instanceId);
     mType.setPing(jsTime());
@@ -66,6 +70,8 @@ void reportStatus(OperationContext* txn, const std::string& instanceId, const Ti
     // balancer is never active in mongos. Here for backwards compatibility only.
     mType.setWaiting(true);
     mType.setMongoVersion(VersionInfoInterface::instance().version().toString());
+    mType.setAdvisoryHostFQDNs(
+        getHostFQDNs(hostName, HostnameCanonicalizationMode::kForwardAndReverse));
 
     try {
         Grid::get(txn)->catalogClient(txn)->updateConfigDocument(
@@ -95,13 +101,14 @@ void ShardingUptimeReporter::startPeriodicThread() {
     _thread = stdx::thread([this] {
         Client::initThread("Uptime reporter");
 
-        const std::string instanceId(constructInstanceIdString());
+        const std::string hostName(getHostNameCached());
+        const std::string instanceId(constructInstanceIdString(hostName));
         const Timer upTimeTimer;
 
         while (!inShutdown()) {
             {
                 auto txn = cc().makeOperationContext();
-                reportStatus(txn.get(), instanceId, upTimeTimer);
+                reportStatus(txn.get(), instanceId, hostName, upTimeTimer);
 
                 auto status =
                     Grid::get(txn.get())->getBalancerConfiguration()->refreshAndCheck(txn.get());
