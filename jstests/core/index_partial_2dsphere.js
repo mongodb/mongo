@@ -39,7 +39,7 @@
                   })
                   .itcount());
 
-    // Don'coll let an update to a document with an invalid geoJson succeed.
+    // Don't let an update to a document with an invalid geoJson succeed.
     assert.writeError(coll.update({_id: 0}, {$set: {isIndexed: 1}}));
 
     // Update the indexed document to remove it from the index.

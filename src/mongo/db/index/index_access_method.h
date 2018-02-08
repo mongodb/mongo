@@ -266,7 +266,7 @@ public:
     enum class GetKeysMode {
         // Relax all constraints.
         kRelaxConstraints,
-        // Relax all constraints on documents that don't apply to a partialFilterIndex.
+        // Relax all constraints on documents that don't apply to a partial index.
         kRelaxConstraintsUnfiltered,
         // Enforce all constraints.
         kEnforceConstraints
