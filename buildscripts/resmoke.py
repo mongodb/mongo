@@ -65,8 +65,18 @@ def _execute_suite(suite):
         suite.return_code = 0
         return False
 
+    archive = None
+    if resmokelib.config.ARCHIVE_FILE:
+        archive = resmokelib.utils.archival.Archival(
+            archival_json_file=resmokelib.config.ARCHIVE_FILE,
+            execution=resmokelib.config.EVERGREEN_EXECUTION,
+            limit_size_mb=resmokelib.config.ARCHIVE_LIMIT_MB,
+            limit_files=resmokelib.config.ARCHIVE_LIMIT_TESTS,
+            logger=logger)
+
     executor_config = suite.get_executor_config()
-    executor = resmokelib.testing.executor.TestSuiteExecutor(logger, suite, **executor_config)
+    executor = resmokelib.testing.executor.TestSuiteExecutor(
+        logger, suite, archive_instance=archive, **executor_config)
 
     try:
         executor.run()
@@ -83,6 +93,9 @@ def _execute_suite(suite):
                          suite.test_kind, suite.get_display_name())
         suite.return_code = 2
         return False
+    finally:
+        if archive:
+            archive.exit()
 
 
 def _log_summary(logger, suites, time_taken):
