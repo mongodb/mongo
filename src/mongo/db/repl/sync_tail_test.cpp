@@ -306,9 +306,7 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentDatabaseMissing) {
                             << "d"
                             << "ns"
                             << "test.othername");
-    ASSERT_THROWS_CODE(_testSyncApplyCrudOperation(ErrorCodes::OK, op, false),
-                       AssertionException,
-                       ErrorCodes::NamespaceNotFound);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, false);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLookupByUUIDFails) {
@@ -334,9 +332,7 @@ TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLookupByUUIDFails) {
                             << nss.getSisterNS("othername")
                             << "ui"
                             << UUID::gen());
-    ASSERT_THROWS_CODE(_testSyncApplyCrudOperation(ErrorCodes::OK, op, false),
-                       AssertionException,
-                       ErrorCodes::NamespaceNotFound);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, false);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {

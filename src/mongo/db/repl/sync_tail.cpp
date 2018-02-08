@@ -360,24 +360,33 @@ Status SyncTail::syncApply(OperationContext* opCtx,
                 // it must have been in the same database or it would have gotten a new UUID.
                 // Need to throw instead of returning a status for it to be properly ignored.
                 actualNss = UUIDCatalog::get(opCtx).lookupNSSByUUID(statusWithUUID.getValue());
-                uassert(ErrorCodes::NamespaceNotFound,
-                        str::stream() << "Failed to apply operation due to missing collection ("
-                                      << statusWithUUID.getValue()
-                                      << "): "
-                                      << redact(op.toString()),
-                        !actualNss.isEmpty());
+                if (actualNss.isEmpty()) {
+                    if (opType[0] == 'd') {
+                        return Status::OK();
+                    }
+                    uasserted(ErrorCodes::NamespaceNotFound,
+                              str::stream()
+                                  << "Failed to apply operation due to missing collection ("
+                                  << statusWithUUID.getValue()
+                                  << "): "
+                                  << redact(op.toString()));
+                }
                 dassert(actualNss.db() == nss.db());
             }
             Lock::CollectionLock collLock(opCtx->lockState(), actualNss.ns(), MODE_IX);
 
             // Need to throw instead of returning a status for it to be properly ignored.
             Database* db = dbHolder().get(opCtx, actualNss.db());
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Failed to apply operation due to missing database ("
-                                  << actualNss.db()
-                                  << "): "
-                                  << redact(op.toString()),
-                    db);
+            if (!db) {
+                if (opType[0] == 'd') {
+                    return Status::OK();
+                }
+                uasserted(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Failed to apply operation due to missing database ("
+                                        << actualNss.db()
+                                        << "): "
+                                        << redact(op.toString()));
+            }
 
             OldClientContext ctx(opCtx, actualNss.ns(), db, /*justCreated*/ false);
             return applyOp(ctx.db());
