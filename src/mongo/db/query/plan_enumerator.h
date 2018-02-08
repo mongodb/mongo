@@ -124,13 +124,45 @@ private:
     // The position of a field in a possibly compound index.
     typedef size_t IndexPosition;
 
+    /**
+     * Represents the route that an outside predicate has taken during the PlanEnumerator's
+     * recursive descent of the match expression tree.
+     */
+    struct OutsidePredRoute {
+        /**
+         * Whether or not the route has traversed through an $elemMatch object node. This is needed
+         * because it is not correct to push down a predicate through an $elemMatch object.
+         */
+        bool traversedThroughElemMatchObj = false;
+
+        /**
+         * The route of the outside predicate. This starts at the indexed OR sibling of the
+         * predicate.  Each value in 'route' is the index of a child in an indexed OR.
+         *
+         * For example, if the MatchExpression tree is:
+         *         AND
+         *        /    \
+         *   {a: 5}    OR
+         *           /    \
+         *         AND    {e: 9}
+         *       /     \
+         *    {b: 6}   OR
+         *           /    \
+         *       {c: 7}  {d: 8}
+         *
+         * and the predicate is {a: 5}, then the route will be {0, 1} when the recursive descent
+         * reaches {d: 8}.
+         */
+        std::deque<size_t> route;
+    };
+
     struct PrepMemoContext {
         PrepMemoContext() : elemMatchExpr(NULL) {}
         MatchExpression* elemMatchExpr;
 
         // Maps from indexable predicates that can be pushed into the current node to the route
         // through ORs that they have taken to get to this node.
-        unordered_map<MatchExpression*, std::deque<size_t>> outsidePreds;
+        unordered_map<MatchExpression*, OutsidePredRoute> outsidePreds;
     };
 
     /**
@@ -372,7 +404,7 @@ private:
      */
     void assignMultikeySafePredicates(
         const std::vector<MatchExpression*>& couldAssign,
-        const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds,
+        const unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
         OneIndexAssignment* indexAssignment);
 
     /**
@@ -419,7 +451,7 @@ private:
     void enumerateOneIndex(IndexToPredMap idxToFirst,
                            IndexToPredMap idxToNotFirst,
                            const std::vector<MemoID>& subnodes,
-                           const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds,
+                           const unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
                            AndAssignment* andAssignment);
 
     /**
@@ -469,10 +501,15 @@ private:
      * 'outsidePreds'. 'pred' must be able to use the index and be multikey-safe to add to
      * 'indexAssignment'.
      */
-    void assignPredicate(const unordered_map<MatchExpression*, std::deque<size_t>>& outsidePreds,
+    void assignPredicate(const unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
                          MatchExpression* pred,
                          size_t position,
                          OneIndexAssignment* indexAssignment);
+
+    /**
+     * Sets a flag on all outside pred routes that descend through an $elemMatch object node.
+     */
+    void markTraversedThroughElemMatchObj(PrepMemoContext* context);
 
     /**
      * Return the memo entry for 'node'.  Does some sanity checking to ensure that a memo entry
