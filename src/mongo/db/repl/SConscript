@@ -10,8 +10,11 @@ env.Library(
         'apply_ops.cpp',
         'do_txn.cpp',
         'oplog.cpp',
+        env.Idlc('apply_ops.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
+        'dbcheck',
+        'repl_coordinator_interface',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
@@ -20,8 +23,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/index_d',
-        'dbcheck',
-        'repl_coordinator_interface',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 
