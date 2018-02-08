@@ -32,13 +32,6 @@
     const master = masterSlaveFixture.start(true, {enableMajorityReadConcern: ""});
     assert.writeOK(master.getDB("test").ensure_db_exists.insert({}));
     assertChangeStreamNotSupportedOnConnection(master);
-
-    const slave = masterSlaveFixture.start(false);
-    // Slaves start in FCV 3.4; we need to wait for it to sync the FCV document from the master
-    // before trying a change stream, or the change stream will fail for the wrong reason.
-    assert.soonNoExcept(() => checkFCV(slave.getDB("admin"), "3.6") || true);
-    assert.soonNoExcept(() => slave.getDB("test").ensure_db_exists.exists());
-    assertChangeStreamNotSupportedOnConnection(slave);
     masterSlaveFixture.stop();
 
     // Test a sharded cluster with standalone shards.

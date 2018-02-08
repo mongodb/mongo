@@ -210,21 +210,13 @@ public:
             ServerGlobalParams::FeatureCompatibility::Version version =
                 serverGlobalParams.featureCompatibility.getVersion();
 
-            if (version >= ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+            if (version >=
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
                 // All collections must have a UUID.
                 if (!opts.uuid) {
                     results.errors.push_back(str::stream() << "UUID missing on collection "
                                                            << nss.ns()
                                                            << " but SchemaVersion=3.6");
-                    results.valid = false;
-                }
-            } else if (version ==
-                       ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
-                // All collections must not have a UUID.
-                if (opts.uuid) {
-                    results.errors.push_back(str::stream() << "UUID present in collection "
-                                                           << nss.ns()
-                                                           << " but SchemaVersion=3.4");
                     results.valid = false;
                 }
             }

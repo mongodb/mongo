@@ -6,6 +6,7 @@
 
 (function() {
     'use strict';
+    load('jstests/libs/feature_compatibility_version.js');
 
     var standalone = MongoRunner.runMongod();
     var db = standalone.getDB("test");
@@ -56,7 +57,7 @@
     updateOp = {
         op: 'u',
         ns: systemVersionColl.getFullName(),
-        o: {_id: "featureCompatibilityVersion", version: "3.4"},
+        o: {_id: "featureCompatibilityVersion", version: lastStableFCV},
         o2: {_id: "featureCompatibilityVersion"}
     };
     assert.commandFailed(
@@ -65,7 +66,7 @@
     assert.commandWorked(db.adminCommand({applyOps: [updateOp], oplogApplicationMode: "ApplyOps"}));
 
     // Test default succeeds.
-    updateOp.o.targetVersion = "3.6";
+    updateOp.o.targetVersion = latestFCV;
     assert.commandWorked(db.adminCommand({
         applyOps: [updateOp],
     }));

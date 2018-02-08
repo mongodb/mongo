@@ -39,7 +39,7 @@ template <typename T>
 class StatusWith;
 
 namespace feature_compatibility_version {
-constexpr StringData kDochubLink = "http://dochub.mongodb.org/core/3.6-feature-compatibility"_sd;
+constexpr StringData kDochubLink = "http://dochub.mongodb.org/core/4.0-feature-compatibility"_sd;
 }  // namespace feature_compatibility_version
 
 class FeatureCompatibilityVersionCommandParser {

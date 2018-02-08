@@ -163,7 +163,7 @@ struct ServerGlobalParams {
          *             use the 3.6 format, and existing entries may have either the
          *             3.4 or 3.6 format
          *
-         * kFullyUpgradedTo36
+         * kFullyDowngradedTo36
          * (3.6, Unset): 3.6 features are available, and new and existing storage
          *               engine entries use the 3.6 format
          *
@@ -176,9 +176,9 @@ struct ServerGlobalParams {
          * (Unset, Unset): This is the case on startup before the fCV document is
          *                 loaded into memory. isVersionInitialized() will return
          *                 false, and getVersion() will return the default
-         *                 (kFullyUpgradedTo36).
+         *                 (kFullyDowngradedTo36).
          *
-         * TODO: update this comment to 3.6/4.0 when FCV 3.4 is removed (SERVER-32597).
+         * TODO: update this comment to 3.6/4.0 when FCV 3.4 is removed (SERVER-33179).
          */
         enum class Version {
             // The order of these enums matter, higher upgrades having higher values, so that
@@ -188,7 +188,7 @@ struct ServerGlobalParams {
             kFullyDowngradedTo34 = 1,
             kDowngradingTo34 = 2,
             kUpgradingTo36 = 3,
-            kFullyUpgradedTo36 = 4,
+            kFullyDowngradedTo36 = 4,
             kDowngradingTo36 = 5,
             kUpgradingTo40 = 6,
             kFullyUpgradedTo40 = 7,
@@ -208,7 +208,7 @@ struct ServerGlobalParams {
          */
         const Version getVersion() const {
             Version v = _version.load();
-            return (v == Version::kUnsetDefault36Behavior) ? Version::kFullyUpgradedTo36 : v;
+            return (v == Version::kUnsetDefault36Behavior) ? Version::kFullyDowngradedTo36 : v;
         }
 
         void reset() {
@@ -221,7 +221,7 @@ struct ServerGlobalParams {
 
         // This determines whether to give Collections UUIDs upon creation.
         const bool isSchemaVersion36() {
-            return (getVersion() >= Version::kFullyUpgradedTo36 ||
+            return (getVersion() >= Version::kFullyDowngradedTo36 ||
                     getVersion() == Version::kUpgradingTo36);
         }
 

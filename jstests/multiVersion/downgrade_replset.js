@@ -25,9 +25,9 @@ function runDowngradeTest(protocolVersion) {
     let primary = rst.getPrimary();
     let coll = "test.foo";
 
-    // TODO(SERVER-32597) remove this when fCV 4.0 becomes the default on clean startup.
-    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-    rst.awaitReplication();
+    // The default FCV is latestFCV for non-shard replica sets.
+    let primaryAdminDB = rst.getPrimary().getDB("admin");
+    checkFCV(primaryAdminDB, latestFCV);
 
     // We wait for the feature compatibility version to be set to lastStableFCV on all nodes of the
     // replica set in order to ensure that all nodes can be successfully downgraded. This

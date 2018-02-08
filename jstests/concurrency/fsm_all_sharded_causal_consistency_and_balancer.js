@@ -91,8 +91,6 @@ var blacklist = [
     'rename_collection_dbname_droptarget.js',
     'rename_collection_droptarget.js',
 
-    'toggle_feature_compatibility.js',  // Sets FCV to 3.4, which will cause session use to fail
-
     'update_simple_eval.js',           // eval doesn't work with sharded collections
     'update_simple_eval_nolock.js',    // eval doesn't work with sharded collections
     'update_upsert_multi.js',          // our update queries lack shard keys

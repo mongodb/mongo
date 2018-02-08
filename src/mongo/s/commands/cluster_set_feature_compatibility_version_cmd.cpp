@@ -41,15 +41,14 @@ namespace mongo {
 namespace {
 
 /**
- * Sets the minimum allowed version for the cluster. If it is 3.4, then shards should not use 3.6
- * features. Similarly, if 3.6, shards will not use 4.0 features.
+ * Sets the minimum allowed version for the cluster. If it is the last stable
+ * featureCompatibilityVersion, then shards will not use latest featureCompatibilityVersion
+ * features.
  *
  * Format:
  * {
  *   setFeatureCompatibilityVersion: <string version>
  * }
- *
- * TODO: update this comment when FCV 3.4 is removed (SERVER-32597).
  */
 class SetFeatureCompatibilityVersionCmd : public BasicCommand {
 public:
@@ -68,7 +67,7 @@ public:
     }
 
     std::string help() const override {
-        // TODO: update this comment when FCV 3.4 is removed (SERVER-32597).
+        // TODO: update this comment when FCV 3.4 is removed (SERVER-33179).
         return str::stream()
             << "Set the API version for the cluster. If set to \""
             << FeatureCompatibilityVersionCommandParser::kVersion34

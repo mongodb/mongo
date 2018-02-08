@@ -401,7 +401,7 @@ TEST(IndexSpecValidateTest, AcceptsIndexVersionV1) {
 TEST(IndexSpecValidateTest, AcceptsIndexVersionV2Unique) {
     ServerGlobalParams::FeatureCompatibility featureCompatibility;
     featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
 
     auto result = validateIndexSpec(kDefaultOpCtx,
                                     BSON("key" << BSON("field" << 1) << "name"
@@ -420,6 +420,7 @@ TEST(IndexSpecValidateTest, AcceptsIndexVersionV2Unique) {
                                         << "v"
                                         << 3)),
                       sorted(result.getValue()));
+    featureCompatibility.reset();
 }
 TEST(IndexSpecValidateTest, ReturnsAnErrorIfCollationIsNotAnObject) {
     ASSERT_EQ(ErrorCodes::TypeMismatch,

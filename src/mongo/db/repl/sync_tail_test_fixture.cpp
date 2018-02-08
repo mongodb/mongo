@@ -94,8 +94,11 @@ void SyncTailTest::setUp() {
                    OplogApplication::Mode oplogApplicationMode) { return Status::OK(); };
     _incOps = [this]() { _opsApplied++; };
 
+    // Initialize the featureCompatibilityVersion server parameter. This is necessary because this
+    // test fixture does not create a featureCompatibilityVersion document from which to initialize
+    // the server parameter.
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
 }
 
 void SyncTailTest::tearDown() {

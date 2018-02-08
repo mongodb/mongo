@@ -9,9 +9,7 @@
     load("jstests/libs/check_uuids.js");
 
     const latestBinary = "latest";
-    const lastStableBinary = "3.4";
-    const latestFCV = "3.6";
-    const lastStableFCV = "3.4";
+    const lastStableBinary = "last-stable";
 
     let setFCV = function(adminDB, version) {
         assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: version}));
@@ -75,15 +73,10 @@
             // Ensure all collections have UUIDs in latest featureCompatibilityVersion mode.
             checkCollectionUUIDs(adminDB);
 
-            // TODO(SERVER-31985) uncomment below code.
-            /*
             // Set featureCompatibilityVersion to last-stable.
             setFCV(adminDB, lastStableFCV);
-            */
         }
 
-        // TODO(SERVER-31985) uncomment below code.
-        /*
         // Ensure featureCompatibilityVersion is last-stable and all collections still have UUIDs.
         checkFCV(adminDB, lastStableFCV);
         checkCollectionUUIDs(adminDB);
@@ -100,7 +93,7 @@
         checkFCV(lastStableAdminDB, lastStableFCV);
 
         // Ensure all collections still have UUIDs on a last-stable mongod.
-        checkCollectionUUIDs(adminDB);
+        checkCollectionUUIDs(lastStableAdminDB);
 
         // Stop last-stable binary version mongod.
         MongoRunner.stopMongod(lastStableConn);
@@ -114,7 +107,6 @@
         setFCV(adminDB, latestFCV);
         checkFCV(adminDB, latestFCV);
         checkCollectionUUIDs(adminDB);
-        */
 
         // Stop latest binary version mongod for the last time
         MongoRunner.stopMongod(conn);
@@ -162,16 +154,11 @@
                 checkCollectionUUIDs(secondaryAdminDB);
             }
 
-            // TODO(SERVER-31985) uncomment below code.
-            /*
             // Change featureCompatibilityVersion to last-stable.
             setFCV(primaryAdminDB, lastStableFCV);
             rst.awaitReplication();
-            */
         }
 
-        // TODO(SERVER-31985) uncomment below code.
-        /*
         // Ensure featureCompatibilityVersion is last-stable and all collections still have UUIDs.
         checkFCV(primaryAdminDB, lastStableFCV);
         for (let j = 0; j < secondaries.length; j++) {
@@ -184,12 +171,10 @@
             let secondaryAdminDB = secondaries[j].getDB("admin");
             checkCollectionUUIDs(secondaryAdminDB);
         }
-        */
 
-        // TODO(SERVER-31985) uncomment below code.
         // Stop latest binary version replica set.
-        // rst.stopSet(null /* signal */, true /* forRestart */);
-        /*
+        rst.stopSet(null /* signal */, true /* forRestart */);
+
         // Downgrade the ReplSetTest binaries and make sure everything is okay.
         jsTest.log("Starting a last-stable binVersion ReplSetTest to test downgrade");
         rst.startSet({restart: true, binVersion: lastStableBinary});
@@ -207,14 +192,12 @@
 
         checkCollectionUUIDs(lastStablePrimaryAdminDB);
         for (let j = 0; j < secondaries.length; j++) {
-            let secondaryAdminDB = secondaries[j].getDB("admin");
+            let secondaryAdminDB = lastStableSecondaries[j].getDB("admin");
             checkCollectionUUIDs(secondaryAdminDB);
         }
-        */
 
-        // TODO(SERVER-31985) uncomment below code.
-        // rst.stopSet(null /* signal */, true /* forRestart */);
-        /*
+        rst.stopSet(null /* signal */, true /* forRestart */);
+
         // Start latest binary version replica set again.
         jsTest.log("Starting a latest binVersion ReplSetTest to test upgrade");
         rst.startSet({restart: true, binVersion: latestBinary});
@@ -237,7 +220,6 @@
             let secondaryAdminDB = secondaries[j].getDB("admin");
             checkCollectionUUIDs(secondaryAdminDB);
         }
-        */
 
         rst.stopSet();
     };

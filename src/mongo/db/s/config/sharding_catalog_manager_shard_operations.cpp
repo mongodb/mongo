@@ -339,13 +339,13 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                                 << " as a shard");
     }
     if (serverGlobalParams.featureCompatibility.getVersion() >
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
         // If FCV 4.0, or upgrading to / downgrading from, wire version must be LATEST.
         invariant(maxWireVersion == WireVersion::LATEST_WIRE_VERSION);
     } else if (serverGlobalParams.featureCompatibility.getVersion() >
                    ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34 &&
                serverGlobalParams.featureCompatibility.getVersion() <=
-                   ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+                   ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
         // If FCV 3.6, or upgrading to / downgrading from, wire version must be v3.6
         // LATEST_WIRE_VERSION or greater.
         invariant(maxWireVersion >= WireVersion::LATEST_WIRE_VERSION - 1);

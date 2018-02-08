@@ -1542,24 +1542,24 @@ TEST_F(InitialSyncerTest,
 TEST_F(InitialSyncerTest,
        InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsUpgradeTargetVersion) {
     auto docs = {BSON("_id" << FeatureCompatibilityVersion::kParameterName << "version"
-                            << FeatureCompatibilityVersionCommandParser::kVersion34
+                            << FeatureCompatibilityVersionCommandParser::kVersion36
                             << "targetVersion"
-                            << FeatureCompatibilityVersionCommandParser::kVersion36)};
+                            << FeatureCompatibilityVersionCommandParser::kVersion40)};
     runInitialSyncWithBadFCVResponse(docs, ErrorCodes::IncompatibleServerVersion);
 }
 
 TEST_F(InitialSyncerTest,
        InitialSyncerReturnsIncompatibleServerVersionWhenFCVFetcherReturnsDowngradeTargetVersion) {
     auto docs = {BSON("_id" << FeatureCompatibilityVersion::kParameterName << "version"
-                            << FeatureCompatibilityVersionCommandParser::kVersion34
+                            << FeatureCompatibilityVersionCommandParser::kVersion36
                             << "targetVersion"
-                            << FeatureCompatibilityVersionCommandParser::kVersion34)};
+                            << FeatureCompatibilityVersionCommandParser::kVersion36)};
     runInitialSyncWithBadFCVResponse(docs, ErrorCodes::IncompatibleServerVersion);
 }
 
 TEST_F(InitialSyncerTest, InitialSyncerReturnsBadValueWhenFCVFetcherReturnsNoVersion) {
     auto docs = {BSON("_id" << FeatureCompatibilityVersion::kParameterName << "targetVersion"
-                            << FeatureCompatibilityVersionCommandParser::kVersion34)};
+                            << FeatureCompatibilityVersionCommandParser::kVersion36)};
     runInitialSyncWithBadFCVResponse(docs, ErrorCodes::BadValue);
 }
 
@@ -1582,7 +1582,7 @@ TEST_F(InitialSyncerTest, InitialSyncerSucceedsWhenFCVFetcherReturnsOldVersion) 
         processSuccessfulLastOplogEntryFetcherResponse({makeOplogEntryObj(1)});
 
         auto docs = {BSON("_id" << FeatureCompatibilityVersion::kParameterName << "version"
-                                << FeatureCompatibilityVersionCommandParser::kVersion34)};
+                                << FeatureCompatibilityVersionCommandParser::kVersion36)};
         processSuccessfulFCVFetcherResponse(docs);
         ASSERT_TRUE(net->hasReadyRequests());
     }

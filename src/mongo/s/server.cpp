@@ -524,12 +524,15 @@ MONGO_INITIALIZER_GENERAL(ForkServer, ("EndStartupOptionHandling"), ("default"))
     return Status::OK();
 }
 
-// We set the featureCompatibilityVersion to 3.6 in the mongos and rely on the shards to reject
-// usages of new features if their featureCompatibilityVersion is lower.
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion36, ("EndStartupOptionStorage"))
+// Initialize the featureCompatibilityVersion server parameter since mongos does not have a
+// featureCompatibilityVersion document from which to initialize the parameter. The parameter is set
+// to the latest version because there is no feature gating that currently occurs at the mongos
+// level. The shards are responsible for rejecting usages of new features if their
+// featureCompatibilityVersion is lower.
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion40, ("EndStartupOptionStorage"))
 (InitializerContext* context) {
     serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
     return Status::OK();
 }
 

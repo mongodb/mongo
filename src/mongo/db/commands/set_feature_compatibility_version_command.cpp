@@ -198,7 +198,7 @@ public:
                         ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40);
 
             if (actualVersion ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) {
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
                 // Set the client's last opTime to the system last opTime so no-ops wait for
                 // writeConcern.
                 repl::ReplClientInfo::forClient(opCtx->getClient())

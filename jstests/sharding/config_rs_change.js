@@ -2,15 +2,17 @@
 // match the replset config on the config servers, and that it can successfully update it's view
 // of the config replset config during startup.
 
+load("jstests/libs/feature_compatibility_version.js");
 var configRS = new ReplSetTest({name: "configRS", nodes: 1, useHostName: true});
 configRS.startSet({configsvr: '', journal: "", storageEngine: 'wiredTiger'});
 var replConfig = configRS.getReplSetConfig();
 replConfig.configsvr = true;
 configRS.initiate(replConfig);
 
-// Ensure the featureCompatibilityVersion is 3.4 so that the mongos can connect if it is version
-// 3.4.
-assert.commandWorked(configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+// Ensure the featureCompatibilityVersion is lastStableFCV so that the mongos can connect if its
+// binary version is lastStable.
+assert.commandWorked(
+    configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 
 // Build a seed list for the config servers to pass to mongos that uses "localhost" for the
 // hostnames even though the replica set config uses the hostname.

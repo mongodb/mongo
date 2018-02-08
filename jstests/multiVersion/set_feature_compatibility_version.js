@@ -22,8 +22,6 @@ TestData.skipCheckDBHashes = true;
 
     const latest = "latest";
     const lastStable = "last-stable";
-    const latestFCV = "4.0";
-    const lastStableFCV = "3.6";
 
     //
     // Standalone tests.
@@ -37,11 +35,7 @@ TestData.skipCheckDBHashes = true;
     assert.neq(
         null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
-    checkFCV(adminDB,
-             lastStableFCV);  // TODO: make this 'latestFCV' when SERVER-32597 bumps default
-
-    // TODO: remove this when SERVER-32597 bumps the default to 4.0.
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    checkFCV(adminDB, latestFCV);
 
     // featureCompatibilityVersion cannot be set to invalid value.
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: 5}));
@@ -97,44 +91,25 @@ TestData.skipCheckDBHashes = true;
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
     checkFCV(adminDB, latestFCV);
 
-    // TODO: remove these FCV 3.4 / 4.0 tests when FCV 3.4 is removed (SERVER-32597).
-    // ----------------------------------------------------------------------------------
-
-    // Cannot jump down two FCVs from 4.0 to 3.4
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
-    checkFCV(adminDB, latestFCV);
-
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
-    checkFCV(adminDB, "3.4");
-
-    // Cannot jump up two FCVs from 3.4 to 4.0
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
-    checkFCV(adminDB, "3.4");
-
-    // ------------------ end FCV 3.4/4.0 testing ---------------------------------------
-
     MongoRunner.stopMongod(conn);
 
     // featureCompatibilityVersion is durable.
-    // TODO: update this to use 'latestFCV' and 'lastStableFCV', rather than 'lastStableFCV' and
-    // '3.4', respectively, when SERVER-32597 bumps the default to 4.0.
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
     assert.neq(
         null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
+    checkFCV(adminDB, latestFCV);
+    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
     checkFCV(adminDB, lastStableFCV);
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
-    checkFCV(adminDB, "3.4");
     MongoRunner.stopMongod(conn);
 
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
     assert.neq(null,
                conn,
                "mongod was unable to start up with binary version=" + latest +
-                   " and featureCompatibilityVersion=3.4");
+                   " and last-stable featureCompatibilityVersion");
     adminDB = conn.getDB("admin");
-    checkFCV(adminDB, "3.4");
+    checkFCV(adminDB, lastStableFCV);
     MongoRunner.stopMongod(conn);
 
     // If you upgrade from 'lastStable' binary to 'latest' binary and have non-local databases, FCV
@@ -184,22 +159,19 @@ TestData.skipCheckDBHashes = true;
     secondaryAdminDB = rst.getSecondary().getDB("admin");
 
     // FCV should default to 'latestFCV' on primary and secondary in a 'latest' binary replica set.
-    // TODO: update these to 'latestFCV' when SERVER-32597 bumps the FCV default.
+    checkFCV(primaryAdminDB, latestFCV);
+    rst.awaitReplication();
+    checkFCV(secondaryAdminDB, latestFCV);
+
+    // featureCompatibilityVersion propagates to secondary.
+    assert.commandWorked(
+        primaryAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
     checkFCV(primaryAdminDB, lastStableFCV);
     rst.awaitReplication();
     checkFCV(secondaryAdminDB, lastStableFCV);
 
-    // featureCompatibilityVersion propagates to secondary.
-    // TODO: update these to 'lastStableFCV' when SERVER-32597 bumps the FCV default.
-    assert.commandWorked(primaryAdminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
-    checkFCV(primaryAdminDB, "3.4");
-    rst.awaitReplication();
-    checkFCV(secondaryAdminDB, "3.4");
-
     // setFeatureCompatibilityVersion cannot be run on secondary.
-    // TODO: update this to 'latestFCV' when SERVER-32597 bumps the FCV default.
-    assert.commandFailed(
-        secondaryAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    assert.commandFailed(secondaryAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
 
     rst.stopSet();
 
@@ -224,6 +196,8 @@ TestData.skipCheckDBHashes = true;
 
     let primary = rst.getPrimary();
     primaryAdminDB = primary.getDB("admin");
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+
     let secondary = rst.add({binVersion: lastStable});
     secondaryAdminDB = secondary.getDB("admin");
 
@@ -289,12 +263,8 @@ TestData.skipCheckDBHashes = true;
     configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
     shardPrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
 
-    // TODO: update this to 'latestFCV' when SERVER-32597 bumps the FCV default.
-    checkFCV(configPrimaryAdminDB, lastStableFCV);
-    checkFCV(shardPrimaryAdminDB, lastStableFCV);
-
-    // TODO: remove this when SERVER-32597 bumps the FCV default ot 4.0.
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    checkFCV(configPrimaryAdminDB, latestFCV);
+    checkFCV(shardPrimaryAdminDB, latestFCV);
 
     // featureCompatibilityVersion cannot be set to invalid value on mongos.
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: 5}));
@@ -392,12 +362,8 @@ TestData.skipCheckDBHashes = true;
     mongosAdminDB = st.s.getDB("admin");
     configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
     shardPrimaryAdminDB = st.shard0.getDB("admin");
-    // TODO: update this to 'latestFCV' when SERVER-32597 updates the FCV defaults.
-    checkFCV(configPrimaryAdminDB, lastStableFCV);
-    checkFCV(shardPrimaryAdminDB, lastStableFCV);
-
-    // TODO: remove this when SERVER-32597 updates the FCV defaults.
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    checkFCV(configPrimaryAdminDB, latestFCV);
+    checkFCV(shardPrimaryAdminDB, latestFCV);
 
     // Ensure that a 'lastStable' binary mongos can be added to a 'lastStableFCV' cluster.
 

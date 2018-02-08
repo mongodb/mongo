@@ -92,12 +92,15 @@ static AtomicBool atPrompt(false);  // can eval before getting to prompt
 namespace {
 const auto kDefaultMongoURL = "mongodb://127.0.0.1:27017"_sd;
 
-// We set the featureCompatibilityVersion to 3.6 in the mongo shell and rely on the server to reject
-// usages of new features if its featureCompatibilityVersion is lower.
-MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion36, ("EndStartupOptionSetup"))
+// Initialize the featureCompatibilityVersion server parameter since the mongo shell does not have a
+// featureCompatibilityVersion document from which to initialize the parameter. The parameter is set
+// to the latest version because there is no feature gating that currently occurs at the mongo shell
+// level. The server is responsible for rejecting usages of new features if its
+// featureCompatibilityVersion is lower.
+MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersion40, ("EndStartupOptionSetup"))
 (InitializerContext* context) {
     mongo::serverGlobalParams.featureCompatibility.setVersion(
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
     return Status::OK();
 }
 const auto kAuthParam = "authSource"s;

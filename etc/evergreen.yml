@@ -4044,7 +4044,7 @@ tasks:
   - func: "run powercycle test"
     vars:
       <<: *powercycle_test
-      client_options: --numCrudClients=20 --numFsmClients=20 --fsmWorkloadBlacklistFiles=toggle_feature_compatibility.js
+      client_options: --numCrudClients=20 --numFsmClients=20
       mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path} --fcv=3.4
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 

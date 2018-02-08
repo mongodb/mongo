@@ -81,7 +81,7 @@ public:
                 return FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo36;
             case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34:
                 return FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo34;
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36:
+            case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36:
                 return FeatureCompatibilityVersionCommandParser::kVersion36;
             case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
                 return FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo40;

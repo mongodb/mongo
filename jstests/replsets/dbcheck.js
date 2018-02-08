@@ -344,30 +344,6 @@
 
     testSucceedsOnStepdown();
 
-    function testFailsOnWrongFCV() {
-        let master = replSet.getPrimary();
-        let db = master.getDB(dbName);
-
-        assert.commandWorked(db.runCommand({dbCheck: multiBatchSimpleCollName}));
-        assert.commandWorked(
-            master.getDB("admin").adminCommand({setFeatureCompatibilityVersion: "3.4"}));
-
-        // Check that the server is still responding.
-        try {
-            assert.commandWorked(db.runCommand({ping: 1}),
-                                 "ping failed after FCV change during dbCheck");
-        } catch (e) {
-            doassert("dbCheck with FCV change crashed server");
-        }
-
-        assert.commandFailed(db.runCommand({dbCheck: multiBatchSimpleCollName}));
-
-        assert.commandWorked(
-            master.getDB("admin").adminCommand({setFeatureCompatibilityVersion: "3.6"}));
-    }
-
-    testFailsOnWrongFCV();
-
     function collectionUuid(db, collName) {
         return db.getCollectionInfos().filter(coll => coll.name === collName)[0].info.uuid;
     }

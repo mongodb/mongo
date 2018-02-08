@@ -772,16 +772,13 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
 
     CollectionOptions optionsWithUUID = options;
     bool generatedUUID = false;
-    if (enableCollectionUUIDs && !optionsWithUUID.uuid &&
-        serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
+    if (!optionsWithUUID.uuid) {
         auto coordinator = repl::ReplicationCoordinator::get(opCtx);
-        bool fullyUpgraded = serverGlobalParams.featureCompatibility.getVersion() >=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36;
         bool canGenerateUUID =
             (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) ||
             coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) || nss.isSystemDotProfile();
 
-        if (fullyUpgraded && !canGenerateUUID) {
+        if (!canGenerateUUID) {
             std::string msg = str::stream() << "Attempted to create a new collection " << nss.ns()
                                             << " without a UUID";
             severe() << msg;
