@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/commands/cluster_write.h"
+#include "mongo/s/write_ops/cluster_write.h"
 
 #include <algorithm>
 
@@ -42,10 +42,10 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/commands/chunk_manager_targeter.h"
 #include "mongo/s/config_server_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/write_ops/chunk_manager_targeter.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 

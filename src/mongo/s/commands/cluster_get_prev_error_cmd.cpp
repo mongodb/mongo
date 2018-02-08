@@ -28,12 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <set>
-#include <string>
-
 #include "mongo/db/commands.h"
-#include "mongo/db/lasterror.h"
-#include "mongo/s/client/shard_connection.h"
 
 namespace mongo {
 namespace {
@@ -42,8 +37,7 @@ class GetPrevErrorCmd : public ErrmsgCommandDeprecated {
 public:
     GetPrevErrorCmd() : ErrmsgCommandDeprecated("getPrevError", "getpreverror") {}
 
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
 
@@ -55,19 +49,19 @@ public:
         return "get previous error (since last reseterror command)";
     }
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
+    void addRequiredPrivileges(const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               std::vector<Privilege>* out) const override {
         // No auth required
     }
 
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const std::string& dbname,
-                           const BSONObj& cmdObj,
-                           std::string& errmsg,
-                           BSONObjBuilder& result) {
-        errmsg += "getpreverror not supported for sharded environments";
-        return false;
+    bool errmsgRun(OperationContext* opCtx,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
+                   std::string& errmsg,
+                   BSONObjBuilder& result) override {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "getPrevError is not supported in sharded environments");
     }
 
 } cmdGetPrevError;

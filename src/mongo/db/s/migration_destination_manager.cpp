@@ -36,7 +36,7 @@
 #include <vector>
 
 #include "mongo/client/connpool.h"
-#include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -47,15 +47,13 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/move_timing_helper.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/concurrency/notification.h"
@@ -65,6 +63,9 @@
 
 namespace mongo {
 namespace {
+
+const auto getMigrationDestinationManager =
+    ServiceContext::declareDecoration<MigrationDestinationManager>();
 
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 // Note: Even though we're setting UNSET here,
@@ -209,6 +210,10 @@ MONGO_FP_DECLARE(failMigrationReceivedOutOfRangeOperation);
 MigrationDestinationManager::MigrationDestinationManager() = default;
 
 MigrationDestinationManager::~MigrationDestinationManager() = default;
+
+MigrationDestinationManager* MigrationDestinationManager::get(OperationContext* opCtx) {
+    return &getMigrationDestinationManager(opCtx->getServiceContext());
+}
 
 MigrationDestinationManager::State MigrationDestinationManager::getState() const {
     stdx::lock_guard<stdx::mutex> sl(_mutex);
@@ -428,7 +433,7 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
     auto opCtx = Client::getCurrent()->makeOperationContext();
 
 
-    if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+    if (AuthorizationManager::get(opCtx->getServiceContext())->isAuthEnabled()) {
         AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
     }
 

@@ -930,7 +930,6 @@ env.Library(
         "index/index_descriptor",
         "index_d",
         "introspect",
-        'keys_collection_client_direct',
         "matcher/expressions_mongod_only",
         "op_observer_d",
         "ops/write_ops_parsers",
@@ -972,6 +971,7 @@ env.Library(
         "update/update_driver",
         "update_index_data",
         "views/views_mongod",
+        'keys_collection_client_direct',
     ],
 )
 

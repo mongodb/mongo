@@ -37,7 +37,6 @@
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/functional.h"
@@ -110,10 +109,6 @@ public:
     ConnectionString getConfigServer(OperationContext* opCtx);
 
     std::string getShardName();
-
-    MigrationDestinationManager* migrationDestinationManager() {
-        return &_migrationDestManager;
-    }
 
     /**
      * Initializes the sharding state of this server from the shard identity document argument
@@ -302,9 +297,6 @@ private:
      * should never be called with a lock.
      */
     ChunkVersion _refreshMetadata(OperationContext* opCtx, const NamespaceString& nss);
-
-    // Manages the state of the migration recipient shard
-    MigrationDestinationManager _migrationDestManager;
 
     // Tracks the active move chunk operations running on this shard
     ActiveMigrationsRegistry _activeMigrationsRegistry;

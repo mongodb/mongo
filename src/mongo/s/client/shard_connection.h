@@ -28,8 +28,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "mongo/client/connpool.h"
 
 namespace mongo {
@@ -112,6 +110,9 @@ public:
         return _conn != NULL;
     }
 
+    /** reports all thread local connections on this instance */
+    static void reportActiveClientConnections(BSONObjBuilder* builder);
+
     /** checks all of my thread local connections for the version of this ns */
     static void checkMyConnectionVersions(OperationContext* opCtx, const std::string& ns);
 
@@ -145,6 +146,9 @@ private:
     bool _setVersion;
 };
 
+/**
+ * Global sharded connection pool, used by all instances of ShardConnection.
+ */
 extern DBConnectionPool shardConnectionPool;
 
 }  // namespace mongo

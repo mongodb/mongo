@@ -723,8 +723,7 @@ DBClientConnection* DBClientReplicaSet::selectNodeUsingTags(
     if (_authPooledSecondaryConn) {
         _authConnection(_lastSlaveOkConn.get());
     } else {
-        // Mongos pooled connections are authenticated through
-        // ShardingConnectionHook::onCreate().
+        // Mongos pooled connections are authenticated through ShardingConnectionHook::onCreate()
     }
 
     LOG(3) << "dbclient_rs selecting node " << _lastSlaveOkHost << endl;

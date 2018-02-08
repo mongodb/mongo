@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/commands/chunk_manager_targeter.h"
+#include "mongo/s/write_ops/chunk_manager_targeter.h"
 
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/canonical_query.h"

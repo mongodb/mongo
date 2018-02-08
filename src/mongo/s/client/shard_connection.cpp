@@ -34,9 +34,7 @@
 
 #include <set>
 
-#include "mongo/db/commands.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -50,111 +48,47 @@
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
-
-using std::unique_ptr;
-using std::map;
-using std::set;
-using std::string;
-using std::stringstream;
-using std::vector;
-
 namespace {
 
 class ClientConnections;
 
 /**
- * Class which tracks ClientConnections (the client connection pool) for each incoming
- * connection, allowing stats access.
+ * Class which tracks ClientConnections (the client connection pool) for each incoming connection,
+ * allowing stats access.
  */
 class ActiveClientConnections {
 public:
     void add(const ClientConnections* cc) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _clientConnections.insert(cc);
     }
 
     void remove(const ClientConnections* cc) {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
         _clientConnections.erase(cc);
     }
 
-    void appendInfo(BSONObjBuilder& b);
+    void appendInfo(BSONObjBuilder* b) const;
 
 private:
-    stdx::mutex _mutex;
-    set<const ClientConnections*> _clientConnections;
+    mutable stdx::mutex _mutex;
+    std::set<const ClientConnections*> _clientConnections;
 
 } activeClientConnections;
 
 /**
- * Command to allow access to the sharded conn pool information in mongos.
- */
-class ShardedPoolStats : public BasicCommand {
-public:
-    ShardedPoolStats() : BasicCommand("shardConnPoolStats") {}
-    std::string help() const override {
-        return "stats about the shard connection pool";
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    AllowedOnSecondary secondaryAllowed() const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    // Same privs as connPoolStats
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::connPoolStats);
-        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-    }
-
-    virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
-                     const mongo::BSONObj& cmdObj,
-                     mongo::BSONObjBuilder& result) {
-        // Connection information
-        executor::ConnectionPoolStats stats{};
-        shardConnectionPool.appendConnectionStats(&stats);
-        stats.appendToBSON(result);
-
-        // Thread connection information
-        activeClientConnections.appendInfo(result);
-
-        return true;
-    }
-
-} shardedPoolStatsCmd;
-
-/**
- * holds all the actual db connections for a client to various servers 1 per thread, so
- * doesn't have to be thread safe.
+ * Holds all the actual db connections for a client to various servers 1 per thread, so doesn't have
+ * to be thread safe.
  */
 class ClientConnections {
     MONGO_DISALLOW_COPYING(ClientConnections);
 
 public:
     struct Status {
-        Status() : created(0), avail(0) {}
-
-        // May be read concurrently, but only written from
-        // this thread.
-        long long created;
-        DBClientBase* avail;
+        // May be read concurrently, but only written from this thread
+        long long created = 0;
+        DBClientBase* avail = nullptr;
     };
-
-    // Gets or creates the status object for the host
-    Status* _getStatus(const string& addr) {
-        scoped_spinlock lock(_lock);
-        Status*& temp = _hosts[addr];
-        if (!temp) {
-            temp = new Status();
-        }
-
-        return temp;
-    }
 
     ClientConnections() {
         // Start tracking client connections
@@ -168,11 +102,45 @@ public:
         releaseAll(true);
     }
 
+    static ClientConnections* threadInstance() {
+        if (!_perThread) {
+            _perThread = stdx::make_unique<ClientConnections>();
+        }
+        return _perThread.get();
+    }
+
+    DBClientBase* get(const std::string& addr, const std::string& ns) {
+        {
+            // We want to report ns stats
+            scoped_spinlock lock(_lock);
+            if (ns.size() > 0)
+                _seenNS.insert(ns);
+        }
+
+        Status* s = _getStatus(addr);
+
+        std::unique_ptr<DBClientBase> c;
+        if (s->avail) {
+            c.reset(s->avail);
+            s->avail = 0;
+
+            // May throw an exception
+            shardConnectionPool.onHandedOut(c.get());
+        } else {
+            c.reset(shardConnectionPool.get(addr));
+
+            // After, so failed creation doesn't get counted
+            s->created++;
+        }
+
+        return c.release();
+    }
+
     void releaseAll(bool fromDestructor = false) {
         // Don't need spinlock protection because if not in the destructor, we don't modify
         // _hosts, and if in the destructor we are not accessible to external threads.
         for (HostMap::iterator i = _hosts.begin(); i != _hosts.end(); ++i) {
-            const string addr = i->first;
+            const auto addr = i->first;
             Status* ss = i->second;
             invariant(ss);
 
@@ -202,34 +170,7 @@ public:
         }
     }
 
-    DBClientBase* get(const string& addr, const string& ns) {
-        {
-            // We want to report ns stats
-            scoped_spinlock lock(_lock);
-            if (ns.size() > 0)
-                _seenNS.insert(ns);
-        }
-
-        Status* s = _getStatus(addr);
-
-        unique_ptr<DBClientBase> c;
-        if (s->avail) {
-            c.reset(s->avail);
-            s->avail = 0;
-
-            // May throw an exception
-            shardConnectionPool.onHandedOut(c.get());
-        } else {
-            c.reset(shardConnectionPool.get(addr));
-
-            // After, so failed creation doesn't get counted
-            s->created++;
-        }
-
-        return c.release();
-    }
-
-    void done(const string& addr, DBClientBase* conn) {
+    void done(const std::string& addr, DBClientBase* conn) {
         Status* s = _hosts[addr];
         verify(s);
 
@@ -263,17 +204,18 @@ public:
             return;
         }
 
-        // Note: Although we try our best to clear bad connections as much as possible,
-        // some of them can still slip through because of how ClientConnections are being
-        // used - as thread local variables. This means that threads won't be able to
-        // see the s->avail connection of other threads.
-
+        // Note: Although we try our best to clear bad connections as much as possible, some of them
+        // can still slip through because of how ClientConnections are being used - as thread local
+        // variables. This means that threads won't be able to see the s->avail connection of other
+        // threads.
         s->avail = conn;
     }
 
-    void checkVersions(OperationContext* opCtx, const string& ns) {
-        vector<ShardId> all;
-        grid.shardRegistry()->getAllShardIds(&all);
+    void checkVersions(OperationContext* opCtx, const std::string& ns) {
+        auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+        std::vector<ShardId> all;
+        shardRegistry->getAllShardIds(&all);
 
         // Don't report exceptions here as errors in GetLastError
         LastError::Disabled ignoreForGLE(&LastError::get(cc()));
@@ -281,16 +223,16 @@ public:
         // Now only check top-level shard connections
         for (const ShardId& shardId : all) {
             try {
-                auto shardStatus = grid.shardRegistry()->getShard(opCtx, shardId);
+                auto shardStatus = shardRegistry->getShard(opCtx, shardId);
                 if (!shardStatus.isOK()) {
                     invariant(shardStatus == ErrorCodes::ShardNotFound);
                     continue;
                 }
                 const auto shard = shardStatus.getValue();
 
-                string sconnString = shard->getConnString().toString();
-                Status* s = _getStatus(sconnString);
+                const auto sconnString = shard->getConnString().toString();
 
+                Status* s = _getStatus(sconnString);
                 if (!s->avail) {
                     s->avail = shardConnectionPool.get(sconnString);
                     s->created++;  // After, so failed creation doesn't get counted
@@ -298,50 +240,23 @@ public:
 
                 versionManager.checkShardVersionCB(opCtx, s->avail, ns, false, 1);
             } catch (const DBException& ex) {
-                warning() << "problem while initially checking shard versions on"
-                          << " " << shardId << causedBy(ex);
+                warning() << "Problem while initially checking shard versions on"
+                          << " " << shardId << causedBy(redact(ex));
 
-                // NOTE: This is only a heuristic, to avoid multiple stale version retries
-                // across multiple shards, and does not affect correctness.
+                // NOTE: This is only a heuristic, to avoid multiple stale version retries across
+                // multiple shards, and does not affect correctness.
             }
         }
     }
 
-    void release(const string& addr, DBClientBase* conn) {
+    void release(const std::string& addr, DBClientBase* conn) {
         shardConnectionPool.release(addr, conn);
     }
 
-    /**
-     * Appends info about the client connection pool to a BOBuilder
-     * Safe to call with activeClientConnections lock
-     */
-    void appendInfo(BSONObjBuilder& b) const {
+    void forgetNS(const std::string& ns) {
         scoped_spinlock lock(_lock);
-
-        BSONArrayBuilder hostsArrB(b.subarrayStart("hosts"));
-        for (HostMap::const_iterator i = _hosts.begin(); i != _hosts.end(); ++i) {
-            BSONObjBuilder bb(hostsArrB.subobjStart());
-            bb.append("host", i->first);
-            bb.append("created", i->second->created);
-            bb.appendBool("avail", static_cast<bool>(i->second->avail));
-            bb.done();
-        }
-        hostsArrB.done();
-
-        BSONArrayBuilder nsArrB(b.subarrayStart("seenNS"));
-        for (set<string>::const_iterator i = _seenNS.begin(); i != _seenNS.end(); ++i) {
-            nsArrB.append(*i);
-        }
-        nsArrB.done();
+        _seenNS.erase(ns);
     }
-
-    // Protects only the creation of new entries in the _hosts and _seenNS map
-    // from external threads.  Reading _hosts / _seenNS in this thread doesn't
-    // need protection.
-    mutable SpinLock _lock;
-    typedef map<string, Status*, DBConnectionPool::serverNameCompare> HostMap;
-    HostMap _hosts;
-    set<string> _seenNS;
 
     /**
      * Clears the connections kept by this pool (ie, not including the global pool)
@@ -357,49 +272,79 @@ public:
         _hosts.clear();
     }
 
-    void forgetNS(const string& ns) {
+    /**
+     * Appends info about the client connection pool to a BSONObjBuilder. Safe to call with
+     * activeClientConnections lock.
+     */
+    void appendInfo(BSONObjBuilder& b) const {
         scoped_spinlock lock(_lock);
-        _seenNS.erase(ns);
+
+        BSONArrayBuilder hostsArrB(b.subarrayStart("hosts"));
+        for (HostMap::const_iterator i = _hosts.begin(); i != _hosts.end(); ++i) {
+            BSONObjBuilder bb(hostsArrB.subobjStart());
+            bb.append("host", i->first);
+            bb.append("created", i->second->created);
+            bb.appendBool("avail", static_cast<bool>(i->second->avail));
+            bb.done();
+        }
+        hostsArrB.done();
+
+        BSONArrayBuilder nsArrB(b.subarrayStart("seenNS"));
+        for (const auto& ns : _seenNS) {
+            nsArrB.append(ns);
+        }
+        nsArrB.done();
     }
 
-    // -----
+private:
+    /**
+     * Gets or creates the status object for the host.
+     */
+    Status* _getStatus(const std::string& addr) {
+        scoped_spinlock lock(_lock);
+        Status*& temp = _hosts[addr];
+        if (!temp) {
+            temp = new Status();
+        }
+
+        return temp;
+    }
 
     static thread_local std::unique_ptr<ClientConnections> _perThread;
 
-    static ClientConnections* threadInstance() {
-        if (!_perThread) {
-            _perThread = stdx::make_unique<ClientConnections>();
-        }
-        return _perThread.get();
-    }
+    // Protects only the creation of new entries in the _hosts and _seenNS map from external
+    // threads. Reading _hosts/_seenNS in this thread doesn't need protection.
+    mutable SpinLock _lock;
+
+    using HostMap = std::map<std::string, Status*, DBConnectionPool::serverNameCompare>;
+    HostMap _hosts;
+    std::set<std::string> _seenNS;
 };
 
-thread_local std::unique_ptr<ClientConnections> ClientConnections::_perThread;
-
-void ActiveClientConnections::appendInfo(BSONObjBuilder& b) {
-    BSONArrayBuilder arr(64 * 1024);  // There may be quite a few threads
+void ActiveClientConnections::appendInfo(BSONObjBuilder* b) const {
+    // Preallocate the buffer because there may be quite a few threads to report
+    BSONArrayBuilder arr(64 * 1024);
 
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);
-        for (set<const ClientConnections*>::const_iterator i = _clientConnections.begin();
-             i != _clientConnections.end();
-             ++i) {
+        for (const auto* conn : _clientConnections) {
             BSONObjBuilder bb(arr.subobjStart());
-            (*i)->appendInfo(bb);
-            bb.done();
+            conn->appendInfo(bb);
+            bb.doneFast();
         }
     }
 
-    b.appendArray("threads", arr.obj());
+    b->appendArray("threads", arr.obj());
 }
+
+thread_local std::unique_ptr<ClientConnections> ClientConnections::_perThread;
 
 }  // namespace
 
-// The global connection pool
 DBConnectionPool shardConnectionPool;
 
 ShardConnection::ShardConnection(const ConnectionString& connectionString,
-                                 const string& ns,
+                                 const std::string& ns,
                                  std::shared_ptr<ChunkManager> manager)
     : _cs(connectionString), _ns(ns), _manager(manager), _finishedInit(false) {
     invariant(_cs.isValid());
@@ -450,7 +395,7 @@ void ShardConnection::_finishInit() {
         _setVersion = versionManager.checkShardVersionCB(opCtx, this, false, 1);
     } else {
         // Make sure we didn't specify a manager for a non-versionable connection (i.e. config)
-        verify(!_manager);
+        invariant(!_manager);
         _setVersion = false;
     }
 }
@@ -458,7 +403,7 @@ void ShardConnection::_finishInit() {
 void ShardConnection::done() {
     if (_conn) {
         ClientConnections::threadInstance()->done(_cs.toString(), _conn);
-        _conn = 0;
+        _conn = nullptr;
         _finishedInit = true;
     }
 }
@@ -481,7 +426,11 @@ void ShardConnection::kill() {
     }
 }
 
-void ShardConnection::checkMyConnectionVersions(OperationContext* opCtx, const string& ns) {
+void ShardConnection::reportActiveClientConnections(BSONObjBuilder* builder) {
+    activeClientConnections.appendInfo(builder);
+}
+
+void ShardConnection::checkMyConnectionVersions(OperationContext* opCtx, const std::string& ns) {
     ClientConnections::threadInstance()->checkVersions(opCtx, ns);
 }
 
@@ -494,7 +443,7 @@ void ShardConnection::clearPool() {
     ClientConnections::threadInstance()->clearPool();
 }
 
-void ShardConnection::forgetNS(const string& ns) {
+void ShardConnection::forgetNS(const std::string& ns) {
     ClientConnections::threadInstance()->forgetNS(ns);
 }
 

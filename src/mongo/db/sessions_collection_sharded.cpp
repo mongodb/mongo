@@ -37,12 +37,12 @@
 #include "mongo/db/sessions_collection_rs.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/commands/cluster_write.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_find.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/util/net/op_msg.h"
 
 namespace mongo {

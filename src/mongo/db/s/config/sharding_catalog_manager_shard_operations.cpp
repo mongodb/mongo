@@ -76,17 +76,12 @@
 namespace mongo {
 namespace {
 
-using std::vector;
-
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 using RemoteCommandCallbackArgs = executor::TaskExecutor::RemoteCommandCallbackArgs;
 using RemoteCommandCallbackFn = executor::TaskExecutor::RemoteCommandCallbackFn;
 
-const Seconds kDefaultFindHostMaxWaitTime(20);
-
 const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{});
-const WriteConcernOptions kNoWaitWriteConcern(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0));
 
 /**
  * Generates a unique name to be given to a newly added shard.
@@ -715,7 +710,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         ->catalogClient()
         ->logChange(
             opCtx, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern)
-        .transitional_ignore();
+        .ignore();
 
     // Ensure the added shard is visible to this process.
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
@@ -789,7 +784,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
                         "",
                         BSON("shard" << name),
                         ShardingCatalogClient::kLocalWriteConcern)
-            .transitional_ignore();
+            .ignore();
 
         return ShardDrainingStatus::STARTED;
     }
@@ -845,7 +840,7 @@ StatusWith<ShardDrainingStatus> ShardingCatalogManager::removeShard(OperationCon
                     "",
                     BSON("shard" << name),
                     ShardingCatalogClient::kLocalWriteConcern)
-        .transitional_ignore();
+        .ignore();
 
     return ShardDrainingStatus::COMPLETED;
 }
@@ -884,7 +879,7 @@ BSONObj ShardingCatalogManager::createShardIdentityUpsertForAddShard(OperationCo
 // static
 StatusWith<ShardId> ShardingCatalogManager::_selectShardForNewDatabase(
     OperationContext* opCtx, ShardRegistry* shardRegistry) {
-    vector<ShardId> allShardIds;
+    std::vector<ShardId> allShardIds;
 
     shardRegistry->getAllShardIds(&allShardIds);
     if (allShardIds.empty()) {
