@@ -84,8 +84,9 @@ selector:
   # TODO: Remove after fixing SERVER-14324. mapReduce behaves unpredictably when the out collection
   # is sharded on anything other than {_id: 1}.
   - jstests/core/mr_undef.js
-  # TODO SERVER-32311: These tests use getAggPlanStage(), which can't handle sharded explain output.
+  # TODO SERVER-32311: These tests use plan stage helpers which can't handle sharded explain output.
   - jstests/core/expr_index_use.js
+  - jstests/core/index_multikey.js
   - jstests/core/optimized_match_explain.js
   - jstests/core/sort_array.js
   # TODO: SERVER-16605

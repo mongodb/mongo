@@ -272,22 +272,27 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
     // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
     // multikey information in order to avoid unintentionally setting path-level multikey
     // information on an index created before 3.4.
-    if (_collection->setIndexIsMultikey(opCtx, _descriptor->indexName(), paths)) {
-        if (_infoCache) {
+    const bool indexMetadataHasChanged =
+        _collection->setIndexIsMultikey(opCtx, _descriptor->indexName(), paths);
+
+    // When the recovery unit commits, update the multikey paths if needed and clear the plan cache
+    // if the index metadata has changed.
+    opCtx->recoveryUnit()->onCommit([this, multikeyPaths, indexMetadataHasChanged] {
+        _isMultikey.store(true);
+
+        if (_indexTracksPathLevelMultikeyInfo) {
+            stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+            for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+                _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+            }
+        }
+
+        if (indexMetadataHasChanged && _infoCache) {
             LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
                    << " set to multi key.";
             _infoCache->clearQueryCache();
         }
-    }
-
-    opCtx->recoveryUnit()->onCommit([this] { _isMultikey.store(true); });
-
-    if (_indexTracksPathLevelMultikeyInfo) {
-        stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-        for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-            _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
-        }
-    }
+    });
 }
 
 // ----
