@@ -1021,6 +1021,7 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp oldestTimestamp) {
     invariantWTOK(_conn->set_timestamp(_conn, commitTSConfigString));
 
     _oplogManager->setOplogReadTimestamp(oldestTimestamp);
+    stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
     _previousSetOldestTimestamp = oldestTimestamp;
     LOG(1) << "Forced a new oldest_timestamp. Value: " << oldestTimestamp;
 }
@@ -1060,6 +1061,8 @@ void WiredTigerKVEngine::_advanceOldestTimestamp(Timestamp oldestTimestamp) {
         // No oldestTimestamp to set, yet.
         return;
     }
+
+    Timestamp timestampToSet;
     {
         stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
         if (!_oplogManager) {
@@ -1076,12 +1079,13 @@ void WiredTigerKVEngine::_advanceOldestTimestamp(Timestamp oldestTimestamp) {
                 return;
             }
         }
+
+        // Lag the oldest_timestamp by one timestamp set, to give a bit more history.
+        invariant(_previousSetOldestTimestamp <= oldestTimestamp);
+        timestampToSet = _previousSetOldestTimestamp;
+        _previousSetOldestTimestamp = oldestTimestamp;
     }
 
-    // Lag the oldest_timestamp by one timestamp set, to give a bit more history.
-    invariant(_previousSetOldestTimestamp <= oldestTimestamp);
-    auto timestampToSet = _previousSetOldestTimestamp;
-    _previousSetOldestTimestamp = oldestTimestamp;
     if (timestampToSet == Timestamp()) {
         // Nothing to set yet.
         return;
