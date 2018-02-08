@@ -5,10 +5,6 @@
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
-// Some of the test cases in this file clear the FCV document, so the validate command's UUID checks
-// will fail.
-TestData.skipCollectionAndIndexValidation = true;
-
 // A replset test case checks that replication to a secondary ceases, so we do not expect identical
 // data.
 TestData.skipCheckDBHashes = true;
@@ -28,59 +24,6 @@ TestData.skipCheckDBHashes = true;
     const lastStable = "last-stable";
     const latestFCV = "4.0";
     const lastStableFCV = "3.6";
-
-    /**
-     * If we're using mmapv1, we must recover the journal files from an unclean shutdown before
-     * attempting to run with --repair.
-     */
-    let recoverMMapJournal = function(isMMAPv1, conn, dbpath) {
-        if (isMMAPv1) {
-            let returnCode = runMongoProgram("mongod",
-                                             "--port",
-                                             conn.port,
-                                             "--journalOptions",
-                                             /*MMAPV1Options::JournalRecoverOnly*/ 4,
-                                             "--dbpath",
-                                             dbpath);
-            assert.eq(returnCode, /*EXIT_NET_ERROR*/ 48);
-        }
-    };
-
-    /**
-     * Ensure that a mongod (without using --repair) fails to start up if there are non-local
-     * collections and either the admin database has been dropped or the FCV document in the admin
-     * database has been removed.
-     *
-     * The mongod has 'version' binary and is started up on 'dbpath'.
-     */
-    let doStartupFailTests = function(version, dbpath) {
-        // Set up a mongod with an admin database but without a FCV document in the admin database.
-        setupMissingFCVDoc(version, dbpath);
-
-        // Now attempt to start up a new mongod without clearing the data files from 'dbpath', which
-        // contain the admin database but are missing the FCV document. The mongod should fail to
-        // start start up if there is a non-local collection and the FCV document is missing.
-        conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: version, noCleanData: true});
-        assert.eq(
-            null,
-            conn,
-            "expected mongod to fail when data files are present but no FCV document is found.");
-    };
-
-    /**
-     * Starts up a mongod with binary 'version' on 'dbpath', then removes the FCV document from the
-     * admin database and returns the mongod.
-     */
-    let setupMissingFCVDoc = function(version, dbpath) {
-        let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: version});
-        assert.neq(null,
-                   conn,
-                   "mongod was unable to start up with version=" + version + " and no data files");
-        adminDB = conn.getDB("admin");
-        removeFCVDocument(adminDB);
-        MongoRunner.stopMongod(conn);
-        return conn;
-    };
 
     //
     // Standalone tests.
@@ -222,43 +165,6 @@ TestData.skipCheckDBHashes = true;
     adminDB = conn.getDB("admin");
     checkFCV(adminDB, lastStableFCV);
     MongoRunner.stopMongod(conn);
-
-    // Check that start up without --repair fails if there is non-local DB data and either the admin
-    // database was dropped or the FCV doc was deleted.
-    doStartupFailTests(latest, dbpath);
-
-    const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
-
-    // --repair can be used to restore a missing featureCompatibilityVersion document to an existing
-    // admin database if at least some collections have UUIDs.
-    conn = setupMissingFCVDoc(latest, dbpath);
-    recoverMMapJournal(isMMAPv1, conn, dbpath);
-    let returnCode = runMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
-    assert.eq(
-        returnCode,
-        0,
-        "expected mongod --repair to execute successfully when restoring a missing FCV document.");
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
-    assert.neq(null,
-               conn,
-               "mongod was unable to start up with version=" + latest + " and existing data files");
-    // FCV is 'latestFCV' because all collections were left intact with UUIDs.
-    // TODO(SERVER-32909): update this section to reflect new FCV restoration semantics.
-    adminDB = conn.getDB("admin");
-    assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
-              lastStableFCV);
-    MongoRunner.stopMongod(conn);
-
-    // If the featureCompatibilityVersion document is present but there are no collection UUIDs,
-    // --repair should not attempt to restore the document and should return success.
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: lastStable});
-    assert.neq(null,
-               conn,
-               "mongod was unable to start up with version=" + lastStable + " and no data files");
-    MongoRunner.stopMongod(conn);
-    recoverMMapJournal(isMMAPv1, conn, dbpath);
-    returnCode = runMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
-    assert.eq(returnCode, 0);
 
     //
     // Replica set tests.

@@ -60,96 +60,82 @@ using std::endl;
 
 namespace {
 
-constexpr StringData upgradeLink = "http://dochub.mongodb.org/core/3.6-upgrade-fcv"_sd;
+constexpr StringData upgradeLink = "http://dochub.mongodb.org/core/4.0-upgrade-fcv"_sd;
 constexpr StringData mustDowngradeErrorMsg =
-    "UPGRADE PROBLEM: The data files need to be fully upgraded to version 3.4 before attempting an upgrade to 3.6; see http://dochub.mongodb.org/core/3.6-upgrade-fcv for more details."_sd;
+    "UPGRADE PROBLEM: The data files need to be fully upgraded to version 3.6 before attempting an upgrade to 4.0; see http://dochub.mongodb.org/core/4.0-upgrade-fcv for more details."_sd;
 
 Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
                                                          const std::vector<std::string>& dbNames) {
+    // Check that all the collections have UUIDs.
     bool isMmapV1 = opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1();
-    // Check whether there are any collections with UUIDs.
-    bool collsHaveUuids = false;
-    bool allCollsHaveUuids = true;
     for (const auto& dbName : dbNames) {
         Database* db = dbHolder().openDb(opCtx, dbName);
         invariant(db);
         for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
             Collection* coll = *collectionIt;
-            if (coll->uuid()) {
-                collsHaveUuids = true;
-            } else if (!coll->uuid() && (!isMmapV1 ||
-                                         !(coll->ns().coll() == "system.indexes" ||
-                                           coll->ns().coll() == "system.namespaces"))) {
-                // Exclude system.indexes and system.namespaces from the UUID check until
-                // SERVER-29926 and SERVER-30095 are addressed, respectively.
-                allCollsHaveUuids = false;
+            if (!coll->uuid()) {
+                // system.indexes and system.namespaces don't currently have UUIDs in MMAP.
+                // SERVER-29926 and SERVER-30095 will address this problem.
+                if (isMmapV1 && (coll->ns().coll() == "system.indexes" ||
+                                 coll->ns().coll() == "system.namespaces")) {
+                    continue;
+                }
+
+                // We expect all collections to have UUIDs starting in FCV 3.6, so if we are missing
+                // a UUID then the user never upgraded to FCV 3.6 and this startup attempt is
+                // illegal.
+                return {ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
             }
         }
     }
 
-    if (!collsHaveUuids) {
-        return {ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
-    }
-
-    // Restore the featureCompatibilityVersion document if it is missing.
-    NamespaceString nss(FeatureCompatibilityVersion::kCollection);
-
-    Database* db = dbHolder().get(opCtx, nss.db());
+    NamespaceString fcvNss(FeatureCompatibilityVersion::kCollection);
 
     // If the admin database does not exist, create it.
+    Database* db = dbHolder().get(opCtx, fcvNss.db());
     if (!db) {
         log() << "Re-creating admin database that was dropped.";
     }
-
-    db = dbHolder().openDb(opCtx, nss.db());
+    db = dbHolder().openDb(opCtx, fcvNss.db());
     invariant(db);
 
-    // If admin.system.version does not exist, create it without a UUID.
+    // If admin.system.version does not exist, create it.
     if (!db->getCollection(opCtx, FeatureCompatibilityVersion::kCollection)) {
         log() << "Re-creating admin.system.version collection that was dropped.";
-        allCollsHaveUuids = false;
-        BSONObjBuilder bob;
-        bob.append("create", nss.coll());
-        BSONObj createObj = bob.done();
-        uassertStatusOK(createCollection(opCtx, nss.db().toString(), createObj));
+        uassertStatusOK(
+            createCollection(opCtx, fcvNss.db().toString(), BSON("create" << fcvNss.coll())));
     }
 
-    Collection* versionColl = db->getCollection(opCtx, FeatureCompatibilityVersion::kCollection);
-    invariant(versionColl);
+    Collection* fcvColl = db->getCollection(opCtx, FeatureCompatibilityVersion::kCollection);
+    invariant(fcvColl);
+
+    // Restore the featureCompatibilityVersion document if it is missing.
     BSONObj featureCompatibilityVersion;
     if (!Helpers::findOne(opCtx,
-                          versionColl,
+                          fcvColl,
                           BSON("_id" << FeatureCompatibilityVersion::kParameterName),
                           featureCompatibilityVersion)) {
-        log() << "Re-creating featureCompatibilityVersion document that was deleted.";
-        BSONObjBuilder bob;
-        bob.append("_id", FeatureCompatibilityVersion::kParameterName);
-        if (allCollsHaveUuids) {
-            // If all collections have UUIDs, create a featureCompatibilityVersion document with
-            // version equal to 3.6.
-            bob.append(FeatureCompatibilityVersion::kVersionField,
-                       FeatureCompatibilityVersionCommandParser::kVersion36);
-        } else {
-            // If some collections do not have UUIDs, create a featureCompatibilityVersion document
-            // with version equal to 3.4 and targetVersion 3.6.
-            bob.append(FeatureCompatibilityVersion::kVersionField,
-                       FeatureCompatibilityVersionCommandParser::kVersion34);
-            bob.append(FeatureCompatibilityVersion::kTargetVersionField,
-                       FeatureCompatibilityVersionCommandParser::kVersion36);
-        }
-        auto fcvObj = bob.done();
-        writeConflictRetry(opCtx, "insertFCVDocument", nss.ns(), [&] {
+        log() << "Re-creating featureCompatibilityVersion document that was deleted with version "
+              << FeatureCompatibilityVersionCommandParser::kVersion36 << ".";
+
+        BSONObj fcvObj = BSON("_id" << FeatureCompatibilityVersion::kParameterName
+                                    << FeatureCompatibilityVersion::kVersionField
+                                    << FeatureCompatibilityVersionCommandParser::kVersion36);
+
+        writeConflictRetry(opCtx, "insertFCVDocument", fcvNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
             OpDebug* const nullOpDebug = nullptr;
             uassertStatusOK(
-                versionColl->insertDocument(opCtx, InsertStatement(fcvObj), nullOpDebug, false));
+                fcvColl->insertDocument(opCtx, InsertStatement(fcvObj), nullOpDebug, false));
             wunit.commit();
         });
     }
+
     invariant(Helpers::findOne(opCtx,
-                               versionColl,
+                               fcvColl,
                                BSON("_id" << FeatureCompatibilityVersion::kParameterName),
                                featureCompatibilityVersion));
+
     return Status::OK();
 }
 

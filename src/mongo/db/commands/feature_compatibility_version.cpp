@@ -354,10 +354,10 @@ void FeatureCompatibilityVersion::onDelete(OperationContext* opCtx, const BSONOb
 
 void FeatureCompatibilityVersion::onDropCollection(OperationContext* opCtx) {
     log() << "setting featureCompatibilityVersion to "
-          << FeatureCompatibilityVersionCommandParser::kVersion34;
+          << FeatureCompatibilityVersionCommandParser::kVersion36;
     opCtx->recoveryUnit()->onCommit([]() {
         serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36);
         updateMinWireVersion();
     });
 }
