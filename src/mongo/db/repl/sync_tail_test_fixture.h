@@ -45,8 +45,10 @@ class StorageInterfaceMock;
 
 class SyncTailTest : public ServiceContextMongoDTest {
 protected:
-    void _testSyncApplyInsertDocument(ErrorCodes::Error expectedError,
-                                      const BSONObj* explicitOp = nullptr);
+    void _testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
+                                     const BSONObj& op,
+                                     bool expectedApplyOpCalled);
+    void _testSyncApplyInsertDocument(ErrorCodes::Error expectedError);
     ServiceContext::UniqueOperationContext _opCtx;
     unsigned int _opsApplied;
     SyncTail::ApplyOperationInLockFn _applyOp;

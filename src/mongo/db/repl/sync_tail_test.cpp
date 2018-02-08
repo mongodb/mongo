@@ -171,6 +171,17 @@ void createCollection(OperationContext* opCtx,
     });
 }
 
+/**
+ * Create test database.
+ */
+void createDatabase(OperationContext* opCtx, StringData dbName) {
+    Lock::GlobalWrite globalLock(opCtx);
+    bool justCreated;
+    Database* db = dbHolder().openDb(opCtx, dbName, &justCreated);
+    ASSERT_TRUE(db);
+    ASSERT_TRUE(justCreated);
+}
+
 auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
     BSONElement tsArray;
     Status status =
@@ -290,6 +301,44 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentDatabaseMissing) {
                        ErrorCodes::NamespaceNotFound);
 }
 
+TEST_F(SyncTailTest, SyncApplyDeleteDocumentDatabaseMissing) {
+    const BSONObj op = BSON("op"
+                            << "d"
+                            << "ns"
+                            << "test.othername");
+    ASSERT_THROWS_CODE(_testSyncApplyCrudOperation(ErrorCodes::OK, op, false),
+                       AssertionException,
+                       ErrorCodes::NamespaceNotFound);
+}
+
+TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLookupByUUIDFails) {
+    const NamespaceString nss("test.t");
+    createDatabase(_opCtx.get(), nss.db());
+    const BSONObj op = BSON("op"
+                            << "i"
+                            << "ns"
+                            << nss.getSisterNS("othername")
+                            << "ui"
+                            << UUID::gen());
+    ASSERT_THROWS_CODE(_testSyncApplyCrudOperation(ErrorCodes::OK, op, true),
+                       AssertionException,
+                       ErrorCodes::NamespaceNotFound);
+}
+
+TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLookupByUUIDFails) {
+    const NamespaceString nss("test.t");
+    createDatabase(_opCtx.get(), nss.db());
+    const BSONObj op = BSON("op"
+                            << "d"
+                            << "ns"
+                            << nss.getSisterNS("othername")
+                            << "ui"
+                            << UUID::gen());
+    ASSERT_THROWS_CODE(_testSyncApplyCrudOperation(ErrorCodes::OK, op, false),
+                       AssertionException,
+                       ErrorCodes::NamespaceNotFound);
+}
+
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
     {
         Lock::GlobalWrite globalLock(_opCtx.get());
@@ -304,6 +353,19 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionMissing) {
     _testSyncApplyInsertDocument(ErrorCodes::OK);
 }
 
+TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionMissing) {
+    const NamespaceString nss("test.t");
+    createDatabase(_opCtx.get(), nss.db());
+    // Even though the collection doesn't exist, this is handled in the actual application function,
+    // which in the case of this test just ignores such errors. This tests mostly that we don't
+    // implicitly create the collection and lock the database in MODE_X.
+    const BSONObj op = BSON("op"
+                            << "d"
+                            << "ns"
+                            << nss.ns());
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, true);
+}
+
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionExists) {
     {
         Lock::GlobalWrite globalLock(_opCtx.get());
@@ -315,6 +377,16 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionExists) {
         ASSERT_TRUE(collection);
     }
     _testSyncApplyInsertDocument(ErrorCodes::OK);
+}
+
+TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionExists) {
+    const NamespaceString nss("test.t");
+    createCollection(_opCtx.get(), nss, {});
+    const BSONObj op = BSON("op"
+                            << "d"
+                            << "ns"
+                            << nss.ns());
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, true);
 }
 
 TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLockedByUUID) {
@@ -337,7 +409,23 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLockedByUUID) {
                             << "test.othername"
                             << "ui"
                             << options.uuid.get());
-    _testSyncApplyInsertDocument(ErrorCodes::OK, &op);
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, true);
+}
+
+TEST_F(SyncTailTest, SyncApplyDeleteDocumentCollectionLockedByUUID) {
+    const NamespaceString nss("test.t");
+    CollectionOptions options;
+    options.uuid = UUID::gen();
+    createCollection(_opCtx.get(), nss, options);
+
+    // Test that the collection to lock is determined by the UUID and not the 'ns' field.
+    auto op = BSON("op"
+                   << "d"
+                   << "ns"
+                   << nss.getSisterNS("othername")
+                   << "ui"
+                   << options.uuid.get());
+    _testSyncApplyCrudOperation(ErrorCodes::OK, op, true);
 }
 
 TEST_F(SyncTailTest, SyncApplyIndexBuild) {

@@ -107,12 +107,9 @@ void SyncTailTest::tearDown() {
     ServiceContextMongoDTest::tearDown();
 }
 
-void SyncTailTest::_testSyncApplyInsertDocument(ErrorCodes::Error expectedError,
-                                                const BSONObj* explicitOp) {
-    const BSONObj op = explicitOp ? *explicitOp : BSON("op"
-                                                       << "i"
-                                                       << "ns"
-                                                       << "test.t");
+void SyncTailTest::_testSyncApplyCrudOperation(ErrorCodes::Error expectedError,
+                                               const BSONObj& op,
+                                               bool expectedApplyOpCalled) {
     bool applyOpCalled = false;
     SyncTail::ApplyOperationInLockFn applyOp = [&](OperationContext* opCtx,
                                                    Database* db,
@@ -142,7 +139,16 @@ void SyncTailTest::_testSyncApplyInsertDocument(ErrorCodes::Error expectedError,
                                   failedApplyCommand,
                                   _incOps),
               expectedError);
-    ASSERT_EQ(applyOpCalled, expectedError == ErrorCodes::OK);
+    ASSERT_EQ(applyOpCalled, expectedApplyOpCalled);
+}
+
+void SyncTailTest::_testSyncApplyInsertDocument(ErrorCodes::Error expectedError) {
+    _testSyncApplyCrudOperation(expectedError,
+                                BSON("op"
+                                     << "i"
+                                     << "ns"
+                                     << "test.t"),
+                                expectedError == ErrorCodes::OK);
 }
 
 Status failedApplyCommand(OperationContext* opCtx,
