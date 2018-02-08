@@ -140,6 +140,7 @@ ReplOperation OplogEntry::makeInsertOperation(const NamespaceString& nss,
                                               boost::optional<UUID> uuid,
                                               const BSONObj& docToInsert) {
     ReplOperation op;
+    op.setOpType(OpTypeEnum::kInsert);
     op.setNamespace(nss);
     op.setUuid(uuid);
     op.setObject(docToInsert);
@@ -151,6 +152,7 @@ ReplOperation OplogEntry::makeUpdateOperation(const NamespaceString nss,
                                               const BSONObj& update,
                                               const BSONObj& criteria) {
     ReplOperation op;
+    op.setOpType(OpTypeEnum::kUpdate);
     op.setNamespace(nss);
     op.setUuid(uuid);
     op.setObject(update);
@@ -162,6 +164,7 @@ ReplOperation OplogEntry::makeDeleteOperation(const NamespaceString& nss,
                                               boost::optional<UUID> uuid,
                                               const BSONObj& docToDelete) {
     ReplOperation op;
+    op.setOpType(OpTypeEnum::kDelete);
     op.setNamespace(nss);
     op.setUuid(uuid);
     op.setObject(docToDelete);
