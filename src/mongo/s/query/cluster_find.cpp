@@ -417,6 +417,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     // getMore on the cursor.
     if (!AuthorizationSession::get(opCtx->getClient())
              ->isCoauthorizedWith(pinnedCursor.getValue().getAuthenticatedUsers())) {
+        // Return the cursor so that it's not killed.
+        pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
         return {ErrorCodes::Unauthorized,
                 str::stream() << "cursor id " << request.cursorid
                               << " was not created by the authenticated user"};
