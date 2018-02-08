@@ -50,8 +50,8 @@ void *thread_dump(void *);
 int
 main(int argc, char *argv[])
 {
-	TEST_OPTS *opts, _opts;
 	struct timespec te, ts;
+	TEST_OPTS *opts, _opts;
 	pthread_t dump_id, id[MAX_THREADS];
 	int i;
 

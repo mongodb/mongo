@@ -47,9 +47,9 @@ fail(int ret) {
 int
 main(int argc, char *argv[])
 {
-	int ret;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
+	int ret;
 
 	(void)argc;
 	(void)argv;

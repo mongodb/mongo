@@ -1137,6 +1137,10 @@ methods = {
 ]),
 
 'WT_SESSION.begin_transaction' : Method([
+    Config('ignore_prepare', 'false', r'''
+        whether to ignore the updates by other prepared transactions as part of
+        read operations of this transaction''',
+        type='boolean'),
     Config('isolation', '', r'''
         the isolation level for this transaction; defaults to the
         session's isolation level''',
@@ -1180,6 +1184,14 @@ methods = {
         wait for record to be written or synchronized.  The
         \c on setting forces log records to be written to the storage device''',
         choices=['background', 'off', 'on']),
+]),
+
+'WT_SESSION.prepare_transaction' : Method([
+    Config('prepare_timestamp', '', r'''
+        set the prepare timestamp for the updates of the current transaction.
+        The supplied value should not be older than any active read timestamps.
+        This configuration option is mandatory.  See
+        @ref transaction_timestamps'''),
 ]),
 
 'WT_SESSION.timestamp_transaction' : Method([

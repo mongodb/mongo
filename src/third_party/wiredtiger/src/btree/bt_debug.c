@@ -511,9 +511,8 @@ __debug_dsk_cell(WT_DBG *ds, const WT_PAGE_HEADER *dsk)
  *	Pretty-print information about a page.
  */
 static char *
-__debug_tree_shape_info(WT_PAGE *page)
+__debug_tree_shape_info(WT_PAGE *page, char *buf, size_t len)
 {
-	static char buf[128];
 	uint64_t v;
 	const char *unit;
 
@@ -532,7 +531,7 @@ __debug_tree_shape_info(WT_PAGE *page)
 		unit = "B";
 	}
 
-	(void)__wt_snprintf(buf, sizeof(buf), "(%p, %" PRIu64
+	(void)__wt_snprintf(buf, len, "(%p, %" PRIu64
 	    "%s, evict gen %" PRIu64 ", create gen %" PRIu64 ")",
 	    (void *)page, v, unit,
 	    page->evict_pass_gen, page->cache_create_gen);
@@ -548,12 +547,14 @@ __debug_tree_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
 {
 	WT_REF *ref;
 	WT_SESSION_IMPL *session;
+	char buf[128];
 
 	session = ds->session;
 
 	if (WT_PAGE_IS_INTERNAL(page)) {
 		WT_RET(ds->f(ds, "%*s" "I" "%d %s\n",
-		    level * 3, " ", level, __debug_tree_shape_info(page)));
+		    level * 3, " ", level,
+		    __debug_tree_shape_info(page, buf, sizeof(buf))));
 		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			if (ref->state == WT_REF_MEM)
 				WT_RET(__debug_tree_shape_worker(
@@ -561,7 +562,8 @@ __debug_tree_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
 		} WT_INTL_FOREACH_END;
 	} else
 		WT_RET(ds->f(ds, "%*s" "L" " %s\n",
-		    level * 3, " ", __debug_tree_shape_info(page)));
+		    level * 3, " ",
+		    __debug_tree_shape_info(page, buf, sizeof(buf))));
 	return (0);
 }
 

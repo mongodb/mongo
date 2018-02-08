@@ -178,7 +178,7 @@ static inline void
 __wt_cache_decr_check_size(
     WT_SESSION_IMPL *session, size_t *vp, size_t v, const char *fld)
 {
-	if (__wt_atomic_subsize(vp, v) < WT_EXABYTE)
+	if (v == 0 || __wt_atomic_subsize(vp, v) < WT_EXABYTE)
 		return;
 
 	/*
@@ -202,7 +202,7 @@ static inline void
 __wt_cache_decr_check_uint64(
     WT_SESSION_IMPL *session, uint64_t *vp, uint64_t v, const char *fld)
 {
-	if (__wt_atomic_sub64(vp, v) < WT_EXABYTE)
+	if (v == 0 || __wt_atomic_sub64(vp, v) < WT_EXABYTE)
 		return;
 
 	/*

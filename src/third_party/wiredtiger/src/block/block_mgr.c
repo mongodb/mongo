@@ -569,6 +569,7 @@ __bm_method_set(WT_BM *bm, bool readonly)
 	bm->compact_page_skip = __bm_compact_page_skip;
 	bm->compact_skip = __bm_compact_skip;
 	bm->compact_start = __bm_compact_start;
+	bm->corrupt = __wt_bm_corrupt;
 	bm->free = __bm_free;
 	bm->is_mapped = __bm_is_mapped;
 	bm->map_discard = __bm_map_discard;
@@ -638,20 +639,9 @@ err:	WT_TRET(bm->close(bm, session));
  * 	Report an error, then panic the handle and the system.
  */
 int
-__wt_block_panic(WT_SESSION_IMPL *session, int error, const char *fmt, ...)
+__wt_block_panic(WT_SESSION_IMPL *session)
     WT_GCC_FUNC_ATTRIBUTE((cold))
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
-	va_list ap;
-
-	/*
-	 * Ignore error returns from underlying event handlers, we already have
-	 * an error value to return.
-	 */
-	va_start(ap, fmt);
-	WT_IGNORE_RET(__wt_eventv(session, false, error, NULL, 0, fmt, ap));
-	va_end(ap);
-
 	/* Switch the handle into read-only mode. */
 	__bm_method_set(S2BT(session)->bm, true);
 

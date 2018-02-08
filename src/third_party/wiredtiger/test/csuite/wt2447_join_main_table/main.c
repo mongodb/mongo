@@ -58,8 +58,8 @@ get_stat_total(WT_SESSION *session, WT_CURSOR *jcursor, const char *descmatch,
 	WT_CURSOR *statcursor;
 	uint64_t val;
 	int ret;
-	bool match;
 	char *desc, *valstr;
+	bool match;
 
 	match = false;
 	*pval = 0;
@@ -91,8 +91,8 @@ main(int argc, char *argv[])
 	WT_SESSION *session;
 	uint64_t maincount;
 	int half, i, j;
-	const char *tablename;
 	char bloom_cfg[128], index1uri[256], index2uri[256], joinuri[256];
+	const char *tablename;
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));
