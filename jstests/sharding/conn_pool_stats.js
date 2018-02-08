@@ -29,4 +29,5 @@
                    stats["totalCreated"],
                    tojson(stats));
     }
+    cluster.stop();
 })();

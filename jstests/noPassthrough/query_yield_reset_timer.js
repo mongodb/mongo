@@ -41,4 +41,5 @@
     // result set to be returned in a single batch.
     assert.gt(explainRes.executionStats.executionStages.saveState, 4 / 2, tojson(explainRes));
     assert.lt(explainRes.executionStats.executionStages.saveState, 4 * 2, tojson(explainRes));
+    MongoRunner.stopMongod(mongod);
 })();

@@ -112,4 +112,5 @@
     let doc = getOneDoc(cursor);
     assert.docEq(doc.operationType, "insert");
     assert.docEq(doc.fullDocument, {_id: 2});
+    rst.stopSet();
 }());

@@ -133,4 +133,5 @@
 
     // Test that attempting to create an index with v=4 returns an error.
     assert.commandFailed(testDB.index_version.createIndex({withV4: 1}, {v: 4}));
+    MongoRunner.stopMongod(conn);
 })();

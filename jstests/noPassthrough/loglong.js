@@ -50,4 +50,5 @@
 
         assert(found, tojson(log));
     }
+    MongoRunner.stopMongod(conn);
 })();

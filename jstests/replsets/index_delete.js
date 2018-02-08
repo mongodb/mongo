@@ -121,3 +121,5 @@ assert.soon(function() {
     return 1 == secondDB[collName].getIndexes().length;
 }, "Indexes not dropped on secondary");
 assert.eq(1, secondDB[collName].getIndexes().length);
+
+replTest.stopSet();

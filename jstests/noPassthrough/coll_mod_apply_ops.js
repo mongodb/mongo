@@ -40,4 +40,5 @@
     // Ensure the collection options of the existing collection were not affected.
     assert.eq(dbCollMod.getCollectionInfos()[0].name, collName);
     assert.eq(dbCollMod.getCollectionInfos()[0].options.validationLevel, "off");
+    MongoRunner.stopMongod(conn);
 }());

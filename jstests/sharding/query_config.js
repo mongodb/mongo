@@ -386,4 +386,5 @@
     queryConfigChunks(st);
     queryUserCreated(configDB);
     queryUserCreated(adminDB);
+    st.stop();
 })();

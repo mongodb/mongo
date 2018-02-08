@@ -31,5 +31,5 @@
         0,
         mongo,
         "Connection attempt failed when an irrelevant sslClusterFile was provided to the server!");
-
+    MongoRunner.stopMongod(mongod);
 }());

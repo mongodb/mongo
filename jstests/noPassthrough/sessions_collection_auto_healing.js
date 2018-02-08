@@ -30,4 +30,5 @@ load('jstests/libs/sessions_collection.js');
         validateSessionsCollection(conn, true, true);
     }
 
+    MongoRunner.stopMongod(conn);
 })();

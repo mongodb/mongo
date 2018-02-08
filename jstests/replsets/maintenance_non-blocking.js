@@ -41,6 +41,7 @@ doTest = function() {
 
     print("******* fsyncUnlock'n secondary ************* ");
     sDB.fsyncUnlock();
+    replTest.stopSet();
 };
 
 doTest();

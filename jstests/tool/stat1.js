@@ -25,3 +25,4 @@ exitCode = MongoRunner.runMongoTool("mongostat", {
     authenticationDatabase: "admin",
 });
 assert.neq(exitCode, 0, "mongostat should exit with -1 with eliot:wrong");
+MongoRunner.stopMongod(m);

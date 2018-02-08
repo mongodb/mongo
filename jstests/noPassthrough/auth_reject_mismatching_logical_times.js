@@ -69,4 +69,5 @@
     assertAcceptsValidLogicalTime(st.configRS.getPrimary().getDB("admin"));
 
     st.stop();
+    rst.stopSet();
 })();

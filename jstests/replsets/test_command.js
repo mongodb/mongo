@@ -141,4 +141,5 @@
         waitForDrainFinish: 0,
     }),
                          'node 1' + primary.host + ' failed to wait for drain to finish');
+    replSet.stopSet();
 })();

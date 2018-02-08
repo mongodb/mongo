@@ -79,6 +79,7 @@
         assert.eq(count, 20, "mongorestore should only have inserted the latter 20 entries");
     }
 
+    MongoRunner.stopMongod(restoreMongod);
     step("stopping replset test");
     replTest.stopSet();
 })();

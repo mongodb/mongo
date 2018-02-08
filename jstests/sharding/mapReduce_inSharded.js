@@ -82,4 +82,5 @@
         {out: {inline: 1}, query: {str: "foo"}, collation: {locale: "en_US", strength: 2}});
     assert.commandWorked(out);
     assert.eq(out.counts.input, 1);
+    st.stop();
 })();

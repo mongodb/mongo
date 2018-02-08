@@ -36,3 +36,5 @@ assert.soon(
 
 jsTestLog("got mongos");
 assert.commandWorked(mongos2.getDB('admin').runCommand('serverStatus'));
+configRS.stopSet();
+MongoRunner.stopMongos(mongos);

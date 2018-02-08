@@ -52,4 +52,5 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
     };
 
     assertErrorCode(foreign, pipeline, 28769);
+    st.stop();
 }());

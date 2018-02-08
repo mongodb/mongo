@@ -151,3 +151,4 @@ explainOut = secondary.getDB("test").runCommand({
     verbosity: "executionStats"
 });
 assert.commandFailed(explainOut, "explain write op on secondary, slaveOk true");
+replTest.stopSet();

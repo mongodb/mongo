@@ -76,4 +76,5 @@
     assert.eq(cmdRes.cursorsAlive, []);
     assert.eq(cmdRes.cursorsNotFound, [cursorId]);
     assert.eq(cmdRes.cursorsUnknown, []);
+    MongoRunner.stopMongod(conn);
 })();

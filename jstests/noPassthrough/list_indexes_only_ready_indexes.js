@@ -48,4 +48,5 @@
     assert.eq(0, exitCode, 'expected shell to exit cleanly');
 
     assertIndexes(coll, 3, ["_id_", "a_1", "b_1"]);
+    MongoRunner.stopMongod(conn);
 }());

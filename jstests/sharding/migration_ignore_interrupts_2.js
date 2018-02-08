@@ -53,4 +53,5 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(1, shard1Coll1.find().itcount());
 
     st.stop();
+    MongoRunner.stopMongod(staticMongod);
 })();

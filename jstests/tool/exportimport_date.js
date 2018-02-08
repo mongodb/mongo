@@ -49,3 +49,4 @@ assert(!dst_cursor.hasNext(),
            'Source has ' + documentCount + ' documents.');
 
 print('Verified that source and destination collections match');
+tt.stop();

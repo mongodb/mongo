@@ -217,4 +217,5 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         testValidWriteConcern(majorityWC, cmd);
     });
 
+    st.stop();
 })();

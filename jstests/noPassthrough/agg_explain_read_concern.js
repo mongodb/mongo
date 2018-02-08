@@ -57,4 +57,6 @@
         expectedErrStr = "Command does not support read concern";
         assert.neq(cmdRes.errmsg.indexOf(expectedErrStr), -1, tojson(cmdRes));
     });
+
+    rst.stopSet();
 }());

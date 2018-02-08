@@ -145,3 +145,5 @@ function testGroup() {
 }
 testGroup();
 testGroup();
+
+MongoRunner.stopMongod(conn);

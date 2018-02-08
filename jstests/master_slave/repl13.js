@@ -63,3 +63,4 @@ s_hash = s.getDB("d").runCommand("dbhash");
 
 assert.eq(
     m_hash.collections.c, s_hash.collections.c, "sad " + tojson(m_hash) + " " + tojson(s_hash));
+rt.stop();

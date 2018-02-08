@@ -70,4 +70,5 @@
     var exitCode = evalRunner({checkExitSuccess: false});
     assert.neq(
         0, exitCode, "expected shell to exit abnormally due to JS execution being terminated");
+    replSet.stopSet();
 })();

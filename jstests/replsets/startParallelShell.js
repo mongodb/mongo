@@ -32,4 +32,5 @@ var db;
         return db.coll0.find({test: "explicit port"}).count() === 1;
     });
     awaitShell();
+    replSet.stopSet();
 })();

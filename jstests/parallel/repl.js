@@ -60,3 +60,4 @@ assert.soon(function() {
     //            printjson( sh );
     return mh.md5 == sh.md5;
 });
+rt.stop();

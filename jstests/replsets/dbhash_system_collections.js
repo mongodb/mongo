@@ -51,4 +51,5 @@
     var primaryMd5 = checkDbHash(primary);
     var secondaryMd5 = checkDbHash(secondary);
     assert.eq(primaryMd5, secondaryMd5, 'dbhash is different on the primary and the secondary');
+    rst.stopSet();
 })();

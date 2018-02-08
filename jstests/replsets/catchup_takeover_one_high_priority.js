@@ -84,4 +84,5 @@
     replSet.waitForState(2, ReplSetTest.State.PRIMARY, 30 * 1000);
     jsTestLog('node 2 performed priority takeover and is now primary');
 
+    replSet.stopSet();
 })();

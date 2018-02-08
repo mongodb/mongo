@@ -68,3 +68,4 @@ assert.eq(
 
 assert.soon("c.findOne()", "mongo import json A");
 assert(c.findOne() && 1 == c.findOne().a, "mongo import json B");
+MongoRunner.stopMongod(m);

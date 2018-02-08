@@ -43,3 +43,5 @@ assert.soon(function() {
 });
 
 assert(!rawMongoProgramOutput().match(/resync/));
+rt1.stop();
+rt2.stop();

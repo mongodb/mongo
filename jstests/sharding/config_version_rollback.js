@@ -169,5 +169,7 @@
               shardIdentityDoc.clusterId,
               "oldPriClusterId: " + origConfigVersionDoc.clusterId);
     configRS.stopSet();
+    MongoRunner.stopMongod(shard);
+    MongoRunner.stopMongos(mongos);
 
 })();

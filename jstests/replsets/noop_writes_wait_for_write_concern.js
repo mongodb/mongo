@@ -232,4 +232,5 @@
         testCommandWithWriteConcern(cmd);
     });
 
+    replTest.stopSet();
 })();

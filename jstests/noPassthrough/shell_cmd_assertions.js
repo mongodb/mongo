@@ -251,4 +251,6 @@
         setup();
         test();
     });
+
+    MongoRunner.stopMongod(conn);
 })();

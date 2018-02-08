@@ -139,6 +139,7 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert.eq(1, recipientCollUpdatedNum, "Update failed on recipient shard during migration!");
 
     jsTest.log('DONE!');
+    MongoRunner.stopMongod(staticMongod);
     st.stop();
 
 })();

@@ -69,4 +69,5 @@
         ErrorCodes.InvalidOptions,
         "expected afterClusterTime fail in serverStatus");
 
+    rst.stopSet();
 }());

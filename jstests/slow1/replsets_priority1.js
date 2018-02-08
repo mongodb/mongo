@@ -202,4 +202,5 @@
         rs.awaitReplication();
     }
 
+    rs.stopSet();
 })();

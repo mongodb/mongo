@@ -88,5 +88,6 @@ load("jstests/replsets/rslib.js");
     res = primary.adminCommand({replSetGetStatus: 1});
     assert.commandWorked(res);
     assert.eq(res.members[0].optime.ts, null);
+    rst.stopSet();
 
 })();

@@ -12,3 +12,4 @@ assert.automsg("c > 0");
 
 assert.commandWorked(m.getDB("local").repairDatabase());
 assert.automsg("c <= m.getDB( 'local' ).oplog.$main.count()");
+rt.stop();

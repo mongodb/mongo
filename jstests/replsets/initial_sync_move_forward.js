@@ -95,4 +95,5 @@
     var indexSpec = GetIndexHelpers.findByKeyPattern(secondaryColl.getIndexes(), {x: 1});
     assert.neq(null, indexSpec);
     assert.eq(true, indexSpec.unique);
+    rst.stopSet();
 })();

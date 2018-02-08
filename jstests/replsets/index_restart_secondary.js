@@ -75,3 +75,5 @@ if (conns[0].getDB('test').serverBuildInfo().bits !== 32) {
 
     jsTest.log("index-restart-secondary.js complete");
 }
+
+replTest.stopSet();

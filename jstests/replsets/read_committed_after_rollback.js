@@ -150,4 +150,5 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
     // Verify data consistency between nodes.
     replTest.checkReplicatedDataHashes();
     replTest.checkOplogs();
+    replTest.stopSet();
 }());

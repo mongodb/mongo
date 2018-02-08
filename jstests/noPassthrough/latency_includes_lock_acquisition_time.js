@@ -150,4 +150,5 @@
     conn.forceWriteMode("compatibility");
     conn.forceReadMode("legacy");
     runTests();
+    MongoRunner.stopMongod(conn);
 }());

@@ -170,4 +170,5 @@
     assert.writeOK(secondary.getDB("foo").flag.insert({sentinel: 1}, {writeConcern: {w: 3}}));
     // Check that no writes were lost.
     assert.eq(secondary.getDB("foo").foo.find().itcount(), numDocuments);
+    replSet.stopSet();
 })();

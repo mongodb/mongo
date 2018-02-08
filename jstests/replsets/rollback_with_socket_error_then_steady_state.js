@@ -137,5 +137,6 @@
     // Verify data consistency between nodes.
     rst.checkReplicatedDataHashes();
     rst.checkOplogs();
+    rst.stopSet();
 
 }());

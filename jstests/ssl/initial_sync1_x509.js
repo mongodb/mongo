@@ -100,3 +100,4 @@ var conns = replTest.startSet();
 assert.throws(function() {
     replTest.initiate();
 });
+replTest.stopSet();

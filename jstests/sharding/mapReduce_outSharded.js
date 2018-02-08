@@ -58,3 +58,4 @@ out = db.runCommand({
     out: "mrBasic" + "srcNonSharded",
 });
 verifyOutput(out);
+st.stop();

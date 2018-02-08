@@ -56,4 +56,5 @@ load("jstests/replsets/rslib.js");
     // Make sure the step up succeeded.
     assert.eq(secondary, rst.getPrimary());
 
+    rst.stopSet();
 })();

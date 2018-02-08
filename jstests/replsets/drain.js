@@ -106,4 +106,5 @@
     // secondary and we cannot guarantee all writes reached the secondary's op queue prior to
     // shutting down the original primary.
     assert.gte(primary.getDB("foo").foo.find().itcount(), 2);
+    replSet.stopSet();
 })();

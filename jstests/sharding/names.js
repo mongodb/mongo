@@ -46,7 +46,8 @@
         rsB.getURL(), config.shards.findOne({_id: rsA.name})["host"], "Wrong host for shard rsA 3");
     assert.eq(
         rsA.getURL(), config.shards.findOne({_id: rsB.name})["host"], "Wrong host for shard rsB 3");
-
+    rsA.stopSet();
+    rsB.stopSet();
     st.stop();
 
 })();

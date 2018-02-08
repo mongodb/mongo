@@ -170,4 +170,6 @@ if (!_isWindows()) {
     // Stop the server
     var exitCode = MongoRunner.stopMongod(md);
     assert(exitCode == 0);
+} else {
+    MongoRunner.stopMongod(md);
 }

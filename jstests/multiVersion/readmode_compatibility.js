@@ -38,4 +38,5 @@
     assert.neq(connLatest, null, 'unable to start 3.2 mongod');
     connLatest.forceReadMode('compatibility');
     assert.eq('commands', connLatest.readMode());
+    MongoRunner.stopMongod(connLatest);
 })();

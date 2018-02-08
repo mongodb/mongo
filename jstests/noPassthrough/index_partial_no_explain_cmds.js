@@ -53,4 +53,5 @@
     // operations to fail if they have no query predicate.
     ret = coll.distinct("x");
     assert.eq(2, ret.length);
+    MongoRunner.stopMongod(runner);
 })();

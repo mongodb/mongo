@@ -15,4 +15,5 @@
     }
 
     assert.eq(getparam("diagnosticDataCollectionPeriodMillis"), 101);
+    MongoRunner.stopMongod(m);
 })();
