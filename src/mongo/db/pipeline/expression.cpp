@@ -3145,17 +3145,15 @@ Value ExpressionPow::evaluate(const Document& root) const {
 
     long long result = 1;
 
-    // When baseLong == -1 and expLong is < 0 the following for loop will never run because expLong
+    // When 'baseLong' == -1 and 'expLong' is < 0 the following for loop will never run because 'expLong'
     // will always be less than 0 so result will always be 1 but the result can potentialy be -1
-    // ex baselong = -1 expLong = -5  then result should be -1
-
+    // ex: 'baselong' = -1 'expLong' = -5  then result should be -1
     if (baseLong == -1 && expLong < 0) {
         expLong = expLong % 2 == 0 ? 2 : 1;
     }
 
     // Use repeated multiplication, since pow() casts args to doubles which could result in loss of
     // precision if arguments are very large.
-
     for (int i = 0; i < expLong; i++) {
         result *= baseLong;
     }
