@@ -49,6 +49,47 @@ const base::LinkerInitialized SpinLock::LINKER_INITIALIZED =
     base::LINKER_INITIALIZED;
 
 namespace {
+
+const int64_t kNanoPerSec = uint64_t(1000) * 1000 * 1000;
+
+#ifdef _WIN32
+int64_t frequency;
+
+void InitTimer() {
+    LARGE_INTEGER large_freq;
+    QueryPerformanceFrequency(&large_freq);
+    frequency = large_freq.QuadPart;
+}
+
+int64_t NowMonotonic() {
+  LARGE_INTEGER time_value;
+  QueryPerformanceCounter(&time_value);
+  return time_value.QuadPart;
+}
+
+int64_t TicksToNanos(int64_t timer_value) {
+  return timer_value * kNanoPerSec / frequency;
+}
+
+#else // _WIN32
+void InitTimer() {}
+
+int64_t NowMonotonic() {
+  struct timespec t;
+
+  if (clock_gettime(CLOCK_MONOTONIC, &t)) {
+    return 0;
+  }
+
+  return (static_cast<double>(t.tv_sec) * kNanoPerSec) + t.tv_nsec;
+}
+
+int64_t TicksToNanos(int64_t timer_value) {
+  return timer_value;
+}
+
+#endif // _WIN32
+
 struct SpinLock_InitHelper {
   SpinLock_InitHelper() {
     // On multi-cpu machines, spin for longer before yielding
@@ -56,6 +97,8 @@ struct SpinLock_InitHelper {
     if (GetSystemCPUsCount() > 1) {
       adaptive_spin_count = 1000;
     }
+
+    InitTimer();
   }
 };
 
@@ -68,6 +111,31 @@ inline void SpinlockPause(void) {
 #if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
   __asm__ __volatile__("rep; nop" : : );
 #endif
+}
+  
+// The current version of atomic_ops.h lacks base::subtle::Barrier_AtomicIncrement
+// so a CAS loop is used instead.
+void NoBarrier_AtomicAdd(volatile base::subtle::Atomic64* ptr,
+                         base::subtle::Atomic64 increment) {
+  base::subtle::Atomic64 base_value = base::subtle::NoBarrier_Load(ptr);
+  while (true) {
+    base::subtle::Atomic64 new_value;
+    base::subtle::NoBarrier_Store(&new_value, base::subtle::NoBarrier_Load(&base_value)
+          + base::subtle::NoBarrier_Load(&increment));
+
+    // Swap in the new incremented value.
+    base::subtle::Atomic64 cas_result = base::subtle::Acquire_CompareAndSwap(
+          ptr, base_value, new_value);
+
+    // Check if the increment succeeded.
+    if (cas_result == base_value) {
+      return;
+    }
+
+    // If the increment failed, just use the previous value as the value to
+    // add our increment to.
+    base_value = cas_result;
+  };
 }
 
 }  // unnamed namespace
@@ -84,10 +152,13 @@ Atomic32 SpinLock::SpinLoop() {
                                               kSpinLockSleeper);
 }
 
+base::subtle::Atomic64 SpinLock::totalDelayNanos_ = 0;
+
 void SpinLock::SlowLock() {
   Atomic32 lock_value = SpinLoop();
 
   int lock_wait_call_count = 0;
+  int64_t start = 0;
   while (lock_value != kSpinLockFree) {
     // If the lock is currently held, but not marked as having a sleeper, mark
     // it as having a sleeper.
@@ -115,11 +186,17 @@ void SpinLock::SlowLock() {
     }
 
     // Wait for an OS specific delay.
+    start = NowMonotonic();
     base::internal::SpinLockDelay(&lockword_, lock_value,
                                   ++lock_wait_call_count);
     // Spin again after returning from the wait routine to give this thread
     // some chance of obtaining the lock.
     lock_value = SpinLoop();
+  }
+
+  if (start) {
+    NoBarrier_AtomicAdd(&totalDelayNanos_, static_cast<base::subtle::Atomic64>(
+        TicksToNanos(NowMonotonic() - start)));
   }
 }
 
