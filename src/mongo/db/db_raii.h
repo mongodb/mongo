@@ -284,4 +284,10 @@ private:
     Collection* _collection;
 };
 
+/**
+ * Returns a MODE_IX LockMode if a read is performed under readConcern level snapshot, or a MODE_IS
+ * lock otherwise. MODE_IX acquisition will allow a read to participate in two-phase locking.
+ */
+LockMode getLockModeForQuery(OperationContext* opCtx);
+
 }  // namespace mongo

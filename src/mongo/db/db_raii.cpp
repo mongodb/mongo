@@ -74,7 +74,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     : AutoGetCollectionForRead(opCtx,
                                nss,
                                AutoGetCollection::ViewMode::kViewsForbidden,
-                               Lock::DBLock(opCtx, nss.db(), MODE_IS, deadline),
+                               Lock::DBLock(opCtx, nss.db(), getLockModeForQuery(opCtx), deadline),
                                deadline) {}
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
@@ -84,7 +84,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     : AutoGetCollectionForRead(opCtx,
                                NamespaceStringOrUUID({dbName.toString(), uuid}),
                                AutoGetCollection::ViewMode::kViewsForbidden,
-                               Lock::DBLock(opCtx, dbName, MODE_IS, deadline),
+                               Lock::DBLock(opCtx, dbName, getLockModeForQuery(opCtx), deadline),
                                deadline) {}
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
@@ -92,7 +92,8 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    AutoGetCollection::ViewMode viewMode,
                                                    Lock::DBLock lock,
                                                    Date_t deadline) {
-    _autoColl.emplace(opCtx, nsOrUUID, std::move(lock), MODE_IS, viewMode, deadline);
+    const auto collectionLockMode = getLockModeForQuery(opCtx);
+    _autoColl.emplace(opCtx, nsOrUUID, std::move(lock), collectionLockMode, viewMode, deadline);
 
     while (true) {
         auto coll = _autoColl->getCollection();
@@ -124,7 +125,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             CurOp::get(opCtx)->yielded();
         }
 
-        _autoColl.emplace(opCtx, nsOrUUID, MODE_IS, viewMode, deadline);
+        _autoColl.emplace(opCtx, nsOrUUID, collectionLockMode, viewMode, deadline);
     }
 }
 
@@ -155,7 +156,10 @@ AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
     AutoGetCollection::ViewMode viewMode,
     Date_t deadline)
     : AutoGetCollectionForReadCommand(
-          opCtx, nss, viewMode, Lock::DBLock(opCtx, nss.db(), MODE_IS, deadline)) {}
+          opCtx,
+          nss,
+          viewMode,
+          Lock::DBLock(opCtx, nss.db(), getLockModeForQuery(opCtx), deadline)) {}
 
 AutoGetCollectionOrViewForReadCommand::AutoGetCollectionOrViewForReadCommand(
     OperationContext* opCtx, const NamespaceString& nss, Date_t deadline)
@@ -277,6 +281,17 @@ OldClientWriteContext::OldClientWriteContext(OperationContext* opCtx, const std:
         Database* db = dbHolder().get(_opCtx, ns);
         invariant(db == _c.db());
     }
+}
+
+LockMode getLockModeForQuery(OperationContext* opCtx) {
+    invariant(opCtx);
+
+    if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
+        repl::ReadConcernLevel::kSnapshotReadConcern) {
+        return MODE_IX;
+    }
+
+    return MODE_IS;
 }
 
 }  // namespace mongo

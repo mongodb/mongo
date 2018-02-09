@@ -252,7 +252,7 @@ public:
 
         // Acquire locks. If the query is on a view, we release our locks and convert the query
         // request into an aggregation command.
-        Lock::DBLock dbSLock(opCtx, dbname, MODE_IS);
+        Lock::DBLock dbLock(opCtx, dbname, getLockModeForQuery(opCtx));
         const NamespaceString nss(CommandHelpers::parseNsOrUUID(opCtx, dbname, cmdObj));
         qr->refreshNSS(opCtx);
 
@@ -280,7 +280,7 @@ public:
         }
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss, std::move(dbSLock));
+        AutoGetCollectionOrViewForReadCommand ctx(opCtx, nss, std::move(dbLock));
         Collection* collection = ctx.getCollection();
         if (ctx.getView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
