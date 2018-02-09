@@ -1350,13 +1350,13 @@ public:
 };
 }
 
-TEST_F(DConcurrencyTestFixture, TestGlobalLockAbandonSnapshot) {
+TEST_F(DConcurrencyTestFixture, TestGlobalLockAbandonsSnapshotWhenNotInWriteUnitOfWork) {
     auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(1);
     auto opCtx = clients[0].second.get();
     auto recovUnitOwned = stdx::make_unique<RecoveryUnitMock>();
     auto recovUnitBorrowed = recovUnitOwned.get();
     opCtx->setRecoveryUnit(recovUnitOwned.release(),
-                           OperationContext::RecoveryUnitState::kActiveUnitOfWork);
+                           OperationContext::RecoveryUnitState::kNotInUnitOfWork);
 
     {
         Lock::GlobalLock gw1(opCtx, MODE_IS, Date_t::now());
@@ -1373,6 +1373,34 @@ TEST_F(DConcurrencyTestFixture, TestGlobalLockAbandonSnapshot) {
         ASSERT(gw1.isLocked());
     }
     ASSERT_FALSE(recovUnitBorrowed->activeTransaction);
+}
+
+TEST_F(DConcurrencyTestFixture, TestGlobalLockDoesNotAbandonSnapshotWhenInWriteUnitOfWork) {
+    auto clients = makeKClientsWithLockers<DefaultLockerImpl>(1);
+    auto opCtx = clients[0].second.get();
+    auto recovUnitOwned = stdx::make_unique<RecoveryUnitMock>();
+    auto recovUnitBorrowed = recovUnitOwned.get();
+    opCtx->setRecoveryUnit(recovUnitOwned.release(),
+                           OperationContext::RecoveryUnitState::kActiveUnitOfWork);
+    opCtx->lockState()->beginWriteUnitOfWork();
+
+    {
+        Lock::GlobalLock gw1(opCtx, MODE_IX, Date_t::now());
+        ASSERT(gw1.isLocked());
+        ASSERT(recovUnitBorrowed->activeTransaction);
+
+        {
+            Lock::GlobalLock gw2(opCtx, MODE_X, Date_t::now());
+            ASSERT(gw2.isLocked());
+            ASSERT(recovUnitBorrowed->activeTransaction);
+        }
+
+        ASSERT(recovUnitBorrowed->activeTransaction);
+        ASSERT(gw1.isLocked());
+    }
+    ASSERT_TRUE(recovUnitBorrowed->activeTransaction);
+
+    opCtx->lockState()->endWriteUnitOfWork();
 }
 
 }  // namespace

@@ -170,10 +170,9 @@ public:
      * Global lock.
      *
      * Grabs global resource lock. Allows further (recursive) acquisition of the global lock
-     * in any mode, see LockMode. An outermost GlobalLock calls abandonSnapshot() on destruction, so
-     * that the storage engine can release resources, such as snapshots or locks, that it may have
-     * acquired during the transaction. Note that any writes are committed in nested WriteUnitOfWork
-     * scopes, so write conflicts cannot happen when releasing the GlobalLock.
+     * in any mode, see LockMode. An outermost GlobalLock, when not in a WriteUnitOfWork, calls
+     * abandonSnapshot() on destruction. This allows the storage engine to release resources, such
+     * as snapshots or locks, that it may have acquired during the transaction.
      *
      * NOTE: Does not acquire flush lock.
      */
@@ -198,7 +197,12 @@ public:
 
         ~GlobalLock() {
             if (isLocked()) {
-                if (_isOutermostLock) {
+                // Abandon our snapshot if destruction of the GlobalLock object results in actually
+                // unlocking the global lock. Recursive locking and the two-phase locking protocol
+                // may prevent lock release.
+                const bool willReleaseLock = _isOutermostLock &&
+                    !(_opCtx->lockState() && _opCtx->lockState()->inAWriteUnitOfWork());
+                if (willReleaseLock) {
                     _opCtx->recoveryUnit()->abandonSnapshot();
                 }
                 _unlock();
