@@ -321,6 +321,8 @@ public:
 
         virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
 
+        virtual bool haveCappedWaiters() = 0;
+
         virtual void notifyCappedWaitersIfNeeded() = 0;
 
         virtual const CollatorInterface* getDefaultCollator() const = 0;
@@ -711,6 +713,10 @@ public:
 
     inline void setMinimumVisibleSnapshot(const Timestamp name) {
         return this->_impl().setMinimumVisibleSnapshot(name);
+    }
+
+    inline bool haveCappedWaiters() {
+        return this->_impl().haveCappedWaiters();
     }
 
     /**

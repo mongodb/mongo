@@ -356,6 +356,8 @@ public:
         _minVisibleSnapshot = name;
     }
 
+    bool haveCappedWaiters() final;
+
     /**
      * Notify (capped collection) waiters of data changes, like an insert.
      */

@@ -56,6 +56,9 @@ public:
         return Status::OK();
     }
 
+    bool haveCappedWaiters() {
+        return false;
+    }
     void notifyCappedWaitersIfNeeded() {}
 
     vector<DiskLoc> deleted;

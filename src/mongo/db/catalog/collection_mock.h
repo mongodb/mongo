@@ -280,6 +280,10 @@ public:
         std::abort();
     }
 
+    bool haveCappedWaiters() {
+        return false;
+    }
+
     void notifyCappedWaitersIfNeeded() {
         std::abort();
     }

@@ -1191,6 +1191,11 @@ bool WiredTigerRecordStore::isOpHidden_forTest(const RecordId& id) const {
         static_cast<std::uint64_t>(id.repr());
 }
 
+bool WiredTigerRecordStore::haveCappedWaiters() {
+    stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
+    return _cappedCallback && _cappedCallback->haveCappedWaiters();
+}
+
 void WiredTigerRecordStore::notifyCappedWaitersIfNeeded() {
     stdx::lock_guard<stdx::mutex> cappedCallbackLock(_cappedCallbackMutex);
     // This wakes up cursors blocking in await_data.

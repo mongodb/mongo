@@ -515,11 +515,16 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
     return status;
 }
 
+bool CollectionImpl::haveCappedWaiters() {
+    // Waiters keep a shared_ptr to '_cappedNotifier', so there are waiters if this CollectionImpl's
+    // shared_ptr is not unique (use_count > 1).
+    return _cappedNotifier.use_count() > 1;
+}
+
 void CollectionImpl::notifyCappedWaitersIfNeeded() {
     // If there is a notifier object and another thread is waiting on it, then we notify
-    // waiters of this document insert. Waiters keep a shared_ptr to '_cappedNotifier', so
-    // there are waiters if this CollectionImpl's shared_ptr is not unique (use_count > 1).
-    if (_cappedNotifier && !_cappedNotifier.unique())
+    // waiters of this document insert.
+    if (haveCappedWaiters())
         _cappedNotifier->notifyAll();
 }
 

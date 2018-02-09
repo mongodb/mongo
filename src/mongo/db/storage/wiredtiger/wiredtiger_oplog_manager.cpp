@@ -33,6 +33,8 @@
 
 #include <cstring>
 
+#include "mongo/db/server_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -165,6 +167,32 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
             MONGO_IDLE_THREAD_BLOCK;
             _opsWaitingForJournalCV.wait(lk,
                                          [&] { return _shuttingDown || _opsWaitingForJournal; });
+
+            // If we're not shutting down and nobody is actively waiting for the oplog to become
+            // durable, delay journaling a bit to reduce the sync rate.
+            auto journalDelay = Milliseconds(storageGlobalParams.journalCommitIntervalMs.load());
+            if (journalDelay == Milliseconds(0)) {
+                journalDelay = Milliseconds(WiredTigerKVEngine::kDefaultJournalDelayMillis);
+            }
+            auto now = Date_t::now();
+            auto deadline = now + journalDelay;
+            auto shouldSyncOpsWaitingForJournal = [&] {
+                return _shuttingDown || oplogRecordStore->haveCappedWaiters() ||
+                    serverGlobalParams.featureCompatibility.getVersion() !=
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36;
+            };
+
+            // Eventually it would be more optimal to merge this with the normal journal flushing
+            // and block for oplog tailers to show up. For now this loop will poll once a
+            // millisecond up to the journalDelay to see if we have any waiters yet. This reduces
+            // sync-related I/O on the primary when secondaries are lagged, but will avoid
+            // significant delays in confirming majority writes on replica sets with infrequent
+            // writes.
+            while (now < deadline &&
+                   !_opsWaitingForJournalCV.wait_until(
+                       lk, now.toSystemTimePoint(), shouldSyncOpsWaitingForJournal)) {
+                now += Milliseconds(1);
+            }
         }
 
         while (!_shuttingDown && MONGO_FAIL_POINT(WTPausePrimaryOplogDurabilityLoop)) {
@@ -177,6 +205,7 @@ void WiredTigerOplogManager::_oplogJournalThreadLoop(WiredTigerSessionCache* ses
             log() << "oplog journal thread loop shutting down";
             return;
         }
+        invariant(_opsWaitingForJournal);
         _opsWaitingForJournal = false;
         lk.unlock();
 
