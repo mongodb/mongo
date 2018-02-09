@@ -260,6 +260,8 @@ public:
     // Returns false if the oplog was dropped while waiting for a deletion request.
     bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx);
 
+    bool haveCappedWaiters();
+
     void notifyCappedWaitersIfNeeded();
 
     class OplogStones;
