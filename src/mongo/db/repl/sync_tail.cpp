@@ -40,6 +40,7 @@
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -280,6 +281,13 @@ NamespaceString parseUUIDOrNs(OperationContext* opCtx, const OplogEntry& oplogEn
     return nss;
 }
 
+NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const BSONObj& op) {
+    if (auto ui = op["ui"]) {
+        return {nss.db(), uassertStatusOK(UUID::parse(ui))};
+    }
+    return {nss};
+}
+
 }  // namespace
 
 SyncTail::SyncTail(BackgroundSync* q, MultiSyncApplyFunc func)
@@ -348,48 +356,24 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 
     if (isCrudOpType(opType)) {
         return writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
-            // DB lock always acquires the global lock
-            Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
-            auto ui = op["ui"];
-            NamespaceString actualNss = nss;
-            if (ui) {
-                auto statusWithUUID = UUID::parse(ui);
-                if (!statusWithUUID.isOK())
-                    return statusWithUUID.getStatus();
-                // We may be replaying operations on a collection that was renamed since. If so,
-                // it must have been in the same database or it would have gotten a new UUID.
-                // Need to throw instead of returning a status for it to be properly ignored.
-                actualNss = UUIDCatalog::get(opCtx).lookupNSSByUUID(statusWithUUID.getValue());
-                if (actualNss.isEmpty()) {
-                    if (opType[0] == 'd') {
-                        return Status::OK();
-                    }
-                    uasserted(ErrorCodes::NamespaceNotFound,
-                              str::stream()
-                                  << "Failed to apply operation due to missing collection ("
-                                  << statusWithUUID.getValue()
-                                  << "): "
-                                  << redact(op.toString()));
-                }
-                dassert(actualNss.db() == nss.db());
-            }
-            Lock::CollectionLock collLock(opCtx->lockState(), actualNss.ns(), MODE_IX);
-
             // Need to throw instead of returning a status for it to be properly ignored.
-            Database* db = dbHolder().get(opCtx, actualNss.db());
-            if (!db) {
+            try {
+                AutoGetCollection autoColl(opCtx, getNsOrUUID(nss, op), MODE_IX);
+                auto db = autoColl.getDb();
+                uassert(ErrorCodes::NamespaceNotFound,
+                        str::stream() << "missing database (" << nss.db() << ")",
+                        db);
+                OldClientContext ctx(opCtx, autoColl.getNss().ns(), db, /*justCreated*/ false);
+                return applyOp(ctx.db());
+            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+                // Delete operations on non-existent namespaces can be treated as successful for
+                // idempotency reasons.
                 if (opType[0] == 'd') {
                     return Status::OK();
                 }
-                uasserted(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Failed to apply operation due to missing database ("
-                                        << actualNss.db()
-                                        << "): "
-                                        << redact(op.toString()));
+                ex.addContext(str::stream() << "Failed to apply operation: " << redact(op));
+                throw;
             }
-
-            OldClientContext ctx(opCtx, actualNss.ns(), db, /*justCreated*/ false);
-            return applyOp(ctx.db());
         });
     }
 
