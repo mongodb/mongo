@@ -45,14 +45,6 @@ AtomicUInt64 sessionIdCounter(0);
 
 Session::Session() : _id(sessionIdCounter.addAndFetch(1)), _tags(kPending) {}
 
-Ticket Session::sourceMessage(Message* message, Date_t expiration) {
-    return getTransportLayer()->sourceMessage(shared_from_this(), message, expiration);
-}
-
-Ticket Session::sinkMessage(const Message& message, Date_t expiration) {
-    return getTransportLayer()->sinkMessage(shared_from_this(), message, expiration);
-}
-
 void Session::setTags(TagMask tagsToSet) {
     mutateTags([tagsToSet](TagMask originalTags) { return (originalTags | tagsToSet); });
 }

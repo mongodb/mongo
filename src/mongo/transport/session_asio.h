@@ -32,6 +32,7 @@
 
 #include "mongo/base/system_error.h"
 #include "mongo/config.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/transport/asio_utils.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/net/sock.h"
@@ -50,16 +51,13 @@ namespace transport {
 
 using GenericSocket = asio::generic::stream_protocol::socket;
 
-class TransportLayerASIO::ASIOSession : public Session {
+class TransportLayerASIO::ASIOSession final : public Session {
     MONGO_DISALLOW_COPYING(ASIOSession);
 
 public:
     ASIOSession(TransportLayerASIO* tl, GenericSocket socket)
         : _socket(std::move(socket)), _tl(tl) {
         std::error_code ec;
-
-        _socket.non_blocking(_tl->_listenerOptions.transportMode == Mode::kAsynchronous, ec);
-        fassert(40490, ec.value() == 0);
 
         auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
         if (family == AF_INET || family == AF_INET6) {
@@ -76,7 +74,7 @@ public:
     }
 
     ~ASIOSession() {
-        shutdown();
+        end();
     }
 
     TransportLayer* getTransportLayer() const override {
@@ -91,16 +89,7 @@ public:
         return _local;
     }
 
-    GenericSocket& getSocket() {
-#ifdef MONGO_CONFIG_SSL
-        if (_sslSocket) {
-            return static_cast<GenericSocket&>(_sslSocket->lowest_layer());
-        }
-#endif
-        return _socket;
-    }
-
-    void shutdown() {
+    void end() override {
         if (getSocket().is_open()) {
             std::error_code ec;
             getSocket().cancel();
@@ -111,6 +100,76 @@ public:
         }
     }
 
+    StatusWith<Message> sourceMessage() override {
+        ensureSync();
+        auto out = StatusWith<Message>(ErrorCodes::InternalError, "uninitialized...");
+        bool called = false;
+        sourceMessageImpl(true, [&](StatusWith<Message> in) {
+            out = std::move(in);
+            called = true;
+        });
+        invariant(called);
+        return out;
+    }
+
+    void asyncSourceMessage(std::function<void(StatusWith<Message>)> cb) override {
+        ensureAsync();
+        sourceMessageImpl(false, std::move(cb));
+    }
+
+    Status sinkMessage(Message message) override {
+        ensureSync();
+
+        std::error_code ec;
+        size_t size;
+        bool called = false;
+
+        write(true,
+              asio::buffer(message.buf(), message.size()),
+              [&](const std::error_code& ec_, size_t size_) {
+                  ec = ec_;
+                  size = size_;
+                  called = true;
+              });
+        invariant(called);
+
+        if (ec)
+            return errorCodeToStatus(ec);
+
+        invariant(size == size_t(message.size()));
+        networkCounter.hitPhysicalOut(message.size());
+        return Status::OK();
+    }
+
+    void asyncSinkMessage(Message message, std::function<void(Status)> cb) override {
+        ensureAsync();
+
+        write(false, asio::buffer(message.buf(), message.size()), [
+            message,  // keep the buffer alive.
+            cb = std::move(cb),
+            this
+        ](const std::error_code& ec, size_t size) {
+            if (ec) {
+                cb(errorCodeToStatus(ec));
+                return;
+            }
+            invariant(size == size_t(message.size()));
+            networkCounter.hitPhysicalOut(message.size());
+            cb(Status::OK());
+        });
+    };
+
+
+private:
+    GenericSocket& getSocket() {
+#ifdef MONGO_CONFIG_SSL
+        if (_sslSocket) {
+            return static_cast<GenericSocket&>(_sslSocket->lowest_layer());
+        }
+#endif
+        return _socket;
+    }
+
     bool isOpen() const {
 #ifdef MONGO_CONFIG_SSL
         return _sslSocket ? _sslSocket->lowest_layer().is_open() : _socket.is_open();
@@ -118,6 +177,55 @@ public:
         return _socket.is_open();
 #endif
     }
+
+    template <typename Callback>
+    void sourceMessageImpl(bool sync, Callback&& cb) {
+        static constexpr auto kHeaderSize = sizeof(MSGHEADER::Value);
+
+        auto headerBuffer = SharedBuffer::allocate(kHeaderSize);
+        auto ptr = headerBuffer.get();
+        read(sync,
+             asio::buffer(ptr, kHeaderSize),
+             [ cb = std::forward<Callback>(cb), headerBuffer = std::move(headerBuffer), this ](
+                 const std::error_code& ec, size_t size) mutable {
+
+                 if (ec)
+                     return cb(errorCodeToStatus(ec));
+                 invariant(size == kHeaderSize);
+
+                 const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
+                 if (msgLen < kHeaderSize || msgLen > MaxMessageSizeBytes) {
+                     StringBuilder sb;
+                     sb << "recv(): message msgLen " << msgLen << " is invalid. "
+                        << "Min " << kHeaderSize << " Max: " << MaxMessageSizeBytes;
+                     const auto str = sb.str();
+                     LOG(0) << str;
+
+                     return cb(Status(ErrorCodes::ProtocolError, str));
+                 }
+
+                 if (msgLen == size) {
+                     // This probably isn't a real case since all (current) messages have bodies.
+                     networkCounter.hitPhysicalIn(msgLen);
+                     return cb(Message(std::move(headerBuffer)));
+                 }
+
+                 auto buffer = SharedBuffer::allocate(msgLen);
+                 memcpy(buffer.get(), headerBuffer.get(), kHeaderSize);
+
+                 MsgData::View msgView(buffer.get());
+                 read(true,
+                      asio::buffer(msgView.data(), msgView.dataLen()),
+                      [ cb = std::move(cb), buffer = std::move(buffer), msgLen, this ](
+                          const std::error_code& ec, size_t size) mutable {
+                          if (ec)
+                              return cb(errorCodeToStatus(ec));
+                          networkCounter.hitPhysicalIn(msgLen);
+                          return cb(Message(std::move(buffer)));
+                      });
+             });
+    }
+
 
     template <typename MutableBufferSequence, typename CompleteHandler>
     void read(bool sync, const MutableBufferSequence& buffers, CompleteHandler&& handler) {
@@ -127,7 +235,8 @@ public:
                 sync, *_sslSocket, buffers, std::forward<CompleteHandler>(handler));
         } else if (!_ranHandshake) {
             invariant(asio::buffer_size(buffers) >= sizeof(MSGHEADER::Value));
-            auto postHandshakeCb = [this, sync, buffers, handler](Status status, bool needsRead) {
+            auto postHandshakeCb = [this, sync, buffers, handler](Status status,
+                                                                  bool needsRead) mutable {
                 if (status.isOK()) {
                     if (needsRead) {
                         read(sync, buffers, handler);
@@ -142,7 +251,7 @@ public:
 
             auto handshakeRecvCb =
                 [ this, postHandshakeCb = std::move(postHandshakeCb), sync, buffers ](
-                    const std::error_code& ec, size_t size) {
+                    const std::error_code& ec, size_t size) mutable {
                 _ranHandshake = true;
                 if (ec) {
                     postHandshakeCb(errorCodeToStatus(ec), size);
@@ -152,30 +261,41 @@ public:
                 maybeHandshakeSSL(sync, buffers, std::move(postHandshakeCb));
             };
 
-            opportunisticRead(sync, _socket, buffers, std::move(handshakeRecvCb));
-        } else {
-
-#endif
-            opportunisticRead(sync, _socket, buffers, std::forward<CompleteHandler>(handler));
-#ifdef MONGO_CONFIG_SSL
+            return opportunisticRead(sync, _socket, buffers, std::move(handshakeRecvCb));
         }
 #endif
+        return opportunisticRead(sync, _socket, buffers, std::forward<CompleteHandler>(handler));
     }
 
     template <typename ConstBufferSequence, typename CompleteHandler>
     void write(bool sync, const ConstBufferSequence& buffers, CompleteHandler&& handler) {
 #ifdef MONGO_CONFIG_SSL
         if (_sslSocket) {
-            opportunisticWrite(sync, *_sslSocket, buffers, std::forward<CompleteHandler>(handler));
-        } else {
-#endif
-            opportunisticWrite(sync, _socket, buffers, std::forward<CompleteHandler>(handler));
-#ifdef MONGO_CONFIG_SSL
+            return opportunisticWrite(
+                sync, *_sslSocket, buffers, std::forward<CompleteHandler>(handler));
         }
 #endif
+        return opportunisticWrite(sync, _socket, buffers, std::forward<CompleteHandler>(handler));
     }
 
-private:
+    void ensureSync() {
+        if (_blockingMode == Sync)
+            return;
+        asio::error_code ec;
+        getSocket().non_blocking(false, ec);
+        fassertStatusOK(40490, errorCodeToStatus(ec));
+        _blockingMode = Sync;
+    }
+
+    void ensureAsync() {
+        if (_blockingMode == Async)
+            return;
+        asio::error_code ec;
+        getSocket().non_blocking(true, ec);
+        fassertStatusOK(50706, errorCodeToStatus(ec));
+        _blockingMode = Async;
+    }
+
     template <typename Stream, typename MutableBufferSequence, typename CompleteHandler>
     void opportunisticRead(bool sync,
                            Stream& stream,
@@ -243,7 +363,7 @@ private:
             _sslSocket.emplace(std::move(_socket), *_tl->_sslContext);
 
             auto handshakeCompleteCb = [ this, onComplete = std::move(onComplete) ](
-                const std::error_code& ec, size_t size) {
+                const std::error_code& ec, size_t size) mutable {
                 auto& sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());
 
                 if (!ec && sslPeerInfo.subjectName.empty()) {
@@ -296,6 +416,14 @@ private:
         }
     }
 #endif
+
+    enum BlockingMode {
+        Unknown,
+        Sync,
+        Async,
+    };
+
+    BlockingMode _blockingMode = Unknown;
 
     HostAndPort _remote;
     HostAndPort _local;

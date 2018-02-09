@@ -33,7 +33,6 @@
 #include "mongo/base/status.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/mock_session.h"
-#include "mongo/transport/mock_ticket.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
@@ -43,54 +42,8 @@ namespace transport {
 
 TransportLayerMock::TransportLayerMock() : _shutdown(false) {}
 
-Ticket TransportLayerMock::sourceMessage(const SessionHandle& session,
-                                         Message* message,
-                                         Date_t expiration) {
-    if (inShutdown()) {
-        return Ticket(TransportLayer::ShutdownStatus);
-    } else if (!owns(session->id())) {
-        return Ticket(TransportLayer::SessionUnknownStatus);
-    } else if (_sessions[session->id()].ended) {
-        return Ticket(TransportLayer::TicketSessionClosedStatus);
-    }
-
-    return Ticket(this, stdx::make_unique<transport::MockTicket>(session, message, expiration));
-}
-
-Ticket TransportLayerMock::sinkMessage(const SessionHandle& session,
-                                       const Message& message,
-                                       Date_t expiration) {
-    if (inShutdown()) {
-        return Ticket(TransportLayer::ShutdownStatus);
-    } else if (!owns(session->id())) {
-        return Ticket(TransportLayer::SessionUnknownStatus);
-    } else if (_sessions[session->id()].ended) {
-        return Ticket(TransportLayer::TicketSessionClosedStatus);
-    }
-
-    return Ticket(this, stdx::make_unique<transport::MockTicket>(session, expiration));
-}
-
-Status TransportLayerMock::wait(Ticket&& ticket) {
-    if (inShutdown()) {
-        return ShutdownStatus;
-    } else if (!ticket.valid()) {
-        return ticket.status();
-    } else if (!owns(ticket.sessionId())) {
-        return TicketSessionUnknownStatus;
-    } else if (_sessions[ticket.sessionId()].ended) {
-        return TransportLayer::TicketSessionClosedStatus;
-    }
-
-    return Status::OK();
-}
-
-void TransportLayerMock::asyncWait(Ticket&& ticket, TicketCallback callback) {
-    callback(wait(std::move(ticket)));
-}
-
 SessionHandle TransportLayerMock::createSession() {
-    auto session = MockSession::create(this);
+    auto session = createSessionHook ? createSessionHook(this) : MockSession::create(this);
     Session::Id sessionId = session->id();
 
     _sessions[sessionId] = Connection{false, session, SSLPeerInfo()};
@@ -107,12 +60,6 @@ SessionHandle TransportLayerMock::get(Session::Id id) {
 
 bool TransportLayerMock::owns(Session::Id id) {
     return _sessions.count(id) > 0;
-}
-
-void TransportLayerMock::end(const SessionHandle& session) {
-    if (!owns(session->id()))
-        return;
-    _sessions[session->id()].ended = true;
 }
 
 Status TransportLayerMock::setup() {

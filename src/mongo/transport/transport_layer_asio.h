@@ -38,7 +38,6 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/transport/ticket_impl.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_mode.h"
 #include "mongo/util/net/hostandport.h"
@@ -93,20 +92,6 @@ public:
 
     virtual ~TransportLayerASIO();
 
-    Ticket sourceMessage(const SessionHandle& session,
-                         Message* message,
-                         Date_t expiration = Ticket::kNoExpirationDate) final;
-
-    Ticket sinkMessage(const SessionHandle& session,
-                       const Message& message,
-                       Date_t expiration = Ticket::kNoExpirationDate) final;
-
-    Status wait(Ticket&& ticket) final;
-
-    void asyncWait(Ticket&& ticket, TicketCallback callback) final;
-
-    void end(const SessionHandle& session) final;
-
     Status setup() final;
     Status start() final;
 
@@ -120,9 +105,6 @@ public:
 
 private:
     class ASIOSession;
-    class ASIOTicket;
-    class ASIOSourceTicket;
-    class ASIOSinkTicket;
 
     using ASIOSessionHandle = std::shared_ptr<ASIOSession>;
     using ConstASIOSessionHandle = std::shared_ptr<const ASIOSession>;

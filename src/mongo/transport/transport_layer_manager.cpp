@@ -49,26 +49,6 @@ namespace transport {
 
 TransportLayerManager::TransportLayerManager() = default;
 
-Ticket TransportLayerManager::sourceMessage(const SessionHandle& session,
-                                            Message* message,
-                                            Date_t expiration) {
-    return session->getTransportLayer()->sourceMessage(session, message, expiration);
-}
-
-Ticket TransportLayerManager::sinkMessage(const SessionHandle& session,
-                                          const Message& message,
-                                          Date_t expiration) {
-    return session->getTransportLayer()->sinkMessage(session, message, expiration);
-}
-
-Status TransportLayerManager::wait(Ticket&& ticket) {
-    return getTicketTransportLayer(ticket)->wait(std::move(ticket));
-}
-
-void TransportLayerManager::asyncWait(Ticket&& ticket, TicketCallback callback) {
-    return getTicketTransportLayer(ticket)->asyncWait(std::move(ticket), std::move(callback));
-}
-
 template <typename Callable>
 void TransportLayerManager::_foreach(Callable&& cb) const {
     {
@@ -77,10 +57,6 @@ void TransportLayerManager::_foreach(Callable&& cb) const {
             cb(tl.get());
         }
     }
-}
-
-void TransportLayerManager::end(const SessionHandle& session) {
-    session->getTransportLayer()->end(session);
 }
 
 // TODO Right now this and setup() leave TLs started if there's an error. In practice the server

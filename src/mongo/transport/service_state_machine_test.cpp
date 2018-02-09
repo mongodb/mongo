@@ -38,7 +38,6 @@
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/mock_session.h"
-#include "mongo/transport/mock_ticket.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_task_names.h"
@@ -115,62 +114,59 @@ private:
 using namespace transport;
 class MockTL : public TransportLayerMock {
 public:
-    ~MockTL() = default;
+    class Session : public MockSession {
+    public:
+        using MockSession::MockSession;
 
-    Ticket sourceMessage(const SessionHandle& session,
-                         Message* message,
-                         Date_t expiration = Ticket::kNoExpirationDate) override {
-        ASSERT_EQ(_ssm->state(), ServiceStateMachine::State::Source);
-        _lastTicketSource = true;
+        StatusWith<Message> sourceMessage() override {
+            auto tl = checked_cast<MockTL*>(getTransportLayer());
+            ASSERT_EQ(tl->_ssm->state(), ServiceStateMachine::State::SourceWait);
+            tl->_lastTicketSource = true;
 
-        _ranSource = true;
-        log() << "In sourceMessage";
+            tl->_ranSource = true;
+            log() << "In sourceMessage";
 
-        if (_nextShouldFail & Source) {
-            return TransportLayer::TicketSessionClosedStatus;
+            if (tl->_waitHook)
+                tl->_waitHook();
+
+            if (tl->_nextShouldFail & Source) {
+                return TransportLayer::TicketSessionClosedStatus;
+            }
+
+            auto out = MockSession::sourceMessage();
+            if (out.isOK()) {
+                OpMsgBuilder builder;
+                builder.setBody(BSON("ping" << 1));
+                out.getValue() = builder.finish();
+            }
+            return out;
         }
 
-        OpMsgBuilder builder;
-        builder.setBody(BSON("ping" << 1));
-        *message = builder.finish();
+        Status sinkMessage(Message message) override {
+            auto tl = checked_cast<MockTL*>(getTransportLayer());
+            ASSERT_EQ(tl->_ssm->state(), ServiceStateMachine::State::SinkWait);
+            tl->_lastTicketSource = false;
 
-        return TransportLayerMock::sourceMessage(session, message, expiration);
-    }
+            log() << "In sinkMessage";
+            tl->_ranSink = true;
 
-    Ticket sinkMessage(const SessionHandle& session,
-                       const Message& message,
-                       Date_t expiration = Ticket::kNoExpirationDate) override {
-        ASSERT_EQ(_ssm->state(), ServiceStateMachine::State::Process);
-        _lastTicketSource = false;
+            if (tl->_waitHook)
+                tl->_waitHook();
 
-        log() << "In sinkMessage";
-        _ranSink = true;
+            if (tl->_nextShouldFail & Sink) {
+                return TransportLayer::TicketSessionClosedStatus;
+            }
 
-        if (_nextShouldFail & Sink) {
-            return TransportLayer::TicketSessionClosedStatus;
+            auto out = MockSession::sinkMessage(message);
+            if (out.isOK())
+                tl->_lastSunk = message;
+
+            return out;
         }
+    };
 
-        _lastSunk = message;
-
-        return TransportLayerMock::sinkMessage(session, message, expiration);
-    }
-
-    Status wait(Ticket&& ticket) override {
-        if (!ticket.valid()) {
-            return ticket.status();
-        }
-        ASSERT_EQ(_ssm->state(),
-                  _lastTicketSource ? ServiceStateMachine::State::SourceWait
-                                    : ServiceStateMachine::State::SinkWait);
-
-        log() << "In wait. ssm state: " << stateToString(_ssm->state());
-        if (_waitHook)
-            _waitHook();
-        return TransportLayerMock::wait(std::move(ticket));
-    }
-
-    void asyncWait(Ticket&& ticket, TicketCallback callback) override {
-        MONGO_UNREACHABLE;
+    MockTL() {
+        createSessionHook = [](TransportLayer* tl) { return std::make_unique<Session>(tl); };
     }
 
     void setSSM(ServiceStateMachine* ssm) {

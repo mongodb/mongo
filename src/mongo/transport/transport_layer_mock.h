@@ -31,8 +31,6 @@
 #include "mongo/base/status.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/ticket.h"
-#include "mongo/transport/ticket_impl.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/ssl_types.h"
@@ -51,27 +49,21 @@ public:
     TransportLayerMock();
     ~TransportLayerMock();
 
-    Ticket sourceMessage(const SessionHandle& session,
-                         Message* message,
-                         Date_t expiration = Ticket::kNoExpirationDate) override;
-    Ticket sinkMessage(const SessionHandle& session,
-                       const Message& message,
-                       Date_t expiration = Ticket::kNoExpirationDate) override;
-
-    Status wait(Ticket&& ticket) override;
-    void asyncWait(Ticket&& ticket, TicketCallback callback) override;
-
     SessionHandle createSession();
     SessionHandle get(Session::Id id);
     bool owns(Session::Id id);
-    void end(const SessionHandle& session) override;
 
     Status setup() override;
     Status start() override;
     void shutdown() override;
     bool inShutdown() const;
 
+    // Set to a factory function to use your own session type.
+    std::function<SessionHandle(TransportLayer*)> createSessionHook;
+
 private:
+    friend class MockSession;
+
     struct Connection {
         bool ended;
         SessionHandle session;

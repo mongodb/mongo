@@ -551,8 +551,7 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
 
         const auto closeConnectionElem = data["closeConnection"];
         if (closeConnectionElem.eoo() || closeConnectionElem.Bool()) {
-            auto transportSession = opCtx->getClient()->session();
-            transportSession->getTransportLayer()->end(transportSession);
+            opCtx->getClient()->session()->end();
         }
 
         const auto failBeforeCommitExceptionElem = data["failBeforeCommitExceptionCode"];

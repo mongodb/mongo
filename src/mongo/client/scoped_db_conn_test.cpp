@@ -118,10 +118,11 @@ public:
 
 private:
     void run(transport::SessionHandle session) {
-        Message inMessage;
-        if (!session->sourceMessage(&inMessage).wait().isOK()) {
+        auto swInMessage = session->sourceMessage();
+        if (!swInMessage.isOK()) {
             return;
         }
+        Message inMessage = swInMessage.getValue();
 
         auto request = rpc::opMsgRequestFromAnyProtocol(inMessage);
         commandRequestHook(request);
@@ -146,9 +147,8 @@ private:
             log() << "Delaying response for " << _replyDelay;
             sleepFor(_replyDelay);
         }
-        if (!session->sinkMessage(response).wait().isOK()) {
-            return;
-        }
+
+        session->sinkMessage(response).ignore();
     }
 
     /**

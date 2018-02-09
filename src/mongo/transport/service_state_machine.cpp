@@ -41,7 +41,6 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor_task_names.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/ticket.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -239,34 +238,43 @@ const transport::SessionHandle& ServiceStateMachine::_session() const {
 
 void ServiceStateMachine::_sourceMessage(ThreadGuard guard) {
     invariant(_inMessage.empty());
-    auto ticket = _session()->sourceMessage(&_inMessage);
-
+    invariant(_state.load() == State::Source);
     _state.store(State::SourceWait);
     guard.release();
 
     if (_transportMode == transport::Mode::kSynchronous) {
-        _sourceCallback([this](auto ticket) {
+        auto msg = [&] {
             MONGO_IDLE_THREAD_BLOCK;
-            return _session()->getTransportLayer()->wait(std::move(ticket));
-        }(std::move(ticket)));
+            return _session()->sourceMessage();
+        }();
+
+        if (msg.isOK()) {
+            _inMessage = std::move(msg.getValue());
+            invariant(!_inMessage.empty());
+        }
+        _sourceCallback(msg.getStatus());
     } else if (_transportMode == transport::Mode::kAsynchronous) {
-        _session()->getTransportLayer()->asyncWait(
-            std::move(ticket), [this](Status status) { _sourceCallback(status); });
+        _session()->asyncSourceMessage([this](StatusWith<Message> msg) {
+            if (msg.isOK()) {
+                _inMessage = std::move(msg.getValue());
+                invariant(!_inMessage.empty());
+            }
+            _sourceCallback(msg.getStatus());
+        });
     }
 }
 
 void ServiceStateMachine::_sinkMessage(ThreadGuard guard, Message toSink) {
     // Sink our response to the client
-    auto ticket = _session()->sinkMessage(toSink);
-
+    invariant(_state.load() == State::Process);
     _state.store(State::SinkWait);
     guard.release();
 
     if (_transportMode == transport::Mode::kSynchronous) {
-        _sinkCallback(_session()->getTransportLayer()->wait(std::move(ticket)));
+        _sinkCallback(_session()->sinkMessage(std::move(toSink)));
     } else if (_transportMode == transport::Mode::kAsynchronous) {
-        _session()->getTransportLayer()->asyncWait(
-            std::move(ticket), [this](Status status) { _sinkCallback(status); });
+        _session()->asyncSinkMessage(std::move(toSink),
+                                     [this](Status status) { _sinkCallback(std::move(status)); });
     }
 }
 
@@ -487,7 +495,7 @@ void ServiceStateMachine::terminate() {
     if (state() == State::Ended)
         return;
 
-    _session()->getTransportLayer()->end(_session());
+    _session()->end();
 }
 
 void ServiceStateMachine::terminateIfTagsDontMatch(transport::Session::TagMask tags) {

@@ -31,14 +31,11 @@
 #include "mongo/base/status.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/ticket.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace transport {
-
-class TicketImpl;
 
 /**
  * The TransportLayer moves Messages between transport::Endpoints and the database.
@@ -67,77 +64,6 @@ public:
     virtual ~TransportLayer() = default;
 
     /**
-     * Source (receive) a new Message for this Session.
-     *
-     * This method returns a work Ticket. The caller must complete the Ticket by
-     * passing it to either TransportLayer::wait() or TransportLayer::asyncWait().
-     *
-     * If an expiration date is given, the returned Ticket will expire at that time.
-     *
-     * When run, the returned Ticket will be exchanged for a Status. If the
-     * TransportLayer is unable to source a Message, this will be a failed status,
-     * and the passed-in Message buffer may be left in an invalid state.
-     */
-    virtual Ticket sourceMessage(const SessionHandle& session,
-                                 Message* message,
-                                 Date_t expiration = Ticket::kNoExpirationDate) = 0;
-
-    /**
-     * Sink (send) a new Message for this Session. This method should be used
-     * to send replies to a given host.
-     *
-     * This method returns a work Ticket. The caller must complete the Ticket by
-     * passing it to either TransportLayer::wait() or TransportLayer::asyncWait().
-     *
-     * If an expiration date is given, the returned Ticket will expire at that time.
-     *
-     * When run, the returned Ticket will be exchanged for a Status. If the
-     * TransportLayer is unable to sink the Message, this will be a failed status.
-     *
-     * This method does NOT take ownership of the sunk Message, which must be cleaned
-     * up by the caller.
-     */
-    virtual Ticket sinkMessage(const SessionHandle& session,
-                               const Message& message,
-                               Date_t expiration = Ticket::kNoExpirationDate) = 0;
-
-    /**
-     * Perform a synchronous wait on the given work Ticket. When this call returns,
-     * the Ticket will have been completed. A call to wait() consumes the Ticket.
-     *
-     * This thread may be used by the TransportLayer to run other Tickets that were
-     * enqueued prior to this call.
-     */
-    virtual Status wait(Ticket&& ticket) = 0;
-
-    /**
-     * Callback for Tickets that are run via asyncWait().
-     */
-    using TicketCallback = stdx::function<void(Status)>;
-
-    /**
-     * Perform an asynchronous wait on the given work Ticket. Once the Ticket has been
-     * completed, the passed-in callback will be invoked.
-     *
-     * This thread will not be used by the TransportLayer to perform work. The callback
-     * passed to asyncWait() may be run on any thread.
-     */
-    virtual void asyncWait(Ticket&& ticket, TicketCallback callback) = 0;
-
-    /**
-     * End the given Session. Tickets for this Session that have already been
-     * started via wait() or asyncWait() will complete, but may return a failed Status.
-     * Future calls to wait() or asyncWait() for this Session will fail. If this
-     * TransportLayer implementation is networked, any connections for this Session will
-     * be closed.
-     *
-     * ~Session() will automatically call end() with itself.
-     *
-     * This method is idempotent and synchronous.
-     */
-    virtual void end(const SessionHandle& session) = 0;
-
-    /**
      * Start the TransportLayer. After this point, the TransportLayer will begin accepting active
      * sessions from new transport::Endpoints.
      */
@@ -160,24 +86,6 @@ public:
 
 protected:
     TransportLayer() = default;
-
-    /**
-     * Return the implementation of this Ticket.
-     */
-    TicketImpl* getTicketImpl(const Ticket& ticket) {
-        return ticket.impl();
-    }
-
-    std::unique_ptr<TicketImpl> getOwnedTicketImpl(Ticket&& ticket) {
-        return std::move(ticket).releaseImpl();
-    }
-
-    /**
-     * Return the transport layer of this Ticket.
-     */
-    TransportLayer* getTicketTransportLayer(const Ticket& ticket) {
-        return ticket._tl;
-    }
 };
 
 }  // namespace transport

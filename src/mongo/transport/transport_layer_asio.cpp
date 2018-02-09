@@ -46,8 +46,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/transport/asio_utils.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/ticket.h"
-#include "mongo/transport/ticket_asio.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message.h"
@@ -84,48 +82,6 @@ TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
 }
 
 TransportLayerASIO::~TransportLayerASIO() = default;
-
-Ticket TransportLayerASIO::sourceMessage(const SessionHandle& session,
-                                         Message* message,
-                                         Date_t expiration) {
-    auto asioSession = checked_pointer_cast<ASIOSession>(session);
-    auto ticket = stdx::make_unique<ASIOSourceTicket>(asioSession, expiration, message);
-    return {this, std::move(ticket)};
-}
-
-Ticket TransportLayerASIO::sinkMessage(const SessionHandle& session,
-                                       const Message& message,
-                                       Date_t expiration) {
-    auto asioSession = checked_pointer_cast<ASIOSession>(session);
-    auto ticket = stdx::make_unique<ASIOSinkTicket>(asioSession, expiration, message);
-    return {this, std::move(ticket)};
-}
-
-Status TransportLayerASIO::wait(Ticket&& ticket) {
-    auto ownedASIOTicket = getOwnedTicketImpl(std::move(ticket));
-    auto asioTicket = checked_cast<ASIOTicket*>(ownedASIOTicket.get());
-
-    Status waitStatus = Status::OK();
-    asioTicket->fill(true, [&waitStatus](Status result) { waitStatus = result; });
-
-    return waitStatus;
-}
-
-void TransportLayerASIO::asyncWait(Ticket&& ticket, TicketCallback callback) {
-    auto ownedASIOTicket = std::shared_ptr<TicketImpl>(getOwnedTicketImpl(std::move(ticket)));
-    auto asioTicket = checked_cast<ASIOTicket*>(ownedASIOTicket.get());
-
-    asioTicket->fill(
-        false,
-        [ callback = std::move(callback),
-          ownedASIOTicket = std::move(ownedASIOTicket) ](Status status) { callback(status); });
-}
-
-// Must not be called while holding the TransportLayerASIO mutex.
-void TransportLayerASIO::end(const SessionHandle& session) {
-    auto asioSession = checked_pointer_cast<ASIOSession>(session);
-    asioSession->shutdown();
-}
 
 Status TransportLayerASIO::setup() {
     std::vector<std::string> listenAddrs;
