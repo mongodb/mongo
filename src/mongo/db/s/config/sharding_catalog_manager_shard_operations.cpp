@@ -93,7 +93,7 @@ StatusWith<std::string> generateNewShardName(OperationContext* opCtx) {
     auto findStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
         opCtx,
         kConfigReadSelector,
-        repl::ReadConcernLevel::kMajorityReadConcern,
+        repl::ReadConcernLevel::kLocalReadConcern,
         ShardType::ConfigNS,
         shardNameRegex.obj(),
         BSON(ShardType::name() << -1),
