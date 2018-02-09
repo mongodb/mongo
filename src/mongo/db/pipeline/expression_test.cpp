@@ -27,6 +27,7 @@
  */
 
 #include "mongo/platform/basic.h"
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/config.h"
 #include "mongo/db/jsobj.h"
@@ -2178,23 +2179,20 @@ TEST(ExpressionFromAccumulators, StdDevSamp) {
          {{}, Value(BSONNULL)}});
 }
 
-TEST(ExpressionFromAccumulators, Pow) {
-    assertExpectedResults(
-        "$pow",
-        {
-         {{Value(2), Value(5)}, Value(32)},
+TEST(ExpressionPowTest, NegativeOneRaisedToNegativeOddExponentShouldOutPutNegativeOne) {
+    assertExpectedResults("$pow",
+                          {
+                              {{Value(-1), Value(-1)}, Value(-1)},
+                              {{Value(-1), Value(-2)}, Value(1)},
+                              {{Value(-1), Value(-3)}, Value(-1)},
 
-         {{Value(-1), Value(-5)}, Value(-1)},
-         {{Value(-1), Value(-4)}, Value(1)},
-         {{Value(-1), Value(-3)}, Value(-1)},
-
-         {{Value(-1LL), Value(0LL)}, Value(1LL)},
-         {{Value(-1LL), Value(-1LL)}, Value(-1LL)},
-         {{Value(-1LL), Value(-2LL)}, Value(1LL)},
-         {{Value(-1LL), Value(-3LL)}, Value(-1LL)},
-         {{Value(-1LL), Value(-4LL)}, Value(1LL)},
-         {{Value(-1LL), Value(-5LL)}, Value(-1LL)},
-        });
+                              {{Value(-1LL), Value(0LL)}, Value(1LL)},
+                              {{Value(-1LL), Value(-1LL)}, Value(-1LL)},
+                              {{Value(-1LL), Value(-2LL)}, Value(1LL)},
+                              {{Value(-1LL), Value(-3LL)}, Value(-1LL)},
+                              {{Value(-1LL), Value(-4LL)}, Value(1LL)},
+                              {{Value(-1LL), Value(-5LL)}, Value(-1LL)},
+                          });
 }
 
 namespace FieldPath {
