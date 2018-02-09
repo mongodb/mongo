@@ -257,6 +257,8 @@ jsTestOptions = function() {
             skipValidationNamespaces: TestData.skipValidationNamespaces || [],
             skipCheckingUUIDsConsistentAcrossCluster:
                 TestData.skipCheckingUUIDsConsistentAcrossCluster || false,
+            skipCheckingCatalogCacheConsistencyWithShardingCatalog:
+                TestData.skipCheckingCatalogCacheConsistencyWithShardingCatalog || false,
             jsonSchemaTestFile: TestData.jsonSchemaTestFile,
             excludedDBsFromDBHash: TestData.excludedDBsFromDBHash,
             alwaysInjectTransactionNumber: TestData.alwaysInjectTransactionNumber,
