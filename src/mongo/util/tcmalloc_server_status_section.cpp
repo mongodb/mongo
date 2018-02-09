@@ -179,6 +179,8 @@ public:
                 sub, "pageheap_reserve_count", "tcmalloc.pageheap_reserve_count");
             appendNumericPropertyIfAvailable(
                 sub, "pageheap_total_reserve_bytes", "tcmalloc.pageheap_total_reserve_bytes");
+            appendNumericPropertyIfAvailable(
+                sub, "spinlock_total_delay_ns", "tcmalloc.spinlock_total_delay_ns");
 
 #if MONGO_HAVE_GPERFTOOLS_SIZE_CLASS_STATS
             if (verbosity >= 2) {
