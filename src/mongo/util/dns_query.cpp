@@ -43,6 +43,8 @@
 
 #include <boost/noncopyable.hpp>
 
+#include "mongo/bson/util/builder.h"
+
 // It is safe to include the implementation "headers" in an anonymous namespace, as the code is
 // meant to live in a single TU -- this one.  Include one of these headers last.
 #define MONGO_UTIL_DNS_QUERY_PLATFORM_INCLUDE_WHITELIST
@@ -68,15 +70,25 @@ std::vector<std::string> dns::lookupARecords(const std::string& service) {
     DNSQueryState dnsQuery;
     auto response = dnsQuery.lookup(service, DNSQueryClass::kInternet, DNSQueryType::kAddress);
 
-    if (response.size() == 0) {
-        uasserted(ErrorCodes::DNSProtocolError,
-                  "Looking up " + service + " A record yielded no results.");
+    std::vector<std::string> rv;
+
+    for (const auto& entry : response) {
+        try {
+            rv.push_back(entry.addressEntry());
+        } catch (const ExceptionFor<ErrorCodes::DNSRecordTypeMismatch>&) {
+        }
     }
 
-    std::vector<std::string> rv;
-    std::transform(begin(response), end(response), back_inserter(rv), [](const auto& entry) {
-        return entry.addressEntry();
-    });
+    if (rv.empty()) {
+        StringBuilder oss;
+        oss << "Looking up " << service << " A record yielded ";
+        if (response.size() == 0) {
+            oss << "no results.";
+        } else {
+            oss << "no A records but " << response.size() << " other records";
+        }
+        uasserted(ErrorCodes::DNSProtocolError, oss.str());
+    }
 
     return rv;
 }
@@ -88,9 +100,24 @@ std::vector<dns::SRVHostEntry> dns::lookupSRVRecords(const std::string& service)
 
     std::vector<SRVHostEntry> rv;
 
-    std::transform(begin(response), end(response), back_inserter(rv), [](const auto& entry) {
-        return entry.srvHostEntry();
-    });
+    for (const auto& entry : response) {
+        try {
+            rv.push_back(entry.srvHostEntry());
+        } catch (const ExceptionFor<ErrorCodes::DNSRecordTypeMismatch>&) {
+        }
+    }
+
+    if (rv.empty()) {
+        StringBuilder oss;
+        oss << "Looking up " << service << " SRV record yielded ";
+        if (response.size() == 0) {
+            oss << "no results.";
+        } else {
+            oss << "no SRV records but " << response.size() << " other records";
+        }
+        uasserted(ErrorCodes::DNSProtocolError, oss.str());
+    }
+
     return rv;
 }
 
@@ -102,20 +129,21 @@ std::vector<std::string> dns::lookupTXTRecords(const std::string& service) {
     std::vector<std::string> rv;
 
     for (auto& entry : response) {
-        auto txtEntry = entry.txtEntry();
-        rv.insert(end(rv),
-                  std::make_move_iterator(begin(txtEntry)),
-                  std::make_move_iterator(end(txtEntry)));
+        try {
+            auto txtEntry = entry.txtEntry();
+            rv.insert(end(rv),
+                      std::make_move_iterator(begin(txtEntry)),
+                      std::make_move_iterator(end(txtEntry)));
+        } catch (const ExceptionFor<ErrorCodes::DNSRecordTypeMismatch>&) {
+        }
     }
+
     return rv;
 }
 
 std::vector<std::string> dns::getTXTRecords(const std::string& service) try {
     return lookupTXTRecords(service);
-} catch (const DBException& ex) {
-    if (ex.code() == ErrorCodes::DNSHostNotFound) {
-        return {};
-    }
-    throw;
+} catch (const ExceptionFor<ErrorCodes::DNSHostNotFound>&) {
+    return {};
 }
 }  // namespace mongo

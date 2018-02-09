@@ -237,6 +237,7 @@ error_code("ForTestingErrorExtraInfo", 236, extra="ErrorExtraInfoExample")
 error_code("CursorKilled", 237)
 error_code("NotImplemented", 238)
 error_code("SnapshotTooOld", 239)
+error_code("DNSRecordTypeMismatch", 240)
 
 # Error codes 4000-8999 are reserved.
 
