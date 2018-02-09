@@ -86,9 +86,20 @@ variables:
       fi
 
       ${activate_virtualenv}
+      # shared scons cache testing
+      # if 'shared_scons_cache' enabled and project level 'disable_shared_scons_cache' is not true
+      # 'shared_scons_cache is set on a per variant basis
+      # 'disable_shared_scons_cache' is set on a project level and applies to all variants
+      if [ "${shared_scons_cache}" = "true" ] && [ "${disable_shared_scons_cache}" != "true" ]; then
+        echo "Shared cache - mounting file system"
+        sudo mount /efs -v || mount /efs
+        MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=shared IS_PATCH=${is_patch} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+      else
+      # Proceed with regular expansions generated
       # This script converts the generated version string into a sanitized version string for
       # use by scons and uploading artifacts as well as information about for the scons cache.
-      MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+      MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+      fi
 
 - &apply_compile_expansions
   command: expansions.update
@@ -2131,6 +2142,19 @@ post:
         if [ -d "${scons_cache_path}" ]; then
             $python buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
         fi
+
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        # umount shared scons mounts
+        sudo umount /efs || umount /efs
+
   - func: "cleanup environment"
 
 timeout:
@@ -6757,7 +6781,7 @@ buildvariants:
   expansions:
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
     compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    use_scons_cache: true
+    shared_scons_cache: true
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -9079,7 +9103,7 @@ buildvariants:
     lang_environment: LANG=C
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    use_scons_cache: true
+    shared_scons_cache: true
     scons_cache_mode: all
     build_mongoreplay: true
   tasks:
