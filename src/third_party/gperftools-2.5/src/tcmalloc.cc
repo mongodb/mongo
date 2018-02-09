@@ -769,6 +769,11 @@ class TCMallocImplementation : public MallocExtension {
       return true;
     }
 
+    if (strcmp(name, "tcmalloc.spinlock_total_delay_ns") == 0) {
+      *value = SpinLock::GetTotalDelayNanos();
+      return true;
+    }
+
     return false;
   }
 

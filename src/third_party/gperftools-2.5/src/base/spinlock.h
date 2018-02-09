@@ -107,6 +107,10 @@ class LOCKABLE SpinLock {
     return base::subtle::NoBarrier_Load(&lockword_) != kSpinLockFree;
   }
 
+  static base::subtle::Atomic64 GetTotalDelayNanos() {
+    return base::subtle::NoBarrier_Load(&totalDelayNanos_);
+  }
+
   static const base::LinkerInitialized LINKER_INITIALIZED;  // backwards compat
  private:
   enum { kSpinLockFree = 0 };
@@ -114,6 +118,8 @@ class LOCKABLE SpinLock {
   enum { kSpinLockSleeper = 2 };
 
   volatile Atomic32 lockword_;
+
+  static base::subtle::Atomic64 totalDelayNanos_;
 
   void SlowLock();
   void SlowUnlock();
