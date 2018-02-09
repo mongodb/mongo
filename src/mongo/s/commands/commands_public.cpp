@@ -275,6 +275,13 @@ public:
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOG(1) << "dropIndexes: " << nss << " cmd:" << redact(cmdObj);
 
+        // If the collection is sharded, we target all shards rather than just shards that own
+        // chunks for the collection, because some shard may have previously owned chunks but no
+        // longer does (and so, may have the index). However, we ignore NamespaceNotFound errors
+        // from individual shards, because some shards may have never owned chunks for the
+        // collection. We additionally ignore IndexNotFound errors, because the index may not have
+        // been built on a shard if the earlier createIndexes command coincided with the shard
+        // receiving its first chunk for the collection (see SERVER-31715).
         auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
             opCtx,
             dbName,
@@ -282,8 +289,11 @@ public:
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kNotIdempotent);
-        return appendRawResponses(
-            opCtx, &errmsg, &output, std::move(shardResponses), {ErrorCodes::NamespaceNotFound});
+        return appendRawResponses(opCtx,
+                                  &errmsg,
+                                  &output,
+                                  std::move(shardResponses),
+                                  {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound});
     }
 } dropIndexesCmd;
 
