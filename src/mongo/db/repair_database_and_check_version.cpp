@@ -67,29 +67,6 @@ constexpr StringData mustDowngradeErrorMsg =
 
 Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
                                                          const std::vector<std::string>& dbNames) {
-    // Check that all the collections have UUIDs.
-    bool isMmapV1 = opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1();
-    for (const auto& dbName : dbNames) {
-        Database* db = dbHolder().openDb(opCtx, dbName);
-        invariant(db);
-        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
-            Collection* coll = *collectionIt;
-            if (!coll->uuid()) {
-                // system.indexes and system.namespaces don't currently have UUIDs in MMAP.
-                // SERVER-29926 and SERVER-30095 will address this problem.
-                if (isMmapV1 && (coll->ns().coll() == "system.indexes" ||
-                                 coll->ns().coll() == "system.namespaces")) {
-                    continue;
-                }
-
-                // We expect all collections to have UUIDs starting in FCV 3.6, so if we are missing
-                // a UUID then the user never upgraded to FCV 3.6 and this startup attempt is
-                // illegal.
-                return {ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
-            }
-        }
-    }
-
     NamespaceString fcvNss(FeatureCompatibilityVersion::kCollection);
 
     // If the admin database does not exist, create it.
@@ -136,6 +113,56 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
                                fcvColl,
                                BSON("_id" << FeatureCompatibilityVersion::kParameterName),
                                featureCompatibilityVersion));
+
+    return Status::OK();
+}
+
+/**
+ * Checks that all replicated collections in the given list of 'dbNames' have UUIDs. Returns a
+ * MustDowngrade error status if any do not.
+ *
+ * Additionally assigns UUIDs to any non-replicated collections that are missing UUIDs.
+ */
+Status ensureAllCollectionsHaveUUIDs(OperationContext* opCtx,
+                                     const std::vector<std::string>& dbNames) {
+    bool isMmapV1 = opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1();
+    std::vector<NamespaceString> nonReplicatedCollNSSsWithoutUUIDs;
+    for (const auto& dbName : dbNames) {
+        Database* db = dbHolder().openDb(opCtx, dbName);
+        invariant(db);
+        for (auto collectionIt = db->begin(); collectionIt != db->end(); ++collectionIt) {
+            Collection* coll = *collectionIt;
+            if (!coll->uuid()) {
+                // system.indexes and system.namespaces don't currently have UUIDs in MMAP.
+                // SERVER-29926 and SERVER-30095 will address this problem.
+                if (isMmapV1 && (coll->ns().coll() == "system.indexes" ||
+                                 coll->ns().coll() == "system.namespaces")) {
+                    continue;
+                }
+
+                if (!coll->ns().isReplicated()) {
+                    nonReplicatedCollNSSsWithoutUUIDs.push_back(coll->ns());
+                    continue;
+                }
+
+                // We expect all collections to have UUIDs starting in FCV 3.6, so if we are missing
+                // a UUID then the user never upgraded to FCV 3.6 and this startup attempt is
+                // illegal.
+                return {ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
+            }
+        }
+    }
+
+    // Non-replicated collections are very easy to fix since they don't require a replication or
+    // sharding solution. So, regardless of what the cause might have been, we go ahead and add
+    // UUIDs to them to ensure UUID dependent code works.
+    //
+    // Note: v3.6 arbiters do not have UUIDs, so this code is necessary to add them on upgrade to
+    // v4.0.
+    for (const auto& collNSS : nonReplicatedCollNSSsWithoutUUIDs) {
+        uassertStatusOK(
+            collModForUUIDUpgrade(opCtx, collNSS, BSON("collMod" << collNSS.coll()), UUID::gen()));
+    }
 
     return Status::OK();
 }
@@ -233,6 +260,8 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     std::vector<std::string> dbNames;
     storageEngine->listDatabases(&dbNames);
 
+    bool repairVerifiedAllCollectionsHaveUUIDs = false;
+
     // Repair all databases first, so that we do not try to open them if they are in bad shape
     if (storageGlobalParams.repair) {
         invariant(!storageGlobalParams.readOnly);
@@ -240,6 +269,14 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             LOG(1) << "    Repairing database: " << dbName;
             fassert(18506, repairDatabase(opCtx, storageEngine, dbName));
         }
+
+        // All collections must have UUIDs before restoring the FCV document to a version that
+        // requires UUIDs.
+        Status uuidsStatus = ensureAllCollectionsHaveUUIDs(opCtx, dbNames);
+        if (!uuidsStatus.isOK()) {
+            return uuidsStatus;
+        }
+        repairVerifiedAllCollectionsHaveUUIDs = true;
 
         // Attempt to restore the featureCompatibilityVersion document if it is missing.
         NamespaceString nss(FeatureCompatibilityVersion::kCollection);
@@ -256,6 +293,14 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             if (!status.isOK()) {
                 return status;
             }
+        }
+    }
+
+    // All collections must have UUIDs.
+    if (!repairVerifiedAllCollectionsHaveUUIDs) {
+        Status uuidsStatus = ensureAllCollectionsHaveUUIDs(opCtx, dbNames);
+        if (!uuidsStatus.isOK()) {
+            return uuidsStatus;
         }
     }
 
@@ -318,9 +363,6 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     const bool shouldClearNonLocalTmpCollections =
         !(checkIfReplMissingFromCommandLine(opCtx) || replSettings.usingReplSets() ||
           replSettings.isSlave());
-
-    // To check whether we are upgrading to 3.6 or have already upgraded to 3.6.
-    bool collsHaveUuids = false;
 
     // To check whether a featureCompatibilityVersion document exists.
     bool fcvDocumentExists = false;
@@ -417,15 +459,6 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             }
         }
 
-        // Iterate through collections and check for UUIDs.
-        for (auto collectionIt = db->begin(); !collsHaveUuids && collectionIt != db->end();
-             ++collectionIt) {
-            Collection* coll = *collectionIt;
-            if (coll->uuid()) {
-                collsHaveUuids = true;
-            }
-        }
-
         // Major versions match, check indexes
         const NamespaceString systemIndexes(db->name(), "system.indexes");
 
@@ -482,21 +515,16 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     // Fail to start up if there is no featureCompatibilityVersion document and there are non-local
     // databases present.
     if (!fcvDocumentExists && nonLocalDatabases) {
-        if (collsHaveUuids) {
-            severe()
-                << "Unable to start up mongod due to missing featureCompatibilityVersion document.";
-            if (opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
-                severe()
-                    << "Please run with --journalOptions "
-                    << static_cast<int>(MMAPV1Options::JournalRecoverOnly)
-                    << " to recover the journal. Then run with --repair to restore the document.";
-            } else {
-                severe() << "Please run with --repair to restore the document.";
-            }
-            fassertFailedNoTrace(40652);
+        severe()
+            << "Unable to start up mongod due to missing featureCompatibilityVersion document.";
+        if (opCtx->getServiceContext()->getGlobalStorageEngine()->isMmapV1()) {
+            severe() << "Please run with --journalOptions "
+                     << static_cast<int>(MMAPV1Options::JournalRecoverOnly)
+                     << " to recover the journal. Then run with --repair to restore the document.";
         } else {
-            return {ErrorCodes::MustDowngrade, mustDowngradeErrorMsg};
+            severe() << "Please run with --repair to restore the document.";
         }
+        fassertFailedNoTrace(40652);
     }
 
     LOG(1) << "done repairDatabases";
