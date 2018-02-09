@@ -2193,6 +2193,22 @@ TEST(ExpressionFromAccumulators, StdDevSamp) {
          {{}, Value(BSONNULL)}});
 }
 
+TEST(ExpressionPowTest, NegativeOneRaisedToNegativeOddExponentShouldOutPutNegativeOne) {
+    assertExpectedResults("$pow",
+                          {
+                              {{Value(-1), Value(-1)}, Value(-1)},
+                              {{Value(-1), Value(-2)}, Value(1)},
+                              {{Value(-1), Value(-3)}, Value(-1)},
+
+                              {{Value(-1LL), Value(0LL)}, Value(1LL)},
+                              {{Value(-1LL), Value(-1LL)}, Value(-1LL)},
+                              {{Value(-1LL), Value(-2LL)}, Value(1LL)},
+                              {{Value(-1LL), Value(-3LL)}, Value(-1LL)},
+                              {{Value(-1LL), Value(-4LL)}, Value(1LL)},
+                              {{Value(-1LL), Value(-5LL)}, Value(-1LL)},
+                          });
+}
+
 namespace FieldPath {
 
 /** The provided field path does not pass validation. */

@@ -111,7 +111,7 @@ load('jstests/aggregation/extras/utils.js');
     testOp({$pow: [NumberInt("4"), NumberLong("-1")]}, 1 / 4);
     testOp({$pow: [NumberInt("1"), NumberLong("-2")]}, NumberLong("1"));
     testOp({$pow: [NumberInt("-1"), NumberLong("-2")]}, NumberLong("1"));
-
+    testOp({$pow: [NumberLong("-1"), NumberLong("-3")]}, NumberLong("-1"));
     // If result would overflow a long, return a double.
     testOp({$pow: [NumberInt("2"), NumberLong("63")]}, 9223372036854776000);
     // Exact decimal result
