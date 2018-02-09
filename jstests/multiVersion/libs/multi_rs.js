@@ -77,8 +77,9 @@ ReplSetTest.prototype.upgradeNode = function(node, opts = {}, user, pwd) {
         // Must retry this command, as it might return "currently running for election" and fail.
         // Node might still be running for an election that will fail because it lost the election
         // race with another node, at test initialization.  See SERVER-23133.
-        assert.soon(function() {
-            return (node.adminCommand("replSetMaintenance").ok);
+        assert.soonNoExcept(function() {
+            assert.commandWorked(node.adminCommand("replSetMaintenance"));
+            return true;
         });
         this.waitForState(node, ReplSetTest.State.RECOVERING);
     }
@@ -100,12 +101,21 @@ ReplSetTest.prototype.stepdown = function(nodeId) {
     assert.eq(this.getNodeId(this.getPrimary()), nodeId);
     var node = this.nodes[nodeId];
 
-    try {
-        node.getDB("admin").runCommand({replSetStepDown: 300, secondaryCatchUpPeriodSecs: 60});
-        assert(false);
-    } catch (ex) {
-        print('Caught exception after stepDown cmd: ' + tojson(ex));
-    }
+    assert.soonNoExcept(function() {
+        // Due to a rare race condition in stepdown, it's possible the secondary just replicated
+        // the most recent write and sent replSetUpdatePosition to the primary, and that
+        // replSetUpdatePosition command gets interrupted by the stepdown.  In that case,
+        // the secondary will clear its sync source, but will be unable to re-connect to the
+        // primary that is trying to step down, because they are at the same OpTime.  The primary
+        // will then get stuck waiting forever for the secondary to catch up so it can complete
+        // stepdown.  Adding a garbage write here ensures that the secondary will be able to
+        // resume syncing from the primary in this case, which in turn will let the primary
+        // finish stepping down successfully.
+        node.getDB('admin').garbageWriteToAdvanceOpTime.insert({a: 1});
+        assert.adminCommandWorkedAllowingNetworkError(
+            node, {replSetStepDown: 5 * 60, secondaryCatchUpPeriodSecs: 60});
+        return true;
+    });
 
     return this.reconnect(node);
 };
