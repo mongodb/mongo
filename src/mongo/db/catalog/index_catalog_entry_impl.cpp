@@ -44,6 +44,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/service_context.h"
@@ -203,38 +204,6 @@ void IndexCatalogEntryImpl::setHead(OperationContext* opCtx, RecordId newHead) {
     _head = newHead;
 }
 
-
-/**
- * RAII class, which associates a new RecoveryUnit with an OperationContext for the purposes
- * of simulating a side-transaction. Takes ownership of the new recovery unit and frees it at
- * destruction time.
- */
-class RecoveryUnitSwap {
-public:
-    RecoveryUnitSwap(OperationContext* opCtx, RecoveryUnit* newRecoveryUnit)
-        : _opCtx(opCtx),
-          _oldRecoveryUnit(_opCtx->releaseRecoveryUnit()),
-          _oldRecoveryUnitState(
-              _opCtx->setRecoveryUnit(newRecoveryUnit, OperationContext::kNotInUnitOfWork)),
-          _newRecoveryUnit(newRecoveryUnit) {}
-
-    ~RecoveryUnitSwap() {
-        _opCtx->releaseRecoveryUnit();
-        _opCtx->setRecoveryUnit(_oldRecoveryUnit, _oldRecoveryUnitState);
-    }
-
-private:
-    // Not owned
-    OperationContext* const _opCtx;
-
-    // Owned, but life-time is not controlled
-    RecoveryUnit* const _oldRecoveryUnit;
-    OperationContext::RecoveryUnitState const _oldRecoveryUnitState;
-
-    // Owned and life-time is controlled
-    const std::unique_ptr<RecoveryUnit> _newRecoveryUnit;
-};
-
 void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
                                         const MultikeyPaths& multikeyPaths) {
     if (!_indexTracksPathLevelMultikeyInfo && isMultikey()) {
@@ -267,63 +236,63 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
         }
     }
 
-    {
-        // Only one thread should set the multi-key value per collection, because the metadata for a
-        // collection is one large document.
-        Lock::ResourceLock collMDLock(
-            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X);
+    MultikeyPaths paths = _indexTracksPathLevelMultikeyInfo ? multikeyPaths : MultikeyPaths{};
 
-        if (!_indexTracksPathLevelMultikeyInfo && isMultikey()) {
-            // It's possible that we raced with another thread when acquiring the MD lock. If the
-            // index is already set as multikey and we don't have any path-level information to
-            // update, then there's nothing more for us to do.
-            return;
-        }
-
-        // This effectively emulates a side-transaction off the main transaction, which invoked
-        // setMultikey. The reason we need is to avoid artificial WriteConflicts, which happen with
-        // snapshot isolation.
-        {
-            StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
-
-            // This ensures that the recovery unit is not swapped for engines that do not support
-            // database level locking.
-            std::unique_ptr<RecoveryUnitSwap> ruSwap;
-            if (storageEngine->supportsDBLocking()) {
-                ruSwap =
-                    stdx::make_unique<RecoveryUnitSwap>(opCtx, storageEngine->newRecoveryUnit());
-            }
-
-            WriteUnitOfWork wuow(opCtx);
-
-            // It's possible that the index type (e.g. ascending/descending index) supports tracking
-            // path-level multikey information, but this particular index doesn't.
-            // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
-            // multikey information in order to avoid unintentionally setting path-level multikey
-            // information on an index created before 3.4.
-            if (_collection->setIndexIsMultikey(
-                    opCtx,
-                    _descriptor->indexName(),
-                    _indexTracksPathLevelMultikeyInfo ? multikeyPaths : MultikeyPaths{})) {
-                if (_infoCache) {
-                    LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
-                           << " set to multi key.";
-                    _infoCache->clearQueryCache();
-                }
-            }
-
-            wuow.commit();
-        }
+    // On a primary, we can simply assign this write the same timestamp as the index creation,
+    // insert, or update that caused this index to become multikey. This is because if two
+    // operations concurrently try to change the index to be multikey, they will conflict and the
+    // loser will simply get a higher timestamp and go into the oplog second with a later optime.
+    //
+    // On a secondary, writes must get the timestamp of their oplog entry, and the multikey change
+    // must occur before the timestamp of the earliest write that makes the index multikey.
+    // Secondaries only serialize writes by document, not by collection. If two inserts that both
+    // make an index multikey are applied out of order, changing the index to multikey at the
+    // insert timestamps would change the index to multikey at the later timestamp, which would be
+    // wrong. To prevent this, rather than setting the index to be multikey here, we add the
+    // necessary information to the OperationContext and do the write at the timestamp of the
+    // beginning of the batch.
+    //
+    // One exception to this rule is for background indexes. Background indexes are built using
+    // a different OperationContext and thus this information would be ignored. Background index
+    // builds happen concurrently though and thus the multikey write can safely occur at the
+    // current clock time. Once a background index is committed, if a future write makes
+    // it multikey, that write will be marked as "isTrackingMultikeyPathInfo" on the applier's
+    // OperationContext and we can safely defer that write to the end of the batch.
+    if (MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
+        MultikeyPathInfo info;
+        info.nss = _collection->ns();
+        info.indexName = _descriptor->indexName();
+        info.multikeyPaths = paths;
+        MultikeyPathTracker::get(opCtx).addMultikeyPathInfo(info);
+        return;
     }
 
-    _isMultikey.store(true);
+    // It's possible that the index type (e.g. ascending/descending index) supports tracking
+    // path-level multikey information, but this particular index doesn't.
+    // CollectionCatalogEntry::setIndexIsMultikey() requires that we discard the path-level
+    // multikey information in order to avoid unintentionally setting path-level multikey
+    // information on an index created before 3.4.
+    const bool indexMetadataHasChanged =
+        _collection->setIndexIsMultikey(opCtx, _descriptor->indexName(), paths);
 
-    if (_indexTracksPathLevelMultikeyInfo) {
-        stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
-        for (size_t i = 0; i < multikeyPaths.size(); ++i) {
-            _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+    // When the recovery unit commits, update the multikey paths if needed and clear the plan cache
+    // if the index metadata has changed.
+    opCtx->recoveryUnit()->onCommit([this, multikeyPaths, indexMetadataHasChanged] {
+        _isMultikey.store(true);
+
+        if (_indexTracksPathLevelMultikeyInfo) {
+            stdx::lock_guard<stdx::mutex> lk(_indexMultikeyPathsMutex);
+            for (size_t i = 0; i < multikeyPaths.size(); ++i) {
+                _indexMultikeyPaths[i].insert(multikeyPaths[i].begin(), multikeyPaths[i].end());
+            }
         }
-    }
+
+        if (indexMetadataHasChanged && _infoCache) {
+            LOG(1) << _ns << ": clearing plan cache - index " << _descriptor->keyPattern()
+                   << " set to multi key.";
+            _infoCache->clearQueryCache();
+        }
+    });
 }
 
 // ----

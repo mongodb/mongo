@@ -19,6 +19,9 @@ from .. import resmokeconfig
 # Mapping of the attribute of the parsed arguments (dest) to its key as it appears in the options
 # YAML configuration file. Most should only be converting from snake_case to camelCase.
 DEST_TO_CONFIG = {
+    "archive_file": "archiveFile",
+    "archive_limit_mb": "archiveLimitMb",
+    "archive_limit_tests": "archiveLimitTests",
     "base_port": "basePort",
     "buildlogger_url": "buildloggerUrl",
     "continue_on_failure": "continueOnFailure",
@@ -27,6 +30,8 @@ DEST_TO_CONFIG = {
     "distro_id": "distroId",
     "dry_run": "dryRun",
     "exclude_with_any_tags": "excludeWithAnyTags",
+    "execution_number": "executionNumber",
+    "git_revision": "gitRevision",
     "include_with_any_tags": "includeWithAnyTags",
     "jobs": "jobs",
     "mongo_executable": "mongo",
@@ -38,6 +43,7 @@ DEST_TO_CONFIG = {
     "num_clients_per_fixture": "numClientsPerFixture",
     "patch_build": "patchBuild",
     "prealloc_journal": "preallocJournal",
+    "project_name": "projectName",
     "repeat": "repeat",
     "report_failure_status": "reportFailureStatus",
     "report_file": "reportFile",
@@ -85,6 +91,23 @@ def parse_command_line():
     parser.add_option("--options", dest="options_file", metavar="OPTIONS",
                       help="A YAML file that specifies global options to resmoke.py.")
 
+    parser.add_option("--archiveFile", dest="archive_file", metavar="ARCHIVE_FILE",
+                      help=("Sets the archive file name for the Evergreen task running the tests."
+                            " The archive file is JSON format containing a list of tests that were"
+                            " successfully archived to S3. If unspecified, no data files from tests"
+                            " will be archived in S3. Tests can be designated for archival in the"
+                            " task suite configuration file."))
+
+    parser.add_option("--archiveLimitMb", type="int", dest="archive_limit_mb",
+                      metavar="ARCHIVE_LIMIT_MB",
+                      help=("Sets the limit (in MB) for archived files to S3. A value of 0"
+                            " indicates there is no limit."))
+
+    parser.add_option("--archiveLimitTests", type="int", dest="archive_limit_tests",
+                      metavar="ARCHIVE_LIMIT_TESTS",
+                      help=("Sets the maximum number of tests to archive to S3. A value"
+                            " of 0 indicates there is no limit."))
+
     parser.add_option("--basePort", dest="base_port", metavar="PORT",
                       help=("The starting port number to use for mongod and mongos processes"
                             " spawned by resmoke.py or the tests themselves. Each fixture and Job"
@@ -109,7 +132,7 @@ def parse_command_line():
                             " specified tags will be excluded from any suites that are run."))
 
     parser.add_option("-f", "--findSuites", action="store_true", dest="find_suites",
-                      help="List the names of the suites that will execute the specified tests.")
+                      help="Lists the names of the suites that will execute the specified tests.")
 
     parser.add_option("--includeWithAnyTags", action="append", dest="include_with_any_tags",
                       metavar="TAG1,TAG2",
@@ -118,20 +141,20 @@ def parse_command_line():
                             " run."))
 
     parser.add_option("-n", action="store_const", const="tests", dest="dry_run",
-                      help=("Output the tests that would be run."))
+                      help=("Outputs the tests that would be run."))
 
     # TODO: add support for --dryRun=commands
     parser.add_option("--dryRun", type="choice", action="store", dest="dry_run",
                       choices=("off", "tests"), metavar="MODE",
-                      help=("Instead of running the tests, output the tests that would be run"
+                      help=("Instead of running the tests, outputs the tests that would be run"
                             " (if MODE=tests). Defaults to MODE=%default."))
 
     parser.add_option("-j", "--jobs", type="int", dest="jobs", metavar="JOBS",
-                      help=("The number of Job instances to use. Each instance will receive its own"
-                            " MongoDB deployment to dispatch tests to."))
+                      help=("The number of Job instances to use. Each instance will receive its"
+                            " own MongoDB deployment to dispatch tests to."))
 
     parser.add_option("-l", "--listSuites", action="store_true", dest="list_suites",
-                      help="List the names of the suites available to execute.")
+                      help="Lists the names of the suites available to execute.")
 
     parser.add_option("--mongo", dest="mongo_executable", metavar="PATH",
                       help="The path to the mongo shell executable for resmoke.py to use.")
@@ -141,7 +164,7 @@ def parse_command_line():
 
     parser.add_option("--mongodSetParameters", dest="mongod_parameters",
                       metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-                      help=("Pass one or more --setParameter options to all mongod processes"
+                      help=("Passes one or more --setParameter options to all mongod processes"
                             " started by resmoke.py. The argument is specified as bracketed YAML -"
                             " i.e. JSON with support for single quoted and unquoted keys."))
 
@@ -150,27 +173,27 @@ def parse_command_line():
 
     parser.add_option("--mongosSetParameters", dest="mongos_parameters",
                       metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
-                      help=("Pass one or more --setParameter options to all mongos processes"
+                      help=("Passes one or more --setParameter options to all mongos processes"
                             " started by resmoke.py. The argument is specified as bracketed YAML -"
                             " i.e. JSON with support for single quoted and unquoted keys."))
 
     parser.add_option("--nojournal", action="store_true", dest="no_journal",
-                      help="Disable journaling for all mongod's.")
+                      help="Disables journaling for all mongod's.")
 
     parser.add_option("--nopreallocj", action="store_const", const="off", dest="prealloc_journal",
-                      help="Disable preallocation of journal files for all mongod processes.")
+                      help="Disables preallocation of journal files for all mongod processes.")
 
     parser.add_option("--numClientsPerFixture", type="int", dest="num_clients_per_fixture",
                       help="Number of clients running tests per fixture")
 
     parser.add_option("--preallocJournal", type="choice", action="store", dest="prealloc_journal",
                       choices=("on", "off"), metavar="ON|OFF",
-                      help=("Enable or disable preallocation of journal files for all mongod"
+                      help=("Enables or disables preallocation of journal files for all mongod"
                             " processes. Defaults to %default."))
 
     parser.add_option("--shellConnString", dest="shell_conn_string",
                       metavar="CONN_STRING",
-                      help="Override the default fixture and connect to an existing MongoDB"
+                      help="Overrides the default fixture and connect to an existing MongoDB"
                            " cluster instead. This is useful for connecting to a MongoDB"
                            " deployment started outside of resmoke.py including one running in a"
                            " debugger.")
@@ -181,7 +204,7 @@ def parse_command_line():
                            " This is useful for connecting to a server running in a debugger.")
 
     parser.add_option("--repeat", type="int", dest="repeat", metavar="N",
-                      help="Repeat the given suite(s) N times, or until one fails.")
+                      help="Repeats the given suite(s) N times, or until one fails.")
 
     parser.add_option("--reportFailureStatus", type="choice", action="store",
                       dest="report_failure_status", choices=("fail", "silentfail"),
@@ -191,7 +214,7 @@ def parse_command_line():
                            " never be silently ignored. Defaults to STATUS=%default.")
 
     parser.add_option("--reportFile", dest="report_file", metavar="REPORT",
-                      help="Write a JSON file with test status and timing information.")
+                      help="Writes a JSON file with test status and timing information.")
 
     parser.add_option("--seed", type="int", dest="seed", metavar="SEED",
                       help=("Seed for the random number generator. Useful in combination with the"
@@ -212,38 +235,38 @@ def parse_command_line():
                       help="The write mode used by the mongo shell.")
 
     parser.add_option("--shuffle", action="store_const", const="on", dest="shuffle",
-                      help=("Randomize the order in which tests are executed. This is equivalent"
+                      help=("Randomizes the order in which tests are executed. This is equivalent"
                             " to specifying --shuffleMode=on."))
 
     parser.add_option("--shuffleMode", type="choice", action="store", dest="shuffle",
                       choices=("on", "off", "auto"), metavar="ON|OFF|AUTO",
-                      help=("Control whether to randomize the order in which tests are executed."
+                      help=("Controls whether to randomize the order in which tests are executed."
                             " Defaults to auto when not supplied. auto enables randomization in"
                             " all cases except when the number of jobs requested is 1."))
 
     parser.add_option("--staggerJobs", type="choice", action="store", dest="stagger_jobs",
                       choices=("on", "off"), metavar="ON|OFF",
-                      help=("Enable or disable the stagger of launching resmoke jobs."
+                      help=("Enables or disables the stagger of launching resmoke jobs."
                             " Defaults to %default."))
 
     parser.add_option("--storageEngine", dest="storage_engine", metavar="ENGINE",
                       help="The storage engine used by dbtests and jstests.")
 
     parser.add_option("--storageEngineCacheSizeGB", dest="storage_engine_cache_size",
-                      metavar="CONFIG", help="Set the storage engine cache size configuration"
+                      metavar="CONFIG", help="Sets the storage engine cache size configuration"
                       " setting for all mongod's.")
 
     parser.add_option("--tagFile", dest="tag_file", metavar="OPTIONS",
                       help="A YAML file that associates tests and tags.")
 
     parser.add_option("--wiredTigerCollectionConfigString", dest="wt_coll_config", metavar="CONFIG",
-                      help="Set the WiredTiger collection configuration setting for all mongod's.")
+                      help="Sets the WiredTiger collection configuration setting for all mongod's.")
 
     parser.add_option("--wiredTigerEngineConfigString", dest="wt_engine_config", metavar="CONFIG",
-                      help="Set the WiredTiger engine configuration setting for all mongod's.")
+                      help="Sets the WiredTiger engine configuration setting for all mongod's.")
 
     parser.add_option("--wiredTigerIndexConfigString", dest="wt_index_config", metavar="CONFIG",
-                      help="Set the WiredTiger index configuration setting for all mongod's.")
+                      help="Sets the WiredTiger index configuration setting for all mongod's.")
 
     parser.add_option("--executor", dest="executor_file",
                       help="OBSOLETE: Superceded by --suites; specify --suites=SUITE path/to/test"
@@ -257,21 +280,34 @@ def parse_command_line():
     parser.add_option_group(evergreen_options)
 
     evergreen_options.add_option("--distroId", dest="distro_id", metavar="DISTRO_ID",
-                                 help=("Set the identifier for the Evergreen distro running the"
+                                 help=("Sets the identifier for the Evergreen distro running the"
+                                       " tests."))
+
+    evergreen_options.add_option("--executionNumber", type="int", dest="execution_number",
+                                 metavar="EXECUTION_NUMBER",
+                                 help=("Sets the number for the Evergreen execution running the"
+                                       " tests."))
+
+    evergreen_options.add_option("--gitRevision", dest="git_revision", metavar="GIT_REVISION",
+                                 help=("Sets the git revision for the Evergreen task running the"
                                        " tests."))
 
     evergreen_options.add_option("--patchBuild", action="store_true", dest="patch_build",
-                                 help=("Indicate that the Evergreen task running the tests is a"
+                                 help=("Indicates that the Evergreen task running the tests is a"
                                        " patch build."))
 
+    evergreen_options.add_option("--projectName", dest="project_name", metavar="PROJECT_NAME",
+                                 help=("Sets the name of the Evergreen project running the tests."
+                                       ))
+
     evergreen_options.add_option("--taskName", dest="task_name", metavar="TASK_NAME",
-                                 help="Set the name of the Evergreen task running the tests.")
+                                 help="Sets the name of the Evergreen task running the tests.")
 
     evergreen_options.add_option("--taskId", dest="task_id", metavar="TASK_ID",
-                                 help="Set the Id of the Evergreen task running the tests.")
+                                 help="Sets the Id of the Evergreen task running the tests.")
 
     evergreen_options.add_option("--variantName", dest="variant_name", metavar="VARIANT_NAME",
-                                 help=("Set the name of the Evergreen build variant running the"
+                                 help=("Sets the name of the Evergreen build variant running the"
                                        " tests."))
 
     parser.set_defaults(logger_file="console",
@@ -322,13 +358,19 @@ def update_config_vars(values):
         if values[dest] is not None:
             config[config_var] = values[dest]
 
+    _config.ARCHIVE_FILE = config.pop("archiveFile")
+    _config.ARCHIVE_LIMIT_MB = config.pop("archiveLimitMb")
+    _config.ARCHIVE_LIMIT_TESTS = config.pop("archiveLimitTests")
     _config.BASE_PORT = int(config.pop("basePort"))
     _config.BUILDLOGGER_URL = config.pop("buildloggerUrl")
     _config.DBPATH_PREFIX = _expand_user(config.pop("dbpathPrefix"))
     _config.DBTEST_EXECUTABLE = _expand_user(config.pop("dbtest"))
     _config.DRY_RUN = config.pop("dryRun")
     _config.EVERGREEN_DISTRO_ID = config.pop("distroId")
+    _config.EVERGREEN_EXECUTION = config.pop("executionNumber")
     _config.EVERGREEN_PATCH_BUILD = config.pop("patchBuild")
+    _config.EVERGREEN_PROJECT_NAME = config.pop("projectName")
+    _config.EVERGREEN_REVISION = config.pop("gitRevision")
     _config.EVERGREEN_TASK_ID = config.pop("taskId")
     _config.EVERGREEN_TASK_NAME = config.pop("taskName")
     _config.EVERGREEN_VARIANT_NAME = config.pop("variantName")

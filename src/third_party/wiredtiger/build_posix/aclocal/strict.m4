@@ -36,7 +36,6 @@ AC_DEFUN([AM_GCC_WARNINGS], [
 	w="$w -Wwrite-strings"
 
 	# Non-fatal informational warnings.
-	w="$w -Wno-error=inline"
 	w="$w -Wno-error=unsafe-loop-optimizations"
 
 	# GCC 4.7

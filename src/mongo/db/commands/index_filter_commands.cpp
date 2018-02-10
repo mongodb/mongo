@@ -139,7 +139,7 @@ std::string IndexFilterCommand::help() const {
 
 Status IndexFilterCommand::checkAuthForCommand(Client* client,
                                                const std::string& dbname,
-                                               const BSONObj& cmdObj) {
+                                               const BSONObj& cmdObj) const {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
     ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
 

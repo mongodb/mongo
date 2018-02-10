@@ -122,5 +122,5 @@
     var failMsg =
         "Index validation of '" + secondaryCappedColl.name + "' failed: " + tojson(validate_result);
     assert(validate_result.valid, failMsg);
-
+    replTest.stopSet();
 })();

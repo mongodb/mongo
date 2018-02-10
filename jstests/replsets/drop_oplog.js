@@ -22,7 +22,7 @@
     let adminDB = master.getDB('admin');
     dropOutput = adminDB.dropDatabase();
     assert.eq(dropOutput.ok, 0);
-    assert.eq(dropOutput.errmsg, "Cannot drop 'admin' database while replication is active");
+    assert.eq(dropOutput.errmsg, "Dropping the 'admin' database is prohibited.");
 
     let renameOutput = localDB.oplog.rs.renameCollection("poison");
     assert.eq(renameOutput.ok, 0);
@@ -32,5 +32,5 @@
     renameOutput = localDB.foo.renameCollection("oplog.rs");
     assert.eq(renameOutput.ok, 0);
     assert.eq(renameOutput.errmsg, "can't rename to live oplog while replicating");
-
+    rt.stopSet();
 }());

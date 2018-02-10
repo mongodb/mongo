@@ -196,6 +196,26 @@ TEST(UpdateZoneKeyRangeRequest, WrongMaxRangeTypeErrors) {
     ASSERT_EQ(ErrorCodes::TypeMismatch, request.getStatus());
 }
 
+TEST(UpdateZoneKeyRangeRequest, WrongPrefixCharacterMinErrors) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+            updateZoneKeyRange: "foo.bar",
+            min: { $x: 1 },
+            max: { x: 100 },
+            zone: "z"
+        })BSON"));
+    ASSERT_EQ(ErrorCodes::DollarPrefixedFieldName, request.getStatus());
+}
+
+TEST(UpdateZoneKeyRangeRequest, WrongPrefixCharacterMaxErrors) {
+    auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
+            updateZoneKeyRange: "foo.bar",
+            min: { x: 1 },
+            max: { $x: 100 },
+            zone: "z"
+        })BSON"));
+    ASSERT_EQ(ErrorCodes::DollarPrefixedFieldName, request.getStatus());
+}
+
 TEST(UpdateZoneKeyRangeRequest, WrongZoneNameTypeErrors) {
     auto request = UpdateZoneKeyRangeRequest::parseFromMongosCommand(fromjson(R"BSON({
             updateZoneKeyRange: "foo.bar",

@@ -40,7 +40,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/metadata_manager.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"

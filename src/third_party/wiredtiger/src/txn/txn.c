@@ -449,6 +449,14 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET(__wt_txn_parse_timestamp(session, "read", &ts, &cval));
 
 		/*
+		 * Prepare transactions are supported only in timestamp build.
+		 */
+		WT_RET(__wt_config_gets_def(session,
+		    cfg, "ignore_prepare", 0, &cval));
+		if (cval.val)
+			F_SET(txn, WT_TXN_IGNORE_PREPARE);
+
+		/*
 		 * Read the configuration here to reduce the span of the
 		 * critical section.
 		 */
@@ -608,11 +616,12 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 static inline int
 __txn_commit_timestamp_validate(WT_SESSION_IMPL *session)
 {
+	WT_DECL_TIMESTAMP(op_timestamp)
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 	WT_UPDATE *upd;
 	u_int i;
-	bool op_used_ts, upd_used_ts;
+	bool op_zero_ts, upd_zero_ts;
 
 	txn = &session->txn;
 
@@ -644,10 +653,12 @@ __txn_commit_timestamp_validate(WT_SESSION_IMPL *session)
 		if (op->type == WT_TXN_OP_BASIC_TS ||
 		    op->type == WT_TXN_OP_BASIC) {
 			/*
-			 * Skip over any aborted update structures.
+			 * Skip over any aborted update structures or ones
+			 * from our own transaction.
 			 */
 			upd = op->u.upd->next;
-			while (upd != NULL && upd->txnid == WT_TXN_ABORTED)
+			while (upd != NULL && (upd->txnid == WT_TXN_ABORTED ||
+			    upd->txnid == txn->id))
 				upd = upd->next;
 
 			/*
@@ -660,16 +671,31 @@ __txn_commit_timestamp_validate(WT_SESSION_IMPL *session)
 			/*
 			 * Check for consistent per-key timestamp usage.
 			 * If timestamps are or are not used originally then
-			 * they should be used the same way always. Check
-			 * timestamps are used in order.
+			 * they should be used the same way always. For this
+			 * transaction, timestamps are in use anytime the
+			 * commit timestamp is set.
+			 * Check timestamps are used in order.
 			 */
-			op_used_ts =
-			    __wt_timestamp_iszero(&op->u.upd->timestamp);
-			upd_used_ts = __wt_timestamp_iszero(&upd->timestamp);
-			if (op_used_ts != upd_used_ts)
+			op_zero_ts = !F_ISSET(txn, WT_TXN_HAS_TS_COMMIT);
+			upd_zero_ts = __wt_timestamp_iszero(&upd->timestamp);
+			if (op_zero_ts != upd_zero_ts)
 				WT_RET_MSG(session, EINVAL,
 				    "per-key timestamps used inconsistently");
-			if (__wt_timestamp_cmp(&op->u.upd->timestamp,
+			/*
+			 * If we aren't using timestamps for this transaction
+			 * then we are done checking. Don't check the timestamp
+			 * because the one in the transaction is not cleared.
+			 */
+			if (op_zero_ts)
+				continue;
+			op_timestamp = op->u.upd->timestamp;
+			/*
+			 * Only if the update structure doesn't have a timestamp
+			 * then use the one in the transaction structure.
+			 */
+			if (__wt_timestamp_iszero(&op->u.upd->timestamp))
+				op_timestamp = txn->commit_timestamp;
+			if (__wt_timestamp_cmp(&op_timestamp,
 			    &upd->timestamp) < 0)
 				WT_RET_MSG(session, EINVAL,
 				    "out of order timestamps");
@@ -940,6 +966,22 @@ err:	/*
 	return (ret);
 }
 
+/*
+ * __wt_txn_prepare --
+ *	Prepare the current transaction.
+ */
+int
+__wt_txn_prepare(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_UNUSED(cfg);
+
+#ifdef HAVE_TIMESTAMPS
+	WT_RET_MSG(session, ENOTSUP, "prepare_transaction is not supported");
+#else
+	WT_RET_MSG(session, ENOTSUP, "prepare_transaction requires a version "
+	    "of WiredTiger built with timestamp support");
+#endif
+}
 /*
  * __wt_txn_rollback --
  *	Roll back the current transaction.

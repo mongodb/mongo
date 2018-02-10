@@ -101,4 +101,5 @@ load('jstests/libs/write_concern_util.js');
     assert.commandFailed(res);
     assert(!res.writeConcernError, 'moveChunk had writeConcernError: ' + tojson(res));
     checkChunkCount(1, 1);
+    st.stop();
 })();

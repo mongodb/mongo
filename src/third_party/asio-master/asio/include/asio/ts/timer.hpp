@@ -15,7 +15,7 @@
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#include <chrono>
+#include "asio/detail/chrono.hpp"
 
 #include "asio/wait_traits.hpp"
 #include "asio/basic_waitable_timer.hpp"

@@ -109,4 +109,5 @@
 
     assert.writeOK(mongosColl.insert({_id: -1002}, {writeConcern: {w: "majority"}}));
     waitForShell();
+    st.stop();
 })();

@@ -100,3 +100,4 @@ for (var idx = 0; idx < dropAction.length; idx++) {
     }, "secondary did not drop index for " + dc.toString());
 }
 jsTest.log("indexbg-interrupts.js done");
+replTest.stopSet();

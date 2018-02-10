@@ -354,5 +354,6 @@
     assert.commandFailed(readOnlyDB.killOp(123));
 
     s.stop();
-
+    d1.stopSet();
+    d2.stopSet();
 })();

@@ -189,6 +189,15 @@ public:
         return Status{ErrorCodes::IllegalOperation, "renameCollection not implemented."};
     }
 
+    Status setIndexIsMultikey(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const std::string& indexName,
+                              const MultikeyPaths& paths,
+                              Timestamp ts) override {
+
+        return Status{ErrorCodes::IllegalOperation, "setIndexIsMultikey not implemented."};
+    }
+
     StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    boost::optional<StringData> indexName,

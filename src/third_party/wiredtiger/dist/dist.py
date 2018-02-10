@@ -21,6 +21,8 @@ def all_c_files():
         yield line
     for line in glob.iglob('../test/*/*.[ci]'):
         yield line
+    for line in glob.iglob('../test/*/*/*.[ci]'):
+        yield line
 
 # all_h_files --
 #       Return list of all WiredTiger C include file names.

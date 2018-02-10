@@ -62,7 +62,7 @@ Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVe
 StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibilityVersion::parse(
     const BSONObj& featureCompatibilityVersionDoc) {
     ServerGlobalParams::FeatureCompatibility::Version version =
-        ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior;
+        ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior;
     std::string versionString;
     std::string targetVersionString;
 
@@ -271,19 +271,12 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
     {
         CollectionOptions options;
         options.uuid = CollectionUUID::gen();
-
-        // Only for 3.4 shard servers, we create admin.system.version without UUID on clean startup.
-        // The mention of kFullyDowngradedTo34 below is to ensure this will not compile in 4.0.
-        if (!storeUpgradeVersion &&
-            serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34)
-            options.uuid.reset();
-
         uassertStatusOK(storageInterface->createCollection(opCtx, nss, options));
     }
 
     // We then insert the featureCompatibilityVersion document into the "admin.system.version"
     // collection. The server parameter will be updated on commit by the op observer.
+    // TODO(SERVER-32597): If storeUpgradeVersion is true, kVersion38 should be stored.
     uassertStatusOK(storageInterface->insertDocument(
         opCtx,
         nss,
@@ -292,7 +285,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
                        << FeatureCompatibilityVersion::kVersionField
                        << (storeUpgradeVersion
                                ? FeatureCompatibilityVersionCommandParser::kVersion36
-                               : FeatureCompatibilityVersionCommandParser::kVersion34)),
+                               : FeatureCompatibilityVersionCommandParser::kVersion36)),
             Timestamp()},
         repl::OpTime::kUninitializedTerm));  // No timestamp or term because this write is not
                                              // replicated.
@@ -389,7 +382,7 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
             spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION - 2;
             spec.outgoing.minWireVersion = LATEST_WIRE_VERSION - 2;
             return;
-        case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior:
+        case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior:
             // getVersion() does not return this value.
             MONGO_UNREACHABLE;
     }
@@ -504,7 +497,7 @@ public:
                     FeatureCompatibilityVersion::kVersionField,
                     FeatureCompatibilityVersionCommandParser::kVersion34);
                 return;
-            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault34Behavior:
+            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior:
                 // getVersion() does not return this value.
                 MONGO_UNREACHABLE;
         }

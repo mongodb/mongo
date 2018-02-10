@@ -60,7 +60,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::top);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));

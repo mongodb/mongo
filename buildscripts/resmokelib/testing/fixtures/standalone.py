@@ -87,6 +87,9 @@ class MongoDFixture(interface.Fixture):
 
         self.mongod = mongod
 
+    def get_dbpath(self):
+        return self._dbpath
+
     def await_ready(self):
         deadline = time.time() + MongoDFixture.AWAIT_READY_TIMEOUT_SECS
 

@@ -37,4 +37,5 @@
 
     // Check an arbitrary collection's uuid field.
     assert.eq(undefined, getUUIDFromListCollections(conn.getDB("local"), "startup_log"));
+    MongoRunner.stopMongod(conn);
 }());

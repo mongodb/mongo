@@ -45,11 +45,9 @@
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard_collection.h"
 #include "mongo/s/catalog_cache_loader.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/commit_chunk_migration_request_type.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
@@ -360,7 +358,7 @@ Status MigrationSourceManager::commitChunkOnRecipient(OperationContext* opCtx) {
     auto scopedGuard = MakeGuard([&] { cleanupOnError(opCtx); });
 
     // Tell the recipient shard to fetch the latest changes.
-    Status commitCloneStatus = _cloneDriver->commitClone(opCtx);
+    auto commitCloneStatus = _cloneDriver->commitClone(opCtx);
 
     if (MONGO_FAIL_POINT(failMigrationCommit) && commitCloneStatus.isOK()) {
         commitCloneStatus = {ErrorCodes::InternalError,
@@ -368,8 +366,10 @@ Status MigrationSourceManager::commitChunkOnRecipient(OperationContext* opCtx) {
     }
 
     if (!commitCloneStatus.isOK()) {
-        return commitCloneStatus.withContext("commit clone failed");
+        return commitCloneStatus.getStatus().withContext("commit clone failed");
     }
+
+    _recipientCloneCounts = commitCloneStatus.getValue()["counts"].Obj().getOwned();
 
     _state = kCloneCompleted;
     scopedGuard.Dismiss();
@@ -573,7 +573,9 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
                     BSON("min" << _args.getMinKey() << "max" << _args.getMaxKey() << "from"
                                << _args.getFromShardId()
                                << "to"
-                               << _args.getToShardId()),
+                               << _args.getToShardId()
+                               << "counts"
+                               << _recipientCloneCounts),
                     ShardingCatalogClient::kMajorityWriteConcern)
         .ignore();
 

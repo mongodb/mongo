@@ -101,8 +101,6 @@ public:
 
     bool isTailableAndAwaitData() const final;
 
-    UserNameIterator getAuthenticatedUsers() const final;
-
     long long getNumReturnedSoFar() const final;
 
     void queueResult(const ClusterQueryResult& result) final;

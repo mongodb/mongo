@@ -42,22 +42,26 @@ _WIN32_WINNT=0x0501
 DEFINES = \
 	-DASIO_DISABLE_IOCP \
 	-D_WIN32_WINNT=$(_WIN32_WINNT) \
-	-DBOOST_ALL_NO_LIB
+	-DBOOST_ALL_NO_LIB \
+	-DBOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING
 !else
 ! ifdef STORE
 DEFINES = \
 	-DWINAPI_FAMILY=WINAPI_FAMILY_PC_APP \
 	-DBOOST_ALL_NO_LIB -D_WIN32_WINNT=$(_WIN32_WINNT) \
-  -DUNICODE -D_UNICODE
+	-DUNICODE -D_UNICODE \
+	-DBOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING
 ! else
 !  ifdef WINRT
 DEFINES = \
 	-ZW -FI SDKDDKVer.h -FI winapifamily.h -DWINAPI_FAMILY=WINAPI_PARTITION_APP \
-	-DBOOST_ALL_NO_LIB
+	-DBOOST_ALL_NO_LIB \
+	-DBOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING
 !  else
 DEFINES = \
 	-D_WIN32_WINNT=$(_WIN32_WINNT) \
-	-DBOOST_ALL_NO_LIB
+	-DBOOST_ALL_NO_LIB \
+	-DBOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING
 !  endif
 ! endif
 !endif
@@ -171,9 +175,19 @@ UNIT_TEST_EXES = \
 	tests\unit\steady_timer.exe \
 	tests\unit\stream_socket_service.exe \
 	tests\unit\streambuf.exe \
+	tests\unit\system_context.exe \
+	tests\unit\system_executor.exe \
 	tests\unit\system_timer.exe \
 	tests\unit\thread.exe \
 	tests\unit\time_traits.exe \
+	tests\unit\ts\buffer.exe \
+	tests\unit\ts\executor.exe \
+	tests\unit\ts\internet.exe \
+	tests\unit\ts\io_context.exe \
+	tests\unit\ts\net.exe \
+	tests\unit\ts\netfwd.exe \
+	tests\unit\ts\socket.exe \
+	tests\unit\ts\timer.exe \
 	tests\unit\waitable_timer_service.exe \
 	tests\unit\windows\basic_handle.exe \
 	tests\unit\windows\basic_object_handle.exe \
@@ -297,6 +311,9 @@ tests\unit\unit_test.obj: tests\unit\unit_test.cpp
 
 {tests\unit\ssl}.cpp{tests\unit\ssl}.exe:
 	cl -Fe$@ -Fo$(<:.cpp=.obj) $(CXXFLAGS) $(SSL_CXXFLAGS) $(DEFINES) $< $(SSL_LIBS) $(LIBS) -link -opt:ref
+
+{tests\unit\ts}.cpp{tests\unit\ts}.exe:
+	cl -Fe$@ -Fo$(<:.cpp=.obj) $(CXXFLAGS) $(DEFINES) $< $(LIBS) -link -opt:ref
 
 {tests\unit\windows}.cpp{tests\unit\windows}.exe:
 	cl -Fe$@ -Fo$(<:.cpp=.obj) $(CXXFLAGS) $(DEFINES) $< $(LIBS) -link -opt:ref

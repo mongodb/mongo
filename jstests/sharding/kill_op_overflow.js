@@ -8,4 +8,5 @@
 
     assert.commandFailed(
         st.s.getDB("admin").runCommand({killOp: 1, op: "shard0000:99999999999999999999999"}));
+    st.stop();
 })();

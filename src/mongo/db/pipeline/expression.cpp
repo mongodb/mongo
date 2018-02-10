@@ -1147,27 +1147,11 @@ Value ExpressionDateFromParts::serialize(bool explain) const {
                   {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()}}}});
 }
 
-/**
- * This function checks whether a field is a number, and fits in the given range.
- *
- * If the field does not exist, the default value is returned trough the returnValue out parameter
- * and the function returns true.
- *
- * If the field exists:
- * - if the value is "nullish", the function returns false, so that the calling function can return
- *   a BSONNULL value.
- * - if the value can not be coerced to an integral value, an exception is returned.
- * - if the value is out of the range [minValue..maxValue], an exception is returned.
- * - otherwise, the coerced integral value is returned through the returnValue
- *   out parameter, and the function returns true.
- */
-bool ExpressionDateFromParts::evaluateNumberWithinRange(const Document& root,
-                                                        const Expression* field,
+bool ExpressionDateFromParts::evaluateNumberWithDefault(const Document& root,
+                                                        intrusive_ptr<Expression> field,
                                                         StringData fieldName,
-                                                        int defaultValue,
-                                                        int minValue,
-                                                        int maxValue,
-                                                        int* returnValue) const {
+                                                        long long defaultValue,
+                                                        long long* returnValue) const {
     if (!field) {
         *returnValue = defaultValue;
         return true;
@@ -1184,30 +1168,21 @@ bool ExpressionDateFromParts::evaluateNumberWithinRange(const Document& root,
                           << typeName(fieldValue.getType())
                           << " with value "
                           << fieldValue.toString(),
-            fieldValue.integral());
+            fieldValue.integral64Bit());
 
-    *returnValue = fieldValue.coerceToInt();
-
-    uassert(40523,
-            str::stream() << "'" << fieldName << "' must evaluate to an integer in the range "
-                          << minValue
-                          << " to "
-                          << maxValue
-                          << ", found "
-                          << *returnValue,
-            *returnValue >= minValue && *returnValue <= maxValue);
+    *returnValue = fieldValue.coerceToLong();
 
     return true;
 }
 
 Value ExpressionDateFromParts::evaluate(const Document& root) const {
-    int hour, minute, second, millisecond;
+    long long hour, minute, second, millisecond;
 
-    if (!evaluateNumberWithinRange(root, _hour.get(), "hour"_sd, 0, 0, 24, &hour) ||
-        !evaluateNumberWithinRange(root, _minute.get(), "minute"_sd, 0, 0, 59, &minute) ||
-        !evaluateNumberWithinRange(root, _second.get(), "second"_sd, 0, 0, 59, &second) ||
-        !evaluateNumberWithinRange(
-            root, _millisecond.get(), "millisecond"_sd, 0, 0, 999, &millisecond)) {
+    if (!evaluateNumberWithDefault(root, _hour, "hour"_sd, 0, &hour) ||
+        !evaluateNumberWithDefault(root, _minute, "minute"_sd, 0, &minute) ||
+        !evaluateNumberWithDefault(root, _second, "second"_sd, 0, &second) ||
+        !evaluateNumberWithDefault(root, _millisecond, "millisecond"_sd, 0, &millisecond)) {
+        // One of the evaluated inputs in nullish.
         return Value(BSONNULL);
     }
 
@@ -1218,26 +1193,33 @@ Value ExpressionDateFromParts::evaluate(const Document& root) const {
     }
 
     if (_year) {
-        int year, month, day;
+        long long year, month, day;
 
-        if (!evaluateNumberWithinRange(root, _year.get(), "year"_sd, 1970, 0, 9999, &year) ||
-            !evaluateNumberWithinRange(root, _month.get(), "month"_sd, 1, 1, 12, &month) ||
-            !evaluateNumberWithinRange(root, _day.get(), "day"_sd, 1, 1, 31, &day)) {
+        if (!evaluateNumberWithDefault(root, _year, "year"_sd, 1970, &year) ||
+            !evaluateNumberWithDefault(root, _month, "month"_sd, 1, &month) ||
+            !evaluateNumberWithDefault(root, _day, "day"_sd, 1, &day)) {
+            // One of the evaluated inputs in nullish.
             return Value(BSONNULL);
         }
+
+        uassert(40523,
+                str::stream() << "'year' must evaluate to an integer in the range " << 0 << " to "
+                              << 9999
+                              << ", found "
+                              << year,
+                year >= 0 && year <= 9999);
 
         return Value(
             timeZone->createFromDateParts(year, month, day, hour, minute, second, millisecond));
     }
 
     if (_isoWeekYear) {
-        int isoWeekYear, isoWeek, isoDayOfWeek;
+        long long isoWeekYear, isoWeek, isoDayOfWeek;
 
-        if (!evaluateNumberWithinRange(
-                root, _isoWeekYear.get(), "isoWeekYear"_sd, 1970, 0, 9999, &isoWeekYear) ||
-            !evaluateNumberWithinRange(root, _isoWeek.get(), "isoWeek"_sd, 1, 1, 53, &isoWeek) ||
-            !evaluateNumberWithinRange(
-                root, _isoDayOfWeek.get(), "isoDayOfWeek"_sd, 1, 1, 7, &isoDayOfWeek)) {
+        if (!evaluateNumberWithDefault(root, _isoWeekYear, "isoWeekYear"_sd, 1970, &isoWeekYear) ||
+            !evaluateNumberWithDefault(root, _isoWeek, "isoWeek"_sd, 1, &isoWeek) ||
+            !evaluateNumberWithDefault(root, _isoDayOfWeek, "isoDayOfWeek"_sd, 1, &isoDayOfWeek)) {
+            // One of the evaluated inputs in nullish.
             return Value(BSONNULL);
         }
 
@@ -1299,12 +1281,15 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(
 
     BSONElement dateStringElem;
     BSONElement timeZoneElem;
+    BSONElement formatElem;
 
     const BSONObj args = expr.embeddedObject();
     for (auto&& arg : args) {
         auto field = arg.fieldNameStringData();
 
-        if (field == "dateString"_sd) {
+        if (field == "format"_sd) {
+            formatElem = arg;
+        } else if (field == "dateString"_sd) {
             dateStringElem = arg;
         } else if (field == "timezone"_sd) {
             timeZoneElem = arg;
@@ -1317,25 +1302,33 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(
 
     uassert(40542, "Missing 'dateString' parameter to $dateFromString", dateStringElem);
 
-    return new ExpressionDateFromString(expCtx,
-                                        parseOperand(expCtx, dateStringElem, vps),
-                                        timeZoneElem ? parseOperand(expCtx, timeZoneElem, vps)
-                                                     : nullptr);
+    return new ExpressionDateFromString(
+        expCtx,
+        parseOperand(expCtx, dateStringElem, vps),
+        timeZoneElem ? parseOperand(expCtx, timeZoneElem, vps) : nullptr,
+        formatElem ? parseOperand(expCtx, formatElem, vps) : nullptr);
 }
 
 ExpressionDateFromString::ExpressionDateFromString(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     intrusive_ptr<Expression> dateString,
-    intrusive_ptr<Expression> timeZone)
-    : Expression(expCtx), _dateString(std::move(dateString)), _timeZone(std::move(timeZone)) {}
+    intrusive_ptr<Expression> timeZone,
+    intrusive_ptr<Expression> format)
+    : Expression(expCtx),
+      _dateString(std::move(dateString)),
+      _timeZone(std::move(timeZone)),
+      _format(std::move(format)) {}
 
 intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
     _dateString = _dateString->optimize();
     if (_timeZone) {
         _timeZone = _timeZone->optimize();
     }
+    if (_format) {
+        _format = _format->optimize();
+    }
 
-    if (ExpressionConstant::allNullOrConstant({_dateString, _timeZone})) {
+    if (ExpressionConstant::allNullOrConstant({_dateString, _timeZone, _format})) {
         // Everything is a constant, so we can turn into a constant.
         return ExpressionConstant::create(getExpressionContext(), evaluate(Document{}));
     }
@@ -1346,7 +1339,8 @@ Value ExpressionDateFromString::serialize(bool explain) const {
     return Value(
         Document{{"$dateFromString",
                   Document{{"dateString", _dateString->serialize(explain)},
-                           {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()}}}});
+                           {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()},
+                           {"format", _format ? _format->serialize(explain) : Value()}}}});
 }
 
 Value ExpressionDateFromString::evaluate(const Document& root) const {
@@ -1364,7 +1358,28 @@ Value ExpressionDateFromString::evaluate(const Document& root) const {
                           << " with value "
                           << dateString.toString(),
             dateString.getType() == BSONType::String);
-    const std::string& dateTimeString = dateString.getString();
+    const auto& dateTimeString = dateString.getStringData();
+
+    if (_format) {
+        const Value format = _format->evaluate(root);
+
+        if (format.nullish()) {
+            return Value(BSONNULL);
+        }
+
+        uassert(40684,
+                str::stream() << "$dateFromString requires that 'format' be a string, found: "
+                              << typeName(format.getType())
+                              << " with value "
+                              << format.toString(),
+                format.getType() == BSONType::String);
+        const auto& formatString = format.getStringData();
+
+        TimeZone::validateFromStringFormat(formatString);
+
+        return Value(getExpressionContext()->timeZoneDatabase->fromString(
+            dateTimeString, timeZone, formatString));
+    }
 
     return Value(getExpressionContext()->timeZoneDatabase->fromString(dateTimeString, timeZone));
 }
@@ -1373,6 +1388,9 @@ void ExpressionDateFromString::_doAddDependencies(DepsTracker* deps) const {
     _dateString->addDependencies(deps);
     if (_timeZone) {
         _timeZone->addDependencies(deps);
+    }
+    if (_format) {
+        _format->addDependencies(deps);
     }
 }
 
@@ -1560,7 +1578,7 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(
 
     const string format = formatElem.str();
 
-    TimeZone::validateFormat(format);
+    TimeZone::validateToStringFormat(format);
 
     return new ExpressionDateToString(expCtx,
                                       format,
@@ -3136,18 +3154,25 @@ Value ExpressionPow::evaluate(const Document& root) const {
     long long baseLong = baseVal.getLong();
     long long expLong = expVal.getLong();
 
-    // If the result cannot be represented as a long, return a double. Otherwise if either number
-    // is a long, return a long. If both numbers are ints, then return an int if the result fits or
-    // a long if it is too big.
+    // If the result cannot be represented as a long, return a double. Otherwise if either number is
+    // a long, return a long. If both numbers are ints, then return an int if the result fits or a
+    // long if it is too big.
     if (!representableAsLong(baseLong, expLong)) {
         return Value(std::pow(baseLong, expLong));
     }
 
     long long result = 1;
 
+<<<<<<< HEAD
     // When 'baseLong' == -1 and 'expLong' is < 0 the following for loop will never run because 'expLong'
     // will always be less than 0 so result will always be 1 but the result can potentialy be -1
     // ex: 'baselong' = -1 'expLong' = -5  then result should be -1
+=======
+    // When 'baseLong' == -1 and 'expLong' is < 0 the following for loop will never run because
+    // 'expLong' will always be less than 0 so result will always be 1. This is not always correct
+    // because the result can potentially be -1. ex: 'baselong' = -1 'expLong' = -5 then result
+    // should be -1.
+>>>>>>> upstream/master
     if (baseLong == -1 && expLong < 0) {
         expLong = expLong % 2 == 0 ? 2 : 1;
     }
@@ -4207,6 +4232,231 @@ Value ExpressionToUpper::evaluate(const Document& root) const {
 REGISTER_EXPRESSION(toUpper, ExpressionToUpper::parse);
 const char* ExpressionToUpper::getOpName() const {
     return "$toUpper";
+}
+
+/* -------------------------- ExpressionTrim ------------------------------ */
+
+REGISTER_EXPRESSION(trim, ExpressionTrim::parse);
+REGISTER_EXPRESSION(ltrim, ExpressionTrim::parse);
+REGISTER_EXPRESSION(rtrim, ExpressionTrim::parse);
+intrusive_ptr<Expression> ExpressionTrim::parse(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement expr,
+    const VariablesParseState& vps) {
+    const auto name = expr.fieldNameStringData();
+    TrimType trimType = TrimType::kBoth;
+    if (name == "$ltrim"_sd) {
+        trimType = TrimType::kLeft;
+    } else if (name == "$rtrim"_sd) {
+        trimType = TrimType::kRight;
+    } else {
+        invariant(name == "$trim"_sd);
+    }
+    uassert(50696,
+            str::stream() << name << " only supports an object as an argument, found "
+                          << typeName(expr.type()),
+            expr.type() == Object);
+
+    boost::intrusive_ptr<Expression> input;
+    boost::intrusive_ptr<Expression> characters;
+    for (auto&& elem : expr.Obj()) {
+        const auto field = elem.fieldNameStringData();
+        if (field == "input"_sd) {
+            input = parseOperand(expCtx, elem, vps);
+        } else if (field == "chars"_sd) {
+            characters = parseOperand(expCtx, elem, vps);
+        } else {
+            uasserted(50694,
+                      str::stream() << name << " found an unknown argument: " << elem.fieldName());
+        }
+    }
+    uassert(50695, str::stream() << name << " requires an 'input' field", input);
+
+    return new ExpressionTrim(expCtx, trimType, name, input, characters);
+}
+
+namespace {
+const std::vector<StringData> kDefaultTrimWhitespaceChars = {
+    "\0"_sd,      // Null character. Avoid using "\u0000" syntax to work around a gcc bug:
+                  // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53690.
+    "\u0020"_sd,  // Space
+    "\u0009"_sd,  // Horizontal tab
+    "\u000A"_sd,  // Line feed/new line
+    "\u000B"_sd,  // Vertical tab
+    "\u000C"_sd,  // Form feed
+    "\u000D"_sd,  // Horizontal tab
+    "\u00A0"_sd,  // Non-breaking space
+    "\u1680"_sd,  // Ogham space mark
+    "\u2000"_sd,  // En quad
+    "\u2001"_sd,  // Em quad
+    "\u2002"_sd,  // En space
+    "\u2003"_sd,  // Em space
+    "\u2004"_sd,  // Three-per-em space
+    "\u2005"_sd,  // Four-per-em space
+    "\u2006"_sd,  // Six-per-em space
+    "\u2007"_sd,  // Figure space
+    "\u2008"_sd,  // Punctuation space
+    "\u2009"_sd,  // Thin space
+    "\u200A"_sd   // Hair space
+};
+
+/**
+ * Assuming 'charByte' is the beginning of a UTF-8 code point, returns the number of bytes that
+ * should be used to represent the code point. Said another way, computes how many continuation
+ * bytes are expected to be present after 'charByte' in a UTF-8 encoded string.
+ */
+inline size_t numberOfBytesForCodePoint(char charByte) {
+    if ((charByte & 0b11111000) == 0b11110000) {
+        return 4;
+    } else if ((charByte & 0b11110000) == 0b11100000) {
+        return 3;
+    } else if ((charByte & 0b11100000) == 0b11000000) {
+        return 2;
+    } else {
+        return 1;
+    }
+}
+
+/**
+ * Returns a vector with one entry per code point to trim, or throws an exception if 'utf8String'
+ * contains invalid UTF-8.
+ */
+std::vector<StringData> extractCodePointsFromChars(StringData utf8String,
+                                                   StringData expressionName) {
+    std::vector<StringData> codePoints;
+    std::size_t i = 0;
+    while (i < utf8String.size()) {
+        uassert(50698,
+                str::stream() << "Failed to parse \"chars\" argument to " << expressionName
+                              << ": Detected invalid UTF-8. Got continuation byte when expecting "
+                                 "the start of a new code point.",
+                !str::isUTF8ContinuationByte(utf8String[i]));
+        codePoints.push_back(utf8String.substr(i, numberOfBytesForCodePoint(utf8String[i])));
+        i += numberOfBytesForCodePoint(utf8String[i]);
+    }
+    uassert(50697,
+            str::stream()
+                << "Failed to parse \"chars\" argument to "
+                << expressionName
+                << ": Detected invalid UTF-8. Missing expected continuation byte at end of string.",
+            i <= utf8String.size());
+    return codePoints;
+}
+}  // namespace
+
+Value ExpressionTrim::evaluate(const Document& root) const {
+    auto unvalidatedInput = _input->evaluate(root);
+    if (unvalidatedInput.nullish()) {
+        return Value(BSONNULL);
+    }
+    uassert(50699,
+            str::stream() << _name << " requires its input to be a string, got "
+                          << unvalidatedInput.toString()
+                          << " (of type "
+                          << typeName(unvalidatedInput.getType())
+                          << ") instead.",
+            unvalidatedInput.getType() == BSONType::String);
+    const StringData input(unvalidatedInput.getStringData());
+
+    if (!_characters) {
+        return Value(doTrim(input, kDefaultTrimWhitespaceChars));
+    }
+    auto unvalidatedUserChars = _characters->evaluate(root);
+    if (unvalidatedUserChars.nullish()) {
+        return Value(BSONNULL);
+    }
+    uassert(50700,
+            str::stream() << _name << " requires 'chars' to be a string, got "
+                          << unvalidatedUserChars.toString()
+                          << " (of type "
+                          << typeName(unvalidatedUserChars.getType())
+                          << ") instead.",
+            unvalidatedUserChars.getType() == BSONType::String);
+
+    return Value(
+        doTrim(input, extractCodePointsFromChars(unvalidatedUserChars.getStringData(), _name)));
+}
+
+bool ExpressionTrim::codePointMatchesAtIndex(const StringData& input,
+                                             std::size_t indexOfInput,
+                                             const StringData& testCP) {
+    for (size_t i = 0; i < testCP.size(); ++i) {
+        if (indexOfInput + i >= input.size() || input[indexOfInput + i] != testCP[i]) {
+            return false;
+        }
+    }
+    return true;
+};
+
+StringData ExpressionTrim::trimFromLeft(StringData input, const std::vector<StringData>& trimCPs) {
+    std::size_t bytesTrimmedFromLeft = 0u;
+    while (bytesTrimmedFromLeft < input.size()) {
+        // Look for any matching code point to trim.
+        auto matchingCP = std::find_if(trimCPs.begin(), trimCPs.end(), [&](auto& testCP) {
+            return codePointMatchesAtIndex(input, bytesTrimmedFromLeft, testCP);
+        });
+        if (matchingCP == trimCPs.end()) {
+            // Nothing to trim, stop here.
+            break;
+        }
+        bytesTrimmedFromLeft += matchingCP->size();
+    }
+    return input.substr(bytesTrimmedFromLeft);
+}
+
+StringData ExpressionTrim::trimFromRight(StringData input, const std::vector<StringData>& trimCPs) {
+    std::size_t bytesTrimmedFromRight = 0u;
+    while (bytesTrimmedFromRight < input.size()) {
+        std::size_t indexToTrimFrom = input.size() - bytesTrimmedFromRight;
+        auto matchingCP = std::find_if(trimCPs.begin(), trimCPs.end(), [&](auto& testCP) {
+            if (indexToTrimFrom < testCP.size()) {
+                // We've gone off the left of the string.
+                return false;
+            }
+            return codePointMatchesAtIndex(input, indexToTrimFrom - testCP.size(), testCP);
+        });
+        if (matchingCP == trimCPs.end()) {
+            // Nothing to trim, stop here.
+            break;
+        }
+        bytesTrimmedFromRight += matchingCP->size();
+    }
+    return input.substr(0, input.size() - bytesTrimmedFromRight);
+}
+
+StringData ExpressionTrim::doTrim(StringData input, const std::vector<StringData>& trimCPs) const {
+    if (_trimType == TrimType::kBoth || _trimType == TrimType::kLeft) {
+        input = trimFromLeft(input, trimCPs);
+    }
+    if (_trimType == TrimType::kBoth || _trimType == TrimType::kRight) {
+        input = trimFromRight(input, trimCPs);
+    }
+    return input;
+}
+
+boost::intrusive_ptr<Expression> ExpressionTrim::optimize() {
+    _input = _input->optimize();
+    if (_characters) {
+        _characters = _characters->optimize();
+    }
+    if (ExpressionConstant::allNullOrConstant({_input, _characters})) {
+        return ExpressionConstant::create(getExpressionContext(), this->evaluate(Document()));
+    }
+    return this;
+}
+
+Value ExpressionTrim::serialize(bool explain) const {
+    return Value(
+        Document{{_name,
+                  Document{{"input", _input->serialize(explain)},
+                           {"chars", _characters ? _characters->serialize(explain) : Value()}}}});
+}
+
+void ExpressionTrim::_doAddDependencies(DepsTracker* deps) const {
+    _input->addDependencies(deps);
+    if (_characters) {
+        _characters->addDependencies(deps);
+    }
 }
 
 /* ------------------------- ExpressionTrunc -------------------------- */

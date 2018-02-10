@@ -153,7 +153,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::dropDatabase);
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
@@ -182,7 +182,7 @@ public:
 
         if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
              repl::ReplicationCoordinator::modeNone) &&
-            ((dbname == NamespaceString::kLocalDb) || (dbname == NamespaceString::kAdminDb))) {
+            (dbname == NamespaceString::kLocalDb)) {
             return CommandHelpers::appendCommandStatus(
                 result,
                 Status(ErrorCodes::IllegalOperation,
@@ -227,7 +227,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::repairDatabase);
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
@@ -314,7 +314,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
         if (cmdObj.firstElement().numberInt() == -1 && !cmdObj.hasField("slowms") &&
@@ -404,7 +404,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::dropCollection);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -423,9 +423,9 @@ public:
                            const BSONObj& cmdObj,
                            string& errmsg,
                            BSONObjBuilder& result) {
-        const NamespaceString nsToDrop = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nsToDrop(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
 
-        if (NamespaceString::virtualized(nsToDrop.ns())) {
+        if (nsToDrop.isVirtualized()) {
             errmsg = "can't drop a virtual collection";
             return false;
         }
@@ -470,7 +470,7 @@ public:
     }
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         const NamespaceString nss(parseNs(dbname, cmdObj));
         return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj, false);
     }
@@ -599,7 +599,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), ActionType::find));
     }
 
@@ -768,7 +768,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -910,7 +910,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::collStats);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -959,7 +959,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         const NamespaceString nss(parseNs(dbname, cmdObj));
         return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj, false);
     }
@@ -992,7 +992,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::dbStats);
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
@@ -1085,7 +1085,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
+                                       std::vector<Privilege>* out) const {}  // No auth required
     virtual bool run(OperationContext* opCtx,
                      const string& dbname,
                      const BSONObj& cmdObj,
@@ -1107,7 +1107,7 @@ public:
     }
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return Status::OK();
     }
 

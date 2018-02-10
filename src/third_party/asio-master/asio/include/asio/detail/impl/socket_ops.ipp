@@ -770,6 +770,8 @@ signed_size_type recv(socket_type s, buf* bufs, size_t count,
     ec = asio::error::connection_reset;
   else if (ec.value() == ERROR_PORT_UNREACHABLE)
     ec = asio::error::connection_refused;
+  else if (ec.value() == WSAEMSGSIZE || ec.value() == ERROR_MORE_DATA)
+    ec.assign(0, ec.category());
   if (result != 0)
     return socket_error_retval;
   ec = asio::error_code();
@@ -848,6 +850,10 @@ void complete_iocp_recv(state_type state,
   {
     ec = asio::error::connection_refused;
   }
+  else if (ec.value() == WSAEMSGSIZE || ec.value() == ERROR_MORE_DATA)
+  {
+    ec.assign(0, ec.category());
+  }
 
   // Check for connection closed.
   else if (!ec && bytes_transferred == 0
@@ -918,6 +924,8 @@ signed_size_type recvfrom(socket_type s, buf* bufs, size_t count,
     ec = asio::error::connection_reset;
   else if (ec.value() == ERROR_PORT_UNREACHABLE)
     ec = asio::error::connection_refused;
+  else if (ec.value() == WSAEMSGSIZE || ec.value() == ERROR_MORE_DATA)
+    ec.assign(0, ec.category());
   if (result != 0)
     return socket_error_retval;
   ec = asio::error_code();
@@ -986,6 +994,10 @@ void complete_iocp_recvfrom(
   else if (ec.value() == ERROR_PORT_UNREACHABLE)
   {
     ec = asio::error::connection_refused;
+  }
+  else if (ec.value() == WSAEMSGSIZE || ec.value() == ERROR_MORE_DATA)
+  {
+    ec.assign(0, ec.category());
   }
 }
 
@@ -1099,6 +1111,10 @@ void complete_iocp_recvmsg(
   else if (ec.value() == ERROR_PORT_UNREACHABLE)
   {
     ec = asio::error::connection_refused;
+  }
+  else if (ec.value() == WSAEMSGSIZE || ec.value() == ERROR_MORE_DATA)
+  {
+    ec.assign(0, ec.category());
   }
 }
 

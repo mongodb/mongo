@@ -71,4 +71,6 @@
     for (var i = 0; i < sourceIndexInfos.length; ++i) {
         assert.contains(sourceIndexInfos[i], destIndexInfos);
     }
+    MongoRunner.stopMongod(source);
+    MongoRunner.stopMongod(dest);
 })();

@@ -135,7 +135,9 @@ private:
      *
      * This fasserts on failure.
      */
-    void _upsertCheckpointTimestampDocument(OperationContext* opCtx, const BSONObj& updateSpec);
+    void _upsertCheckpointTimestampDocument(OperationContext* opCtx,
+                                            const BSONObj& updateSpec,
+                                            const Timestamp& ts);
 
 
     StorageInterface* _storageInterface;

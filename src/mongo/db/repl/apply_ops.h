@@ -26,18 +26,58 @@
  *    it in the license file.
  */
 
+#include <vector>
+
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/repl/apply_ops_gen.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
-class BSONObj;
 class BSONObjBuilder;
 class OperationContext;
 
+namespace repl {
 class ApplyOps {
 public:
     static constexpr StringData kPreconditionFieldName = "preCondition"_sd;
     static constexpr StringData kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;
+
+    /**
+     * Extracts CRUD operations from an atomic applyOps oplog entry.
+     * Throws UserException on error.
+     */
+    static MultiApplier::Operations extractOperations(const OplogEntry& applyOpsOplogEntry);
+};
+
+/**
+ * Holds information about an applyOps command object.
+ */
+class ApplyOpsCommandInfo : public ApplyOpsCommandInfoBase {
+public:
+    /**
+     * Parses the object in the 'o' field of an applyOps command.
+     * May throw UserException.
+     */
+    static ApplyOpsCommandInfo parse(const BSONObj& applyOpCmd);
+
+    /**
+     * Returns true if all operations described by this applyOps command are CRUD only.
+     */
+    bool areOpsCrudOnly() const;
+
+    /**
+     * Returns true if applyOps will try to process all operations in a single batch atomically.
+     * Derived from getAllowAtomic() and areOpsCrudOnly().
+     */
+    bool isAtomic() const;
+
+private:
+    explicit ApplyOpsCommandInfo(const BSONObj& applyOpCmd);
+
+    const bool _areOpsCrudOnly;
 };
 
 /**
@@ -56,4 +96,5 @@ Status applyOps(OperationContext* opCtx,
                 repl::OplogApplication::Mode oplogApplicationMode,
                 BSONObjBuilder* result);
 
+}  // namespace repl
 }  // namespace mongo

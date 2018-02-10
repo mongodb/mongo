@@ -58,7 +58,7 @@ public:
     }
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
-                                 const BSONObj& cmdObj) override {
+                                 const BSONObj& cmdObj) const override {
         // It is always ok to run this command, as long as you are authenticated
         // as some user, if auth is enabled.
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());

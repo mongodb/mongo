@@ -44,14 +44,12 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/stringutils.h"
 
 namespace mongo {
-
 namespace {
 
 /**

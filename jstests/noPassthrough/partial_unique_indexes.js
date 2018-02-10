@@ -44,4 +44,5 @@
         testDB.adminCommand({configureFailPoint: 'WTWriteConflictExceptionForReads', mode: "off"}));
     res = t.validate();
     assert(res.valid, tojson(res));
+    MongoRunner.stopMongod(conn);
 })();

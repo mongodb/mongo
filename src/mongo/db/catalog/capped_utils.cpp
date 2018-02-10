@@ -78,7 +78,7 @@ mongo::Status mongo::emptyCapped(OperationContext* opCtx, const NamespaceString&
                                     << collectionName.ns());
     }
 
-    if (NamespaceString::virtualized(collectionName.ns())) {
+    if (collectionName.isVirtualized()) {
         return Status(ErrorCodes::IllegalOperation,
                       str::stream() << "Cannot truncate a virtual collection: "
                                     << collectionName.ns());

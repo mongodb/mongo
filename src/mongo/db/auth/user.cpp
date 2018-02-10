@@ -30,6 +30,8 @@
 
 #include <vector>
 
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -55,6 +57,24 @@ User::User(const UserName& name)
 
 User::~User() {
     dassert(_refCount == 0);
+}
+
+template <>
+User::SCRAMCredentials<SHA1Block>& User::CredentialData::scram<SHA1Block>() {
+    return scram_sha1;
+}
+template <>
+const User::SCRAMCredentials<SHA1Block>& User::CredentialData::scram<SHA1Block>() const {
+    return scram_sha1;
+}
+
+template <>
+User::SCRAMCredentials<SHA256Block>& User::CredentialData::scram<SHA256Block>() {
+    return scram_sha256;
+}
+template <>
+const User::SCRAMCredentials<SHA256Block>& User::CredentialData::scram<SHA256Block>() const {
+    return scram_sha256;
 }
 
 const UserName& User::getName() const {

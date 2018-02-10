@@ -173,6 +173,11 @@ public:
      */
     void setOldestTimestamp(Timestamp oldestTimestamp);
 
+    Timestamp getPreviousSetOldestTimestamp() const {
+        stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
+        return _previousSetOldestTimestamp;
+    }
+
     virtual bool supportsRecoverToStableTimestamp() const override;
 
     virtual Status recoverToStableTimestamp() override;
@@ -258,6 +263,8 @@ private:
 
     // Not threadsafe; callers must be serialized along with `setOldestTimestamp`.
     void _advanceOldestTimestamp(Timestamp oldestTimestamp);
+
+    // Protected by _oplogManagerMutex.
     Timestamp _previousSetOldestTimestamp;
 
     WT_CONNECTION* _conn;

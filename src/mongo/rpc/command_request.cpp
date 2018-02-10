@@ -38,6 +38,7 @@
 #include "mongo/base/data_type_terminated.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/assert_util.h"

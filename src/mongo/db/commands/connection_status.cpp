@@ -49,7 +49,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
+                                       std::vector<Privilege>* out) const {}  // No auth required
 
     std::string help() const override {
         return "Returns connection-specific information such as logged-in users and their roles";

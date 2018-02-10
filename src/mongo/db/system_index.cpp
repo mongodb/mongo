@@ -47,6 +47,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -97,6 +98,13 @@ void generateSystemIndexForExistingCollection(OperationContext* opCtx,
                                               Collection* collection,
                                               const NamespaceString& ns,
                                               const IndexSpec& spec) {
+    // Do not try and generate any system indexes in read only mode.
+    if (storageGlobalParams.readOnly) {
+        warning() << "Running in queryable backup mode. Unable to create authorization index on "
+                  << ns;
+        return;
+    }
+
     try {
         auto indexSpecStatus = index_key_validate::validateIndexSpec(
             opCtx, spec.toBSON(), ns, serverGlobalParams.featureCompatibility);

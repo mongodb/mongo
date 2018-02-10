@@ -30,8 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/user_management_commands.h"
-
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/client/dbclientinterface.h"
@@ -40,9 +38,9 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/user_management_commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/rpc/write_concern_error_detail.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
@@ -81,7 +79,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForCreateUserCommand(client, dbname, cmdObj);
     }
 
@@ -121,7 +119,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForUpdateUserCommand(client, dbname, cmdObj);
     }
 
@@ -173,7 +171,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForDropUserCommand(client, dbname, cmdObj);
     }
 
@@ -220,7 +218,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForDropAllUsersFromDatabaseCommand(client, dbname);
     }
 
@@ -263,7 +261,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForGrantRolesToUserCommand(client, dbname, cmdObj);
     }
 
@@ -313,7 +311,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForRevokeRolesFromUserCommand(client, dbname, cmdObj);
     }
 
@@ -362,7 +360,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForUsersInfoCommand(client, dbname, cmdObj);
     }
 
@@ -394,7 +392,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForCreateRoleCommand(client, dbname, cmdObj);
     }
 
@@ -430,7 +428,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForUpdateRoleCommand(client, dbname, cmdObj);
     }
 
@@ -473,7 +471,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForGrantPrivilegesToRoleCommand(client, dbname, cmdObj);
     }
 
@@ -515,7 +513,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForRevokePrivilegesFromRoleCommand(client, dbname, cmdObj);
     }
 
@@ -557,7 +555,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForGrantRolesToRoleCommand(client, dbname, cmdObj);
     }
 
@@ -599,7 +597,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForRevokeRolesFromRoleCommand(client, dbname, cmdObj);
     }
 
@@ -644,7 +642,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForDropRoleCommand(client, dbname, cmdObj);
     }
 
@@ -691,7 +689,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForDropAllRolesFromDatabaseCommand(client, dbname);
     }
 
@@ -733,7 +731,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForRolesInfoCommand(client, dbname, cmdObj);
     }
 
@@ -770,7 +768,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForInvalidateUserCacheCommand(client);
     }
 
@@ -818,7 +816,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return auth::checkAuthForMergeAuthzCollectionsCommand(client, cmdObj);
     }
 

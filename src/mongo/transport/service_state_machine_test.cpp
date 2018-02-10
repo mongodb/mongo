@@ -33,6 +33,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/stdx/memory.h"
@@ -52,7 +53,8 @@
 
 namespace mongo {
 namespace {
-inline std::string stateToString(ServiceStateMachine::State state) {
+
+std::string stateToString(ServiceStateMachine::State state) {
     std::string ret = str::stream() << state;
     return ret;
 }

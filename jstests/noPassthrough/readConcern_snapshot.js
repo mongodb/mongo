@@ -51,6 +51,7 @@
     rst = new ReplSetTest({nodes: 2});
     rst.startSet();
     rst.initiate();
+    assert.commandWorked(rst.getPrimary().getDB(dbName).coll.insert({}, {w: 2}));
     assert.commandWorked(rst.getPrimary().getDB(dbName).runCommand(
         {find: collName, readConcern: {level: "snapshot"}}));
 

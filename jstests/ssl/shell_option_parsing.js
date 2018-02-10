@@ -181,4 +181,5 @@
                 usernameX509,
                 '--authenticationMechanism',
                 'MONGODB-X509');
+    rst.stopSet();
 })();

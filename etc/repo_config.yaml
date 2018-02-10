@@ -115,6 +115,17 @@ repos:
     repos:
       - apt/debian/dists/jessie/mongodb-org
 
+  - name: debian92
+    type: deb
+    code_name: "stretch"
+    bucket: repo.mongodb.org
+    edition: org
+    component: main
+    architectures:
+      - amd64
+    repos:
+      - apt/debian/dists/stretch/mongodb-org
+
   - name: debian71
     type: deb
     code_name: "wheezy"

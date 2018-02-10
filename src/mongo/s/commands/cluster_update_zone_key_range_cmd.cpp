@@ -90,7 +90,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) override {
+                               const BSONObj& cmdObj) const override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(ShardType::ConfigNS), ActionType::find)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");

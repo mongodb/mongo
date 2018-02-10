@@ -35,6 +35,7 @@
 #include <limits>
 #include <string>
 
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/mongod_options.h"
@@ -62,7 +63,7 @@
 
 namespace mongo {
 namespace repl {
-using std::vector;
+
 const Seconds TopologyCoordinator::VoteLease::leaseTime = Seconds(30);
 
 // Controls how caught up in replication a secondary with higher priority than the current primary
@@ -1995,7 +1996,7 @@ void TopologyCoordinator::prepareStatusResponse(const ReplSetStatusArgs& rsStatu
                                                 BSONObjBuilder* response,
                                                 Status* result) {
     // output for each member
-    vector<BSONObj> membersOut;
+    std::vector<BSONObj> membersOut;
     const MemberState myState = getMemberState();
     const Date_t now = rsStatusArgs.now;
     const OpTime lastOpApplied = getMyLastAppliedOpTime();

@@ -58,5 +58,5 @@
     for (var i = 0; i < commands.length; i++) {
         testCommand(commands[i]);
     }
-
+    MongoRunner.stopMongod(conn, null, {user: "admin", pwd: "pwd"});
 })();

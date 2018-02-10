@@ -19,11 +19,12 @@
 #include "asio/detail/scheduler.hpp"
 #include "asio/detail/thread_group.hpp"
 #include "asio/execution_context.hpp"
-#include "asio/system_executor.hpp"
 
 #include "asio/detail/push_options.hpp"
 
 namespace asio {
+
+class system_executor;
 
 /// The executor context for the system executor.
 class system_context : public execution_context
@@ -36,10 +37,7 @@ public:
   ASIO_DECL ~system_context();
 
   /// Obtain an executor for the context.
-  executor_type get_executor() ASIO_NOEXCEPT
-  {
-    return system_executor();
-  }
+  executor_type get_executor() ASIO_NOEXCEPT;
 
   /// Signal all threads in the system thread pool to stop.
   ASIO_DECL void stop();
@@ -72,6 +70,7 @@ private:
 
 #include "asio/detail/pop_options.hpp"
 
+#include "asio/impl/system_context.hpp"
 #if defined(ASIO_HEADER_ONLY)
 # include "asio/impl/system_context.ipp"
 #endif // defined(ASIO_HEADER_ONLY)

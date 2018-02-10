@@ -100,7 +100,7 @@ public:
      */
     virtual Status checkAuthForOperation(OperationContext* opCtx,
                                          const std::string& dbname,
-                                         const BSONObj& cmdObj) {
+                                         const BSONObj& cmdObj) const {
         if (Object != cmdObj.firstElement().type()) {
             return Status(ErrorCodes::BadValue, "explain command requires a nested object");
         }

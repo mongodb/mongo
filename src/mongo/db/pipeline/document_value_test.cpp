@@ -1,5 +1,3 @@
-// documenttests.cpp : Unit tests for Document, Value, and related classes.
-
 /**
  *    Copyright (C) 2012 10gen Inc.
  *
@@ -1716,6 +1714,75 @@ public:
                         Value::deserializeForSorter(reader, Value::SorterDeserializeSettings()));
     }
 };
+
+namespace {
+
+// Integer limits.
+const int kIntMax = std::numeric_limits<int>::max();
+const int kIntMin = std::numeric_limits<int>::lowest();
+const long long kIntMaxAsLongLong = kIntMax;
+const long long kIntMinAsLongLong = kIntMin;
+const double kIntMaxAsDouble = kIntMax;
+const double kIntMinAsDouble = kIntMin;
+const Decimal128 kIntMaxAsDecimal = Decimal128(kIntMax);
+const Decimal128 kIntMinAsDecimal = Decimal128(kIntMin);
+
+// 64-bit integer limits.
+const long long kLongLongMax = std::numeric_limits<long long>::max();
+const long long kLongLongMin = std::numeric_limits<long long>::lowest();
+const double kLongLongMaxAsDouble = static_cast<double>(kLongLongMax);
+const double kLongLongMinAsDouble = static_cast<double>(kLongLongMin);
+const Decimal128 kLongLongMaxAsDecimal = Decimal128(static_cast<int64_t>(kLongLongMax));
+const Decimal128 kLongLongMinAsDecimal = Decimal128(static_cast<int64_t>(kLongLongMin));
+
+// Double limits.
+const double kDoubleMax = std::numeric_limits<double>::max();
+const double kDoubleMin = std::numeric_limits<double>::lowest();
+const Decimal128 kDoubleMaxAsDecimal = Decimal128(kDoubleMin);
+const Decimal128 kDoubleMinAsDecimal = Decimal128(kDoubleMin);
+
+}  // namespace
+
+TEST(ValueIntegral, CorrectlyIdentifiesValidIntegralValues) {
+    ASSERT_TRUE(Value(kIntMax).integral());
+    ASSERT_TRUE(Value(kIntMin).integral());
+    ASSERT_TRUE(Value(kIntMaxAsLongLong).integral());
+    ASSERT_TRUE(Value(kIntMinAsLongLong).integral());
+    ASSERT_TRUE(Value(kIntMaxAsDouble).integral());
+    ASSERT_TRUE(Value(kIntMinAsDouble).integral());
+    ASSERT_TRUE(Value(kIntMaxAsDecimal).integral());
+    ASSERT_TRUE(Value(kIntMinAsDecimal).integral());
+}
+
+TEST(ValueIntegral, CorrectlyIdentifiesInvalidIntegralValues) {
+    ASSERT_FALSE(Value(kLongLongMax).integral());
+    ASSERT_FALSE(Value(kLongLongMin).integral());
+    ASSERT_FALSE(Value(kLongLongMaxAsDouble).integral());
+    ASSERT_FALSE(Value(kLongLongMinAsDouble).integral());
+    ASSERT_FALSE(Value(kLongLongMaxAsDecimal).integral());
+    ASSERT_FALSE(Value(kLongLongMinAsDecimal).integral());
+    ASSERT_FALSE(Value(kDoubleMax).integral());
+    ASSERT_FALSE(Value(kDoubleMin).integral());
+}
+
+TEST(ValueIntegral, CorrectlyIdentifiesValid64BitIntegralValues) {
+    ASSERT_TRUE(Value(kIntMax).integral64Bit());
+    ASSERT_TRUE(Value(kIntMin).integral64Bit());
+    ASSERT_TRUE(Value(kLongLongMax).integral64Bit());
+    ASSERT_TRUE(Value(kLongLongMin).integral64Bit());
+    ASSERT_TRUE(Value(kLongLongMinAsDouble).integral64Bit());
+    ASSERT_TRUE(Value(kLongLongMaxAsDecimal).integral64Bit());
+    ASSERT_TRUE(Value(kLongLongMinAsDecimal).integral64Bit());
+}
+
+TEST(ValueIntegral, CorrectlyIdentifiesInvalid64BitIntegralValues) {
+    ASSERT_FALSE(Value(kLongLongMaxAsDouble).integral64Bit());
+    ASSERT_FALSE(Value(kDoubleMax).integral64Bit());
+    ASSERT_FALSE(Value(kDoubleMin).integral64Bit());
+    ASSERT_FALSE(Value(kDoubleMaxAsDecimal).integral64Bit());
+    ASSERT_FALSE(Value(kDoubleMinAsDecimal).integral64Bit());
+}
+
 }  // namespace Value
 
 class All : public Suite {

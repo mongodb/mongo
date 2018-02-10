@@ -93,6 +93,12 @@ public:
                             const NamespaceString& toNS,
                             bool stayTemp) override;
 
+    Status setIndexIsMultikey(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const std::string& indexName,
+                              const MultikeyPaths& paths,
+                              Timestamp ts) override;
+
     StatusWith<std::vector<BSONObj>> findDocuments(OperationContext* opCtx,
                                                    const NamespaceString& nss,
                                                    boost::optional<StringData> indexName,

@@ -80,7 +80,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) final {
+                               const BSONObj& cmdObj) const final {
         StatusWith<GetMoreRequest> parseStatus = GetMoreRequest::parseFromBSON(dbname, cmdObj);
         if (!parseStatus.isOK()) {
             return parseStatus.getStatus();

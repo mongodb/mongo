@@ -38,18 +38,11 @@
  * account the collator.
  */
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include <wiredtiger.h>
-
 #define	KEY_SIZE	20
 
 static int
 my_compare(WT_COLLATOR *collator, WT_SESSION *session,
-	   const WT_ITEM *v1, const WT_ITEM *v2, int *cmp)
+    const WT_ITEM *v1, const WT_ITEM *v2, int *cmp)
 {
 	(void)collator;
 	(void)session;
@@ -67,10 +60,10 @@ main(int argc, char *argv[])
 {
 	TEST_OPTS *opts, _opts;
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
-	char buf[KEY_SIZE];
 	WT_ITEM key;
+	WT_SESSION *session;
+	char buf[KEY_SIZE];
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));

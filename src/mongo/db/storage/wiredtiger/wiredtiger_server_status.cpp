@@ -57,7 +57,7 @@ bool WiredTigerServerStatusSection::includeByDefault() const {
 
 BSONObj WiredTigerServerStatusSection::generateSection(OperationContext* opCtx,
                                                        const BSONElement& configElement) const {
-    Lock::GlobalLock lk(opCtx, LockMode::MODE_IS, UINT_MAX);
+    Lock::GlobalLock lk(opCtx, LockMode::MODE_IS, Date_t::max());
 
     // The session does not open a transaction here as one is not needed and opening one would
     // mean that execution could become blocked when a new transaction cannot be allocated

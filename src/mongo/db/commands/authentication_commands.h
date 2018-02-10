@@ -51,7 +51,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
+                                       std::vector<Privilege>* out) const {}  // No auth required
 
     CmdAuthenticate() : BasicCommand("authenticate") {}
     bool run(OperationContext* opCtx,
@@ -76,7 +76,6 @@ private:
                          const std::string& mechanism,
                          const UserName& user,
                          const BSONObj& cmdObj);
-    Status _authenticateCR(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj);
     Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BSONObj& cmdObj);
 };
 

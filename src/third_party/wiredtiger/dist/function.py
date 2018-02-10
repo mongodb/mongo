@@ -44,6 +44,7 @@ types = [
     'struct',
     'union',
     'enum',
+    'TEST_',
     'WT_',
     'wt_',
     'double',

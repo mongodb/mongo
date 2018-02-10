@@ -33,6 +33,7 @@
 
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 
 namespace mongo {
@@ -46,6 +47,11 @@ class UserName {
 public:
     UserName() : _splitPoint(0) {}
     UserName(StringData user, StringData dbname);
+
+    /**
+     * Parses a string of the form "db.username" into a UserName object.
+     */
+    static StatusWith<UserName> parse(StringData userNameStr);
 
     /**
      * Gets the user part of a UserName.
@@ -184,6 +190,15 @@ UserNameIterator makeUserNameIterator(const ContainerIterator& begin,
 template <typename Container>
 UserNameIterator makeUserNameIteratorForContainer(const Container& container) {
     return makeUserNameIterator(container.begin(), container.end());
+}
+
+template <typename Container>
+Container userNameIteratorToContainer(UserNameIterator it) {
+    Container container;
+    while (it.more()) {
+        container.emplace_back(it.next());
+    }
+    return container;
 }
 
 }  // namespace mongo

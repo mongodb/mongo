@@ -57,7 +57,7 @@ Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData not
     // Use GlobalLock + lockMMAPV1Flush instead of DBLock to allow return when the lock is not
     // available. It may happen when the primary steps down and a shared global lock is
     // acquired.
-    Lock::GlobalLock lock(opCtx, MODE_IX, 1);
+    Lock::GlobalLock lock(opCtx, MODE_IX, Date_t::now() + Milliseconds(1));
 
     if (!lock.isLocked()) {
         LOG(1) << "Global lock is not available skipping noopWrite";
@@ -105,7 +105,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(), ActionType::appendOplogNote)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");

@@ -113,6 +113,9 @@ sub copy_source_file
   my $extension_state = 0;
   my $old_services_state = 0;
 
+  # State for simplifying namespaces in examples.
+  my $code_snippet_state = 0;
+
   # Copy the content.
   my $lineno = 1;
   while (my $line = <$input>)
@@ -237,12 +240,21 @@ sub copy_source_file
       next if ($line eq "");
     }
 
+    # Keep track of whether we are in an example.
+    if ($code_snippet_state == 0)
+    {
+      if ($line =~ /\@code/)
+      {
+        $code_snippet_state = 1;
+      }
+    }
+
     # Unconditional replacements.
     $line =~ s/[\\@]ref boost_bind/std::bind()/g;
     if ($from =~ /.*\.txt$/)
     {
-      $line =~ s/[\\@]ref async_read/std::experimental::net::async_read()/g;
-      $line =~ s/[\\@]ref async_write/std::experimental::net::async_write()/g;
+      $line =~ s/[\\@]ref async_read/std::experimental::net::v1::async_read()/g;
+      $line =~ s/[\\@]ref async_write/std::experimental::net::v1::async_write()/g;
     }
     if ($line =~ /asio_detail_posix_thread_function/)
     {
@@ -278,7 +290,7 @@ sub copy_source_file
     }
 
     # Conditional replacements.
-    if ($line =~ /^(.* *)namespace asio {/)
+    if ($line =~ /^(.* *)namespace asio \{/)
     {
       print_line($output, $1 . "namespace std {", $from, $lineno);
       print_line($output, $1 . "namespace experimental {", $from, $lineno);
@@ -356,7 +368,7 @@ sub copy_source_file
     {
       # Line is removed.
     }
-    elsif ($line =~ /asio::thread/)
+    elsif ($line =~ /asio::thread\b/)
     {
       if ($is_test)
       {
@@ -385,12 +397,13 @@ sub copy_source_file
       $line =~ s/asio::error_category/std::error_category/g;
       $line =~ s/asio::system_category/std::system_category/g;
       $line =~ s/asio::system_error/std::system_error/g;
-      $line =~ s/asio::/std::experimental::net::/g;
+      $line =~ s/asio::/std::experimental::net::v1::/g if $code_snippet_state == 0;
+      $line =~ s/asio::/std::experimental::net::/g if $code_snippet_state == 1;
       print_line($output, $line, $from, $lineno);
     }
     elsif ($line =~ /using namespace asio/)
     {
-      $line =~ s/using namespace asio/using namespace std::experimental::net/g;
+      $line =~ s/using namespace asio/using namespace std::experimental::net::v1/g;
       print_line($output, $line, $from, $lineno);
     }
     elsif ($line =~ /[\\@]ref boost_bind/)
@@ -408,6 +421,16 @@ sub copy_source_file
     {
       print_line($output, $line, $from, $lineno);
     }
+
+    # Keep track of whether we are in an example.
+    if ($code_snippet_state == 1)
+    {
+      if ($line =~ /\@endcode/)
+      {
+        $code_snippet_state = 0;
+      }
+    }
+
     ++$lineno;
   }
 

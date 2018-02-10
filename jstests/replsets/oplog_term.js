@@ -53,4 +53,6 @@
     assert.eq(status.term,
               oplogEntry.t,
               'term in oplog entry does not match term in status: ' + tojson(oplogEntry));
+
+    replSet.stopSet();
 })();

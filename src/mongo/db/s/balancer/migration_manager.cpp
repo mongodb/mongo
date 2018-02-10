@@ -44,7 +44,6 @@
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -64,6 +63,7 @@ using str::stream;
 namespace {
 
 const char kChunkTooBig[] = "chunkTooBig";  // TODO: delete in 3.8
+
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 Seconds(15));

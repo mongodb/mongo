@@ -35,6 +35,9 @@ MONGO_RUNNER_SUBDIR = "mongorunner"
 
 # Names below correspond to how they are specified via the command line or in the options YAML file.
 DEFAULTS = {
+    "archiveFile": None,
+    "archiveLimitMb": 5000,
+    "archiveLimitTests": 10,
     "basePort": 20000,
     "buildloggerUrl": "https://logkeeper.mongodb.org",
     "continueOnFailure": False,
@@ -43,6 +46,8 @@ DEFAULTS = {
     "distroId": None,
     "dryRun": None,
     "excludeWithAnyTags": None,
+    "executionNumber": 0,
+    "gitRevision": None,
     "includeWithAnyTags": None,
     "jobs": 1,
     "mongo": None,
@@ -55,6 +60,7 @@ DEFAULTS = {
     "shellPort": None,
     "shellConnString": None,
     "patchBuild": False,
+    "projectName": "mongodb-mongo-master",
     "repeat": 1,
     "reportFailureStatus": "fail",
     "reportFile": None,
@@ -165,6 +171,15 @@ SuiteOptions.ALL_INHERITED = SuiteOptions(**dict(zip(SuiteOptions._fields,
 # Variables that are set by the user at the command line or with --options.
 ##
 
+# The name of the archive JSON file used to associate S3 archives to an Evergreen task.
+ARCHIVE_FILE = None
+
+# The limit size of all archive files for an Evergreen task.
+ARCHIVE_LIMIT_MB = None
+
+# The limit number of tests to archive for an Evergreen task.
+ARCHIVE_LIMIT_TESTS = None
+
 # The starting port number to use for mongod and mongos processes spawned by resmoke.py and the
 # mongo shell.
 BASE_PORT = None
@@ -186,8 +201,17 @@ DRY_RUN = None
 # The identifier for the Evergreen distro that resmoke.py is being run on.
 EVERGREEN_DISTRO_ID = None
 
+# The number of the Evergreen execution that resmoke.py is being run on.
+EVERGREEN_EXECUTION = None
+
 # If true, then resmoke.py is being run as part of a patch build in Evergreen.
 EVERGREEN_PATCH_BUILD = None
+
+# The name of the Evergreen project that resmoke.py is being run on.
+EVERGREEN_PROJECT_NAME = None
+
+# The git revision of the Evergreen task that resmoke.py is being run on.
+EVERGREEN_REVISION = None
 
 # The identifier for the Evergreen task that resmoke.py is being run under. If set, then the
 # Evergreen task id value will be transmitted to logkeeper when creating builds and tests.
@@ -300,6 +324,9 @@ WT_INDEX_CONFIG = None
 ##
 # Internally used configuration options that aren't exposed to the user
 ##
+
+# S3 Bucket to upload archive files.
+ARCHIVE_BUCKET = "mongodatafiles"
 
 # Default sort order for test execution. Will only be changed if --suites wasn't specified.
 ORDER_TESTS_BY_NAME = True

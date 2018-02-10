@@ -79,4 +79,5 @@ load('./jstests/libs/chunk_manipulation_util.js');
                   .itcount());
 
     st.stop();
+    MongoRunner.stopMongod(staticMongod);
 })();

@@ -33,16 +33,6 @@
 
 namespace mongo {
 
-TEST(BitsTest, HeaderCorrect) {
-#if defined(MONGO_PLATFORM_64)
-    ASSERT_EQUALS(8U, sizeof(char*));
-#elif defined(MONGO_PLATFORM_32)
-    ASSERT_EQUALS(4U, sizeof(char*));
-#else
-    ASSERT(false);
-#endif
-}
-
 TEST(BitsTest_CountZeros, Constants) {
     ASSERT_EQUALS(countLeadingZeros64(0ull), 64);
     ASSERT_EQUALS(countTrailingZeros64(0ull), 64);

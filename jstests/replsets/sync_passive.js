@@ -79,3 +79,5 @@ replTest.awaitReplication();
 
 print("bring #1 back up, make sure everything's okay");
 replTest.restart(1);
+
+replTest.stopSet();

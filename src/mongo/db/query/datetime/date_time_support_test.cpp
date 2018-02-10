@@ -37,6 +37,7 @@ namespace mongo {
 namespace {
 
 const TimeZoneDatabase kDefaultTimeZoneDatabase{};
+const TimeZone kDefaultTimeZone = TimeZoneDatabase::utcZone();
 
 TEST(GetTimeZone, DoesReturnKnownTimeZone) {
     // Just asserting that these do not throw exceptions.
@@ -939,15 +940,28 @@ TEST(NewYorkTimeAfterEpoch, DoesOutputFormatDate) {
 }
 
 TEST(DateFormat, ThrowsUserExceptionIfGivenUnrecognizedFormatter) {
-    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().validateFormat("%x"), AssertionException, 18536);
+    ASSERT_THROWS_CODE(
+        TimeZoneDatabase::utcZone().validateToStringFormat("%x"), AssertionException, 18536);
+    ASSERT_THROWS_CODE(
+        TimeZoneDatabase::utcZone().validateFromStringFormat("%x"), AssertionException, 18536);
 }
 
 TEST(DateFormat, ThrowsUserExceptionIfGivenUnmatchedPercent) {
-    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().validateFormat("%"), AssertionException, 18535);
     ASSERT_THROWS_CODE(
-        TimeZoneDatabase::utcZone().validateFormat("%%%"), AssertionException, 18535);
+        TimeZoneDatabase::utcZone().validateToStringFormat("%"), AssertionException, 18535);
     ASSERT_THROWS_CODE(
-        TimeZoneDatabase::utcZone().validateFormat("blahblah%"), AssertionException, 18535);
+        TimeZoneDatabase::utcZone().validateToStringFormat("%%%"), AssertionException, 18535);
+    ASSERT_THROWS_CODE(
+        TimeZoneDatabase::utcZone().validateToStringFormat("blahblah%"), AssertionException, 18535);
+
+    // Repeat the tests with the format map for $dateFromString.
+    ASSERT_THROWS_CODE(
+        TimeZoneDatabase::utcZone().validateFromStringFormat("%"), AssertionException, 18535);
+    ASSERT_THROWS_CODE(
+        TimeZoneDatabase::utcZone().validateFromStringFormat("%%%"), AssertionException, 18535);
+    ASSERT_THROWS_CODE(TimeZoneDatabase::utcZone().validateFromStringFormat("blahblah%"),
+                       AssertionException,
+                       18535);
 }
 
 TEST(DateFormat, ThrowsUserExceptionIfGivenDateBeforeYear0) {
@@ -974,6 +988,114 @@ TEST(DateFormat, ThrowsUserExceptionIfGivenDateAfterYear9999) {
 
     ASSERT_THROWS_CODE(
         TimeZoneDatabase::utcZone().formatDate("%G", Date_t::max()), AssertionException, 18537);
+}
+
+TEST(DateFromString, CorrectlyParsesStringThatMatchesFormat) {
+    auto input = "2017-07-04T10:56:02Z";
+    auto format = "%Y-%m-%dT%H:%M:%SZ"_sd;
+    auto date = kDefaultTimeZoneDatabase.fromString(input, kDefaultTimeZone, format);
+    ASSERT_EQ(TimeZoneDatabase::utcZone().formatDate(format, date), input);
+}
+
+TEST(DateFromString, RejectsStringWithInvalidYearFormat) {
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("201", kDefaultTimeZone, "%Y"_sd),
+                       AssertionException,
+                       40545);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("20i7", kDefaultTimeZone, "%Y"_sd),
+                       AssertionException,
+                       40553);
+}
+
+TEST(DateFromString, RejectsStringWithInvalidMinuteFormat) {
+    // Minute must be 2 digits with leading zero.
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString(
+                           "2017-01-01T00:1:00", kDefaultTimeZone, "%Y-%m-%dT%H%M%S"_sd),
+                       AssertionException,
+                       40553);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString(
+                           "2017-01-01T00:0i:00", kDefaultTimeZone, "%Y-%m-%dT%H%M%S"_sd),
+                       AssertionException,
+                       40553);
+}
+
+TEST(DateFromString, RejectsStringWithInvalidSecondsFormat) {
+    // Seconds must be 2 digits with leading zero.
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString(
+                           "2017-01-01T00:00:1", kDefaultTimeZone, "%Y-%m-%dT%H%M%S"_sd),
+                       AssertionException,
+                       40553);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString(
+                           "2017-01-01T00:00:i0", kDefaultTimeZone, "%Y-%m-%dT%H%M%S"_sd),
+                       AssertionException,
+                       40553);
+}
+
+TEST(DateFromString, RejectsStringWithInvalidMillisecondsFormat) {
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString(
+                           "2017-01-01T00:00:00.i", kDefaultTimeZone, "%Y-%m-%dT%H:%M:%S.%L"_sd),
+                       AssertionException,
+                       40553);
+}
+
+TEST(DateFromString, RejectsStringWithInvalidISOYear) {
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("20i7", kDefaultTimeZone, "%G"_sd),
+                       AssertionException,
+                       40553);
+}
+
+TEST(DateFromString, RejectsStringWithInvalidISOWeekOfYear) {
+    // ISO week of year must be between 1 and 53.
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-55", kDefaultTimeZone, "%G-%V"_sd),
+                       AssertionException,
+                       40553);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-FF", kDefaultTimeZone, "%G-%V"_sd),
+                       AssertionException,
+                       40553);
+}
+
+TEST(DateFromString, RejectsStringWithInvalidISODayOfWeek) {
+    // Day of week must be single digit between 1 and 7.
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-8", kDefaultTimeZone, "%G-%u"_sd),
+                       AssertionException,
+                       40553);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-0", kDefaultTimeZone, "%G-%u"_sd),
+                       AssertionException,
+                       40553);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-a", kDefaultTimeZone, "%G-%u"_sd),
+                       AssertionException,
+                       40553);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("2017-11", kDefaultTimeZone, "%G-%u"_sd),
+                       AssertionException,
+                       40553);
+    ASSERT_THROWS_CODE(
+        kDefaultTimeZoneDatabase.fromString("2017-123", kDefaultTimeZone, "%G-%u"_sd),
+        AssertionException,
+        40553);
+}
+
+TEST(DateFromString, RejectsStringWithInvalidTimezoneOffset) {
+    // Timezone offset minutes (%Z) requires format +/-mmm.
+    ASSERT_THROWS_CODE(
+        kDefaultTimeZoneDatabase.fromString("2017 500", kDefaultTimeZone, "%G %Z"_sd),
+        AssertionException,
+        40553);
+    ASSERT_THROWS_CODE(
+        kDefaultTimeZoneDatabase.fromString("2017 0500", kDefaultTimeZone, "%G %Z"_sd),
+        AssertionException,
+        40553);
+    ASSERT_THROWS_CODE(
+        kDefaultTimeZoneDatabase.fromString("2017 +i00", kDefaultTimeZone, "%G %Z"_sd),
+        AssertionException,
+        40553);
+}
+
+TEST(DateFromString, EmptyFormatStringThrowsForAllInputs) {
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("1/1/2017", kDefaultTimeZone, ""_sd),
+                       AssertionException,
+                       40553);
+    ASSERT_THROWS_CODE(kDefaultTimeZoneDatabase.fromString("", kDefaultTimeZone, ""_sd),
+                       AssertionException,
+                       40545);
 }
 
 }  // namespace

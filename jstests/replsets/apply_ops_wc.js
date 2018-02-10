@@ -135,4 +135,5 @@
     secondaries[0].getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
     secondaries[1].getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
 
+    replTest.stopSet();
 })();

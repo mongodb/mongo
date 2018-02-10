@@ -4,6 +4,9 @@
  * Additionally, this file tests that index version v=2 is required to create an index with a
  * collation and that index version v=2 is required to index decimal data on storage engines using
  * the KeyString format.
+ *
+ * Also, index version v=3 is required to prohibit duplicates in unique index at secondary. Enhance
+ * the tests for index version v=3.
  */
 (function() {
     "use strict";
@@ -118,6 +121,17 @@
 
     testDB.dropDatabase();
 
-    // Test that attempting to create an index with v=3 returns an error.
-    assert.commandFailed(testDB.index_version.createIndex({withV3: 1}, {v: 3}));
+    // MongoDB4.0 onwards index version v=3 would be supported. Test that an index created with v=3
+    // succeeds.
+    assert.commandWorked(testDB.index_version.createIndex({withV3: 1}, {v: 3}));
+
+    //
+    // Index version v=4
+    //
+
+    testDB.dropDatabase();
+
+    // Test that attempting to create an index with v=4 returns an error.
+    assert.commandFailed(testDB.index_version.createIndex({withV4: 1}, {v: 4}));
+    MongoRunner.stopMongod(conn);
 })();

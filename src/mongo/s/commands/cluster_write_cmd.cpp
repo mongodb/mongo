@@ -147,7 +147,7 @@ public:
         return true;
     }
 
-    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) final {
+    Status checkAuthForRequest(OperationContext* opCtx, const OpMsgRequest& request) const final {
         Status status = auth::checkAuthForWriteCommand(
             AuthorizationSession::get(opCtx->getClient()), _writeType, request);
 

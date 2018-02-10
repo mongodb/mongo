@@ -86,7 +86,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
+                                       std::vector<Privilege>* out) const {}  // No auth required
     std::string help() const override {
         return "get version #, etc.\n"
                "{ buildinfo:1 }";
@@ -122,7 +122,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
+                                       std::vector<Privilege>* out) const {}  // No auth required
     virtual bool requiresAuth() const override {
         return false;
     }
@@ -149,7 +149,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
+                                       std::vector<Privilege>* out) const {}  // No auth required
     virtual bool run(OperationContext* opCtx,
                      const string& ns,
                      const BSONObj& cmdObj,
@@ -186,7 +186,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::hostInfo);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
@@ -232,7 +232,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::logRotate);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
@@ -266,7 +266,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
+                                       std::vector<Privilege>* out) const {}  // No auth required
     virtual bool run(OperationContext* opCtx,
                      const string& ns,
                      const BSONObj& cmdObj,
@@ -315,7 +315,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::getLog);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
@@ -386,7 +386,7 @@ public:
     }
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) override {
+                               const BSONObj& cmdObj) const override {
         // No access control needed since this command is a testing-only command that must be
         // enabled at the command line.
         return Status::OK();
@@ -441,7 +441,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::getCmdLineOpts);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
@@ -464,7 +464,7 @@ int* volatile illegalAddress;  // NOLINT - used for fail point only
 
 void CmdShutdown::addRequiredPrivileges(const std::string& dbname,
                                         const BSONObj& cmdObj,
-                                        std::vector<Privilege>* out) {
+                                        std::vector<Privilege>* out) const {
     ActionSet actions;
     actions.addAction(ActionType::shutdown);
     out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));

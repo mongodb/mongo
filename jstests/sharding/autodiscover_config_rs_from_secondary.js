@@ -14,9 +14,9 @@
     conf.writeConcernMajorityJournalDefault = true;
     rst.initiate(conf);
 
-    // Ensure the featureCompatibilityVersion is 3.4 so that the mongos can connect if it is version
-    // 3.4.
-    assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+    // Ensure the featureCompatibilityVersion is 3.6 so that the mongos can connect if it is version
+    // 3.6.
+    assert.commandWorked(rst.getPrimary().adminCommand({setFeatureCompatibilityVersion: "3.6"}));
 
     var seedList = rst.name + "/" + rst.nodes[1].host;  // node 1 is guaranteed to not be primary
     {
@@ -47,4 +47,6 @@
     var admin = mongos.getDB('admin');
     mongos.setSlaveOk(true);
     assert.eq(1, admin.foo.findOne().a);
+    MongoRunner.stopMongos(mongos);
+    rst.stopSet();
 })();

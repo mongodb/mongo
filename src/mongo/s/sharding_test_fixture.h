@@ -144,6 +144,12 @@ protected:
                      const NamespaceString& expectedNs,
                      const BSONObj& expectedQuery,
                      const StatusWith<long long>& response);
+
+    /**
+     *
+     */
+    void expectFindSendBSONObjVector(const HostAndPort& configHost, std::vector<BSONObj> obj);
+
     /**
      * Waits for an operation which creates a capped config collection with the specified name and
      * capped size.

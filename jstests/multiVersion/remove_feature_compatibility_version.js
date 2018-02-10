@@ -15,4 +15,5 @@
             {renameCollection: 'admin.system.version', to: 'admin.dummy.collection'}),
         ErrorCodes.IllegalOperation);
     assert.writeErrorWithCode(adminDB.system.version.remove({}), 40670);
+    MongoRunner.stopMongod(standalone);
 })();

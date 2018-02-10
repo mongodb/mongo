@@ -30,3 +30,5 @@ assert.throws(function() {
 primary.coll.aggregate({$out: "out"}).itcount();
 replTest.awaitReplication();
 assert.eq(primary.out.find().sort({x: 1}).toArray(), secondary.out.find().sort({x: 1}).toArray());
+
+replTest.stopSet();

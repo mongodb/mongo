@@ -47,10 +47,14 @@
 
     // TEST: Destroying the admin.system.users index and restarting will recreate it, even if
     // admin.system.roles does not exist
-    db.dropDatabase();
-    // Restore the featureCompatibilityVersion document since as of SERVER-29452, mongod fails to
-    // startup without such a document.
-    assert.commandWorked(db.runCommand({setFeatureCompatibilityVersion: "3.6"}));
+    // Use _mergeAuthzCollections to clear admin.system.users and admin.system.roles.
+    assert.commandWorked(db.adminCommand({
+        _mergeAuthzCollections: 1,
+        tempUsersCollection: 'admin.tempusers',
+        tempRolesCollection: 'admin.temproles',
+        db: "",
+        drop: true
+    }));
     db.createUser({user: "user", pwd: "pwd", roles: []});
     assert.commandWorked(db.system.users.dropIndexes());
     MongoRunner.stopMongod(conn);
@@ -60,15 +64,20 @@
 
     // TEST: Destroying the admin.system.roles index and restarting will recreate it, even if
     // admin.system.users does not exist
-    db.dropDatabase();
-    // Restore the featureCompatibilityVersion document since as of SERVER-29452, mongod fails to
-    // startup without such a document.
-    assert.commandWorked(db.runCommand({setFeatureCompatibilityVersion: "3.6"}));
+    // Use _mergeAuthzCollections to clear admin.system.users and admin.system.roles.
+    assert.commandWorked(db.adminCommand({
+        _mergeAuthzCollections: 1,
+        tempUsersCollection: 'admin.tempusers',
+        tempRolesCollection: 'admin.temproles',
+        db: "",
+        drop: true
+    }));
     db.createRole({role: "role", privileges: [], roles: []});
     assert.commandWorked(db.system.roles.dropIndexes());
     MongoRunner.stopMongod(conn);
     conn = MongoRunner.runMongod({restart: conn, cleanData: false});
     db = conn.getDB("admin");
     assert.eq(2, db.system.roles.getIndexes().length);
+    MongoRunner.stopMongod(conn);
 
 })();

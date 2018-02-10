@@ -246,6 +246,8 @@ Status waitForReadConcern(OperationContext* opCtx,
     }
 
     auto afterClusterTime = readConcernArgs.getArgsAfterClusterTime();
+    auto atClusterTime = readConcernArgs.getArgsAtClusterTime();
+
     if (afterClusterTime) {
         if (!allowAfterClusterTime) {
             return {ErrorCodes::InvalidOptions, "afterClusterTime is not allowed for this command"};
@@ -259,10 +261,12 @@ Status waitForReadConcern(OperationContext* opCtx,
     }
 
     if (!readConcernArgs.isEmpty()) {
-        if (replCoord->isReplEnabled() && afterClusterTime) {
-            auto status = makeNoopWriteIfNeeded(opCtx, *afterClusterTime);
+        invariant(!afterClusterTime || !atClusterTime);
+        auto targetClusterTime = afterClusterTime ? afterClusterTime : atClusterTime;
+        if (replCoord->isReplEnabled() && targetClusterTime) {
+            auto status = makeNoopWriteIfNeeded(opCtx, *targetClusterTime);
             if (!status.isOK()) {
-                LOG(0) << "Failed noop write at clusterTime: " << afterClusterTime->toString()
+                LOG(0) << "Failed noop write at clusterTime: " << targetClusterTime->toString()
                        << " due to " << status.toString();
             }
         }
@@ -275,18 +279,19 @@ Status waitForReadConcern(OperationContext* opCtx,
         }
     }
 
-    auto pointInTime = readConcernArgs.getArgsAtClusterTime();
-    if (pointInTime) {
-        fassertStatusOK(39345, opCtx->recoveryUnit()->selectSnapshot(pointInTime->asTimestamp()));
+
+    if (atClusterTime) {
+        fassertStatusOK(39345, opCtx->recoveryUnit()->selectSnapshot(atClusterTime->asTimestamp()));
+        return Status::OK();
     }
 
-    if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern &&
+    if ((readConcernArgs.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
+         readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) &&
         replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet) {
-        // ReadConcern Majority is not supported in ProtocolVersion 0.
         if (!replCoord->isV1ElectionProtocol()) {
-            return {ErrorCodes::ReadConcernMajorityNotEnabled,
+            return {ErrorCodes::IncompatibleElectionProtocol,
                     str::stream() << "Replica sets running protocol version 0 do not support "
-                                     "readConcern: majority"};
+                                     "majority committed reads"};
         }
 
         const int debugLevel = serverGlobalParams.clusterRole == ClusterRole::ConfigServer ? 1 : 2;

@@ -39,7 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/catalog/sharding_catalog_manager.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
@@ -80,7 +80,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) override {
+                                       const BSONObj& cmdObj) const override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)), ActionType::internal)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");

@@ -41,13 +41,15 @@ public:
 
   static void* allocate(thread_info_base* this_thread, std::size_t size)
   {
+    std::size_t chunks = (size + chunk_size - 1) / chunk_size;
+
     if (this_thread && this_thread->reusable_memory_)
     {
       void* const pointer = this_thread->reusable_memory_;
       this_thread->reusable_memory_ = 0;
 
       unsigned char* const mem = static_cast<unsigned char*>(pointer);
-      if (static_cast<std::size_t>(mem[0]) >= size)
+      if (static_cast<std::size_t>(mem[0]) >= chunks)
       {
         mem[size] = mem[0];
         return pointer;
@@ -56,16 +58,16 @@ public:
       ::operator delete(pointer);
     }
 
-    void* const pointer = ::operator new(size + 1);
+    void* const pointer = ::operator new(chunks * chunk_size + 1);
     unsigned char* const mem = static_cast<unsigned char*>(pointer);
-    mem[size] = (size <= UCHAR_MAX) ? static_cast<unsigned char>(size) : 0;
+    mem[size] = (chunks <= UCHAR_MAX) ? static_cast<unsigned char>(chunks) : 0;
     return pointer;
   }
 
   static void deallocate(thread_info_base* this_thread,
       void* pointer, std::size_t size)
   {
-    if (size <= UCHAR_MAX)
+    if (size <= chunk_size * UCHAR_MAX)
     {
       if (this_thread && this_thread->reusable_memory_ == 0)
       {
@@ -80,6 +82,7 @@ public:
   }
 
 private:
+  enum { chunk_size = 4 };
   void* reusable_memory_;
 };
 

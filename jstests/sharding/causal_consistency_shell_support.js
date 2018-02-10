@@ -194,5 +194,6 @@
             ErrorCodes.InvalidOptions + ", because the afterClusterTime value, " + invalidTime +
             ", should not be ahead of the clusterTime, " + session.getClusterTime().clusterTime);
 
+    rst.stopSet();
     st.stop();
 })();

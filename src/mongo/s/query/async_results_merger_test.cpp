@@ -117,7 +117,7 @@ protected:
         boost::optional<BSONObj> findCmd = boost::none,
         boost::optional<long long> getMoreBatchSize = boost::none,
         ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly)) {
-        _params = stdx::make_unique<ClusterClientCursorParams>(_nss, UserNameIterator(), readPref);
+        _params = stdx::make_unique<ClusterClientCursorParams>(_nss, readPref);
         _params->remotes = std::move(remoteCursors);
 
         if (findCmd) {
@@ -1522,8 +1522,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreRequestIncludesMaxTimeMS) {
 }
 
 TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfOneOrMoreRemotesHasNoOplogTimestamp) {
-    auto params =
-        stdx::make_unique<ClusterClientCursorParams>(_nss, UserNameIterator(), boost::none);
+    auto params = stdx::make_unique<ClusterClientCursorParams>(_nss, boost::none);
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
     cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 123, {}));
     cursors.emplace_back(kTestShardIds[1], kTestShardHosts[1], CursorResponse(_nss, 456, {}));
@@ -1587,8 +1586,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfOneOrMoreRemotesHas
 
 TEST_F(AsyncResultsMergerTest,
        SortedTailableCursorNotReadyIfOneOrMoreRemotesHasNullOplogTimestamp) {
-    auto params =
-        stdx::make_unique<ClusterClientCursorParams>(_nss, UserNameIterator(), boost::none);
+    auto params = stdx::make_unique<ClusterClientCursorParams>(_nss, boost::none);
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
     cursors.emplace_back(
         kTestShardIds[0],
@@ -1636,8 +1634,7 @@ TEST_F(AsyncResultsMergerTest,
 }
 
 TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfOneRemoteHasLowerOplogTime) {
-    auto params =
-        stdx::make_unique<ClusterClientCursorParams>(_nss, UserNameIterator(), boost::none);
+    auto params = stdx::make_unique<ClusterClientCursorParams>(_nss, boost::none);
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
     Timestamp tooLow = Timestamp(1, 2);
     cursors.emplace_back(
@@ -1671,8 +1668,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNotReadyIfOneRemoteHasLowerOp
 }
 
 TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting) {
-    auto params =
-        stdx::make_unique<ClusterClientCursorParams>(_nss, UserNameIterator(), boost::none);
+    auto params = stdx::make_unique<ClusterClientCursorParams>(_nss, boost::none);
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
     cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 123, {}));
     params->remotes = std::move(cursors);
@@ -1743,8 +1739,7 @@ TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedAfterExisting)
 }
 
 TEST_F(AsyncResultsMergerTest, SortedTailableCursorNewShardOrderedBeforeExisting) {
-    auto params =
-        stdx::make_unique<ClusterClientCursorParams>(_nss, UserNameIterator(), boost::none);
+    auto params = stdx::make_unique<ClusterClientCursorParams>(_nss, boost::none);
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
     cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 123, {}));
     params->remotes = std::move(cursors);

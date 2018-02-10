@@ -37,9 +37,4 @@ namespace mongo {
  */
 extern SimpleMutex filesLockedFsync;
 
-/**
- * Returns true if mongod is currently fsyncLocked.
- */
-bool lockedForWriting();
-
 }  // namespace mongo

@@ -207,4 +207,6 @@ load("jstests/replsets/rslib.js");
         }
         return true;
     });
+    MongoRunner.stopMongod(conn);
+    rs.stopSet();
 })();

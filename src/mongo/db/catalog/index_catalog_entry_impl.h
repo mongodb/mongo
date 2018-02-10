@@ -138,6 +138,11 @@ public:
      * If this index supports path-level multikey tracking, then 'multikeyPaths' must be a vector
      * with size equal to the number of elements in the index key pattern. Additionally, at least
      * one path component of the indexed fields must cause this index to be multikey.
+     *
+     * If isTrackingMultikeyPathInfo() is set on the OperationContext's MultikeyPathTracker,
+     * then after we confirm that we actually need to set the index as multikey, we will save the
+     * namespace, index name, and multikey paths on the OperationContext rather than set the index
+     * as multikey here.
      */
     void setMultikey(OperationContext* opCtx, const MultikeyPaths& multikeyPaths) final;
 

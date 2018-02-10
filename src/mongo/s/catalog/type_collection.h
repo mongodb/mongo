@@ -158,6 +158,10 @@ public:
         return _allowBalance.get_value_or(true);
     }
 
+    void setIsAssignedShardKey(bool isAssignedShardKey) {
+        _isAssignedShardKey = isAssignedShardKey;
+    }
+
     bool isAssignedShardKey() const {
         return _isAssignedShardKey.get_value_or(true);
     }

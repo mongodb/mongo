@@ -6,6 +6,15 @@
 (function() {
     "use strict";
 
+    // Only run this test if the storage engine is "wiredTiger" or "inMemory".
+    const acceptedStorageEngines = ["wiredTiger", "inMemory"];
+    const currentStorageEngine = jsTest.options().storageEngine || "wiredTiger";
+    if (!acceptedStorageEngines.includes(currentStorageEngine)) {
+        jsTest.log("Refusing to run restartCatalog test on " + currentStorageEngine +
+                   " storage engine");
+        return;
+    }
+
     // Helper function for sorting documents in JavaScript.
     function sortOnId(doc1, doc2) {
         return bsonWoCompare({_: doc1._id}, {_: doc2._id});

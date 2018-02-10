@@ -43,4 +43,5 @@
                   "renameCollection was supposed to only generate " + test.expectedOplogEntries +
                       " oplog entries: " + tojson(ops));
     });
+    rs.stopSet();
 })();

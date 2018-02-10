@@ -41,6 +41,63 @@ namespace detail
       return true;
     }
   };
+
+  template <typename Protocol, typename Iterator>
+  inline typename Protocol::endpoint deref_connect_result(
+      Iterator iter, asio::error_code& ec)
+  {
+    return ec ? typename Protocol::endpoint() : *iter;
+  }
+
+  template <typename T, typename Iterator>
+  struct legacy_connect_condition_helper : T
+  {
+    typedef char (*fallback_func_type)(...);
+    operator fallback_func_type() const;
+  };
+
+  template <typename R, typename Arg1, typename Arg2, typename Iterator>
+  struct legacy_connect_condition_helper<R (*)(Arg1, Arg2), Iterator>
+  {
+    R operator()(Arg1, Arg2) const;
+    char operator()(...) const;
+  };
+
+  template <typename T, typename Iterator>
+  struct is_legacy_connect_condition
+  {
+    static char asio_connect_condition_check(char);
+    static char (&asio_connect_condition_check(Iterator))[2];
+
+    static const bool value =
+      sizeof(asio_connect_condition_check(
+        (*static_cast<legacy_connect_condition_helper<T, Iterator>*>(0))(
+          *static_cast<const asio::error_code*>(0),
+          *static_cast<const Iterator*>(0)))) != 1;
+  };
+
+  template <typename ConnectCondition, typename Iterator>
+  inline Iterator call_connect_condition(ConnectCondition& connect_condition,
+      const asio::error_code& ec, Iterator next, Iterator end,
+      typename enable_if<is_legacy_connect_condition<
+        ConnectCondition, Iterator>::value>::type* = 0)
+  {
+    if (next != end)
+      return connect_condition(ec, next);
+    return end;
+  }
+
+  template <typename ConnectCondition, typename Iterator>
+  inline Iterator call_connect_condition(ConnectCondition& connect_condition,
+      const asio::error_code& ec, Iterator next, Iterator end,
+      typename enable_if<!is_legacy_connect_condition<
+        ConnectCondition, Iterator>::value>::type* = 0)
+  {
+    for (;next != end; ++next)
+      if (connect_condition(ec, *next))
+        return next;
+    return end;
+  }
 }
 
 template <typename Protocol ASIO_SVC_TPARAM, typename EndpointSequence>
@@ -63,10 +120,9 @@ typename Protocol::endpoint connect(
     typename enable_if<is_endpoint_sequence<
         EndpointSequence>::value>::type*)
 {
-  typename EndpointSequence::iterator iter = connect(
-      s, endpoints.begin(), endpoints.end(),
-      detail::default_connect_condition(), ec);
-  return ec ? typename Protocol::endpoint() : *iter;
+  return detail::deref_connect_result<Protocol>(
+      connect(s, endpoints.begin(), endpoints.end(),
+        detail::default_connect_condition(), ec), ec);
 }
 
 #if !defined(ASIO_NO_DEPRECATED)
@@ -130,9 +186,9 @@ typename Protocol::endpoint connect(
     typename enable_if<is_endpoint_sequence<
         EndpointSequence>::value>::type*)
 {
-  typename EndpointSequence::iterator iter = connect(
-      s, endpoints.begin(), endpoints.end(), connect_condition, ec);
-  return ec ? typename Protocol::endpoint() : *iter;
+  return detail::deref_connect_result<Protocol>(
+      connect(s, endpoints.begin(), endpoints.end(),
+        connect_condition, ec), ec);
 }
 
 #if !defined(ASIO_NO_DEPRECATED)
@@ -180,13 +236,16 @@ Iterator connect(basic_socket<Protocol ASIO_SVC_TARG>& s,
 
   for (Iterator iter = begin; iter != end; ++iter)
   {
-    if (connect_condition(ec, iter))
+    iter = (detail::call_connect_condition(connect_condition, ec, iter, end));
+    if (iter != end)
     {
       s.close(ec);
       s.connect(*iter, ec);
       if (!ec)
         return iter;
     }
+    else
+      break;
   }
 
   if (!ec)
@@ -208,11 +267,11 @@ namespace detail
     {
     }
 
-    template <typename Endpoint>
-    bool check_condition(const asio::error_code& ec,
-        const Endpoint& endpoint)
+    template <typename Iterator>
+    void check_condition(const asio::error_code& ec,
+        Iterator& iter, Iterator& end)
     {
-      return connect_condition_(ec, endpoint);
+      iter = detail::call_connect_condition(connect_condition_, ec, iter, end);
     }
 
   private:
@@ -229,10 +288,9 @@ namespace detail
     {
     }
 
-    template <typename Endpoint>
-    bool check_condition(const asio::error_code&, const Endpoint&)
+    template <typename Iterator>
+    void check_condition(const asio::error_code&, Iterator&, Iterator&)
     {
-      return true;
     }
   };
 
@@ -279,18 +337,18 @@ namespace detail
 
     void operator()(asio::error_code ec, int start = 0)
     {
-      typename EndpointSequence::iterator iter = endpoints_.begin();
+      typename EndpointSequence::const_iterator begin = endpoints_.begin();
+      typename EndpointSequence::const_iterator iter = begin;
       std::advance(iter, index_);
-      typename EndpointSequence::iterator end = endpoints_.end();
+      typename EndpointSequence::const_iterator end = endpoints_.end();
 
       switch (start_ = start)
       {
         case 1:
         for (;;)
         {
-          for (; iter != end; ++iter, ++index_)
-            if (this->check_condition(ec, *iter))
-              break;
+          this->check_condition(ec, iter, end);
+          index_ = std::distance(begin, iter);
 
           if (iter != end)
           {
@@ -443,9 +501,7 @@ namespace detail
         case 1:
         for (;;)
         {
-          for (; iter_ != end_; ++iter_)
-            if (this->check_condition(ec, *iter_))
-              break;
+          this->check_condition(ec, iter_, end_);
 
           if (iter_ != end_)
           {

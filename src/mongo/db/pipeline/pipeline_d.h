@@ -123,7 +123,7 @@ public:
          * collation.
          */
         std::unique_ptr<CollatorInterface> _getCollectionDefaultCollator(OperationContext* opCtx,
-                                                                         const NamespaceString& nss,
+                                                                         StringData dbName,
                                                                          UUID collectionUUID);
 
         DBDirectClient _client;

@@ -168,6 +168,12 @@ public:
      */
     bool integral() const;
 
+    /**
+     * Returns true if this value is a numeric type that can be represented as a 64-bit integer,
+     * and false otherwise.
+     */
+    bool integral64Bit() const;
+
     /// Get the BSON type of the field.
     BSONType getType() const {
         return _storage.bsonType();
@@ -180,6 +186,9 @@ public:
     Decimal128 getDecimal() const;
     double getDouble() const;
     std::string getString() const;
+    // May contain embedded NUL bytes, the returned StringData is just a view into the string still
+    // owned by this Value.
+    StringData getStringData() const;
     Document getDocument() const;
     OID getOid() const;
     bool getBool() const;
@@ -351,8 +360,8 @@ private:
 
     explicit Value(const ValueStorage& storage) : _storage(storage) {}
 
-    // does no type checking
-    StringData getStringData() const;  // May contain embedded NUL bytes
+    // May contain embedded NUL bytes, does not check the type.
+    StringData getRawData() const;
 
     ValueStorage _storage;
     friend class MutableValue;  // gets and sets _storage.genericRCPtr
@@ -394,6 +403,11 @@ inline size_t Value::getArrayLength() const {
 }
 
 inline StringData Value::getStringData() const {
+    verify(getType() == String);
+    return getRawData();
+}
+
+inline StringData Value::getRawData() const {
     return _storage.getString();
 }
 

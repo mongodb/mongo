@@ -27,3 +27,4 @@ assertStartsWith(print
 
 db.auth("admin", "pass");
 db.shutdownServer();
+waitProgram(m.pid);

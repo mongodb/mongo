@@ -38,3 +38,5 @@ assert.commandFailedWithCode(primaryAdmin.runCommand(cmd2), 13);
 assert.commandWorked(arbiterAdmin.runCommand(cmd0));
 assert.commandWorked(arbiterAdmin.runCommand(cmd1));
 assert.commandWorked(arbiterAdmin.runCommand(cmd2));
+
+replTest.stopSet();

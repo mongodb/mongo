@@ -44,7 +44,6 @@
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
 #include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -52,6 +51,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_test_fixture.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
@@ -69,8 +69,8 @@ using std::string;
 using std::vector;
 using unittest::assertGet;
 
-using InsertRetryTest = ShardingCatalogTestFixture;
-using UpdateRetryTest = ShardingCatalogTestFixture;
+using InsertRetryTest = ShardingTestFixture;
+using UpdateRetryTest = ShardingTestFixture;
 
 const NamespaceString kTestNamespace("config.TestColl");
 const HostAndPort kTestHosts[] = {

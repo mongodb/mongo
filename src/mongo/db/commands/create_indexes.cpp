@@ -222,7 +222,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         ActionSet actions;
         actions.addAction(ActionType::createIndex);
         Privilege p(parseResourcePattern(dbname, cmdObj), actions);
@@ -278,6 +278,11 @@ public:
                 errmsg = "Cannot create indexes on a view";
                 return CommandHelpers::appendCommandStatus(
                     result, {ErrorCodes::CommandNotSupportedOnView, errmsg});
+            }
+
+            status = userAllowedCreateNS(ns.db(), ns.coll());
+            if (!status.isOK()) {
+                return CommandHelpers::appendCommandStatus(result, status);
             }
 
             writeConflictRetry(opCtx, kCommandName, ns.ns(), [&] {

@@ -46,6 +46,12 @@ def _get_field_member_setter_name(field):
     return "set%s" % (common.title_case(field.cpp_name))
 
 
+def _get_field_member_getter_name(field):
+    # type: (ast.Field) -> unicode
+    """Get the C++ class getter name for a field."""
+    return "get%s" % (common.title_case(field.cpp_name))
+
+
 def _get_has_field_member_name(field):
     # type: (ast.Field) -> unicode
     """Get the C++ class member name for bool 'has' member field."""
@@ -423,8 +429,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-    def gen_getter(self, field):
-        # type: (ast.Field) -> None
+    def gen_getter(self, struct, field):
+        # type: (ast.Struct, ast.Field) -> None
         """Generate the C++ getter definition for a field."""
         cpp_type_info = cpp_types.get_cpp_type(field)
         param_type = cpp_type_info.get_getter_setter_type()
@@ -434,7 +440,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             param_type += "&"
 
         template_params = {
-            'method_name': common.title_case(field.cpp_name),
+            'method_name': _get_field_member_getter_name(field),
             'param_type': param_type,
             'body': cpp_type_info.get_getter_body(member_name),
             'const_type': 'const ' if cpp_type_info.is_const_type() else '',
@@ -444,18 +450,27 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # optional types, and non-primitive types.
         with self._with_template(template_params):
 
-            if cpp_type_info.disable_xvalue():
+            if field.chained_struct_field:
                 self._writer.write_template(
-                    'const ${param_type} get${method_name}() const& { ${body} }')
-                self._writer.write_template('void get${method_name}() && = delete;')
+                    '${const_type} ${param_type} ${method_name}() const { return %s.%s(); }' % (
+                        (_get_field_member_name(field.chained_struct_field),
+                         _get_field_member_getter_name(field))))
+
+            elif cpp_type_info.disable_xvalue():
+                self._writer.write_template(
+                    'const ${param_type} ${method_name}() const& { ${body} }')
+                self._writer.write_template('void ${method_name}() && = delete;')
+
             elif field.struct_type:
                 # Support mutable accessors
                 self._writer.write_template(
-                    'const ${param_type} get${method_name}() const { ${body} }')
-                self._writer.write_template('${param_type} get${method_name}() { ${body} }')
+                    'const ${param_type} ${method_name}() const { ${body} }')
+
+                if not struct.immutable:
+                    self._writer.write_template('${param_type} ${method_name}() { ${body} }')
             else:
                 self._writer.write_template(
-                    '${const_type}${param_type} get${method_name}() const { ${body} }')
+                    '${const_type}${param_type} ${method_name}() const { ${body} }')
 
     def gen_setter(self, field):
         # type: (ast.Field) -> None
@@ -547,7 +562,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         # type: (ast.Command) -> None
         """Generate the methods for a command."""
         if command.command_field:
-            self.gen_getter(command.command_field)
+            self.gen_getter(command, command.command_field)
         else:
             struct_type_info = struct_types.get_struct_info(command)
             struct_type_info.gen_getter_method(self._writer)
@@ -694,11 +709,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
                     # Write getters & setters
                     for field in struct.fields:
-                        if not field.ignore and not field.chained_struct_field:
+                        if not field.ignore:
                             if field.description:
                                 self.gen_description_comment(field.description)
-                            self.gen_getter(field)
-                            if not struct.immutable:
+                            self.gen_getter(struct, field)
+                            if not struct.immutable and not field.chained_struct_field:
                                 self.gen_setter(field)
 
                     if struct.generate_comparison_operators:

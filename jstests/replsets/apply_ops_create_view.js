@@ -14,4 +14,6 @@
     const cmd = {applyOps: [{op: "c", ns: db + ".$cmd", o: {create: "foo", viewOn: "bar"}}]};
     assert.commandWorked(db.runCommand(cmd), tojson(cmd));
     assert.eq(db.foo.findOne({a: 1}).b, "hi");
+
+    replTest.stopSet();
 }());

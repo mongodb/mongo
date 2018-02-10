@@ -70,7 +70,7 @@ public:
     }
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return rename_collection::checkAuthForRenameCollectionCommand(client, dbname, cmdObj);
     }
     std::string help() const override {

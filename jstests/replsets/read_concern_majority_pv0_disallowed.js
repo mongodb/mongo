@@ -19,7 +19,7 @@
 
     // A read concern of majority should be disallowed because protocol version is 0.
     assert.commandFailedWithCode(coll.runCommand("find", {"readConcern": {"level": "majority"}}),
-                                 ErrorCodes.ReadConcernMajorityNotEnabled);
+                                 ErrorCodes.IncompatibleElectionProtocol);
 
     replTest.stopSet();
 }());

@@ -31,9 +31,9 @@ namespace detail {
 DWORD win_tss_ptr_create()
 {
 #if defined(UNDER_CE)
-  enum { out_of_indexes = 0xFFFFFFFF };
+  const DWORD out_of_indexes = 0xFFFFFFFF;
 #else
-  enum { out_of_indexes = TLS_OUT_OF_INDEXES };
+  const DWORD out_of_indexes = TLS_OUT_OF_INDEXES;
 #endif
 
   DWORD tss_key = ::TlsAlloc();

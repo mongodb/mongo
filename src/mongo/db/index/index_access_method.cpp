@@ -46,12 +46,14 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -218,7 +220,10 @@ Status IndexAccessMethod::remove(OperationContext* opCtx,
     // multikey when removing a document since the index metadata isn't updated when keys are
     // deleted.
     MultikeyPaths* multikeyPaths = nullptr;
-    getKeys(obj, options.getKeysMode, &keys, multikeyPaths);
+
+    // Relax key constraints on removal when deleting documents with invalid formats, but only
+    // those that don't apply to the partialIndex filter.
+    getKeys(obj, GetKeysMode::kRelaxConstraintsUnfiltered, &keys, multikeyPaths);
 
     for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
         removeOneKey(opCtx, *i, loc, options.dupsAllowed);
@@ -471,6 +476,13 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
                                      bool mayInterrupt,
                                      bool dupsAllowed,
                                      set<RecordId>* dupsToDrop) {
+    // Do not track multikey path info for index builds.
+    ScopeGuard restartTracker =
+        MakeGuard([opCtx] { MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo(); });
+    if (!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
+        restartTracker.Dismiss();
+    }
+    MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo();
     Timer timer;
 
     std::unique_ptr<BulkBuilder::Sorter::Iterator> i(bulk->_sorter->done());
@@ -551,6 +563,10 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
     return Status::OK();
 }
 
+void IndexAccessMethod::setIndexIsMultikey(OperationContext* opCtx, MultikeyPaths paths) {
+    _btreeState->setMultikey(opCtx, paths);
+}
+
 void IndexAccessMethod::getKeys(const BSONObj& obj,
                                 GetKeysMode mode,
                                 BSONObjSet* keys,
@@ -582,11 +598,11 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
     try {
         doGetKeys(obj, keys, multikeyPaths);
     } catch (const AssertionException& ex) {
+        // Suppress all indexing errors when mode is kRelaxConstraints.
         if (mode == GetKeysMode::kEnforceConstraints) {
             throw;
         }
 
-        // Suppress indexing errors when mode is kRelaxConstraints.
         keys->clear();
         if (multikeyPaths) {
             multikeyPaths->clear();
@@ -595,6 +611,15 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
         if (whiteList.find(ex.code()) == whiteList.end()) {
             throw;
         }
+
+        // If the document applies to the filter (which means that it should have never been
+        // indexed), do not supress the error.
+        const MatchExpression* filter = _btreeState->getFilterExpression();
+        if (mode == GetKeysMode::kRelaxConstraintsUnfiltered && filter &&
+            filter->matchesBSON(obj)) {
+            throw;
+        }
+
         LOG(1) << "Ignoring indexing error for idempotency reasons: " << redact(ex)
                << " when getting index keys of " << redact(obj);
     }

@@ -20,4 +20,5 @@
         {aggregate: 'foo', pipeline: [{$project: {total: {'$add': ['$a', 1]}}}], cursor: {}});
     assert.commandFailed(res);
     assert.eq("$add only supports numeric or date types, not array", res.errmsg, printjson(res));
+    st.stop();
 }());

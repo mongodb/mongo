@@ -52,20 +52,22 @@ public:
     PlanYieldPolicy(PlanExecutor::YieldPolicy policy, ClockSource* cs);
 
     /**
-     * Used by YIELD_AUTO plan executors in order to check whether it is time to yield.
-     * PlanExecutors give up their locks periodically in order to be fair to other
-     * threads.
+     * Periodically returns true to indicate that it is time to check for interrupt (in the case of
+     * YIELD_AUTO and INTERRUPT_ONLY) or release locks or storage engine state (in the case of
+     * auto-yielding plans).
      */
-    virtual bool shouldYield();
+    virtual bool shouldYieldOrInterrupt();
 
     /**
-     * Resets the yield timer so that we wait for a while before yielding again.
+     * Resets the yield timer so that we wait for a while before yielding/interrupting again.
      */
     void resetTimer();
 
     /**
-     * Used to cause a plan executor to release locks or storage engine state. The PlanExecutor must
-     * *not* be in saved state. Handles calls to save/restore state internally.
+     * Used to cause a plan executor to check for interrupt (in the case of YIELD_AUTO and
+     * INTERRUPT_ONLY) or release locks or storage engine state (in the case of auto-yielding
+     * plans). The PlanExecutor must *not* be in saved state. Handles calls to save/restore state
+     * internally.
      *
      * If 'fetcher' is non-NULL, then we are yielding because the storage engine told us
      * that we will page fault on this record. We use 'fetcher' to retrieve the record
@@ -75,17 +77,20 @@ public:
      * ErrorCodes::QueryPlanKilled if the executor got killed during yield, and
      * ErrorCodes::ExceededTimeLimit if the operation has exceeded the time limit.
      */
-    virtual Status yield(RecordFetcher* fetcher = NULL);
+    virtual Status yieldOrInterrupt(RecordFetcher* fetcher = nullptr);
 
     /**
-     * More generic version of yield() above.  This version calls 'beforeYieldingFn' immediately
-     * before locks are yielded (if they are), and 'whileYieldingFn' before locks are restored.
+     * More generic version of yieldOrInterrupt() above.  This version calls 'beforeYieldingFn'
+     * immediately before locks are yielded (if they are), and 'whileYieldingFn' before locks are
+     * restored.
      */
-    virtual Status yield(stdx::function<void()> beforeYieldingFn,
-                         stdx::function<void()> whileYieldingFn);
+    virtual Status yieldOrInterrupt(stdx::function<void()> beforeYieldingFn,
+                                    stdx::function<void()> whileYieldingFn);
 
     /**
-     * All calls to shouldYield() will return true until the next call to yield.
+     * All calls to shouldYieldOrInterrupt() will return true until the next call to
+     * yieldOrInterrupt(). This must only be called for auto-yielding plans, to force a yield. It
+     * cannot be used to force an interrupt for INTERRUPT_ONLY plans.
      */
     void forceYield() {
         dassert(canAutoYield());
@@ -105,7 +110,8 @@ public:
                 return true;
             }
             case PlanExecutor::NO_YIELD:
-            case PlanExecutor::WRITE_CONFLICT_RETRY_ONLY: {
+            case PlanExecutor::WRITE_CONFLICT_RETRY_ONLY:
+            case PlanExecutor::INTERRUPT_ONLY: {
                 return false;
             }
         }
@@ -127,6 +133,7 @@ public:
             }
             case PlanExecutor::NO_YIELD:
             case PlanExecutor::YIELD_MANUAL:
+            case PlanExecutor::INTERRUPT_ONLY:
                 return false;
         }
         MONGO_UNREACHABLE;
@@ -145,6 +152,12 @@ private:
     // The plan executor which this yield policy is responsible for yielding. Must
     // not outlive the plan executor.
     PlanExecutor* const _planYielding;
+
+    // Returns true to indicate it's time to release locks or storage engine state.
+    bool shouldYield();
+
+    // Releases locks or storage engine state.
+    Status yield(stdx::function<void()> beforeYieldingFn, stdx::function<void()> whileYieldingFn);
 };
 
 }  // namespace mongo

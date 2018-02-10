@@ -120,6 +120,9 @@ class MasterSlaveFixture(interface.ReplFixture):
     def get_secondaries(self):
         return [self.slave]
 
+    def get_dbpath(self):
+        return self._dbpath_prefix
+
     def _new_mongod(self, mongod_logger, mongod_options):
         """
         Returns a standalone.MongoDFixture with the specified logger and

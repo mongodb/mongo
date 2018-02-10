@@ -900,6 +900,21 @@ transaction_ops(WT_SESSION *session_arg)
 	error_check(session->commit_transaction(session, NULL));
 	/*! [transaction isolation] */
 
+	/*! [transaction prepare] */
+	/*
+	 * Prepare a transaction which guarantees a subsequent commit will
+	 * succeed. Only commit and rollback are allowed on a transaction after
+	 * it has been prepared.
+	 */
+	error_check(session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor));
+	error_check(session->begin_transaction(session, NULL));
+	cursor->set_key(cursor, "key");
+	cursor->set_value(cursor, "value");
+	session->prepare_transaction(session, "prepare_timestamp=2a");
+	error_check(session->commit_transaction(session, NULL));
+	/*! [transaction prepare] */
+
 	/*! [session isolation configuration] */
 	/* Open a session configured for read-uncommitted isolation. */
 	error_check(conn->open_session(

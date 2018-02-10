@@ -72,22 +72,6 @@ constexpr auto kLargeString =
 const auto kOneKiBMatchStage = BSON("$match" << BSON("data" << kLargeString));
 const auto kTinyMatchStage = BSON("$match" << BSONObj());
 
-// Allow tests to temporarily switch to a different FCV.
-class EnsureFCV {
-public:
-    using Version = ServerGlobalParams::FeatureCompatibility::Version;
-    EnsureFCV(Version version)
-        : _origVersion(serverGlobalParams.featureCompatibility.getVersion()) {
-        serverGlobalParams.featureCompatibility.setVersion(version);
-    }
-    ~EnsureFCV() {
-        serverGlobalParams.featureCompatibility.setVersion(_origVersion);
-    }
-
-private:
-    const Version _origVersion;
-};
-
 class DurableViewCatalogDummy final : public DurableViewCatalog {
 public:
     explicit DurableViewCatalogDummy() : _upsertCount(0), _iterateCount(0) {}
@@ -241,9 +225,6 @@ TEST_F(ViewCatalogFixture, CreateViewWithPipelineFailsOnInvalidStageName) {
 }
 
 TEST_F(ReplViewCatalogFixture, CreateViewWithPipelineFailsOnIneligibleStage) {
-    // Temporarily set the feature version to 3.6 for $changeStream.
-    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
-
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 
@@ -417,9 +398,6 @@ TEST_F(ViewCatalogFixture, ModifyViewOnInvalidCollectionName) {
 }
 
 TEST_F(ReplViewCatalogFixture, ModifyViewWithPipelineFailsOnIneligibleStage) {
-    // Temporarily set the feature version to 3.6 for $changeStream.
-    EnsureFCV ensureFCV(EnsureFCV::Version::kFullyUpgradedTo36);
-
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 

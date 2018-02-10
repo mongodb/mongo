@@ -42,7 +42,6 @@
 #include "mongo/db/s/split_chunk.h"
 #include "mongo/db/s/split_vector.h"
 #include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"

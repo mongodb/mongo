@@ -123,6 +123,7 @@ load('./jstests/libs/cleanup_orphaned_util.js');
     assert.eq(1, recipColl.count());
     assert.eq(1, coll.count());
 
+    MongoRunner.stopMongod(staticMongod);
     st.stop();
 
 })();

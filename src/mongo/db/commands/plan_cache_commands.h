@@ -75,7 +75,7 @@ public:
      */
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj);
+                                       const BSONObj& cmdObj) const;
     /**
      * Subset of command arguments used by plan cache commands
      * Override to provide command functionality.

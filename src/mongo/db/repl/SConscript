@@ -10,8 +10,11 @@ env.Library(
         'apply_ops.cpp',
         'do_txn.cpp',
         'oplog.cpp',
+        env.Idlc('apply_ops.idl')[0],
     ],
     LIBDEPS_PRIVATE=[
+        'dbcheck',
+        'repl_coordinator_interface',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
@@ -20,8 +23,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/index_d',
-        'dbcheck',
-        'repl_coordinator_interface',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 
@@ -284,6 +286,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_options',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         'optime',
         'repl_coordinator_global',
         'replication_consistency_markers_idl',
@@ -1564,10 +1567,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/repair_database',
         '$BUILD_DIR/mongo/db/repl/oplog_buffer_proxy',
         '$BUILD_DIR/mongo/db/s/balancer',
+        '$BUILD_DIR/mongo/db/s/sharding_catalog_manager',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_manager',
         'bgsync',
         'drop_pending_collection_reaper',
         'oplog_buffer_collection',

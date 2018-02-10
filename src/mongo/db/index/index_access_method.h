@@ -190,6 +190,11 @@ public:
      */
     Status compact(OperationContext* opCtx);
 
+    /**
+     * Sets this index as multikey with the provided paths.
+     */
+    void setIndexIsMultikey(OperationContext* opCtx, MultikeyPaths paths);
+
     //
     // Bulk operations support
     //
@@ -255,9 +260,17 @@ public:
                       std::set<RecordId>* dups);
 
     /**
-     * Specifies whether getKeys should relax the index constraints or not.
+     * Specifies whether getKeys should relax the index constraints or not, in order of most
+     * permissive to least permissive.
      */
-    enum class GetKeysMode { kRelaxConstraints, kEnforceConstraints };
+    enum class GetKeysMode {
+        // Relax all constraints.
+        kRelaxConstraints,
+        // Relax all constraints on documents that don't apply to a partial index.
+        kRelaxConstraintsUnfiltered,
+        // Enforce all constraints.
+        kEnforceConstraints
+    };
 
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.

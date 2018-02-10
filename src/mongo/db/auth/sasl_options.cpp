@@ -41,16 +41,26 @@ namespace mongo {
 
 SASLGlobalParams saslGlobalParams;
 
-const int defaultScramIterationCount = 10000;
-const int minimumScramIterationCount = 5000;
+// For backward compatability purposes, "scramIterationCount" refers to the SHA-1 variant.
+// The SHA-256 variant, as well as all future parameters, will use their specific name.
+constexpr auto scramSHA1IterationCountServerParameter = "scramIterationCount"_sd;
+constexpr auto scramSHA256IterationCountServerParameter = "scramSHA256IterationCount"_sd;
+
+const int defaultScramSHA1IterationCount = 10000;
+const int minimumScramSHA1IterationCount = 5000;
+
+const int defaultScramSHA256IterationCount = 15000;
+const int minimumScramSHA256IterationCount = 5000;
 
 SASLGlobalParams::SASLGlobalParams() {
     // Authentication mechanisms supported by default.
     authenticationMechanisms.push_back("MONGODB-X509");
     authenticationMechanisms.push_back("SCRAM-SHA-1");
+    authenticationMechanisms.push_back("SCRAM-SHA-256");
 
     // Default iteration count for SCRAM authentication.
-    scramIterationCount.store(defaultScramIterationCount);
+    scramSHA1IterationCount.store(defaultScramSHA1IterationCount);
+    scramSHA256IterationCount.store(defaultScramSHA256IterationCount);
 
     // Default value for auth failed delay
     authFailedDelay.store(0);
@@ -100,7 +110,9 @@ Status storeSASLOptions(const moe::Environment& params) {
     bool haveHostName = false;
     bool haveServiceName = false;
     bool haveAuthdPath = false;
-    bool haveScramIterationCount = false;
+    bool haveScramSHA1IterationCount = false;
+    bool haveScramSHA256IterationCount = false;
+    int scramSHA1IterationCount = defaultScramSHA1IterationCount;
 
     // Check our setParameter options first so that these values can be properly overridden via
     // the command line even though the options have different names.
@@ -118,8 +130,14 @@ Status storeSASLOptions(const moe::Environment& params) {
                 haveServiceName = true;
             } else if (parametersIt->first == "saslauthdPath") {
                 haveAuthdPath = true;
-            } else if (parametersIt->first == "scramIterationCount") {
-                haveScramIterationCount = true;
+            } else if (parametersIt->first == scramSHA1IterationCountServerParameter) {
+                haveScramSHA1IterationCount = true;
+                // If the value here is non-numeric, atoi() will fail to parse.
+                // We can ignore that error since the ExportedServerParameter
+                // will catch it for us.
+                scramSHA1IterationCount = atoi(parametersIt->second.c_str());
+            } else if (parametersIt->first == scramSHA256IterationCountServerParameter) {
+                haveScramSHA256IterationCount = true;
             }
         }
     }
@@ -137,9 +155,21 @@ Status storeSASLOptions(const moe::Environment& params) {
     if (params.count("security.sasl.saslauthdSocketPath") && !haveAuthdPath) {
         saslGlobalParams.authdPath = params["security.sasl.saslauthdSocketPath"].as<std::string>();
     }
-    if (params.count("security.sasl.scramIterationCount") && !haveScramIterationCount) {
-        saslGlobalParams.scramIterationCount.store(
-            params["security.sasl.scramIterationCount"].as<int>());
+    if (params.count("security.sasl.scramIterationCount") && !haveScramSHA1IterationCount) {
+        scramSHA1IterationCount = params["security.sasl.scramIterationCount"].as<int>();
+        saslGlobalParams.scramSHA1IterationCount.store(scramSHA1IterationCount);
+    }
+    if (!haveScramSHA256IterationCount) {
+        if (params.count("security.sasl.scramSHA256IterationCount")) {
+            saslGlobalParams.scramSHA256IterationCount.store(
+                params["security.sasl.scramSHA256IterationCount"].as<int>());
+        } else {
+            // If scramSHA256IterationCount isn't provided explicitly,
+            // then fall back on scramIterationCount if it is greater than
+            // the default scramSHA256IterationCount.
+            saslGlobalParams.scramSHA256IterationCount.store(
+                std::max<int>(scramSHA1IterationCount, defaultScramSHA256IterationCount));
+        }
     }
 
     return Status::OK();
@@ -169,27 +199,37 @@ ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> SASLServ
 ExportedServerParameter<std::string, ServerParameterType::kStartupOnly> SASLAuthdPathSetting(
     ServerParameterSet::getGlobal(), "saslauthdPath", &saslGlobalParams.authdPath);
 
-const std::string scramIterationCountServerParameter = "scramIterationCount";
 class ExportedScramIterationCountParameter
     : public ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime> {
 public:
-    ExportedScramIterationCountParameter()
+    ExportedScramIterationCountParameter(StringData name, AtomicInt32* value, int minimum)
         : ExportedServerParameter<int, ServerParameterType::kStartupAndRuntime>(
-              ServerParameterSet::getGlobal(),
-              scramIterationCountServerParameter,
-              &saslGlobalParams.scramIterationCount) {}
+              ServerParameterSet::getGlobal(), name.toString(), value),
+          _minimum(minimum) {}
 
     virtual Status validate(const int& newValue) {
-        if (newValue < minimumScramIterationCount) {
+        if (newValue < _minimum) {
             return Status(
                 ErrorCodes::BadValue,
                 mongoutils::str::stream() << "Invalid value for SCRAM iteration count: " << newValue
                                           << " is less than the minimum SCRAM iteration count, "
-                                          << minimumScramIterationCount);
+                                          << _minimum);
         }
 
         return Status::OK();
     }
-} scramIterationCountParam;
+
+private:
+    int _minimum;
+};
+
+ExportedScramIterationCountParameter scramSHA1IterationCountParam(
+    scramSHA1IterationCountServerParameter,
+    &saslGlobalParams.scramSHA1IterationCount,
+    minimumScramSHA1IterationCount);
+ExportedScramIterationCountParameter scramSHA256IterationCountParam(
+    scramSHA256IterationCountServerParameter,
+    &saslGlobalParams.scramSHA256IterationCount,
+    minimumScramSHA256IterationCount);
 
 }  // namespace mongo

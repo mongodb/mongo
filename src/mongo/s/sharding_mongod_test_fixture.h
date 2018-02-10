@@ -33,28 +33,18 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/s/grid.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-class BalancerConfiguration;
-class CatalogCache;
 class CatalogCacheLoader;
 class ConnectionString;
-class ClusterCursorManager;
 class DistLockCatalog;
 class DistLockManager;
 class NamespaceString;
 class RemoteCommandTargeterFactoryMock;
-class ShardingCatalogClient;
 class ShardRegistry;
-
-namespace executor {
-class NetworkInterfaceMock;
-class NetworkTestEnv;
-class TaskExecutor;
-class TaskExecutorPool;
-}  // namespace executor
 
 namespace repl {
 class ReplicationCoordinatorMock;

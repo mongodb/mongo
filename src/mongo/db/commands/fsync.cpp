@@ -43,6 +43,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db.h"
@@ -112,7 +113,7 @@ public:
     }
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::fsync);
         out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
@@ -146,7 +147,7 @@ public:
             }
 
             // Take a global IS lock to ensure the storage engine is not shutdown
-            Lock::GlobalLock global(opCtx, MODE_IS, UINT_MAX);
+            Lock::GlobalLock global(opCtx, MODE_IS, Date_t::max());
             StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
             result.append("numFiles", storageEngine->flushAllFiles(opCtx, sync));
             return true;
@@ -283,7 +284,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) override {
+                               const BSONObj& cmdObj) const override {
         bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
             ResourcePattern::forClusterResource(), ActionType::unlock);
 
@@ -391,7 +392,8 @@ void FSyncLockThread::run() {
     }
 }
 
-bool lockedForWriting() {
-    return fsyncCmd.fsyncLocked();
+MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
+    setLockedForWritingImpl([]() { return fsyncCmd.fsyncLocked(); });
+    return Status::OK();
 }
 }

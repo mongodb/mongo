@@ -322,6 +322,7 @@ nobase_include_HEADERS = \
 	asio/impl/spawn.hpp \
 	asio/impl/src.cpp \
 	asio/impl/src.hpp \
+	asio/impl/system_context.hpp \
 	asio/impl/system_context.ipp \
 	asio/impl/system_executor.hpp \
 	asio/impl/thread_pool.hpp \

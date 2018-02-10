@@ -229,9 +229,9 @@ ServiceStateMachine::ServiceStateMachine(ServiceContext* svcContext,
       _transportMode(transportMode),
       _serviceContext(svcContext),
       _sessionHandle(session),
-      _dbClient{svcContext->makeClient("conn", std::move(session))},
-      _dbClientPtr{_dbClient.get()},
-      _threadName{str::stream() << "conn" << _session()->id()} {}
+      _threadName{str::stream() << "conn" << _session()->id()},
+      _dbClient{svcContext->makeClient(_threadName, std::move(session))},
+      _dbClientPtr{_dbClient.get()} {}
 
 const transport::SessionHandle& ServiceStateMachine::_session() const {
     return _sessionHandle;

@@ -72,5 +72,6 @@ load('./jstests/libs/chunk_manipulation_util.js');
     assert(!shard0ServerStatus.sharding.migrations);
 
     st.stop();
+    MongoRunner.stopMongod(staticMongod);
 
 })();

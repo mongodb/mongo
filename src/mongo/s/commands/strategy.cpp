@@ -542,7 +542,6 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
     ConstDataCursor cursors(dbm->getArray(numCursors));
 
     Client* const client = opCtx->getClient();
-    AuthorizationSession* const authSession = AuthorizationSession::get(client);
     ClusterCursorManager* const manager = Grid::get(opCtx)->getCursorManager();
 
     for (int i = 0; i < numCursors; ++i) {
@@ -554,28 +553,16 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
             continue;
         }
 
-        {
-            // Block scope ccPin so that it releases our checked out cursor
-            // prior to the killCursor invocation below.
-            auto ccPin = manager->checkOutCursor(*nss, cursorId, opCtx);
-            if (!ccPin.isOK()) {
-                LOG(3) << "Unable to check out cursor for killCursor.  Namespace: '" << *nss
-                       << "', cursor id: " << cursorId << ".";
-                continue;
-            }
-            auto cursorOwners = ccPin.getValue().getAuthenticatedUsers();
-            auto authorizationStatus = authSession->checkAuthForKillCursors(*nss, cursorOwners);
-
-            audit::logKillCursorsAuthzCheck(client,
-                                            *nss,
-                                            cursorId,
-                                            authorizationStatus.isOK() ? ErrorCodes::OK
-                                                                       : ErrorCodes::Unauthorized);
-            if (!authorizationStatus.isOK()) {
-                LOG(3) << "Not authorized to kill cursor.  Namespace: '" << *nss
-                       << "', cursor id: " << cursorId << ".";
-                continue;
-            }
+        auto authzSession = AuthorizationSession::get(client);
+        auto authChecker = [&authzSession, &nss](UserNameIterator userNames) -> Status {
+            return authzSession->checkAuthForKillCursors(*nss, userNames);
+        };
+        auto authzStatus = manager->checkAuthForKillCursors(opCtx, *nss, cursorId, authChecker);
+        audit::logKillCursorsAuthzCheck(client, *nss, cursorId, authzStatus.code());
+        if (!authzStatus.isOK()) {
+            LOG(3) << "Not authorized to kill cursor.  Namespace: '" << *nss
+                   << "', cursor id: " << cursorId << ".";
+            continue;
         }
 
         Status killCursorStatus = manager->killCursor(*nss, cursorId);

@@ -29,4 +29,5 @@
         coll.explain('executionStats').group({key: {_id: 1}, reduce: function() {}, initial: {}});
     var numYields = explain.executionStats.executionStages.saveState;
     assert.gt(numYields, (nDocsToInsert / worksPerYield) - 2, tojson(explain));
+    MongoRunner.stopMongod(conn);
 })();

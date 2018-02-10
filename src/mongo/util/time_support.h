@@ -64,6 +64,13 @@ public:
     }
 
     /**
+     * The minimum representable Date_t.
+     */
+    static constexpr Date_t min() {
+        return fromMillisSinceEpoch(0);
+    }
+
+    /**
      * Reads the system clock and returns a Date_t representing the present time.
      */
     static Date_t now();

@@ -657,8 +657,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     if (ShardingState::get(opCtx)->needCollectionMetadata(opCtx, nss.ns())) {
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
-    return getExecutor(
-        opCtx, collection, std::move(canonicalQuery), PlanExecutor::YIELD_AUTO, plannerOptions);
+    return getExecutor(opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions);
 }
 
 namespace {

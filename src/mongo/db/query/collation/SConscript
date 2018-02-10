@@ -1,6 +1,5 @@
 # -*- mode: python -*-
 
-Import("endian")
 Import("env")
 Import("use_system_version_of_library")
 
@@ -117,27 +116,16 @@ env.CppUnitTest(
 icuEnv = env.Clone()
 
 if not use_system_version_of_library("icu"):
-    generateICUInit = icuEnv.Command(
-        target="icu_init.cpp",
-        source=[
-            "generate_icu_init_cpp.py",
-            ("$BUILD_DIR/third_party/icu4c-57.1/source/mongo_sources/icudt57l.dat"
-                if endian == "little"
-                else "$BUILD_DIR/third_party/icu4c-57.1/source/mongo_sources/icudt57b.dat"),
-        ],
-        action="$PYTHON ${SOURCES[0]} -o $TARGET -i ${SOURCES[1]}",
-    )
-
-    icuEnv.Alias("generated-sources", generateICUInit)
-
     icuEnv.InjectThirdPartyIncludePaths("icu")
-
     # Since we are injecting the third-party ICU headers, we must also copy the same defines that we
     # use to configure ICU when building ICU sources. See comment in
     # src/third_party/icu4c-57.1/source/SConscript.
     icuEnv.Append(
         CPPDEFINES=[
-            ("UCONFIG_ONLY_COLLATION", 1),
+            ('UCONFIG_NO_BREAK_ITERATION', 1),
+            ('UCONFIG_NO_FORMATTING', 1),
+            ('UCONFIG_NO_TRANSLITERATION', 1),
+            ('UCONFIG_NO_REGULAR_EXPRESSIONS', 1),
             ("U_CHARSET_IS_UTF8", 1),
             ("U_DISABLE_RENAMING", 1),
             ("U_STATIC_IMPLEMENTATION", 1),
@@ -150,11 +138,11 @@ icuEnv.Library(
     source=[
         "collator_factory_icu.cpp",
         "collator_interface_icu.cpp",
-        "icu_init.cpp" if not use_system_version_of_library("icu") else "icu_init_stub.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/bson/util/bson_extract",
+        "$BUILD_DIR/mongo/util/icu_init",
         "$BUILD_DIR/third_party/shim_icu",
         "collator_factory_interface",
     ],

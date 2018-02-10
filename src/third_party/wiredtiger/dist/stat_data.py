@@ -493,7 +493,7 @@ connection_stats = [
     TxnStat('txn_checkpoint_time_total', 'transaction checkpoint total time (msecs)', 'no_clear,no_scale'),
     TxnStat('txn_commit', 'transactions committed'),
     TxnStat('txn_commit_queue_empty', 'commit timestamp queue insert to empty'),
-    TxnStat('txn_commit_queue_head', 'commit timestamp queue inserts to head'),
+    TxnStat('txn_commit_queue_tail', 'commit timestamp queue inserts to tail'),
     TxnStat('txn_commit_queue_inserts', 'commit timestamp queue inserts total'),
     TxnStat('txn_commit_queue_len', 'commit timestamp queue length'),
     TxnStat('txn_fail_cache', 'transaction failures due to cache overflow'),

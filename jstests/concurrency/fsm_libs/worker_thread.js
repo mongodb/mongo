@@ -26,7 +26,11 @@ var workerThread = (function() {
         var configs = {};
 
         globalAssertLevel = args.globalAssertLevel;
-        TestData = args.testData;
+
+        // The global 'TestData' object may still be undefined if the concurrency suite isn't being
+        // run by resmoke.py (e.g. if it is being run via a parallel shell in the backup/restore
+        // tests).
+        TestData = (args.testData !== undefined) ? args.testData : {};
 
         try {
             if (Cluster.isStandalone(args.clusterOptions)) {

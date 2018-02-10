@@ -106,11 +106,11 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/s/balancer/balancer.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
-#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -133,7 +133,6 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_initialization.h"
@@ -918,9 +917,9 @@ void shutdownTask() {
     // of this function to prevent any operations from running that need a lock.
     //
     DefaultLockerImpl* globalLocker = new DefaultLockerImpl();
-    LockResult result = globalLocker->lockGlobalBegin(MODE_X, Milliseconds::max());
+    LockResult result = globalLocker->lockGlobalBegin(MODE_X, Date_t::max());
     if (result == LOCK_WAITING) {
-        result = globalLocker->lockGlobalComplete(Milliseconds::max());
+        result = globalLocker->lockGlobalComplete(Date_t::max());
     }
 
     invariant(LOCK_OK == result);

@@ -75,4 +75,6 @@
     replTest.awaitReplication();
 
     checkCollectionTemp(secondaryFoo, "permanentColl", false);
+
+    replTest.stopSet();
 }());

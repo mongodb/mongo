@@ -49,8 +49,9 @@ var $config = (function() {
             const viewName = this.getRandomView(this.viewList);
             this.assertCommandWorkedOrFailedWithCode(db.runCommand({drop: viewName}),
                                                      [ErrorCodes.NamespaceNotFound]);
-            this.assertCommandWorkedOrFailedWithCode(db.createView(viewName, collName, []),
-                                                     [ErrorCodes.NamespaceExists]);
+            this.assertCommandWorkedOrFailedWithCode(
+                db.createView(viewName, collName, []),
+                [ErrorCodes.NamespaceExists, ErrorCodes.NamespaceNotFound]);
         }
 
         /**

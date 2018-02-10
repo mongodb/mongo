@@ -151,8 +151,8 @@ Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     //   2) some stage requested a yield due to a document fetch, or
     //   3) we need to yield and retry due to a WriteConflictException.
     // In all cases, the actual yielding happens here.
-    if (yieldPolicy->shouldYield()) {
-        auto yieldStatus = yieldPolicy->yield(_fetcher.get());
+    if (yieldPolicy->shouldYieldOrInterrupt()) {
+        auto yieldStatus = yieldPolicy->yieldOrInterrupt(_fetcher.get());
 
         if (!yieldStatus.isOK()) {
             _failure = true;

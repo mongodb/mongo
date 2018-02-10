@@ -44,7 +44,6 @@
 #include "mongo/db/query/collation/collator_factory_mock.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/s/sharding_task_executor.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_pool.h"
@@ -66,6 +65,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/sharding_egress_metadata_hook_for_mongos.h"
+#include "mongo/s/sharding_task_executor.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/mock_session.h"
@@ -519,6 +519,15 @@ void ShardingTestFixture::expectCount(const HostAndPort& configHost,
         BSONObjBuilder responseBuilder;
         CommandHelpers::appendCommandStatus(responseBuilder, response.getStatus());
         return responseBuilder.obj();
+    });
+}
+
+void ShardingTestFixture::expectFindSendBSONObjVector(const HostAndPort& configHost,
+                                                      std::vector<BSONObj> obj) {
+    onFindCommand([&, obj](const RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, configHost);
+        ASSERT_EQ(request.dbname, "config");
+        return obj;
     });
 }
 

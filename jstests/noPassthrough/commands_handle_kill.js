@@ -196,4 +196,5 @@ if (${ canYield }) {
 
     assertCommandPropogatesPlanExecutorKillReason(
         {delete: coll.getName(), deletes: [{q: {}, limit: 0}]}, {curOpFilter: {op: 'remove'}});
+    MongoRunner.stopMongod(mongod);
 })();

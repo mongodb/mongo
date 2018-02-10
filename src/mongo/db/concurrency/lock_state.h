@@ -102,10 +102,10 @@ public:
     stdx::thread::id getThreadId() const override;
 
     virtual LockResult lockGlobal(LockMode mode);
-    virtual LockResult lockGlobalBegin(LockMode mode, Milliseconds timeout) {
-        return _lockGlobalBegin(mode, timeout);
+    virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) {
+        return _lockGlobalBegin(mode, deadline);
     }
-    virtual LockResult lockGlobalComplete(Milliseconds timeout);
+    virtual LockResult lockGlobalComplete(Date_t deadline);
     virtual void lockMMAPV1Flush();
 
     virtual void downgradeGlobalXtoSForMMAPV1();
@@ -120,7 +120,7 @@ public:
 
     virtual LockResult lock(ResourceId resId,
                             LockMode mode,
-                            Milliseconds timeout = Milliseconds::max(),
+                            Date_t deadline = Date_t::max(),
                             bool checkDeadlock = false);
 
     virtual void downgrade(ResourceId resId, LockMode newMode);
@@ -169,13 +169,11 @@ public:
      *
      * @param resId Resource id which was passed to an earlier lockBegin call. Must match.
      * @param mode Mode which was passed to an earlier lockBegin call. Must match.
-     * @param timeout How long to wait for the lock acquisition to complete.
+     * @param deadline The absolute time point when this lock acquisition will time out, if not yet
+     * granted.
      * @param checkDeadlock whether to perform deadlock detection while waiting.
      */
-    LockResult lockComplete(ResourceId resId,
-                            LockMode mode,
-                            Milliseconds timeout,
-                            bool checkDeadlock);
+    LockResult lockComplete(ResourceId resId, LockMode mode, Date_t deadline, bool checkDeadlock);
 
 private:
     friend class AutoYieldFlushLockForMMAPV1Commit;
@@ -183,9 +181,9 @@ private:
     typedef FastMapNoAlloc<ResourceId, LockRequest, 16> LockRequestsMap;
 
     /**
-     * Like lockGlobalBegin, but accepts a timeout for acquiring a ticket.
+     * Like lockGlobalBegin, but accepts a deadline for acquiring a ticket.
      */
-    LockResult _lockGlobalBegin(LockMode, Milliseconds timeout);
+    LockResult _lockGlobalBegin(LockMode, Date_t deadline);
 
     /**
      * The main functionality of the unlock method, except accepts iterator in order to avoid

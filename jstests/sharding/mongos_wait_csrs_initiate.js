@@ -13,9 +13,9 @@ assert.throws(function() {
 jsTestLog("Initiating CSRS");
 configRS.initiate(replConfig);
 
-// Ensure the featureCompatibilityVersion is 3.4 so that the mongos can connect if it is version
-// 3.4.
-assert.commandWorked(configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+// Ensure the featureCompatibilityVersion is 3.6 so that the mongos can connect if it is version
+// 3.6.
+assert.commandWorked(configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: "3.6"}));
 
 jsTestLog("getting mongos");
 var e;
@@ -36,3 +36,5 @@ assert.soon(
 
 jsTestLog("got mongos");
 assert.commandWorked(mongos2.getDB('admin').runCommand('serverStatus'));
+configRS.stopSet();
+MongoRunner.stopMongos(mongos);

@@ -499,6 +499,46 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
     });
 }
 
+Status StorageInterfaceImpl::setIndexIsMultikey(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const std::string& indexName,
+                                                const MultikeyPaths& paths,
+                                                Timestamp ts) {
+    if (ts.isNull()) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "Cannot set index " << indexName << " on " << nss.ns()
+                                    << " as multikey at null timestamp");
+    }
+
+    return writeConflictRetry(opCtx, "StorageInterfaceImpl::setIndexIsMultikey", nss.ns(), [&] {
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        auto collectionResult = getCollection(
+            autoColl, nss, "The collection must exist before setting an index to multikey.");
+        if (!collectionResult.isOK()) {
+            return collectionResult.getStatus();
+        }
+        auto collection = collectionResult.getValue();
+
+        WriteUnitOfWork wunit(opCtx);
+        auto tsResult = opCtx->recoveryUnit()->setTimestamp(ts);
+        if (!tsResult.isOK()) {
+            return tsResult;
+        }
+
+        auto idx = collection->getIndexCatalog()->findIndexByName(
+            opCtx, indexName, true /* includeUnfinishedIndexes */);
+        if (!idx) {
+            return Status(ErrorCodes::IndexNotFound,
+                          str::stream() << "Could not find index " << indexName << " in "
+                                        << nss.ns()
+                                        << " to set to multikey.");
+        }
+        collection->getIndexCatalog()->getIndex(idx)->setIndexIsMultikey(opCtx, paths);
+        wunit.commit();
+        return Status::OK();
+    });
+}
+
 namespace {
 
 /**

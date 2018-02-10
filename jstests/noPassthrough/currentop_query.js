@@ -486,6 +486,7 @@
         });
 
         delete TestData.queryFilter;
+        MongoRunner.stopMongod(conn);
     }
 
     function currentOpCommand(inputDB, filter) {

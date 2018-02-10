@@ -208,4 +208,5 @@
         assertListContainsRole(role.roles, {role: "readWrite", db: "db1"}, node);
     });
 
+    rstest.stopSet();
 }());

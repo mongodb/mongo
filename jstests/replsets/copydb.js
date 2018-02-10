@@ -93,4 +93,5 @@
     assert.eq(primaryTargetDB.foo.getIndexes().length,
               secondaryTargetDB.foo.getIndexes().length,
               'incorrect number of indexes in target collection on secondary after copy');
+    replTest.stopSet();
 }());

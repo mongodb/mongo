@@ -19,3 +19,4 @@ assert.eq(0, mrResult.ok, 'mr result: ' + tojson(mrResult));
 // Confirm that mongod did not crash
 var cmdResult = testDB.adminCommand({serverStatus: 1});
 assert(cmdResult.ok, 'serverStatus failed, result: ' + tojson(cmdResult));
+MongoRunner.stopMongod(conn);

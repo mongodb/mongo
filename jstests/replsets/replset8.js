@@ -82,4 +82,5 @@
                   slave.getDB('d')['c'].count() + ')');
 
     jsTestLog("finished");
+    rt.stopSet();
 })();

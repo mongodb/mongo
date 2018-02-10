@@ -385,4 +385,6 @@ load('jstests/libs/write_concern_util.js');
         testValidWriteConcern(cmd);
         testInvalidWriteConcern(cmd);
     });
+
+    st.stop();
 })();

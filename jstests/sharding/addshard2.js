@@ -194,5 +194,6 @@
     rst5.stopSet();
 
     st.stop();
+    MongoRunner.stopMongod(normalShard);
 
 })();

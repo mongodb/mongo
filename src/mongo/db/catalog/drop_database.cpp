@@ -94,6 +94,12 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
     uassert(ErrorCodes::IllegalOperation,
             "Cannot drop a database in read-only mode",
             !storageGlobalParams.readOnly);
+
+    // As of SERVER-32205, dropping the admin database is prohibited.
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Dropping the '" << dbName << "' database is prohibited.",
+            dbName != NamespaceString::kAdminDb);
+
     // TODO (Kal): OldClientContext legacy, needs to be removed
     {
         CurOp::get(opCtx)->ensureStarted();

@@ -53,7 +53,8 @@ public:
     AutoStatsTracker(OperationContext* opCtx,
                      const NamespaceString& nss,
                      Top::LockType lockType,
-                     boost::optional<int> dbProfilingLevel);
+                     boost::optional<int> dbProfilingLevel,
+                     Date_t deadline = Date_t::max());
 
     /**
      * Records stats about the current operation via Top.
@@ -82,43 +83,33 @@ class AutoGetCollectionForRead {
     MONGO_DISALLOW_COPYING(AutoGetCollectionForRead);
 
 public:
-    AutoGetCollectionForRead(OperationContext* opCtx, const NamespaceString& nss)
-        : AutoGetCollectionForRead(opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
-
-    AutoGetCollectionForRead(OperationContext* opCtx, const StringData dbName, const UUID& uuid);
-
-    /**
-     * This constructor is intended for internal use and should not be used outside this file.
-     * AutoGetCollectionForReadCommand and AutoGetCollectionOrViewForReadCommand use 'viewMode' to
-     * determine whether or not it is permissible to obtain a handle on a view namespace. Use
-     * another constructor or another 'AutoGet' class instead.
-     */
     AutoGetCollectionForRead(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             AutoGetCollection::ViewMode viewMode);
+                             Date_t deadline = Date_t::max());
 
     AutoGetCollectionForRead(OperationContext* opCtx,
-                             const NamespaceString& nss,
+                             const StringData dbName,
+                             const UUID& uuid,
+                             Date_t deadline = Date_t::max());
+
+    // TODO (SERVER-32367): Do not use this constructor, it is for internal purposes only
+    AutoGetCollectionForRead(OperationContext* opCtx,
+                             const NamespaceStringOrUUID& nsOrUUID,
                              AutoGetCollection::ViewMode viewMode,
-                             Lock::DBLock lock);
+                             Lock::DBLock lock,
+                             Date_t deadline = Date_t::max());
+
     Database* getDb() const {
-        if (!_autoColl) {
-            return nullptr;
-        }
         return _autoColl->getDb();
     }
 
     Collection* getCollection() const {
-        if (!_autoColl) {
-            return nullptr;
-        }
         return _autoColl->getCollection();
     }
 
 private:
-    void _ensureMajorityCommittedSnapshotIsValid(const NamespaceString& nss,
-                                                 OperationContext* opCtx);
-
+    // This field is optional, because the code to wait for majority committed snapshot needs to
+    // release locks in order to block waiting
     boost::optional<AutoGetCollection> _autoColl;
 };
 
@@ -140,19 +131,24 @@ class AutoGetCollectionForReadCommand {
     MONGO_DISALLOW_COPYING(AutoGetCollectionForReadCommand);
 
 public:
-    AutoGetCollectionForReadCommand(OperationContext* opCtx, const NamespaceString& nss)
+    AutoGetCollectionForReadCommand(OperationContext* opCtx,
+                                    const NamespaceString& nss,
+                                    Date_t deadline = Date_t::max())
         : AutoGetCollectionForReadCommand(
-              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden) {}
+              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, deadline) {}
 
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    Lock::DBLock lock)
+                                    Lock::DBLock lock,
+                                    Date_t deadline = Date_t::max())
         : AutoGetCollectionForReadCommand(
-              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, std::move(lock)) {}
+              opCtx, nss, AutoGetCollection::ViewMode::kViewsForbidden, std::move(lock), deadline) {
+    }
 
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const StringData dbName,
-                                    const UUID& uuid);
+                                    const UUID& uuid,
+                                    Date_t deadline = Date_t::max());
 
     Database* getDb() const {
         return _autoCollForRead->getDb();
@@ -165,12 +161,14 @@ public:
 protected:
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const NamespaceString& nss,
-                                    AutoGetCollection::ViewMode viewMode);
+                                    AutoGetCollection::ViewMode viewMode,
+                                    Date_t deadline = Date_t::max());
 
     AutoGetCollectionForReadCommand(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     AutoGetCollection::ViewMode viewMode,
-                                    Lock::DBLock lock);
+                                    Lock::DBLock lock,
+                                    Date_t deadline = Date_t::max());
 
     // '_autoCollForRead' may need to be reset by AutoGetCollectionOrViewForReadCommand, so needs to
     // be a boost::optional.
@@ -192,10 +190,13 @@ class AutoGetCollectionOrViewForReadCommand final : public AutoGetCollectionForR
     MONGO_DISALLOW_COPYING(AutoGetCollectionOrViewForReadCommand);
 
 public:
-    AutoGetCollectionOrViewForReadCommand(OperationContext* opCtx, const NamespaceString& nss);
     AutoGetCollectionOrViewForReadCommand(OperationContext* opCtx,
                                           const NamespaceString& nss,
-                                          Lock::DBLock lock);
+                                          Date_t deadline = Date_t::max());
+    AutoGetCollectionOrViewForReadCommand(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          Lock::DBLock lock,
+                                          Date_t deadline = Date_t::max());
 
     ViewDefinition* getView() const {
         return _view.get();

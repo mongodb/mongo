@@ -19,3 +19,4 @@ var slave = rt.start(false);
 // Perform a w=2 write to ensure that slave can be read from, and initial sync is complete.
 assert.writeOK(master.getDB("test").mycoll.insert({}, {writeConcern: {w: 2}}));
 assert.eq(1, slave.getDB("test").mycoll.find({}).itcount());
+rt.stop();

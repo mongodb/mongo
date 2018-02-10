@@ -64,4 +64,5 @@ load('./jstests/libs/chunk_manipulation_util.js');
     joinMoveChunk();
 
     st.stop();
+    MongoRunner.stopMongod(staticMongod);
 })();

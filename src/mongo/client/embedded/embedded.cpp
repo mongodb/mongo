@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_rebuilder.h"
@@ -59,10 +60,8 @@
 #include "mongo/db/ttl.h"
 #include "mongo/logger/log_component.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
-#include "mongo/scripting/engine.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/fast_clock_source_factory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/quick_exit.h"
@@ -109,6 +108,11 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager,
     repl::setOplogCollectionName(serviceContext);
     return Status::OK();
 }
+
+MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
+    setLockedForWritingImpl([]() { return false; });
+    return Status::OK();
+}
 }  // namespace
 
 using logger::LogComponent;
@@ -137,9 +141,9 @@ void shutdown() {
     // of this function to prevent any operations from running that need a lock.
     //
     DefaultLockerImpl* globalLocker = new DefaultLockerImpl();
-    LockResult result = globalLocker->lockGlobalBegin(MODE_X, Milliseconds::max());
+    LockResult result = globalLocker->lockGlobalBegin(MODE_X, Date_t::max());
     if (result == LOCK_WAITING) {
-        result = globalLocker->lockGlobalComplete(Milliseconds::max());
+        result = globalLocker->lockGlobalComplete(Date_t::max());
     }
 
     invariant(LOCK_OK == result);
@@ -148,11 +152,6 @@ void shutdown() {
     if (serviceContext->getGlobalStorageEngine()) {
         serviceContext->shutdownGlobalStorageEngineCleanly();
     }
-
-    // We drop the scope cache because leak sanitizer can't see across the
-    // thread we use for proxying MozJS requests. Dropping the cache cleans up
-    // the memory and makes leak sanitizer happy.
-    ScriptEngine::dropScopeCache();
 
     log(LogComponent::kControl) << "now exiting";
 }
@@ -176,7 +175,6 @@ int initialize(int argc, char* argv[], char** envp) {
 
     auto serviceContext = checked_cast<ServiceContextMongoEmbedded*>(getGlobalServiceContext());
 
-    serviceContext->setFastClockSource(FastClockSourceFactory::create(Milliseconds(10)));
     auto opObserverRegistry = stdx::make_unique<OpObserverRegistry>();
     opObserverRegistry->addObserver(stdx::make_unique<OpObserverImpl>());
     opObserverRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
@@ -254,10 +252,6 @@ int initialize(int argc, char* argv[], char** envp) {
 
     if (!storageGlobalParams.readOnly) {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
-    }
-
-    if (mongodGlobalParams.scriptingEnabled) {
-        ScriptEngine::setup();
     }
 
     auto startupOpCtx = serviceContext->makeOperationContext(&cc());

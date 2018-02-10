@@ -51,9 +51,9 @@
 namespace mongo {
 
 void CatalogCacheTestFixture::setUp() {
-    ShardingCatalogTestFixture::setUp();
+    ShardingTestFixture::setUp();
     setRemote(HostAndPort("FakeRemoteClient:34567"));
-    configTargeter()->setFindHostReturnValue(HostAndPort{CONFIG_HOST_PORT});
+    configTargeter()->setFindHostReturnValue(kConfigHostAndPort);
 
     CollatorFactoryInterface::set(serviceContext(), stdx::make_unique<CollatorFactoryMock>());
 }
@@ -95,11 +95,7 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
     ChunkVersion version(1, 0, OID::gen());
 
     const BSONObj databaseBSON = [&]() {
-        DatabaseType db;
-        db.setName(nss.db().toString());
-        db.setPrimary({"0"});
-        db.setSharded(true);
-
+        DatabaseType db(nss.db().toString(), {"0"}, true);
         return db.toBSON();
     }();
 
@@ -142,10 +138,10 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
 
     auto future = scheduleRoutingInfoRefresh(nss);
 
-    expectFindOnConfigSendBSONObjVector({databaseBSON});
-    expectFindOnConfigSendBSONObjVector({collectionBSON});
-    expectFindOnConfigSendBSONObjVector({collectionBSON});
-    expectFindOnConfigSendBSONObjVector(initialChunks);
+    expectFindSendBSONObjVector(kConfigHostAndPort, {databaseBSON});
+    expectFindSendBSONObjVector(kConfigHostAndPort, {collectionBSON});
+    expectFindSendBSONObjVector(kConfigHostAndPort, {collectionBSON});
+    expectFindSendBSONObjVector(kConfigHostAndPort, initialChunks);
 
     auto routingInfo = future.timed_get(kFutureTimeout);
     ASSERT(routingInfo->cm());

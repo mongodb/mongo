@@ -68,7 +68,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string&,
                                        const BSONObj&,
-                                       std::vector<Privilege>*) {}
+                                       std::vector<Privilege>*) const {}
 
     void redactForLogging(mutablebson::Document* cmdObj) const override;
 
@@ -96,7 +96,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string&,
                                        const BSONObj&,
-                                       std::vector<Privilege>*) {}
+                                       std::vector<Privilege>*) const {}
 
     virtual bool run(OperationContext* opCtx,
                      const std::string& db,

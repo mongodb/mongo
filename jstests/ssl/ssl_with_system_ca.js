@@ -4,6 +4,10 @@
 // for details.
 ((function() {
     'use strict';
+    // Do not fail if this test leaves unterminated processes because testWithCerts
+    // is expected to throw before it calls stopMongod.
+    TestData.failIfUnterminatedProcesses = false;
+
     const HOST_TYPE = getBuildInfo().buildEnvironment.target_os;
 
     if (HOST_TYPE == "windows") {
@@ -35,6 +39,7 @@
     };
 
     assert.throws(function() {
+        // Note: this leaves a running mongod process.
         testWithCerts("server.pem", "client.pem");
     });
     assert.doesNotThrow(function() {

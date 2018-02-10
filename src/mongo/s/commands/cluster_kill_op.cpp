@@ -70,7 +70,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) final {
+                               const BSONObj& cmdObj) const final {
         bool isAuthorized = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
             ResourcePattern::forClusterResource(), ActionType::killop);
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");

@@ -189,6 +189,9 @@ Status userAllowedWriteNS(StringData db, StringData coll) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "cannot write to '" << db << ".system.profile'");
     }
+    if (coll == "system.indexes") {
+        return Status::OK();
+    }
     return userAllowedCreateNS(db, coll);
 }
 
@@ -222,8 +225,6 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
 
 
     if (coll.startsWith("system.")) {
-        if (coll == "system.indexes")
-            return Status::OK();
         if (coll == "system.js")
             return Status::OK();
         if (coll == "system.profile")
@@ -261,8 +262,12 @@ Status userAllowedCreateNS(StringData db, StringData coll) {
     // some special rules
 
     if (coll.find(".system.") != string::npos) {
-        // If this is metadata for the sessions collection, shard servers need to be able to
-        // write to it.
+        // Writes are permitted to the persisted chunk metadata collections. These collections are
+        // named based on the name of the sharded collection, e.g.
+        // 'config.cache.chunks.dbname.collname'. Since there is a sharded collection
+        // 'config.system.sessions', there will be a corresponding persisted chunk metadata
+        // collection 'config.cache.chunks.config.system.sessions'. We wish to allow writes to this
+        // collection.
         if (coll.find(".system.sessions") != string::npos) {
             return Status::OK();
         }

@@ -193,6 +193,7 @@ var runRoleTest = function() {
     conn = MongoRunner.runMongod({auth: '', dbpath: dbpath, restart: true, cleanData: false});
     mongo = new Mongo("localhost:" + conn.port);
     assertCannotRunCommands(mongo);
+    MongoRunner.stopMongod(conn);
 };
 
 runTest(false, false);

@@ -70,7 +70,7 @@ public:
     ObjectIdTest() : BasicDriverHelper("driverOIDTest") {}
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {}  // No auth required
+                                       std::vector<Privilege>* out) const {}  // No auth required
     virtual bool errmsgRun(OperationContext* opCtx,
                            const string&,
                            const BSONObj& cmdObj,

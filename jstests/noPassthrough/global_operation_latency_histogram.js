@@ -166,4 +166,5 @@
     // Test non-command.
     assert.commandFailed(testColl.runCommand("IHopeNobodyEverMakesThisACommand"));
     lastHistogram = checkHistogramDiff(0, 0, 1);
+    MongoRunner.stopMongod(mongo);
 }());

@@ -50,7 +50,6 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/type_shard_identity.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -259,21 +258,13 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::getDatabas
 
     // The admin database is always hosted on the config server.
     if (dbName == "admin") {
-        DatabaseType dbt;
-        dbt.setName(dbName);
-        dbt.setSharded(false);
-        dbt.setPrimary(ShardRegistry::kConfigServerShardId);
-
+        DatabaseType dbt(dbName, ShardRegistry::kConfigServerShardId, false);
         return repl::OpTimeWith<DatabaseType>(dbt);
     }
 
     // The config database's primary shard is always config, and it is always sharded.
     if (dbName == "config") {
-        DatabaseType dbt;
-        dbt.setName(dbName);
-        dbt.setSharded(true);
-        dbt.setPrimary(ShardRegistry::kConfigServerShardId);
-
+        DatabaseType dbt(dbName, ShardRegistry::kConfigServerShardId, true);
         return repl::OpTimeWith<DatabaseType>(dbt);
     }
 

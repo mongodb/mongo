@@ -428,6 +428,7 @@ SortedDataInterface* getMMAPV1Interface(HeadManager* headManager,
                 headManager, recordStore, cursorRegistry, ordering, indexName, isUnique);
         case IndexVersion::kV1:
         case IndexVersion::kV2:
+        case IndexVersion::kV2Unique:
             return new BtreeInterfaceImpl<BtreeLayoutV1>(
                 headManager, recordStore, cursorRegistry, ordering, indexName, isUnique);
     }

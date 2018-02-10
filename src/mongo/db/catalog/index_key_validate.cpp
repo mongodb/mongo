@@ -133,7 +133,8 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
 
                 break;
             }
-            case IndexVersion::kV2: {
+            case IndexVersion::kV2:
+            case IndexVersion::kV2Unique: {
                 if (keyElement.isNumber()) {
                     double value = keyElement.number();
                     if (std::isnan(value)) {

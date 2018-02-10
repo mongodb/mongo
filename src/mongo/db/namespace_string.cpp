@@ -131,6 +131,11 @@ NamespaceString NamespaceString::getTargetNSForListIndexes() const {
     return NamespaceString(db(), coll().substr(listIndexesCursorNSPrefix.size()));
 }
 
+std::string NamespaceString::getSisterNS(StringData local) const {
+    verify(local.size() && local[0] != '.');
+    return db().toString() + "." + local.toString();
+}
+
 boost::optional<NamespaceString> NamespaceString::getTargetNSForGloballyManagedNamespace() const {
     // Globally managed namespaces are of the form '$cmd.commandName.<targetNs>' or simply
     // '$cmd.commandName'.
@@ -147,7 +152,7 @@ bool NamespaceString::isDropPendingNamespace() const {
 }
 
 NamespaceString NamespaceString::makeDropPendingNamespace(const repl::OpTime& opTime) const {
-    mongo::StringBuilder ss;
+    StringBuilder ss;
     ss << db() << "." << dropPendingNSPrefix;
     ss << opTime.getSecs() << "i" << opTime.getTimestamp().getInc() << "t" << opTime.getTerm();
     ss << "." << coll();
@@ -240,8 +245,25 @@ bool NamespaceString::isReplicated() const {
     return true;
 }
 
+StringData NamespaceStringOrUUID::db() const {
+    if (_nss)
+        return _nss->db();
+    return _dbAndUUID->dbName;
+}
+
+std::string NamespaceStringOrUUID::toString() const {
+    if (_nss)
+        return _nss->toString();
+    else
+        return str::stream() << _dbAndUUID->dbName << ':' << _dbAndUUID->uuid.toString();
+}
+
 std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss) {
     return stream << nss.toString();
+}
+
+std::ostream& operator<<(std::ostream& stream, const NamespaceStringOrUUID& nsOrUUID) {
+    return stream << nsOrUUID.toString();
 }
 
 }  // namespace mongo

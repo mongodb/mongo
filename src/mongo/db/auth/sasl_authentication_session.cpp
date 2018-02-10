@@ -49,6 +49,7 @@ namespace mongo {
 SaslAuthenticationSession::SaslAuthenticationSessionFactoryFn SaslAuthenticationSession::create;
 
 // Mechanism name constants.
+const char SaslAuthenticationSession::mechanismSCRAMSHA256[] = "SCRAM-SHA-256";
 const char SaslAuthenticationSession::mechanismSCRAMSHA1[] = "SCRAM-SHA-1";
 const char SaslAuthenticationSession::mechanismGSSAPI[] = "GSSAPI";
 const char SaslAuthenticationSession::mechanismPLAIN[] = "PLAIN";

@@ -52,3 +52,5 @@ c.save({a: 2, b: 2, loc: [0, 0]});
 near = db.runCommand({geoNear: 'foo', near: [0, 0], query: unsatisfiable});
 assert.commandWorked(near);
 assert.eq(0, near.results.length);
+
+s.stop();

@@ -44,4 +44,5 @@
     assert.writeOK(coll.insert({_id: 2}));
 
     cleanupShell();
+    MongoRunner.stopMongod(conn);
 }());

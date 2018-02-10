@@ -121,11 +121,6 @@ namespace {
  */
 Collection* _localOplogCollection = nullptr;
 
-// Specifies whether we abort initial sync when attempting to apply a renameCollection operation.
-// If set to true, users risk corrupting their data. This should only be enabled by expert users
-// of the server who understand the risks this poses.
-MONGO_EXPORT_SERVER_PARAMETER(allowUnsafeRenamesDuringInitialSync, bool, false);
-
 PseudoRandom hashGenerator(std::unique_ptr<SecureRandom>(SecureRandom::create())->nextInt64());
 
 // Synchronizes the section where a new Timestamp is generated and when it is registered in the
@@ -1506,21 +1501,6 @@ Status applyCommand_inlock(OperationContext* opCtx,
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};
         }
-    }
-
-    // Applying renameCollection during initial sync to a collection without UUID might lead to
-    // data corruption, so we restart the initial sync.
-    if (fieldUI.eoo() && (mode == OplogApplication::Mode::kInitialSync) &&
-        o.firstElementFieldName() == std::string("renameCollection")) {
-        if (!allowUnsafeRenamesDuringInitialSync.load()) {
-            return Status(ErrorCodes::OplogOperationUnsupported,
-                          str::stream()
-                              << "Applying renameCollection not supported in initial sync: "
-                              << redact(op));
-        }
-        warning() << "allowUnsafeRenamesDuringInitialSync set to true. Applying renameCollection "
-                     "operation during initial sync even though it may lead to data corruption: "
-                  << redact(op);
     }
 
     // During upgrade from 3.4 to 3.6, the feature compatibility version cannot change during

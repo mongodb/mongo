@@ -136,4 +136,5 @@ load('jstests/multiVersion/libs/auth_helpers.js');
         testInvalidWriteConcern(cmd);
     });
 
+    replTest.stopSet();
 })();

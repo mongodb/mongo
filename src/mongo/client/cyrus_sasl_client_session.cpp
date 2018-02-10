@@ -41,7 +41,7 @@ namespace mongo {
 namespace {
 
 SaslClientSession* createCyrusSaslClientSession(const std::string& mech) {
-    if (mech == "SCRAM-SHA-1") {
+    if ((mech == "SCRAM-SHA-1") || (mech == "SCRAM-SHA-256")) {
         return new NativeSaslClientSession();
     }
     return new CyrusSaslClientSession();

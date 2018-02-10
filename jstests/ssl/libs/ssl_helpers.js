@@ -1,5 +1,9 @@
 load('jstests/multiVersion/libs/multi_rs.js');
 
+// Do not fail if this test leaves unterminated processes because this file expects replset1.js to
+// throw for invalid SSL options.
+TestData.failIfUnterminatedProcesses = false;
+
 //=== Shared SSL testing library functions and constants ===
 
 var KEYFILE = "jstests/libs/key1";
@@ -55,12 +59,8 @@ var replShouldFail = function(name, opt1, opt2) {
     ssl_options1 = opt1;
     ssl_options2 = opt2;
     ssl_name = name;
-    replTest = null;
     assert.throws(load, [replSetTestFile], "This setup should have failed");
-    // clean up to continue running...
-    if (replTest) {
-        replTest.stopSet();
-    }
+    // Note: this leaves running mongod processes.
 };
 
 /**

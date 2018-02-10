@@ -78,7 +78,7 @@ public:
      */
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) final {
+                               const BSONObj& cmdObj) const final {
         return Status::OK();
     }
 
@@ -114,7 +114,7 @@ public:
         vector<string> dbNames;
         StorageEngine* storageEngine = getGlobalServiceContext()->getGlobalStorageEngine();
         {
-            Lock::GlobalLock lk(opCtx, MODE_IS, UINT_MAX);
+            Lock::GlobalLock lk(opCtx, MODE_IS, Date_t::max());
             storageEngine->listDatabases(&dbNames);
         }
 

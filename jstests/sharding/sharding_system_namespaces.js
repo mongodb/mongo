@@ -60,3 +60,4 @@ if (Array.contains(storageEngines, "wiredTiger")) {
 } else {
     print("Skipping test. wiredTiger engine not supported by mongod binary.");
 }
+st.stop();

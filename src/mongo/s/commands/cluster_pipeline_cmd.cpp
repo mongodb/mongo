@@ -61,7 +61,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) override {
+                               const BSONObj& cmdObj) const override {
         const NamespaceString nss(AggregationRequest::parseNs(dbname, cmdObj));
         return AuthorizationSession::get(client)->checkAuthForAggregate(nss, cmdObj, true);
     }

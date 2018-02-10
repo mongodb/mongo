@@ -115,6 +115,11 @@ public:
         size_t cursorsPinned = 0;
     };
 
+    // Represents a function that may be passed into a ClusterCursorManager method which checks
+    // whether the current client is authorized to perform the operation in question. The function
+    // will be passed the list of users authorized to use the cursor.
+    using AuthzCheckFn = std::function<Status(UserNameIterator)>;
+
     /**
      * PinnedCursor is a moveable, non-copyable class representing ownership of a cursor that has
      * been leased from a ClusterCursorManager.
@@ -184,12 +189,6 @@ public:
          * A cursor must be owned.
          */
         bool isTailableAndAwaitData() const;
-
-        /**
-         * Returns the set of authenticated users when this cursor was created. Cannot be called
-         * after returnCursor() is called.  A cursor must be owned.
-         */
-        UserNameIterator getAuthenticatedUsers() const;
 
         /**
          * Transfers ownership of the underlying cursor back to the manager.  A cursor must be
@@ -299,7 +298,8 @@ public:
                                         std::unique_ptr<ClusterClientCursor> cursor,
                                         const NamespaceString& nss,
                                         CursorType cursorType,
-                                        CursorLifetime cursorLifetime);
+                                        CursorLifetime cursorLifetime,
+                                        UserNameIterator authenticatedUsers);
 
     /**
      * Moves the given cursor to the 'pinned' state, and transfers ownership of the cursor to the
@@ -310,6 +310,10 @@ public:
      * returns an error Status with code CursorInUse.  If the given cursor is not registered or has
      * a pending kill, returns an error Status with code CursorNotFound.
      *
+     * 'authChecker' is function that will be called with the list of users authorized to use this
+     * cursor. This function should check whether the current client is also authorized to use this
+     * cursor, and if not, return an error status, which will cause checkOutCursor to fail.
+     *
      * This method updates the 'last active' time associated with the cursor to the current time.
      *
      * Does not block.
@@ -318,7 +322,18 @@ public:
     StatusWith<PinnedCursor> checkOutCursor(const NamespaceString& nss,
                                             CursorId cursorId,
                                             OperationContext* opCtx,
+                                            AuthzCheckFn authChecker,
                                             AuthCheck checkSessionAuth = kCheckSession);
+
+    /**
+     * This method will find the given cursor, and if it exists, call 'authChecker', passing the
+     * list of users authorized to use the cursor. Will propagate the return value of authChecker.
+     */
+    Status checkAuthForKillCursors(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   CursorId cursorId,
+                                   AuthzCheckFn authChecker);
+
 
     /**
      * Informs the manager that the given cursor should be killed.  The cursor need not necessarily
@@ -462,12 +477,15 @@ private:
         CursorEntry(std::unique_ptr<ClusterClientCursor> cursor,
                     CursorType cursorType,
                     CursorLifetime cursorLifetime,
-                    Date_t lastActive)
+                    Date_t lastActive,
+                    UserNameIterator authenticatedUsersIter)
             : _cursor(std::move(cursor)),
               _cursorType(cursorType),
               _cursorLifetime(cursorLifetime),
               _lastActive(lastActive),
-              _lsid(_cursor->getLsid()) {
+              _lsid(_cursor->getLsid()),
+              _authenticatedUsers(
+                  userNameIteratorToContainer<std::vector<UserName>>(authenticatedUsersIter)) {
             invariant(_cursor);
         }
 
@@ -494,29 +512,38 @@ private:
             return _lastActive;
         }
 
-        bool isCursorOwned() const {
-            return static_cast<bool>(_cursor);
-        }
-
         boost::optional<LogicalSessionId> getLsid() const {
             return _lsid;
         }
 
         /**
-         * Releases the cursor from this entry.  If the cursor has already been released, returns
-         * null.
+         * Returns the cursor owned by this CursorEntry for an operation to use. Only one operation
+         * may use the cursor at a time, so callers should check that getOperationUsingCursor()
+         * returns null before using this function. Callers may pass nullptr, but only if the
+         * released cursor is going to be deleted.
          */
-        std::unique_ptr<ClusterClientCursor> releaseCursor() {
+        std::unique_ptr<ClusterClientCursor> releaseCursor(OperationContext* opCtx) {
+            invariant(!_operationUsingCursor);
+            invariant(_cursor);
+            _operationUsingCursor = opCtx;
             return std::move(_cursor);
         }
 
+        OperationContext* getOperationUsingCursor() const {
+            return _operationUsingCursor;
+        }
+
         /**
-         * Transfers ownership of the given released cursor back to this entry.
+         * Indicate that the cursor is no longer in use by an operation. Once this is called,
+         * another operation may check the cursor out.
          */
         void returnCursor(std::unique_ptr<ClusterClientCursor> cursor) {
             invariant(cursor);
             invariant(!_cursor);
+            invariant(_operationUsingCursor);
+
             _cursor = std::move(cursor);
+            _operationUsingCursor = nullptr;
         }
 
         void setKillPending() {
@@ -531,6 +558,10 @@ private:
             _lastActive = lastActive;
         }
 
+        UserNameIterator getAuthenticatedUsers() const {
+            return makeUserNameIterator(_authenticatedUsers.begin(), _authenticatedUsers.end());
+        }
+
     private:
         std::unique_ptr<ClusterClientCursor> _cursor;
         bool _killPending = false;
@@ -539,6 +570,12 @@ private:
         CursorLifetime _cursorLifetime = CursorLifetime::Mortal;
         Date_t _lastActive;
         boost::optional<LogicalSessionId> _lsid;
+
+        // Current operation using the cursor. Non-null if the cursor is checked out.
+        OperationContext* _operationUsingCursor = nullptr;
+
+        // The set of users authorized to use this cursor.
+        const std::vector<UserName> _authenticatedUsers;
     };
 
     /**

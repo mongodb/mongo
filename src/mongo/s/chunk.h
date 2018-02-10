@@ -42,7 +42,7 @@ class BSONObj;
 class Chunk {
 public:
     // Test whether we should split once data * kSplitTestFactor > chunkSize (approximately)
-    const uint64_t kSplitTestFactor = 5;
+    static const uint64_t kSplitTestFactor = 5;
 
     explicit Chunk(const ChunkType& from);
 

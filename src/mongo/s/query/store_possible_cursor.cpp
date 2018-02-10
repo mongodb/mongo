@@ -61,9 +61,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
         return cmdResult;
     }
 
-    ClusterClientCursorParams params(
-        incomingCursorResponse.getValue().getNSS(),
-        AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames());
+    ClusterClientCursorParams params(incomingCursorResponse.getValue().getNSS());
     params.remotes.emplace_back(shardId,
                                 server,
                                 CursorResponse(incomingCursorResponse.getValue().getNSS(),
@@ -76,12 +74,14 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
     // We don't expect to use this cursor until a subsequent getMore, so detach from the current
     // OperationContext until then.
     ccc->detachFromOperationContext();
+    auto authUsers = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames();
     auto clusterCursorId =
         cursorManager->registerCursor(opCtx,
                                       ccc.releaseCursor(),
                                       requestedNss,
                                       ClusterCursorManager::CursorType::SingleTarget,
-                                      ClusterCursorManager::CursorLifetime::Mortal);
+                                      ClusterCursorManager::CursorLifetime::Mortal,
+                                      authUsers);
     if (!clusterCursorId.isOK()) {
         return clusterCursorId.getStatus();
     }

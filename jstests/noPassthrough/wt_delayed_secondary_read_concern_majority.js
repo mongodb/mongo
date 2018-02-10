@@ -10,6 +10,9 @@
 (function() {
     "use strict";
 
+    // Skip db hash check because delayed secondary will not catch up to primary.
+    TestData.skipCheckDBHashes = true;
+
     // Skip this test if not running with the "wiredTiger" storage engine.
     var storageEngine = jsTest.options().storageEngine || "wiredTiger";
     if (storageEngine !== "wiredTiger") {
@@ -57,5 +60,6 @@
             }
             assert.writeOK(batch.execute());
         }
+        rst.stopSet();
     }
 })();

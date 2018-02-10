@@ -45,4 +45,5 @@
     assert.eq(
         op, getLatestOp(), "oplog entry created when system.profile was emptied via emptycapped");
     assert(primaryDB.system.profile.drop());
+    rst.stopSet();
 })();

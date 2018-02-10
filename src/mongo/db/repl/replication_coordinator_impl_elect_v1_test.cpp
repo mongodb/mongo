@@ -2261,7 +2261,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryDoesNotNeedToCatchUp) {
     ASSERT_EQ(1, countLogLinesContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -2284,7 +2284,7 @@ TEST_F(PrimaryCatchUpTest, CatchupSucceeds) {
     ASSERT_EQUALS(1, countLogLinesContaining("Caught up to the latest known optime successfully"));
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -2304,7 +2304,7 @@ TEST_F(PrimaryCatchUpTest, CatchupTimeout) {
     ASSERT_EQUALS(1, countLogLinesContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -2329,7 +2329,7 @@ TEST_F(PrimaryCatchUpTest, CannotSeeAllNodes) {
     ASSERT_EQ(1, countLogLinesContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -2354,7 +2354,7 @@ TEST_F(PrimaryCatchUpTest, HeartbeatTimeout) {
     ASSERT_EQ(1, countLogLinesContaining("Caught up to the latest optime known via heartbeats"));
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -2377,7 +2377,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownBeforeHeartbeatRefreshing) {
     ASSERT_EQUALS(0, countLogLinesContaining("Caught up to the latest"));
     ASSERT_EQUALS(0, countLogLinesContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -2406,7 +2406,7 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringCatchUp) {
     ASSERT_EQUALS(0, countLogLinesContaining("Caught up to the latest"));
     ASSERT_EQUALS(0, countLogLinesContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -2449,11 +2449,11 @@ TEST_F(PrimaryCatchUpTest, PrimaryStepsDownDuringDrainMode) {
     ASSERT(replCoord->getApplierState() == ApplierState::Draining);
     auto opCtx = makeOperationContext();
     {
-        Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+        Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
         ASSERT_FALSE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
     }
     signalDrainComplete(opCtx.get());
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT(replCoord->getApplierState() == ApplierState::Stopped);
     ASSERT_TRUE(replCoord->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
@@ -2517,7 +2517,7 @@ TEST_F(PrimaryCatchUpTest, FreshestNodeBecomesAvailableLater) {
     ASSERT_EQ(1, countLogLinesContaining("Caught up to the latest"));
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -2562,7 +2562,7 @@ TEST_F(PrimaryCatchUpTest, InfiniteTimeoutAndAbort) {
     ASSERT_EQUALS(0, countLogLinesContaining("Catchup timed out"));
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 
@@ -2576,7 +2576,7 @@ TEST_F(PrimaryCatchUpTest, ZeroTimeout) {
     ASSERT_EQUALS(1, countLogLinesContaining("Skipping primary catchup"));
     auto opCtx = makeOperationContext();
     signalDrainComplete(opCtx.get());
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "test"));
 }
 

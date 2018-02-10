@@ -47,8 +47,13 @@
 namespace mongo {
 
 namespace {
+
 const auto getTimeZoneDatabase =
     ServiceContext::declareDecoration<std::unique_ptr<TimeZoneDatabase>>();
+
+std::unique_ptr<_timelib_time, TimeZone::TimelibTimeDeleter> createTimelibTime() {
+    return std::unique_ptr<_timelib_time, TimeZone::TimelibTimeDeleter>(timelib_time_ctor());
+}
 
 // Converts a date to a number of seconds, being careful to round appropriately for negative numbers
 // of seconds.
@@ -63,6 +68,67 @@ long long seconds(Date_t date) {
         }
     }
     return durationCount<Seconds>(Milliseconds(millis));
+}
+
+//
+// Format specifier map when parsing a date from a string with a required format.
+//
+const std::vector<timelib_format_specifier> kDateFromStringFormatMap = {
+    {'d', TIMELIB_FORMAT_DAY_TWO_DIGIT},
+    {'G', TIMELIB_FORMAT_YEAR_ISO},
+    {'H', TIMELIB_FORMAT_HOUR_TWO_DIGIT_24_MAX},
+    {'L', TIMELIB_FORMAT_MILLISECOND_THREE_DIGIT},
+    {'m', TIMELIB_FORMAT_MONTH_TWO_DIGIT},
+    {'M', TIMELIB_FORMAT_MINUTE_TWO_DIGIT},
+    {'S', TIMELIB_FORMAT_SECOND_TWO_DIGIT},
+    {'u', TIMELIB_FORMAT_DAY_OF_WEEK_ISO},
+    {'V', TIMELIB_FORMAT_WEEK_OF_YEAR_ISO},
+    {'Y', TIMELIB_FORMAT_YEAR_FOUR_DIGIT},
+    {'z', TIMELIB_FORMAT_TIMEZONE_OFFSET},
+    {'Z', TIMELIB_FORMAT_TIMEZONE_OFFSET_MINUTES},
+    {'\0', TIMELIB_FORMAT_END}};
+
+//
+// Format specifier map when converting a date to a string.
+//
+const std::vector<timelib_format_specifier> kDateToStringFormatMap = {
+    {'d', TIMELIB_FORMAT_DAY_TWO_DIGIT},
+    {'G', TIMELIB_FORMAT_YEAR_ISO},
+    {'H', TIMELIB_FORMAT_HOUR_TWO_DIGIT_24_MAX},
+    {'j', TIMELIB_FORMAT_DAY_OF_YEAR},
+    {'L', TIMELIB_FORMAT_MILLISECOND_THREE_DIGIT},
+    {'m', TIMELIB_FORMAT_MONTH_TWO_DIGIT},
+    {'M', TIMELIB_FORMAT_MINUTE_TWO_DIGIT},
+    {'S', TIMELIB_FORMAT_SECOND_TWO_DIGIT},
+    {'w', TIMELIB_FORMAT_DAY_OF_WEEK},
+    {'u', TIMELIB_FORMAT_DAY_OF_WEEK_ISO},
+    {'U', TIMELIB_FORMAT_WEEK_OF_YEAR},
+    {'V', TIMELIB_FORMAT_WEEK_OF_YEAR_ISO},
+    {'Y', TIMELIB_FORMAT_YEAR_FOUR_DIGIT},
+    {'z', TIMELIB_FORMAT_TIMEZONE_OFFSET},
+    {'Z', TIMELIB_FORMAT_TIMEZONE_OFFSET_MINUTES}};
+
+
+// Verifies that any '%' is followed by a valid format character as indicated by 'allowedFormats',
+// and that the 'format' string ends with an even number of '%' symbols.
+void validateFormat(StringData format,
+                    const std::vector<timelib_format_specifier>& allowedFormats) {
+    for (auto it = format.begin(); it != format.end(); ++it) {
+        if (*it != '%') {
+            continue;
+        }
+
+        ++it;  // next character must be format modifier
+        uassert(18535, "Unmatched '%' at end of format string", it != format.end());
+
+        const bool validSpecifier = (*it == '%') ||
+            std::find_if(allowedFormats.begin(), allowedFormats.end(), [=](const auto& format) {
+                return format.specifier == *it;
+            }) != allowedFormats.end();
+        uassert(18536,
+                str::stream() << "Invalid format character '%" << *it << "' in format string",
+                validSpecifier);
+    }
 }
 
 }  // namespace
@@ -133,17 +199,37 @@ static timelib_tzinfo* timezonedatabase_gettzinfowrapper(char* tz_id,
     return nullptr;
 }
 
-Date_t TimeZoneDatabase::fromString(StringData dateString, boost::optional<TimeZone> tz) const {
+Date_t TimeZoneDatabase::fromString(StringData dateString,
+                                    boost::optional<TimeZone> tz,
+                                    boost::optional<StringData> format) const {
     std::unique_ptr<timelib_error_container, TimeZoneDatabase::TimelibErrorContainerDeleter>
         errors{};
     timelib_error_container* rawErrors;
 
-    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> parsedTime(
-        timelib_strtotime(const_cast<char*>(dateString.toString().c_str()),
-                          dateString.size(),
-                          &rawErrors,
-                          _timeZoneDatabase.get(),
-                          timezonedatabase_gettzinfowrapper));
+    timelib_time* rawTime;
+    if (!format) {
+        // Without a format, timelib will attempt to parse a string as best as it can, accepting a
+        // variety of formats.
+        rawTime = timelib_strtotime(const_cast<char*>(dateString.rawData()),
+                                    dateString.size(),
+                                    &rawErrors,
+                                    _timeZoneDatabase.get(),
+                                    timezonedatabase_gettzinfowrapper);
+    } else {
+        const timelib_format_config dateFormatConfig = {
+            &kDateFromStringFormatMap[0],
+            // Format specifiers must be prefixed by '%'.
+            '%'};
+        rawTime = timelib_parse_from_format_with_map(const_cast<char*>(format->rawData()),
+                                                     const_cast<char*>(dateString.rawData()),
+                                                     dateString.size(),
+                                                     &rawErrors,
+                                                     _timeZoneDatabase.get(),
+                                                     timezonedatabase_gettzinfowrapper,
+                                                     &dateFormatConfig);
+    }
+    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> parsedTime(rawTime);
+
     errors.reset(rawErrors);
 
     // If the parsed string has a warning or error, throw an error.
@@ -292,9 +378,14 @@ void TimeZone::adjustTimeZone(timelib_time* timelibTime) const {
     timelib_update_from_sse(timelibTime);
 }
 
-Date_t TimeZone::createFromDateParts(
-    int year, int month, int day, int hour, int minute, int second, int millisecond) const {
-    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> newTime(timelib_time_ctor());
+Date_t TimeZone::createFromDateParts(long long year,
+                                     long long month,
+                                     long long day,
+                                     long long hour,
+                                     long long minute,
+                                     long long second,
+                                     long long millisecond) const {
+    auto newTime = createTimelibTime();
 
     newTime->y = year;
     newTime->m = month;
@@ -312,14 +403,14 @@ Date_t TimeZone::createFromDateParts(
     return returnValue;
 }
 
-Date_t TimeZone::createFromIso8601DateParts(int isoYear,
-                                            int isoWeekYear,
-                                            int isoDayOfWeek,
-                                            int hour,
-                                            int minute,
-                                            int second,
-                                            int millisecond) const {
-    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> newTime(timelib_time_ctor());
+Date_t TimeZone::createFromIso8601DateParts(long long isoYear,
+                                            long long isoWeekYear,
+                                            long long isoDayOfWeek,
+                                            long long hour,
+                                            long long minute,
+                                            long long second,
+                                            long long millisecond) const {
+    auto newTime = createTimelibTime();
 
     timelib_date_from_isodate(
         isoYear, isoWeekYear, isoDayOfWeek, &newTime->y, &newTime->m, &newTime->d);
@@ -387,7 +478,7 @@ void TimeZone::TimelibTimeDeleter::operator()(timelib_time* time) {
 
 std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> TimeZone::getTimelibTime(
     Date_t date) const {
-    std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> time(timelib_time_ctor());
+    auto time = createTimelibTime();
 
     timelib_unixtime2gmt(time.get(), seconds(date));
     adjustTimeZone(time.get());
@@ -458,41 +549,12 @@ Seconds TimeZone::utcOffset(Date_t date) const {
     return Seconds(time->z);
 }
 
-void TimeZone::validateFormat(StringData format) {
-    for (auto it = format.begin(); it != format.end(); ++it) {
-        if (*it != '%') {
-            continue;
-        }
+void TimeZone::validateToStringFormat(StringData format) {
+    return validateFormat(format, kDateToStringFormatMap);
+}
 
-        ++it;  // next character must be format modifier
-        uassert(18535, "Unmatched '%' at end of $dateToString format string", it != format.end());
-
-
-        switch (*it) {
-            // all of these fall through intentionally
-            case '%':
-            case 'Y':
-            case 'm':
-            case 'd':
-            case 'H':
-            case 'M':
-            case 'S':
-            case 'L':
-            case 'j':
-            case 'w':
-            case 'U':
-            case 'G':
-            case 'V':
-            case 'u':
-            case 'z':
-            case 'Z':
-                break;
-            default:
-                uasserted(18536,
-                          str::stream() << "Invalid format character '%" << *it
-                                        << "' in $dateToString format string");
-        }
-    }
+void TimeZone::validateFromStringFormat(StringData format) {
+    return validateFormat(format, kDateFromStringFormatMap);
 }
 
 std::string TimeZone::formatDate(StringData format, Date_t date) const {

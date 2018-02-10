@@ -31,12 +31,11 @@
                   "Should have updated one document for user@test");
         admin.logout();
 
-        assert(!test.auth({user: 'user', pwd: 'pass'}));
+        const error = assert.throws(function() {
+            test._authOrThrow({user: 'user', pwd: 'pass'});
+        });
 
-        assert.soon(function() {
-            const log = cat(mongod.fullOptions.logFile);
-            return /Unable to perform SCRAM auth.* invalid SCRAM credentials/.test(log);
-        }, "No warning issued for invalid SCRAM-SHA-1 credendials doc", 30 * 1000, 5 * 1000);
+        assert.eq(error, "Error: credential document SCRAM-SHA-1 failed validation");
     }
 
     const mongod = MongoRunner.runMongod({auth: "", useLogFiles: true});

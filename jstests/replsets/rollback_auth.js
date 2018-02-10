@@ -127,7 +127,7 @@
         } catch (e) {
             return false;
         }
-    }, "B didn't become master", 60000, 1000);
+    }, "B didn't become master");
     printjson(b.adminCommand('replSetGetStatus'));
 
     // Modify the the user and role in a way that will be rolled back.
@@ -162,7 +162,7 @@
         } catch (e) {
             return false;
         }
-    }, "A didn't become master", 60000, 1000);
+    }, "A didn't become master");
 
     // A should not have the new data as it was down
     assert.commandWorked(a.runCommand({dbStats: 1}));

@@ -102,6 +102,9 @@ class ShardedClusterFixture(interface.Fixture):
         for shard in self.shards:
             shard.setup()
 
+    def get_dbpath(self):
+        return self._dbpath_prefix
+
     def await_ready(self):
         # Wait for the config server
         if self.configsvr is not None:

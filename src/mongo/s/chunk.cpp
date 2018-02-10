@@ -32,16 +32,37 @@
 
 #include "mongo/s/chunk.h"
 
+#include "mongo/platform/random.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+namespace {
+
+// Test whether we should split once data * kSplitCheckInterval > chunkSize (approximately)
+PseudoRandom prng(static_cast<int64_t>(time(0)));
+
+// Assume user has 64MB chunkSize setting. It is ok if this assumption is wrong since it is only
+// a heuristic.
+const int64_t kMaxDataWritten = 64 / Chunk::kSplitTestFactor;
+
+/**
+ * Generates a random value for _dataWritten so that a mongos restart wouldn't cause delay in
+ * splitting.
+ */
+int64_t mkDataWritten() {
+    return prng.nextInt64(kMaxDataWritten);
+}
+
+}  // namespace
 
 Chunk::Chunk(const ChunkType& from)
     : _range(from.getMin(), from.getMax()),
       _shardId(from.getShard()),
       _lastmod(from.getVersion()),
       _jumbo(from.getJumbo()),
-      _dataWritten(0) {
+      _dataWritten(mkDataWritten()) {
     invariantOK(from.validate());
 }
 

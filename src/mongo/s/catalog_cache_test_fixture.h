@@ -31,7 +31,7 @@
 #include <vector>
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog/sharding_catalog_test_fixture.h"
+#include "mongo/s/sharding_test_fixture.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
@@ -42,7 +42,7 @@ class ChunkManager;
 class CollatorInterface;
 class ShardKeyPattern;
 
-class CatalogCacheTestFixture : public ShardingCatalogTestFixture {
+class CatalogCacheTestFixture : public ShardingTestFixture {
 protected:
     void setUp() override;
 
@@ -74,6 +74,8 @@ protected:
      * generated as "0", "1", etc.
      */
     void setupNShards(int numShards);
+
+    const HostAndPort kConfigHostAndPort{"DummyConfig", 1234};
 };
 
 }  // namespace mongo

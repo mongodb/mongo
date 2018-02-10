@@ -113,7 +113,7 @@ public:
         authzManager->setAuthEnabled(true);
 
         credentials = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
-                               "a", saslGlobalParams.scramIterationCount.load()));
+                               "a", saslGlobalParams.scramSHA1IterationCount.load()));
     }
 };
 

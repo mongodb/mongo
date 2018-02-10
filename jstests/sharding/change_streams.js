@@ -167,5 +167,5 @@
         pipeline: [{$changeStream: {resumeAfter: resumeToken}}],
         expectedCode: 40615
     });
-
+    st.stop();
 })();

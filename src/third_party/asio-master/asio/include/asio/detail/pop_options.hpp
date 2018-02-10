@@ -67,6 +67,10 @@
 #  pragma GCC visibility pop
 # endif // (__GNUC__ == 4 && __GNUC_MINOR__ >= 1) || (__GNUC__ > 4)
 
+# if (__GNUC__ >= 7)
+#  pragma GCC diagnostic pop
+# endif // (__GNUC__ >= 7)
+
 #elif defined(__KCC)
 
 // Kai C++

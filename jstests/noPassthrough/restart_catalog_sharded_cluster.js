@@ -1,8 +1,18 @@
 /**
  * Tests restarting the catalog in a sharded cluster on the config server and the shards.
+ * @tags: [requires_replication, requires_sharding]
  */
 (function() {
     "use strict";
+
+    // Only run this test if the storage engine is "wiredTiger" or "inMemory".
+    const acceptedStorageEngines = ["wiredTiger", "inMemory"];
+    const currentStorageEngine = jsTest.options().storageEngine || "wiredTiger";
+    if (!acceptedStorageEngines.includes(currentStorageEngine)) {
+        jsTest.log("Refusing to run restartCatalog test on " + currentStorageEngine +
+                   " storage engine");
+        return;
+    }
 
     // Helper function for sorting documents in JavaScript.
     function sortOn(fieldName) {

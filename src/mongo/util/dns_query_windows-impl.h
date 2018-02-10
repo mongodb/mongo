@@ -78,10 +78,11 @@ public:
      */
     std::vector<std::string> txtEntry() const {
         if (this->_record->wType != DNS_TYPE_TEXT) {
-            std::ostringstream oss;
+            StringBuilder oss;
             oss << "Incorrect record format for \"" << this->_service
-                << "\": expected TXT record, found something else";
-            uasserted(ErrorCodes::DNSProtocolError, oss.str());
+                << "\": expected TXT record, found a record of type " << this->_record->wType
+                << " instead";
+            uasserted(ErrorCodes::DNSRecordTypeMismatch, oss.str());
         }
 
         std::vector<std::string> rv;
@@ -97,10 +98,11 @@ public:
      */
     std::string addressEntry() const {
         if (this->_record->wType != DNS_TYPE_A) {
-            std::ostringstream oss;
+            StringBuilder oss;
             oss << "Incorrect record format for \"" << this->_service
-                << "\": expected A record, found something else";
-            uasserted(ErrorCodes::DNSProtocolError, oss.str());
+                << "\": expected A record, found a record of type " << this->_record->wType
+                << " instead";
+            uasserted(ErrorCodes::DNSRecordTypeMismatch, oss.str());
         }
 
         std::string rv;
@@ -121,10 +123,11 @@ public:
      */
     SRVHostEntry srvHostEntry() const {
         if (this->_record->wType != DNS_TYPE_SRV) {
-            std::ostringstream oss;
+            StringBuilder oss;
             oss << "Incorrect record format for \"" << this->_service
-                << "\": expected SRV record, found something else";
-            uasserted(ErrorCodes::DNSProtocolError, oss.str());
+                << "\": expected SRV record, found a record of type " << this->_record->wType
+                << " instead";
+            uasserted(ErrorCodes::DNSRecordTypeMismatch, oss.str());
         }
 
         const auto& data = this->_record->Data.SRV;

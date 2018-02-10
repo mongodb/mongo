@@ -60,3 +60,5 @@ if (!_isWindows()) {
     var config = master.getDB("local").system.replset.findOne();
     assert.eq(false, config.settings.chainingAllowed, tojson(config));
 }
+
+replTest.stopSet();

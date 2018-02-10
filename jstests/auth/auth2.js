@@ -30,3 +30,4 @@ users = db.getCollection("system.users");
 assert.eq(1, users.count());
 
 db.shutdownServer();
+waitProgram(m.pid);

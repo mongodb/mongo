@@ -139,6 +139,7 @@ sub copy_source_file
       $line =~ s/asio\.examples/boost_asio.examples/g;
       $line =~ s/asio\.history/boost_asio.history/g;
       $line =~ s/asio\.index/boost_asio.index/g;
+      $line =~ s/asio\.net_ts/boost_asio.net_ts/g;
       $line =~ s/asio\.overview/boost_asio.overview/g;
       $line =~ s/asio\.reference/boost_asio.reference/g;
       $line =~ s/asio\.tutorial/boost_asio.tutorial/g;
@@ -154,7 +155,7 @@ sub copy_source_file
     }
 
     # Conditional replacements.
-    if ($line =~ /^( *)namespace asio {/)
+    if ($line =~ /^( *)namespace asio \{/)
     {
       if ($is_qbk)
       {
@@ -242,7 +243,7 @@ sub copy_source_file
     {
       # Line is removed.
     }
-    elsif ($line =~ /asio::thread/)
+    elsif ($line =~ /asio::thread\b/)
     {
       if ($is_test)
       {
@@ -269,7 +270,7 @@ sub copy_source_file
         print_line($output, $1 . "boost::thread" . $2, $from, $lineno);
       }
     }
-    elsif ($line =~ /namespace std {/)
+    elsif ($line =~ /namespace std \{ *$/)
     {
       print_line($output, "namespace boost {", $from, $lineno);
       print_line($output, "namespace system {", $from, $lineno);
@@ -277,6 +278,7 @@ sub copy_source_file
     elsif ($line =~ /std::error_code/)
     {
       $line =~ s/std::error_code/boost::system::error_code/g;
+      $line =~ s/asio::/boost::asio::/g if !$is_xsl;
       print_line($output, $line, $from, $lineno);
     }
     elsif ($line =~ /} \/\/ namespace std/)
@@ -381,6 +383,7 @@ sub copy_include_files
       "include/asio/ssl/impl",
       "include/asio/ssl/old",
       "include/asio/ssl/old/detail",
+      "include/asio/ts",
       "include/asio/windows");
 
   foreach my $dir (@dirs)
@@ -428,6 +431,7 @@ sub copy_unit_tests
       "src/tests/unit/local",
       "src/tests/unit/posix",
       "src/tests/unit/ssl",
+      "src/tests/unit/ts",
       "src/tests/unit/windows");
 
   our $boost_dir;
@@ -515,9 +519,15 @@ sub copy_examples
       "src/examples/cpp11/chat",
       "src/examples/cpp11/echo",
       "src/examples/cpp11/executors",
+      "src/examples/cpp11/fork",
       "src/examples/cpp11/futures",
+      "src/examples/cpp11/handler_tracking",
       "src/examples/cpp11/http/server",
+      "src/examples/cpp11/invocation",
       "src/examples/cpp11/iostreams",
+      "src/examples/cpp11/local",
+      "src/examples/cpp11/multicast",
+      "src/examples/cpp11/nonblocking",
       "src/examples/cpp11/spawn",
       "src/examples/cpp14/executors");
 
@@ -547,6 +557,7 @@ sub copy_doc
   my @files = (
       "src/doc/asio.qbk",
       "src/doc/examples.qbk",
+      "src/doc/net_ts.qbk",
       "src/doc/reference.xsl",
       "src/doc/tutorial.xsl",
       glob("src/doc/overview/*.qbk"),

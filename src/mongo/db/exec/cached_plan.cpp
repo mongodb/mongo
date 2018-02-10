@@ -179,9 +179,9 @@ Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
     //   2) some stage requested a yield due to a document fetch, or
     //   3) we need to yield and retry due to a WriteConflictException.
     // In all cases, the actual yielding happens here.
-    if (yieldPolicy->shouldYield()) {
+    if (yieldPolicy->shouldYieldOrInterrupt()) {
         // Here's where we yield.
-        return yieldPolicy->yield(_fetcher.get());
+        return yieldPolicy->yieldOrInterrupt(_fetcher.get());
     }
 
     // We're done using the fetcher, so it should be freed. We don't want to

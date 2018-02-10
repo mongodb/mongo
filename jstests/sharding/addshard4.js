@@ -36,6 +36,7 @@
     printjson(result);
     assert.eq(result, true);
 
+    r.stopSet();
     r = new ReplSetTest({name: "addshard42", nodes: 3});
     r.startSet();
 
@@ -57,5 +58,6 @@
     assert.eq(result, true);
 
     s.stop();
+    r.stopSet();
 
 })();

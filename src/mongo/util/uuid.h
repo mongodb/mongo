@@ -43,6 +43,7 @@ namespace mongo {
 
 namespace repl {
 class OplogEntryBase;
+class ReplOperation;
 }  // namespace repl
 
 namespace idl {
@@ -68,6 +69,7 @@ class UUID {
     friend class LogicalSessionIdToClient;
     friend class LogicalSessionFromClient;
     friend class repl::OplogEntryBase;
+    friend class repl::ReplOperation;
     friend class ResumeTokenInternal;
 
 public:

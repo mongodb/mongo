@@ -148,4 +148,5 @@ load('jstests/libs/write_concern_util.js');
         testInvalidWriteConcern(cmd);
     });
 
+    replTest.stopSet();
 })();

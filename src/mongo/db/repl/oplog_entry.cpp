@@ -136,6 +136,41 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
 const int OplogEntry::kOplogVersion = 2;
 
 // Static
+ReplOperation OplogEntry::makeInsertOperation(const NamespaceString& nss,
+                                              boost::optional<UUID> uuid,
+                                              const BSONObj& docToInsert) {
+    ReplOperation op;
+    op.setOpType(OpTypeEnum::kInsert);
+    op.setNamespace(nss);
+    op.setUuid(uuid);
+    op.setObject(docToInsert);
+    return op;
+}
+
+ReplOperation OplogEntry::makeUpdateOperation(const NamespaceString nss,
+                                              boost::optional<UUID> uuid,
+                                              const BSONObj& update,
+                                              const BSONObj& criteria) {
+    ReplOperation op;
+    op.setOpType(OpTypeEnum::kUpdate);
+    op.setNamespace(nss);
+    op.setUuid(uuid);
+    op.setObject(update);
+    op.setObject2(criteria);
+    return op;
+}
+
+ReplOperation OplogEntry::makeDeleteOperation(const NamespaceString& nss,
+                                              boost::optional<UUID> uuid,
+                                              const BSONObj& docToDelete) {
+    ReplOperation op;
+    op.setOpType(OpTypeEnum::kDelete);
+    op.setNamespace(nss);
+    op.setUuid(uuid);
+    op.setObject(docToDelete);
+    return op;
+}
+
 StatusWith<OplogEntry> OplogEntry::parse(const BSONObj& object) {
     try {
         return OplogEntry(object);

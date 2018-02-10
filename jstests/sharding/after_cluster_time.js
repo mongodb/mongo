@@ -117,5 +117,6 @@
     assertAfterClusterTimeReadFailsWithCode(
         testDB, {level: "majority", afterClusterTime: Timestamp(0, 0)}, ErrorCodes.InvalidOptions);
 
+    rst.stopSet();
     st.stop();
 })();

@@ -93,3 +93,4 @@ result = conns[1].getDB("admin").runCommand({replSetMaintenance: 0});
 assert.eq(result.ok, 1, tojson(result));
 
 secondarySoon();
+replTest.stopSet();

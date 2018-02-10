@@ -13,4 +13,5 @@
 
     var returnCode = runProgram("mongo", "--jsHeapLimitMB=1", "--nodb", "--eval='exit();'");
     assert.eq(returnCode, 1);
+    MongoRunner.stopMongod(conn);
 }());

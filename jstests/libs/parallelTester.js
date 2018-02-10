@@ -153,10 +153,6 @@ if (typeof _threadInject != "undefined") {
 
         // some tests can't run in parallel with most others
         var skipTests = makeKeys([
-            "repair.js",
-            "cursor8.js",
-            "recstore.js",
-            "extent.js",
             "indexb.js",
 
             // Tests that set a parameter that causes the server to ignore
@@ -164,19 +160,21 @@ if (typeof _threadInject != "undefined") {
             "index_bigkeys_nofail.js",
             "index_bigkeys_validation.js",
 
-            "mr_drop.js",
             "mr3.js",
-            "indexh.js",
             "evald.js",
-            "evalf.js",
             "run_program1.js",
             "notablescan.js",
             "dropdb_race.js",
             "bench_test1.js",
-            "padding.js",
+
+            // These tests use getLog to examine the logs. Tests which do so shouldn't be run in
+            // this suite because any test being run at the same time could conceivably spam the
+            // logs so much that the line they are looking for has been rotated off the server's
+            // in-memory buffer of log messages, which only stores the 1024 most recent operations.
+            "getlog2.js",
+            "logprocessdetails.js",
             "queryoptimizera.js",
-            "loglong.js",  // log might overflow before
-            // this has a chance to see the message
+
             "connections_opened.js",  // counts connections, globally
             "opcounters_write_cmd.js",
             "set_param1.js",                  // changes global state
@@ -265,11 +263,6 @@ if (typeof _threadInject != "undefined") {
             parallelFilesDir + "/profile_repair_cursor.js",
             parallelFilesDir + "/profile_sampling.js",
             parallelFilesDir + "/profile_update.js",
-
-            // These tests use getLog to examine the slow query logs. Tests which examine the slow
-            // query logs can't be run concurrently with tests that affect the profile sampling
-            // rate, since that also impacts which operations get logged.
-            parallelFilesDir + "/getlog2.js",
         ];
         var serialTests = makeKeys(serialTestsArr);
 

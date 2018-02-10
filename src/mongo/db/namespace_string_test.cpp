@@ -1,6 +1,5 @@
-// namespacestring_test.cpp
-
-/*    Copyright 2012 10gen Inc.
+/**
+ *    Copyright (C) 2018 MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -18,23 +17,23 @@
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
  *    linked combinations including the program with the OpenSSL library. You
- *    must comply with the GNU Affero General Public License in all respects
- *    for all of the code used other than as permitted herein. If you modify
- *    file(s) with this exception, you may extend this exception to your
- *    version of the file(s), but you are not obligated to do so. If you do not
- *    wish to do so, delete this exception statement from your version. If you
- *    delete this exception statement from all source files in the program,
- *    then also delete it in the license file.
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
-using std::string;
+namespace {
 
 TEST(NamespaceStringTest, Normal) {
     ASSERT(NamespaceString::normal("a"));
@@ -313,67 +312,37 @@ TEST(NamespaceStringTest, CollectionValidNames) {
     ASSERT(!NamespaceString::validCollectionName("a\0b"_sd));
 }
 
-TEST(NamespaceStringTest, DBHash) {
-    ASSERT_EQUALS(nsDBHash("foo"), nsDBHash("foo"));
-    ASSERT_EQUALS(nsDBHash("foo"), nsDBHash("foo.a"));
-    ASSERT_EQUALS(nsDBHash("foo"), nsDBHash("foo."));
-
-    ASSERT_EQUALS(nsDBHash(""), nsDBHash(""));
-    ASSERT_EQUALS(nsDBHash(""), nsDBHash(".a"));
-    ASSERT_EQUALS(nsDBHash(""), nsDBHash("."));
-
-    ASSERT_NOT_EQUALS(nsDBHash("foo"), nsDBHash("food"));
-    ASSERT_NOT_EQUALS(nsDBHash("foo."), nsDBHash("food"));
-    ASSERT_NOT_EQUALS(nsDBHash("foo.d"), nsDBHash("food"));
-}
-
 TEST(NamespaceStringTest, nsToDatabase1) {
     ASSERT_EQUALS("foo", nsToDatabaseSubstring("foo.bar"));
     ASSERT_EQUALS("foo", nsToDatabaseSubstring("foo"));
     ASSERT_EQUALS("foo", nsToDatabase("foo.bar"));
     ASSERT_EQUALS("foo", nsToDatabase("foo"));
-    ASSERT_EQUALS("foo", nsToDatabase(string("foo.bar")));
-    ASSERT_EQUALS("foo", nsToDatabase(string("foo")));
-}
-
-TEST(NamespaceStringTest, nsToDatabase2) {
-    char buf[MaxDatabaseNameLen];
-
-    nsToDatabase("foo.bar", buf);
-    ASSERT_EQUALS('f', buf[0]);
-    ASSERT_EQUALS('o', buf[1]);
-    ASSERT_EQUALS('o', buf[2]);
-    ASSERT_EQUALS(0, buf[3]);
-
-    nsToDatabase("bar", buf);
-    ASSERT_EQUALS('b', buf[0]);
-    ASSERT_EQUALS('a', buf[1]);
-    ASSERT_EQUALS('r', buf[2]);
-    ASSERT_EQUALS(0, buf[3]);
+    ASSERT_EQUALS("foo", nsToDatabase(std::string("foo.bar")));
+    ASSERT_EQUALS("foo", nsToDatabase(std::string("foo")));
 }
 
 TEST(NamespaceStringTest, NamespaceStringParse1) {
     NamespaceString ns("a.b");
-    ASSERT_EQUALS((string) "a", ns.db());
-    ASSERT_EQUALS((string) "b", ns.coll());
+    ASSERT_EQUALS(std::string("a"), ns.db());
+    ASSERT_EQUALS(std::string("b"), ns.coll());
 }
 
 TEST(NamespaceStringTest, NamespaceStringParse2) {
     NamespaceString ns("a.b.c");
-    ASSERT_EQUALS((string) "a", ns.db());
-    ASSERT_EQUALS((string) "b.c", ns.coll());
+    ASSERT_EQUALS(std::string("a"), ns.db());
+    ASSERT_EQUALS(std::string("b.c"), ns.coll());
 }
 
 TEST(NamespaceStringTest, NamespaceStringParse3) {
     NamespaceString ns("abc");
-    ASSERT_EQUALS((string) "", ns.db());
-    ASSERT_EQUALS((string) "", ns.coll());
+    ASSERT_EQUALS(std::string(""), ns.db());
+    ASSERT_EQUALS(std::string(""), ns.coll());
 }
 
 TEST(NamespaceStringTest, NamespaceStringParse4) {
     NamespaceString ns("abc.");
-    ASSERT_EQUALS((string) "abc", ns.db());
-    ASSERT_EQUALS((string) "", ns.coll());
+    ASSERT_EQUALS(std::string("abc"), ns.db());
+    ASSERT_EQUALS(std::string(""), ns.coll());
 }
 
 TEST(NamespaceStringTest, makeListCollectionsNSIsCorrect) {
@@ -404,4 +373,6 @@ TEST(NamespaceStringTest, EmptyNSStringReturnsEmptyDb) {
     ASSERT_TRUE(nss.isEmpty());
     ASSERT_EQ(nss.db(), StringData{});
 }
-}
+
+}  // namespace
+}  // namespace mongo

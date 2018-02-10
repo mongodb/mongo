@@ -122,4 +122,5 @@ load('jstests/libs/write_concern_util.js');
         print('replSetStepDown did not throw exception but returned: ' + tojson(result));
     });
     parallelShell();
+    replTest.stopSet();
 }());

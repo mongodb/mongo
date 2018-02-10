@@ -335,6 +335,7 @@ TEST_F(ReplCoordTest, NodeReturnsNodeNotFoundWhenQuorumCheckFailsWhileInitiating
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);
     hbArgs.setTerm(0);
+    hbArgs.setHeartbeatVersion(1);
 
     Status status(ErrorCodes::InternalError, "Not set");
     stdx::thread prsiThread([&] { doReplSetInitiate(getReplCoord(), &status); });
@@ -367,6 +368,7 @@ TEST_F(ReplCoordTest, InitiateSucceedsWhenQuorumCheckPasses) {
     hbArgs.setSenderHost(HostAndPort("node1", 12345));
     hbArgs.setSenderId(0);
     hbArgs.setTerm(0);
+    hbArgs.setHeartbeatVersion(1);
 
     auto appliedTS = Timestamp(3, 3);
     getReplCoord()->setMyLastAppliedOpTime(OpTime(appliedTS, 1));
@@ -2116,7 +2118,7 @@ TEST_F(StepDownTest, InterruptingStepDownCommandRestoresWriteAvailability) {
     // This is the important check, that we didn't accidentally step back up when aborting the
     // stepdown command attempt.
     const auto opCtx = makeOperationContext();
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_TRUE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
 }
 
@@ -2172,7 +2174,7 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
 
     // This is the important check, that we didn't accidentally step back up when aborting the
     // stepdown command attempt.
-    Lock::GlobalLock lock(opCtx.get(), MODE_IX, UINT_MAX);
+    Lock::GlobalLock lock(opCtx.get(), MODE_IX, Date_t::max());
     ASSERT_FALSE(getReplCoord()->canAcceptWritesForDatabase(opCtx.get(), "admin"));
 }
 

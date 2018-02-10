@@ -413,7 +413,7 @@ protected:
 BSONObj fast_emit(const BSONObj& args, void* data);
 BSONObj _bailFromJS(const BSONObj& args, void* data);
 
-void addPrivilegesRequiredForMapReduce(Command* commandTemplate,
+void addPrivilegesRequiredForMapReduce(const Command* commandTemplate,
                                        const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out);

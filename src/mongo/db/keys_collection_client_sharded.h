@@ -28,22 +28,16 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-
-#include "mongo/base/status.h"
 #include "mongo/db/keys_collection_client.h"
 
 namespace mongo {
 
-class OperationContext;
-class LogicalTime;
-class BSONObj;
 class ShardingCatalogClient;
 
 class KeysCollectionClientSharded : public KeysCollectionClient {
 public:
     KeysCollectionClientSharded(ShardingCatalogClient*);
+
     /**
      * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis.
      */
@@ -62,4 +56,5 @@ public:
 private:
     ShardingCatalogClient* const _catalogClient;
 };
+
 }  // namespace mongo

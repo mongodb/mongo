@@ -41,3 +41,4 @@ assert(m.getDB(baseName).getCollection("fourth").isCapped());
 assert.soon(function() {
     return s.getDB(baseName).getCollection("fourth").isCapped();
 });
+rt.stop();

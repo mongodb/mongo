@@ -172,4 +172,5 @@ load("jstests/replsets/rslib.js");  // For startSetIfSupportsReadMajority.
             assert.eq(doCommittedRead(secondaryColl), test.expectedAfter);
         }
     }
+    replTest.stopSet();
 }());

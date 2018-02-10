@@ -310,6 +310,9 @@ class ReplicaSetFixture(interface.ReplFixture):
     def get_initial_sync_node(self):
         return self.initial_sync_node
 
+    def get_dbpath(self):
+        return self._dbpath_prefix
+
     def _new_mongod(self, index, replset_name):
         """
         Returns a standalone.MongoDFixture configured to be used as a

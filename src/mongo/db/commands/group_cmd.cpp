@@ -95,7 +95,7 @@ private:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnNamespace(

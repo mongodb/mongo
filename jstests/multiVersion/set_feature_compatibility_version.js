@@ -54,18 +54,6 @@ TestData.skipCheckDBHashes = true;
      * The mongod has 'version' binary and is started up on 'dbpath'.
      */
     let doStartupFailTests = function(version, dbpath) {
-        // Set up a mongod with a user collection but without an admin database.
-        setupUserCollAndMissingAdminDB(version, dbpath);
-
-        // Now attempt to start up a new mongod without clearing the data files from 'dbpath', which
-        // contain a user collection but are missing the admin database. The mongod should fail to
-        // start up if the admin database is missing but there are non-local collections.
-        conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: version, noCleanData: true});
-        assert.eq(
-            null,
-            conn,
-            "expected mongod to fail when data files are present but no admin database is found.");
-
         // Set up a mongod with an admin database but without a FCV document in the admin database.
         setupMissingFCVDoc(version, dbpath);
 
@@ -90,27 +78,6 @@ TestData.skipCheckDBHashes = true;
                    "mongod was unable to start up with version=" + version + " and no data files");
         adminDB = conn.getDB("admin");
         removeFCVDocument(adminDB);
-        MongoRunner.stopMongod(conn);
-        return conn;
-    };
-
-    /**
-     * Starts up a mongod with binary 'version' on 'dbpath' and creates a user collection. Then
-     * drops the admin database and returns the mongod.
-     */
-    let setupUserCollAndMissingAdminDB = function(version, dbpath) {
-        conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: version});
-        assert.neq(null,
-                   conn,
-                   "mongod was unable to start up with version=" + version + " and no data files");
-
-        let testDB = conn.getDB("test");
-        assert.commandWorked(testDB.createCollection("testcoll"));
-
-        adminDB = conn.getDB("admin");
-        assert.commandWorked(adminDB.runCommand({dropDatabase: 1}),
-                             "expected drop of admin database to be successful");
-
         MongoRunner.stopMongod(conn);
         return conn;
     };
@@ -253,9 +220,7 @@ TestData.skipCheckDBHashes = true;
     assert.neq(
         null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
     adminDB = conn.getDB("admin");
-    // TODO: update this to use 'lastStableFCV' when SERVER-32597 bumps the --shardsvr default to
-    // 3.6.
-    checkFCV(adminDB, "3.4");
+    checkFCV(adminDB, lastStableFCV);
     MongoRunner.stopMongod(conn);
 
     // Check that start up without --repair fails if there is non-local DB data and either the admin
@@ -264,36 +229,11 @@ TestData.skipCheckDBHashes = true;
 
     const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
 
-    // --repair can be used to restore a missing admin database, and thus FCV document that resides
-    // in the admin database, if at least some collections have UUIDs.
-    conn = setupUserCollAndMissingAdminDB(latest, dbpath);
-    recoverMMapJournal(isMMAPv1, conn, dbpath);
-    let returnCode = runMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
-    assert.eq(
-        returnCode,
-        0,
-        "expected mongod --repair to execute successfully when restoring a missing admin database.");
-    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
-    assert.neq(null,
-               conn,
-               "mongod was unable to start up with version=" + latest + " and existing data files");
-    // FCV is 3.4 and targetVersion is 3.6 because the admin.system.version collection was restored
-    // without a UUID.
-    // TODO: update this code and comment when SERVER-32597 bumps the FCV defaults.
-    adminDB = conn.getDB("admin");
-    assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version, "3.4");
-    assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).targetVersion,
-              lastStableFCV);
-    let adminInfos = adminDB.getCollectionInfos();
-    assert(!adminInfos[0].info.uuid,
-           "Expected collection with infos " + tojson(adminInfos) + " to not have a UUID.");
-    MongoRunner.stopMongod(conn);
-
     // --repair can be used to restore a missing featureCompatibilityVersion document to an existing
     // admin database if at least some collections have UUIDs.
     conn = setupMissingFCVDoc(latest, dbpath);
     recoverMMapJournal(isMMAPv1, conn, dbpath);
-    returnCode = runMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
+    let returnCode = runMongoProgram("mongod", "--port", conn.port, "--repair", "--dbpath", dbpath);
     assert.eq(
         returnCode,
         0,
@@ -303,7 +243,7 @@ TestData.skipCheckDBHashes = true;
                conn,
                "mongod was unable to start up with version=" + latest + " and existing data files");
     // FCV is 'latestFCV' because all collections were left intact with UUIDs.
-    // TODO: update 'lastStableFCV' to 'latestFCV' when SERVER-32597 bumps the FCV defaults.
+    // TODO(SERVER-32909): update this section to reflect new FCV restoration semantics.
     adminDB = conn.getDB("admin");
     assert.eq(adminDB.system.version.findOne({_id: "featureCompatibilityVersion"}).version,
               lastStableFCV);
@@ -502,11 +442,7 @@ TestData.skipCheckDBHashes = true;
     latestShard.startSet();
     latestShard.initiate();
     let latestShardPrimaryAdminDB = latestShard.getPrimary().getDB("admin");
-    // TODO: update these FCV checks to 'lastStableFCV' when SERVER-32597 bumps the default FCV.
-    checkFCV(latestShardPrimaryAdminDB, "3.4");
-    // TODO: remove this setFCV command when SERVER-32597 bumps the shard FCV default.
-    assert.commandWorked(
-        latestShardPrimaryAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    checkFCV(latestShardPrimaryAdminDB, lastStableFCV);
     assert.commandWorked(mongosAdminDB.runCommand({addShard: latestShard.getURL()}));
     checkFCV(latestShardPrimaryAdminDB, lastStableFCV);
 
@@ -526,11 +462,7 @@ TestData.skipCheckDBHashes = true;
     st = new ShardingTest({shards: 0, other: {mongosOptions: {binVersion: lastStable}}});
     mongosAdminDB = st.s.getDB("admin");
     configPrimaryAdminDB = st.configRS.getPrimary().getDB("admin");
-    // TODO: update this to 'lastStableFCV' when SERVER-32597 updates the FCV defaults.
-    checkFCV(configPrimaryAdminDB, "3.4");
-
-    // TODO: remove this when SERVER-32597 updates the FCV defaults.
-    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+    checkFCV(configPrimaryAdminDB, lastStableFCV);
 
     // Adding a 'lastStable' binary shard to a cluster with 'lastStableFCV' succeeds.
     let lastStableShard = new ReplSetTest({
@@ -541,9 +473,6 @@ TestData.skipCheckDBHashes = true;
     });
     lastStableShard.startSet();
     lastStableShard.initiate();
-    // TODO: remove this setFCV call when SERVER-32597 updates the FCV defaults.
-    lastStableShard.getPrimary().getDB("admin").runCommand(
-        {setFeatureCompatibilityVersion: lastStableFCV});
     assert.commandWorked(mongosAdminDB.runCommand({addShard: lastStableShard.getURL()}));
     checkFCV(lastStableShard.getPrimary().getDB("admin"), lastStableFCV);
 

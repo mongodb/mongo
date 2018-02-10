@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/sasl_mechanism_advertiser.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/logical_session_id.h"
@@ -63,7 +64,7 @@ public:
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
+                               std::vector<Privilege>* out) const override {
         // No auth required
     }
 
@@ -131,6 +132,8 @@ public:
 
         MessageCompressorManager::forSession(opCtx->getClient()->session())
             .serverNegotiate(cmdObj, &result);
+
+        SASLMechanismAdvertiser::advertise(opCtx, cmdObj, &result);
 
         return true;
     }

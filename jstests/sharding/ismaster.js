@@ -36,3 +36,4 @@ for (field in res) {
 }
 assert(badFields.length === 0,
        "\nthe result:\n" + tojson(res) + "\ncontained fields it shouldn't have: " + badFields);
+st.stop();

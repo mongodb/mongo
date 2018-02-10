@@ -113,7 +113,7 @@ public:
 
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
-                                 const BSONObj& cmdObj) override {
+                                 const BSONObj& cmdObj) const override {
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
 
         if (!authSession->isAuthorizedToParseNamespaceElement(cmdObj.firstElement())) {
@@ -143,8 +143,7 @@ public:
         }
 
         // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
-
-        ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx,
@@ -197,8 +196,13 @@ public:
         Collection* collection = ctx.getCollection();
 
         // We have a parsed query. Time to get the execution plan for it.
+        auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        auto yieldPolicy =
+            readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+            ? PlanExecutor::INTERRUPT_ONLY
+            : PlanExecutor::YIELD_AUTO;
         auto statusWithPlanExecutor =
-            getExecutorFind(opCtx, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO);
+            getExecutorFind(opCtx, collection, nss, std::move(cq), yieldPolicy);
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -262,7 +266,7 @@ public:
         beginQueryOp(opCtx, nss, cmdObj, ntoreturn, ntoskip);
 
         // Finish the parsing step by using the QueryRequest to create a CanonicalQuery.
-        ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
+        const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
             CanonicalQuery::canonicalize(opCtx,
@@ -306,8 +310,13 @@ public:
         }
 
         // Get the execution plan for the query.
+        auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        auto yieldPolicy =
+            readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+            ? PlanExecutor::INTERRUPT_ONLY
+            : PlanExecutor::YIELD_AUTO;
         auto statusWithPlanExecutor =
-            getExecutorFind(opCtx, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO);
+            getExecutorFind(opCtx, collection, nss, std::move(cq), yieldPolicy);
         if (!statusWithPlanExecutor.isOK()) {
             return CommandHelpers::appendCommandStatus(result, statusWithPlanExecutor.getStatus());
         }

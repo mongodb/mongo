@@ -32,6 +32,17 @@ static int go_write_bio_puts(BIO *b, const char *str) {
 }
 
 /*
+ * Functions to convey openssl feature defines at runtime
+ */
+int X_OPENSSL_NO_ECDH() {
+#ifdef OPENSSL_NO_ECDH
+	return 1;
+#else
+	return 0;
+#endif
+}
+
+/*
  ************************************************
  * v1.1.X and later implementation
  ************************************************
@@ -322,18 +333,16 @@ int X_shim_init() {
 	SSL_load_error_strings();
 	SSL_library_init();
 	OpenSSL_add_all_algorithms();
-	//
-	// Set up OPENSSL thread safety callbacks.  We only set the locking
-	// callback because the default id callback implementation is good
-	// enough for us.
+
+#if OPENSSL_VERSION_NUMBER < 0x1010000fL
+	// Set up OPENSSL thread safety callbacks.
 	rc = go_init_locks();
 	if (rc != 0) {
 		return rc;
 	}
 	CRYPTO_set_locking_callback(go_thread_locking_callback);
-
 	CRYPTO_set_id_callback(go_thread_id_callback);
-
+#endif
 	rc = x_bio_init_methods();
 	if (rc != 0) {
 		return rc;
@@ -464,10 +473,6 @@ long X_SSL_CTX_get_timeout(SSL_CTX* ctx) {
 
 long X_SSL_CTX_add_extra_chain_cert(SSL_CTX* ctx, X509 *cert) {
 	return SSL_CTX_add_extra_chain_cert(ctx, cert);
-}
-
-long X_SSL_CTX_set_tmp_ecdh(SSL_CTX* ctx, EC_KEY *key) {
-	return SSL_CTX_set_tmp_ecdh(ctx, key);
 }
 
 long X_SSL_CTX_set_tlsext_servername_callback(
@@ -673,9 +678,15 @@ const EVP_CIPHER *X_EVP_CIPHER_CTX_cipher(EVP_CIPHER_CTX *ctx) {
 }
 
 #if OPENSSL_VERSION_NUMBER >  0x10000000L
+#ifndef OPENSSL_NO_EC
 int X_EVP_PKEY_CTX_set_ec_paramgen_curve_nid(EVP_PKEY_CTX *ctx, int nid) {
 	return EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, nid);
 }
+#else
+int X_EVP_PKEY_CTX_set_ec_paramgen_curve_nid(EVP_PKEY_CTX *ctx, int nid) {
+	return -2; // not supported
+}
+#endif
 #endif
 
 // END HERE
@@ -720,18 +731,18 @@ X509 *X_sk_X509_value(STACK_OF(X509)* sk, int i) {
    return sk_X509_value(sk, i);
 }
 
-#if OPENSSL_VERSION_NUMBER < 0x10000000L
-int X_FIPS_mode(void) {
-    return 0;
-}
-int X_FIPS_mode_set(int r) {
-    return 0;
-}
-#else
+#ifdef OPENSSL_FIPS
 int X_FIPS_mode(void) {
     return FIPS_mode();
 }
 int X_FIPS_mode_set(int r) {
     return FIPS_mode_set(r);
+}
+#else
+int X_FIPS_mode(void) {
+    return 0;
+}
+int X_FIPS_mode_set(int r) {
+    return 0;
 }
 #endif

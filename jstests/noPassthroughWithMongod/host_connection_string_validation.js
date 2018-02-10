@@ -25,6 +25,7 @@
         var exitCode = _runMongoProgram.apply(null, args);
         jsTest.log("Inner mode test finished, exit code was " + exitCode);
 
+        MongoRunner.stopMongod(mongod);
         // Pass the inner test's exit code back as the outer test's exit code
         if (exitCode != 0) {
             doassert("inner test failed with exit code " + exitcode);

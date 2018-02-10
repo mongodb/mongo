@@ -30,7 +30,6 @@
 
 #include "mongo/db/ops/parsed_update.h"
 
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
@@ -149,16 +148,6 @@ Status ParsedUpdate::parseUpdate() {
 }
 
 Status ParsedUpdate::parseArrayFilters() {
-    if (!_request->getArrayFilters().empty() &&
-        (serverGlobalParams.featureCompatibility.getVersion() <
-         ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36)) {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream()
-                          << "The featureCompatibilityVersion must be 3.6 to use arrayFilters. See "
-                          << feature_compatibility_version::kDochubLink
-                          << ".");
-    }
-
     for (auto rawArrayFilter : _request->getArrayFilters()) {
         boost::intrusive_ptr<ExpressionContext> expCtx(
             new ExpressionContext(_opCtx, _collator.get()));

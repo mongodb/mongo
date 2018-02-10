@@ -42,7 +42,6 @@
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/sharding_task_executor.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -66,6 +65,7 @@
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/sharding_task_executor.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
@@ -278,7 +278,7 @@ Status waitForShardRegistryReload(OperationContext* opCtx) {
         try {
             uassertStatusOK(ClusterIdentityLoader::get(opCtx)->loadClusterId(
                 opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
-            if (grid.shardRegistry()->isUp()) {
+            if (Grid::get(opCtx)->shardRegistry()->isUp()) {
                 return Status::OK();
             }
             sleepFor(kRetryInterval);

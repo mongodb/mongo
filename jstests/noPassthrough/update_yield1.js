@@ -42,4 +42,5 @@
     // A multi-update shouldn't yield if it has $isolated.
     assert.writeOK(coll.update({$isolated: true}, {$inc: {counter: 1}}, {multi: true}));
     assert.eq(countUpdateYields(coll), 0, 'yielded during $isolated multi-update');
+    MongoRunner.stopMongod(mongod);
 })();

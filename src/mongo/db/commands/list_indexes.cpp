@@ -92,7 +92,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
         if (!authzSession->isAuthorizedToParseNamespaceElement(cmdObj.firstElement())) {

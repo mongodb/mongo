@@ -32,22 +32,21 @@
 
 #include "mongo/db/s/balancer/scoped_migration_request.h"
 
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
 namespace {
+
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 Seconds(15));
 const int kDuplicateKeyErrorMaxRetries = 2;
-}
+
+}  // namespace
 
 ScopedMigrationRequest::ScopedMigrationRequest(OperationContext* opCtx,
                                                const NamespaceString& nss,
@@ -93,12 +92,13 @@ ScopedMigrationRequest& ScopedMigrationRequest::operator=(ScopedMigrationRequest
 
 StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
     OperationContext* opCtx, const MigrateInfo& migrateInfo, bool waitForDelete) {
+    auto const grid = Grid::get(opCtx);
 
     // Try to write a unique migration document to config.migrations.
     const MigrationType migrationType(migrateInfo, waitForDelete);
 
     for (int retry = 0; retry < kDuplicateKeyErrorMaxRetries; ++retry) {
-        Status result = grid.catalogClient()->insertConfigDocument(
+        Status result = grid->catalogClient()->insertConfigDocument(
             opCtx, MigrationType::ConfigNS, migrationType.toBSON(), kMajorityWriteConcern);
 
         if (result == ErrorCodes::DuplicateKey) {
@@ -106,7 +106,7 @@ StatusWith<ScopedMigrationRequest> ScopedMigrationRequest::writeMigration(
             // for the request because this migration request will join the active one once
             // scheduled.
             auto statusWithMigrationQueryResult =
-                grid.shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                grid->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
                     opCtx,
                     ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                     repl::ReadConcernLevel::kLocalReadConcern,

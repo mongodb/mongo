@@ -15,6 +15,10 @@
         return;
     }
 
+    // Do not fail if this test leaves unterminated processes because testSockOptions
+    // is expected to throw before it calls stopMongod.
+    TestData.failIfUnterminatedProcesses = false;
+
     var doesLogMatchRegex = function(logArray, regex) {
         for (let i = (logArray.length - 1); i >= 0; i--) {
             var regexInLine = regex.exec(logArray[i]);

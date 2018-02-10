@@ -289,7 +289,7 @@ private:
       bail_out_of_coroutine: \
       break; \
     } \
-    else case 0:
+    else /* fall-through */ case 0:
 
 #define ASIO_CORO_YIELD_IMPL(n) \
   for (_coro_value = (n);;) \
@@ -301,12 +301,12 @@ private:
     else \
       switch (_coro_value ? 0 : 1) \
         for (;;) \
-          case -1: if (_coro_value) \
+          /* fall-through */ case -1: if (_coro_value) \
             goto terminate_coroutine; \
           else for (;;) \
-            case 1: if (_coro_value) \
+            /* fall-through */ case 1: if (_coro_value) \
               goto bail_out_of_coroutine; \
-            else case 0:
+            else /* fall-through */ case 0:
 
 #define ASIO_CORO_FORK_IMPL(n) \
   for (_coro_value = -(n);; _coro_value = (n)) \

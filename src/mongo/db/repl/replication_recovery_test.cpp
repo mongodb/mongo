@@ -96,6 +96,18 @@ protected:
         return _consistencyMarkers.get();
     }
 
+    /**
+     * Generates a default CollectionOptions object with a UUID. These options should be used
+     * when creating a collection in this test because otherwise, collections will not be created
+     * with UUIDs. All collections are expected to have UUIDs.
+     * TODO(SERVER-31540) Remove once UUID is no longer a boost::optional in CollectionOptions.
+     */
+    CollectionOptions generateOptionsWithUuid() {
+        CollectionOptions options;
+        options.uuid = UUID::gen();
+        return options;
+    }
+
 private:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
@@ -108,7 +120,7 @@ private:
                                     stdx::make_unique<ReplicationCoordinatorMock>(service));
 
         ASSERT_OK(_storageInterface->createCollection(
-            getOperationContext(), testNs, CollectionOptions()));
+            getOperationContext(), testNs, generateOptionsWithUuid()));
     }
 
     void tearDown() override {
@@ -153,6 +165,7 @@ CollectionOptions _createOplogCollectionOptions() {
     options.capped = true;
     options.cappedSize = 64 * 1024 * 1024LL;
     options.autoIndexId = CollectionOptions::NO;
+    options.uuid = UUID::gen();
     return options;
 }
 
@@ -212,7 +225,7 @@ TEST_F(ReplicationRecoveryTest, RecoveryWithNoOplogSucceeds) {
 
     // Create the database.
     ASSERT_OK(getStorageInterface()->createCollection(
-        opCtx, NamespaceString("local.other"), CollectionOptions()));
+        opCtx, NamespaceString("local.other"), generateOptionsWithUuid()));
 
     recovery.recoverFromOplog(opCtx);
 
@@ -245,7 +258,7 @@ DEATH_TEST_F(ReplicationRecoveryTest,
 
     // Create the database.
     ASSERT_OK(getStorageInterface()->createCollection(
-        opCtx, NamespaceString("local.other"), CollectionOptions()));
+        opCtx, NamespaceString("local.other"), generateOptionsWithUuid()));
 
     recovery.recoverFromOplog(opCtx);
 }

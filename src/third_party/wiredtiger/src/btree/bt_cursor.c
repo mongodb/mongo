@@ -59,6 +59,7 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt)
 {
 	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
+	uint32_t current_state;
 
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
@@ -68,7 +69,7 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt)
 	 * external key.
 	 */
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE)) {
-		WT_ASSERT((WT_SESSION_IMPL *)cursor->session,
+		WT_ASSERT(session,
 		    cbt->ref == NULL && !F_ISSET(cursor, WT_CURSTD_KEY_INT));
 		return (false);
 	}
@@ -89,12 +90,16 @@ __cursor_page_pinned(WT_CURSOR_BTREE *cbt)
 		return (false);
 
 	/*
-	 * If we are doing an update, we need a page with history.  Release the
-	 * page so we get it again with history if required.
+	 * If we are doing an update, we need a page with history, release the
+	 * page so we get it again with history if required. Eviction may be
+	 * locking the page, wait until we see a "normal" state and then test
+	 * against that state (eviction may have already locked the page again).
 	 */
-	if (F_ISSET(&session->txn, WT_TXN_UPDATE) &&
-	    cbt->ref->state != WT_REF_MEM)
-		return (false);
+	if (F_ISSET(&session->txn, WT_TXN_UPDATE)) {
+		while ((current_state = cbt->ref->state) == WT_REF_LOCKED)
+			__wt_yield();
+		return (current_state == WT_REF_MEM);
+	}
 
 	return (true);
 }
@@ -654,6 +659,12 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	} else if ((ret = __wt_btcur_next(cbt, false)) != WT_NOTFOUND)
 		exact = 1;
 	else {
+		/*
+		 * The cursor next call may have overwritten our caller's key,
+		 * restore it to its original value.
+		 */
+		__cursor_state_restore(cursor, &state);
+
 		WT_ERR(__cursor_func_init(cbt, true));
 		WT_ERR(btree->type == BTREE_ROW ?
 		    __cursor_row_search(session, cbt, NULL, true) :
@@ -811,9 +822,9 @@ err:	if (ret == WT_RESTART) {
 		goto retry;
 	}
 
-done:	/* Insert doesn't maintain a position across calls, clear resources. */
+	/* Insert doesn't maintain a position across calls, clear resources. */
 	if (ret == 0) {
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+done:		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		if (append_key)
 			F_SET(cursor, WT_CURSTD_KEY_EXT);
 	}
@@ -921,10 +932,12 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	bool iterating;
 
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
+	iterating = F_ISSET(cbt, WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
 
 	WT_STAT_CONN_INCR(session, cursor_remove);
 	WT_STAT_DATA_INCR(session, cursor_remove);
@@ -991,35 +1004,23 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 		    __cursor_col_modify(session, cbt, WT_UPDATE_TOMBSTONE);
 		if (ret == 0)
 			goto done;
-
-		/*
-		 * The pinned page goes away if we fail for any reason, get a
-		 * local copy of any pinned key and discard any value (remove
-		 * discards any previous value on success or failure). (Restart
-		 * could still use the pinned page, but that's an unlikely
-		 * path.) Re-save the cursor state: we may retry but eventually
-		 * fail.
-		 */
-		WT_TRET(__cursor_localkey(cursor));
-		F_CLR(cursor, WT_CURSTD_VALUE_SET);
-		__cursor_state_save(cursor, &state);
 		goto err;
 	}
 
-	if (positioned == POSITIONED)
-		positioned = SEARCH_POSITION;
-
 	/*
-	 * The pinned page goes away if we do a search, get a local copy of any
-	 * pinned key and discard any value (remove discards any previous
-	 * value on success or failure). Re-save the cursor state: we may retry
-	 * but eventually fail.
+	 * The pinned page goes away if we do a search, including as a result of
+	 * a restart. Get a local copy of any pinned key and re-save the cursor
+	 * state: we may retry but eventually fail.
+	 *
+	 * Note these steps must be repeatable, we'll continue to take this path
+	 * as long as we encounter WT_RESTART.
 	 */
+retry:	if (positioned == POSITIONED)
+		positioned = SEARCH_POSITION;
 	WT_ERR(__cursor_localkey(cursor));
-	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	__cursor_state_save(cursor, &state);
 
-retry:	WT_ERR(__cursor_func_init(cbt, true));
+	WT_ERR(__cursor_func_init(cbt, true));
 
 	if (btree->type == BTREE_ROW) {
 		WT_ERR(__cursor_row_search(session, cbt, NULL, false));
@@ -1067,9 +1068,8 @@ err:	if (ret == WT_RESTART) {
 		goto retry;
 	}
 
-done:	if (ret == 0) {
-		F_CLR(cursor, WT_CURSTD_VALUE_SET);
-		switch (positioned) {
+	if (ret == 0) {
+done:		switch (positioned) {
 		case NO_POSITION:
 			/*
 			 * Never positioned and we leave it that way, clear any
@@ -1099,18 +1099,34 @@ done:	if (ret == 0) {
 		__cursor_state_restore(cursor, &state);
 
 		/*
-		 * If the cursor is configured to overwrite and the record isn't
-		 * found, that is exactly what we want, return success. Note we
-		 * set clear the return value after everything else, the clause
+		 * If the record isn't found and the cursor is configured for
+		 * overwrite, that is what we want, try to return success.
+		 *
+		 * We set the return to 0 after testing for success, the clause
 		 * above dealing with the cursor position is only correct if we
 		 * were successful. If search failed after positioned is set to
 		 * SEARCH_POSITION, we cannot return a key. The only action to
 		 * take is to set the cursor to its original key, which we just
 		 * did.
+		 *
+		 * Finally, if an iterating or positioned cursor was forced to
+		 * give up its pinned page and then a search failed, we've
+		 * lost our cursor position. Since no subsequent iteration can
+		 * succeed, we cannot return success.
 		 */
-		if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) && ret == WT_NOTFOUND)
+		if (ret == WT_NOTFOUND &&
+		    F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
+		    !iterating && positioned == NO_POSITION)
 			ret = 0;
 	}
+
+	/*
+	 * Upper level cursor removes don't expect the cursor value to be set
+	 * after a successful remove (and check in diagnostic mode). Error
+	 * handling may have converted failure to a success, do a final check.
+	 */
+	if (ret == 0)
+		F_CLR(cursor, WT_CURSTD_VALUE_SET);
 
 	return (ret);
 }
@@ -1230,8 +1246,8 @@ err:	if (ret == WT_RESTART) {
 	 * To make this work, we add a field to the btree cursor to pass back a
 	 * pointer to the modify function's allocated update structure.
 	 */
-done:	if (ret == 0)
-		switch (modify_type) {
+	if (ret == 0) {
+done:		switch (modify_type) {
 		case WT_UPDATE_STANDARD:
 			/*
 			 * WT_CURSOR.update returns a key and a value.
@@ -1258,6 +1274,7 @@ done:	if (ret == 0)
 			WT_TRET(__wt_illegal_value(session, NULL));
 			break;
 		}
+	}
 
 	if (ret != 0) {
 		WT_TRET(__cursor_reset(cbt));

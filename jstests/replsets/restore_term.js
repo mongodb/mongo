@@ -64,4 +64,5 @@ load("jstests/replsets/rslib.js");
     // After restart, the new primary stands up with the newer term.
     assert.gte(getCurrentTerm(primary), firstSuccessfulTerm + 1);
 
+    rst.stopSet();
 })();

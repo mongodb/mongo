@@ -35,7 +35,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -44,10 +43,6 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-using std::string;
-using std::vector;
-
 namespace {
 
 const char kVersionField[] = "version";
@@ -60,7 +55,7 @@ const char kVersionField[] = "version";
  *  ShardNotFound if shard by that id is not available on the registry
  *  NoSuchKey if the version could not be retrieved
  */
-StatusWith<string> retrieveShardMongoDVersion(OperationContext* opCtx, ShardId shardId) {
+StatusWith<std::string> retrieveShardMongoDVersion(OperationContext* opCtx, ShardId shardId) {
     auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     auto shardStatus = shardRegistry->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
@@ -83,7 +78,7 @@ StatusWith<string> retrieveShardMongoDVersion(OperationContext* opCtx, ShardId s
 
     BSONObj serverStatus = std::move(commandResponse.getValue().response);
 
-    string version;
+    std::string version;
     Status status = bsonExtractStringField(serverStatus, kVersionField, &version);
     if (!status.isOK()) {
         return status;
@@ -100,7 +95,7 @@ ClusterStatisticsImpl::ClusterStatisticsImpl() = default;
 
 ClusterStatisticsImpl::~ClusterStatisticsImpl() = default;
 
-StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationContext* opCtx) {
+StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationContext* opCtx) {
     // Get a list of all the shards that are participating in this balance round along with any
     // maximum allowed quotas and current utilization. We get the latter by issuing
     // db.serverStatus() (mem.mapped) to all shards.
@@ -112,9 +107,9 @@ StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationCon
         return shardsStatus.getStatus();
     }
 
-    const vector<ShardType> shards(std::move(shardsStatus.getValue().value));
+    const auto& shards = shardsStatus.getValue().value;
 
-    vector<ShardStatistics> stats;
+    std::vector<ShardStatistics> stats;
 
     for (const auto& shard : shards) {
         const auto shardSizeStatus = [&]() -> StatusWith<long long> {
@@ -133,7 +128,7 @@ StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationCon
                                       << shard.getName());
         }
 
-        string mongoDVersion;
+        std::string mongoDVersion;
 
         auto mongoDVersionStatus = retrieveShardMongoDVersion(opCtx, shard.getName());
         if (mongoDVersionStatus.isOK()) {
@@ -145,7 +140,7 @@ StatusWith<vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationCon
                   << causedBy(mongoDVersionStatus.getStatus());
         }
 
-        std::set<string> shardTags;
+        std::set<std::string> shardTags;
 
         for (const auto& shardTag : shard.getTags()) {
             shardTags.insert(shardTag);

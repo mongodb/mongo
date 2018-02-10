@@ -28,13 +28,13 @@
 #include "asio/detail/throw_exception.hpp"
 #include "asio/detail/type_traits.hpp"
 
-#if defined(ASIO_MSVC)
+#if defined(ASIO_MSVC) && (ASIO_MSVC >= 1700)
 # if defined(_HAS_ITERATOR_DEBUGGING) && (_HAS_ITERATOR_DEBUGGING != 0)
 #  if !defined(ASIO_DISABLE_BUFFER_DEBUGGING)
 #   define ASIO_ENABLE_BUFFER_DEBUGGING
 #  endif // !defined(ASIO_DISABLE_BUFFER_DEBUGGING)
 # endif // defined(_HAS_ITERATOR_DEBUGGING)
-#endif // defined(ASIO_MSVC)
+#endif // defined(ASIO_MSVC) && (ASIO_MSVC >= 1700)
 
 #if defined(__GNUC__)
 # if defined(_GLIBCXX_DEBUG)
@@ -1920,7 +1920,8 @@ inline std::size_t buffer_copy_1(const mutable_buffer& target,
   std::size_t target_size = target.size();
   std::size_t source_size = source.size();
   std::size_t n = target_size < source_size ? target_size : source_size;
-  memcpy(target.data(), source.data(), n);
+  if (n > 0)
+    memcpy(target.data(), source.data(), n);
   return n;
 }
 

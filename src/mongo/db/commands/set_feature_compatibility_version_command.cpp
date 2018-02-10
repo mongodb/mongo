@@ -40,10 +40,10 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
-#include "mongo/s/catalog/sharding_catalog_manager.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
@@ -95,7 +95,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) override {
+                               const BSONObj& cmdObj) const override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(),
                 ActionType::setFeatureCompatibilityVersion)) {
@@ -249,7 +249,7 @@ public:
                     // Otherwise createCollection may determine not to add a UUID before the FCV
                     // change, but then actually create the collection after the update below
                     // identifies all of the databases to update with UUIDs.
-                    Lock::GlobalLock lk(opCtx, MODE_S, UINT_MAX);
+                    Lock::GlobalLock lk(opCtx, MODE_S, Date_t::max());
                 }
 
                 // First put UUIDs in the storage layer metadata. UUIDs will be generated for
@@ -330,7 +330,7 @@ public:
                 // Otherwise createCollection may determine to add a UUID before the FCV change, but
                 // then actually create the collection after the update below identifies all of the
                 // databases from which to remove UUIDs.
-                Lock::GlobalLock lk(opCtx, MODE_S, UINT_MAX);
+                Lock::GlobalLock lk(opCtx, MODE_S, Date_t::max());
             }
 
             // Fail after updating the FCV document but before removing UUIDs.

@@ -10,9 +10,9 @@
     var sourceMongodConn = MongoRunner.runMongod({});
     var sourceTestDB = sourceMongodConn.getDB('test');
 
-    // Ensure sourceMongodConn has featureCompatibilityVersion=3.4, so that the sharded cluster can
-    // communicate with it if it has featureCompatibilityVersion=3.4.
-    assert.commandWorked(sourceMongodConn.adminCommand({setFeatureCompatibilityVersion: "3.4"}));
+    // Ensure sourceMongodConn has featureCompatibilityVersion=3.6, so that the sharded cluster can
+    // communicate with it if it has featureCompatibilityVersion=3.6.
+    assert.commandWorked(sourceMongodConn.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
 
     sourceTestDB.foo.insert({a: 1});
 
@@ -41,4 +41,5 @@
     assert.eq(1, destTestDB.foo.findOne().a);
 
     st.stop();
+    MongoRunner.stopMongod(sourceMongodConn);
 })();

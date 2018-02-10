@@ -53,7 +53,6 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/shard_registry.h"
@@ -62,6 +61,7 @@
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/store_possible_cursor.h"
+#include "mongo/s/request_types/create_collection_gen.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
@@ -257,7 +257,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::dropIndex);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -301,7 +301,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::createIndex);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -350,7 +350,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::reIndex);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -394,7 +394,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
         return AuthorizationSession::get(client)->checkAuthForCollMod(nss, cmdObj, true);
     }
@@ -429,7 +429,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         ActionSet actions;
         actions.addAction(ActionType::validate);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -505,7 +505,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) override {
+                               const BSONObj& cmdObj) const override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
         return AuthorizationSession::get(client)->checkAuthForCreate(nss, cmdObj, true);
     }
@@ -520,9 +520,28 @@ public:
              BSONObjBuilder& result) override {
         uassertStatusOK(createShardDatabase(opCtx, dbName));
 
-        const auto dbInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-        return passthrough(opCtx, dbName, dbInfo.primaryId(), cmdObj, result);
+        BSONObjIterator cmdIter(cmdObj);
+        invariant(cmdIter.more());
+
+        const NamespaceString ns(dbName, cmdIter.next().str());
+
+        ConfigsvrCreateCollection configCreateCmd;
+        configCreateCmd.setNs(ns);
+
+        BSONObjBuilder optionsBuilder;
+        CommandHelpers::filterCommandRequestForPassthrough(&cmdIter, &optionsBuilder);
+        configCreateCmd.setOptions(optionsBuilder.obj());
+
+        auto response =
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                "admin",
+                CommandHelpers::appendMajorityWriteConcern(configCreateCmd.toBSON()),
+                Shard::RetryPolicy::kIdempotent);
+
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
+        return true;
     }
 
 } createCmd;
@@ -533,7 +552,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         return rename_collection::checkAuthForRenameCollectionCommand(client, dbname, cmdObj);
     }
 
@@ -594,7 +613,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) override {
+                               const BSONObj& cmdObj) const override {
         return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
     }
 
@@ -664,7 +683,7 @@ public:
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::collStats);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -844,7 +863,7 @@ public:
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -930,7 +949,7 @@ public:
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::convertToCapped);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -952,7 +971,7 @@ public:
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -1034,7 +1053,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) override {
+                               const BSONObj& cmdObj) const override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
                 ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
                 ActionType::splitVector)) {
@@ -1071,7 +1090,7 @@ public:
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -1298,7 +1317,7 @@ public:
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
+                               std::vector<Privilege>* out) const override {
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), ActionType::find));
     }
 
@@ -1447,7 +1466,7 @@ public:
 
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) override {
+                               std::vector<Privilege>* out) const override {
         ActionSet actions;
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
@@ -1582,7 +1601,7 @@ public:
 
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) {
+                                       std::vector<Privilege>* out) const {
         // $eval can do pretty much anything, so require all privileges.
         RoleGraph::generateUniversalPrivileges(out);
     }
@@ -1614,7 +1633,7 @@ public:
 
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
-                               const BSONObj& cmdObj) final {
+                               const BSONObj& cmdObj) const final {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
         // Check for the listCollections ActionType on the database
@@ -1659,7 +1678,7 @@ public:
 
     virtual Status checkAuthForCommand(Client* client,
                                        const std::string& dbname,
-                                       const BSONObj& cmdObj) {
+                                       const BSONObj& cmdObj) const {
         AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
         // Check for the listIndexes ActionType on the database, or find on system.indexes for pre

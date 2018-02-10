@@ -250,6 +250,9 @@ private:
     // The transition from false to true is protected by the collection X-lock, which happens just
     // before the config server metadata commit is scheduled.
     bool _readsShouldWaitOnCritSec{false};
+
+    // The statistics about a chunk migration to be included in moveChunk.commit
+    BSONObj _recipientCloneCounts;
 };
 
 }  // namespace mongo

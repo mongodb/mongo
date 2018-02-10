@@ -209,6 +209,7 @@ __las_page_instantiate_verbose(WT_SESSION_IMPL *session, uint64_t las_pageid)
 static int
 __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t btree_id)
 {
+	WT_CACHE *cache;
 	WT_CURSOR *cursor;
 	WT_CURSOR_BTREE cbt;
 	WT_DECL_ITEM(current_key);
@@ -221,15 +222,18 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t btree_id)
 	uint32_t las_id, session_flags;
 	const uint8_t *p;
 	uint8_t upd_type;
+	bool locked;
 
 	cursor = NULL;
 	page = ref->page;
 	first_upd = last_upd = upd = NULL;
+	locked = false;
 	total_incr = 0;
 	current_recno = recno = WT_RECNO_OOB;
 	session_flags = 0;		/* [-Werror=maybe-uninitialized] */
 	WT_CLEAR(las_key);
 
+	cache = S2C(session)->cache;
 	__las_page_instantiate_verbose(session, ref->page_las->las_pageid);
 	WT_STAT_CONN_INCR(session, cache_read_lookaside);
 	WT_STAT_DATA_INCR(session, cache_read_lookaside);
@@ -251,6 +255,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t btree_id)
 	 */
 	ret = __wt_las_cursor_position(
 	    cursor, btree_id, ref->page_las->las_pageid);
+	__wt_readlock(session, &cache->las_sweepwalk_lock);
+	locked = true;
 	for (; ret == 0; ret = cursor->next(cursor)) {
 		WT_ERR(cursor->get_key(cursor,
 		    &las_pageid, &las_id, &las_counter, &las_key));
@@ -317,6 +323,8 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t btree_id)
 		}
 		upd = NULL;
 	}
+	__wt_readunlock(session, &cache->las_sweepwalk_lock);
+	locked = false;
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Insert the last set of updates, if any. */
@@ -369,7 +377,9 @@ __las_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t btree_id)
 		}
 	}
 
-err:	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
+err:	if (locked)
+		__wt_readunlock(session, &cache->las_sweepwalk_lock);
+	WT_TRET(__wt_las_cursor_close(session, &cursor, session_flags));
 	WT_TRET(__wt_btcur_close(&cbt, true));
 
 	/*
@@ -498,17 +508,9 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 
 	final_state = WT_REF_MEM;
 
-	/*
-	 * If we already have the page image, just instantiate the history.
-	 *
-	 * We need exclusive access because other threads could be reading the
-	 * page without history and we can't change the state underneath them.
-	 */
-	if (previous_state == WT_REF_LIMBO) {
-		if (__wt_hazard_check(session, ref) != NULL)
-			goto err;
+	/* If we already have the page image, just instantiate the history. */
+	if (previous_state == WT_REF_LIMBO)
 		goto skip_read;
-	}
 
 	/*
 	 * Get the address: if there is no address, the page was deleted or had
@@ -608,7 +610,7 @@ skip_read:
 		 * Don't free WT_REF.page_las, there may be concurrent readers.
 		 */
 		WT_TRET(__wt_las_remove_block(
-		    session, NULL, btree->id, ref->page_las->las_pageid));
+		    session, btree->id, ref->page_las->las_pageid));
 
 		ref->page_las->eviction_to_lookaside = false;
 		break;

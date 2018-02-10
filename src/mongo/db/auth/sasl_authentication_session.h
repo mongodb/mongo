@@ -57,6 +57,7 @@ public:
     static SaslAuthenticationSessionFactoryFn create;
 
     // Mechanism name constants.
+    static const char mechanismSCRAMSHA256[];
     static const char mechanismSCRAMSHA1[];
     static const char mechanismGSSAPI[];
     static const char mechanismPLAIN[];

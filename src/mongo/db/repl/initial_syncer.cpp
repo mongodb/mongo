@@ -384,6 +384,15 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
 
     _storage->setInitialDataTimestamp(opCtx->getServiceContext(),
                                       lastApplied.getValue().opTime.getTimestamp());
+
+    auto currentLastAppliedOpTime = _opts.getMyLastOptime();
+    if (currentLastAppliedOpTime.isNull()) {
+        _opts.setMyLastOptime(lastApplied.getValue().opTime,
+                              ReplicationCoordinator::DataConsistency::Consistent);
+    } else {
+        invariant(currentLastAppliedOpTime == lastApplied.getValue().opTime);
+    }
+
     _replicationProcess->getConsistencyMarkers()->clearInitialSyncFlag(opCtx);
     log() << "initial sync done; took "
           << duration_cast<Seconds>(_stats.initialSyncEnd - _stats.initialSyncStart) << ".";
@@ -427,9 +436,9 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
     _lastApplied = {};
     _lastFetched = {};
 
-    LOG(2) << "Resetting feature compatibility version to 3.4. If the sync source is in feature "
-              "compatibility version 3.6, we will find out when we clone the admin.system.version "
-              "collection.";
+    LOG(2) << "Resetting feature compatibility version to last-stable. If the sync source is in "
+              "latest feature compatibility version, we will find out when we clone the "
+              "admin.system.version collection.";
     serverGlobalParams.featureCompatibility.reset();
 
     // Clear the oplog buffer.
