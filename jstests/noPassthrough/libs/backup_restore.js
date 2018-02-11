@@ -41,17 +41,36 @@ var BackupRestoreTest = function(options) {
     /**
      * Starts a client that will run a CRUD workload.
      */
-    function _crudClient(host, dbName, collectionName) {
+    function _crudClient(host, dbName, collectionName, numNodes) {
         // Launch CRUD client
-        var crudClientCmds = function(dbName, collectionName) {
+        var crudClientCmds = function(dbName, collectionName, numNodes) {
             var bulkNum = 1000;
             var baseNum = 100000;
+
+            let iteration = 0;
+
             var coll = db.getSiblingDB(dbName).getCollection(collectionName);
             coll.ensureIndex({x: 1});
+
             var largeValue = new Array(1024).join('L');
+
             Random.setRandomSeed();
+
             // Run indefinitely.
             while (true) {
+                ++iteration;
+
+                // We periodically use a write concern of w='numNodes' as a backpressure mechanism
+                // to prevent the secondaries from falling off the primary's oplog. The CRUD client
+                // inserts ~1KB documents 1000 at a time, so in the worst case we'll have rolled the
+                // primary's oplog over every ~1000 iterations. We use 100 iterations for the
+                // frequency of when to use a write concern of w='numNodes' to lessen the risk of
+                // being unlucky as a result of running concurrently with the FSM client. Note that
+                // although the updates performed by the CRUD client may in the worst case modify
+                // every document, the oplog entries produced as a result are 10x smaller than the
+                // document itself.
+                const writeConcern = (iteration % 100 === 0) ? {w: numNodes} : {w: 1};
+
                 try {
                     var op = Random.rand();
                     var match = Math.floor(Random.rand() * baseNum);
@@ -64,10 +83,10 @@ var BackupRestoreTest = function(options) {
                                 doc: largeValue.substring(0, match % largeValue.length),
                             });
                         }
-                        assert.writeOK(bulk.execute());
+                        assert.writeOK(bulk.execute(writeConcern));
                     } else if (op < 0.4) {
                         // 20% of the operations: update docs.
-                        var updateOpts = {upsert: true, multi: true};
+                        var updateOpts = {upsert: true, multi: true, writeConcern: writeConcern};
                         assert.writeOK(coll.update({x: {$gte: match}},
                                                    {$inc: {x: baseNum}, $set: {n: 'hello'}},
                                                    updateOpts));
@@ -77,7 +96,8 @@ var BackupRestoreTest = function(options) {
                         coll.find({x: {$gte: match}}).itcount();
                     } else {
                         // 10% of the operations: remove matching docs.
-                        assert.writeOK(coll.remove({x: {$gte: match}}));
+                        assert.writeOK(
+                            coll.remove({x: {$gte: match}}, {writeConcern: writeConcern}));
                     }
                 } catch (e) {
                     if (e instanceof ReferenceError || e instanceof TypeError) {
@@ -89,11 +109,11 @@ var BackupRestoreTest = function(options) {
 
         // Returns the pid of the started mongo shell so the CRUD test client can be terminated
         // without waiting for its execution to finish.
-        return startMongoProgramNoConnect(
-            'mongo',
-            '--eval',
-            '(' + crudClientCmds + ')("' + dbName + '", "' + collectionName + '")',
-            host);
+        return startMongoProgramNoConnect('mongo',
+                                          '--eval',
+                                          '(' + crudClientCmds + ')("' + dbName + '", "' +
+                                              collectionName + '", ' + numNodes + ')',
+                                          host);
     }
 
     /**
@@ -222,7 +242,7 @@ var BackupRestoreTest = function(options) {
         // Launch CRUD client
         var crudDb = "crud";
         var crudColl = "backuprestore";
-        var crudPid = _crudClient(primary.host, crudDb, crudColl);
+        var crudPid = _crudClient(primary.host, crudDb, crudColl, numNodes);
 
         // Launch FSM client
         var fsmPid = _fsmClient(primary.host, crudDb, numNodes);
