@@ -14,6 +14,13 @@ executor:
           runningWithCausalConsistency: true
           usingReplicaSetShards: true
   hooks:
+  - class: CheckReplDBHash
+    shell_options:
+      global_vars:
+        TestData:
+          excludedDBsFromDBHash:
+            - config
+          skipValidationOnInvalidViewDefinitions: true
   - class: ValidateCollections
     shell_options:
       global_vars:
