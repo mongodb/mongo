@@ -91,14 +91,12 @@ StatusWith<int> ReplicationProcess::getRollbackID(OperationContext* opCtx) {
     }
 
     // The _rbid, which caches the rollback ID persisted in the local.system.rollback.id collection,
-    // may be uninitialized for a couple of reasons:
-    // 1) This is the first time we are retrieving the rollback ID; or
-    // 2) The rollback ID was incremented previously using this class which has the side-effect of
-    //    invalidating the cached value.
+    // may be uninitialized because this is the first time we are retrieving the rollback ID.
     auto rbidResult = _storageInterface->getRollbackID(opCtx);
     if (!rbidResult.isOK()) {
         return rbidResult;
     }
+    log() << "Rollback ID is " << rbidResult.getValue();
     _rbid = rbidResult.getValue();
 
     invariant(kUninitializedRollbackId != _rbid);
@@ -112,12 +110,13 @@ Status ReplicationProcess::initializeRollbackID(OperationContext* opCtx) {
 
     // Do not make any assumptions about the starting value of the rollback ID in the
     // local.system.rollback.id collection other than it cannot be "kUninitializedRollbackId".
-    // Leave _rbid uninitialized until the next getRollbackID() to retrieve the actual value
-    // from storage.
+    // Cache the rollback ID in _rbid to be returned the next time getRollbackID() is called.
 
     auto initRbidSW = _storageInterface->initializeRollbackID(opCtx);
     if (initRbidSW.isOK()) {
         log() << "Initialized the rollback ID to " << initRbidSW.getValue();
+        _rbid = initRbidSW.getValue();
+        invariant(kUninitializedRollbackId != _rbid);
     } else {
         warning() << "Failed to initialize the rollback ID: " << initRbidSW.getStatus().reason();
     }
@@ -129,11 +128,12 @@ Status ReplicationProcess::incrementRollbackID(OperationContext* opCtx) {
 
     auto status = _storageInterface->incrementRollbackID(opCtx);
 
-    // If the rollback ID was incremented successfully, reset _rbid so that we will read from
-    // storage next time getRollbackID() is called.
+    // If the rollback ID was incremented successfully, cache the new value in _rbid to be returned
+    // the next time getRollbackID() is called.
     if (status.isOK()) {
-        _rbid = kUninitializedRollbackId;
         log() << "Incremented the rollback ID to " << status.getValue();
+        _rbid = status.getValue();
+        invariant(kUninitializedRollbackId != _rbid);
     } else {
         warning() << "Failed to increment the rollback ID: " << status.getStatus().reason();
     }
