@@ -1027,6 +1027,19 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp oldestTimestamp) {
 }
 
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
+    if (stableTimestamp.isNull()) {
+        return;
+    }
+
+    const auto oplogReadTimestamp = Timestamp(_oplogManager->getOplogReadTimestamp());
+    if (!oplogReadTimestamp.isNull() && stableTimestamp > oplogReadTimestamp) {
+        // When a replica set has one voting node, replication can advance the commit point ahead
+        // of the current oplog read visibility. Allowing that to happen in storage can result in
+        // logically previous transactions trying to commit behind this updated stable
+        // timestamp. Instead, pin the stable timestamp to the oplog read timestamp.
+        stableTimestamp = oplogReadTimestamp;
+    }
+
     const bool keepOldBehavior = true;
     // Communicate to WiredTiger what the "stable timestamp" is. Timestamp-aware checkpoints will
     // only persist to disk transactions committed with a timestamp earlier than the "stable
@@ -1057,11 +1070,6 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
 }
 
 void WiredTigerKVEngine::_advanceOldestTimestamp(Timestamp oldestTimestamp) {
-    if (oldestTimestamp == Timestamp()) {
-        // No oldestTimestamp to set, yet.
-        return;
-    }
-
     Timestamp timestampToSet;
     {
         stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
