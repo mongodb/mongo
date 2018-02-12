@@ -1,7 +1,13 @@
-// @tags: [does_not_support_stepdowns]
-
 // Test clearing of the plan cache, either manually through the planCacheClear command,
 // or due to system events such as an index build.
+//
+// @tags: [
+//   # This test attempts to perform queries and introspect/manipulate the server's plan cache
+//   # entries. The former operation may be routed to a secondary in the replica set, whereas the
+//   # latter must be routed to the primary.
+//   assumes_read_preference_unchanged,
+//   does_not_support_stepdowns,
+// ]
 
 var t = db.jstests_plan_cache_clear;
 t.drop();

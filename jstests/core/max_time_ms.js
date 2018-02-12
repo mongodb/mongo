@@ -1,6 +1,12 @@
-// @tags: [requires_getmore]
-
 // Tests query/command option $maxTimeMS.
+//
+// @tags: [
+//   # This test attempts to perform read operations after having enabled the maxTimeAlwaysTimeOut
+//   # failpoint. The former operations may be routed to a secondary in the replica set, whereas the
+//   # latter must be routed to the primary.
+//   assumes_read_preference_unchanged,
+//   requires_getmore,
+// ]
 
 var t = db.max_time_ms;
 var exceededTimeLimit = 50;  // ErrorCodes::ExceededTimeLimit

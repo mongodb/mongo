@@ -1,4 +1,10 @@
 // Test that top and latency histogram statistics are recorded for views.
+//
+// This test attempts to perform write operations and get latency statistics using the $collStats
+// stage. The former operation must be routed to the primary in a replica set, whereas the latter
+// may be routed to a secondary.
+//
+// @tags: [assumes_read_preference_unchanged]
 
 (function() {
     "use strict";

@@ -1,7 +1,13 @@
-// @tags: [does_not_support_stepdowns]
-
 // Test the planCacheListQueryShapes command, which returns a list of query shapes
 // for the queries currently cached in the collection.
+//
+// @tags: [
+//   # This test attempts to perform queries with plan cache filters set up. The former operation
+//   # may be routed to a secondary in the replica set, whereas the latter must be routed to the
+//   # primary.
+//   assumes_read_preference_unchanged,
+//   does_not_support_stepdowns,
+// ]
 
 var t = db.jstests_plan_cache_list_shapes;
 t.drop();

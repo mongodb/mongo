@@ -1,5 +1,11 @@
 /**
  * 1. check top numbers are correct
+ *
+ * This test attempts to perform read operations and get statistics using the top command. The
+ * former operation may be routed to a secondary in the replica set, whereas the latter must be
+ * routed to the primary.
+ *
+ * @tags: [assumes_read_preference_unchanged]
  */
 (function() {
     load("jstests/libs/stats.js");

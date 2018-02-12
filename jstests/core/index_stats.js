@@ -1,7 +1,15 @@
-// Cannot implicitly shard accessed collections because of following errmsg: A single
-// update/delete on a sharded collection must contain an exact match on _id or contain the shard
-// key.
-// @tags: [assumes_unsharded_collection, does_not_support_stepdowns, requires_non_retryable_writes]
+// @tags: [
+//   # Cannot implicitly shard accessed collections because of following errmsg: A single
+//   # update/delete on a sharded collection must contain an exact match on _id or contain the shard
+//   # key.
+//   assumes_unsharded_collection,
+//   # This test attempts to perform write operations and get index usage statistics using the
+//   # $indexStats stage. The former operation must be routed to the primary in a replica set,
+//   # whereas the latter may be routed to a secondary.
+//   assumes_read_preference_unchanged,
+//   does_not_support_stepdowns,
+//   requires_non_retryable_writes,
+// ]
 
 (function() {
     "use strict";

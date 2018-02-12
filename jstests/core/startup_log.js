@@ -1,3 +1,10 @@
+/**
+ * This test attempts to read from the "local.startup_log" collection and assert that it has an
+ * entry matching the server's response from the "getCmdLineOpts" command. The former operation may
+ * be routed to a secondary in the replica set, whereas the latter must be routed to the primary.
+ *
+ * @tags: [assumes_read_preference_unchanged]
+ */
 load('jstests/aggregation/extras/utils.js');
 
 (function() {

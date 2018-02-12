@@ -1,9 +1,16 @@
 // Basic tests for the $listLocalSessions aggregation stage.
 //
-// Sessions are asynchronously flushed to disk, so a stepdown immediately after calling
-// startSession may cause this test to fail to find the returned sessionId.
-// Uses features that require featureCompatibilityVersion 3.6.
-// @tags: [does_not_support_stepdowns, requires_fcv36]
+// @tags: [
+//   # This test attempts to start a session and find it using the $listLocalSessions stage. The
+//   # former operation must be routed to the primary in a replica set, whereas the latter may be
+//   # routed to a secondary.
+//   assumes_read_preference_unchanged,
+//   # Sessions are asynchronously flushed to disk, so a stepdown immediately after calling
+//   # startSession may cause this test to fail to find the returned sessionId.
+//   does_not_support_stepdowns,
+//   # Usage of sessions requires featureCompatibilityVersion=3.6.
+//   requires_fcv36,
+// ]
 
 (function() {
     'use strict';

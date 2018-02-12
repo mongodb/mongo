@@ -1,6 +1,12 @@
-// @tags: [does_not_support_stepdowns]
-
 // tests getlog as well as slow querying logging
+//
+// @tags: [
+//   # This test attempts to perform a find command and see that it ran using the getLog command.
+//   # The former operation may be routed to a secondary in the replica set, whereas the latter must
+//   # be routed to the primary.
+//   assumes_read_preference_unchanged,
+//   does_not_support_stepdowns,
+// ]
 
 // We turn off gossiping the mongo shell's clusterTime because it causes the slow command log
 // messages to get truncated since they'll exceed 512 characters. The truncated log messages will
