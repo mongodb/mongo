@@ -774,4 +774,12 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
+void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
+    invariant(opCtx->getTxnNumber());
+}
+
+void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {
+    invariant(opCtx->getTxnNumber());
+}
+
 }  // namespace mongo

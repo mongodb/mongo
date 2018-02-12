@@ -221,6 +221,17 @@ public:
     virtual void onEmptyCapped(OperationContext* opCtx,
                                const NamespaceString& collectionName,
                                OptionalCollectionUUID uuid) = 0;
+    /**
+     * The onTransactionCommit method is called on the commit of an atomic transaction, before the
+     * RecoveryUnit onCommit() is called.  It must not be called when no transaction is active.
+     */
+    virtual void onTransactionCommit(OperationContext* opCtx) = 0;
+
+    /**
+     * The onTransactionAbort method is called when an atomic transaction aborts, before the
+     * RecoveryUnit onRollback() is called.  It must not be called when no transaction is active.
+     */
+    virtual void onTransactionAbort(OperationContext* opCtx) = 0;
 };
 
 }  // namespace mongo

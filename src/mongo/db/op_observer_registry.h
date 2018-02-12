@@ -173,6 +173,16 @@ public:
             o->onEmptyCapped(opCtx, collectionName, uuid);
     }
 
+    void onTransactionCommit(OperationContext* opCtx) override {
+        for (auto& o : _observers)
+            o->onTransactionCommit(opCtx);
+    }
+
+    void onTransactionAbort(OperationContext* opCtx) override {
+        for (auto& o : _observers)
+            o->onTransactionAbort(opCtx);
+    }
+
 private:
     repl::OpTime _forEachObserver(stdx::function<repl::OpTime(OpObserver&)> f) {
         repl::OpTime opTime;

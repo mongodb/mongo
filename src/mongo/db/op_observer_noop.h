@@ -97,6 +97,8 @@ public:
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,
                        OptionalCollectionUUID uuid) override {}
+    void onTransactionCommit(OperationContext* opCtx) override{};
+    void onTransactionAbort(OperationContext* opCtx) override{};
 };
 
 }  // namespace mongo
