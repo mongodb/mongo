@@ -6116,7 +6116,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: osx-ssl
     push_arch: x86_64
-    tooltags: "-tags ssl"
+    tooltags: "-tags 'ssl openssl_pre_1.0'"
     gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
@@ -6244,7 +6244,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: osx
     push_arch: x86_64-enterprise
-    tooltags: "-tags 'ssl sasl'"
+    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
@@ -9544,7 +9544,7 @@ buildvariants:
   batchtime: 1440 # 1 day
   expansions:
     test_flags: --storageEngine=mmapv1 --excludeWithAnyTags=requires_wiredtiger
-    tooltags: -tags 'ssl sasl'
+    tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     gorootvars: >-
       CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10
       CGO_LDFLAGS=-mmacosx-version-min=10.10
