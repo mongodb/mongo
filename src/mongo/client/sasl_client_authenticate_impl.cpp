@@ -145,8 +145,7 @@ Status configureSession(SaslClientSession* session,
         return status;
     session->setParameter(SaslClientSession::parameterUser, value);
 
-    bool digestPasswordDefault = !(targetDatabase == "$external" && mechanism == "PLAIN") &&
-        !(targetDatabase == "$external" && mechanism == "GSSAPI");
+    const bool digestPasswordDefault = (mechanism == "SCRAM-SHA-1");
     bool digestPassword;
     status = bsonExtractBooleanFieldWithDefault(
         saslParameters, saslCommandDigestPasswordFieldName, digestPasswordDefault, &digestPassword);
