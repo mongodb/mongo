@@ -173,7 +173,8 @@ private:
         std::shared_ptr<RefreshFunc> _doRefresh;
 
         bool _hasSeenKeys = false;
-        bool _inShutdown = false;
+        // In the process of stopping this runner.
+        bool _isStopping = false;
     };
 
     /**
