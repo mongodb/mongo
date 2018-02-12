@@ -1,6 +1,9 @@
-// @tags: [does_not_support_stepdowns]
-
 // Confirms that profiled insert execution contains all expected metrics with proper values.
+//
+// @tags: [
+//   assumes_write_concern_unchanged,
+//   does_not_support_stepdowns,
+// ]
 
 (function() {
     "use strict";

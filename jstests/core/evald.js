@@ -1,7 +1,11 @@
-// Cannot implicitly shard accessed collections because unsupported use of sharded collection
-// from db.eval.
-// @tags: [assumes_unsharded_collection, does_not_support_stepdowns,
-// requires_non_retryable_commands]
+// @tags: [
+//   # Cannot implicitly shard accessed collections because unsupported use of sharded collection
+//   # from db.eval.
+//   assumes_unsharded_collection,
+//   does_not_support_stepdowns,
+//   requires_eval_command,
+//   requires_non_retryable_commands,
+// ]
 
 t = db.jstests_evald;
 t.drop();

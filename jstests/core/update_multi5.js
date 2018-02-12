@@ -9,8 +9,8 @@
     assert.writeOK(t.insert({path: 'r1', subscribers: [1, 2]}));
     assert.writeOK(t.insert({path: 'r2', subscribers: [3, 4]}));
 
-    var res = assert.writeOK(t.update(
-        {}, {$addToSet: {subscribers: 5}}, {upsert: false, multi: true, writeConcern: {w: 1}}));
+    var res =
+        assert.writeOK(t.update({}, {$addToSet: {subscribers: 5}}, {upsert: false, multi: true}));
 
     assert.eq(res.nMatched, 2, tojson(res));
 

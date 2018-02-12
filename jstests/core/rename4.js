@@ -1,4 +1,7 @@
-// @tags: [requires_non_retryable_writes]
+// @tags: [
+//   requires_eval_command,
+//   requires_non_retryable_commands,
+// ]
 
 t = db.jstests_rename4;
 t.drop();
