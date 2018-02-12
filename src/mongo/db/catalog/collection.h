@@ -290,7 +290,9 @@ public:
         virtual StatusWithMatchExpression parseValidator(
             OperationContext* opCtx,
             const BSONObj& validator,
-            MatchExpressionParser::AllowedFeatureSet allowedFeatures) const = 0;
+            MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+            boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
+                maxFeatureCompatibilityVersion = boost::none) const = 0;
 
         virtual Status setValidator(OperationContext* opCtx, BSONObj validator) = 0;
 
@@ -618,8 +620,11 @@ public:
     inline StatusWithMatchExpression parseValidator(
         OperationContext* opCtx,
         const BSONObj& validator,
-        MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
-        return this->_impl().parseValidator(opCtx, validator, allowedFeatures);
+        MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+        boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
+            maxFeatureCompatibilityVersion) const {
+        return this->_impl().parseValidator(
+            opCtx, validator, allowedFeatures, maxFeatureCompatibilityVersion);
     }
 
     static StatusWith<ValidationLevel> parseValidationLevel(StringData);

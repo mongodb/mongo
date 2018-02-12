@@ -202,6 +202,10 @@ public:
     // Tracks the depth of nested aggregation sub-pipelines. Used to enforce depth limits.
     size_t subPipelineDepth = 0;
 
+    // If set, this will disallow use of features introduced in versions above the provided version.
+    boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
+        maxFeatureCompatibilityVersion;
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 

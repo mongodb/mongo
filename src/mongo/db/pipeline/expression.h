@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/server_options.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/mongoutils/str.h"
@@ -56,14 +57,31 @@ class BSONObjBuilder;
 class DocumentSource;
 
 /**
- * Registers an Parser so it can be called from parseExpression and friends.
+ * Registers a Parser so it can be called from parseExpression and friends.
  *
  * As an example, if your expression looks like {"$foo": [1,2,3]} you would add this line:
  * REGISTER_EXPRESSION(foo, ExpressionFoo::parse);
+ *
+ * An expression registered this way can be used in any featureCompatibilityVersion.
  */
 #define REGISTER_EXPRESSION(key, parser)                                     \
     MONGO_INITIALIZER(addToExpressionParserMap_##key)(InitializerContext*) { \
-        Expression::registerExpression("$" #key, (parser));                  \
+        Expression::registerExpression("$" #key, (parser), boost::none);     \
+        return Status::OK();                                                 \
+    }
+
+/**
+ * Registers a Parser so it can be called from parseExpression and friends. Use this version if your
+ * expression can only be persisted to a catalog data structure in a feature compatibility version
+ * >= X.
+ *
+ * As an example, if your expression looks like {"$foo": [1,2,3]}, and can only be used in a feature
+ * compatibility version >= X, you would add this line:
+ * REGISTER_EXPRESSION_WITH_MIN_VERSION(foo, ExpressionFoo::parse, X);
+ */
+#define REGISTER_EXPRESSION_WITH_MIN_VERSION(key, parser, minVersion)        \
+    MONGO_INITIALIZER(addToExpressionParserMap_##key)(InitializerContext*) { \
+        Expression::registerExpression("$" #key, (parser), (minVersion));    \
         return Status::OK();                                                 \
     }
 
@@ -208,7 +226,10 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_EXPRESSION macro defined in this
      * file.
      */
-    static void registerExpression(std::string key, Parser parser);
+    static void registerExpression(
+        std::string key,
+        Parser parser,
+        boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion);
 
 protected:
     Expression(const boost::intrusive_ptr<ExpressionContext>& expCtx) : _expCtx(expCtx) {

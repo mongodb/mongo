@@ -268,7 +268,9 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
 StatusWithMatchExpression CollectionImpl::parseValidator(
     OperationContext* opCtx,
     const BSONObj& validator,
-    MatchExpressionParser::AllowedFeatureSet allowedFeatures) const {
+    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+    boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
+        maxFeatureCompatibilityVersion) const {
     if (validator.isEmpty())
         return {nullptr};
 
@@ -293,6 +295,9 @@ StatusWithMatchExpression CollectionImpl::parseValidator(
     // The MatchExpression and contained ExpressionContext created as part of the validator are
     // owned by the Collection and will outlive the OperationContext they were created under.
     expCtx->opCtx = nullptr;
+
+    // Enforce a maximum feature version if requested.
+    expCtx->maxFeatureCompatibilityVersion = maxFeatureCompatibilityVersion;
 
     auto statusWithMatcher =
         MatchExpressionParser::parse(validator, expCtx, ExtensionsCallbackNoop(), allowedFeatures);

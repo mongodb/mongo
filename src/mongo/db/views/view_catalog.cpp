@@ -43,9 +43,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_facet.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -251,6 +248,17 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline_
                               // pipeline that will require a real implementation.
                               std::make_shared<StubMongoProcessInterface>(),
                               std::move(resolvedNamespaces));
+
+    // Save this to a variable to avoid reading the atomic variable multiple times.
+    auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+
+    // If the feature compatibility version is not 4.0, and we are validating features as master,
+    // ban the use of new agg features introduced in 4.0 to prevent them from being persisted in the
+    // catalog.
+    if (serverGlobalParams.validateFeaturesAsMaster.load() &&
+        currentFCV != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+        expCtx->maxFeatureCompatibilityVersion = currentFCV;
+    }
     auto pipelineStatus = Pipeline::parse(viewDef.pipeline(), std::move(expCtx));
     if (!pipelineStatus.isOK()) {
         return pipelineStatus.getStatus();

@@ -233,7 +233,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
             restrictSearchWithMatch: {$not: {a: 1}}
         }
     };
-    assertErrorCode(local, pipeline, 40186, "unable to parse match expression");
+    assert.throws(() => local.aggregate(pipeline), [], "unable to parse match expression");
 
     // $where and $text cannot be used inside $graphLookup.
     pipeline = {
@@ -246,7 +246,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
             restrictSearchWithMatch: {$where: "3 > 2"}
         }
     };
-    assertErrorCode(local, pipeline, 40186, "cannot use $where inside $graphLookup");
+    assert.throws(() => local.aggregate(pipeline), [], "cannot use $where inside $graphLookup");
 
     pipeline = {
         $graphLookup: {
@@ -258,7 +258,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
             restrictSearchWithMatch: {$text: {$search: "some text"}}
         }
     };
-    assertErrorCode(local, pipeline, 40186, "cannot use $text inside $graphLookup");
+    assert.throws(() => local.aggregate(pipeline), [], "cannot use $text inside $graphLookup");
 
     pipeline = {
         $graphLookup: {
@@ -272,7 +272,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
             }
         }
     };
-    assertErrorCode(local, pipeline, 40186, "cannot use $near inside $graphLookup");
+    assert.throws(() => local.aggregate(pipeline), [], "cannot use $near inside $graphLookup");
 
     pipeline = {
         $graphLookup: {
@@ -293,7 +293,8 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
             }
         }
     };
-    assertErrorCode(local, pipeline, 40186, "cannot use $near inside $graphLookup at any depth");
+    assert.throws(
+        () => local.aggregate(pipeline), [], "cannot use $near inside $graphLookup at any depth");
 
     let foreign = db.foreign;
     foreign.drop();
@@ -310,7 +311,7 @@ load("jstests/aggregation/extras/utils.js");  // For "assertErrorCode".
             restrictSearchWithMatch: {$expr: {$eq: ["$x", "$$unbound"]}}
         }
     };
-    assertErrorCode(local, pipeline, 40186, "cannot use $expr with unbound variable");
+    assert.throws(() => local.aggregate(pipeline), [], "cannot use $expr with unbound variable");
 
     // Test a restrictSearchWithMatchExpression that throws at runtime.
     pipeline = {

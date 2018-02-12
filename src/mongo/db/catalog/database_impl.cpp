@@ -1037,6 +1037,17 @@ auto mongo::userCreateNSImpl(OperationContext* opCtx,
     if (!collectionOptions.validator.isEmpty()) {
         boost::intrusive_ptr<ExpressionContext> expCtx(
             new ExpressionContext(opCtx, collator.get()));
+
+        // Save this to a variable to avoid reading the atomic variable multiple times.
+        const auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+
+        // If the feature compatibility version is not 4.0, and we are validating features as
+        // master, ban the use of new agg features introduced in 4.0 to prevent them from being
+        // persisted in the catalog.
+        if (serverGlobalParams.validateFeaturesAsMaster.load() &&
+            currentFCV != ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+            expCtx->maxFeatureCompatibilityVersion = currentFCV;
+        }
         auto statusWithMatcher =
             MatchExpressionParser::parse(collectionOptions.validator, std::move(expCtx));
 

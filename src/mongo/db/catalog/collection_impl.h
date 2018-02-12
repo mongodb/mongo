@@ -286,7 +286,9 @@ public:
     StatusWithMatchExpression parseValidator(
         OperationContext* opCtx,
         const BSONObj& validator,
-        MatchExpressionParser::AllowedFeatureSet allowedFeatures) const final;
+        MatchExpressionParser::AllowedFeatureSet allowedFeatures,
+        boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
+            maxFeatureCompatibilityVersion = boost::none) const final;
 
     static StatusWith<ValidationLevel> parseValidationLevel(StringData);
     static StatusWith<ValidationAction> parseValidationAction(StringData);

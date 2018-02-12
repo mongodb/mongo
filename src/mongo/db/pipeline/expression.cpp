@@ -36,6 +36,7 @@
 #include <cstdio>
 #include <vector>
 
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -104,15 +105,23 @@ intrusive_ptr<Expression> Expression::parseObject(
 }
 
 namespace {
-StringMap<Parser> parserMap;
+struct ParserRegistration {
+    Parser parser;
+    boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion;
+};
+
+StringMap<ParserRegistration> parserMap;
 }
 
-void Expression::registerExpression(string key, Parser parser) {
+void Expression::registerExpression(
+    string key,
+    Parser parser,
+    boost::optional<ServerGlobalParams::FeatureCompatibility::Version> requiredMinVersion) {
     auto op = parserMap.find(key);
     massert(17064,
             str::stream() << "Duplicate expression (" << key << ") registered.",
             op == parserMap.end());
-    parserMap[key] = parser;
+    parserMap[key] = {parser, requiredMinVersion};
 }
 
 intrusive_ptr<Expression> Expression::parseExpression(
@@ -127,11 +136,26 @@ intrusive_ptr<Expression> Expression::parseExpression(
 
     // Look up the parser associated with the expression name.
     const char* opName = obj.firstElementFieldName();
-    auto op = parserMap.find(opName);
+    auto it = parserMap.find(opName);
     uassert(ErrorCodes::InvalidPipelineOperator,
             str::stream() << "Unrecognized expression '" << opName << "'",
-            op != parserMap.end());
-    return op->second(expCtx, obj.firstElement(), vps);
+            it != parserMap.end());
+
+    // Make sure we are allowed to use this expression under the current feature compatibility
+    // version.
+    auto& entry = it->second;
+    uassert(
+        ErrorCodes::QueryFeatureNotAllowed,
+        // TODO SERVER-31968 we would like to include the current version and the required minimum
+        // version in this error message, but using FeatureCompatibilityVersion::toString() would
+        // introduce a dependency cycle.
+        str::stream() << opName
+                      << " is not allowed in the current feature compatibility version. See "
+                      << feature_compatibility_version::kDochubLink
+                      << " for more information.",
+        !expCtx->maxFeatureCompatibilityVersion || !entry.requiredMinVersion ||
+            (*entry.requiredMinVersion <= *expCtx->maxFeatureCompatibilityVersion));
+    return entry.parser(expCtx, obj.firstElement(), vps);
 }
 
 Expression::ExpressionVector ExpressionNary::parseArguments(
@@ -1302,6 +1326,34 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(
         }
     }
 
+    // The 'format', 'onNull' and 'onError' options were introduced in 4.0, and should not be
+    // allowed in contexts where the maximum feature version is <= 4.0.
+    if (expCtx->maxFeatureCompatibilityVersion &&
+        *expCtx->maxFeatureCompatibilityVersion <
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+        uassert(
+            ErrorCodes::QueryFeatureNotAllowed,
+            str::stream() << "\"format\" option to $dateFromString is not allowed with the current "
+                             "feature compatibility version. See "
+                          << feature_compatibility_version::kDochubLink
+                          << " for more information.",
+            !formatElem);
+        uassert(
+            ErrorCodes::QueryFeatureNotAllowed,
+            str::stream() << "\"onNull\" option to $dateFromString is not allowed with the current "
+                             "feature compatibility version. See "
+                          << feature_compatibility_version::kDochubLink
+                          << " for more information.",
+            !onNullElem);
+        uassert(ErrorCodes::QueryFeatureNotAllowed,
+                str::stream()
+                    << "\"onError\" option to $dateFromString is not allowed with the current "
+                       "feature compatibility version. See "
+                    << feature_compatibility_version::kDochubLink
+                    << " for more information.",
+                !onErrorElem);
+    }
+
     uassert(40542, "Missing 'dateString' parameter to $dateFromString", dateStringElem);
 
     return new ExpressionDateFromString(
@@ -1620,6 +1672,28 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(
                       str::stream() << "Unrecognized argument to $dateToString: "
                                     << arg.fieldName());
         }
+    }
+
+    // The 'onNull' option was introduced in 4.0, and should not be allowed in contexts where the
+    // maximum feature version is <= 4.0. Similarly, the 'format' option was made optional in 4.0,
+    // so should be required in such scenarios.
+    if (expCtx->maxFeatureCompatibilityVersion &&
+        *expCtx->maxFeatureCompatibilityVersion <
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+        uassert(
+            ErrorCodes::QueryFeatureNotAllowed,
+            str::stream() << "\"onNull\" option to $dateToString is not allowed with the current "
+                             "feature compatibility version. See "
+                          << feature_compatibility_version::kDochubLink
+                          << " for more information.",
+            !onNullElem);
+
+        uassert(ErrorCodes::QueryFeatureNotAllowed,
+                str::stream() << "\"format\" option to $dateToString is required with the current "
+                                 "feature compatibility version. See "
+                              << feature_compatibility_version::kDochubLink
+                              << " for more information.",
+                formatElem);
     }
 
     uassert(18628, "Missing 'date' parameter to $dateToString", !dateElem.eoo());
@@ -4325,9 +4399,21 @@ const char* ExpressionToUpper::getOpName() const {
 
 /* -------------------------- ExpressionTrim ------------------------------ */
 
-REGISTER_EXPRESSION(trim, ExpressionTrim::parse);
-REGISTER_EXPRESSION(ltrim, ExpressionTrim::parse);
-REGISTER_EXPRESSION(rtrim, ExpressionTrim::parse);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    trim,
+    ExpressionTrim::parse,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    ltrim,
+    ExpressionTrim::parse,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    rtrim,
+    ExpressionTrim::parse,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+
 intrusive_ptr<Expression> ExpressionTrim::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expr,
@@ -5074,7 +5160,11 @@ private:
 const double ExpressionConvert::kLongLongMaxPlusOneAsDouble =
     scalbn(1, std::numeric_limits<long long>::digits);
 
-REGISTER_EXPRESSION(convert, ExpressionConvert::parse);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    convert,
+    ExpressionConvert::parse,
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+
 intrusive_ptr<Expression> ExpressionConvert::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     BSONElement expr,

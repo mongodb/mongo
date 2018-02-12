@@ -32,8 +32,11 @@
         partialFilterExpression:
             {$and: [{$and: [{x: {$lt: 2}}, {x: {$gt: 0}}]}, {x: {$exists: true}}]}
     }));
+    // Use of $expr is banned in a partial index filter.
     assert.commandFailed(
         coll.createIndex({x: 1}, {partialFilterExpression: {$expr: {$eq: ["$x", 5]}}}));
+    assert.commandFailed(coll.createIndex(
+        {x: 1}, {partialFilterExpression: {$expr: {$eq: [{$trim: {input: "$x"}}, "hi"]}}}));
 
     for (var i = 0; i < 10; i++) {
         assert.writeOK(coll.insert({x: i, a: i}));

@@ -175,9 +175,23 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             }
 
         } else if (fieldName == "validator" && !isView) {
-            MatchExpressionParser::AllowedFeatureSet allowedFeatures =
-                MatchExpressionParser::kDefaultSpecialFeatures;
-            auto statusW = coll->parseValidator(opCtx, e.Obj(), allowedFeatures);
+            // Save this to a variable to avoid reading the atomic variable multiple times.
+            const auto currentFCV = serverGlobalParams.featureCompatibility.getVersion();
+
+            // If the feature compatibility version is not 4.0, and we are validating features as
+            // master, ban the use of new agg features introduced in 4.0 to prevent them from being
+            // persisted in the catalog.
+            boost::optional<ServerGlobalParams::FeatureCompatibility::Version>
+                maxFeatureCompatibilityVersion;
+            if (serverGlobalParams.validateFeaturesAsMaster.load() &&
+                currentFCV !=
+                    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
+                maxFeatureCompatibilityVersion = currentFCV;
+            }
+            auto statusW = coll->parseValidator(opCtx,
+                                                e.Obj(),
+                                                MatchExpressionParser::kDefaultSpecialFeatures,
+                                                maxFeatureCompatibilityVersion);
             if (!statusW.isOK()) {
                 return statusW.getStatus();
             }
