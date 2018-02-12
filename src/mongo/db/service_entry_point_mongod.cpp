@@ -107,7 +107,9 @@ const StringMap<int> cmdWhitelist = {{"delete", 1},
                                      {"findAndModify", 1},
                                      {"insert", 1},
                                      {"refreshLogicalSessionCacheNow", 1},
-                                     {"update", 1}};
+                                     {"update", 1},
+                                     {"find", 1},
+                                     {"getMore", 1}};
 
 BSONObj getRedactedCopyForLogging(const Command* command, const BSONObj& cmdObj) {
     mutablebson::Document cmdToLog(cmdObj, mutablebson::Document::kInPlaceDisabled);
@@ -579,8 +581,12 @@ void execCommandDatabase(OperationContext* opCtx,
         // servers may result in a deadlock when a server tries to check out a session it is already
         // using to service an earlier operation in the command's chain. To avoid this, only check
         // out sessions for commands that require them (i.e. write commands).
-        OperationContextSession sessionTxnState(
-            opCtx, cmdWhitelist.find(command->getName()) != cmdWhitelist.cend());
+        // Session checkout is also prevented for commands run within DBDirectClient. If checkout is
+        // required, it is expected to be handled by the outermost command.
+        const bool shouldCheckoutSession =
+            cmdWhitelist.find(command->getName()) != cmdWhitelist.cend() &&
+            !opCtx->getClient()->isInDirectClient();
+        OperationContextSession sessionTxnState(opCtx, shouldCheckoutSession);
 
         ImpersonationSessionGuard guard(opCtx);
         uassertStatusOK(Command::checkAuthorization(command, opCtx, request));

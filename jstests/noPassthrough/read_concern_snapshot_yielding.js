@@ -14,6 +14,10 @@
     const db = rst.getPrimary().getDB(dbName);
     const adminDB = db.getSiblingDB("admin");
     const coll = db.coll;
+
+    TestData.sessionId = assert.commandWorked(adminDB.runCommand({startSession: 1})).id;
+    TestData.txnNumber = 0;
+
     assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
     db.setProfilingLevel(2);
 
@@ -59,41 +63,55 @@
     }
 
     function awaitFindFn() {
-        const session = db.getMongo().startSession({causalConsistency: false});
-        const sessionDB = session.getDatabase("test");
-        assert.commandWorked(sessionDB.runCommand({
+        assert.commandWorked(db.runCommand({
             find: "coll",
             filter: {x: 1},
             readConcern: {level: "snapshot"},
-            txnNumber: NumberLong(0)
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
         }));
     }
 
     function awaitGetMoreFn() {
-        const session = db.getMongo().startSession({causalConsistency: false});
-        const sessionDB = session.getDatabase("test");
         const cursorId = assert
-                             .commandWorked(sessionDB.runCommand({
+                             .commandWorked(db.runCommand({
                                  find: "coll",
                                  filter: {x: 1},
                                  batchSize: 2,
                                  readConcern: {level: "snapshot"},
-                                 txnNumber: NumberLong(0)
+                                 lsid: TestData.sessionId,
+                                 txnNumber: NumberLong(TestData.txnNumber)
                              }))
                              .cursor.id;
-        assert.commandWorked(sessionDB.adminCommand(
-            {configureFailPoint: "setCheckForInterruptHang", mode: "alwaysOn"}));
-        assert.commandWorked(sessionDB.runCommand(
-            {getMore: NumberLong(cursorId), collection: "coll", txnNumber: NumberLong(0)}));
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: "setCheckForInterruptHang", mode: "alwaysOn"}));
+        assert.commandWorked(db.runCommand({
+            getMore: NumberLong(cursorId),
+            collection: "coll",
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
     }
 
     for (let i = 0; i < 4; i++) {
-        assert.commandWorked(db.coll.insert({_id: i, x: 1}));
+        assert.commandWorked(db.coll.insert({_id: i, x: 1}, {writeConcern: {w: "majority"}}));
     }
+
+    // Perform an initial find prior to setting the 'setCheckForInterruptHang' failpoint. As the
+    // first read on a session, this will setup the session. Included in setup is a read on the
+    // config.transactions collection. If the session is setup while the failpoint is active
+    // we will block on the config.transaction read and not the user operation we are testing.
+    assert.commandWorked(db.runCommand({
+        find: "coll",
+        filter: {x: 1},
+        lsid: TestData.sessionId,
+        txnNumber: NumberLong(TestData.txnNumber)
+    }));
 
     //
     // Snapshot finds can be killed.
     //
+    TestData.txnNumber++;
 
     // Start a find command that hangs before checking for interrupt.
     assert.commandWorked(
@@ -114,6 +132,7 @@
     //
     // Snapshot getMores can be killed.
     //
+    TestData.txnNumber++;
 
     // Start a getMore command that hangs before checking for interrupt.
     let awaitGetMore = startParallelShell(awaitGetMoreFn, rst.ports[0]);
@@ -132,6 +151,7 @@
     //
     // Snapshot finds do not yield locks.
     //
+    TestData.txnNumber++;
 
     // Start a find command that hangs before checking for interrupt.
     assert.commandWorked(
@@ -159,12 +179,13 @@
 
     // Restore the collection.
     for (let i = 0; i < 4; i++) {
-        assert.commandWorked(db.coll.insert({_id: i, x: 1}));
+        assert.commandWorked(db.coll.insert({_id: i, x: 1}, {writeConcern: {w: "majority"}}));
     }
 
     //
     // Snapshot getMores do not yield locks.
     //
+    TestData.txnNumber++;
 
     // Start a getMore command that hangs before checking for interrupt.
     awaitGetMore = startParallelShell(awaitGetMoreFn, rst.ports[0]);
