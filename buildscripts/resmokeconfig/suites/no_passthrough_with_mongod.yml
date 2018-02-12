@@ -5,6 +5,9 @@ selector:
   - jstests/noPassthroughWithMongod/*.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       readMode: commands

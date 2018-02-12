@@ -8,6 +8,9 @@ selector:
   - requires_mobile_se
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       global_vars:

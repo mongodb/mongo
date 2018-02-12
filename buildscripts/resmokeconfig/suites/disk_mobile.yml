@@ -10,6 +10,9 @@ selector:
   - requires_wiredtiger
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       global_vars:

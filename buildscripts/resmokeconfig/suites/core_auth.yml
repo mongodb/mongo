@@ -20,6 +20,9 @@ selector:
   - jstests/core/commands_with_uuid.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       global_vars:

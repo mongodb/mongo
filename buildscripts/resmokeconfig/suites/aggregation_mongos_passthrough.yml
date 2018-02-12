@@ -18,6 +18,10 @@ selector:
   - requires_replication
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       # Use an override to error if a test starts its own test fixture since such a test should not

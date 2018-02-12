@@ -4,6 +4,9 @@ selector:
   root: build/integration_tests.txt
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config: {}
   hooks:
   - class: ValidateCollections

@@ -5,6 +5,9 @@ selector:
   - jstests/mmap_v1/*.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       global_vars:

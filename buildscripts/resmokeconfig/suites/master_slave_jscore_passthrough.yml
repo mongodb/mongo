@@ -11,6 +11,10 @@ selector:
   - jstests/core/apply_ops1.js  # Nested applyOps work differently in master/slave.
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       eval: "testingReplication = true;"

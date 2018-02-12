@@ -5,6 +5,9 @@ selector:
   - jstests/core/**/*.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       eval: load("jstests/libs/override_methods/enable_sessions.js")

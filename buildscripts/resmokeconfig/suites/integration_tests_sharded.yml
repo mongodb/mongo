@@ -6,6 +6,10 @@ selector:
   - build/integration_tests/network_interface_asio_integration_test*
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
   config: {}
   hooks:
   - class: CheckReplDBHash

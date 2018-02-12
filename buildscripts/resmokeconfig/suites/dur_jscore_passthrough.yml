@@ -8,6 +8,9 @@ selector:
   - jstests/core/shellkillop.js  # Takes forever and doesn't test anything new.
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       readMode: commands

@@ -4,6 +4,11 @@ selector:
   root: build/integration_tests.txt
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
   config: {}
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied

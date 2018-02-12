@@ -33,6 +33,11 @@ selector:
   - jstests/core/write_result.js
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
   config:
     shell_options:
       eval: >-

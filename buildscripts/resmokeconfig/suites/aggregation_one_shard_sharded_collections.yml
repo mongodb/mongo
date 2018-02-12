@@ -23,6 +23,10 @@ selector:
   - requires_replication
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       # Use the overrides to implicitly shard all accessed collections, and to error if a test

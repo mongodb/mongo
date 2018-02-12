@@ -5,6 +5,9 @@ selector:
   - src/mongo/db/modules/*/jstests/rlp/*.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       readMode: commands

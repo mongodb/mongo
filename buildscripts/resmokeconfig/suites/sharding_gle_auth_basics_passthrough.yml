@@ -19,6 +19,9 @@ selector:
   - jstests/gle/core/update4.js
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
   config:
     shell_options:
       global_vars:

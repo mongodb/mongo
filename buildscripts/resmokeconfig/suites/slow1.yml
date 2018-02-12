@@ -5,6 +5,9 @@ selector:
   - jstests/slow1/*.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       readMode: commands

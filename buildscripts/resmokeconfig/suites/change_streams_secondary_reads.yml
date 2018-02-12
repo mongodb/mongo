@@ -34,6 +34,10 @@ selector:
   - assumes_read_preference_unchanged
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - ValidateCollections
   config:
     shell_options:
       global_vars:

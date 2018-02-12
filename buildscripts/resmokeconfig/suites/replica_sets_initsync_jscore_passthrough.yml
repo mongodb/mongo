@@ -80,6 +80,9 @@ selector:
 
 run_hook_interval: &run_hook_interval 20
 executor:
+  archive:
+    hooks:
+      - BackgroundInitialSync
   config:
     shell_options:
       eval: "testingReplication = true;"

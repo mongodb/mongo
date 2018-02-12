@@ -100,6 +100,11 @@ selector:
   - requires_eval_command
 
 executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
   config:
     shell_options:
       eval: >-

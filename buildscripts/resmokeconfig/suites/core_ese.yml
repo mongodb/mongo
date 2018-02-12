@@ -9,6 +9,9 @@ selector:
   - jstests/core/**/*.js
 
 executor:
+  archive:
+    hooks:
+      - ValidateCollections
   config:
     shell_options:
       readMode: commands
