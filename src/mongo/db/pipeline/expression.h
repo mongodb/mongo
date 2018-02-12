@@ -986,13 +986,15 @@ protected:
 
 private:
     ExpressionDateToString(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                           const std::string& format,                   // The format string.
-                           boost::intrusive_ptr<Expression> date,       // The date to format.
-                           boost::intrusive_ptr<Expression> timeZone);  // The optional timezone.
+                           const std::string& format,                  // The format string.
+                           boost::intrusive_ptr<Expression> date,      // The date to format.
+                           boost::intrusive_ptr<Expression> timeZone,  // The optional timezone.
+                           boost::intrusive_ptr<Expression> onNull);
 
     const std::string _format;
     boost::intrusive_ptr<Expression> _date;
     boost::intrusive_ptr<Expression> _timeZone;
+    boost::intrusive_ptr<Expression> _onNull;
 };
 
 class ExpressionDayOfMonth final : public DateExpressionAcceptingTimeZone<ExpressionDayOfMonth> {
