@@ -69,7 +69,6 @@ def _execute_suite(suite):
     if resmokelib.config.ARCHIVE_FILE:
         archive = resmokelib.utils.archival.Archival(
             archival_json_file=resmokelib.config.ARCHIVE_FILE,
-            execution=resmokelib.config.EVERGREEN_EXECUTION,
             limit_size_mb=resmokelib.config.ARCHIVE_LIMIT_MB,
             limit_files=resmokelib.config.ARCHIVE_LIMIT_TESTS,
             logger=logger)
