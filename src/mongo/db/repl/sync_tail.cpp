@@ -58,6 +58,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/query/query_knobs.h"
+#include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/initial_syncer.h"
 #include "mongo/db/repl/multiapplier.h"
@@ -1556,8 +1557,29 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());
         scheduleWritesToOplog(opCtx, workerPool, ops);
 
+        // Used by fillWriterVectors() only. May be overridden to point to extracted applyOps
+        // operations.
+        MultiApplier::Operations* opsPtr = &ops;
+
+        // Holds extracted applyOps operations.
+        // The operations in 'applyOpsOperations', rather than the original applyOps command, will
+        // be processed by the writer threads.
+        MultiApplier::Operations applyOpsOperations;
+        const auto& firstOplogEntry = ops.front();
+        if (storageEngine->supportsDocLocking() && firstOplogEntry.isCommand() &&
+            OplogEntry::CommandType::kApplyOps == firstOplogEntry.getCommandType()) {
+            try {
+                applyOpsOperations = ApplyOps::extractOperations(firstOplogEntry);
+                opsPtr = &applyOpsOperations;
+            } catch (...) {
+                warning() << "Unable to extract operations from applyOps "
+                          << redact(firstOplogEntry.toBSON()) << ": " << exceptionToStatus()
+                          << ". Applying as standalone command.";
+            }
+        }
+
         std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
-        fillWriterVectors(opCtx, &ops, &writerVectors);
+        fillWriterVectors(opCtx, opsPtr, &writerVectors);
 
         // Wait for writes to finish before applying ops.
         workerPool->join();
