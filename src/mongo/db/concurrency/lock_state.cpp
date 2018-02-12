@@ -307,7 +307,7 @@ LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(LockMode mode, Date_t deadl
     dassert(isLocked() == (_modeForTicket != MODE_NONE));
     if (_modeForTicket == MODE_NONE) {
         const bool reader = isSharedLockMode(mode);
-        auto holder = shouldAcquireTicket() ? ticketHolders[mode] : nullptr;
+        auto holder = ticketHolders[mode];
         if (holder) {
             _clientState.store(reader ? kQueuedReader : kQueuedWriter);
             if (deadline == Date_t::max()) {

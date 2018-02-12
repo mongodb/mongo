@@ -67,7 +67,6 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     // batches that are taking a long time.
     auto opCtx = client->makeOperationContext();
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
-    opCtx->lockState()->setShouldAcquireTicket(false);
 
     for (auto& collector : _collectors) {
         BSONObjBuilder subObjBuilder(builder.subobjStart(collector->name()));
