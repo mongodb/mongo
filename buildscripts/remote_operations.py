@@ -36,9 +36,10 @@ _IS_WINDOWS = sys.platform == "win32" or sys.platform == "cygwin"
 _OPERATIONS = ["shell", "copy_to", "copy_from"]
 
 _SSH_CONNECTION_ERRORS = [
-    "System is booting up.",
+    "Connection refused",
     "Permission denied",
-    "ssh_exchange_identification: read: Connection reset by peer"
+    "System is booting up.",
+    "ssh_exchange_identification: read: Connection reset by peer",
 ]
 
 
