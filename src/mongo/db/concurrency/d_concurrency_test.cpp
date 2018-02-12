@@ -1013,7 +1013,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTimeout) {
     auto opctx1 = clientOpctxPairs[0].second.get();
     auto opctx2 = clientOpctxPairs[1].second.get();
 
-    const Milliseconds timeoutMillis = Milliseconds(30'000);
+    const Milliseconds timeoutMillis = Milliseconds(1500);
 
     Lock::DBLock L1(opctx1, "testdb"_sd, MODE_X, Date_t::max());
     ASSERT(opctx1->lockState()->isDbLockedForMode("testdb"_sd, MODE_X));
@@ -1031,7 +1031,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTimeoutDueToGlobalLock) {
     auto opctx1 = clientOpctxPairs[0].second.get();
     auto opctx2 = clientOpctxPairs[1].second.get();
 
-    const Milliseconds timeoutMillis = Milliseconds(30'000);
+    const Milliseconds timeoutMillis = Milliseconds(1500);
 
     Lock::GlobalLock G1(opctx1, MODE_X, Date_t::max());
     ASSERT(G1.isLocked());
@@ -1048,7 +1048,7 @@ TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
     auto opctx1 = clientOpctxPairs[0].second.get();
     auto opctx2 = clientOpctxPairs[1].second.get();
 
-    const Milliseconds timeoutMillis = Milliseconds(30'000);
+    const Milliseconds timeoutMillis = Milliseconds(1500);
 
     Lock::DBLock DBL1(opctx1, "testdb"_sd, MODE_IX, Date_t::max());
     ASSERT(opctx1->lockState()->isDbLockedForMode("testdb"_sd, MODE_IX));
