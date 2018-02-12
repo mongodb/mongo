@@ -1,5 +1,13 @@
 // Test the awaitData flag for the find/getMore commands.
-// @tags: [requires_replication, requires_getmore]
+//
+// @tags: [
+//   # This test attempts to perform a getMore command and find it using the currentOp command. The
+//   # former operation may be routed to a secondary in the replica set, whereas the latter must be
+//   # routed to the primary.
+//   assumes_read_preference_unchanged,
+//   requires_getmore,
+// ]
+
 (function() {
     'use strict';
 

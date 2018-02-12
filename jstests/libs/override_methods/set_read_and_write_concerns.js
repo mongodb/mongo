@@ -65,6 +65,7 @@
         "createRole",
         "createUser",
         "delete",
+        "deleteIndexes",
         "drop",
         "dropAllRolesFromDatabase",
         "dropAllUsersFromDatabase",

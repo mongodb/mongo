@@ -4111,6 +4111,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: write_concern_majority_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=write_concern_majority_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replica_sets
   commands:
   - func: "do setup"
@@ -5262,6 +5273,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: sharding_last_stable_mongos_and_mixed_shards
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
   - name: push
 
 - name: linux-64-repeated-execution
@@ -5378,6 +5390,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops_WT
   - name: slow1_WT
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -6081,6 +6094,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - ubuntu1604-test
@@ -6375,6 +6389,9 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
+    distros:
+    - windows-64-vs2015-large
 
 - name: enterprise-windows-64-2k8
   display_name: "! Enterprise Windows 2008R2"
@@ -6572,6 +6589,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-windows-64-2k8-inmem
   display_name: Enterprise Windows 2008R2 (inMemory)
@@ -6751,6 +6769,7 @@ buildvariants:
   - name: tool_WT
   - name: update_fuzzer_WT
   - name: update_fuzzer_replication_WT
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70-small
@@ -6880,6 +6899,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool_WT
   - name: update_fuzzer_WT
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70-small
@@ -7208,6 +7228,9 @@ buildvariants:
   - name: tool_WT
   - name: update_fuzzer_WT
   - name: update_fuzzer_replication_WT
+  - name: write_concern_majority_passthrough_WT
+    distros:
+    - rhel62-large
   - name: package
     distros:
     - ubuntu1604-packer
@@ -7330,6 +7353,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: update_fuzzer_WT
+  - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-rhel-70-64-bit
   display_name: "* Enterprise RHEL 7.0"
@@ -7691,6 +7715,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70-small
@@ -7797,6 +7822,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70-small
@@ -7934,6 +7960,7 @@ buildvariants:
   - name: sslSpecial
   # - name: tool
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70
@@ -8317,6 +8344,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - suse12-test
@@ -8555,6 +8583,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - suse11-test
@@ -9054,6 +9083,7 @@ buildvariants:
   - name: tool
   - name: update_fuzzer_WT
   - name: update_fuzzer_replication_WT
+  - name: write_concern_majority_passthrough_WT
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
@@ -9219,6 +9249,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-rhel-72-s390x-inmem
   display_name: Enterprise RHEL 7.2 s390x (inMemory) DEBUG
@@ -9309,6 +9340,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough_WT
 
 - name: ubuntu1404-rocksdb
   display_name: Ubuntu 14.04 (RocksDB)
@@ -9455,6 +9487,7 @@ buildvariants:
   - name: tool_WT
   - name: update_fuzzer_WT
   - name: update_fuzzer_replication_WT
+  - name: write_concern_majority_passthrough_WT
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
@@ -9609,6 +9642,7 @@ buildvariants:
   - name: tool_WT
   - name: update_fuzzer_WT
   - name: update_fuzzer_replication_WT
+  - name: write_concern_majority_passthrough_WT
 
 - name: ubuntu1604-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise SSL Ubuntu 16.04 DEBUG"
@@ -9739,6 +9773,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
 
 - name: ubuntu1604-debug-legacy-transportlayer
   display_name: "Enterprise SSL Ubuntu 16.04 DEBUG Legacy Transport"
@@ -9843,6 +9878,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool_WT
+  - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
