@@ -86,7 +86,7 @@ functions:
           set -v
           chmod +x mongod
           chmod +x mongo
-          git clone https://github.com/mongodb/mongo-perf perf
+          git clone git@github.com:mongodb/mongo-perf.git perf
           cd perf
           git describe --tags
     - command: shell.exec
