@@ -56,8 +56,11 @@ public:
     static constexpr StringData kTargetVersionField = "targetVersion"_sd;
 
     /**
-     * Should be taken in exclusive mode by any operations that should not run while
+     * Should be taken in shared mode by any operations that should not run while
      * setFeatureCompatibilityVersion is running.
+     *
+     * setFCV takes this lock in exclusive mode so that it both does not run with the shared mode
+     * operations and does not run with itself.
      */
     static Lock::ResourceMutex fcvLock;
 

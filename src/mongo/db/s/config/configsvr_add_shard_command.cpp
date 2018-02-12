@@ -100,7 +100,8 @@ public:
 
         // Do not allow adding shards while a featureCompatibilityVersion upgrade or downgrade is in
         // progress (see SERVER-31231 for details).
-        Lock::ExclusiveLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+        invariant(!opCtx->lockState()->isLocked());
+        Lock::SharedLock lk(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
 
         auto swParsedRequest = AddShardRequest::parseFromConfigCommand(cmdObj);
         if (!swParsedRequest.isOK()) {
