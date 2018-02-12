@@ -70,7 +70,7 @@ public:
                "not call directly. Receives, validates, and processes a SplitChunkRequest.";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

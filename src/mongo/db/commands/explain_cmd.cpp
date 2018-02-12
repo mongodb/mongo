@@ -63,7 +63,7 @@ public:
     /**
      * Running an explain on a secondary requires explicitly setting slaveOk.
      */
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kOptIn;
     }
 

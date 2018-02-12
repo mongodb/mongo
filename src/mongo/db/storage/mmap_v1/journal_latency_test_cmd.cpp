@@ -68,7 +68,7 @@ class JournalLatencyTestCmd : public BasicCommand {
 public:
     JournalLatencyTestCmd() : BasicCommand("journalLatencyTest") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

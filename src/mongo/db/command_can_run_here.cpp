@@ -42,7 +42,7 @@ bool commandCanRunHere(OperationContext* opCtx, const std::string& dbname, const
         return true;  // primary: always ok
     if (!opCtx->writesAreReplicated())
         return true;  // standalone: always ok
-    switch (command->secondaryAllowed()) {
+    switch (command->secondaryAllowed(opCtx->getServiceContext())) {
         case Command::AllowedOnSecondary::kAlways:
             return true;
         case Command::AllowedOnSecondary::kNever:

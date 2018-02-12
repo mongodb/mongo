@@ -49,7 +49,7 @@ using std::stringstream;
  */
 class CmdLockInfo : public BasicCommand {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

@@ -63,7 +63,7 @@ class ConfigSvrCreateDatabaseCommand : public BasicCommand {
 public:
     ConfigSvrCreateDatabaseCommand() : BasicCommand("_configsvrCreateDatabase") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

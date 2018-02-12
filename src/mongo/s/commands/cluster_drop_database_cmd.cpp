@@ -46,7 +46,7 @@ class DropDatabaseCmd : public BasicCommand {
 public:
     DropDatabaseCmd() : BasicCommand("dropDatabase") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

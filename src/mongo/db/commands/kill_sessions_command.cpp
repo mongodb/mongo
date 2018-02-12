@@ -84,7 +84,7 @@ class KillSessionsCommand final : public BasicCommand {
 public:
     KillSessionsCommand() : BasicCommand("killSessions") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     bool adminOnly() const override {

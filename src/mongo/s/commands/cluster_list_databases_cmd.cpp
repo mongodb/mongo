@@ -48,7 +48,7 @@ class ListDatabasesCmd : public BasicCommand {
 public:
     ListDatabasesCmd() : BasicCommand("listDatabases", "listdatabases") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

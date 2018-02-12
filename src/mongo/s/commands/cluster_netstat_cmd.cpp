@@ -40,7 +40,7 @@ class NetStatCmd : public BasicCommand {
 public:
     NetStatCmd() : BasicCommand("netstat") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

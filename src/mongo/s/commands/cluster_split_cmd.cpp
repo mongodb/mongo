@@ -88,7 +88,7 @@ class SplitCollectionCmd : public ErrmsgCommandDeprecated {
 public:
     SplitCollectionCmd() : ErrmsgCommandDeprecated("split") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

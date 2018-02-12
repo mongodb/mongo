@@ -69,7 +69,7 @@ class ShardCollectionCmd : public BasicCommand {
 public:
     ShardCollectionCmd() : BasicCommand("shardCollection", "shardcollection") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

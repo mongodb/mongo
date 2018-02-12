@@ -44,7 +44,7 @@ class CmdMakeSnapshot final : public BasicCommand {
 public:
     CmdMakeSnapshot() : BasicCommand("makeSnapshot") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -92,7 +92,7 @@ class CmdSetCommittedSnapshot final : public BasicCommand {
 public:
     CmdSetCommittedSnapshot() : BasicCommand("setCommittedSnapshot") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

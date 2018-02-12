@@ -65,7 +65,7 @@ public:
                "directly. Validates and adds a new shard to the cluster.";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

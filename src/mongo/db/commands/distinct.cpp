@@ -76,7 +76,7 @@ public:
         return "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kOptIn;
     }
 

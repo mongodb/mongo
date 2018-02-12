@@ -54,7 +54,7 @@ class ClusterPlanCacheCmd : public BasicCommand {
 public:
     virtual ~ClusterPlanCacheCmd() {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kOptIn;
     }
 

@@ -78,7 +78,7 @@ class FindAndModifyCmd : public BasicCommand {
 public:
     FindAndModifyCmd() : BasicCommand("findAndModify", "findandmodify") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

@@ -44,7 +44,7 @@ class EndSessionsCommand final : public BasicCommand {
 public:
     EndSessionsCommand() : BasicCommand("endSessions") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     bool adminOnly() const override {

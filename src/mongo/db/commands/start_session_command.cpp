@@ -51,7 +51,7 @@ class StartSessionCommand final : public BasicCommand {
 public:
     StartSessionCommand() : BasicCommand("startSession") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     bool adminOnly() const override {

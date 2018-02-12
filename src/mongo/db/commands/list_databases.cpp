@@ -57,7 +57,7 @@ intmax_t dbSize(const string& database);
 
 class CmdListDatabases : public BasicCommand {
 public:
-    AllowedOnSecondary secondaryAllowed() const final {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kOptIn;
     }
     bool adminOnly() const final {

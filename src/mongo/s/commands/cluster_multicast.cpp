@@ -66,7 +66,7 @@ class MulticastCmd : public BasicCommand {
 public:
     MulticastCmd() : BasicCommand("multicast") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     bool adminOnly() const override {

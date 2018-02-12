@@ -74,7 +74,7 @@ class CmdBuildInfo : public BasicCommand {
 public:
     CmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
@@ -107,7 +107,7 @@ class PingCommand : public BasicCommand {
 public:
     PingCommand() : BasicCommand("ping") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     std::string help() const override {
@@ -141,7 +141,7 @@ public:
     std::string help() const override {
         return "return build level feature settings";
     }
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -173,7 +173,7 @@ class HostInfoCmd : public BasicCommand {
 public:
     HostInfoCmd() : BasicCommand("hostInfo") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
@@ -224,7 +224,7 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     bool adminOnly() const override {
@@ -258,7 +258,7 @@ public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual bool adminOnly() const {
@@ -286,10 +286,13 @@ public:
         for (const auto& c : commands) {
             BSONObjBuilder temp(b.subobjStart(c->getName()));
             temp.append("help", c->help());
-            temp.append("slaveOk", c->secondaryAllowed() == Command::AllowedOnSecondary::kAlways);
+            temp.append("slaveOk",
+                        c->secondaryAllowed(opCtx->getServiceContext()) ==
+                            Command::AllowedOnSecondary::kAlways);
             temp.append("adminOnly", c->adminOnly());
             // optionally indicates that the command can be forced to run on a slave/secondary
-            if (c->secondaryAllowed() == Command::AllowedOnSecondary::kOptIn)
+            if (c->secondaryAllowed(opCtx->getServiceContext()) ==
+                Command::AllowedOnSecondary::kOptIn)
                 temp.append("slaveOverrideOk", true);
             temp.done();
         }
@@ -304,7 +307,7 @@ class GetLogCmd : public ErrmsgCommandDeprecated {
 public:
     GetLogCmd() : ErrmsgCommandDeprecated("getLog") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -375,7 +378,7 @@ class ClearLogCmd : public BasicCommand {
 public:
     ClearLogCmd() : BasicCommand("clearLog") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -436,7 +439,7 @@ public:
     virtual bool adminOnly() const {
         return true;
     }
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,

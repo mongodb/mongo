@@ -46,7 +46,7 @@ class TopCommand : public BasicCommand {
 public:
     TopCommand() : BasicCommand("top") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual bool adminOnly() const {

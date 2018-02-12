@@ -61,7 +61,7 @@ class ConfigSvrEnableShardingCommand : public BasicCommand {
 public:
     ConfigSvrEnableShardingCommand() : BasicCommand("_configsvrEnableSharding") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

@@ -267,7 +267,7 @@ public:
         return false;
     }
 
-    virtual AllowedOnSecondary secondaryAllowed() const = 0;
+    virtual AllowedOnSecondary secondaryAllowed(ServiceContext*) const = 0;
 
     /**
      * Override and return fales if the command opcounters should not be incremented on

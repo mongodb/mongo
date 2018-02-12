@@ -489,7 +489,7 @@ class DbCheckCmd : public BasicCommand {
 public:
     DbCheckCmd() : BasicCommand("dbCheck") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

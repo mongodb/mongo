@@ -67,8 +67,8 @@ public:
         return false;
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
-        if (repl::getGlobalReplicationCoordinator()->getSettings().isSlave()) {
+    AllowedOnSecondary secondaryAllowed(ServiceContext* serviceContext) const override {
+        if (repl::ReplicationCoordinator::get(serviceContext)->getSettings().isSlave()) {
             // ok on --slave setups
             return Command::AllowedOnSecondary::kAlways;
         }

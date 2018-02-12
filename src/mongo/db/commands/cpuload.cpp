@@ -42,7 +42,7 @@ using std::stringstream;
 class CPULoadCommand : public BasicCommand {
 public:
     CPULoadCommand() : BasicCommand("cpuload") {}
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual bool isWriteCommandForConfigServer() const {

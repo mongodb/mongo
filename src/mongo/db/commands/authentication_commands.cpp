@@ -97,7 +97,7 @@ class CmdGetNonce : public BasicCommand {
 public:
     CmdGetNonce() : BasicCommand("getnonce"), _random(SecureRandom::create()) {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 
@@ -259,7 +259,7 @@ CmdAuthenticate cmdAuthenticate;
 
 class CmdLogout : public BasicCommand {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     virtual void addRequiredPrivileges(const std::string& dbname,

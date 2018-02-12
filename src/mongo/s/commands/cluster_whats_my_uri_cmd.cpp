@@ -38,7 +38,7 @@ class WhatsMyUriCmd : public BasicCommand {
 public:
     WhatsMyUriCmd() : BasicCommand("whatsmyuri") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

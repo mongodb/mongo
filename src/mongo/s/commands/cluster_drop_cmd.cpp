@@ -45,7 +45,7 @@ class DropCmd : public BasicCommand {
 public:
     DropCmd() : BasicCommand("drop") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

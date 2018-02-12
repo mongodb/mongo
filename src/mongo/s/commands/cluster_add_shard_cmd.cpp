@@ -47,7 +47,7 @@ class AddShardCmd : public BasicCommand {
 public:
     AddShardCmd() : BasicCommand("addShard", "addshard") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

@@ -47,7 +47,7 @@ class ReplSetCommand : public BasicCommand {
 protected:
     ReplSetCommand(const char* s) : BasicCommand(s) {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

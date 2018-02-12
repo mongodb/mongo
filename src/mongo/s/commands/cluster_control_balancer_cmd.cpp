@@ -50,7 +50,7 @@ public:
           _configsvrCommandName(configsvrCommandName),
           _authorizationAction(authorizationAction) {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

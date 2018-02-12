@@ -570,7 +570,7 @@ void execCommandDatabase(OperationContext* opCtx,
 
         if (!opCtx->getClient()->isInDirectClient() &&
             !MONGO_FAIL_POINT(skipCheckingForNotMasterInCommandDispatch)) {
-            auto allowed = command->secondaryAllowed();
+            auto allowed = command->secondaryAllowed(opCtx->getServiceContext());
             bool alwaysAllowed = allowed == Command::AllowedOnSecondary::kAlways;
             bool couldHaveOptedIn = allowed == Command::AllowedOnSecondary::kOptIn;
             bool optedIn =

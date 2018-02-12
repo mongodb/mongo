@@ -55,7 +55,7 @@ class SetFeatureCompatibilityVersionCmd : public BasicCommand {
 public:
     SetFeatureCompatibilityVersionCmd() : BasicCommand("setFeatureCompatibilityVersion") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

@@ -63,7 +63,7 @@ class CmdCloneCollection : public ErrmsgCommandDeprecated {
 public:
     CmdCloneCollection() : ErrmsgCommandDeprecated("cloneCollection") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

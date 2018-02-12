@@ -40,7 +40,7 @@ class CmdAuthenticate : public BasicCommand {
 public:
     static void disableAuthMechanism(std::string authMechanism);
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
     std::string help() const override {

@@ -131,7 +131,7 @@ class DoTxnCmd : public BasicCommand {
 public:
     DoTxnCmd() : BasicCommand("doTxn") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

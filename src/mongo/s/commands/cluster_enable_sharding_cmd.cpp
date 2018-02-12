@@ -48,7 +48,7 @@ class EnableShardingCmd : public ErrmsgCommandDeprecated {
 public:
     EnableShardingCmd() : ErrmsgCommandDeprecated("enableSharding", "enablesharding") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

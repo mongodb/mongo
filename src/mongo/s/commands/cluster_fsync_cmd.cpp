@@ -42,7 +42,7 @@ class FsyncCommand : public ErrmsgCommandDeprecated {
 public:
     FsyncCommand() : ErrmsgCommandDeprecated("fsync") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

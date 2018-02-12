@@ -68,7 +68,7 @@ class FaultInjectCmd : public ErrmsgCommandDeprecated {
 public:
     FaultInjectCmd() : ErrmsgCommandDeprecated("configureFailPoint") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

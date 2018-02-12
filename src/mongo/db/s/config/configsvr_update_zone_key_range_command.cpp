@@ -67,7 +67,7 @@ public:
                "directly. Validates and assigns a new range to a zone.";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

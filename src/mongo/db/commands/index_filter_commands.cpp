@@ -129,7 +129,7 @@ bool IndexFilterCommand::supportsWriteConcern(const BSONObj& cmd) const {
     return false;
 }
 
-Command::AllowedOnSecondary IndexFilterCommand::secondaryAllowed() const {
+Command::AllowedOnSecondary IndexFilterCommand::secondaryAllowed(ServiceContext*) const {
     return AllowedOnSecondary::kOptIn;
 }
 

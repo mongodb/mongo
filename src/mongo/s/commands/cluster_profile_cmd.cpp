@@ -37,7 +37,7 @@ class ProfileCmd : public ErrmsgCommandDeprecated {
 public:
     ProfileCmd() : ErrmsgCommandDeprecated("profile") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

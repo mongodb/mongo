@@ -56,7 +56,7 @@ public:
                "directly. Requests the balancer to move or rebalance a single chunk.";
     }
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

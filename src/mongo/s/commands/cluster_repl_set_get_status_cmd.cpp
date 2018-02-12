@@ -40,7 +40,7 @@ class CmdReplSetGetStatus : public ErrmsgCommandDeprecated {
 public:
     CmdReplSetGetStatus() : ErrmsgCommandDeprecated("replSetGetStatus") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

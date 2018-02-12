@@ -57,7 +57,7 @@ class MoveDatabasePrimaryCommand : public BasicCommand {
 public:
     MoveDatabasePrimaryCommand() : BasicCommand("movePrimary", "moveprimary") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

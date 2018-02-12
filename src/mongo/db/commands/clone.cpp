@@ -56,7 +56,7 @@ class CmdClone : public BasicCommand {
 public:
     CmdClone() : BasicCommand("clone") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

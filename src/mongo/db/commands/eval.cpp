@@ -154,7 +154,7 @@ bool dbEval(OperationContext* opCtx,
 
 class CmdEval : public ErrmsgCommandDeprecated {
 public:
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

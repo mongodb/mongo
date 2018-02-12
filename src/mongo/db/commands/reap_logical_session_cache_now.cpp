@@ -44,7 +44,7 @@ class ReapLogicalSessionCacheNowCommand final : public BasicCommand {
 public:
     ReapLogicalSessionCacheNowCommand() : BasicCommand("reapLogicalSessionCacheNow") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

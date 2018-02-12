@@ -62,7 +62,7 @@ class AddShardToZoneCmd : public BasicCommand {
 public:
     AddShardToZoneCmd() : BasicCommand("addShardToZone", "addshardtozone") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
 

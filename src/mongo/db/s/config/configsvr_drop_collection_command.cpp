@@ -58,7 +58,7 @@ class ConfigSvrDropCollectionCommand : public BasicCommand {
 public:
     ConfigSvrDropCollectionCommand() : BasicCommand("_configsvrDropCollection") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 

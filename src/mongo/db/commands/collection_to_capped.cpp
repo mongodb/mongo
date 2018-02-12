@@ -52,7 +52,7 @@ using std::stringstream;
 class CmdCloneCollectionAsCapped : public ErrmsgCommandDeprecated {
 public:
     CmdCloneCollectionAsCapped() : ErrmsgCommandDeprecated("cloneCollectionAsCapped") {}
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -151,7 +151,7 @@ public:
 class CmdConvertToCapped : public ErrmsgCommandDeprecated {
 public:
     CmdConvertToCapped() : ErrmsgCommandDeprecated("convertToCapped") {}
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {

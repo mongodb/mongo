@@ -202,7 +202,7 @@ class ApplyOpsCmd : public BasicCommand {
 public:
     ApplyOpsCmd() : BasicCommand("applyOps") {}
 
-    AllowedOnSecondary secondaryAllowed() const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
 
