@@ -3557,6 +3557,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: write_concern_majority_passthrough
+  depends_on:
+  - name: jsCore
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=write_concern_majority_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replica_sets
   commands:
   - func: "do setup"
@@ -4622,6 +4633,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops
   - name: sharding_last_stable_mongos_and_mixed_shards
   - name: tool
+  - name: write_concern_majority_passthrough
   - name: push
 
 - name: linux-64-repeated-execution
@@ -4738,6 +4750,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_wire_ops
   - name: slow1
   - name: tool
+  - name: write_concern_majority_passthrough
 
 - <<: *linux-64-debug-template
   name: linux-64-debug-wtdevelop
@@ -5443,6 +5456,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough
   - name: push
     distros:
     - ubuntu1604-test
@@ -5734,6 +5748,9 @@ buildvariants:
     distros:
     - windows-64-vs2015-large
   - name: tool
+  - name: write_concern_majority_passthrough
+    distros:
+    - windows-64-vs2015-large
 
 - &enterprise-windows-64-2k8-template
   name: enterprise-windows-64-2k8
@@ -6047,6 +6064,7 @@ buildvariants:
   - name: tool
   - name: update_fuzzer
   - name: update_fuzzer_replication
+  - name: write_concern_majority_passthrough
   - name: push
     distros:
     - rhel70-small
@@ -6177,6 +6195,7 @@ buildvariants:
   - name: tool
   - name: update_fuzzer
   - name: update_fuzzer_replication
+  - name: write_concern_majority_passthrough
   - name: push
     distros:
     - rhel70-small
@@ -6502,6 +6521,9 @@ buildvariants:
   - name: tool
   - name: update_fuzzer
   - name: update_fuzzer_replication
+  - name: write_concern_majority_passthrough
+    distros:
+    - rhel62-large
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6624,6 +6646,7 @@ buildvariants:
   - name: sslSpecial
   - name: update_fuzzer
   - name: update_fuzzer_replication
+  - name: write_concern_majority_passthrough
 
 - name: enterprise-rhel-70-64-bit
   display_name: "* Enterprise RHEL 7.0"
@@ -6983,6 +7006,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough
   - name: push
     distros:
     - rhel70-small
@@ -7089,6 +7113,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough
   - name: push
     distros:
     - rhel70-small
@@ -7189,6 +7214,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough
   - name: push
     distros:
     - rhel70
@@ -7566,6 +7592,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough
   - name: push
     distros:
     - suse12-test
@@ -7803,6 +7830,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough
   - name: push
     distros:
     - suse11-test
@@ -8387,6 +8415,7 @@ buildvariants:
   - name: tool
   - name: update_fuzzer
   - name: update_fuzzer_replication
+  - name: write_concern_majority_passthrough
 
 - name: enterprise-rhel-62-64-bit-mobile
   display_name: Enterprise RHEL 6.2 (mobile)
@@ -8658,6 +8687,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough
 
 - name: enterprise-rhel-72-s390x-inmem
   display_name: Enterprise RHEL 7.2 s390x (inMemory) DEBUG
@@ -8747,6 +8777,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough
 
 - name: ubuntu1404-rocksdb
   display_name: Ubuntu 14.04 (RocksDB)
@@ -8892,6 +8923,7 @@ buildvariants:
   - name: tool
   - name: update_fuzzer
   - name: update_fuzzer_replication
+  - name: write_concern_majority_passthrough
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
@@ -9047,6 +9079,7 @@ buildvariants:
   - name: tool
   - name: update_fuzzer
   - name: update_fuzzer_replication
+  - name: write_concern_majority_passthrough
 
 - name: ubuntu1604-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise SSL Ubuntu 16.04 DEBUG"
@@ -9173,6 +9206,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: tool
+  - name: write_concern_majority_passthrough
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
