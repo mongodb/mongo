@@ -242,6 +242,17 @@ repos:
     repos:
       - zypper/suse/12/mongodb-enterprise
 
+  - name: debian92
+    type: deb
+    edition: enterprise
+    code_name: "stretch"
+    bucket: repo.mongodb.com
+    component: main
+    architectures:
+      - amd64
+    repos:
+      - apt/debian/dists/stretch/mongodb-enterprise
+
   - name: debian81
     type: deb
     edition: enterprise

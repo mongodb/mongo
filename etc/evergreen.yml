@@ -8206,6 +8206,59 @@ buildvariants:
     - ubuntu1604-packer
   - name: push
 
+- name: enterprise-debian92-64
+  display_name: Enterprise Debian 9.2
+  modules:
+  - enterprise
+  run_on:
+  - debian92-test
+  batchtime: 1440 # 1 day
+  expansions:
+    gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
+    tooltags: "-tags 'ssl sasl'"
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-debian92
+    compile_flags: --ssl MONGO_DISTMOD=debian92 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_arch: x86_64
+    packager_distro: debian92
+    repo_edition: enterprise
+    use_scons_cache: true
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - debian92-build
+  - name: compile_all
+    distros:
+    - debian92-build
+  - name: audit
+  - name: dbtest
+  - name: ese
+  - name: jsCore
+  - name: jsCore_auth
+  - name: aggregation_fuzzer
+  - name: jstestfuzz
+  - name: jstestfuzz_concurrent
+  - name: jstestfuzz_concurrent_replication
+  - name: jstestfuzz_concurrent_sharded
+  - name: jstestfuzz_replication
+  - name: jstestfuzz_sharded
+  - name: replica_sets_auth
+  - name: sasl
+  - name: sharding_auth
+  - name: snmp
+  - name: ssl
+  - name: sslSpecial
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+
 - name: debian92
   display_name: SSL Debian 9.2
   run_on:
