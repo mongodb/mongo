@@ -59,6 +59,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/logical_time_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
+#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/parallel.h"
 #include "mongo/s/client/shard_connection.h"
@@ -289,28 +290,36 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
         try {
             execCommandClient(opCtx, command, request, &crb);
             return;
-        } catch (const StaleConfigException& e) {
-            if (e->getns().empty()) {
+        } catch (ExceptionForCat<ErrorCategory::NeedRetargettingError>& ex) {
+            const auto ns = [&] {
+                if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
+                    return NamespaceString(staleInfo->getns());
+                } else if (auto implicitCreateInfo =
+                               ex.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
+                    return NamespaceString(implicitCreateInfo->getNss());
+                } else {
+                    throw;
+                }
+            }();
+
+            if (ns.isEmpty()) {
                 // This should be impossible but older versions tried incorrectly to handle it here.
                 log() << "Received a stale config error with an empty namespace while executing "
-                      << redact(request.body) << " : " << redact(e);
+                      << redact(request.body) << " : " << redact(ex);
                 throw;
             }
 
             if (loops <= 0)
-                throw e;
+                throw;
 
-            loops--;
-            log() << "Retrying command " << redact(request.body) << causedBy(e);
+            log() << "Retrying command " << redact(request.body) << causedBy(ex);
 
-            ShardConnection::checkMyConnectionVersions(opCtx, e->getns());
-            if (loops < 4) {
-                const NamespaceString staleNSS(e->getns());
-                if (staleNSS.isValid()) {
-                    Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(staleNSS);
-                }
+            ShardConnection::checkMyConnectionVersions(opCtx, ns.ns());
+            if (ns.isValid()) {
+                Grid::get(opCtx)->catalogCache()->invalidateShardedCollection(ns);
             }
 
+            loops--;
             continue;
         } catch (const DBException& e) {
             crb.reset();

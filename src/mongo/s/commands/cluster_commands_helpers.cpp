@@ -76,13 +76,20 @@ BSONObj appendDbVersion(BSONObj cmdObj, DatabaseVersion version) {
     return cmdWithVersionBob.obj();
 }
 
+const auto kAllowImplicitCollectionCreation = "allowImplicitCollectionCreation"_sd;
+
 std::vector<AsyncRequestsSender::Request> buildUnversionedRequestsForAllShards(
     OperationContext* opCtx, const BSONObj& cmdObj) {
+    auto cmdToSend = cmdObj;
+    if (!cmdToSend.hasField(kAllowImplicitCollectionCreation)) {
+        cmdToSend = appendAllowImplicitCreate(cmdToSend, false);
+    }
+
     std::vector<AsyncRequestsSender::Request> requests;
     std::vector<ShardId> shardIds;
     Grid::get(opCtx)->shardRegistry()->getAllShardIds(&shardIds);
     for (auto&& shardId : shardIds) {
-        requests.emplace_back(std::move(shardId), cmdObj);
+        requests.emplace_back(std::move(shardId), cmdToSend);
     }
     return requests;
 }
@@ -93,6 +100,11 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
     const BSONObj& cmdObj,
     const BSONObj& query,
     const BSONObj& collation) {
+    auto cmdToSend = cmdObj;
+    if (!cmdToSend.hasField(kAllowImplicitCollectionCreation)) {
+        cmdToSend = appendAllowImplicitCreate(cmdToSend, false);
+    }
+
     std::vector<AsyncRequestsSender::Request> requests;
     if (routingInfo.cm()) {
         // The collection is sharded. Target all shards that own chunks that match the query.
@@ -100,14 +112,14 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
         routingInfo.cm()->getShardIdsForQuery(opCtx, query, collation, &shardIds);
         for (const ShardId& shardId : shardIds) {
             requests.emplace_back(
-                shardId, appendShardVersion(cmdObj, routingInfo.cm()->getVersion(shardId)));
+                shardId, appendShardVersion(cmdToSend, routingInfo.cm()->getVersion(shardId)));
         }
     } else {
         // The collection is unsharded. Target only the primary shard for the database.
 
         // Attach shardVersion "UNSHARDED", unless targeting the config server.
         const auto cmdObjWithShardVersion = (routingInfo.db().primaryId() != "config")
-            ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
+            ? appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED())
             : cmdObj;
 
         // Attach the databaseVersion if we have one cached for the database.
@@ -145,6 +157,8 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
     // Get the responses.
 
     std::vector<AsyncRequestsSender::Response> responses;  // Stores results by ShardId
+    bool atLeastOneSucceeded = false;
+    boost::optional<Status> implicitCreateErrorStatus;
 
     while (!ars.done()) {
         auto response = ars.next();
@@ -156,6 +170,10 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
             // Check for special errors that require throwing out any accumulated results.
             auto& responseObj = response.swResponse.getValue().data;
             status = getStatusFromCommandResult(responseObj);
+
+            if (status.isOK()) {
+                atLeastOneSucceeded = true;
+            }
 
             // Failing to establish a consistent shardVersion means no results should be examined.
             if (ErrorCodes::isStaleShardingError(status.code())) {
@@ -174,9 +192,21 @@ std::vector<AsyncRequestsSender::Response> gatherResponses(
             if (ErrorCodes::CommandOnShardedViewNotSupportedOnMongod == status) {
                 uassertStatusOK(status);
             }
+
+            if (ErrorCodes::CannotImplicitlyCreateCollection == status) {
+                implicitCreateErrorStatus = status;
+            }
         }
         responses.push_back(std::move(response));
     }
+
+    // TODO: This should not be needed once we get better targetting with SERVER-32723.
+    // Some commands are sent with allowImplicit: false to all shards and expect only some of
+    // them to succeed.
+    if (implicitCreateErrorStatus && !atLeastOneSucceeded) {
+        uassertStatusOK(*implicitCreateErrorStatus);
+    }
+
     return responses;
 }
 
@@ -186,6 +216,12 @@ BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version) {
     BSONObjBuilder cmdWithVersionBob(std::move(cmdObj));
     version.appendForCommands(&cmdWithVersionBob);
     return cmdWithVersionBob.obj();
+}
+
+BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow) {
+    BSONObjBuilder newCmdBuilder(std::move(cmdObj));
+    newCmdBuilder.append(kAllowImplicitCollectionCreation, allow);
+    return newCmdBuilder.obj();
 }
 
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShards(
@@ -227,10 +263,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
         // An unversioned request on a sharded collection can cause a shard that has not owned data
         // for the collection yet to implicitly create the collection without all the collection
         // options. So, we signal to shards that they should not implicitly create the collection.
-        BSONObjBuilder augmentedCmdBob;
-        augmentedCmdBob.appendElementsUnique(cmdObj);
-        augmentedCmdBob.append("allowImplicitCollectionCreation", false);
-        requests = buildUnversionedRequestsForAllShards(opCtx, augmentedCmdBob.obj());
+        requests = buildUnversionedRequestsForAllShards(opCtx, cmdObj);
     } else {
         requests = buildVersionedRequestsForTargetedShards(
             opCtx, routingInfo, cmdObj, BSONObj(), BSONObj());

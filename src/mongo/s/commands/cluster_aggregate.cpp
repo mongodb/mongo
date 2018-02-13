@@ -230,7 +230,8 @@ BSONObj createCommandForTargetedShards(
         targetedCmd.reset(wrapAggAsExplain(targetedCmd.freeze(), *explainVerbosity));
     }
 
-    return targetedCmd.freeze().toBson();
+    // agg creates temp collection and should handle implicit create separately.
+    return appendAllowImplicitCreate(targetedCmd.freeze().toBson(), true);
 }
 
 BSONObj createCommandForMergingShard(
@@ -252,7 +253,8 @@ BSONObj createCommandForMergingShard(
             : Value(Document{CollationSpec::kSimpleSpec});
     }
 
-    return mergeCmd.freeze().toBson();
+    // agg creates temp collection and should handle implicit create separately.
+    return appendAllowImplicitCreate(mergeCmd.freeze().toBson(), true);
 }
 
 std::vector<ClusterClientCursorParams::RemoteCursor> establishShardCursors(

@@ -54,6 +54,11 @@ void appendWriteConcernErrorToCmdResponse(const ShardId& shardID,
 BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);
 
 /**
+ * Returns a copy of 'cmdObj' with 'allowImplicitCollectionCreation' appended.
+ */
+BSONObj appendAllowImplicitCreate(BSONObj cmdObj, bool allow);
+
+/**
  * Utility for dispatching unversioned commands to all shards in a cluster.
  *
  * Returns a non-OK status if a failure occurs on *this* node during execution. Otherwise, returns

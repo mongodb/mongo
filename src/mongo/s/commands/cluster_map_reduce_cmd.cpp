@@ -106,7 +106,9 @@ BSONObj fixForShards(const BSONObj& orig,
         b.append("splitInfo", maxChunkSizeBytes);
     }
 
-    return b.obj();
+    // mapReduce creates temporary collections and renames them at the end, so it will handle
+    // cluster collection creation differently.
+    return appendAllowImplicitCreate(b.obj(), true);
 }
 
 /**
@@ -283,7 +285,10 @@ public:
 
             BSONObj res;
             bool ok = conn->runCommand(
-                dbname, CommandHelpers::filterCommandRequestForPassthrough(cmdObj), res);
+                dbname,
+                appendAllowImplicitCreate(
+                    CommandHelpers::filterCommandRequestForPassthrough(cmdObj), true),
+                res);
             conn.done();
 
             if (auto wcErrorElem = res["writeConcernError"]) {
@@ -443,7 +448,8 @@ public:
                 uassertStatusOK(shardRegistry->getShard(opCtx, outputDbInfo.primaryId()));
 
             ShardConnection conn(outputShard->getConnString(), outputCollNss.ns());
-            ok = conn->runCommand(outDB, finalCmd.obj(), singleResult);
+            ok = conn->runCommand(
+                outDB, appendAllowImplicitCreate(finalCmd.obj(), true), singleResult);
 
             BSONObj counts = singleResult.getObjectField("counts");
             postCountsB.append(conn->getServerAddress(), counts);
@@ -496,7 +502,7 @@ public:
                     return CommandHelpers::appendCommandStatus(result, scopedDistLock.getStatus());
                 }
 
-                BSONObj finalCmdObj = finalCmd.obj();
+                BSONObj finalCmdObj = appendAllowImplicitCreate(finalCmd.obj(), true);
                 mrCommandResults.clear();
 
                 try {

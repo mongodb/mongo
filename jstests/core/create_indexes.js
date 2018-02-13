@@ -32,6 +32,11 @@
         return result;
     };
 
+    var checkImplicitCreate = function(createIndexResult, isMongos) {
+        let allowImplicit = !isMongos;
+        assert.eq(allowImplicit, createIndexResult.createdCollectionAutomatically);
+    };
+
     var dbTest = db.getSisterDB('create_indexes_db');
     dbTest.dropDatabase();
 
@@ -40,7 +45,7 @@
     var res = assert.commandWorked(
         collDbNotExist.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
     res = extractResult(res);
-    assert(res.createdCollectionAutomatically);
+    checkImplicitCreate(res, isMongos);
     assert.eq(1, res.numIndexesBefore);
     assert.eq(2, res.numIndexesAfter);
     assert.isnull(res.note,
@@ -52,7 +57,7 @@
     var res = assert.commandWorked(
         t.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
     res = extractResult(res);
-    assert(res.createdCollectionAutomatically);
+    checkImplicitCreate(res, isMongos);
     assert.eq(1, res.numIndexesBefore);
     assert.eq(2, res.numIndexesAfter);
     assert.isnull(res.note,

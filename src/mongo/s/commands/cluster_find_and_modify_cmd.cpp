@@ -217,7 +217,7 @@ private:
         uassertStatusOK(response.status);
 
         const auto responseStatus = getStatusFromCommandResult(response.data);
-        if (ErrorCodes::isStaleShardingError(responseStatus.code())) {
+        if (ErrorCodes::isNeedRetargettingError(responseStatus.code())) {
             // Command code traps this exception and re-runs
             uassertStatusOK(responseStatus.withContext("findAndModify"));
         }

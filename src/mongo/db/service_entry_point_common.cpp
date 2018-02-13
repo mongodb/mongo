@@ -61,6 +61,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/implicit_create_collection.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharded_connection_info.h"
@@ -79,6 +80,7 @@
 #include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/cannot_implicitly_create_collection_info.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point_service.h"
@@ -729,6 +731,11 @@ void execCommandDatabase(OperationContext* opCtx,
                 onShardVersionMismatch(
                     opCtx, NamespaceString(sce->getns()), sce->getVersionReceived())
                     .ignore();
+            }
+        } else if (auto cannotImplicitCreateCollInfo =
+                       e.extraInfo<CannotImplicitlyCreateCollectionInfo>()) {
+            if (ShardingState::get(opCtx)->enabled()) {
+                onCannotImplicitlyCreateCollection(opCtx, cannotImplicitCreateCollInfo->getNss());
             }
         }
 

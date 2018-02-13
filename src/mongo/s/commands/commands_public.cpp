@@ -319,7 +319,12 @@ public:
             b.append("fromhost", shard->getConnString().toString());
         }
 
-        return passthrough(opCtx, NamespaceString::kAdminDb, toDbInfo.primaryId(), b.obj(), result);
+        // copyDb creates multiple collections and should handle collection creation differently.
+        return passthrough(opCtx,
+                           NamespaceString::kAdminDb,
+                           toDbInfo.primaryId(),
+                           appendAllowImplicitCreate(b.obj(), true),
+                           result);
     }
 
 } clusterCopyDBCmd;
@@ -344,6 +349,15 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
+    bool run(OperationContext* opCtx,
+             const std::string& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        // convertToCapped creates a temp collection and renames it at the end. It will require
+        // special handling for create collection.
+        return NotAllowedOnShardedCollectionCmd::run(
+            opCtx, dbName, appendAllowImplicitCreate(cmdObj, true), result);
+    }
 } convertToCappedCmd;
 
 class GroupCmd : public NotAllowedOnShardedCollectionCmd {
