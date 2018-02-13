@@ -29,7 +29,6 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/plan_stage.h"
@@ -39,9 +38,6 @@
 #include "mongo/db/record_id.h"
 
 namespace mongo {
-
-using std::unique_ptr;
-using std::vector;
 
 using fts::FTSSpec;
 
@@ -79,7 +75,7 @@ public:
                 IndexDescriptor* index);
     ~TextOrStage();
 
-    void addChild(unique_ptr<PlanStage> child);
+    void addChild(std::unique_ptr<PlanStage> child);
 
     void addChildren(Children childrenToAdd);
 

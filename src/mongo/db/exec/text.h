@@ -29,7 +29,6 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
@@ -39,9 +38,6 @@
 #include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
-
-using std::unique_ptr;
-using std::vector;
 
 using fts::FTSQueryImpl;
 using fts::FTSSpec;
@@ -98,10 +94,10 @@ private:
     /**
      * Helper method to built the query execution plan for the text stage.
      */
-    unique_ptr<PlanStage> buildTextTree(OperationContext* opCtx,
-                                        WorkingSet* ws,
-                                        const MatchExpression* filter,
-                                        bool wantTextScore) const;
+    std::unique_ptr<PlanStage> buildTextTree(OperationContext* opCtx,
+                                             WorkingSet* ws,
+                                             const MatchExpression* filter,
+                                             bool wantTextScore) const;
 
     // Parameters of this text stage.
     TextStageParams _params;

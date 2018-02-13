@@ -38,8 +38,6 @@
 
 namespace mongo {
 
-using std::unique_ptr;
-
 using fts::FTSMatcher;
 using fts::FTSQueryImpl;
 using fts::FTSSpec;
@@ -58,7 +56,7 @@ class RecordID;
 class TextMatchStage final : public PlanStage {
 public:
     TextMatchStage(OperationContext* opCtx,
-                   unique_ptr<PlanStage> child,
+                   std::unique_ptr<PlanStage> child,
                    const FTSQueryImpl& query,
                    const FTSSpec& spec,
                    WorkingSet* ws);
