@@ -3619,18 +3619,21 @@ TEST_F(
                                           const MultiApplier::Operations& ops,
                                           MultiApplier::ApplyOperationFn applyOperation) {
         // 'OperationPtr*' is ignored by our overridden _multiInitialSyncApply().
-        applyOperation(nullptr).transitional_ignore();
+        ASSERT_OK(applyOperation(nullptr, nullptr));
         return ops.back().getOpTime();
     };
     bool fetchCountIncremented = false;
-    getExternalState()->multiInitialSyncApplyFn = [&fetchCountIncremented](
-        MultiApplier::OperationPtrs*, const HostAndPort&, AtomicUInt32* fetchCount) {
-        if (!fetchCountIncremented) {
-            fetchCount->addAndFetch(1);
-            fetchCountIncremented = true;
-        }
-        return Status::OK();
-    };
+    getExternalState()->multiInitialSyncApplyFn =
+        [&fetchCountIncremented](MultiApplier::OperationPtrs*,
+                                 const HostAndPort&,
+                                 AtomicUInt32* fetchCount,
+                                 WorkerMultikeyPathInfo*) {
+            if (!fetchCountIncremented) {
+                fetchCount->addAndFetch(1);
+                fetchCountIncremented = true;
+            }
+            return Status::OK();
+        };
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));

@@ -41,6 +41,8 @@ struct MultikeyPathInfo {
     MultikeyPaths multikeyPaths;
 };
 
+using WorkerMultikeyPathInfo = std::vector<MultikeyPathInfo>;
+
 /**
  * An OperationContext decoration that tracks which indexes should be made multikey. This is used
  * by IndexCatalogEntryImpl::setMultikey() to track what indexes should be set as multikey during
@@ -64,7 +66,7 @@ public:
     /**
      * Returns the multikey path information that has been saved.
      */
-    const std::vector<MultikeyPathInfo>& getMultikeyPathInfo() const;
+    const WorkerMultikeyPathInfo& getMultikeyPathInfo() const;
 
     /**
      * Specifies that we should track multikey path information on this MultikeyPathTracker. This is
@@ -87,7 +89,7 @@ public:
 
 
 private:
-    std::vector<MultikeyPathInfo> _multikeyPathInfo;
+    WorkerMultikeyPathInfo _multikeyPathInfo;
     bool _trackMultikeyPathInfo = false;
 };
 

@@ -55,7 +55,9 @@ class OpTime;
  */
 class SyncTail {
 public:
-    using MultiSyncApplyFunc = stdx::function<void(MultiApplier::OperationPtrs* ops, SyncTail* st)>;
+    using MultiSyncApplyFunc = stdx::function<void(MultiApplier::OperationPtrs* ops,
+                                                   SyncTail* st,
+                                                   WorkerMultikeyPathInfo* workerMultikeyPathInfo)>;
 
     /**
      * Type of function to increment "repl.apply.ops" server status metric.
@@ -226,12 +228,6 @@ public:
     static AtomicInt32 replBatchLimitOperations;
 
     /**
-     * Adds the given multikey path information to the list of indexes to make multikey at the
-     * end of the current batch.
-     */
-    void addMultikeyPathInfo(std::vector<MultikeyPathInfo> infoList);
-
-    /**
      * Passthrough function to test multiApply.
      */
     OpTime multiApply_forTest(OperationContext* opCtx, MultiApplier::Operations ops);
@@ -256,12 +252,6 @@ private:
 
     // persistent pool of worker threads for writing ops to the databases
     std::unique_ptr<OldThreadPool> _writerPool;
-
-    // Protects member variables below.
-    mutable stdx::mutex _mutex;
-
-    // Maintains the information for all indexes that must be set as multikey in the current batch.
-    std::vector<MultikeyPathInfo> _multikeyPathInfo;
 };
 
 /**
@@ -282,12 +272,15 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
 // They consume the passed in OperationPtrs and callers should not make any assumptions about the
 // state of the container after calling. However, these functions cannot modify the pointed-to
 // operations because the OperationPtrs container contains const pointers.
-void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st);
+void multiSyncApply(MultiApplier::OperationPtrs* ops,
+                    SyncTail* st,
+                    WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 
 // Used by 3.4 initial sync.
 Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                              SyncTail* st,
-                             AtomicUInt32* fetchCount);
+                             AtomicUInt32* fetchCount,
+                             WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 
 /**
  * Testing-only version of multiSyncApply that returns an error instead of aborting.
@@ -307,7 +300,8 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
 Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
                                      MultiApplier::OperationPtrs* ops,
                                      SyncTail* st,
-                                     AtomicUInt32* fetchCount);
+                                     AtomicUInt32* fetchCount,
+                                     WorkerMultikeyPathInfo* workerMultikeyPathInfo);
 
 }  // namespace repl
 }  // namespace mongo

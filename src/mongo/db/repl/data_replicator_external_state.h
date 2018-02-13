@@ -137,12 +137,15 @@ private:
     /**
      * Used by _multiApply() to write operations to database during initial sync. `fetchCount` is a
      * pointer to a counter that is incremented every time we fetch a missing document.
+     * `workerMultikeyPathInfo` is a pointer to a list of objects tracking which indexes to set as
+     * multikey at the end of the batch. It should never be null.
      *
      * Used exclusively by the InitialSyncer to construct a MultiApplier.
      */
     virtual Status _multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                           const HostAndPort& source,
-                                          AtomicUInt32* fetchCount) = 0;
+                                          AtomicUInt32* fetchCount,
+                                          WorkerMultikeyPathInfo* workerMultikeyPathInfo) = 0;
 
     // Provides InitialSyncer with access to _multiApply, _multiSyncApply and
     // _multiInitialSyncApply.

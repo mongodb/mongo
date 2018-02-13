@@ -40,7 +40,7 @@ void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo info) {
     _multikeyPathInfo.emplace_back(info);
 }
 
-const std::vector<MultikeyPathInfo>& MultikeyPathTracker::getMultikeyPathInfo() const {
+const WorkerMultikeyPathInfo& MultikeyPathTracker::getMultikeyPathInfo() const {
     return _multikeyPathInfo;
 }
 

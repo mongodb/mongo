@@ -880,14 +880,17 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
 }
 
 Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
-    MultiApplier::OperationPtrs* ops, const HostAndPort& source, AtomicUInt32* fetchCount) {
+    MultiApplier::OperationPtrs* ops,
+    const HostAndPort& source,
+    AtomicUInt32* fetchCount,
+    WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())
     // to fetch missing documents during initial sync. Therefore, it is fine to construct SyncTail
     // with invalid BackgroundSync, MultiSyncApplyFunc and writerPool arguments because we will not
     // be accessing any SyncTail functionality that require these constructor parameters.
     SyncTail syncTail(nullptr, SyncTail::MultiSyncApplyFunc(), nullptr);
     syncTail.setHostname(source.toString());
-    return repl::multiInitialSyncApply(ops, &syncTail, fetchCount);
+    return repl::multiInitialSyncApply(ops, &syncTail, fetchCount, workerMultikeyPathInfo);
 }
 
 std::unique_ptr<OplogBuffer> ReplicationCoordinatorExternalStateImpl::makeInitialSyncOplogBuffer(

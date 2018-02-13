@@ -449,13 +449,14 @@ void prefetchOps(const MultiApplier::Operations& ops, OldThreadPool* prefetcherP
 void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
               OldThreadPool* writerPool,
               const MultiApplier::ApplyOperationFn& func,
-              std::vector<Status>* statusVector) {
+              std::vector<Status>* statusVector,
+              std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo) {
     invariant(writerVectors.size() == statusVector->size());
     TimerHolder timer(&applyBatchStats);
     for (size_t i = 0; i < writerVectors.size(); i++) {
         if (!writerVectors[i].empty()) {
-            writerPool->schedule([&func, &writerVectors, statusVector, i] {
-                (*statusVector)[i] = func(&writerVectors[i]);
+            writerPool->schedule([&func, &writerVectors, statusVector, workerMultikeyPathInfo, i] {
+                (*statusVector)[i] = func(&writerVectors[i], &((*workerMultikeyPathInfo)[i]));
             });
         }
     }
@@ -705,32 +706,16 @@ OpTime SyncTail::multiApply_forTest(OperationContext* opCtx, MultiApplier::Opera
  * this batch, it will not be updated.
  */
 OpTime SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations ops) {
-    auto applyOperation = [this](MultiApplier::OperationPtrs* ops) -> Status {
-        _applyFunc(ops, this);
+    auto applyOperation = [this](MultiApplier::OperationPtrs* ops,
+                                 WorkerMultikeyPathInfo* workerMultikeyPathInfo) -> Status {
+        _applyFunc(ops, this, workerMultikeyPathInfo);
         // This function is used by 3.2 initial sync and steady state data replication.
         // _applyFunc() will throw or abort on error, so we return OK here.
         return Status::OK();
     };
-    Timestamp firstTimeInBatch = ops.front().getTimestamp();
 
-    OpTime finalOpTime = fassertStatusOK(
+    return fassertStatusOK(
         34437, repl::multiApply(opCtx, _writerPool.get(), std::move(ops), applyOperation));
-
-    invariant(!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo());
-    // Set any indexes to multikey that this batch ignored.
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    for (MultikeyPathInfo info : _multikeyPathInfo) {
-        // We timestamp every multikey write with the first timestamp in the batch. It is always
-        // safe to set an index as multikey too early, just not too late. We conservatively pick
-        // the first timestamp in the batch since we do not have enough information to find out
-        // the timestamp of the first write that set the given multikey path.
-        fassertStatusOK(50686,
-                        StorageInterface::get(opCtx)->setIndexIsMultikey(
-                            opCtx, info.nss, info.indexName, info.multikeyPaths, firstTimeInBatch));
-    }
-    _multikeyPathInfo.clear();
-
-    return finalOpTime;
 }
 
 namespace {
@@ -1243,30 +1228,28 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
     });
 }
 
-void SyncTail::addMultikeyPathInfo(std::vector<MultikeyPathInfo> infoList) {
-    stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _multikeyPathInfo.reserve(_multikeyPathInfo.size() + infoList.size());
-    for (MultikeyPathInfo info : infoList) {
-        _multikeyPathInfo.emplace_back(info);
-    }
-}
-
 // This free function is used by the writer threads to apply each op
-void multiSyncApply(MultiApplier::OperationPtrs* ops, SyncTail* st) {
+void multiSyncApply(MultiApplier::OperationPtrs* ops,
+                    SyncTail* st,
+                    WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     initializeWriterThread();
     auto opCtx = cc().makeOperationContext();
     auto syncApply = [](
         OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
         return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
     };
+    {
+        ON_BLOCK_EXIT(
+            [&opCtx] { MultikeyPathTracker::get(opCtx.get()).stopTrackingMultikeyPathInfo(); });
+        MultikeyPathTracker::get(opCtx.get()).startTrackingMultikeyPathInfo();
+        fassertNoTrace(16359, multiSyncApply_noAbort(opCtx.get(), ops, syncApply));
+    }
 
-    ON_BLOCK_EXIT(
-        [&opCtx] { MultikeyPathTracker::get(opCtx.get()).stopTrackingMultikeyPathInfo(); });
-    MultikeyPathTracker::get(opCtx.get()).startTrackingMultikeyPathInfo();
-    fassertNoTrace(16359, multiSyncApply_noAbort(opCtx.get(), ops, syncApply));
-
-    if (!MultikeyPathTracker::get(opCtx.get()).getMultikeyPathInfo().empty()) {
-        st->addMultikeyPathInfo(MultikeyPathTracker::get(opCtx.get()).getMultikeyPathInfo());
+    invariant(!MultikeyPathTracker::get(opCtx.get()).isTrackingMultikeyPathInfo());
+    invariant(workerMultikeyPathInfo->empty());
+    auto newPaths = MultikeyPathTracker::get(opCtx.get()).getMultikeyPathInfo();
+    if (!newPaths.empty()) {
+        workerMultikeyPathInfo->swap(newPaths);
     }
 }
 
@@ -1449,16 +1432,18 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
 
 Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                              SyncTail* st,
-                             AtomicUInt32* fetchCount) {
+                             AtomicUInt32* fetchCount,
+                             WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     initializeWriterThread();
     auto opCtx = cc().makeOperationContext();
-    return multiInitialSyncApply_noAbort(opCtx.get(), ops, st, fetchCount);
+    return multiInitialSyncApply_noAbort(opCtx.get(), ops, st, fetchCount, workerMultikeyPathInfo);
 }
 
 Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
                                      MultiApplier::OperationPtrs* ops,
                                      SyncTail* st,
-                                     AtomicUInt32* fetchCount) {
+                                     AtomicUInt32* fetchCount,
+                                     WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
     {  // Ensure that the MultikeyPathTracker stops tracking paths.
@@ -1503,17 +1488,12 @@ Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
     }
 
     invariant(!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo());
-    // Set any indexes to multikey that this batch ignored.
-    Timestamp firstTimeInBatch = ops->front()->getTimestamp();
-    for (MultikeyPathInfo info : MultikeyPathTracker::get(opCtx).getMultikeyPathInfo()) {
-        // We timestamp every multikey write with the first timestamp in the batch. It is always
-        // safe to set an index as multikey too early, just not too late. We conservatively pick
-        // the first timestamp in the batch since we do not have enough information to find out
-        // the timestamp of the first write that set the given multikey path.
-        fassertStatusOK(50685,
-                        StorageInterface::get(opCtx)->setIndexIsMultikey(
-                            opCtx, info.nss, info.indexName, info.multikeyPaths, firstTimeInBatch));
+    invariant(workerMultikeyPathInfo->empty());
+    auto newPaths = MultikeyPathTracker::get(opCtx).getMultikeyPathInfo();
+    if (!newPaths.empty()) {
+        workerMultikeyPathInfo->swap(newPaths);
     }
+
     return Status::OK();
 }
 
@@ -1558,6 +1538,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
     }
 
     std::vector<Status> statusVector(workerPool->getNumThreads(), Status::OK());
+    std::vector<WorkerMultikeyPathInfo> multikeyVector(workerPool->getNumThreads());
     {
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on the stack
@@ -1598,7 +1579,7 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
         consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
 
-        applyOps(writerVectors, workerPool, applyOperation, &statusVector);
+        applyOps(writerVectors, workerPool, applyOperation, &statusVector, &multikeyVector);
         workerPool->join();
 
         // Update the transaction table to point to the latest oplog entries for each session id.
@@ -1612,6 +1593,22 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         // up in the future.
         const auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
         storageEngine->replicationBatchIsComplete();
+    }
+
+    Timestamp firstTimeInBatch = ops.front().getTimestamp();
+    // Set any indexes to multikey that this batch ignored. This must be done while holding the
+    // parallel batch writer mutex.
+    for (WorkerMultikeyPathInfo infoVector : multikeyVector) {
+        for (MultikeyPathInfo info : infoVector) {
+            // We timestamp every multikey write with the first timestamp in the batch. It is always
+            // safe to set an index as multikey too early, just not too late. We conservatively pick
+            // the first timestamp in the batch since we do not have enough information to find out
+            // the timestamp of the first write that set the given multikey path.
+            fassertStatusOK(
+                50686,
+                StorageInterface::get(opCtx)->setIndexIsMultikey(
+                    opCtx, info.nss, info.indexName, info.multikeyPaths, firstTimeInBatch));
+        }
     }
 
     // If any of the statuses is not ok, return error.

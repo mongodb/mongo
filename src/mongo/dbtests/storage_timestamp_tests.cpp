@@ -1340,11 +1340,19 @@ public:
 
         // We add in an index creation op to test that we restart tracking multikey path info
         // after bulk index builds.
-        std::vector<const repl::OplogEntry*> ops = {&op0, &createIndexOp, &op1, &op2};
+        std::vector<repl::OplogEntry> ops = {op0, createIndexOp, op1, op2};
 
-        repl::SyncTail syncTail(nullptr, repl::SyncTail::MultiSyncApplyFunc(), nullptr);
         AtomicUInt32 fetchCount(0);
-        ASSERT_OK(repl::multiInitialSyncApply_noAbort(_opCtx, &ops, &syncTail, &fetchCount));
+        repl::SyncTail syncTail(nullptr, repl::multiSyncApply);
+        repl::MultiApplier::ApplyOperationFn applyOpFn = [&fetchCount, &syncTail](
+            repl::MultiApplier::OperationPtrs* ops,
+            WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+            return repl::multiInitialSyncApply(ops, &syncTail, &fetchCount, workerMultikeyPathInfo);
+        };
+
+        auto lastTime =
+            assertGet(repl::multiApply(_opCtx, syncTail.getWriterPool(), ops, applyOpFn));
+        ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);
         assertMultikeyPaths(

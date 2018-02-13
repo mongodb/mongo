@@ -58,7 +58,7 @@ protected:
     ReplicationProcess* _replicationProcess = nullptr;
 
     // Implements the MultiApplier::ApplyOperationFn interface and does nothing.
-    static Status noopApplyOperationFn(MultiApplier::OperationPtrs*) {
+    static Status noopApplyOperationFn(MultiApplier::OperationPtrs*, WorkerMultikeyPathInfo*) {
         return Status::OK();
     }
 
