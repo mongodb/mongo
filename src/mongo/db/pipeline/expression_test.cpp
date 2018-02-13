@@ -2864,6 +2864,24 @@ TEST(ExpressionObjectOptimizations, OptimizingAnObjectShouldOptimizeSubExpressio
     ASSERT_VALUE_EQ(expConstant->evaluate(Document()), Value(3));
 };
 
+TEST(ExpressionObjectOptimizations, OptimizingAnObjectWithAllConstantsShouldOptimizeToExpressionConstant) {
+
+    intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    VariablesParseState vps = expCtx->variablesParseState;
+
+    //All constants should optimize to ExpressionConstant
+    auto object1 =  ExpressionObject::parse(expCtx, BSON("b" << 1 << "c" << 1),vps);
+    auto optimized1 = object1->optimize();
+    auto constant1 = dynamic_cast<ExpressionConstant*>(optimized1.get());
+    ASSERT_TRUE(constant1);
+   
+   //Not all constants should not optimize to ExpressionConstant
+    auto object2=  ExpressionObject::parse(expCtx, BSON("b"<< 1 << "input" << "$inputField"),vps);
+    auto optimized2 = object2->optimize();
+    auto constant2 = dynamic_cast<ExpressionConstant*>(optimized2.get());
+    ASSERT_FALSE(constant2);
+};
+
 }  // namespace Object
 
 namespace Or {

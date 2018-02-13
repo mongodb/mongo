@@ -466,8 +466,23 @@ const char* ExpressionArray::getOpName() const {
 /* ------------------------- ExpressionArrayElemAt -------------------------- */
 
 Value ExpressionArrayElemAt::evaluate(const Document& root) const {
-    const Value array = vpOperand[0]->evaluate(root);
+    /*
+        TODO
+            If root.FieldPath == Filter attach condition to return array of size <= indexArg
+            Ex: if filter is supposed to return an array of size 5 but you only want the 2 index
+            return a array of size 2 this optimize a called to $arrayElemAt: {$filter: [], 0} so 
+            filter doesnt have to loop through the whole array
+        
+        After TODO
+            do the same optimization for other operators such as silce and reduce
+    */
     const Value indexArg = vpOperand[1]->evaluate(root);
+    // verify(str::equals(expr.fieldName(), "$filter"));
+   
+    root.addField("limit", indexArg);
+    
+
+    const Value array = vpOperand[0]->evaluate(root);
 
     if (array.nullish() || indexArg.nullish()) {
         return Value(BSONNULL);
@@ -1729,8 +1744,15 @@ intrusive_ptr<ExpressionObject> ExpressionObject::parse(
 }
 
 intrusive_ptr<Expression> ExpressionObject::optimize() {
+    size_t countConstants = 0;
     for (auto&& pair : _expressions) {
+        if (dynamic_cast<ExpressionConstant*>(pair.second.get())) {
+            countConstants++;
+        }
         pair.second = pair.second->optimize();
+    }
+    if (countConstants == _expressions.size()) {
+        return    ExpressionConstant::create(getExpressionContext(), evaluate(Document()));
     }
     return this;
 }
@@ -3009,7 +3031,7 @@ const char* ExpressionOr::getOpName() const {
     return "$or";
 }
 
-/* ----------------------- ExpressionPow ---------------------------- */
+/* ----------------------- Expression ---------------------------- */
 
 intrusive_ptr<Expression> ExpressionPow::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Value base, Value exp) {
@@ -3163,16 +3185,10 @@ Value ExpressionPow::evaluate(const Document& root) const {
 
     long long result = 1;
 
-<<<<<<< HEAD
-    // When 'baseLong' == -1 and 'expLong' is < 0 the following for loop will never run because 'expLong'
-    // will always be less than 0 so result will always be 1 but the result can potentialy be -1
-    // ex: 'baselong' = -1 'expLong' = -5  then result should be -1
-=======
     // When 'baseLong' == -1 and 'expLong' is < 0 the following for loop will never run because
     // 'expLong' will always be less than 0 so result will always be 1. This is not always correct
     // because the result can potentially be -1. ex: 'baselong' = -1 'expLong' = -5 then result
     // should be -1.
->>>>>>> upstream/master
     if (baseLong == -1 && expLong < 0) {
         expLong = expLong % 2 == 0 ? 2 : 1;
     }
