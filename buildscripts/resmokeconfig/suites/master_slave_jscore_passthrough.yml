@@ -30,6 +30,5 @@ executor:
   fixture:
     class: MasterSlaveFixture
     mongod_options:
-      oplogSize: 511
       set_parameters:
         enableTestCommands: 1

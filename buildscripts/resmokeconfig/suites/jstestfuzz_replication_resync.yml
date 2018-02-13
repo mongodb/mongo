@@ -26,7 +26,6 @@ executor:
   fixture:
     class: ReplicaSetFixture
     mongod_options:
-      oplogSize: 511
       verbose: ''
       set_parameters:
         logComponentVerbosity:

@@ -65,6 +65,9 @@ class ReplicaSetFixture(interface.ReplFixture):
         if self.use_replica_set_connection_string is None:
             self.use_replica_set_connection_string = self.all_nodes_electable
 
+        # Set the default oplogSize to 511MB.
+        self.mongod_options.setdefault("oplogSize", 511)
+
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
         # create replica sets and assign their dbpath structure explicitly.

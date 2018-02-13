@@ -144,7 +144,6 @@ executor:
     class: ReplicaSetFixture
     mongod_options:
       enableMajorityReadConcern: ''
-      oplogSize: 511
       set_parameters:
         enableTestCommands: 1
         numInitialSyncAttempts: 1
