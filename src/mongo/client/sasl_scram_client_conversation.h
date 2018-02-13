@@ -85,12 +85,12 @@ private:
     /**
      * Parses server-first-message and generate client-final-message.
      **/
-    StatusWith<bool> _secondStep(const std::vector<std::string>& input, std::string* outputData);
+    StatusWith<bool> _secondStep(StringData input, std::string* outputData);
 
     /**
      * Generates client-first-message.
      **/
-    StatusWith<bool> _thirdStep(const std::vector<std::string>& input, std::string* outputData);
+    StatusWith<bool> _thirdStep(StringData input, std::string* outputData);
 
 protected:
     int _step{0};

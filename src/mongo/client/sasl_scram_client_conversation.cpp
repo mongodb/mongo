@@ -46,18 +46,15 @@ using std::unique_ptr;
 using std::string;
 
 StatusWith<bool> SaslSCRAMClientConversation::step(StringData inputData, std::string* outputData) {
-    std::vector<std::string> input = StringSplitter::split(inputData.toString(), ",");
     _step++;
 
     switch (_step) {
         case 1:
             return _firstStep(outputData);
         case 2:
-            // Append server-first-message to _authMessage
-            _authMessage += inputData.toString() + ",";
-            return _secondStep(input, outputData);
+            return _secondStep(inputData, outputData);
         case 3:
-            return _thirdStep(input, outputData);
+            return _thirdStep(inputData, outputData);
         default:
             return StatusWith<bool>(
                 ErrorCodes::AuthenticationFailed,
@@ -80,8 +77,7 @@ static void encodeSCRAMUsername(std::string& user) {
  */
 StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData) {
     if (_saslClientSession->getParameter(SaslClientSession::parameterPassword).empty()) {
-        return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream() << "Empty client password provided");
+        return Status(ErrorCodes::BadValue, "Empty client password provided");
     }
 
     // Create text-based nonce as base64 encoding of a binary blob of length multiple of 3
@@ -105,80 +101,82 @@ StatusWith<bool> SaslSCRAMClientConversation::_firstStep(std::string* outputData
     _clientNonce = base64::encode(reinterpret_cast<char*>(binaryNonce), sizeof(binaryNonce));
 
     // Append client-first-message-bare to authMessage
-    _authMessage = "n=" + user + ",r=" + _clientNonce + ",";
+    _authMessage = "n=" + user + ",r=" + _clientNonce;
 
     StringBuilder sb;
-    sb << "n,,n=" << user << ",r=" << _clientNonce;
+    sb << "n,," << _authMessage;
     *outputData = sb.str();
 
-    return StatusWith<bool>(false);
+    return false;
 }
 
 /**
  * Parse server-first-message on the form:
- * r=client-nonce|server-nonce,s=user-salt,i=iteration-count
+ * [reserved-mext ',']r=client-nonce|server-nonce,s=user-salt,i=iteration-count[,extensions]
  *
  * Generate client-final-message of the form:
  * c=channel-binding(base64),r=client-nonce|server-nonce,p=ClientProof
  *
  **/
-StatusWith<bool> SaslSCRAMClientConversation::_secondStep(const std::vector<string>& input,
+StatusWith<bool> SaslSCRAMClientConversation::_secondStep(StringData inputData,
                                                           std::string* outputData) {
-    if (input.size() != 3) {
-        return StatusWith<bool>(
-            ErrorCodes::BadValue,
-            mongoutils::str::stream()
-                << "Incorrect number of arguments for first SCRAM server message, got "
-                << input.size()
-                << " expected 3");
-    } else if (!str::startsWith(input[0], "r=") || input[0].size() < 2) {
-        return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream() << "Incorrect SCRAM client|server nonce: "
-                                                          << input[0]);
-    } else if (!str::startsWith(input[1], "s=") || input[1].size() < 6) {
-        return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream() << "Incorrect SCRAM salt: " << input[1]);
-    } else if (!str::startsWith(input[2], "i=") || input[2].size() < 3) {
-        return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream() << "Incorrect SCRAM iteration count: "
-                                                          << input[2]);
+    if (inputData.startsWith("m=")) {
+        return Status(ErrorCodes::BadValue, "SCRAM required extensions not supported");
+    }
+    const auto input = StringSplitter::split(inputData.toString(), ",");
+
+    if (input.size() < 3) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream()
+                          << "Incorrect number of arguments for first SCRAM server message, got "
+                          << input.size()
+                          << " expected at least 3");
     }
 
-    std::string nonce = input[0].substr(2);
+    if (!str::startsWith(input[0], "r=") || input[0].size() < 3) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Incorrect SCRAM client|server nonce: " << input[0]);
+    }
+
+    const auto nonce = input[0].substr(2);
     if (!str::startsWith(nonce, _clientNonce)) {
-        return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream()
-                                    << "Server SCRAM nonce does not match client nonce: "
-                                    << input[0]);
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Server SCRAM nonce does not match client nonce: " << nonce);
     }
 
-    std::string salt = input[1].substr(2);
+    if (!str::startsWith(input[1], "s=") || input[1].size() < 6) {
+        return Status(ErrorCodes::BadValue, str::stream() << "Incorrect SCRAM salt: " << input[1]);
+    }
+    const auto salt64 = input[1].substr(2);
+
+    if (!str::startsWith(input[2], "i=") || input[2].size() < 3) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Incorrect SCRAM iteration count: " << input[2]);
+    }
     size_t iterationCount;
-
     Status status = parseNumberFromStringWithBase(input[2].substr(2), 10, &iterationCount);
-    if (status != Status::OK()) {
-        return StatusWith<bool>(
-            ErrorCodes::BadValue,
-            mongoutils::str::stream() << "Failed to parse SCRAM iteration count: " << input[2]);
+    if (!status.isOK()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Failed to parse SCRAM iteration count: " << input[2]);
     }
 
-    // Append client-final-message-without-proof to _authMessage
-    _authMessage += "c=biws,r=" + nonce;
+    // Append server-first-message and client-final-message-without-proof.
+    _authMessage += "," + inputData.toString() + ",c=biws,r=" + nonce;
 
     std::string decodedSalt, clientProof;
     try {
-        decodedSalt = base64::decode(salt);
+        decodedSalt = base64::decode(salt64);
         clientProof = generateClientProof(
             std::vector<std::uint8_t>(decodedSalt.begin(), decodedSalt.end()), iterationCount);
     } catch (const DBException& ex) {
-        return StatusWith<bool>(ex.toStatus());
+        return ex.toStatus();
     }
 
     StringBuilder sb;
     sb << "c=biws,r=" << nonce << ",p=" << clientProof;
     *outputData = sb.str();
 
-    return StatusWith<bool>(false);
+    return false;
 }
 
 /**
@@ -188,39 +186,40 @@ StatusWith<bool> SaslSCRAMClientConversation::_secondStep(const std::vector<stri
  * or failed authentication server-final-message on the form:
  * e=message
  **/
-StatusWith<bool> SaslSCRAMClientConversation::_thirdStep(const std::vector<string>& input,
+StatusWith<bool> SaslSCRAMClientConversation::_thirdStep(StringData inputData,
                                                          std::string* outputData) {
-    if (input.size() != 1) {
-        return StatusWith<bool>(
+    const auto input = StringSplitter::split(inputData.toString(), ",");
+
+    if (input.empty()) {
+        return Status(
             ErrorCodes::BadValue,
-            mongoutils::str::stream()
-                << "Incorrect number of arguments for final SCRAM server message, got "
-                << input.size()
-                << " expected 1");
-    } else if (input[0].size() < 3) {
-        return StatusWith<bool>(
-            ErrorCodes::BadValue,
-            mongoutils::str::stream() << "Incorrect SCRAM server message length: " << input[0]);
-    } else if (str::startsWith(input[0], "e=")) {
-        return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
-                                mongoutils::str::stream() << "SCRAM authentication failure: "
-                                                          << input[0].substr(2));
-    } else if (!str::startsWith(input[0], "v=")) {
-        return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream() << "Incorrect SCRAM ServerSignature: "
-                                                          << input[0]);
+            "Incorrect number of arguments for final SCRAM server message, got 0 expected 1");
+    }
+
+    if (input[0].size() < 3) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Incorrect SCRAM server message length: " << input[0]);
+    }
+
+    if (str::startsWith(input[0], "e=")) {
+        return Status(ErrorCodes::AuthenticationFailed,
+                      str::stream() << "SCRAM authentication failure: " << input[0].substr(2));
+    }
+
+    if (!str::startsWith(input[0], "v=")) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Incorrect SCRAM ServerSignature: " << input[0]);
     }
 
     if (!verifyServerSignature(base64::decode(input[0].substr(2)))) {
         *outputData = "e=Invalid server signature";
-        return StatusWith<bool>(ErrorCodes::BadValue,
-                                mongoutils::str::stream()
-                                    << "Client failed to verify SCRAM ServerSignature, received "
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Client failed to verify SCRAM ServerSignature, received "
                                     << input[0].substr(2));
     }
 
     *outputData = "";
 
-    return StatusWith<bool>(true);
+    return true;
 }
 }  // namespace mongo

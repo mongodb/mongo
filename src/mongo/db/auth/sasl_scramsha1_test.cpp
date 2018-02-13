@@ -255,10 +255,10 @@ TEST_F(SCRAMSHA1Fixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
         serverMessage = serverMessage.replace(nonceBegin, nonceEnd, "r=");
 
     });
-    ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 2),
-                               Status(ErrorCodes::BadValue,
-                                      "Server SCRAM nonce does not match client nonce: r=")),
-              runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
+    ASSERT_EQ(
+        SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 2),
+                         Status(ErrorCodes::BadValue, "Incorrect SCRAM client|server nonce: r=")),
+        runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
 TEST_F(SCRAMSHA1Fixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
@@ -489,6 +489,55 @@ TEST_F(SCRAMSHA1Fixture, testIncorrectPassword) {
                                Status(ErrorCodes::AuthenticationFailed,
                                       "SCRAM authentication failed, storedKey mismatch")),
               runSteps(saslServerSession.get(), saslClientSession.get()));
+}
+
+TEST_F(SCRAMSHA1Fixture, testOptionalClientExtensions) {
+    // Verify server ignores unknown/optional extensions sent by client.
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
+
+    saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
+    saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
+                                    createPasswordDigest("sajack", "sajack"));
+
+    ASSERT_OK(saslClientSession->initialize());
+
+    SCRAMMutators mutator;
+    mutator.setMutator(SaslTestState(SaslTestState::kClient, 1), [](std::string& clientMessage) {
+        clientMessage += ",x=unsupported-extension";
+    });
+
+    // Optional client extension is successfully ignored, or we'd have failed in step 1.
+    // We still fail at step 2, because client was unaware of the injected extension.
+    ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 2),
+                               Status(ErrorCodes::AuthenticationFailed,
+                                      "SCRAM authentication failed, storedKey mismatch")),
+              runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
+}
+
+TEST_F(SCRAMSHA1Fixture, testOptionalServerExtensions) {
+    // Verify client errors on unknown/optional extensions sent by server.
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
+
+    saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
+    saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
+                                    createPasswordDigest("sajack", "sajack"));
+
+    ASSERT_OK(saslClientSession->initialize());
+
+    SCRAMMutators mutator;
+    mutator.setMutator(SaslTestState(SaslTestState::kServer, 1), [](std::string& serverMessage) {
+        serverMessage += ",x=unsupported-extension";
+    });
+
+    // As with testOptionalClientExtensions, we can be confident that the optionality
+    // is respected because we would have failed at client step 2.
+    // We do still fail at server step 2 because server was unaware of injected extension.
+    ASSERT_EQ(SCRAMStepsResult(SaslTestState(SaslTestState::kServer, 2),
+                               Status(ErrorCodes::AuthenticationFailed,
+                                      "SCRAM authentication failed, storedKey mismatch")),
+              runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
 TEST(SCRAMSHA1Cache, testGetFromEmptyCache) {
