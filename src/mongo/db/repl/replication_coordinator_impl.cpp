@@ -466,14 +466,14 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     }
 
     // Check that we have a local Rollback ID. If we do not have one, create one.
-    auto rbid = _replicationProcess->getRollbackID(opCtx);
-    if (!rbid.isOK()) {
-        if (rbid.getStatus() == ErrorCodes::NamespaceNotFound) {
+    auto status = _replicationProcess->refreshRollbackID(opCtx);
+    if (!status.isOK()) {
+        if (status == ErrorCodes::NamespaceNotFound) {
             log() << "Did not find local Rollback ID document at startup. Creating one.";
             auto initializingStatus = _replicationProcess->initializeRollbackID(opCtx);
             fassertStatusOK(40424, initializingStatus);
         } else {
-            severe() << "Error loading local Rollback ID document at startup; " << rbid.getStatus();
+            severe() << "Error loading local Rollback ID document at startup; " << status;
             fassertFailedNoTrace(40428);
         }
     }
@@ -485,7 +485,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
         return true;
     }
     ReplSetConfig localConfig;
-    Status status = localConfig.initialize(cfg.getValue());
+    status = localConfig.initialize(cfg.getValue());
     if (!status.isOK()) {
         error() << "Locally stored replica set configuration does not parse; See "
                    "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "

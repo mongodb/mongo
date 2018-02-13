@@ -83,6 +83,24 @@ ReplicationProcess::ReplicationProcess(
       _recovery(std::move(recovery)),
       _rbid(kUninitializedRollbackId) {}
 
+Status ReplicationProcess::refreshRollbackID(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lock(_mutex);
+
+    auto rbidResult = _storageInterface->getRollbackID(opCtx);
+    if (!rbidResult.isOK()) {
+        return rbidResult.getStatus();
+    }
+
+    if (kUninitializedRollbackId == _rbid) {
+        log() << "Rollback ID is " << rbidResult.getValue();
+    } else {
+        log() << "Rollback ID is " << rbidResult.getValue() << " (previously " << _rbid << ")";
+    }
+    _rbid = rbidResult.getValue();
+
+    return Status::OK();
+}
+
 StatusWith<int> ReplicationProcess::getRollbackID(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
