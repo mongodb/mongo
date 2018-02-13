@@ -31,10 +31,13 @@
 #include <queue>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/executor/egress_tag_closer.h"
+#include "mongo/executor/egress_tag_closer_manager.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -55,7 +58,7 @@ struct ConnectionPoolStats;
  * The overall workflow here is to manage separate pools for each unique
  * HostAndPort. See comments on the various Options for how the pool operates.
  */
-class ConnectionPool {
+class ConnectionPool : public EgressTagCloser {
     class ConnectionHandleDeleter;
     class SpecificPool;
 
@@ -117,6 +120,14 @@ public:
          * out connections or new requests
          */
         Milliseconds hostTimeout = kDefaultHostTimeout;
+
+        /**
+         * An egress tag closer manager which will provide global access to this connection pool.
+         * The manager set's tags and potentially drops connections that don't match those tags.
+         *
+         * The manager will hold this pool for the lifetime of the pool.
+         */
+        EgressTagCloserManager* egressTagCloserManager = nullptr;
     };
 
     explicit ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> impl,
@@ -126,6 +137,12 @@ public:
     ~ConnectionPool();
 
     void dropConnections(const HostAndPort& hostAndPort);
+
+    void dropConnections(transport::Session::TagMask tags) override;
+
+    void mutateTags(const HostAndPort& hostAndPort,
+                    const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>&
+                        mutateFunc) override;
 
     void get(const HostAndPort& hostAndPort, Milliseconds timeout, GetConnectionCallback cb);
 
@@ -147,6 +164,8 @@ private:
     // The global mutex for specific pool access and the generation counter
     mutable stdx::mutex _mutex;
     stdx::unordered_map<HostAndPort, std::unique_ptr<SpecificPool>> _pools;
+
+    EgressTagCloserManager* _manager;
 };
 
 class ConnectionPool::ConnectionHandleDeleter {

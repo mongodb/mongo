@@ -63,6 +63,10 @@ std::unique_ptr<NetworkInterface> makeNetworkInterface(
     options.metadataHook = std::move(metadataHook);
     options.timerFactory = stdx::make_unique<AsyncTimerFactoryASIO>();
     options.connectionPoolOptions = connPoolOptions;
+    if (!options.connectionPoolOptions.egressTagCloserManager && hasGlobalServiceContext()) {
+        options.connectionPoolOptions.egressTagCloserManager =
+            &EgressTagCloserManager::get(getGlobalServiceContext());
+    }
 
 #ifdef MONGO_CONFIG_SSL
     if (SSLManagerInterface* manager = getSSLManager()) {

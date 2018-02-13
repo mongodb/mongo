@@ -152,6 +152,35 @@ public:
      */
     size_t openConnections(const stdx::unique_lock<stdx::mutex>& lk);
 
+    /**
+     * Return true if the tags on the specific pool match the passed in tags
+     */
+    bool matchesTags(const stdx::unique_lock<stdx::mutex>& lk,
+                     transport::Session::TagMask tags) const {
+        return !!(_tags & tags);
+    }
+
+    /**
+     * Atomically manipulate the tags in the pool
+     */
+    void mutateTags(const stdx::unique_lock<stdx::mutex>& lk,
+                    const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>&
+                        mutateFunc) {
+        _tags = mutateFunc(_tags);
+    }
+
+    /**
+     * See runWithActiveClient for what this controls, and be very very careful to manage the
+     * refcount correctly.
+     */
+    void incActiveClients(const stdx::unique_lock<stdx::mutex>& lk) {
+        _activeClients++;
+    }
+
+    void decActiveClients(const stdx::unique_lock<stdx::mutex>& lk) {
+        _activeClients--;
+    }
+
 private:
     using OwnedConnection = std::unique_ptr<ConnectionInterface>;
     using OwnershipPool = stdx::unordered_map<ConnectionInterface*, OwnedConnection>;
@@ -200,6 +229,8 @@ private:
 
     size_t _created;
 
+    transport::Session::TagMask _tags = transport::Session::kPending;
+
     /**
      * The current state of the pool
      *
@@ -239,9 +270,20 @@ const Status ConnectionPool::kConnectionStateUnknown =
 ConnectionPool::ConnectionPool(std::unique_ptr<DependentTypeFactoryInterface> impl,
                                std::string name,
                                Options options)
-    : _name(std::move(name)), _options(std::move(options)), _factory(std::move(impl)) {}
+    : _name(std::move(name)),
+      _options(std::move(options)),
+      _factory(std::move(impl)),
+      _manager(options.egressTagCloserManager) {
+    if (_manager) {
+        _manager->add(this);
+    }
+}
 
-ConnectionPool::~ConnectionPool() = default;
+ConnectionPool::~ConnectionPool() {
+    if (_manager) {
+        _manager->remove(this);
+    }
+}
 
 void ConnectionPool::dropConnections(const HostAndPort& hostAndPort) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
@@ -256,6 +298,54 @@ void ConnectionPool::dropConnections(const HostAndPort& hostAndPort) {
             Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"),
             std::move(lk));
     });
+}
+
+void ConnectionPool::dropConnections(transport::Session::TagMask tags) {
+    std::vector<SpecificPool*> pools;
+
+    // Ensure we decrement active clients for all pools that we inc on (because we intend to process
+    // failures)
+    const auto guard = MakeGuard([&] {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+        for (const auto& pool : pools) {
+            pool->decActiveClients(lk);
+        }
+    });
+
+    // Grab all current pools that don't match tags (under the lock)
+    {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+        for (auto& pair : _pools) {
+            if (!pair.second->matchesTags(lk, tags)) {
+                pools.push_back(pair.second.get());
+                pair.second->incActiveClients(lk);
+            }
+        }
+    }
+
+    // Reacquire the lock per pool and process failures.  We'll dec active clients when we're all
+    // through in the guard
+    for (const auto& pool : pools) {
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
+        pool->processFailure(
+            Status(ErrorCodes::PooledConnectionsDropped, "Pooled connections dropped"),
+            std::move(lk));
+    }
+}
+
+void ConnectionPool::mutateTags(
+    const HostAndPort& hostAndPort,
+    const stdx::function<transport::Session::TagMask(transport::Session::TagMask)>& mutateFunc) {
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+
+    auto iter = _pools.find(hostAndPort);
+
+    if (iter == _pools.end())
+        return;
+
+    iter->second->mutateTags(lk, mutateFunc);
 }
 
 void ConnectionPool::get(const HostAndPort& hostAndPort,

@@ -53,12 +53,12 @@ protected:
         TimerImpl::clear();
     }
 
-    void doneWith(const ConnectionPool::ConnectionHandle& swConn) {
-        static_cast<ConnectionImpl*>(swConn.get())->indicateSuccess();
-    }
-
 private:
 };
+
+void doneWith(const ConnectionPool::ConnectionHandle& swConn) {
+    static_cast<ConnectionImpl*>(swConn.get())->indicateSuccess();
+}
 
 #define CONN2ID(swConn)                                                     \
     [](StatusWith<ConnectionPool::ConnectionHandle>& swConn) {              \
@@ -1306,6 +1306,80 @@ TEST_F(ConnectionPoolTest, RefreshTimeoutsDontTimeoutRequests) {
     ASSERT(conn1->getStatus().code() == ErrorCodes::NetworkInterfaceExceededTimeLimit);
 
     ASSERT(!conn2);
+}
+
+template <typename T>
+void dropConnectionsByTagTest(ConnectionPool& pool, T& t) {
+    auto now = Date_t::now();
+    PoolImpl::setNow(now);
+
+    HostAndPort hap1("a");
+    HostAndPort hap2("b");
+    HostAndPort hap3("c");
+
+    // Successfully get connections to two hosts
+    ConnectionImpl::pushSetup(Status::OK());
+    pool.get(hap1, Seconds(1), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+        doneWith(swConn.getValue());
+    });
+
+    ConnectionImpl::pushSetup(Status::OK());
+    pool.get(hap2, Seconds(1), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+        doneWith(swConn.getValue());
+    });
+
+    ConnectionImpl::pushSetup(Status::OK());
+    pool.get(hap3, Seconds(1), [&](StatusWith<ConnectionPool::ConnectionHandle> swConn) {
+        doneWith(swConn.getValue());
+    });
+
+    ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap1));
+    ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap2));
+    ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap3));
+
+    t.dropConnections(transport::Session::kPending);
+
+    ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap1));
+    ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap2));
+    ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap3));
+
+    t.mutateTags(hap1, [](transport::Session::TagMask tags) {
+        return transport::Session::kKeepOpen | transport::Session::kInternalClient;
+    });
+
+    t.mutateTags(hap2,
+                 [](transport::Session::TagMask tags) { return transport::Session::kKeepOpen; });
+
+    t.mutateTags(
+        hap3, [](transport::Session::TagMask tags) { return transport::Session::kEmptyTagMask; });
+
+    t.dropConnections(transport::Session::kKeepOpen);
+
+    ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap1));
+    ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap2));
+    ASSERT_EQ(0ul, pool.getNumConnectionsPerHost(hap3));
+
+    t.dropConnections(transport::Session::kInternalClient);
+
+    ASSERT_EQ(1ul, pool.getNumConnectionsPerHost(hap1));
+    ASSERT_EQ(0ul, pool.getNumConnectionsPerHost(hap2));
+    ASSERT_EQ(0ul, pool.getNumConnectionsPerHost(hap3));
+}
+
+TEST_F(ConnectionPoolTest, DropConnectionsByTag) {
+    ConnectionPool::Options options;
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
+
+    dropConnectionsByTagTest(pool, pool);
+}
+
+TEST_F(ConnectionPoolTest, DropConnectionsByTagInMultipleViaManager) {
+    EgressTagCloserManager manager;
+    ConnectionPool::Options options;
+    options.egressTagCloserManager = &manager;
+    ConnectionPool pool(stdx::make_unique<PoolImpl>(), "test pool", options);
+
+    dropConnectionsByTagTest(pool, manager);
 }
 
 }  // namespace connection_pool_test_details
