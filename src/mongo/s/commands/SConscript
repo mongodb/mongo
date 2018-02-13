@@ -17,8 +17,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/killcursors_common',
         '$BUILD_DIR/mongo/db/commands/current_op_common',
         '$BUILD_DIR/mongo/s/async_requests_sender',
-        '$BUILD_DIR/mongo/s/client/parallel',
-        '$BUILD_DIR/mongo/s/coreshard',
     ]
 )
 
@@ -94,11 +92,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/views',
         '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/s/async_requests_sender',
-        '$BUILD_DIR/mongo/s/client/parallel',
         '$BUILD_DIR/mongo/s/coreshard',
-        '$BUILD_DIR/mongo/s/query/cluster_query',
-        '$BUILD_DIR/mongo/s/write_ops/cluster_write_op',
+        '$BUILD_DIR/mongo/s/sharding_api',
+        '$BUILD_DIR/mongo/s/sharding_legacy_api',
         '$BUILD_DIR/mongo/s/write_ops/cluster_write_op_conversion',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         'shared_cluster_commands',

@@ -28,7 +28,6 @@ env.Library(
         'batch_write_exec.cpp',
         'batch_write_op.cpp',
         'chunk_manager_targeter.cpp',
-        'cluster_write.cpp',
         'write_op.cpp',
     ],
     LIBDEPS=[
@@ -47,9 +46,7 @@ env.Library(
         'batch_downconvert.cpp',
     ],
     LIBDEPS=[
-        'cluster_write_op',
-        '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/db/lasterror',
+        'batch_write_types',
     ],
 )
 
@@ -60,23 +57,22 @@ env.CppUnitTest(
         'batched_command_response_test.cpp',
     ],
     LIBDEPS=[
-        'batch_write_types',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers_test_helpers',
+        'batch_write_types',
     ]
 )
 
 env.CppUnitTest(
     target='cluster_write_op_test',
     source=[
-        'write_op_test.cpp',
-        'batch_write_op_test.cpp',
         'batch_write_exec_test.cpp',
+        'batch_write_op_test.cpp',
+        'write_op_test.cpp',
     ],
     LIBDEPS=[
-        'cluster_write_op',
-        '$BUILD_DIR/mongo/db/range_arithmetic',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/s/sharding_test_fixture',
+        'cluster_write_op',
     ]
 )
 
@@ -86,9 +82,6 @@ env.CppUnitTest(
         'batch_downconvert_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-        'cluster_write_op',
         'cluster_write_op_conversion',
     ]
 )

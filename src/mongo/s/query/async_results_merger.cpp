@@ -40,8 +40,6 @@
 #include "mongo/db/query/killcursors_request.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/s/client/shard_registry.h"
-#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -719,10 +717,6 @@ bool AsyncResultsMerger::RemoteCursorData::hasNext() const {
 
 bool AsyncResultsMerger::RemoteCursorData::exhausted() const {
     return cursorId == 0;
-}
-
-std::shared_ptr<Shard> AsyncResultsMerger::RemoteCursorData::getShard() {
-    return grid.shardRegistry()->getShardNoReload(shardHostAndPort.toString());
 }
 
 //

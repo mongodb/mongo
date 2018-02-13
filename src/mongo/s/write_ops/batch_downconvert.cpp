@@ -30,9 +30,7 @@
 
 #include "mongo/s/write_ops/batch_downconvert.h"
 
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/write_concern_options.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/bson/bsonmisc.h"
 
 namespace mongo {
 

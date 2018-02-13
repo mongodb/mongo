@@ -951,9 +951,9 @@ env.Library(
         "repl/sync_tail",
         "repl/topology_coordinator",
         "rw_concern_d",
-        "s/collection_metadata",
         "s/commands_db_s",
-        "s/sharding",
+        "s/sharding_api_d",
+        "s/sharding_runtime_d",
         "startup_warnings_mongod",
         "stats/counters",
         "stats/serveronly_stats",
@@ -1158,12 +1158,11 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/s/write_ops/cluster_write_op',
         'logical_session_id',
         'sessions_collection',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/s/query/cluster_query',
+        '$BUILD_DIR/mongo/s/sharding_api',
         'sessions_collection_rs',
     ],
 )
@@ -1578,19 +1577,6 @@ env.Library(
         'server_options',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/net/network',
-    ],
-)
-
-env.Library(
-    target='conn_pool_options',
-    source=[
-        'conn_pool_options.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/clientdriver',
-        '$BUILD_DIR/mongo/db/server_parameters',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
     ],
 )
 

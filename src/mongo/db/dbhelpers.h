@@ -31,15 +31,17 @@
 #include <boost/filesystem/path.hpp>
 #include <memory>
 
-#include "mongo/db/db.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/data_protector.h"
 
 namespace mongo {
 
 class Collection;
+class Database;
 class DataProtector;
 class OperationContext;
+class QueryRequest;
 
 /**
  * db helpers are helper functions and classes that let us easily manipulate the local

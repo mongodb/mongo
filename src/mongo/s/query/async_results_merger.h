@@ -97,7 +97,7 @@ public:
      * In order to be destroyed, either the ARM must have been kill()'ed or all cursors must have
      * been exhausted. This is so that any unexhausted cursors are cleaned up by the ARM.
      */
-    virtual ~AsyncResultsMerger();
+    ~AsyncResultsMerger();
 
     /**
      * Returns true if all of the remote cursors are exhausted.
@@ -229,11 +229,6 @@ private:
          * its cursor).
          */
         bool exhausted() const;
-
-        /**
-         * Returns the Shard object associated with this remote cursor.
-         */
-        std::shared_ptr<Shard> getShard();
 
         // Used when merging tailable awaitData cursors in sorted order. In order to return any
         // result to the client we have to know that no shard will ever return anything that sorts

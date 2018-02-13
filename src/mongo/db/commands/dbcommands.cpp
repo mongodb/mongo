@@ -30,12 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include <array>
 #include <time.h>
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -49,10 +46,10 @@
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/catalog_raii.h"
 #include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -90,8 +87,6 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/write_concern.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/fail_point_service.h"
@@ -106,6 +101,7 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 
+namespace {
 
 class CmdShutdownMongoD : public CmdShutdown {
 public:
@@ -574,7 +570,6 @@ public:
     }
 } cmdCreate;
 
-
 class CmdFileMD5 : public BasicCommand {
 public:
     CmdFileMD5() : BasicCommand("filemd5") {}
@@ -746,7 +741,6 @@ public:
     }
 
 } cmdFileMD5;
-
 
 class CmdDatasize : public ErrmsgCommandDeprecated {
     virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const {
@@ -1129,4 +1123,5 @@ public:
     }
 } availableQueryOptionsCmd;
 
+}  // namespace
 }  // namespace mongo
