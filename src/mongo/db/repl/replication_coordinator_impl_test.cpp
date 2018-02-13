@@ -4356,7 +4356,6 @@ TEST_F(ReplCoordTest, PrepareOplogQueryMetadata) {
 
     BSONObjBuilder metadataBob;
     getReplCoord()->prepareReplMetadata(
-        opCtx.get(),
         BSON(rpc::kOplogQueryMetadataFieldName << 1 << rpc::kReplSetMetadataFieldName << 1),
         OpTime(),
         &metadataBob);

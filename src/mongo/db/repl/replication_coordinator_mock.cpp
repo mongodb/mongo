@@ -423,8 +423,7 @@ Status ReplicationCoordinatorMock::processReplSetRequestVotes(
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::prepareReplMetadata(OperationContext* opCtx,
-                                                     const BSONObj& metadataRequestObj,
+void ReplicationCoordinatorMock::prepareReplMetadata(const BSONObj& metadataRequestObj,
                                                      const OpTime& lastOpTimeFromClient,
                                                      BSONObjBuilder* builder) const {}
 

@@ -271,8 +271,7 @@ public:
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response) override;
 
-    virtual void prepareReplMetadata(OperationContext* opCtx,
-                                     const BSONObj& metadataRequestObj,
+    virtual void prepareReplMetadata(const BSONObj& metadataRequestObj,
                                      const OpTime& lastOpTimeFromClient,
                                      BSONObjBuilder* builder) const override;
 
