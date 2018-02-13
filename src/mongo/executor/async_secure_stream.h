@@ -33,9 +33,9 @@
 #ifdef MONGO_CONFIG_SSL
 
 #include <asio.hpp>
-#include <asio/ssl.hpp>
 
 #include "mongo/executor/async_stream_interface.h"
+#include "mongo/util/net/ssl.hpp"
 
 namespace mongo {
 namespace executor {

@@ -41,6 +41,15 @@ env.Library(
     ],
 )
 
+env.Library(
+    target="ssl_stream",
+    source=[
+        "ssl_stream.cpp"],
+    LIBDEPS=[
+        '$BUILD_DIR/third_party/shim_asio',
+    ]
+)
+
 env.CppUnitTest(
     target='network_test',
     source=[

@@ -42,7 +42,7 @@
 
 #include "asio.hpp"
 #ifdef MONGO_CONFIG_SSL
-#include "asio/ssl.hpp"
+#include "mongo/util/net/ssl.hpp"
 #endif
 
 namespace mongo {

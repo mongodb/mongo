@@ -37,7 +37,7 @@
 
 #include "mongo/config.h"
 #ifdef MONGO_CONFIG_SSL
-#include <asio/ssl.hpp>
+#include "mongo/util/net/ssl.hpp"
 #endif
 
 #include "mongo/base/checked_cast.h"

@@ -70,6 +70,7 @@ tlEnv.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/util/net/ssl_stream',
         '$BUILD_DIR/third_party/shim_asio',
     ],
 )
