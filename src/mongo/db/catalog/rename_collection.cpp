@@ -144,16 +144,10 @@ Status renameCollectionCommon(OperationContext* opCtx,
     Collection* targetColl = targetDB->getCollection(opCtx, target);
     if (targetColl) {
         // If we already have the collection with the target UUID, we found our future selves,
-        // so nothing left to do but drop the source collection in case of cross-db renames.
+        // so nothing left to do.
         if (targetUUID && targetUUID == targetColl->uuid()) {
-            if (source.db() == target.db())
-                return Status::OK();
-            BSONObjBuilder unusedResult;
-            return dropCollection(opCtx,
-                                  source,
-                                  unusedResult,
-                                  {},
-                                  DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+            invariant(source == target);
+            return Status::OK();
         }
         if (CollectionShardingState::get(opCtx, target)->getMetadata()) {
             return {ErrorCodes::IllegalOperation, "cannot rename to a sharded collection"};

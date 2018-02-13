@@ -498,6 +498,46 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsAcrossDatabaseWithTarget
     ASSERT_EQUALS(uuid, _getCollectionUuid(_opCtx.get(), _targetNssDifferentDb));
 }
 
+TEST_F(RenameCollectionTest, RenameCollectionToItselfByNsForApplyOps) {
+    _createCollection(_opCtx.get(), _sourceNss);
+    auto dbName = _sourceNss.db().toString();
+    AutoGetDb autoDb(_opCtx.get(), dbName, MODE_X);
+    auto db = autoDb.getDb();
+    auto uuid = db->getCollection(_opCtx.get(), _sourceNss)->uuid();
+    auto uuidDoc = BSON("ui" << uuid.get());
+    auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _sourceNss.ns() << "dropTarget"
+                                       << true);
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _sourceNss));
+}
+
+TEST_F(RenameCollectionTest, RenameCollectionToItselfByUUIDForApplyOps) {
+    _createCollection(_opCtx.get(), _targetNss);
+    auto dbName = _targetNss.db().toString();
+    AutoGetDb autoDb(_opCtx.get(), dbName, MODE_X);
+    auto db = autoDb.getDb();
+    auto uuid = db->getCollection(_opCtx.get(), _targetNss)->uuid();
+    auto uuidDoc = BSON("ui" << uuid.get());
+    auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
+                                       << true);
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss));
+}
+
+TEST_F(RenameCollectionTest, RenameCollectionByUUIDRatherThanNsForApplyOps) {
+    auto realRenameFromNss = NamespaceString("test.bar2");
+    _createCollection(_opCtx.get(), realRenameFromNss);
+    auto dbName = realRenameFromNss.db().toString();
+    AutoGetDb autoDb(_opCtx.get(), dbName, MODE_X);
+    auto db = autoDb.getDb();
+    auto uuid = db->getCollection(_opCtx.get(), realRenameFromNss)->uuid();
+    auto uuidDoc = BSON("ui" << uuid.get());
+    auto cmd = BSON("renameCollection" << _sourceNss.ns() << "to" << _targetNss.ns() << "dropTarget"
+                                       << true);
+    ASSERT_OK(renameCollectionForApplyOps(_opCtx.get(), dbName, uuidDoc["ui"], cmd, {}));
+    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss));
+}
+
 TEST_F(RenameCollectionTest,
        RenameCollectionReturnsNamespaceExitsIfTargetExistsAndDropTargetIsFalse) {
     _createCollection(_opCtx.get(), _sourceNss);
