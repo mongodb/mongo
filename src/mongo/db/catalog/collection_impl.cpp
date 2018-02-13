@@ -1277,7 +1277,10 @@ Status CollectionImpl::validate(OperationContext* opCtx,
             opCtx, &indexConsistency, level, &_indexCatalog, &indexNsResultsMap);
 
         // Validate the record store
-        log(LogComponent::kIndex) << "validating collection " << ns().toString() << endl;
+        std::string uuidString = str::stream()
+            << " (UUID: " << (uuid() ? uuid()->toString() : "none") << ")";
+        log(LogComponent::kIndex) << "validating collection " << ns().toString() << uuidString
+                                  << endl;
         _validateRecordStore(
             opCtx, _recordStore, level, background, &indexValidator, results, output);
 
@@ -1311,9 +1314,10 @@ Status CollectionImpl::validate(OperationContext* opCtx,
 
         if (!results->valid) {
             log(LogComponent::kIndex) << "validating collection " << ns().toString() << " failed"
-                                      << endl;
+                                      << uuidString << endl;
         } else {
-            log(LogComponent::kIndex) << "validated collection " << ns().toString() << endl;
+            log(LogComponent::kIndex) << "validated collection " << ns().toString() << uuidString
+                                      << endl;
         }
     } catch (DBException& e) {
         if (ErrorCodes::isInterruption(e.code())) {
