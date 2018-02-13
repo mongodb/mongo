@@ -69,6 +69,9 @@ const std::map<OpType, std::string> kOpTypeNames{{OpType::NONE, "none"},
 // '$cmd'.
 const int kNoOptions = 0;
 
+const BSONObj readConcernSnapshot = BSON("level"
+                                         << "snapshot");
+
 class BenchRunWorkerStateGuard {
     MONGO_DISALLOW_COPYING(BenchRunWorkerStateGuard);
 
@@ -186,15 +189,17 @@ bool runCommandWithSession(DBClientBase* conn,
  */
 int runQueryWithReadCommands(DBClientBase* conn,
                              const boost::optional<LogicalSessionIdToClient>& lsid,
+                             boost::optional<TxnNumber> txnNumber,
                              std::unique_ptr<QueryRequest> qr,
                              BSONObj* objOut) {
     const auto dbName = qr->nss().db().toString();
 
     BSONObj findCommandResult;
-    uassert(ErrorCodes::CommandFailed,
-            str::stream() << "find command failed; reply was: " << findCommandResult,
-            runCommandWithSession(
-                conn, dbName, qr->asFindCommand(), kNoOptions, lsid, &findCommandResult));
+    uassert(
+        ErrorCodes::CommandFailed,
+        str::stream() << "find command failed; reply was: " << findCommandResult,
+        runCommandWithSession(
+            conn, dbName, qr->asFindCommand(), kNoOptions, lsid, txnNumber, &findCommandResult));
 
     CursorResponse cursorResponse =
         uassertStatusOK(CursorResponse::parseFromBSON(findCommandResult));
@@ -216,11 +221,15 @@ int runQueryWithReadCommands(DBClientBase* conn,
                                       boost::none,   // term
                                       boost::none);  // lastKnownCommittedOpTime
         BSONObj getMoreCommandResult;
-        uassert(
-            ErrorCodes::CommandFailed,
-            str::stream() << "getMore command failed; reply was: " << getMoreCommandResult,
-            runCommandWithSession(
-                conn, dbName, getMoreRequest.toBSON(), kNoOptions, lsid, &getMoreCommandResult));
+        uassert(ErrorCodes::CommandFailed,
+                str::stream() << "getMore command failed; reply was: " << getMoreCommandResult,
+                runCommandWithSession(conn,
+                                      dbName,
+                                      getMoreRequest.toBSON(),
+                                      kNoOptions,
+                                      lsid,
+                                      txnNumber,
+                                      &getMoreCommandResult));
 
         cursorResponse = uassertStatusOK(CursorResponse::parseFromBSON(getMoreCommandResult));
         count += cursorResponse.getBatch().size();
@@ -570,6 +579,12 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
                                   << typeName(arg.type()),
                     arg.isBoolean());
             useIdempotentWrites = arg.boolean();
+        } else if (name == "useSnapshotReads") {
+            uassert(50707,
+                    str::stream() << "Field '" << name << "' should be a boolean. Type is "
+                                  << typeName(arg.type()),
+                    arg.isBoolean());
+            useSnapshotReads = arg.boolean();
         } else if (name == "hideResults") {
             hideResults = arg.trueValue();
         } else if (name == "handleErrors") {
@@ -746,10 +761,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
             LogicalSessionIdToClient::parse(IDLParserErrorContext("lsid"), result["id"].Obj()));
     }
 
-    boost::optional<TxnNumber> txnNumberForWriteCommands;
-    if (_config->useIdempotentWrites) {
-        txnNumberForWriteCommands = 0;
-    }
+    TxnNumber txnNumber = 0;
 
     std::unique_ptr<Scope> scope{getGlobalScriptEngine()->newScopeForCurrentThread()};
     verify(scope.get());
@@ -803,10 +815,19 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             qr->setProj(op.projection);
                             qr->setLimit(1LL);
                             qr->setWantMore(false);
+                            if (_config->useSnapshotReads) {
+                                qr->setReadConcern(readConcernSnapshot);
+                            }
                             invariantOK(qr->validate());
 
                             BenchRunEventTrace _bret(&stats.findOneCounter);
-                            runQueryWithReadCommands(conn, lsid, std::move(qr), &result);
+                            boost::optional<TxnNumber> txnNumberForOp;
+                            if (_config->useSnapshotReads) {
+                                ++txnNumber;
+                                txnNumberForOp = txnNumber;
+                            }
+                            runQueryWithReadCommands(
+                                conn, lsid, txnNumberForOp, std::move(qr), &result);
                         } else {
                             BenchRunEventTrace _bret(&stats.findOneCounter);
                             result = conn->findOne(op.ns,
@@ -919,10 +940,19 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                             if (op.batchSize) {
                                 qr->setBatchSize(op.batchSize);
                             }
+                            if (_config->useSnapshotReads) {
+                                qr->setReadConcern(readConcernSnapshot);
+                            }
                             invariantOK(qr->validate());
 
                             BenchRunEventTrace _bret(&stats.queryCounter);
-                            count = runQueryWithReadCommands(conn, lsid, std::move(qr), nullptr);
+                            boost::optional<TxnNumber> txnNumberForOp;
+                            if (_config->useSnapshotReads) {
+                                ++txnNumber;
+                                txnNumberForOp = txnNumber;
+                            }
+                            count = runQueryWithReadCommands(
+                                conn, lsid, txnNumberForOp, std::move(qr), nullptr);
                         } else {
                             // Use special query function for exhaust query option.
                             if (op.options & QueryOption_Exhaust) {
@@ -987,14 +1017,17 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 docBuilder.done();
                                 builder.append("writeConcern", op.writeConcern);
 
-                                if (txnNumberForWriteCommands)
-                                    ++(*txnNumberForWriteCommands);
+                                boost::optional<TxnNumber> txnNumberForOp;
+                                if (_config->useIdempotentWrites) {
+                                    ++txnNumber;
+                                    txnNumberForOp = txnNumber;
+                                }
                                 runCommandWithSession(conn,
                                                       nsToDatabaseSubstring(op.ns).toString(),
                                                       builder.done(),
                                                       kNoOptions,
                                                       lsid,
-                                                      txnNumberForWriteCommands,
+                                                      txnNumberForOp,
                                                       &result);
                             } else {
                                 auto toSend =
@@ -1054,14 +1087,17 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 docBuilder.done();
                                 builder.append("writeConcern", op.writeConcern);
 
-                                if (txnNumberForWriteCommands)
-                                    ++(*txnNumberForWriteCommands);
+                                boost::optional<TxnNumber> txnNumberForOp;
+                                if (_config->useIdempotentWrites) {
+                                    ++txnNumber;
+                                    txnNumberForOp = txnNumber;
+                                }
                                 runCommandWithSession(conn,
                                                       nsToDatabaseSubstring(op.ns).toString(),
                                                       builder.done(),
                                                       kNoOptions,
                                                       lsid,
-                                                      txnNumberForWriteCommands,
+                                                      txnNumberForOp,
                                                       &result);
                             } else {
                                 std::vector<BSONObj> insertArray;
@@ -1120,14 +1156,17 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                                 docBuilder.done();
                                 builder.append("writeConcern", op.writeConcern);
 
-                                if (txnNumberForWriteCommands)
-                                    ++(*txnNumberForWriteCommands);
+                                boost::optional<TxnNumber> txnNumberForOp;
+                                if (_config->useIdempotentWrites) {
+                                    ++txnNumber;
+                                    txnNumberForOp = txnNumber;
+                                }
                                 runCommandWithSession(conn,
                                                       nsToDatabaseSubstring(op.ns).toString(),
                                                       builder.done(),
                                                       kNoOptions,
                                                       lsid,
-                                                      txnNumberForWriteCommands,
+                                                      txnNumberForOp,
                                                       &result);
                             } else {
                                 auto toSend = makeRemoveMessage(

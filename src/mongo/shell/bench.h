@@ -167,6 +167,11 @@ public:
      */
     bool useIdempotentWrites{false};
 
+    /**
+     * Whether read commands should be sent with a txnNumber and read concern level snapshot.
+     */
+    bool useSnapshotReads{false};
+
     /// Base random seed for threads
     int64_t randomSeed;
 
