@@ -879,13 +879,6 @@ StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::multiApply(
     return repl::multiApply(opCtx, _writerPool.get(), std::move(ops), applyOperation);
 }
 
-Status ReplicationCoordinatorExternalStateImpl::multiSyncApply(MultiApplier::OperationPtrs* ops) {
-    // SyncTail* argument is not used by repl::multiSyncApply().
-    repl::multiSyncApply(ops, nullptr);
-    // multiSyncApply() will throw or abort on error, so we hardcode returning OK.
-    return Status::OK();
-}
-
 Status ReplicationCoordinatorExternalStateImpl::multiInitialSyncApply(
     MultiApplier::OperationPtrs* ops, const HostAndPort& source, AtomicUInt32* fetchCount) {
     // repl::multiInitialSyncApply uses SyncTail::shouldRetry() (and implicitly getMissingDoc())

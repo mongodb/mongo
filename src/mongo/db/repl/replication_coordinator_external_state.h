@@ -297,11 +297,6 @@ public:
                                           MultiApplier::ApplyOperationFn applyOperation) = 0;
 
     /**
-     * Used by multiApply() to writes operations to database during steady state replication.
-     */
-    virtual Status multiSyncApply(MultiApplier::OperationPtrs* ops) = 0;
-
-    /**
      * Used by multiApply() to writes operations to database during initial sync. `fetchCount` is a
      * pointer to a counter that is incremented every time we fetch a missing document.
      *
