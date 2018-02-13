@@ -48,6 +48,3 @@ BENCHMARK(BM_empty);
 BENCHMARK(BM_empty)->ThreadPerCpu();
 
 }  // namespace
-
-// This function executes previously registered benchmarks.
-BENCHMARK_MAIN();
