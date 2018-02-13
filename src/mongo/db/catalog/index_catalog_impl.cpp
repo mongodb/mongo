@@ -392,6 +392,9 @@ IndexCatalogImpl::IndexBuildBlock::IndexBuildBlock(OperationContext* opCtx,
 }
 
 Status IndexCatalogImpl::IndexBuildBlock::init() {
+    // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
+    invariant(_opCtx->lockState()->inAWriteUnitOfWork());
+
     // need this first for names, etc...
     BSONObj keyPattern = _spec.getObjectField("key");
     auto descriptor = stdx::make_unique<IndexDescriptor>(
@@ -425,6 +428,8 @@ IndexCatalogImpl::IndexBuildBlock::~IndexBuildBlock() {
 }
 
 void IndexCatalogImpl::IndexBuildBlock::fail() {
+    // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
+    invariant(_opCtx->lockState()->inAWriteUnitOfWork());
     fassert(17204, _catalog->_getCollection()->ok());  // defensive
 
     IndexCatalogEntry* entry = IndexCatalog::_getEntries(_catalog).find(_indexName);
@@ -438,6 +443,9 @@ void IndexCatalogImpl::IndexBuildBlock::fail() {
 }
 
 void IndexCatalogImpl::IndexBuildBlock::success() {
+    // Being in a WUOW means all timestamping responsibility can be pushed up to the caller.
+    invariant(_opCtx->lockState()->inAWriteUnitOfWork());
+
     Collection* collection = _catalog->_getCollection();
     fassert(17207, collection->ok());
     NamespaceString ns(_indexNamespace);

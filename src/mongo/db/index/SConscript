@@ -90,6 +90,9 @@ serveronlyEnv.Library(
         '$BUILD_DIR/third_party/shim_snappy',
         'index_descriptor',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/logical_clock',
+    ],
 )
 
 env.Library(

@@ -188,28 +188,31 @@ public:
 
         result.appendNumber("nIndexesWas", all.size());
 
+        std::unique_ptr<MultiIndexBlock> indexer;
+        StatusWith<std::vector<BSONObj>> swIndexesToRebuild(ErrorCodes::UnknownError,
+                                                            "Uninitialized");
+
         {
             WriteUnitOfWork wunit(opCtx);
             collection->getIndexCatalog()->dropAllIndexes(opCtx, true);
+
+            indexer = stdx::make_unique<MultiIndexBlock>(opCtx, collection);
+
+            swIndexesToRebuild = indexer->init(all);
+            if (!swIndexesToRebuild.isOK()) {
+                return CommandHelpers::appendCommandStatus(result, swIndexesToRebuild.getStatus());
+            }
             wunit.commit();
         }
 
-        MultiIndexBlock indexer(opCtx, collection);
-        // do not want interruption as that will leave us without indexes.
-
-        auto indexInfoObjs = indexer.init(all);
-        if (!indexInfoObjs.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, indexInfoObjs.getStatus());
-        }
-
-        auto status = indexer.insertAllDocumentsInCollection();
+        auto status = indexer->insertAllDocumentsInCollection();
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatus(result, status);
         }
 
         {
             WriteUnitOfWork wunit(opCtx);
-            indexer.commit();
+            indexer->commit();
             wunit.commit();
         }
 
@@ -221,8 +224,8 @@ public:
         auto snapshotName = replCoord->getMinimumVisibleSnapshot(opCtx);
         collection->setMinimumVisibleSnapshot(snapshotName);
 
-        result.append("nIndexes", static_cast<int>(indexInfoObjs.getValue().size()));
-        result.append("indexes", indexInfoObjs.getValue());
+        result.append("nIndexes", static_cast<int>(swIndexesToRebuild.getValue().size()));
+        result.append("indexes", swIndexesToRebuild.getValue());
 
         return true;
     }

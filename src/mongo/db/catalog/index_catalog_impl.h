@@ -286,12 +286,20 @@ public:
 
         ~IndexBuildBlock();
 
+        /**
+         * Must be called from within a `WriteUnitOfWork`
+         */
         Status init();
 
+        /**
+         * Must be called from within a `WriteUnitOfWork`
+         */
         void success();
 
         /**
          * index build failed, clean up meta data
+         *
+         * Must be called from within a `WriteUnitOfWork`
          */
         void fail();
 

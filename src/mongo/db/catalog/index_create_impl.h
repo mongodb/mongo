@@ -130,7 +130,7 @@ public:
      *
      * Can throw an exception if interrupted.
      *
-     * Should not be called inside of a WriteUnitOfWork.
+     * Must not be called inside of a WriteUnitOfWork.
      */
     Status insertAllDocumentsInCollection(std::set<RecordId>* dupsOut = nullptr) override;
 
@@ -153,7 +153,7 @@ public:
      * the set. Documents added to this set are not indexed, so callers MUST either fail this
      * index build or delete the documents from the collection.
      *
-     * Should not be called inside of a WriteUnitOfWork.
+     * Must not be called inside of a WriteUnitOfWork.
      */
     Status doneInserting(std::set<RecordId>* dupsOut = nullptr) override;
 

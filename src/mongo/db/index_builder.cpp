@@ -146,7 +146,6 @@ Status IndexBuilder::_build(OperationContext* opCtx,
             if (allowBackgroundBuilding)
                 indexer.allowBackgroundBuilding();
 
-
             try {
                 status = indexer.init(_index).getStatus();
                 if (status == ErrorCodes::IndexAlreadyExists ||

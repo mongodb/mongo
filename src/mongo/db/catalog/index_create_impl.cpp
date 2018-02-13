@@ -43,9 +43,11 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -66,6 +68,30 @@ MONGO_INITIALIZER(InitializeMultiIndexBlockFactory)(InitializerContext* const) {
         });
     return Status::OK();
 }
+
+/**
+ * Returns true if writes to the catalog entry for the input namespace require being
+ * timestamped. A ghost write is when the operation is not committed with an oplog entry and
+ * implies the caller will look at the logical clock to choose a time to use.
+ */
+bool requiresGhostCommitTimestamp(OperationContext* opCtx, NamespaceString nss) {
+    if (!nss.isReplicated() || nss.coll().startsWith("tmp.mr")) {
+        return false;
+    }
+
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->getSettings().usingReplSets()) {
+        return false;
+    }
+
+    // Nodes in `startup` may not have yet initialized the `LogicalClock`.
+    if (replCoord->getMemberState().startup()) {
+        return false;
+    }
+
+    return opCtx->recoveryUnit()->getCommitTimestamp().isNull();
+}
+
 }  // namespace
 
 using std::unique_ptr;
@@ -145,6 +171,9 @@ MultiIndexBlockImpl::MultiIndexBlockImpl(OperationContext* opCtx, Collection* co
 MultiIndexBlockImpl::~MultiIndexBlockImpl() {
     if (!_needToCleanup || _indexes.empty())
         return;
+
+    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
+
     while (true) {
         try {
             WriteUnitOfWork wunit(_opCtx);
@@ -153,6 +182,11 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
             // of a WUOW. Nothing inside this block can fail, and it is made fatal if it does.
             for (size_t i = 0; i < _indexes.size(); i++) {
                 _indexes[i].block->fail();
+            }
+            if (requiresCommitTimestamp) {
+                fassertStatusOK(50703,
+                                _opCtx->recoveryUnit()->setTimestamp(
+                                    LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
             }
             wunit.commit();
             return;
@@ -189,6 +223,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const BSONObj& spec) 
 }
 
 StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSONObj>& indexSpecs) {
+    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
+
     WriteUnitOfWork wunit(_opCtx);
 
     invariant(_indexes.empty());
@@ -278,6 +314,12 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
     if (_buildInBackground)
         _backgroundOperation.reset(new BackgroundOperation(ns));
 
+    if (requiresCommitTimestamp) {
+        fassertStatusOK(50702,
+                        _opCtx->recoveryUnit()->setTimestamp(
+                            LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
+    }
+
     wunit.commit();
 
     if (MONGO_FAIL_POINT(crashAfterStartingIndexBuild)) {
@@ -294,6 +336,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
 }
 
 Status MultiIndexBlockImpl::insertAllDocumentsInCollection(std::set<RecordId>* dupsOut) {
+    invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
+
     const char* curopMessage = _buildInBackground ? "Index Build (background)" : "Index Build";
     const auto numRecords = _collection->numRecords(_opCtx);
     stdx::unique_lock<Client> lk(*_opCtx->getClient());
@@ -445,6 +489,8 @@ Status MultiIndexBlockImpl::insert(const BSONObj& doc, const RecordId& loc) {
 }
 
 Status MultiIndexBlockImpl::doneInserting(std::set<RecordId>* dupsOut) {
+    invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
+    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].bulk == NULL)
             continue;
@@ -454,7 +500,8 @@ Status MultiIndexBlockImpl::doneInserting(std::set<RecordId>* dupsOut) {
                                                      std::move(_indexes[i].bulk),
                                                      _allowInterruption,
                                                      _indexes[i].options.dupsAllowed,
-                                                     dupsOut);
+                                                     dupsOut,
+                                                     requiresCommitTimestamp);
         if (!status.isOK()) {
             return status;
         }
@@ -469,8 +516,16 @@ void MultiIndexBlockImpl::abortWithoutCleanup() {
 }
 
 void MultiIndexBlockImpl::commit() {
+    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
+
     for (size_t i = 0; i < _indexes.size(); i++) {
         _indexes[i].block->success();
+    }
+
+    if (requiresCommitTimestamp) {
+        fassertStatusOK(50701,
+                        _opCtx->recoveryUnit()->setTimestamp(
+                            LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
     }
 
     _opCtx->recoveryUnit()->registerChange(new SetNeedToCleanupOnRollback(this));

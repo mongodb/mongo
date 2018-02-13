@@ -344,6 +344,23 @@ public:
         }
     }
 
+    std::string getNewIndexIdent(KVCatalog* kvCatalog, std::vector<std::string>& origIdents) {
+        // Find the collection and index ident by performing a set difference on the original
+        // idents and the current idents.
+        std::vector<std::string> identsWithColl = kvCatalog->getAllIdents(_opCtx);
+        std::sort(origIdents.begin(), origIdents.end());
+        std::sort(identsWithColl.begin(), identsWithColl.end());
+        std::vector<std::string> collAndIdxIdents;
+        std::set_difference(identsWithColl.begin(),
+                            identsWithColl.end(),
+                            origIdents.begin(),
+                            origIdents.end(),
+                            std::back_inserter(collAndIdxIdents));
+
+        ASSERT(collAndIdxIdents.size() == 1);
+        return collAndIdxIdents[0];
+    }
+
     std::tuple<std::string, std::string> getNewCollectionIndexIdent(
         KVCatalog* kvCatalog, std::vector<std::string>& origIdents) {
         // Find the collection and index ident by performing a set difference on the original
@@ -375,10 +392,15 @@ public:
                                       const std::string& collIdent,
                                       const std::string& indexIdent,
                                       Timestamp timestamp) {
-        WriteUnitOfWork wuow(_opCtx);
+        auto recoveryUnit = _opCtx->recoveryUnit();
+        recoveryUnit->abandonSnapshot();
         ASSERT_OK(_opCtx->recoveryUnit()->selectSnapshot(timestamp));
         auto allIdents = kvCatalog->getAllIdents(_opCtx);
-        ASSERT(std::find(allIdents.begin(), allIdents.end(), collIdent) != allIdents.end());
+        if (collIdent.size() > 0) {
+            // Index build test does not pass in a collection ident.
+            ASSERT(std::find(allIdents.begin(), allIdents.end(), collIdent) != allIdents.end());
+        }
+
         if (indexIdent.size() > 0) {
             // `system.profile` does not have an `_id` index.
             ASSERT(std::find(allIdents.begin(), allIdents.end(), indexIdent) != allIdents.end());
@@ -389,11 +411,17 @@ public:
                                         const std::string& collIdent,
                                         const std::string& indexIdent,
                                         Timestamp timestamp) {
-        WriteUnitOfWork wuow(_opCtx);
+        auto recoveryUnit = _opCtx->recoveryUnit();
+        recoveryUnit->abandonSnapshot();
         ASSERT_OK(_opCtx->recoveryUnit()->selectSnapshot(timestamp));
         auto allIdents = kvCatalog->getAllIdents(_opCtx);
-        ASSERT(std::find(allIdents.begin(), allIdents.end(), collIdent) == allIdents.end());
-        ASSERT(std::find(allIdents.begin(), allIdents.end(), indexIdent) == allIdents.end());
+        if (collIdent.size() > 0) {
+            // Index build test does not pass in a collection ident.
+            ASSERT(std::find(allIdents.begin(), allIdents.end(), collIdent) == allIdents.end());
+        }
+
+        ASSERT(std::find(allIdents.begin(), allIdents.end(), indexIdent) == allIdents.end())
+            << "Ident: " << indexIdent << " Timestamp: " << timestamp;
     }
 
     std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
@@ -1854,6 +1882,110 @@ public:
     }
 };
 
+/**
+ * This test asserts that the catalog updates that represent the beginning and end of an index
+ * build are timestamped. Additionally, the index will be `multikey` and that catalog update that
+ * finishes the index build will also observe the index is multikey.
+ */
+template <bool SimulateBackground>
+class TimestampIndexBuilds : public StorageTimestampTest {
+public:
+    void run() {
+        // Only run on 'wiredTiger'. No other storage engines to-date timestamp writes.
+        if (mongo::storageGlobalParams.engine != "wiredTiger") {
+            return;
+        }
+
+        auto kvStorageEngine =
+            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine());
+        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
+
+        NamespaceString nss("unittests.timestampIndexBuilds");
+        reset(nss);
+
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
+
+        const LogicalTime insertTimestamp = _clock->reserveTicks(1);
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            insertDocument(autoColl.getCollection(),
+                           InsertStatement(BSON("_id" << 0 << "a" << BSON_ARRAY(1 << 2)),
+                                           insertTimestamp.asTimestamp(),
+                                           0LL));
+            wuow.commit();
+            ASSERT_EQ(1, itCount(autoColl.getCollection()));
+        }
+
+        // Save the pre-state idents so we can capture the specific ident related to index
+        // creation.
+        std::vector<std::string> origIdents = kvCatalog->getAllIdents(_opCtx);
+
+        // Build an index on `{a: 1}`. This index will be multikey.
+        MultiIndexBlock indexer(_opCtx, autoColl.getCollection());
+        const LogicalTime beforeIndexBuild = _clock->reserveTicks(2);
+        {
+            const Timestamp commitTimestamp =
+                SimulateBackground ? Timestamp::min() : beforeIndexBuild.addTicks(1).asTimestamp();
+            TimestampBlock tsBlock(_opCtx, commitTimestamp);
+
+            ASSERT_OK(indexer
+                          .init({BSON("v" << 2 << "unique" << true << "name"
+                                          << "a_1"
+                                          << "ns"
+                                          << nss.ns()
+                                          << "key"
+                                          << BSON("a" << 1))})
+                          .getStatus());
+        }
+        const LogicalTime afterIndexInit = _clock->reserveTicks(2);
+
+        // Inserting all the documents has the side-effect of setting internal state on the index
+        // builder that the index is multikey.
+        ASSERT_OK(indexer.insertAllDocumentsInCollection());
+
+        {
+            const Timestamp commitTimestamp =
+                SimulateBackground ? Timestamp::min() : afterIndexInit.addTicks(1).asTimestamp();
+            TimestampBlock tsBlock(_opCtx, commitTimestamp);
+
+            WriteUnitOfWork wuow(_opCtx);
+            indexer.commit();
+            wuow.commit();
+        }
+
+        const Timestamp afterIndexBuild = _clock->reserveTicks(1).asTimestamp();
+
+        const std::string indexIdent = getNewIndexIdent(kvCatalog, origIdents);
+        assertIdentsMissingAtTimestamp(kvCatalog, "", indexIdent, beforeIndexBuild.asTimestamp());
+
+        // Assert that the index entry exists after init and `ready: false`.
+        assertIdentsExistAtTimestamp(kvCatalog, "", indexIdent, afterIndexInit.asTimestamp());
+        {
+            _opCtx->recoveryUnit()->abandonSnapshot();
+            ASSERT_OK(_opCtx->recoveryUnit()->selectSnapshot(afterIndexInit.asTimestamp()));
+            auto collMetaData = kvCatalog->getMetaData(_opCtx, nss.ns());
+            auto indexMetaData = collMetaData.indexes[collMetaData.findIndexOffset("a_1")];
+            ASSERT_FALSE(indexMetaData.ready);
+        }
+
+        // After the build completes, assert that the index is `ready: true` and multikey.
+        assertIdentsExistAtTimestamp(kvCatalog, "", indexIdent, afterIndexBuild);
+        {
+            _opCtx->recoveryUnit()->abandonSnapshot();
+            ASSERT_OK(_opCtx->recoveryUnit()->selectSnapshot(afterIndexBuild));
+            auto collMetaData = kvCatalog->getMetaData(_opCtx, nss.ns());
+            auto indexMetaData = collMetaData.indexes[collMetaData.findIndexOffset("a_1")];
+            ASSERT(indexMetaData.ready);
+            ASSERT(indexMetaData.multikey);
+            ASSERT_EQ(std::size_t(1), indexMetaData.multikeyPaths.size());
+            const bool match = indexMetaData.multikeyPaths[0] == std::set<std::size_t>({0});
+            if (!match) {
+                FAIL(str::stream() << "Expected: [ [ 0 ] ] Actual: "
+                                   << dumpMultikeyPaths(indexMetaData.multikeyPaths));
+            }
+        }
+    }
+};
 
 class AllStorageTimestampTests : public unittest::Suite {
 public:
@@ -1883,6 +2015,9 @@ public:
         // KVDropDatabase<IsPrimary>
         add<KVDropDatabase<false>>();
         add<KVDropDatabase<true>>();
+        // Timestamp<SimulateBackground>
+        add<TimestampIndexBuilds<false>>();
+        add<TimestampIndexBuilds<true>>();
     }
 };
 

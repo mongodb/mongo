@@ -369,7 +369,9 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionExists) {
         Database* db = dbHolder().openDb(_opCtx.get(), "test", &justCreated);
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
+        WriteUnitOfWork wuow(_opCtx.get());
         Collection* collection = db->createCollection(_opCtx.get(), "test.t");
+        wuow.commit();
         ASSERT_TRUE(collection);
     }
     _testSyncApplyInsertDocument(ErrorCodes::OK);
@@ -394,7 +396,9 @@ TEST_F(SyncTailTest, SyncApplyInsertDocumentCollectionLockedByUUID) {
         Database* db = dbHolder().openDb(_opCtx.get(), "test", &justCreated);
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
+        WriteUnitOfWork wuow(_opCtx.get());
         Collection* collection = db->createCollection(_opCtx.get(), "test.t", options);
+        wuow.commit();
         ASSERT_TRUE(collection);
     }
 

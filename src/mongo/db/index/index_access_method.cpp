@@ -46,9 +46,11 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/util/log.h"
@@ -475,7 +477,8 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
                                      std::unique_ptr<BulkBuilder> bulk,
                                      bool mayInterrupt,
                                      bool dupsAllowed,
-                                     set<RecordId>* dupsToDrop) {
+                                     set<RecordId>* dupsToDrop,
+                                     bool assignTimestamp) {
     // Do not track multikey path info for index builds.
     ScopeGuard restartTracker =
         MakeGuard([opCtx] { MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo(); });
@@ -505,6 +508,11 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
         }
 
         builder.reset(_newInterface->getBulkBuilder(opCtx, dupsAllowed));
+        if (assignTimestamp) {
+            fassertStatusOK(50705,
+                            opCtx->recoveryUnit()->setTimestamp(
+                                LogicalClock::get(opCtx)->getClusterTime().asTimestamp()));
+        }
         wunit.commit();
     });
 
@@ -546,6 +554,11 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
         // If we're here either it's a dup and we're cool with it or the addKey went just
         // fine.
         pm.hit();
+        if (assignTimestamp) {
+            fassertStatusOK(50704,
+                            opCtx->recoveryUnit()->setTimestamp(
+                                LogicalClock::get(opCtx)->getClusterTime().asTimestamp()));
+        }
         wunit.commit();
     }
 
@@ -559,6 +572,11 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     LOG(timer.seconds() > 10 ? 0 : 1) << "\t done building bottom layer, going to commit";
 
+    std::unique_ptr<TimestampBlock> tsBlock;
+    if (assignTimestamp) {
+        tsBlock = stdx::make_unique<TimestampBlock>(
+            opCtx, LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
+    }
     builder->commit(mayInterrupt);
     return Status::OK();
 }

@@ -257,7 +257,8 @@ public:
                       std::unique_ptr<BulkBuilder> bulk,
                       bool mayInterrupt,
                       bool dupsAllowed,
-                      std::set<RecordId>* dups);
+                      std::set<RecordId>* dups,
+                      bool assignTimestamp = false);
 
     /**
      * Specifies whether getKeys should relax the index constraints or not, in order of most
