@@ -78,6 +78,7 @@ public:
     /**
      * Rollback ID is an increasing counter of how many rollbacks have occurred on this server.
      */
+    Status refreshRollbackID(OperationContext* opCtx);
     StatusWith<int> getRollbackID(OperationContext* opCtx);
     Status initializeRollbackID(OperationContext* opCtx);
     Status incrementRollbackID(OperationContext* opCtx);
