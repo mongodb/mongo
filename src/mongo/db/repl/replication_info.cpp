@@ -172,9 +172,9 @@ public:
         BSONObjBuilder result;
         appendReplicationInfo(opCtx, result, level);
 
-        auto rbid = ReplicationProcess::get(opCtx)->getRollbackID(opCtx);
-        if (rbid.isOK()) {
-            result.append("rbid", rbid.getValue());
+        auto rbid = ReplicationProcess::get(opCtx)->getRollbackID();
+        if (ReplicationProcess::kUninitializedRollbackId != rbid) {
+            result.append("rbid", rbid);
         }
 
         return result.obj();

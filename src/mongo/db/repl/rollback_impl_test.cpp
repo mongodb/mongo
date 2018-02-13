@@ -266,13 +266,13 @@ TEST_F(RollbackImplTest, RollbackIncrementsRollbackID) {
     _localOplog->setOperations({op});
 
     // Get the initial rollback id.
-    int initRollbackId = unittest::assertGet(_replicationProcess->getRollbackID(_opCtx.get()));
+    int initRollbackId = _replicationProcess->getRollbackID();
 
     // Run rollback.
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
 
     // Check that the rollback id was incremented.
-    int newRollbackId = unittest::assertGet(_replicationProcess->getRollbackID(_opCtx.get()));
+    int newRollbackId = _replicationProcess->getRollbackID();
     ASSERT_EQUALS(initRollbackId + 1, newRollbackId);
 }
 
