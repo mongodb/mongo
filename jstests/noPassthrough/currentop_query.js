@@ -326,6 +326,25 @@
         delete TestData.commandResult;
 
         //
+        // Confirm that a legacy query whose filter contains a field named 'query' appears as
+        // expected in currentOp. This test ensures that upconverting a legacy query correctly
+        // identifies this as a user field rather than a wrapped filter spec.
+        //
+        if (readMode === "legacy") {
+            confirmCurrentOpContents({
+                test: function() {
+                    assert.eq(db.currentop_query.find({query: "foo", $comment: "currentop_query"})
+                                  .itcount(),
+                              0);
+                },
+                command: "find",
+                planSummary: "COLLSCAN",
+                currentOpFilter:
+                    {"command.filter.$comment": "currentop_query", "command.filter.query": "foo"}
+            });
+        }
+
+        //
         // Confirm that currentOp displays upconverted getMore and originatingCommand in the case of
         // a legacy query.
         //

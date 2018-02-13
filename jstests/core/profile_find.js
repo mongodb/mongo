@@ -171,4 +171,13 @@
     profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
     assert.eq((typeof profileObj.command.$truncated), "string", tojson(profileObj));
     assert.eq(profileObj.command.comment, "profile_find", tojson(profileObj));
+
+    //
+    // Confirm that a query whose filter contains a field named 'query' appears as expected in the
+    // profiler. This test ensures that upconverting a legacy query correctly identifies this as a
+    // user field rather than a wrapped filter spec.
+    //
+    coll.find({query: "foo"}).itcount();
+    profileObj = getLatestProfilerEntry(testDB, profileEntryFilter);
+    assert.eq(profileObj.command.filter, {query: "foo"}, tojson(profileObj));
 })();
