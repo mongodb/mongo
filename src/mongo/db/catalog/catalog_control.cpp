@@ -80,7 +80,9 @@ void openCatalog(OperationContext* opCtx) {
     auto indexesToRebuild = storageEngine->reconcileCatalogAndIdents(opCtx);
     fassertStatusOK(40688, indexesToRebuild.getStatus());
 
-    // Rebuild indexes if necessary.
+    // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
+    // indexes on that collection are done at once, so we use a map to group them together.
+    StringMap<IndexNameObjs> nsToIndexNameObjMap;
     for (auto indexNamespace : indexesToRebuild.getValue()) {
         NamespaceString collNss(indexNamespace.first);
         auto indexName = indexNamespace.second;
@@ -115,11 +117,30 @@ void openCatalog(OperationContext* opCtx) {
             str::stream() << "expected to find a list containing exactly 1 index spec, but found "
                           << indexesToRebuild.second.size());
 
-        log() << "openCatalog: rebuilding index " << indexName << " in collection "
-              << collNss.toString();
+        auto& ino = nsToIndexNameObjMap[collNss.ns()];
+        ino.first.emplace_back(std::move(indexesToRebuild.first.back()));
+        ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
+    }
+
+    for (const auto& entry : nsToIndexNameObjMap) {
+        NamespaceString collNss(entry.first);
+
+        auto dbCatalogEntry = storageEngine->getDatabaseCatalogEntry(opCtx, collNss.db());
+        invariant(dbCatalogEntry,
+                  str::stream() << "couldn't get database catalog entry for database "
+                                << collNss.db());
+        auto collCatalogEntry = dbCatalogEntry->getCollectionCatalogEntry(collNss.toString());
+        invariant(collCatalogEntry,
+                  str::stream() << "couldn't get collection catalog entry for collection "
+                                << collNss.toString());
+
+        for (const auto& indexName : entry.second.first) {
+            log() << "openCatalog: rebuilding index: collection: " << collNss.toString()
+                  << ", index: " << indexName;
+        }
         fassertStatusOK(40690,
                         rebuildIndexesOnCollection(
-                            opCtx, dbCatalogEntry, collCatalogEntry, std::move(indexesToRebuild)));
+                            opCtx, dbCatalogEntry, collCatalogEntry, std::move(entry.second)));
     }
 
     // Open all databases and repopulate the UUID catalog.
