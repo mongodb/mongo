@@ -39,7 +39,6 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/record_store.h"
-#include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 class Client;

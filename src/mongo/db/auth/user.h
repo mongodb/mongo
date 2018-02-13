@@ -39,8 +39,8 @@
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/unordered_map.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -98,7 +98,7 @@ public:
         const SCRAMCredentials<HashBlock>& scram() const;
     };
 
-    typedef unordered_map<ResourcePattern, Privilege> ResourcePrivilegeMap;
+    typedef stdx::unordered_map<ResourcePattern, Privilege> ResourcePrivilegeMap;
 
     explicit User(const UserName& name);
     ~User();
@@ -249,7 +249,7 @@ private:
     ResourcePrivilegeMap _privileges;
 
     // Roles the user has privileges from
-    unordered_set<RoleName> _roles;
+    stdx::unordered_set<RoleName> _roles;
 
     // Roles that the user indirectly has privileges from, due to role inheritance.
     std::vector<RoleName> _indirectRoles;

@@ -1,5 +1,3 @@
-// string_map_test.cpp
-
 /*    Copyright 2012 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
@@ -32,7 +30,6 @@
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/platform/random.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/util/log.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/timer.h"

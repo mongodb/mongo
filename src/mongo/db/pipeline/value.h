@@ -31,7 +31,6 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/value_internal.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -482,4 +481,4 @@ inline BSONBinData Value::getBinData() const {
     auto stringData = _storage.getString();
     return BSONBinData(stringData.rawData(), stringData.size(), _storage.binDataType());
 }
-};
+}  // namespace mongo

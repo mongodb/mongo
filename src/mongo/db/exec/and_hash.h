@@ -34,8 +34,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
-#include "mongo/platform/unordered_map.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -105,12 +105,12 @@ private:
 
     // _dataMap is filled out by the first child and probed by subsequent children.  This is the
     // hash table that we create by intersecting _children and probe with the last child.
-    typedef unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
+    typedef stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
     DataMap _dataMap;
 
     // Keeps track of what elements from _dataMap subsequent children have seen.
     // Only used while _hashingChildren.
-    typedef unordered_set<RecordId, RecordId::Hasher> SeenMap;
+    typedef stdx::unordered_set<RecordId, RecordId::Hasher> SeenMap;
     SeenMap _seenMap;
 
     // True if we're still intersecting _children[0..._children.size()-1].

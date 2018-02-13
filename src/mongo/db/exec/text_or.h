@@ -150,7 +150,7 @@ private:
         double score;
     };
 
-    typedef unordered_map<RecordId, TextRecordData, RecordId::Hasher> ScoreMap;
+    typedef stdx::unordered_map<RecordId, TextRecordData, RecordId::Hasher> ScoreMap;
     ScoreMap _scores;
     ScoreMap::const_iterator _scoreIterator;
 
@@ -162,4 +162,4 @@ private:
     std::unique_ptr<SeekableRecordCursor> _recordCursor;
     IndexDescriptor* _index;
 };
-}
+}  // namespace mongo

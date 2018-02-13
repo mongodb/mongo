@@ -36,7 +36,7 @@
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/query_knobs.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -162,7 +162,7 @@ private:
 
         // Maps from indexable predicates that can be pushed into the current node to the route
         // through ORs that they have taken to get to this node.
-        unordered_map<MatchExpression*, OutsidePredRoute> outsidePreds;
+        stdx::unordered_map<MatchExpression*, OutsidePredRoute> outsidePreds;
     };
 
     /**
@@ -404,7 +404,7 @@ private:
      */
     void assignMultikeySafePredicates(
         const std::vector<MatchExpression*>& couldAssign,
-        const unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
+        const stdx::unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
         OneIndexAssignment* indexAssignment);
 
     /**
@@ -431,7 +431,7 @@ private:
     /**
      * Output index intersection assignments inside of an AND node.
      */
-    typedef unordered_map<IndexID, std::vector<MatchExpression*>> IndexToPredMap;
+    typedef stdx::unordered_map<IndexID, std::vector<MatchExpression*>> IndexToPredMap;
 
     /**
      * Generate index intersection assignments given the predicate/index structure in idxToFirst
@@ -448,11 +448,12 @@ private:
      * and idxToNotFirst (and the sub-trees in 'subnodes').  Outputs the assignments into
      * 'andAssignment'. The predicates in 'outsidePreds' are considered for OrPushdownTags.
      */
-    void enumerateOneIndex(IndexToPredMap idxToFirst,
-                           IndexToPredMap idxToNotFirst,
-                           const std::vector<MemoID>& subnodes,
-                           const unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
-                           AndAssignment* andAssignment);
+    void enumerateOneIndex(
+        IndexToPredMap idxToFirst,
+        IndexToPredMap idxToNotFirst,
+        const std::vector<MemoID>& subnodes,
+        const stdx::unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
+        AndAssignment* andAssignment);
 
     /**
      * Generate single-index assignments for queries which contain mandatory
@@ -501,10 +502,11 @@ private:
      * 'outsidePreds'. 'pred' must be able to use the index and be multikey-safe to add to
      * 'indexAssignment'.
      */
-    void assignPredicate(const unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
-                         MatchExpression* pred,
-                         size_t position,
-                         OneIndexAssignment* indexAssignment);
+    void assignPredicate(
+        const stdx::unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
+        MatchExpression* pred,
+        size_t position,
+        OneIndexAssignment* indexAssignment);
 
     /**
      * Sets a flag on all outside pred routes that descend through an $elemMatch object node.
@@ -520,10 +522,10 @@ private:
     std::string dumpMemo();
 
     // Map from expression to its MemoID.
-    unordered_map<MatchExpression*, MemoID> _nodeToId;
+    stdx::unordered_map<MatchExpression*, MemoID> _nodeToId;
 
     // Map from MemoID to its precomputed solution info.
-    unordered_map<MemoID, NodeAssignment*> _memo;
+    stdx::unordered_map<MemoID, NodeAssignment*> _memo;
 
     // If true, there are no further enumeration states, and getNext should return false.
     // We could be _done immediately after init if we're unable to output an indexed plan.

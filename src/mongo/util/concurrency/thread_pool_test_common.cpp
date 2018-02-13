@@ -61,7 +61,7 @@ private:
 
 using ThreadPoolTestCaseFactory =
     stdx::function<std::unique_ptr<::mongo::unittest::Test>(ThreadPoolFactory)>;
-using ThreadPoolTestCaseMap = unordered_map<std::string, ThreadPoolTestCaseFactory>;
+using ThreadPoolTestCaseMap = stdx::unordered_map<std::string, ThreadPoolTestCaseFactory>;
 
 static ThreadPoolTestCaseMap& threadPoolTestCaseRegistry() {
     static ThreadPoolTestCaseMap registry;

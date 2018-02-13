@@ -33,7 +33,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -73,6 +73,6 @@ public:
 
 private:
     bool _frozen;
-    unordered_map<std::string, FailPoint*> _fpMap;
+    stdx::unordered_map<std::string, FailPoint*> _fpMap;
 };
-}
+}  // namespace mongo

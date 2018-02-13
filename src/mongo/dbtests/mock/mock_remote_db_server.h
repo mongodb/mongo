@@ -32,8 +32,8 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/rpc/unique_message.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/spin_lock.h"
 
 namespace mongo {
@@ -207,8 +207,8 @@ private:
      */
     void checkIfUp(InstanceID id) const;
 
-    typedef unordered_map<std::string, std::shared_ptr<CircularBSONIterator>> CmdToReplyObj;
-    typedef unordered_map<std::string, std::vector<BSONObj>> MockDataMgr;
+    typedef stdx::unordered_map<std::string, std::shared_ptr<CircularBSONIterator>> CmdToReplyObj;
+    typedef stdx::unordered_map<std::string, std::vector<BSONObj>> MockDataMgr;
 
     bool _isRunning;
 
@@ -234,4 +234,4 @@ private:
     // protects this entire instance
     mutable mongo::SpinLock _lock;
 };
-}
+}  // namespace mongo

@@ -1,5 +1,3 @@
-// engine.cpp
-
 /*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
@@ -40,7 +38,6 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/file.h"
@@ -611,4 +608,4 @@ const char* jsSkipWhiteSpace(const char* raw) {
     }
     return raw;
 }
-}
+}  // namespace mongo

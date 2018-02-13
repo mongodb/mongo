@@ -208,7 +208,7 @@ private:
     // document and we wouldn't want to update that.
     //
     // So, no matter what, we keep track of where the doc wound up.
-    typedef unordered_set<RecordId, RecordId::Hasher> RecordIdSet;
+    typedef stdx::unordered_set<RecordId, RecordId::Hasher> RecordIdSet;
     const std::unique_ptr<RecordIdSet> _updatedRecordIds;
 
     // These get reused for each update.

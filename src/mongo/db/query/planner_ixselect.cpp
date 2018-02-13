@@ -140,7 +140,7 @@ static bool boundsGeneratingNodeContainsComparisonToType(MatchExpression* node, 
 // static
 void QueryPlannerIXSelect::getFields(const MatchExpression* node,
                                      string prefix,
-                                     unordered_set<string>* out) {
+                                     stdx::unordered_set<string>* out) {
     // Do not traverse tree beyond a NOR negation node
     MatchExpression::MatchType exprtype = node->matchType();
     if (exprtype == MatchExpression::NOR) {
@@ -172,7 +172,7 @@ void QueryPlannerIXSelect::getFields(const MatchExpression* node,
 }
 
 // static
-void QueryPlannerIXSelect::findRelevantIndices(const unordered_set<string>& fields,
+void QueryPlannerIXSelect::findRelevantIndices(const stdx::unordered_set<string>& fields,
                                                const vector<IndexEntry>& allIndices,
                                                vector<IndexEntry>* out) {
     for (size_t i = 0; i < allIndices.size(); ++i) {

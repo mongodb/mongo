@@ -37,7 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/record_id.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -171,7 +171,7 @@ private:
     std::vector<SortableDataItem>::iterator _resultIterator;
 
     // We buffer a lot of data and we want to look it up by RecordId quickly upon invalidation.
-    typedef unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
+    typedef stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher> DataMap;
     DataMap _wsidByRecordId;
 
     SortStats _specificStats;

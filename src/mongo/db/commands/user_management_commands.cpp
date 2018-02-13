@@ -64,11 +64,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -93,9 +93,10 @@ Status useDefaultCode(const Status& status, ErrorCodes::Error defaultCode) {
     return Status(defaultCode, status.reason());
 }
 
-BSONArray roleSetToBSONArray(const unordered_set<RoleName>& roles) {
+BSONArray roleSetToBSONArray(const stdx::unordered_set<RoleName>& roles) {
     BSONArrayBuilder rolesArrayBuilder;
-    for (unordered_set<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
+    for (stdx::unordered_set<RoleName>::const_iterator it = roles.begin(); it != roles.end();
+         ++it) {
         const RoleName& role = *it;
         rolesArrayBuilder.append(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
                                       << role.getRole()
@@ -142,7 +143,7 @@ Status privilegeVectorToBSONArray(const PrivilegeVector& privileges, BSONArray* 
 Status getCurrentUserRoles(OperationContext* opCtx,
                            AuthorizationManager* authzManager,
                            const UserName& userName,
-                           unordered_set<RoleName>* roles) {
+                           stdx::unordered_set<RoleName>* roles) {
     User* user;
     authzManager->invalidateUserByName(userName);  // Need to make sure cache entry is up to date
     Status status = authzManager->acquireUser(opCtx, userName, &user);
@@ -1055,7 +1056,7 @@ public:
         }
 
         UserName userName(userNameString, dbname);
-        unordered_set<RoleName> userRoles;
+        stdx::unordered_set<RoleName> userRoles;
         status = getCurrentUserRoles(opCtx, authzManager, userName, &userRoles);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatus(result, status);
@@ -1127,7 +1128,7 @@ public:
         }
 
         UserName userName(userNameString, dbname);
-        unordered_set<RoleName> userRoles;
+        stdx::unordered_set<RoleName> userRoles;
         status = getCurrentUserRoles(opCtx, authzManager, userName, &userRoles);
         if (!status.isOK()) {
             return CommandHelpers::appendCommandStatus(result, status);
@@ -2480,7 +2481,7 @@ public:
                         AuthorizationManager* authzManager,
                         StringData db,
                         bool update,
-                        unordered_set<UserName>* usersToDrop,
+                        stdx::unordered_set<UserName>* usersToDrop,
                         const BSONObj& userObj) {
         UserName userName = extractUserNameFromBSON(userObj);
         if (!db.empty() && userName.getDB() != db) {
@@ -2518,7 +2519,7 @@ public:
                         AuthorizationManager* authzManager,
                         StringData db,
                         bool update,
-                        unordered_set<RoleName>* rolesToDrop,
+                        stdx::unordered_set<RoleName>* rolesToDrop,
                         const BSONObj roleObj) {
         RoleName roleName = extractRoleNameFromBSON(roleObj);
         if (!db.empty() && roleName.getDB() != db) {
@@ -2563,7 +2564,7 @@ public:
         // collection with the users from the temp collection, without removing all
         // users at the beginning and thus potentially locking ourselves out by having
         // no users in the whole system for a time.
-        unordered_set<UserName> usersToDrop;
+        stdx::unordered_set<UserName> usersToDrop;
 
         if (drop) {
             // Create map of the users currently in the DB
@@ -2636,7 +2637,7 @@ public:
         // This is so that we can completely replace the system.roles
         // collection with the roles from the temp collection, without removing all
         // roles at the beginning and thus potentially locking ourselves out.
-        unordered_set<RoleName> rolesToDrop;
+        stdx::unordered_set<RoleName> rolesToDrop;
 
         if (drop) {
             // Create map of the roles currently in the DB
@@ -2674,7 +2675,7 @@ public:
 
         if (drop) {
             long long numRemoved;
-            for (unordered_set<RoleName>::iterator it = rolesToDrop.begin();
+            for (stdx::unordered_set<RoleName>::iterator it = rolesToDrop.begin();
                  it != rolesToDrop.end();
                  ++it) {
                 const RoleName& roleName = *it;

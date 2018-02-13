@@ -36,13 +36,13 @@
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/write_error_detail.h"
 #include "mongo/s/write_ops/write_op.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 

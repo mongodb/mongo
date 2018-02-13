@@ -34,8 +34,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/initializer_function.h"
 #include "mongo/base/status.h"
-#include "mongo/platform/unordered_map.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -103,10 +103,10 @@ public:
 private:
     struct NodeData {
         InitializerFunction fn;
-        unordered_set<std::string> prerequisites;
+        stdx::unordered_set<std::string> prerequisites;
     };
 
-    typedef unordered_map<std::string, NodeData> NodeMap;
+    typedef stdx::unordered_map<std::string, NodeData> NodeMap;
     typedef NodeMap::value_type Node;
 
     /**
@@ -115,7 +115,7 @@ private:
     static Status recursiveTopSort(const NodeMap& nodeMap,
                                    const Node& currentNode,
                                    std::vector<std::string>* inProgressNodeNames,
-                                   unordered_set<std::string>* visitedNodeNames,
+                                   stdx::unordered_set<std::string>* visitedNodeNames,
                                    std::vector<std::string>* sortedNames);
 
     /**

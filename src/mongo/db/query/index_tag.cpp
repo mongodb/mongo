@@ -31,7 +31,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/indexability.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/unordered_map.h"
 
 #include <algorithm>
 #include <limits>
@@ -130,9 +130,9 @@ void attachNode(MatchExpression* node,
 
 // Partitions destinations according to the first element of the destination's route. Trims the
 // first element off of each destination's route.
-unordered_map<size_t, std::vector<OrPushdownTag::Destination>> partitionChildDestinations(
+stdx::unordered_map<size_t, std::vector<OrPushdownTag::Destination>> partitionChildDestinations(
     std::vector<OrPushdownTag::Destination> destinations) {
-    unordered_map<size_t, std::vector<OrPushdownTag::Destination>> childDestinations;
+    stdx::unordered_map<size_t, std::vector<OrPushdownTag::Destination>> childDestinations;
     for (auto&& dest : destinations) {
         invariant(!dest.route.empty());
         auto index = dest.route.front();

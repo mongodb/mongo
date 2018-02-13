@@ -1,5 +1,3 @@
-// wiredtiger_util.cpp
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -42,7 +40,6 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"

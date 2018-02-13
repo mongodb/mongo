@@ -40,9 +40,9 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_test_fixture.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/log.h"
@@ -71,7 +71,7 @@ private:
 
 using ExecutorTestCaseFactory =
     stdx::function<std::unique_ptr<CommonTaskExecutorTestFixture>(ExecutorFactory)>;
-using ExecutorTestCaseMap = unordered_map<std::string, ExecutorTestCaseFactory>;
+using ExecutorTestCaseMap = stdx::unordered_map<std::string, ExecutorTestCaseFactory>;
 
 static ExecutorTestCaseMap& executorTestCaseRegistry() {
     static ExecutorTestCaseMap registry;

@@ -40,7 +40,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -184,7 +184,7 @@ private:
 
     // May need to track disklocs from the child stage to do our own deduping, also to do
     // invalidation of buffered results.
-    unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _seenDocuments;
+    stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher> _seenDocuments;
 
     // Stats for the stage covering this interval
     // This is owned by _specificStats

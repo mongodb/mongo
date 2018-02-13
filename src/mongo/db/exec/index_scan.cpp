@@ -276,7 +276,7 @@ void IndexScan::doInvalidate(OperationContext* opCtx, const RecordId& dl, Invali
 
     // If we see this RecordId again, it may not be the same document it was before, so we want
     // to return it if we see it again.
-    unordered_set<RecordId, RecordId::Hasher>::iterator it = _returned.find(dl);
+    stdx::unordered_set<RecordId, RecordId::Hasher>::iterator it = _returned.find(dl);
     if (it != _returned.end()) {
         ++_specificStats.seenInvalidated;
         _returned.erase(it);

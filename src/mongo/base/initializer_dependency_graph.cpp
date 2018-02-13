@@ -82,7 +82,7 @@ Status InitializerDependencyGraph::topSort(std::vector<std::string>* sortedNames
      */
 
     std::vector<std::string> inProgressNodeNames;
-    unordered_set<std::string> visitedNodeNames;
+    stdx::unordered_set<std::string> visitedNodeNames;
 
     sortedNames->clear();
     for (const auto& node : _nodes) {
@@ -101,11 +101,12 @@ Status InitializerDependencyGraph::topSort(std::vector<std::string>* sortedNames
     return Status::OK();
 }
 
-Status InitializerDependencyGraph::recursiveTopSort(const NodeMap& nodeMap,
-                                                    const Node& currentNode,
-                                                    std::vector<std::string>* inProgressNodeNames,
-                                                    unordered_set<std::string>* visitedNodeNames,
-                                                    std::vector<std::string>* sortedNames) {
+Status InitializerDependencyGraph::recursiveTopSort(
+    const NodeMap& nodeMap,
+    const Node& currentNode,
+    std::vector<std::string>* inProgressNodeNames,
+    stdx::unordered_set<std::string>* visitedNodeNames,
+    std::vector<std::string>* sortedNames) {
 
     /*
      * The top sort is performed by depth-first traversal starting at each node in the

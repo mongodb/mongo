@@ -39,8 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/session_killer.h"
-#include "mongo/platform/unordered_map.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/duration.h"
@@ -80,7 +79,7 @@ class PlanExecutor;
  */
 class CursorManager {
 public:
-    using RegistrationToken = Partitioned<unordered_set<PlanExecutor*>>::PartitionId;
+    using RegistrationToken = Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId;
 
     /**
      * Appends the sessions that have open cursors on the global cursor manager and across
@@ -143,7 +142,8 @@ public:
      * happens automatically for yielding PlanExecutors, so this should only be called by a
      * PlanExecutor itself. Returns a token that must be stored for use during deregistration.
      */
-    Partitioned<unordered_set<PlanExecutor*>>::PartitionId registerExecutor(PlanExecutor* exec);
+    Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId registerExecutor(
+        PlanExecutor* exec);
 
     /**
      * Remove an executor from the registry. It is legal to call this even if 'exec' is not
@@ -296,8 +296,9 @@ private:
     //   partition helpers to acquire mutexes for all partitions.
     mutable SimpleMutex _registrationLock;
     std::unique_ptr<PseudoRandom> _random;
-    Partitioned<unordered_set<PlanExecutor*>, kNumPartitions, PlanExecutorPartitioner>
+    Partitioned<stdx::unordered_set<PlanExecutor*>, kNumPartitions, PlanExecutorPartitioner>
         _registeredPlanExecutors;
-    std::unique_ptr<Partitioned<unordered_map<CursorId, ClientCursor*>, kNumPartitions>> _cursorMap;
+    std::unique_ptr<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>, kNumPartitions>>
+        _cursorMap;
 };
 }  // namespace mongo

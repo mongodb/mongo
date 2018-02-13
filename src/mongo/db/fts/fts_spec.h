@@ -1,5 +1,3 @@
-// fts_spec.h
-
 /**
 *    Copyright (C) 2012 10gen Inc.
 *
@@ -40,7 +38,7 @@
 #include "mongo/db/fts/stemmer.h"
 #include "mongo/db/fts/stop_words.h"
 #include "mongo/db/fts/tokenizer.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -52,7 +50,7 @@ extern const double MAX_WORD_WEIGHT;
 extern const double DEFAULT_WEIGHT;
 
 typedef std::map<std::string, double> Weights;  // TODO cool map
-typedef unordered_map<std::string, double> TermFrequencyMap;
+typedef stdx::unordered_map<std::string, double> TermFrequencyMap;
 
 struct ScoreHelperStruct {
     ScoreHelperStruct() : freq(0), count(0), exp(0) {}
@@ -186,5 +184,5 @@ private:
     // Suffix compound key - used for covering index behavior
     std::vector<std::string> _extraAfter;
 };
-}
-}
+}  // namespace fts
+}  // namespace mongo

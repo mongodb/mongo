@@ -35,7 +35,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/record_id.h"
-#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 

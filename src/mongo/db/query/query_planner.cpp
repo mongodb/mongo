@@ -577,10 +577,11 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     // Figure out what fields we care about.
-    unordered_set<string> fields;
+    stdx::unordered_set<string> fields;
     QueryPlannerIXSelect::getFields(query.root(), "", &fields);
 
-    for (unordered_set<string>::const_iterator it = fields.begin(); it != fields.end(); ++it) {
+    for (stdx::unordered_set<string>::const_iterator it = fields.begin(); it != fields.end();
+         ++it) {
         LOG(5) << "Predicate over field '" << *it << "'";
     }
 

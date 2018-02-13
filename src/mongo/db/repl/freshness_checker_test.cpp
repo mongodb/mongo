@@ -34,10 +34,10 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -444,7 +444,7 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestManyNodes) {
 
     startTest(Timestamp(10, 0), config, 0, hosts);
     const Date_t startDate = getNet()->now();
-    unordered_set<HostAndPort> seen;
+    stdx::unordered_set<HostAndPort> seen;
     getNet()->enterNetwork();
     for (size_t i = 0; i < hosts.size(); ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
@@ -507,7 +507,7 @@ TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestOpTimeManyNodes
 
     startTest(Timestamp(10, 0), config, 0, hosts);
     const Date_t startDate = getNet()->now();
-    unordered_set<HostAndPort> seen;
+    stdx::unordered_set<HostAndPort> seen;
     getNet()->enterNetwork();
 
     for (size_t i = 0; i < hosts.size(); ++i) {
@@ -577,7 +577,7 @@ TEST_F(FreshnessCheckerTest, ElectWrongTypeInFreshnessResponseManyNodes) {
 
     startTest(Timestamp(10, 0), config, 0, hosts);
     const Date_t startDate = getNet()->now();
-    unordered_set<HostAndPort> seen;
+    stdx::unordered_set<HostAndPort> seen;
     getNet()->enterNetwork();
     for (size_t i = 0; i < hosts.size(); ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
@@ -639,7 +639,7 @@ TEST_F(FreshnessCheckerTest, ElectVetoedManyNodes) {
 
     startTest(Timestamp(10, 0), config, 0, hosts);
     const Date_t startDate = getNet()->now();
-    unordered_set<HostAndPort> seen;
+    stdx::unordered_set<HostAndPort> seen;
     getNet()->enterNetwork();
     for (size_t i = 0; i < hosts.size(); ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
@@ -704,7 +704,7 @@ TEST_F(FreshnessCheckerTest, ElectVetoedAndTiedFreshnessManyNodes) {
 
     startTest(Timestamp(10, 0), config, 0, hosts);
     const Date_t startDate = getNet()->now();
-    unordered_set<HostAndPort> seen;
+    stdx::unordered_set<HostAndPort> seen;
     getNet()->enterNetwork();
 
     for (size_t i = 0; i < hosts.size(); ++i) {
@@ -780,7 +780,7 @@ TEST_F(FreshnessCheckerTest, ElectManyNodesNotAllRespond) {
 
     startTest(Timestamp(10, 0), config, 0, hosts);
     const Date_t startDate = getNet()->now();
-    unordered_set<HostAndPort> seen;
+    stdx::unordered_set<HostAndPort> seen;
     getNet()->enterNetwork();
     for (size_t i = 0; i < hosts.size(); ++i) {
         const NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();

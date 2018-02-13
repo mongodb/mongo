@@ -34,7 +34,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/snapshot.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
@@ -110,7 +109,7 @@ public:
     /**
      * Return the set of all WSIDs passed to flagForReview.
      */
-    const unordered_set<WorkingSetID>& getFlagged() const;
+    const stdx::unordered_set<WorkingSetID>& getFlagged() const;
 
     /**
      * Removes and deallocates all members of this working set.

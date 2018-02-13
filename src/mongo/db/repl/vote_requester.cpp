@@ -166,7 +166,7 @@ VoteRequester::Result VoteRequester::Algorithm::getResult() const {
     }
 }
 
-unordered_set<HostAndPort> VoteRequester::Algorithm::getResponders() const {
+stdx::unordered_set<HostAndPort> VoteRequester::Algorithm::getResponders() const {
     return _responders;
 }
 
@@ -196,7 +196,7 @@ VoteRequester::Result VoteRequester::getResult() const {
     return _algorithm->getResult();
 }
 
-unordered_set<HostAndPort> VoteRequester::getResponders() const {
+stdx::unordered_set<HostAndPort> VoteRequester::getResponders() const {
     return _algorithm->getResponders();
 }
 

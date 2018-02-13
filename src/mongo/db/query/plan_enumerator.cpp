@@ -264,7 +264,7 @@ PlanEnumerator::PlanEnumerator(const PlanEnumeratorParams& params)
       _intersectLimit(params.maxIntersectPerAnd) {}
 
 PlanEnumerator::~PlanEnumerator() {
-    typedef unordered_map<MemoID, NodeAssignment*> MemoMap;
+    typedef stdx::unordered_map<MemoID, NodeAssignment*> MemoMap;
     for (MemoMap::iterator it = _memo.begin(); it != _memo.end(); ++it) {
         delete it->second;
     }
@@ -337,7 +337,7 @@ string PlanEnumerator::NodeAssignment::toString() const {
 }
 
 PlanEnumerator::MemoID PlanEnumerator::memoIDForNode(MatchExpression* node) {
-    unordered_map<MatchExpression*, MemoID>::iterator it = _nodeToId.find(node);
+    stdx::unordered_map<MatchExpression*, MemoID>::iterator it = _nodeToId.find(node);
 
     if (_nodeToId.end() == it) {
         error() << "Trying to look up memo entry for node, none found.";
@@ -683,14 +683,14 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
                     // Assign any predicates on the non-leading index fields to 'indexAssign' that
                     // don't violate the intersecting or compounding rules for multikey indexes.
                     // We do not currently try to assign outside predicates to mandatory indexes.
-                    const unordered_map<MatchExpression*, OutsidePredRoute> outsidePreds{};
+                    const stdx::unordered_map<MatchExpression*, OutsidePredRoute> outsidePreds{};
                     assignMultikeySafePredicates(compIt->second, outsidePreds, &indexAssign);
                 }
             } else {
                 // Assign any predicates on the leading index field to 'indexAssign' that don't
                 // violate the intersecting rules for multikey indexes.
                 // We do not currently try to assign outside predicates to mandatory indexes.
-                const unordered_map<MatchExpression*, OutsidePredRoute> outsidePreds{};
+                const stdx::unordered_map<MatchExpression*, OutsidePredRoute> outsidePreds{};
                 assignMultikeySafePredicates(predsOverLeadingField, outsidePreds, &indexAssign);
 
                 // Assign the mandatory predicate to 'thisIndex'. Due to how keys are generated for
@@ -794,7 +794,7 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
 }
 
 void PlanEnumerator::assignPredicate(
-    const unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
+    const stdx::unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
     MatchExpression* pred,
     size_t position,
     OneIndexAssignment* indexAssignment) {
@@ -836,7 +836,7 @@ void PlanEnumerator::enumerateOneIndex(
     IndexToPredMap idxToFirst,
     IndexToPredMap idxToNotFirst,
     const vector<MemoID>& subnodes,
-    const unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
+    const stdx::unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
     AndAssignment* andAssignment) {
     // Each choice in the 'andAssignment' will consist of a single subnode to index (an OR or array
     // operator) or a OneIndexAssignment. When creating a OneIndexAssignment, we ensure that at
@@ -1319,7 +1319,7 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
     //
     // As we iterate over the available indexed predicates, we keep track
     // of the used prefixes both inside and outside of an $elemMatch context.
-    unordered_map<MatchExpression*, set<string>> used;
+    stdx::unordered_map<MatchExpression*, set<string>> used;
 
     // Initialize 'used' with the starting predicates in 'assigned'. Begin by
     // initializing the top-level scope with the prefix of the full path.
@@ -1387,7 +1387,7 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
 
 void PlanEnumerator::assignMultikeySafePredicates(
     const std::vector<MatchExpression*>& couldAssign,
-    const unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
+    const stdx::unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
     OneIndexAssignment* indexAssignment) {
     invariant(indexAssignment);
     invariant(indexAssignment->preds.size() == indexAssignment->positions.size());

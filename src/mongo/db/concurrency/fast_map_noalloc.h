@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/base/static_assert.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

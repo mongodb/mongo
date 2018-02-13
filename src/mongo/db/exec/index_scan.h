@@ -37,7 +37,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -137,7 +137,7 @@ private:
 
     // Could our index have duplicates?  If so, we use _returned to dedup.
     bool _shouldDedup;
-    unordered_set<RecordId, RecordId::Hasher> _returned;
+    stdx::unordered_set<RecordId, RecordId::Hasher> _returned;
 
     const bool _forward;
     const IndexScanParams _params;

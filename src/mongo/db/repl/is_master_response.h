@@ -34,7 +34,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/optime_with.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
@@ -133,7 +133,7 @@ public:
         return _slaveDelay;
     }
 
-    const unordered_map<std::string, std::string> getTags() const {
+    const stdx::unordered_map<std::string, std::string> getTags() const {
         return _tags;
     }
 
@@ -270,7 +270,7 @@ private:
     bool _buildIndexesSet;
     Seconds _slaveDelay;
     bool _slaveDelaySet;
-    unordered_map<std::string, std::string> _tags;
+    stdx::unordered_map<std::string, std::string> _tags;
     bool _tagsSet;
     HostAndPort _me;
     bool _meSet;

@@ -34,11 +34,11 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
@@ -158,7 +158,7 @@ public:
         virtual void onDestroyOperationContext(OperationContext* opCtx) = 0;
     };
 
-    using ClientSet = unordered_set<Client*>;
+    using ClientSet = stdx::unordered_set<Client*>;
 
     /**
      * Cursor for enumerating the live Client objects belonging to a ServiceContext.

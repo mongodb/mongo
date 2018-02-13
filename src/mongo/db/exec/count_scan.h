@@ -35,7 +35,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -99,7 +99,7 @@ private:
 
     // Could our index have duplicates?  If so, we use _returned to dedup.
     bool _shouldDedup;
-    unordered_set<RecordId, RecordId::Hasher> _returned;
+    stdx::unordered_set<RecordId, RecordId::Hasher> _returned;
 
     CountScanParams _params;
 

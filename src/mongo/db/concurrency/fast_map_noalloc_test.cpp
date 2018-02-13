@@ -147,7 +147,7 @@ TEST(FastMapNoAlloc, FindAndRemove) {
 
 TEST(FastMapNoAlloc, RemoveAll) {
     TestFastMapNoAlloc map;
-    unordered_map<ResourceId, TestStruct> checkMap;
+    stdx::unordered_map<ResourceId, TestStruct> checkMap;
 
     for (int i = 1; i <= 6; i++) {
         map.insert(ResourceId(RESOURCE_COLLECTION, i))

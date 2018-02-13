@@ -37,9 +37,9 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -77,7 +77,7 @@ public:
         /**
          * Returns the list of nodes that responded to the VoteRequest command.
          */
-        unordered_set<HostAndPort> getResponders() const;
+        stdx::unordered_set<HostAndPort> getResponders() const;
 
     private:
         enum class PrimaryVote { Pending, Yes, No };
@@ -88,7 +88,7 @@ public:
         bool _dryRun = false;  // this bool indicates this is a mock election when true
         const OpTime _lastDurableOpTime;
         std::vector<HostAndPort> _targets;
-        unordered_set<HostAndPort> _responders;
+        stdx::unordered_set<HostAndPort> _responders;
         bool _staleTerm = false;
         long long _responsesProcessed = 0;
         long long _votes = 1;
@@ -122,7 +122,7 @@ public:
     void cancel();
 
     Result getResult() const;
-    unordered_set<HostAndPort> getResponders() const;
+    stdx::unordered_set<HostAndPort> getResponders() const;
 
 private:
     std::shared_ptr<Algorithm> _algorithm;

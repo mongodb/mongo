@@ -108,7 +108,7 @@ void HaystackAccessMethod::searchCommand(OperationContext* opCtx,
 
             BSONObj key = bb.obj();
 
-            unordered_set<RecordId, RecordId::Hasher> thisPass;
+            stdx::unordered_set<RecordId, RecordId::Hasher> thisPass;
 
 
             auto exec = InternalPlanner::indexScan(opCtx,
@@ -125,7 +125,7 @@ void HaystackAccessMethod::searchCommand(OperationContext* opCtx,
                 if (hopper.limitReached()) {
                     break;
                 }
-                pair<unordered_set<RecordId, RecordId::Hasher>::iterator, bool> p =
+                pair<stdx::unordered_set<RecordId, RecordId::Hasher>::iterator, bool> p =
                     thisPass.insert(loc);
                 // If a new element was inserted (haven't seen the RecordId before), p.second
                 // is true.

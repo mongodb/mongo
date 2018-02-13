@@ -20,7 +20,6 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 #include "mongo/util/password_digest.h"

@@ -235,7 +235,7 @@ public:
         ASSERT_LESS_THAN(memUsageAfter, memUsageBefore);
 
         // And expect to find foo==15 it flagged for review.
-        const unordered_set<WorkingSetID>& flagged = ws.getFlagged();
+        const stdx::unordered_set<WorkingSetID>& flagged = ws.getFlagged();
         ASSERT_EQUALS(size_t(1), flagged.size());
 
         // Expect to find the right value of foo in the flagged item.
@@ -316,7 +316,7 @@ public:
         PlanStage::StageState status = ah->work(&id);
         ASSERT_EQUALS(PlanStage::NEED_TIME, status);
 
-        const unordered_set<WorkingSetID>& flagged = ws.getFlagged();
+        const stdx::unordered_set<WorkingSetID>& flagged = ws.getFlagged();
         ASSERT_EQUALS(size_t(0), flagged.size());
 
         // "delete" deletedObj (by invalidating the RecordId of the obj that matches it).

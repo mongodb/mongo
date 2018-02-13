@@ -37,8 +37,8 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 
@@ -143,7 +143,7 @@ public:
 
 private:
     // Allowed index entries owned here.
-    using AllowedIndexEntryMap = unordered_map<PlanCacheKey, AllowedIndexEntry>;
+    using AllowedIndexEntryMap = stdx::unordered_map<PlanCacheKey, AllowedIndexEntry>;
     AllowedIndexEntryMap _allowedIndexEntryMap;
 
     /**

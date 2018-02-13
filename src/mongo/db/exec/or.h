@@ -32,7 +32,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -81,7 +81,7 @@ private:
     bool _dedup;
 
     // Which RecordIds have we returned?
-    unordered_set<RecordId, RecordId::Hasher> _seen;
+    stdx::unordered_set<RecordId, RecordId::Hasher> _seen;
 
     // Stats
     OrStats _specificStats;

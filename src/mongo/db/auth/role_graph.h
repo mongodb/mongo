@@ -37,8 +37,8 @@
 #include "mongo/db/auth/restriction_set.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/platform/unordered_map.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -294,7 +294,7 @@ private:
     // Helper method doing a topological DFS to compute the indirect privilege
     // data and look for cycles
     Status _recomputePrivilegeDataHelper(const RoleName& currentRole,
-                                         unordered_set<RoleName>& visitedRoles);
+                                         stdx::unordered_set<RoleName>& visitedRoles);
 
     /**
      * If the role name given is not a built-in role, or it is but it's already in the role
@@ -328,9 +328,9 @@ private:
 
 
     // Represents all the outgoing edges to other roles from any given role.
-    using EdgeSet = unordered_map<RoleName, std::vector<RoleName>>;
+    using EdgeSet = stdx::unordered_map<RoleName, std::vector<RoleName>>;
     // Maps a role name to a list of privileges associated with that role.
-    using RolePrivilegeMap = unordered_map<RoleName, PrivilegeVector>;
+    using RolePrivilegeMap = stdx::unordered_map<RoleName, PrivilegeVector>;
 
     // Maps a role name to a restriction document.
     using RestrictionDocumentMap = stdx::unordered_map<RoleName, SharedRestrictionDocument>;
@@ -339,7 +339,7 @@ private:
         stdx::unordered_map<RoleName, std::vector<SharedRestrictionDocument>>;
 
     EdgeSet _roleToSubordinates;
-    unordered_map<RoleName, unordered_set<RoleName>> _roleToIndirectSubordinates;
+    stdx::unordered_map<RoleName, stdx::unordered_set<RoleName>> _roleToIndirectSubordinates;
     EdgeSet _roleToMembers;
     RolePrivilegeMap _directPrivilegesForRole;
     RolePrivilegeMap _allPrivilegesForRole;

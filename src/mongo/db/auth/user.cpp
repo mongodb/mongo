@@ -110,7 +110,7 @@ uint32_t User::getRefCount() const {
 }
 
 const ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
-    unordered_map<ResourcePattern, Privilege>::const_iterator it = _privileges.find(resource);
+    stdx::unordered_map<ResourcePattern, Privilege>::const_iterator it = _privileges.find(resource);
     if (it == _privileges.end()) {
         return ActionSet();
     }

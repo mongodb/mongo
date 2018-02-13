@@ -34,7 +34,7 @@
 
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
-#include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -421,7 +421,7 @@ Status RoleGraph::recomputePrivilegeData() {
      * we can get back to them after visiting their children.
      */
 
-    unordered_set<RoleName> visitedRoles;
+    stdx::unordered_set<RoleName> visitedRoles;
     for (EdgeSet::const_iterator it = _roleToSubordinates.begin(); it != _roleToSubordinates.end();
          ++it) {
         Status status = _recomputePrivilegeDataHelper(it->first, visitedRoles);
@@ -433,7 +433,7 @@ Status RoleGraph::recomputePrivilegeData() {
 }
 
 Status RoleGraph::_recomputePrivilegeDataHelper(const RoleName& startingRole,
-                                                unordered_set<RoleName>& visitedRoles) {
+                                                stdx::unordered_set<RoleName>& visitedRoles) {
     if (visitedRoles.count(startingRole)) {
         return Status::OK();
     }
@@ -494,7 +494,7 @@ Status RoleGraph::_recomputePrivilegeDataHelper(const RoleName& startingRole,
         currentRoleAllPrivileges = _directPrivilegesForRole[currentRole];
 
         // Need to do the same thing for the indirect roles
-        unordered_set<RoleName>& currentRoleIndirectRoles =
+        stdx::unordered_set<RoleName>& currentRoleIndirectRoles =
             _roleToIndirectSubordinates[currentRole];
         currentRoleIndirectRoles.clear();
         for (const auto& role : currentRoleDirectRoles) {

@@ -32,7 +32,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/logger/component_message_log_domain.h"
 #include "mongo/logger/rotatable_file_writer.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 namespace logger {
@@ -62,7 +62,7 @@ public:
     MessageLogDomain* getNamedDomain(const std::string& name);
 
 private:
-    typedef unordered_map<std::string, MessageLogDomain*> DomainsByNameMap;
+    typedef stdx::unordered_map<std::string, MessageLogDomain*> DomainsByNameMap;
 
     DomainsByNameMap _domains;
     ComponentMessageLogDomain _globalDomain;

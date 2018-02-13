@@ -110,7 +110,7 @@ public:
 private:
     SimpleMutex _mutex;
 
-    typedef unordered_map<unsigned, NamespaceString> Map;
+    typedef stdx::unordered_map<unsigned, NamespaceString> Map;
     Map _idToNss;
     unsigned _nextId;
 
@@ -400,7 +400,7 @@ CursorManager::CursorManager(NamespaceString nss)
                                                : globalCursorIdCache->registerCursorManager(_nss)),
       _random(stdx::make_unique<PseudoRandom>(globalCursorIdCache->nextSeed())),
       _registeredPlanExecutors(),
-      _cursorMap(stdx::make_unique<Partitioned<unordered_map<CursorId, ClientCursor*>>>()) {}
+      _cursorMap(stdx::make_unique<Partitioned<stdx::unordered_map<CursorId, ClientCursor*>>>()) {}
 
 CursorManager::~CursorManager() {
     // All cursors and PlanExecutors should have been deleted already.
@@ -515,7 +515,7 @@ namespace {
 static AtomicUInt32 registeredPlanExecutorId;
 }  // namespace
 
-Partitioned<unordered_set<PlanExecutor*>>::PartitionId CursorManager::registerExecutor(
+Partitioned<stdx::unordered_set<PlanExecutor*>>::PartitionId CursorManager::registerExecutor(
     PlanExecutor* exec) {
     auto partitionId = registeredPlanExecutorId.fetchAndAdd(1);
     exec->setRegistrationToken(partitionId);

@@ -47,10 +47,9 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
-#include "mongo/platform/unordered_map.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -1144,7 +1143,7 @@ private:
     // every host that sends it a heartbeat request to this set, and also starts
     // sending heartbeat requests to that host.  This set is cleared whenever
     // a node discovers that it is a member of a config.
-    unordered_set<HostAndPort> _seedList;  // (M)
+    stdx::unordered_set<HostAndPort> _seedList;  // (M)
 
     // Back pointer to the ServiceContext that has started the instance.
     ServiceContext* const _service;  // (S)

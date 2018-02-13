@@ -1,5 +1,3 @@
-// record_store_v1_base.h
-
 /**
 *    Copyright (C) 2013-2014 MongoDB Inc.
 *
@@ -30,7 +28,7 @@
 
 #pragma once
 
-#include "mongo/platform/unordered_set.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/concurrency/spin_lock.h"
 
 #include "mongo/db/storage/mmap_v1/diskloc.h"
@@ -146,7 +144,8 @@ public:
 
 private:
     SpinLock _mutex;
-    typedef unordered_set<SavedCursor*> SavedCursorSet;  // SavedCursor pointers not owned here
+    typedef stdx::unordered_set<SavedCursor*>
+        SavedCursorSet;  // SavedCursor pointers not owned here
     SavedCursorSet _cursors;
 };
 
@@ -358,4 +357,4 @@ private:
     const RecordStoreV1Base* _rs;
     bool _forward;
 };
-}
+}  // namespace mongo

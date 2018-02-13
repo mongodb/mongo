@@ -88,7 +88,7 @@ string toString(Iter begin, Iter end) {
 void testGetFields(const char* query, const char* prefix, const char* expectedFieldsStr) {
     BSONObj obj = fromjson(query);
     unique_ptr<MatchExpression> expr(parseMatchExpression(obj));
-    unordered_set<string> fields;
+    stdx::unordered_set<string> fields;
     QueryPlannerIXSelect::getFields(expr.get(), prefix, &fields);
 
     // Verify results

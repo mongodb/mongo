@@ -35,7 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/logger/rotatable_file_writer.h"
-#include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 namespace logger {
@@ -83,7 +83,7 @@ public:
     FileNameStatusPairVector rotateAll(bool renameFiles, const std::string& renameTargetSuffix);
 
 private:
-    typedef unordered_map<std::string, RotatableFileWriter*> WriterByNameMap;
+    typedef stdx::unordered_map<std::string, RotatableFileWriter*> WriterByNameMap;
 
     WriterByNameMap _writers;
 };

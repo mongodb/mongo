@@ -130,7 +130,7 @@ void CollectionInfoCacheImpl::computeIndexKeys(OperationContext* opCtx) {
         const IndexCatalogEntry* entry = i.catalogEntry(descriptor);
         const MatchExpression* filter = entry->getFilterExpression();
         if (filter) {
-            unordered_set<std::string> paths;
+            stdx::unordered_set<std::string> paths;
             QueryPlannerIXSelect::getFields(filter, "", &paths);
             for (auto it = paths.begin(); it != paths.end(); ++it) {
                 _indexedPaths.addPath(*it);

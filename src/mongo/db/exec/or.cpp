@@ -135,7 +135,7 @@ void OrStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, Invalida
     // If we see DL again it is not the same record as it once was so we still want to
     // return it.
     if (_dedup && INVALIDATION_DELETION == type) {
-        unordered_set<RecordId, RecordId::Hasher>::iterator it = _seen.find(dl);
+        stdx::unordered_set<RecordId, RecordId::Hasher>::iterator it = _seen.find(dl);
         if (_seen.end() != it) {
             ++_specificStats.recordIdsForgotten;
             _seen.erase(dl);

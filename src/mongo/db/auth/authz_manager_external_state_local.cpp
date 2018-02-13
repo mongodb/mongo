@@ -203,7 +203,7 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* opCt
 
 void AuthzManagerExternalStateLocal::resolveUserRoles(mutablebson::Document* userDoc,
                                                       const std::vector<RoleName>& directRoles) {
-    unordered_set<RoleName> indirectRoles;
+    stdx::unordered_set<RoleName> indirectRoles;
     PrivilegeVector allPrivileges;
     std::vector<SharedRestrictionDocument> allAuthenticationRestrictions;
     bool isRoleGraphConsistent = false;

@@ -86,7 +86,7 @@ void WorkingSet::flagForReview(WorkingSetID i) {
     _flagged.insert(i);
 }
 
-const unordered_set<WorkingSetID>& WorkingSet::getFlagged() const {
+const stdx::unordered_set<WorkingSetID>& WorkingSet::getFlagged() const {
     return _flagged;
 }
 

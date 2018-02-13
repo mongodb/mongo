@@ -54,7 +54,6 @@
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/platform/unordered_map.h"
 #include "mongo/util/log.h"
 
 namespace mongo {

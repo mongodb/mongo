@@ -287,7 +287,7 @@ bool NearStage::isEOF() {
 void NearStage::doInvalidate(OperationContext* opCtx, const RecordId& dl, InvalidationType type) {
     // If a result is in _resultBuffer and has a RecordId it will be in _seenDocuments as
     // well. It's safe to return the result w/o the RecordId, so just fetch the result.
-    unordered_map<RecordId, WorkingSetID, RecordId::Hasher>::iterator seenIt =
+    stdx::unordered_map<RecordId, WorkingSetID, RecordId::Hasher>::iterator seenIt =
         _seenDocuments.find(dl);
 
     if (seenIt != _seenDocuments.end()) {
