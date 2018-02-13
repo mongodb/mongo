@@ -18,10 +18,7 @@
 #include "mongo/util/net/ssl/context.hpp"
 #include "mongo/util/net/ssl/context_base.hpp"
 #include "mongo/util/net/ssl/error.hpp"
-#include "mongo/util/net/ssl/rfc2818_verification.hpp"
 #include "mongo/util/net/ssl/stream.hpp"
 #include "mongo/util/net/ssl/stream_base.hpp"
-#include "mongo/util/net/ssl/verify_context.hpp"
-#include "mongo/util/net/ssl/verify_mode.hpp"
 
 #endif // ASIO_SSL_HPP

@@ -22,7 +22,5 @@
 #include "mongo/util/net/ssl/impl/context.ipp"
 #include "mongo/util/net/ssl/impl/error.ipp"
 #include "mongo/util/net/ssl/detail/impl/engine.ipp"
-#include "mongo/util/net/ssl/detail/impl/openssl_init.ipp"
-#include "mongo/util/net/ssl/impl/rfc2818_verification.ipp"
 
 #endif // ASIO_SSL_IMPL_SRC_HPP

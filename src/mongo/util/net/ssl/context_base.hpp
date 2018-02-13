@@ -145,38 +145,6 @@ public:
 # endif // defined(SSL_OP_NO_COMPRESSION)
 #endif
 
-  /// File format types.
-  enum file_format
-  {
-    /// ASN.1 file.
-    asn1,
-
-    /// PEM file.
-    pem
-  };
-
-#if !defined(GENERATING_DOCUMENTATION)
-  // The following types and constants are preserved for backward compatibility.
-  // New programs should use the equivalents of the same names that are defined
-  // in the asio::ssl namespace.
-  typedef int verify_mode;
-  ASIO_STATIC_CONSTANT(int, verify_none = SSL_VERIFY_NONE);
-  ASIO_STATIC_CONSTANT(int, verify_peer = SSL_VERIFY_PEER);
-  ASIO_STATIC_CONSTANT(int,
-      verify_fail_if_no_peer_cert = SSL_VERIFY_FAIL_IF_NO_PEER_CERT);
-  ASIO_STATIC_CONSTANT(int, verify_client_once = SSL_VERIFY_CLIENT_ONCE);
-#endif
-
-  /// Purpose of PEM password.
-  enum password_purpose
-  {
-    /// The password is needed for reading/decryption.
-    for_reading,
-
-    /// The password is needed for writing/encryption.
-    for_writing
-  };
-
 protected:
   /// Protected destructor to prevent deletion through this type.
   ~context_base()

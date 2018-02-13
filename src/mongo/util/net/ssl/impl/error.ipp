@@ -17,7 +17,6 @@
 
 #include "asio/detail/config.hpp"
 #include "mongo/util/net/ssl/error.hpp"
-#include "mongo/util/net/ssl/detail/openssl_init.hpp"
 
 #include "asio/detail/push_options.hpp"
 

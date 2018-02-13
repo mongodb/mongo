@@ -20,9 +20,7 @@
 #include "asio/buffer.hpp"
 #include "asio/detail/static_mutex.hpp"
 #include "mongo/util/net/ssl/detail/openssl_types.hpp"
-#include "mongo/util/net/ssl/detail/verify_callback.hpp"
 #include "mongo/util/net/ssl/stream_base.hpp"
-#include "mongo/util/net/ssl/verify_mode.hpp"
 
 #include "asio/detail/push_options.hpp"
 
@@ -64,18 +62,6 @@ public:
   // Get the underlying implementation in the native type.
   ASIO_DECL SSL* native_handle();
 
-  // Set the peer verification mode.
-  ASIO_DECL asio::error_code set_verify_mode(
-      verify_mode v, asio::error_code& ec);
-
-  // Set the peer verification depth.
-  ASIO_DECL asio::error_code set_verify_depth(
-      int depth, asio::error_code& ec);
-
-  // Set a peer certificate verification callback.
-  ASIO_DECL asio::error_code set_verify_callback(
-      verify_callback_base* callback, asio::error_code& ec);
-
   // Perform an SSL handshake using either SSL_connect (client-side) or
   // SSL_accept (server-side).
   ASIO_DECL want handshake(
@@ -110,10 +96,6 @@ private:
   // Disallow copying and assignment.
   engine(const engine&);
   engine& operator=(const engine&);
-
-  // Callback used when the SSL implementation wants to verify a certificate.
-  ASIO_DECL static int verify_callback_function(
-      int preverified, X509_STORE_CTX* ctx);
 
 #if (OPENSSL_VERSION_NUMBER < 0x10000000L)
   // The SSL_accept function may not be thread safe. This mutex is used to
