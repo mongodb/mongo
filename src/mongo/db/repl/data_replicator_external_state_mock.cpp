@@ -101,10 +101,6 @@ StatusWith<OpTime> DataReplicatorExternalStateMock::_multiApply(
     return multiApplyFn(opCtx, std::move(ops), applyOperation);
 }
 
-Status DataReplicatorExternalStateMock::_multiSyncApply(MultiApplier::OperationPtrs* ops) {
-    return Status::OK();
-}
-
 Status DataReplicatorExternalStateMock::_multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                                                                const HostAndPort& source,
                                                                AtomicUInt32* fetchCount) {

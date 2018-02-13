@@ -135,13 +135,6 @@ private:
                                            MultiApplier::ApplyOperationFn applyOperation) = 0;
 
     /**
-     * Used by _multiApply() to write operations to database during steady state replication.
-     *
-     * Used exclusively by the InitialSyncer to construct a MultiApplier.
-     */
-    virtual Status _multiSyncApply(MultiApplier::OperationPtrs* ops) = 0;
-
-    /**
      * Used by _multiApply() to write operations to database during initial sync. `fetchCount` is a
      * pointer to a counter that is incremented every time we fetch a missing document.
      *
