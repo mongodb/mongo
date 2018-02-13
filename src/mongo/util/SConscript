@@ -626,6 +626,25 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target='future_test',
+    source=[
+        'future_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Benchmark(
+    target='future_bm',
+    source=[
+        'future_bm.cpp',
+    ],
+    LIBDEPS=[
+    ],
+)
+
 if env.TargetOSIs('linux'):
     env.Library(
         target='procparser',

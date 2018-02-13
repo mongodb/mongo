@@ -242,6 +242,7 @@ error_code("ConversionFailure", 241)
 error_code("CannotCreateCollection", 242)
 error_code("IncompatibleWithUpgradedServer", 243)
 error_code("TransactionAborted", 244)
+error_code("BrokenPromise", 245)
 
 # Error codes 4000-8999 are reserved.
 
