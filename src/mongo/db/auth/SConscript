@@ -295,10 +295,10 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='sasl_scramsha1_test',
+    target='sasl_scram_test',
     source=[
         'sasl_authentication_session_test.cpp',
-        'sasl_scramsha1_test.cpp',
+        'sasl_scram_test.cpp',
     ],
     LIBDEPS_PRIVATE=[
         'saslauth',

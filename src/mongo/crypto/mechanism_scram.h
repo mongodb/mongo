@@ -284,8 +284,5 @@ private:
     std::shared_ptr<SecureSecrets> _ptr;
 };
 
-using SHA1Presecrets = Presecrets<SHA1Block>;
-using SHA1Secrets = Secrets<SHA1Block>;
-
 }  // namespace scram
 }  // namespace mongo

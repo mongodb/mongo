@@ -33,6 +33,8 @@
 #include "mongo/db/logical_session_id.h"
 
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -105,7 +107,7 @@ public:
     }
 
     User* addSimpleUser(UserName un) {
-        const auto creds = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
+        const auto creds = BSON("SCRAM-SHA-1" << scram::Secrets<SHA1Block>::generateCredentials(
                                     "a", saslGlobalParams.scramSHA1IterationCount.load()));
         ASSERT_OK(managerState->insertPrivilegeDocument(
             _opCtx.get(),
@@ -120,8 +122,8 @@ public:
     }
 
     User* addClusterUser(UserName un) {
-        const auto creds = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
-                                    "a", saslGlobalParams.scramSHA1IterationCount.load()));
+        const auto creds = BSON("SCRAM-SHA-256" << scram::Secrets<SHA256Block>::generateCredentials(
+                                    "a", saslGlobalParams.scramSHA256IterationCount.load()));
         ASSERT_OK(managerState->insertPrivilegeDocument(
             _opCtx.get(),
             BSON("user" << un.getUser() << "db" << un.getDB() << "credentials" << creds << "roles"

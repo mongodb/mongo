@@ -120,6 +120,4 @@ private:
     HostToSecretsMap _hostToSecrets;
 };
 
-using SCRAMSHA1ClientCache = SCRAMClientCache<SHA1Block>;
-
 }  // namespace mongo

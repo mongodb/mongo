@@ -26,11 +26,15 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/scram_client_cache.h"
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
@@ -40,23 +44,26 @@
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/log.h"
 #include "mongo/util/password_digest.h"
 
 namespace mongo {
+namespace {
 
 BSONObj generateSCRAMUserDocument(StringData username, StringData password) {
-    const size_t scramIterationCount = 10000;
-    auto database = "test"_sd;
+    const auto database = "test"_sd;
 
-    std::string digested = createPasswordDigest(username, password);
-    auto scramCred = scram::SHA1Secrets::generateCredentials(digested, scramIterationCount);
+    const auto digested = createPasswordDigest(username, password);
+    const auto sha1Cred = scram::Secrets<SHA1Block>::generateCredentials(digested, 10000);
+    const auto sha256Cred =
+        scram::Secrets<SHA256Block>::generateCredentials(password.toString(), 15000);
     return BSON("_id" << (str::stream() << database << "." << username).operator StringData()
                       << AuthorizationManager::USER_NAME_FIELD_NAME
                       << username
                       << AuthorizationManager::USER_DB_FIELD_NAME
                       << database
                       << "credentials"
-                      << BSON("SCRAM-SHA-1" << scramCred)
+                      << BSON("SCRAM-SHA-1" << sha1Cred << "SCRAM-SHA-256" << sha256Cred)
                       << "roles"
                       << BSONArray()
                       << "privileges"
@@ -194,7 +201,7 @@ SCRAMStepsResult runSteps(NativeSaslAuthenticationSession* saslServerSession,
     return result;
 }
 
-class SCRAMSHA1Fixture : public mongo::unittest::Test {
+class SCRAMFixture : public mongo::unittest::Test {
 protected:
     const SCRAMStepsResult goalState =
         SCRAMStepsResult(SaslTestState(SaslTestState::kClient, 4), Status::OK());
@@ -210,7 +217,7 @@ protected:
     std::unique_ptr<NativeSaslAuthenticationSession> saslServerSession;
     std::unique_ptr<NativeSaslClientSession> saslClientSession;
 
-    void setUp() {
+    void setUp() final {
         client = serviceContext.makeClient("test");
         opCtx = serviceContext.makeOperationContext(client.get());
 
@@ -224,23 +231,55 @@ protected:
 
         saslServerSession = stdx::make_unique<NativeSaslAuthenticationSession>(authzSession.get());
         saslServerSession->setOpCtxt(opCtx.get());
-        saslServerSession->start("test", "SCRAM-SHA-1", "mongodb", "MockServer.test", 1, false)
-            .transitional_ignore();
+        ASSERT_OK(
+            saslServerSession->start("test", _mechanism, "mongodb", "MockServer.test", 1, false));
         saslClientSession = stdx::make_unique<NativeSaslClientSession>();
-        saslClientSession->setParameter(NativeSaslClientSession::parameterMechanism, "SCRAM-SHA-1");
+        saslClientSession->setParameter(NativeSaslClientSession::parameterMechanism, _mechanism);
         saslClientSession->setParameter(NativeSaslClientSession::parameterServiceName, "mongodb");
         saslClientSession->setParameter(NativeSaslClientSession::parameterServiceHostname,
                                         "MockServer.test");
         saslClientSession->setParameter(NativeSaslClientSession::parameterServiceHostAndPort,
                                         "MockServer.test:27017");
     }
+
+    void tearDown() final {
+        saslClientSession.reset();
+        saslServerSession.reset();
+        authzSession.reset();
+        authzManager.reset();
+        authzManagerExternalState = nullptr;
+        opCtx.reset();
+        client.reset();
+    }
+
+    std::string createPasswordDigest(StringData username, StringData password) {
+        if (_digestPassword) {
+            return mongo::createPasswordDigest(username, password);
+        } else {
+            return password.toString();
+        }
+    }
+
+    std::string _mechanism;
+    bool _digestPassword;
+
+public:
+    void run() {
+        log() << "SCRAM-SHA-1 variant";
+        _mechanism = "SCRAM-SHA-1";
+        _digestPassword = true;
+        Test::run();
+
+        log() << "SCRAM-SHA-256 variant";
+        _mechanism = "SCRAM-SHA-256";
+        _digestPassword = false;
+        Test::run();
+    }
 };
 
-TEST_F(SCRAMSHA1Fixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -261,11 +300,9 @@ TEST_F(SCRAMSHA1Fixture, testServerStep1DoesNotIncludeNonceFromClientStep1) {
         runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
-TEST_F(SCRAMSHA1Fixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -285,11 +322,9 @@ TEST_F(SCRAMSHA1Fixture, testClientStep2DoesNotIncludeNonceFromServerStep1) {
         runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
-TEST_F(SCRAMSHA1Fixture, testClientStep2GivesBadProof) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testClientStep2GivesBadProof) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -313,11 +348,9 @@ TEST_F(SCRAMSHA1Fixture, testClientStep2GivesBadProof) {
               runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
-TEST_F(SCRAMSHA1Fixture, testServerStep2GivesBadVerifier) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testServerStep2GivesBadVerifier) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -349,11 +382,9 @@ TEST_F(SCRAMSHA1Fixture, testServerStep2GivesBadVerifier) {
 }
 
 
-TEST_F(SCRAMSHA1Fixture, testSCRAM) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testSCRAM) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -364,11 +395,9 @@ TEST_F(SCRAMSHA1Fixture, testSCRAM) {
     ASSERT_EQ(goalState, runSteps(saslServerSession.get(), saslClientSession.get()));
 }
 
-TEST_F(SCRAMSHA1Fixture, testSCRAMWithChannelBindingSupportedByClient) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testSCRAMWithChannelBindingSupportedByClient) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -384,11 +413,9 @@ TEST_F(SCRAMSHA1Fixture, testSCRAMWithChannelBindingSupportedByClient) {
     ASSERT_EQ(goalState, runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
-TEST_F(SCRAMSHA1Fixture, testSCRAMWithChannelBindingRequiredByClient) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testSCRAMWithChannelBindingRequiredByClient) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -407,11 +434,9 @@ TEST_F(SCRAMSHA1Fixture, testSCRAMWithChannelBindingRequiredByClient) {
         runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
-TEST_F(SCRAMSHA1Fixture, testSCRAMWithInvalidChannelBinding) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testSCRAMWithInvalidChannelBinding) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -430,11 +455,9 @@ TEST_F(SCRAMSHA1Fixture, testSCRAMWithInvalidChannelBinding) {
               runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
-TEST_F(SCRAMSHA1Fixture, testNULLInPassword) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("sajack", "saj\0ack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testNULLInPassword) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "saj\0ack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -446,11 +469,9 @@ TEST_F(SCRAMSHA1Fixture, testNULLInPassword) {
 }
 
 
-TEST_F(SCRAMSHA1Fixture, testCommasInUsernameAndPassword) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("s,a,jack", "s,a,jack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testCommasInUsernameAndPassword) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("s,a,jack", "s,a,jack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "s,a,jack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -461,7 +482,7 @@ TEST_F(SCRAMSHA1Fixture, testCommasInUsernameAndPassword) {
     ASSERT_EQ(goalState, runSteps(saslServerSession.get(), saslClientSession.get()));
 }
 
-TEST_F(SCRAMSHA1Fixture, testIncorrectUser) {
+TEST_F(SCRAMFixture, testIncorrectUser) {
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
                                     createPasswordDigest("sajack", "sajack"));
@@ -473,11 +494,9 @@ TEST_F(SCRAMSHA1Fixture, testIncorrectUser) {
               runSteps(saslServerSession.get(), saslClientSession.get()));
 }
 
-TEST_F(SCRAMSHA1Fixture, testIncorrectPassword) {
-    authzManagerExternalState
-        ->insertPrivilegeDocument(
-            opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj())
-        .transitional_ignore();
+TEST_F(SCRAMFixture, testIncorrectPassword) {
+    ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
+        opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
 
     saslClientSession->setParameter(NativeSaslClientSession::parameterUser, "sajack");
     saslClientSession->setParameter(NativeSaslClientSession::parameterPassword,
@@ -491,7 +510,7 @@ TEST_F(SCRAMSHA1Fixture, testIncorrectPassword) {
               runSteps(saslServerSession.get(), saslClientSession.get()));
 }
 
-TEST_F(SCRAMSHA1Fixture, testOptionalClientExtensions) {
+TEST_F(SCRAMFixture, testOptionalClientExtensions) {
     // Verify server ignores unknown/optional extensions sent by client.
     ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
@@ -515,7 +534,7 @@ TEST_F(SCRAMSHA1Fixture, testOptionalClientExtensions) {
               runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
-TEST_F(SCRAMSHA1Fixture, testOptionalServerExtensions) {
+TEST_F(SCRAMFixture, testOptionalServerExtensions) {
     // Verify client errors on unknown/optional extensions sent by server.
     ASSERT_OK(authzManagerExternalState->insertPrivilegeDocument(
         opCtx.get(), generateSCRAMUserDocument("sajack", "sajack"), BSONObj()));
@@ -540,70 +559,91 @@ TEST_F(SCRAMSHA1Fixture, testOptionalServerExtensions) {
               runSteps(saslServerSession.get(), saslClientSession.get(), mutator));
 }
 
-TEST(SCRAMSHA1Cache, testGetFromEmptyCache) {
-    SCRAMSHA1ClientCache cache;
-    std::string saltStr("saltsaltsaltsalt");
-    std::vector<std::uint8_t> salt(saltStr.begin(), saltStr.end());
+template <typename HashBlock>
+void testGetFromEmptyCache() {
+    SCRAMClientCache<HashBlock> cache;
+    const auto salt = scram::Presecrets<HashBlock>::generateSecureRandomSalt();
     HostAndPort host("localhost:27017");
-
-    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000)));
+    ASSERT_FALSE(cache.getCachedSecrets(host, scram::Presecrets<HashBlock>("aaa", salt, 10000)));
 }
 
+TEST(SCRAMCache, testGetFromEmptyCache) {
+    testGetFromEmptyCache<SHA1Block>();
+    testGetFromEmptyCache<SHA256Block>();
+}
 
-TEST(SCRAMSHA1Cache, testSetAndGet) {
-    SCRAMSHA1ClientCache cache;
-    std::string saltStr("saltsaltsaltsalt");
-    std::string badSaltStr("s@lts@lts@lts@lt");
-    std::vector<std::uint8_t> salt(saltStr.begin(), saltStr.end());
-    std::vector<std::uint8_t> badSalt(badSaltStr.begin(), badSaltStr.end());
+template <typename HashBlock>
+void testSetAndGet() {
+    SCRAMClientCache<HashBlock> cache;
+    const auto salt = scram::Presecrets<HashBlock>::generateSecureRandomSalt();
     HostAndPort host("localhost:27017");
 
-    auto secret = scram::SHA1Secrets(scram::SHA1Presecrets("aaa", salt, 10000));
-    cache.setCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000), secret);
-    auto cachedSecret = cache.getCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000));
+    const auto presecrets = scram::Presecrets<HashBlock>("aaa", salt, 10000);
+    const auto secrets = scram::Secrets<HashBlock>(presecrets);
+    cache.setCachedSecrets(host, presecrets, secrets);
+    const auto cachedSecrets = cache.getCachedSecrets(host, presecrets);
+
+    ASSERT_TRUE(cachedSecrets);
+    ASSERT_TRUE(secrets.clientKey() == cachedSecrets.clientKey());
+    ASSERT_TRUE(secrets.serverKey() == cachedSecrets.serverKey());
+    ASSERT_TRUE(secrets.storedKey() == cachedSecrets.storedKey());
+}
+
+TEST(SCRAMCache, testSetAndGet) {
+    testSetAndGet<SHA1Block>();
+    testSetAndGet<SHA256Block>();
+}
+
+template <typename HashBlock>
+void testSetAndGetWithDifferentParameters() {
+    SCRAMClientCache<HashBlock> cache;
+    const auto salt = scram::Presecrets<HashBlock>::generateSecureRandomSalt();
+    HostAndPort host("localhost:27017");
+
+    const auto presecrets = scram::Presecrets<HashBlock>("aaa", salt, 10000);
+    const auto secrets = scram::Secrets<HashBlock>(presecrets);
+    cache.setCachedSecrets(host, presecrets, secrets);
+    ASSERT_TRUE(cache.getCachedSecrets(host, presecrets));
+
+    // Alter each of: host, password, salt, iterationCount.
+    // Any one of which should fail to retreive from cache.
+    ASSERT_FALSE(cache.getCachedSecrets(HostAndPort("localhost:27018"), presecrets));
+    ASSERT_FALSE(cache.getCachedSecrets(host, scram::Presecrets<HashBlock>("aab", salt, 10000)));
+    const auto badSalt = scram::Presecrets<HashBlock>::generateSecureRandomSalt();
+    ASSERT_FALSE(cache.getCachedSecrets(host, scram::Presecrets<HashBlock>("aaa", badSalt, 10000)));
+    ASSERT_FALSE(cache.getCachedSecrets(host, scram::Presecrets<HashBlock>("aaa", salt, 10001)));
+}
+
+TEST(SCRAMCache, testSetAndGetWithDifferentParameters) {
+    testSetAndGetWithDifferentParameters<SHA1Block>();
+    testSetAndGetWithDifferentParameters<SHA256Block>();
+}
+
+template <typename HashBlock>
+void testSetAndReset() {
+    SCRAMClientCache<HashBlock> cache;
+    const auto salt = scram::Presecrets<HashBlock>::generateSecureRandomSalt();
+    HostAndPort host("localhost:27017");
+
+    const auto presecretsA = scram::Presecrets<HashBlock>("aaa", salt, 10000);
+    const auto secretsA = scram::Secrets<HashBlock>(presecretsA);
+    cache.setCachedSecrets(host, presecretsA, secretsA);
+    const auto presecretsB = scram::Presecrets<HashBlock>("aab", salt, 10000);
+    const auto secretsB = scram::Secrets<HashBlock>(presecretsB);
+    cache.setCachedSecrets(host, presecretsB, secretsB);
+
+    ASSERT_FALSE(cache.getCachedSecrets(host, presecretsA));
+    const auto cachedSecret = cache.getCachedSecrets(host, presecretsB);
     ASSERT_TRUE(cachedSecret);
-    ASSERT_TRUE(secret.clientKey() == cachedSecret.clientKey());
-    ASSERT_TRUE(secret.serverKey() == cachedSecret.serverKey());
-    ASSERT_TRUE(secret.storedKey() == cachedSecret.storedKey());
+    ASSERT_TRUE(secretsB.clientKey() == cachedSecret.clientKey());
+    ASSERT_TRUE(secretsB.serverKey() == cachedSecret.serverKey());
+    ASSERT_TRUE(secretsB.storedKey() == cachedSecret.storedKey());
 }
 
-
-TEST(SCRAMSHA1Cache, testSetAndGetWithDifferentParameters) {
-    SCRAMSHA1ClientCache cache;
-    std::string saltStr("saltsaltsaltsalt");
-    std::string badSaltStr("s@lts@lts@lts@lt");
-    std::vector<std::uint8_t> salt(saltStr.begin(), saltStr.end());
-    std::vector<std::uint8_t> badSalt(badSaltStr.begin(), badSaltStr.end());
-    HostAndPort host("localhost:27017");
-
-    auto secret = scram::SHA1Secrets(scram::SHA1Presecrets("aaa", salt, 10000));
-    cache.setCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000), secret);
-
-    ASSERT_FALSE(cache.getCachedSecrets(HostAndPort("localhost:27018"),
-                                        scram::SHA1Presecrets("aaa", salt, 10000)));
-    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SHA1Presecrets("aab", salt, 10000)));
-    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SHA1Presecrets("aaa", badSalt, 10000)));
-    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10001)));
+TEST(SCRAMCache, testSetAndReset) {
+    testSetAndReset<SHA1Block>();
+    testSetAndReset<SHA256Block>();
 }
 
-
-TEST(SCRAMSHA1Cache, testSetAndReset) {
-    SCRAMSHA1ClientCache cache;
-    StringData saltStr("saltsaltsaltsalt");
-    std::vector<std::uint8_t> salt(saltStr.begin(), saltStr.end());
-    HostAndPort host("localhost:27017");
-
-    scram::SHA1Secrets secret(scram::SHA1Presecrets("aaa", salt, 10000));
-    cache.setCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000), secret);
-    scram::SHA1Secrets newSecret(scram::SHA1Presecrets("aab", salt, 10000));
-    cache.setCachedSecrets(host, scram::SHA1Presecrets("aab", salt, 10000), newSecret);
-
-    ASSERT_FALSE(cache.getCachedSecrets(host, scram::SHA1Presecrets("aaa", salt, 10000)));
-    auto cachedSecret = cache.getCachedSecrets(host, scram::SHA1Presecrets("aab", salt, 10000));
-    ASSERT_TRUE(cachedSecret);
-    ASSERT_TRUE(newSecret.clientKey() == cachedSecret.clientKey());
-    ASSERT_TRUE(newSecret.serverKey() == cachedSecret.serverKey());
-    ASSERT_TRUE(newSecret.storedKey() == cachedSecret.storedKey());
-}
-
+}  // namespace
 }  // namespace mongo

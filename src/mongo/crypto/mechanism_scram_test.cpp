@@ -31,6 +31,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -38,45 +40,75 @@ namespace mongo {
 namespace scram {
 namespace {
 
-TEST(MechanismScram, BasicVectors) {
-    const std::vector<uint8_t> kBadSha1Salt{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+template <typename HashBlock>
+void testBasicVectors(StringData saltedPw,
+                      StringData clientKey,
+                      StringData storedKey,
+                      StringData serverKey,
+                      StringData proof,
+                      StringData signature) {
+    // Predictable salts yield predictable secrets.
+    // salt = {0, 1, 2, 3, ..., n-1}
+    std::vector<uint8_t> salt;
+    salt.resize(HashBlock::kHashLength - 4);
+    int i = 0;
+    std::generate(salt.begin(), salt.end(), [&i] { return i++; });
 
-    ASSERT_EQ(kBadSha1Salt.size(), SHA1Block::kHashLength - 4);
+    Presecrets<HashBlock> presecrets("password", salt, 4096);
+    ASSERT_EQ(presecrets.generateSaltedPassword().toString(), saltedPw);
 
-    SHA1Presecrets presecrets("password", kBadSha1Salt, 4096);
-    ASSERT_EQ(presecrets.generateSaltedPassword().toString(), "531aYHrF581Skow4E0gCWLw/Ibo=");
-
-    SHA1Secrets secrets(presecrets);
-    ASSERT_EQ(secrets.clientKey().toString(), "wiHbIsPcvJo230S6Qf5xYCDrhb0=");
-    ASSERT_EQ(secrets.storedKey().toString(), "SjXiaB2hLRr8aMUyXMVEw7H1jSI=");
-    ASSERT_EQ(secrets.serverKey().toString(), "FilAoFIclBukd3xZxBvYMXTU3HM=");
+    Secrets<HashBlock> secrets(presecrets);
+    ASSERT_EQ(secrets.clientKey().toString(), clientKey);
+    ASSERT_EQ(secrets.storedKey().toString(), storedKey);
+    ASSERT_EQ(secrets.serverKey().toString(), serverKey);
 
     const StringData authMessage("secret");
-    auto proof = secrets.generateClientProof(authMessage);
-    ASSERT_EQ(proof, "y+cpoAm0YlN30GuNgN4B9xghi4E=");
-    ASSERT_TRUE(secrets.verifyClientProof(authMessage, base64::decode(proof)));
+    const auto generatedProof = secrets.generateClientProof(authMessage);
+    ASSERT_EQ(generatedProof, proof);
+    ASSERT_TRUE(secrets.verifyClientProof(authMessage, base64::decode(generatedProof)));
 
-    auto sig = secrets.generateServerSignature(authMessage);
-    ASSERT_EQ(sig, "kiZS90Kz4/yaYZn9JieHtcRzXR0=");
-    ASSERT_TRUE(secrets.verifyServerSignature(authMessage, base64::decode(sig)));
+    const auto generatedSig = secrets.generateServerSignature(authMessage);
+    ASSERT_EQ(generatedSig, signature);
+    ASSERT_TRUE(secrets.verifyServerSignature(authMessage, base64::decode(generatedSig)));
 }
 
-TEST(MechanismScram, generateCredentials) {
-    const auto bson = SHA1Secrets::generateCredentials("password", 4096);
+TEST(MechanismScram, BasicVectors) {
+    testBasicVectors<SHA1Block>("531aYHrF581Skow4E0gCWLw/Ibo=",
+                                "wiHbIsPcvJo230S6Qf5xYCDrhb0=",
+                                "SjXiaB2hLRr8aMUyXMVEw7H1jSI=",
+                                "FilAoFIclBukd3xZxBvYMXTU3HM=",
+                                "y+cpoAm0YlN30GuNgN4B9xghi4E=",
+                                "kiZS90Kz4/yaYZn9JieHtcRzXR0=");
+    testBasicVectors<SHA256Block>("UA7rgIQG0u7EQJuOrJ99qaWVlcWnY0e/ijWBuyzSN0M=",
+                                  "xdYqTeBpV5U7m/j9EdpKT1Ls+5ublIEeYGND2RUB18k=",
+                                  "w4nwnR0Mck11lMY3EeF4pCcpJMgaToIguPbEk/ipNGY=",
+                                  "oKgZqeFO8FDpB14Y8QDLbiX1TurT6XZTdlexUt/Ny5g=",
+                                  "D6x37wuGhm1HegzIrJhedSb26XOdg5IRyR47oFqzKIo=",
+                                  "ybHsTJuRLmeT0/1YvQZKrlsgDE40RobAX7o8fu9sbdk=");
+}
+
+template <typename HashBlock>
+void testGenerateCredentials() {
+    const auto bson = Secrets<HashBlock>::generateCredentials("password", 4096);
 
     ASSERT_EQ(bson.nFields(), 4);
 
     ASSERT_TRUE(bson.hasField("salt"));
-    ASSERT_EQ(base64::decode(bson.getStringField("salt")).size(), SHA1Block::kHashLength - 4);
+    ASSERT_EQ(base64::decode(bson.getStringField("salt")).size(), HashBlock::kHashLength - 4);
 
     ASSERT_TRUE(bson.hasField("storedKey"));
-    ASSERT_EQ(base64::decode(bson.getStringField("storedKey")).size(), SHA1Block::kHashLength);
+    ASSERT_EQ(base64::decode(bson.getStringField("storedKey")).size(), HashBlock::kHashLength);
 
     ASSERT_TRUE(bson.hasField("serverKey"));
-    ASSERT_EQ(base64::decode(bson.getStringField("serverKey")).size(), SHA1Block::kHashLength);
+    ASSERT_EQ(base64::decode(bson.getStringField("serverKey")).size(), HashBlock::kHashLength);
 
     ASSERT_TRUE(bson.hasField("iterationCount"));
     ASSERT_EQ(bson.getIntField("iterationCount"), 4096);
+}
+
+TEST(MechanismScram, generateCredentials) {
+    testGenerateCredentials<SHA1Block>();
+    testGenerateCredentials<SHA256Block>();
 }
 
 }  // namespace

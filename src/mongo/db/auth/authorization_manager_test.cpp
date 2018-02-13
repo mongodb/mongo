@@ -33,6 +33,8 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -173,13 +175,16 @@ public:
     void setUp() override {
         auto localExternalState = stdx::make_unique<AuthzManagerExternalStateMock>();
         externalState = localExternalState.get();
-        externalState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
         authzManager = stdx::make_unique<AuthorizationManager>(std::move(localExternalState));
         externalState->setAuthorizationManager(authzManager.get());
         authzManager->setAuthEnabled(true);
 
-        credentials = BSON("SCRAM-SHA-1" << scram::SHA1Secrets::generateCredentials(
-                               "password", saslGlobalParams.scramSHA1IterationCount.load()));
+        credentials = BSON("SCRAM-SHA-1"
+                           << scram::Secrets<SHA1Block>::generateCredentials(
+                                  "password", saslGlobalParams.scramSHA1IterationCount.load())
+                           << "SCRAM-SHA-256"
+                           << scram::Secrets<SHA256Block>::generateCredentials(
+                                  "password", saslGlobalParams.scramSHA256IterationCount.load()));
     }
 
     std::unique_ptr<AuthorizationManager> authzManager;
