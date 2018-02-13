@@ -116,7 +116,7 @@ public:
 
     // WiredTigerIndex additions
 
-    bool isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id);
+    virtual bool isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id);
 
     uint64_t tableId() const {
         return _tableId;
@@ -220,6 +220,8 @@ public:
     Status _insert(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
 
     void _unindex(WT_CURSOR* c, const BSONObj& key, const RecordId& id, bool dupsAllowed) override;
+
+    bool isDup(WT_CURSOR* c, const BSONObj& key, const RecordId& id) override;
 
 private:
     bool _partial;
