@@ -30,7 +30,6 @@
 
 #include "mongo/db/repl/rollback_test_fixture.h"
 
-#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/rollback_impl.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
@@ -116,7 +115,7 @@ private:
 
 protected:
     std::unique_ptr<StorageInterfaceRollback> _storageInterface;
-    std::unique_ptr<OplogInterfaceLocal> _localOplog;
+    std::unique_ptr<OplogInterfaceMock> _localOplog;
     std::unique_ptr<OplogInterfaceMock> _remoteOplog;
     std::unique_ptr<RollbackImpl> _rollback;
 
@@ -144,8 +143,7 @@ void RollbackImplTest::setUp() {
     // Set up test-specific storage interface.
     _storageInterface = stdx::make_unique<StorageInterfaceRollback>();
 
-    _localOplog = stdx::make_unique<OplogInterfaceLocal>(_opCtx.get(),
-                                                         NamespaceString::kRsOplogNamespace.ns());
+    _localOplog = stdx::make_unique<OplogInterfaceMock>();
     _remoteOplog = stdx::make_unique<OplogInterfaceMock>();
     _listener = stdx::make_unique<Listener>(this);
     _rollback = stdx::make_unique<RollbackImpl>(_localOplog.get(),
@@ -154,8 +152,6 @@ void RollbackImplTest::setUp() {
                                                 _replicationProcess.get(),
                                                 _coordinator,
                                                 _listener.get());
-
-    createOplog(_opCtx.get());
 }
 
 void RollbackImplTest::tearDown() {
@@ -234,7 +230,7 @@ TEST_F(RollbackImplTest, RollbackReturnsNotSecondaryWhenFailingToTransitionToRol
 }
 
 TEST_F(RollbackImplTest, RollbackReturnsInvalidSyncSourceWhenNoRemoteOplog) {
-    ASSERT_OK(_insertOplogEntry(makeOp(1)));
+    _localOplog->setOperations({makeOpAndRecordId(1)});
 
     ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, _rollback->runRollback(_opCtx.get()));
 }
@@ -247,32 +243,27 @@ TEST_F(RollbackImplTest, RollbackReturnsOplogStartMissingWhenNoLocalOplog) {
 
 TEST_F(RollbackImplTest, RollbackReturnsNoMatchingDocumentWhenNoCommonPoint) {
     _remoteOplog->setOperations({makeOpAndRecordId(1)});
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _localOplog->setOperations({makeOpAndRecordId(2)});
 
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, _rollback->runRollback(_opCtx.get()));
 }
 
-TEST_F(RollbackImplTest, RollbackPersistsDocumentAfterCommonPointToOplogTruncateAfterPoint) {
-    auto commonPoint = makeOpAndRecordId(2);
-    _remoteOplog->setOperations({commonPoint});
-    ASSERT_OK(_insertOplogEntry(commonPoint.first));
-
-    auto nextTime = 3;
-    ASSERT_OK(_insertOplogEntry(makeOp(nextTime)));
+TEST_F(RollbackImplTest, RollbackPersistsCommonPointToOplogTruncateAfterPoint) {
+    _remoteOplog->setOperations({makeOpAndRecordId(2)});
+    _localOplog->setOperations({makeOpAndRecordId(2)});
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
 
     // Check that the common point was saved.
     auto truncateAfterPoint =
         _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(_opCtx.get());
-    ASSERT_EQUALS(Timestamp(nextTime, nextTime), truncateAfterPoint);
+    ASSERT_EQUALS(Timestamp(2, 2), truncateAfterPoint);
 }
 
 TEST_F(RollbackImplTest, RollbackIncrementsRollbackID) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
-    ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _localOplog->setOperations({op});
 
     // Get the initial rollback id.
     int initRollbackId = _replicationProcess->getRollbackID();
@@ -288,8 +279,7 @@ TEST_F(RollbackImplTest, RollbackIncrementsRollbackID) {
 TEST_F(RollbackImplTest, RollbackCallsRecoverToStableTimestamp) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
-    ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _localOplog->setOperations({op});
 
     auto stableTimestamp = Timestamp(10, 0);
     auto currTimestamp = Timestamp(20, 0);
@@ -311,8 +301,7 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverToStableTimestamp) {
 TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
-    ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _localOplog->setOperations({op});
 
     auto stableTimestamp = Timestamp(10, 0);
     auto currTimestamp = Timestamp(20, 0);
@@ -338,8 +327,7 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails
 TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
-    ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _localOplog->setOperations({op});
 
     // Delete the rollback id collection.
     auto rollbackIdNss = NamespaceString(_storageInterface->kDefaultRollbackIdNamespace);
@@ -355,8 +343,7 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
 TEST_F(RollbackImplTest, RollbackCallsRecoverFromOplog) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
-    ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _localOplog->setOperations({op});
 
     // Run rollback.
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
@@ -368,8 +355,7 @@ TEST_F(RollbackImplTest, RollbackCallsRecoverFromOplog) {
 TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownEarly) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
-    ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _localOplog->setOperations({op});
 
     _onRecoverToStableTimestampFn = [this]() {
         _recoveredToStableTimestamp = true;
@@ -388,8 +374,7 @@ TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownEarly) {
 TEST_F(RollbackImplTest, RollbackSucceeds) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
-    ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _localOplog->setOperations({op});
 
     ASSERT_OK(_rollback->runRollback(_opCtx.get()));
     ASSERT_EQUALS(Timestamp(1, 1), _commonPointFound);
@@ -405,8 +390,7 @@ DEATH_TEST_F(RollbackImplTest,
 
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
-    ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
+    _localOplog->setOperations({op});
     auto status = _rollback->runRollback(_opCtx.get());
     unittest::log() << "Mongod did not crash. Status: " << status;
     MONGO_UNREACHABLE;
@@ -420,9 +404,7 @@ DEATH_TEST_F(RollbackImplTest,
 
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
-    ASSERT_OK(_insertOplogEntry(op.first));
-    ASSERT_OK(_insertOplogEntry(makeOp(2)));
-
+    _localOplog->setOperations({op});
     auto status = _rollback->runRollback(_opCtx.get());
     unittest::log() << "Mongod did not crash. Status: " << status;
     MONGO_UNREACHABLE;

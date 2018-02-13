@@ -29,7 +29,6 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/repl/roll_back_local_operations.h"
 #include "mongo/db/repl/rollback.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/stdx/functional.h"
@@ -163,14 +162,7 @@ private:
     /**
      * Finds the common point between the local and remote oplogs.
      */
-    StatusWith<RollBackLocalOperations::RollbackCommonPoint> _findCommonPoint();
-
-    /**
-     * Finds the timestamp of the record after the common point to put into the oplog truncate
-     * after point.
-     */
-    Timestamp _findTruncateTimestamp(
-        OperationContext* opCtx, RollBackLocalOperations::RollbackCommonPoint commonPoint) const;
+    StatusWith<Timestamp> _findCommonPoint();
 
     /**
      * Uses the ReplicationCoordinator to transition the current member state to ROLLBACK.

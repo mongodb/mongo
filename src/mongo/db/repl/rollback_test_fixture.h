@@ -77,11 +77,6 @@ public:
                                          const CollectionOptions& options);
 
     /**
-     * Inserts a document into the oplog.
-     */
-    Status _insertOplogEntry(const BSONObj& doc);
-
-    /**
      * Creates an oplog entry with a recordId for a command operation.
      */
     static std::pair<BSONObj, RecordId> makeCommandOp(

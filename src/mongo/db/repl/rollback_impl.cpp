@@ -34,7 +34,6 @@
 
 #include "mongo/db/background.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -105,21 +104,16 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
         return commonPointSW.getStatus();
     }
 
-    // During replication recovery, we truncate all oplog entries with timestamps greater than or
-    // equal to the oplog truncate after point. As a result, we must find the oplog entry after
-    // the common point so we do not truncate the common point itself. If we entered rollback,
-    // we are guaranteed to have at least one oplog entry after the common point.
-    Timestamp truncatePoint = _findTruncateTimestamp(opCtx, commonPointSW.getValue());
-
-    // Persist the truncate point to the 'oplogTruncateAfterPoint' document. We save this value so
+    // Persist the common point to the 'oplogTruncateAfterPoint' document. We save this value so
     // that the replication recovery logic knows where to truncate the oplog. Note that it must be
     // saved *durably* in case a crash occurs after the storage engine recovers to the stable
     // timestamp. Upon startup after such a crash, the standard replication recovery code will know
     // where to truncate the oplog by observing the value of the 'oplogTruncateAfterPoint' document.
     // Note that the storage engine timestamp recovery only restores the database *data* to a stable
     // timestamp, but does not revert the oplog, which must be done as part of the rollback process.
-    _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(opCtx, truncatePoint);
-    _listener->onCommonPointFound(commonPointSW.getValue().first.getTimestamp());
+    _replicationProcess->getConsistencyMarkers()->setOplogTruncateAfterPoint(
+        opCtx, commonPointSW.getValue());
+    _listener->onCommonPointFound(commonPointSW.getValue());
 
     // Increment the Rollback ID of this node. The Rollback ID is a natural number that it is
     // incremented by 1 every time a rollback occurs. Note that the Rollback ID must be incremented
@@ -225,7 +219,7 @@ Status RollbackImpl::_awaitBgIndexCompletion(OperationContext* opCtx) {
     return Status::OK();
 }
 
-StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findCommonPoint() {
+StatusWith<Timestamp> RollbackImpl::_findCommonPoint() {
     if (_isInShutdown()) {
         return Status(ErrorCodes::ShutdownInProgress, "rollback shutting down");
     }
@@ -259,35 +253,7 @@ StatusWith<RollBackLocalOperations::RollbackCommonPoint> RollbackImpl::_findComm
     invariant(commonPoint.getTimestamp() >= committedSnapshot.getTimestamp());
     invariant(commonPoint >= committedSnapshot);
 
-    return commonPointSW.getValue();
-}
-
-Timestamp RollbackImpl::_findTruncateTimestamp(
-    OperationContext* opCtx, RollBackLocalOperations::RollbackCommonPoint commonPoint) const {
-
-    AutoGetCollectionForRead oplog(opCtx, NamespaceString::kRsOplogNamespace);
-    invariant(oplog.getCollection());
-    auto oplogCursor = oplog.getCollection()->getCursor(opCtx, /*forward=*/true);
-
-    auto commonPointRecord = oplogCursor->seekExact(commonPoint.second);
-    // Check that we've found the right document for the common point.
-    invariant(commonPointRecord);
-    auto commonPointTime = OpTime::parseFromOplogEntry(commonPointRecord->data.releaseToBson());
-    invariantOK(commonPointTime.getStatus());
-    invariant(commonPointTime.getValue() == commonPoint.first,
-              str::stream() << "Common point: " << commonPoint.first.toString()
-                            << ", record found: "
-                            << commonPointTime.getValue().toString());
-
-    // Get the next document, which will be the first document to truncate.
-    auto truncatePointRecord = oplogCursor->next();
-    invariant(truncatePointRecord);
-    auto truncatePointTime = OpTime::parseFromOplogEntry(truncatePointRecord->data.releaseToBson());
-    invariantOK(truncatePointTime.getStatus());
-
-    log() << "Marking to truncate all oplog entries with timestamps greater than or equal to "
-          << truncatePointTime.getValue();
-    return truncatePointTime.getValue().getTimestamp();
+    return commonPoint.getTimestamp();
 }
 
 Status RollbackImpl::_recoverToStableTimestamp(OperationContext* opCtx) {
