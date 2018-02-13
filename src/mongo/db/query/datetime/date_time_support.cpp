@@ -200,7 +200,7 @@ static timelib_tzinfo* timezonedatabase_gettzinfowrapper(char* tz_id,
 }
 
 Date_t TimeZoneDatabase::fromString(StringData dateString,
-                                    boost::optional<TimeZone> tz,
+                                    const TimeZone& tz,
                                     boost::optional<StringData> format) const {
     std::unique_ptr<timelib_error_container, TimeZoneDatabase::TimelibErrorContainerDeleter>
         errors{};
@@ -279,7 +279,7 @@ Date_t TimeZoneDatabase::fromString(StringData dateString,
                       << "\"");
     }
 
-    if (tz && !tz->isUtcZone()) {
+    if (!tz.isUtcZone()) {
         switch (parsedTime->zone_type) {
             case 0:
                 // Do nothing, as this indicates there is no associated time zone information.
@@ -306,7 +306,7 @@ Date_t TimeZoneDatabase::fromString(StringData dateString,
         }
     }
 
-    tz->adjustTimeZone(parsedTime.get());
+    tz.adjustTimeZone(parsedTime.get());
 
     return Date_t::fromMillisSinceEpoch(
         durationCount<Milliseconds>(Seconds(parsedTime->sse) + Microseconds(parsedTime->us)));

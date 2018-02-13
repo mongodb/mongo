@@ -57,9 +57,7 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-namespace {
-constexpr StringData kISOFormatString = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
-}
+constexpr StringData Value::kISOFormatString;
 
 void ValueStorage::verifyRefCountingIfShould() const {
     switch (type) {
@@ -604,7 +602,7 @@ string Value::coerceToString() const {
             return getTimestamp().toStringPretty();
 
         case Date:
-            return TimeZoneDatabase::utcZone().formatDate(kISOFormatString, getDate());
+            return TimeZoneDatabase::utcZone().formatDate(Value::kISOFormatString, getDate());
 
         case EOO:
         case jstNULL:
@@ -1140,7 +1138,7 @@ ostream& operator<<(ostream& out, const Value& val) {
         case Undefined:
             return out << "undefined";
         case Date:
-            return out << TimeZoneDatabase::utcZone().formatDate(kISOFormatString,
+            return out << TimeZoneDatabase::utcZone().formatDate(Value::kISOFormatString,
                                                                  val.coerceToDate());
         case bsonTimestamp:
             return out << val.getTimestamp().toString();

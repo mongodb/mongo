@@ -1412,11 +1412,11 @@ Value ExpressionDateFromString::evaluate(const Document& root) const {
             }
 
             return Value(getExpressionContext()->timeZoneDatabase->fromString(
-                dateTimeString, timeZone, formatValue.getStringData()));
+                dateTimeString, timeZone.get(), formatValue.getStringData()));
         }
 
         return Value(
-            getExpressionContext()->timeZoneDatabase->fromString(dateTimeString, timeZone));
+            getExpressionContext()->timeZoneDatabase->fromString(dateTimeString, timeZone.get()));
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         if (_onError) {
             return _onError->evaluate(root);
@@ -1622,20 +1622,11 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(
         }
     }
 
-    uassert(18627, "Missing 'format' parameter to $dateToString", !formatElem.eoo());
     uassert(18628, "Missing 'date' parameter to $dateToString", !dateElem.eoo());
 
-    uassert(18533,
-            "The 'format' parameter to $dateToString must be a string literal",
-            formatElem.type() == BSONType::String);
-
-    const string format = formatElem.str();
-
-    TimeZone::validateToStringFormat(format);
-
     return new ExpressionDateToString(expCtx,
-                                      format,
                                       parseOperand(expCtx, dateElem, vps),
+                                      formatElem ? parseOperand(expCtx, formatElem, vps) : nullptr,
                                       timeZoneElem ? parseOperand(expCtx, timeZoneElem, vps)
                                                    : nullptr,
                                       onNullElem ? parseOperand(expCtx, onNullElem, vps) : nullptr);
@@ -1643,12 +1634,12 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(
 
 ExpressionDateToString::ExpressionDateToString(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const string& format,
     intrusive_ptr<Expression> date,
+    intrusive_ptr<Expression> format,
     intrusive_ptr<Expression> timeZone,
     intrusive_ptr<Expression> onNull)
     : Expression(expCtx),
-      _format(format),
+      _format(std::move(format)),
       _date(std::move(date)),
       _timeZone(std::move(timeZone)),
       _onNull(std::move(onNull)) {}
@@ -1663,7 +1654,11 @@ intrusive_ptr<Expression> ExpressionDateToString::optimize() {
         _onNull = _onNull->optimize();
     }
 
-    if (ExpressionConstant::allNullOrConstant({_date, _timeZone, _onNull})) {
+    if (_format) {
+        _format = _format->optimize();
+    }
+
+    if (ExpressionConstant::allNullOrConstant({_date, _format, _timeZone, _onNull})) {
         // Everything is a constant, so we can turn into a constant.
         return ExpressionConstant::create(getExpressionContext(), evaluate(Document{}));
     }
@@ -1674,25 +1669,53 @@ intrusive_ptr<Expression> ExpressionDateToString::optimize() {
 Value ExpressionDateToString::serialize(bool explain) const {
     return Value(
         Document{{"$dateToString",
-                  Document{{"format", _format},
-                           {"date", _date->serialize(explain)},
+                  Document{{"date", _date->serialize(explain)},
+                           {"format", _format ? _format->serialize(explain) : Value()},
                            {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()},
                            {"onNull", _onNull ? _onNull->serialize(explain) : Value()}}}});
 }
 
 Value ExpressionDateToString::evaluate(const Document& root) const {
     const Value date = _date->evaluate(root);
+    Value formatValue;
+
+    // Eagerly validate the format parameter, ignoring if nullish since the input date nullish
+    // behavior takes precedence.
+    if (_format) {
+        formatValue = _format->evaluate(root);
+        if (!formatValue.nullish()) {
+            uassert(18533,
+                    str::stream() << "$dateToString requires that 'format' be a string, found: "
+                                  << typeName(formatValue.getType())
+                                  << " with value "
+                                  << formatValue.toString(),
+                    formatValue.getType() == BSONType::String);
+
+            TimeZone::validateToStringFormat(formatValue.getStringData());
+        }
+    }
+
+    // Evaluate the timezone parameter before checking for nullish input, as this will throw an
+    // exception for an invalid timezone string.
+    auto timeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get());
 
     if (date.nullish()) {
         return _onNull ? _onNull->evaluate(root) : Value(BSONNULL);
     }
 
-    auto timeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get());
     if (!timeZone) {
         return Value(BSONNULL);
     }
 
-    return Value(timeZone->formatDate(_format, date.coerceToDate()));
+    if (_format) {
+        if (formatValue.nullish()) {
+            return Value(BSONNULL);
+        }
+
+        return Value(timeZone->formatDate(formatValue.getStringData(), date.coerceToDate()));
+    }
+
+    return Value(timeZone->formatDate(Value::kISOFormatString, date.coerceToDate()));
 }
 
 void ExpressionDateToString::_doAddDependencies(DepsTracker* deps) const {
@@ -1703,6 +1726,10 @@ void ExpressionDateToString::_doAddDependencies(DepsTracker* deps) const {
 
     if (_onNull) {
         _onNull->addDependencies(deps);
+    }
+
+    if (_format) {
+        _format->addDependencies(deps);
     }
 }
 

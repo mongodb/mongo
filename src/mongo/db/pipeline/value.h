@@ -127,6 +127,8 @@ public:
     /// Deep-convert from BSONElement to Value
     explicit Value(const BSONElement& elem);
 
+    static constexpr StringData kISOFormatString = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
+
     /** Construct a long or integer-valued Value.
      *
      *  Used when preforming arithmetic operations with int where the

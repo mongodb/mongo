@@ -170,30 +170,121 @@ load("jstests/aggregation/extras/utils.js");  // For assertErrorCode
             .toArray());
 
     /* --------------------------------------------------------------------------------------- */
+    /* Test that the default format is "%Y-%m-%dT%H:%M:%S.%LZ" if none specified. */
+    coll.drop();
 
-    let pipeline = {$project: {date: {$dateToString: {date: "$date", timezone: "$tz"}}}};
-    assertErrorCode(coll, pipeline, 18627);
+    assert.writeOK(coll.insert([
+        {_id: 0, date: new ISODate("2017-01-04T15:08:51.911Z")},
+        {_id: 1, date: new ISODate("2017-07-04T15:09:12.911Z")},
+        {_id: 2, date: new ISODate("2017-12-04T15:09:14.911Z")},
+    ]));
 
-    pipeline = {$project: {date: {$dateToString: {format: "%Y-%m-%d %H:%M:%S", timezone: "$tz"}}}};
-    assertErrorCode(coll, pipeline, 18628);
+    assert.eq(
+        [
+          {_id: 0, date: "2017-01-04T10:08:51.911Z"},
+          {_id: 1, date: "2017-07-04T11:09:12.911Z"},
+          {_id: 2, date: "2017-12-04T10:09:14.911Z"},
+        ],
+        coll.aggregate([
+                {$project: {date: {$dateToString: {date: "$date", timezone: "America/New_York"}}}},
+                {$sort: {_id: 1}}
+            ])
+            .toArray());
 
-    pipeline = {
+    /* --------------------------------------------------------------------------------------- */
+    /* Test that null is returned when 'format' evaluates to nullish. */
+    coll.drop();
+    assert.writeOK(coll.insert({_id: 0}));
+
+    assert.eq([{_id: 0, date: null}],
+              coll.aggregate({
+                      $project: {
+                          date: {
+                              $dateToString: {
+                                  date: new ISODate("2017-01-04T15:08:51.911Z"),
+                                  format: null,
+                              }
+                          }
+                      }
+                  })
+                  .toArray());
+    assert.eq([{_id: 0, date: null}],
+              coll.aggregate({
+                      $project: {
+                          date: {
+                              $dateToString: {
+                                  date: new ISODate("2017-01-04T15:08:51.911Z"),
+                                  format: undefined,
+                              }
+                          }
+                      }
+                  })
+                  .toArray());
+    assert.eq([{_id: 0, date: null}],
+              coll.aggregate({
+                      $project: {
+                          date: {
+                              $dateToString: {
+                                  date: new ISODate("2017-01-04T15:08:51.911Z"),
+                                  format: "$missing",
+                              }
+                          }
+                      }
+                  })
+                  .toArray());
+
+    /* --------------------------------------------------------------------------------------- */
+
+    let pipeline = [{
         $project:
-            {date: {$dateToString: {format: "%Y-%m-%d %H:%M:%S", date: "$date", timezone: 5}}}
-    };
-    assertErrorCode(coll, pipeline, 40517);
+            {date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: 5}}}
+    }];
+    assertErrMsgContains(coll, pipeline, 18533, "$dateToString requires that 'format' be a string");
 
-    pipeline = {$project: {date: {$dateToString: {format: "%Y-%m-%d %H:%M:%S", date: 42}}}};
-    assertErrorCode(coll, pipeline, 16006);
+    pipeline =
+        [{$project: {date: {$dateToString: {format: "%Y-%m-%d %H:%M:%S", timezone: "$tz"}}}}];
+    assertErrMsgContains(coll, pipeline, 18628, "Missing 'date' parameter to $dateToString");
 
-    pipeline = {
+    pipeline = [{
         $project: {
             date: {
-                $dateToString:
-                    {format: "%Y-%m-%d %H:%M:%S", date: "$date", timezone: "DoesNot/Exist"}
+                $dateToString: {
+                    date: new ISODate("2017-01-04T15:08:51.911Z"),
+                    format: "%Y-%m-%d %H:%M:%S",
+                    timezone: 5
+                }
             }
         }
-    };
-    assertErrorCode(coll, pipeline, 40485);
+    }];
+    assertErrMsgContains(coll, pipeline, 40517, "timezone must evaluate to a string");
 
+    pipeline = [{$project: {date: {$dateToString: {format: "%Y-%m-%d %H:%M:%S", date: 42}}}}];
+    assertErrMsgContains(coll, pipeline, 16006, "can't convert from BSON type double to Date");
+
+    pipeline = [{
+        $project: {
+            date: {
+                $dateToString: {
+                    date: new ISODate("2017-01-04T15:08:51.911Z"),
+                    format: "%Y-%m-%d %H:%M:%S",
+                    timezone: "DoesNotExist"
+                }
+            }
+        }
+    }];
+    assertErrMsgContains(coll, pipeline, 40485, "unrecognized time zone identifier");
+
+    pipeline = [{
+        $project:
+            {date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: "%"}}}
+    }];
+    assertErrMsgContains(coll, pipeline, 18535, "Unmatched '%' at end of format string");
+
+    // Fails for unknown format specifier.
+    pipeline = [{
+        $project: {
+            date: {$dateToString: {date: new ISODate("2017-01-04T15:08:51.911Z"), format: "%n"}}
+        }
+    }];
+    assertErrMsgContains(coll, pipeline, 18536, "Invalid format character '%n' in format string");
 })();

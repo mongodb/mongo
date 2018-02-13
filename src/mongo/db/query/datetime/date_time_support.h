@@ -384,7 +384,7 @@ public:
      *  * The string does not match the 'format' specifier.
      */
     Date_t fromString(StringData dateString,
-                      boost::optional<TimeZone> tz,
+                      const TimeZone& tz,
                       boost::optional<StringData> format = boost::none) const;
 
     /**
