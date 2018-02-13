@@ -170,9 +170,7 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(HostAndPort peer,
     if (sslMode == kEnableSSL ||
         (sslMode == kGlobalSSLMode && ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
                                        (globalSSLMode == SSLParams::SSLMode_requireSSL)))) {
-        Status sslStatus = Status::OK();
-        auto onComplete = [&sslStatus](Status status) { sslStatus = status; };
-        session->handshakeSSLForEgress(peer, std::move(onComplete));
+        auto sslStatus = session->handshakeSSLForEgress(peer).getNoThrow();
         if (!sslStatus.isOK()) {
             return sslStatus;
         }

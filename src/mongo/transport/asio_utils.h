@@ -31,6 +31,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/system_error.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
 
@@ -165,6 +166,121 @@ StatusWith<EventsMask> pollASIOSocket(Socket& socket, EventsMask mask, Milliseco
     }
 }
 
+/**
+ * Pass this to asio functions in place of a callback to have them return a Future<T>. This behaves
+ * similarly to asio::use_future_t, however it returns a mongo::Future<T> rather than a
+ * std::future<T>.
+ *
+ * The type of the Future will be determined by the arguments that the callback would have if one
+ * was used. If the arguments start with std::error_code, it will be used to set the Status of the
+ * Future and will not affect the Future's type. For the remaining arguments:
+ *  - if none: Future<void>
+ *  - if one: Future<T>
+ *  - more than one: Future<std::tuple<A, B, ...>>
+ *
+ * Example:
+ *    Future<size_t> future = my_socket.async_read_some(my_buffer, UseFuture{});
+ */
+struct UseFuture {};
 
+namespace use_future_details {
+
+template <typename... Args>
+struct AsyncHandlerHelper {
+    using Result = std::tuple<Args...>;
+    static void complete(Promise<Result>* promise, Args... args) {
+        promise->emplaceValue(args...);
+    }
+};
+
+template <>
+struct AsyncHandlerHelper<> {
+    using Result = void;
+    static void complete(SharedPromise<Result>* promise) {
+        promise->emplaceValue();
+    }
+};
+
+template <typename Arg>
+struct AsyncHandlerHelper<Arg> {
+    using Result = Arg;
+    static void complete(SharedPromise<Result>* promise, Arg arg) {
+        promise->emplaceValue(arg);
+    }
+};
+
+template <typename... Args>
+struct AsyncHandlerHelper<std::error_code, Args...> {
+    using Helper = AsyncHandlerHelper<Args...>;
+    using Result = typename Helper::Result;
+
+    template <typename... Args2>
+    static void complete(SharedPromise<Result>* promise, std::error_code ec, Args2&&... args) {
+        if (ec) {
+            promise->setError(errorCodeToStatus(ec));
+        } else {
+            Helper::complete(promise, std::forward<Args2>(args)...);
+        }
+    }
+};
+
+template <>
+struct AsyncHandlerHelper<std::error_code> {
+    using Result = void;
+    static void complete(SharedPromise<Result>* promise, std::error_code ec) {
+        if (ec) {
+            promise->setError(errorCodeToStatus(ec));
+        } else {
+            promise->emplaceValue();
+        }
+    }
+};
+
+template <typename... Args>
+struct AsyncHandler {
+    using Helper = AsyncHandlerHelper<Args...>;
+    using Result = typename Helper::Result;
+
+    explicit AsyncHandler(UseFuture) {}
+
+    template <typename... Args2>
+    void operator()(Args2&&... args) {
+        Helper::complete(&promise, std::forward<Args2>(args)...);
+    }
+
+    SharedPromise<Result> promise;
+};
+
+template <typename... Args>
+struct AsyncResult {
+    using completion_handler_type = AsyncHandler<Args...>;
+    using RealResult = typename AsyncHandler<Args...>::Result;
+    using return_type = Future<RealResult>;
+
+    explicit AsyncResult(completion_handler_type& handler) {
+        Promise<RealResult> promise;
+        fut = promise.getFuture();
+        handler.promise = promise.share();
+    }
+
+    auto get() {
+        return std::move(fut);
+    }
+
+    Future<RealResult> fut;
+};
+
+}  // namespace use_future_details
 }  // namespace transport
 }  // namespace mongo
+
+namespace asio {
+template <typename Comp, typename Sig>
+class async_result;
+
+template <typename Result, typename... Args>
+class async_result<::mongo::transport::UseFuture, Result(Args...)>
+    : public ::mongo::transport::use_future_details::AsyncResult<Args...> {
+    using ::mongo::transport::use_future_details::AsyncResult<Args...>::AsyncResult;
+};
+}  // namespace asio
