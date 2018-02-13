@@ -171,12 +171,7 @@ public:
         if (!status.isOK())
             return appendCommandStatus(result, status);
 
-        auto rbid = ReplicationProcess::get(opCtx)->getRollbackID(opCtx);
-
-        // We should always have a Rollback ID since it is created at startup.
-        fassertStatusOK(40426, rbid.getStatus());
-
-        result.append("rbid", rbid.getValue());
+        result.append("rbid", ReplicationProcess::get(opCtx)->getRollbackID());
         return appendCommandStatus(result, Status::OK());
     }
 } cmdReplSetRBID;
