@@ -42,7 +42,9 @@ post:
         working_dir: work
         script: |
           source ./dsienv.sh
-          infrastructure_teardown.py
+          if [ -e /data/infrastructure_provisioning/terraform/provisioned.${cluster} ]; then
+            mark_idle.sh
+          fi
 
     - command: shell.exec
       params:
