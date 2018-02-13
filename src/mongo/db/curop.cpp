@@ -84,12 +84,12 @@ BSONObj upconvertQueryEntry(const BSONObj& query,
 
     // Extract the query predicate.
     BSONObj filter;
-    if (auto elem = query["query"]) {
+    if (query["query"].isABSONObj()) {
         predicateIsWrapped = true;
-        bob.appendAs(elem, "filter");
-    } else if (auto elem = query["$query"]) {
+        bob.appendAs(query["query"], "filter");
+    } else if (query["$query"].isABSONObj()) {
         predicateIsWrapped = true;
-        bob.appendAs(elem, "filter");
+        bob.appendAs(query["$query"], "filter");
     } else if (!query.isEmpty()) {
         bob.append("filter", query);
     }
