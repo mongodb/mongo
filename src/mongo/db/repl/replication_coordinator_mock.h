@@ -229,8 +229,7 @@ public:
                                               const ReplSetRequestVotesArgs& args,
                                               ReplSetRequestVotesResponse* response);
 
-    void prepareReplMetadata(OperationContext* opCtx,
-                             const BSONObj& metadataRequestObj,
+    void prepareReplMetadata(const BSONObj& metadataRequestObj,
                              const OpTime& lastOpTimeFromClient,
                              BSONObjBuilder* builder) const override;
 
