@@ -34,6 +34,18 @@ env.Library(target="integration_test_main",
             ],
 )
 
+bmEnv = env.Clone()
+bmEnv.InjectThirdPartyIncludePaths(libraries=['benchmark'])
+bmEnv.Library(
+    target="benchmark_main",
+    source=[
+        'benchmark_main.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.CppUnitTest('unittest_test', 'unittest_test.cpp')
 env.CppUnitTest('fixture_test', 'fixture_test.cpp')
 env.CppUnitTest('temp_dir_test', 'temp_dir_test.cpp')
