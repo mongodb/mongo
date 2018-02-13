@@ -33,6 +33,7 @@
 #include "mongo/db/session.h"
 
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -430,6 +431,73 @@ void Session::_beginTxn(WithLock wl, TxnNumber txnNumber) {
     _activeTxnNumber = txnNumber;
     _activeTxnCommittedStatements.clear();
     _hasIncompleteHistory = false;
+    _isSnapshotTxn = false;
+}
+
+void Session::stashTransactionResources(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    if (!_isSnapshotTxn) {
+        return;
+    }
+
+    if (!opCtx->hasStashedCursor()) {
+        if (opCtx->getWriteUnitOfWork()) {
+            opCtx->setWriteUnitOfWork(nullptr);
+        }
+        return;
+    }
+
+    if (*opCtx->getTxnNumber() != _activeTxnNumber) {
+        uasserted(ErrorCodes::TransactionAborted,
+                  str::stream() << "Transaction aborted. Active txnNumber is now "
+                                << _activeTxnNumber);
+    }
+
+    opCtx->getWriteUnitOfWork()->release();
+    opCtx->setWriteUnitOfWork(nullptr);
+
+    _stashedLocker = opCtx->releaseLockState();
+    _stashedRecoveryUnit.reset(opCtx->releaseRecoveryUnit());
+
+    opCtx->setLockState(stdx::make_unique<DefaultLockerImpl>());
+    opCtx->setRecoveryUnit(opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit(),
+                           OperationContext::kNotInUnitOfWork);
+}
+
+void Session::unstashTransactionResources(OperationContext* opCtx) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    if (opCtx->getTxnNumber() < _activeTxnNumber) {
+        _releaseStashedTransactionResources(lg, opCtx);
+        uasserted(ErrorCodes::TransactionAborted,
+                  str::stream() << "Transaction aborted. Active txnNumber is now "
+                                << _activeTxnNumber);
+        return;
+    }
+
+    if (_stashedLocker) {
+        invariant(_stashedRecoveryUnit);
+        opCtx->releaseLockState();
+        opCtx->setLockState(std::move(_stashedLocker));
+        opCtx->setRecoveryUnit(_stashedRecoveryUnit.release(),
+                               OperationContext::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->setWriteUnitOfWork(WriteUnitOfWork::createForSnapshotResume(opCtx));
+    } else {
+        auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+            opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
+            _isSnapshotTxn = true;
+        }
+    }
+}
+
+void Session::_releaseStashedTransactionResources(WithLock wl, OperationContext* opCtx) {
+    if (opCtx->getWriteUnitOfWork()) {
+        opCtx->setWriteUnitOfWork(nullptr);
+    }
+
+    _stashedRecoveryUnit.reset(nullptr);
+    _stashedLocker.reset(nullptr);
+    _isSnapshotTxn = false;
 }
 
 void Session::_checkValid(WithLock) const {

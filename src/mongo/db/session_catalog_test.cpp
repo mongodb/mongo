@@ -35,6 +35,7 @@
 #include "mongo/db/session_catalog.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/memory.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -74,9 +75,23 @@ TEST_F(SessionCatalogTest, OperationContextSession) {
 
         ASSERT(session);
         ASSERT_EQ(*opCtx()->getLogicalSessionId(), session->getSessionId());
+
+        // Confirm that stash and unstash can be executed against a top-level checked-out Session.
+        ocs.stashTransactionResources();
+        ocs.unstashTransactionResources();
     }
 
-    ASSERT(!OperationContextSession::get(opCtx()));
+    {
+        OperationContextSession ocs(opCtx(), false);
+        auto session = OperationContextSession::get(opCtx());
+
+        ASSERT(!session);
+
+        // Confirm that stash and unstash can be executed against a top-level not-checked-out
+        // Session.
+        ocs.stashTransactionResources();
+        ocs.unstashTransactionResources();
+    }
 }
 
 TEST_F(SessionCatalogTest, GetOrCreateNonExistentSession) {
@@ -139,6 +154,38 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
     }
 
     ASSERT(!OperationContextSession::get(opCtx()));
+}
+
+DEATH_TEST_F(SessionCatalogTest,
+             CannotStashInNestedOperationContext,
+             "Invariant failure checkedOutSession->checkOutNestingLevel == 1") {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(1);
+
+    {
+        OperationContextSession outerScopedSession(opCtx(), true);
+
+        {
+            OperationContextSession innerScopedSession(opCtx(), true);
+            innerScopedSession.stashTransactionResources();
+        }
+    }
+}
+
+DEATH_TEST_F(SessionCatalogTest,
+             CannotUnstashInNestedOperationContext,
+             "Invariant failure checkedOutSession->checkOutNestingLevel == 1") {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    opCtx()->setTxnNumber(1);
+
+    {
+        OperationContextSession outerScopedSession(opCtx(), true);
+
+        {
+            OperationContextSession innerScopedSession(opCtx(), true);
+            innerScopedSession.unstashTransactionResources();
+        }
+    }
 }
 
 TEST_F(SessionCatalogTest, OnlyCheckOutSessionWithCheckOutSessionTrue) {

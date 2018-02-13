@@ -101,16 +101,24 @@ using logger::LogComponent;
 // so if it didn't, and the function it was given contains any of these whitelisted commands, they
 // would try to check out a session under a lock, which is not allowed.  Similarly,
 // refreshLogicalSessionCacheNow triggers a bulk update under a lock on the sessions collection.
-const StringMap<int> cmdWhitelist = {{"delete", 1},
-                                     {"eval", 1},
-                                     {"$eval", 1},
-                                     {"findandmodify", 1},
-                                     {"findAndModify", 1},
-                                     {"insert", 1},
-                                     {"refreshLogicalSessionCacheNow", 1},
-                                     {"update", 1},
-                                     {"find", 1},
-                                     {"getMore", 1}};
+const StringMap<int> sessionCheckoutWhitelist = {{"delete", 1},
+                                                 {"eval", 1},
+                                                 {"$eval", 1},
+                                                 {"findandmodify", 1},
+                                                 {"findAndModify", 1},
+                                                 {"insert", 1},
+                                                 {"refreshLogicalSessionCacheNow", 1},
+                                                 {"update", 1},
+                                                 {"find", 1},
+                                                 {"getMore", 1},
+                                                 {"count", 1},
+                                                 {"geoSearch", 1},
+                                                 {"parallelCollectionScan", 1}};
+
+// The command names for which readConcern level snapshot is allowed. The getMore command is
+// implicitly allowed to operate on a cursor which was opened under readConcern level snapshot.
+const StringMap<int> readConcernSnapshotWhitelist = {
+    {"find", 1}, {"count", 1}, {"geoSearch", 1}, {"parallelCollectionScan", 1}};
 
 void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                       const QueryMessage& queryMessage,
@@ -526,7 +534,7 @@ void execCommandDatabase(OperationContext* opCtx,
         // Session checkout is also prevented for commands run within DBDirectClient. If checkout is
         // required, it is expected to be handled by the outermost command.
         const bool shouldCheckoutSession =
-            cmdWhitelist.find(command->getName()) != cmdWhitelist.cend() &&
+            sessionCheckoutWhitelist.find(command->getName()) != sessionCheckoutWhitelist.cend() &&
             !opCtx->getClient()->isInDirectClient();
         OperationContextSession sessionTxnState(opCtx, shouldCheckoutSession);
 
@@ -601,7 +609,30 @@ void execCommandDatabase(OperationContext* opCtx,
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         readConcernArgs = uassertStatusOK(_extractReadConcern(command, dbname, request.body));
 
+        // TODO SERVER-33354: Remove whitelist.
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+            const bool snapshotAllowedForCommand =
+                readConcernSnapshotWhitelist.find(command->getName()) !=
+                readConcernSnapshotWhitelist.cend();
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "readConcern level snapshot may not be used with the "
+                                  << command->getName()
+                                  << " command",
+                    snapshotAllowedForCommand);
+
+            uassert(ErrorCodes::InvalidOptions,
+                    "readConcernLevel snapshot requires a session ID",
+                    opCtx->getLogicalSessionId());
+            uassert(ErrorCodes::InvalidOptions,
+                    "readConcernLevel snapshot requires a txnNumber",
+                    opCtx->getTxnNumber());
+
+            // TODO SERVER-33355: Remove once readConcern level snapshot is supported on
+            // secondaries.
+            uassert(ErrorCodes::InvalidOptions,
+                    "readConcern level snapshot only supported on primaries",
+                    iAmPrimary);
+
             opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
         }
 
@@ -642,10 +673,13 @@ void execCommandDatabase(OperationContext* opCtx,
             rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
         }
 
+        sessionTxnState.unstashTransactionResources();
         retval =
             runCommandImpl(opCtx, command, request, replyBuilder, startOperationTime, behaviors);
 
-        if (!retval) {
+        if (retval) {
+            sessionTxnState.stashTransactionResources();
+        } else {
             command->incrementCommandsFailed();
         }
     } catch (const DBException& e) {

@@ -287,6 +287,36 @@ OperationContextSession::~OperationContextSession() {
     }
 }
 
+void OperationContextSession::stashTransactionResources() {
+    if (_opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+
+    if (auto& checkedOutSession = operationSessionDecoration(_opCtx)) {
+        invariant(checkedOutSession->checkOutNestingLevel == 1);
+        if (auto session = checkedOutSession->scopedSession.get()) {
+            session->stashTransactionResources(_opCtx);
+        }
+    }
+}
+
+void OperationContextSession::unstashTransactionResources() {
+    if (!_opCtx->getTxnNumber()) {
+        return;
+    }
+
+    if (_opCtx->getClient()->isInDirectClient()) {
+        return;
+    }
+
+    if (auto& checkedOutSession = operationSessionDecoration(_opCtx)) {
+        invariant(checkedOutSession->checkOutNestingLevel == 1);
+        if (auto session = checkedOutSession->scopedSession.get()) {
+            session->unstashTransactionResources(_opCtx);
+        }
+    }
+}
+
 Session* OperationContextSession::get(OperationContext* opCtx) {
     auto& checkedOutSession = operationSessionDecoration(opCtx);
     if (checkedOutSession) {

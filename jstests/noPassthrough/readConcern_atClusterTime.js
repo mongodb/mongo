@@ -19,67 +19,85 @@
         return;
     }
 
+    const session = testDB.getMongo().startSession({causalConsistency: false});
+    const sessionDb = session.getDatabase(dbName);
+
     const pingRes = assert.commandWorked(rst.getPrimary().adminCommand({ping: 1}));
     assert(pingRes.hasOwnProperty("$clusterTime"), tojson(pingRes));
     assert(pingRes.$clusterTime.hasOwnProperty("clusterTime"), tojson(pingRes));
     const clusterTime = pingRes.$clusterTime.clusterTime;
+    let txnNumber = 0;
 
     // 'atClusterTime' can be used with readConcern level 'snapshot'.
-    assert.commandWorked(testDB.runCommand(
-        {find: collName, readConcern: {level: "snapshot", atClusterTime: clusterTime}}));
+    assert.commandWorked(sessionDb.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot", atClusterTime: clusterTime},
+        txnNumber: NumberLong(txnNumber++)
+    }));
 
     // 'atClusterTime' must have type Timestamp.
-    assert.commandFailedWithCode(
-        testDB.runCommand({find: collName, readConcern: {level: "snapshot", atClusterTime: "bad"}}),
-        ErrorCodes.TypeMismatch);
+    assert.commandFailedWithCode(sessionDb.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot", atClusterTime: "bad"},
+        txnNumber: NumberLong(txnNumber++)
+    }),
+                                 ErrorCodes.TypeMismatch);
 
     // 'atClusterTime' cannot be used with readConcern level 'majority'.
     assert.commandFailedWithCode(
-        testDB.runCommand(
+        sessionDb.runCommand(
             {find: collName, readConcern: {level: "majority", atClusterTime: clusterTime}}),
         ErrorCodes.InvalidOptions);
 
     // 'atClusterTime' cannot be used with readConcern level 'local'.
     assert.commandFailedWithCode(
-        testDB.runCommand(
+        sessionDb.runCommand(
             {find: collName, readConcern: {level: "local", atClusterTime: clusterTime}}),
         ErrorCodes.InvalidOptions);
 
     // 'atClusterTime' cannot be used with readConcern level 'available'.
     assert.commandFailedWithCode(
-        testDB.runCommand(
+        sessionDb.runCommand(
             {find: collName, readConcern: {level: "available", atClusterTime: clusterTime}}),
         ErrorCodes.InvalidOptions);
 
     // 'atClusterTime' cannot be used with readConcern level 'linearizable'.
     assert.commandFailedWithCode(
-        testDB.runCommand(
+        sessionDb.runCommand(
             {find: collName, readConcern: {level: "linearizable", atClusterTime: clusterTime}}),
         ErrorCodes.InvalidOptions);
 
     // 'atClusterTime' cannot be used without readConcern level (level is 'local' by default).
     assert.commandFailedWithCode(
-        testDB.runCommand({find: collName, readConcern: {atClusterTime: clusterTime}}),
+        sessionDb.runCommand({find: collName, readConcern: {atClusterTime: clusterTime}}),
         ErrorCodes.InvalidOptions);
 
     // 'atClusterTime' cannot be used with 'afterOpTime'.
-    assert.commandFailedWithCode(testDB.runCommand({
+    assert.commandFailedWithCode(sessionDb.runCommand({
         find: collName,
         readConcern: {
             level: "snapshot",
             atClusterTime: clusterTime,
             afterOpTime: {ts: Timestamp(1, 2), t: 1}
-        }
+        },
+        txnNumber: NumberLong(txnNumber++)
     }),
                                  ErrorCodes.InvalidOptions);
+
+    // 'atClusterTime' cannot be used outside of a session.
+    assert.commandFailedWithCode(
+        testDB.runCommand(
+            {find: collName, readConcern: {level: "snapshot", atClusterTime: clusterTime}}),
+        ErrorCodes.InvalidOptions);
 
     // 'atClusterTime' cannot be used with 'afterClusterTime'.
-    assert.commandFailedWithCode(testDB.runCommand({
+    assert.commandFailedWithCode(sessionDb.runCommand({
         find: collName,
-        readConcern:
-            {level: "snapshot", atClusterTime: clusterTime, afterClusterTime: clusterTime}
+        readConcern: {level: "snapshot", atClusterTime: clusterTime, afterClusterTime: clusterTime},
+        txnNumber: NumberLong(txnNumber++)
     }),
                                  ErrorCodes.InvalidOptions);
 
+    session.endSession();
     rst.stopSet();
 }());

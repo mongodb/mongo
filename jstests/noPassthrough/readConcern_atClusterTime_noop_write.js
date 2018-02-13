@@ -40,6 +40,9 @@
         txnNumber: NumberLong(0)
     }));
 
+    // TODO SERVER-33355: Uncomment the following once secondary reads are supported for readConcern
+    // level snapshot.
+    /*
     // Perform a write on shard 1 and get its op time.
     res = assert.commandWorked(testDB1.runCommand({insert: "coll1", documents: [{_id: 0}]}));
     assert(res.hasOwnProperty("operationTime"), tojson(res));
@@ -54,6 +57,7 @@
         readConcern: {level: "snapshot", atClusterTime: clusterTime},
         txnNumber: NumberLong(0)
     }));
+    */
 
     st.stop();
 }());

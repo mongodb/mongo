@@ -293,6 +293,24 @@ public:
     void setTxnNumber(TxnNumber txnNumber);
 
     /**
+     * Returns the top-level WriteUnitOfWork associated with this operation context, if any.
+     */
+    WriteUnitOfWork* getWriteUnitOfWork() {
+        return _writeUnitOfWork.get();
+    }
+
+    /**
+     * Sets a top-level WriteUnitOfWork for this operation context, to be held for the duration
+     * of the given network operation.
+     */
+    void setWriteUnitOfWork(std::unique_ptr<WriteUnitOfWork> writeUnitOfWork) {
+        invariant(writeUnitOfWork || _writeUnitOfWork);
+        invariant(!(writeUnitOfWork && _writeUnitOfWork));
+
+        _writeUnitOfWork = std::move(writeUnitOfWork);
+    }
+
+    /**
      * Returns WriteConcernOptions of the current operation
      */
     const WriteConcernOptions& getWriteConcern() const {
@@ -411,6 +429,20 @@ public:
      */
     Microseconds getRemainingMaxTimeMicros() const;
 
+    /**
+     * Indicate that the current network operation will leave an open client cursor on completion.
+     */
+    void setStashedCursor() {
+        _hasStashedCursor = true;
+    }
+
+    /**
+     * Returns whether the current network operation will leave an open client cursor on completion.
+     */
+    bool hasStashedCursor() {
+        return _hasStashedCursor;
+    }
+
 private:
     /**
      * Returns true if this operation has a deadline and it has passed according to the fast clock
@@ -455,6 +487,10 @@ private:
     std::unique_ptr<RecoveryUnit> _recoveryUnit;
     RecoveryUnitState _ruState = kNotInUnitOfWork;
 
+    // Operations run within a transaction will hold a WriteUnitOfWork for the duration in order
+    // to maintain two-phase locking.
+    std::unique_ptr<WriteUnitOfWork> _writeUnitOfWork;
+
     // Follows the values of ErrorCodes::Error. The default value is 0 (OK), which means the
     // operation is not killed. If killed, it will contain a specific code. This value changes only
     // once from OK to some kill code.
@@ -490,16 +526,20 @@ private:
     Timer _elapsedTime;
 
     bool _writesAreReplicated = true;
+
+    // When true, the cursor used by this operation will be stashed for use by a subsequent network
+    // operation.
+    bool _hasStashedCursor = false;
 };
 
 class WriteUnitOfWork {
     MONGO_DISALLOW_COPYING(WriteUnitOfWork);
 
 public:
+    WriteUnitOfWork() = default;
+
     WriteUnitOfWork(OperationContext* opCtx)
-        : _opCtx(opCtx),
-          _committed(false),
-          _toplevel(opCtx->_ruState == OperationContext::kNotInUnitOfWork) {
+        : _opCtx(opCtx), _toplevel(opCtx->_ruState == OperationContext::kNotInUnitOfWork) {
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot execute a write operation in read-only mode",
                 !storageGlobalParams.readOnly);
@@ -512,7 +552,7 @@ public:
 
     ~WriteUnitOfWork() {
         dassert(!storageGlobalParams.readOnly);
-        if (!_committed) {
+        if (!_released && !_committed) {
             invariant(_opCtx->_ruState != OperationContext::kNotInUnitOfWork);
             if (_toplevel) {
                 _opCtx->recoveryUnit()->abortUnitOfWork();
@@ -524,8 +564,34 @@ public:
         }
     }
 
+    /**
+     * Creates a top-level WriteUnitOfWork without changing RecoveryUnit or Locker state. For use
+     * when the RecoveryUnit and Locker are already in an active state.
+     */
+    static std::unique_ptr<WriteUnitOfWork> createForSnapshotResume(OperationContext* opCtx) {
+        auto wuow = stdx::make_unique<WriteUnitOfWork>();
+        wuow->_opCtx = opCtx;
+        wuow->_toplevel = true;
+        wuow->_opCtx->_ruState = OperationContext::kActiveUnitOfWork;
+        return wuow;
+    }
+
+    /**
+     * Releases the OperationContext RecoveryUnit and Locker objects from management without
+     * changing state. Allows for use of these objects beyond the WriteUnitOfWork lifespan.
+     */
+    void release() {
+        invariant(_opCtx->_ruState == OperationContext::kActiveUnitOfWork);
+        invariant(!_committed);
+        invariant(_toplevel);
+
+        _released = true;
+        _opCtx->_ruState = OperationContext::kNotInUnitOfWork;
+    }
+
     void commit() {
         invariant(!_committed);
+        invariant(!_released);
         invariant(_opCtx->_ruState == OperationContext::kActiveUnitOfWork);
         if (_toplevel) {
             _opCtx->recoveryUnit()->commitUnitOfWork();
@@ -536,10 +602,12 @@ public:
     }
 
 private:
-    OperationContext* const _opCtx;
+    OperationContext* _opCtx;
 
-    bool _committed;
     bool _toplevel;
+
+    bool _committed = false;
+    bool _released = false;
 };
 
 namespace repl {

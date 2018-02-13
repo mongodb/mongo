@@ -415,8 +415,9 @@ public:
             exec->detachFromOperationContext();
 
             cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
-
             cursor->incPos(numResults);
+
+            opCtx->setStashedCursor();
         } else {
             curOp->debug().cursorExhausted = true;
         }

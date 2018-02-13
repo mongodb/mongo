@@ -30,13 +30,9 @@
     }));
 
     // Test that explain is illegal with other readConcern levels.
-    let nonLocalReadConcerns = ["majority", "available", "linearizable", "snapshot"];
+    // TODO SERVER-33354: Add "snapshot" once the aggregate command supports.
+    let nonLocalReadConcerns = ["majority", "available", "linearizable"];
     nonLocalReadConcerns.forEach(function(readConcernLevel) {
-        if (readConcernLevel === "snapshot" &&
-            !testDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-            return;
-        }
-
         assert.throws(() => coll.explain().aggregate([], {readConcern: {level: readConcernLevel}}));
 
         let cmdRes = testDB.runCommand({

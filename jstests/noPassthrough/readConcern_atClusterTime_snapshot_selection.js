@@ -99,6 +99,9 @@
     }));
     assert.eq(res.cursor.firstBatch.length, 2, printjson(res));
 
+    // TODO SERVER-33355: Uncomment the following once secondary reads are supported for readConcern
+    // level snapshot.
+    /*
     // A read on the lagged secondary at the old cluster time should not include the write.
     res = assert.commandWorked(secondaryDB0.runCommand(
         {find: collName, readConcern: {level: "snapshot", atClusterTime: clusterTimeBefore}}));
@@ -114,10 +117,14 @@
         txnNumber: NumberLong(secondaryTxnNumber++)
     }),
                                  ErrorCodes.ExceededTimeLimit);
+    */
 
     // Restart replication on the lagged secondary.
     restartServerReplication(secondaryConn0);
 
+    // TODO SERVER-33355: Uncomment the following once secondary reads are supported for readConcern
+    // level snapshot.
+    /*
     // A read on the secondary at the new cluster time now succeeds.
     res = assert.commandWorked(secondaryDB0.runCommand({
         find: collName,
@@ -125,6 +132,7 @@
         txnNumber: NumberLong(secondaryTxnNumber++)
     }));
     assert.eq(res.cursor.firstBatch.length, 2, printjson(res));
+    */
 
     // A read at a time that is too old fails.
     assert.commandFailedWithCode(primaryDB.runCommand({

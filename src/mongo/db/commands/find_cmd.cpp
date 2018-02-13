@@ -409,6 +409,8 @@ public:
             }
             pinnedCursor.getCursor()->setPos(numResults);
 
+            opCtx->setStashedCursor();
+
             // Fill out curop based on the results.
             endQueryOp(opCtx, collection, *cursorExec, numResults, cursorId);
         } else {

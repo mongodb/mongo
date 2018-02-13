@@ -32,9 +32,12 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/logical_session_id.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 
@@ -175,6 +178,18 @@ public:
      */
     bool checkStatementExecutedNoOplogEntryFetch(TxnNumber txnNumber, StmtId stmtId) const;
 
+    /**
+     * Transfers management of both locks and WiredTiger transaction from the OperationContext to
+     * the Session.
+     */
+    void stashTransactionResources(OperationContext* opCtx);
+
+    /**
+     * Transfers management of both locks and WiredTiger transaction from the Session to the
+     * OperationContext.
+     */
+    void unstashTransactionResources(OperationContext* opCtx);
+
 private:
     void _beginTxn(WithLock, TxnNumber txnNumber);
 
@@ -195,6 +210,8 @@ private:
                                       TxnNumber newTxnNumber,
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
+
+    void _releaseStashedTransactionResources(WithLock, OperationContext* opCtx);
 
     const LogicalSessionId _sessionId;
 
@@ -219,6 +236,17 @@ private:
     // the last written txn record. When it is > than that in the last written txn record, this
     // means a new transaction has begun on the session, but it hasn't yet performed any writes.
     TxnNumber _activeTxnNumber{kUninitializedTxnNumber};
+
+    // Set when the first command in a transaction specifies readConcern level snapshot.
+    bool _isSnapshotTxn{false};
+
+    // Holds a transaction's Locker while not active. Combined with stashing of the RecoveryUnit,
+    // this allows transaction state to be maintained across network operations.
+    std::unique_ptr<Locker> _stashedLocker;
+
+    // Holds a transaction's RecoveryUnit while not active. Combined with stashing of the Locker,
+    // this allows transaction state to be maintained across network operations.
+    std::unique_ptr<RecoveryUnit> _stashedRecoveryUnit;
 
     // For the active txn, tracks which statement ids have been committed and at which oplog
     // opTime. Used for fast retryability check and retrieving the previous write's data without

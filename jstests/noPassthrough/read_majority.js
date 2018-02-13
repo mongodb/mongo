@@ -246,7 +246,11 @@ load("jstests/libs/analyze_plan.js");
         testReadConcernLevel("majority");
     }
 
+    // TODO SERVER-33218: Test for readConcern level snapshot once itcount() preserves
+    // txnNumber. Without this, itcount() calls will execute a getMore without txnNumber.
+    /*
     if (supportsSnapshotReadConcern) {
         testReadConcernLevel("snapshot");
     }
+    */
 }());
