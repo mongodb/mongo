@@ -294,6 +294,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'db/catalog/health_log',
         'db/commands/core',
+        'db/conn_pool_options',
         'db/dbdirectclient',
         'db/ftdc/ftdc_mongod',
         'db/index_d',
@@ -409,6 +410,7 @@ env.Install(
         LIBDEPS=[
             'db/commands/core',
             'db/commands/server_status',
+            'db/conn_pool_options',
             'db/ftdc/ftdc_mongos',
             'db/logical_time_metadata_hook',
             'db/mongodandmongos',

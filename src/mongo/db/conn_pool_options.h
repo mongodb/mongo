@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,14 +26,49 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/client/global_conn_pool.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
-DBConnectionPool globalConnPool;
+// NOTE:
+// The connection pools themselves are placed in different files and are currently hard to move
+// due to spaghetti dependencies.
+// TODO: Extract conn pools from driver files and shardconnection.cpp
 
-ReplicaSetMonitorManager globalRSMonitorManager;
+/**
+ * Struct namespace for connection pool options on mongos and mongod
+ */
+struct ConnPoolOptions {
+    /**
+     * Maximum connections per host the connection pool should store.
+     */
+    static int maxConnsPerHost;
 
-}  // namespace mongo
+    /**
+     * Maximum connections per host the sharded conn pool should store.
+     */
+    static int maxShardedConnsPerHost;
+
+    /**
+     * Maximum in-use connections per host in the global connection pool.
+     */
+    static int maxInUseConnsPerHost;
+
+    /**
+     * Maximum in-use connections per host in the sharded connection pool.
+     */
+    static int maxShardedInUseConnsPerHost;
+
+    /**
+     * Amount of time, in minutes, to keep idle connections in the global connection pool.
+     */
+    static int globalConnPoolIdleTimeout;
+
+    /**
+     * Amount of time, in minutes, to keep idle connections in the sharded connection pool.
+     */
+    static int shardedConnPoolIdleTimeout;
+};
+}

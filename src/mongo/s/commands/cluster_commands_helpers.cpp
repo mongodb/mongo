@@ -40,6 +40,7 @@
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/client/parallel.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/create_database_gen.h"
