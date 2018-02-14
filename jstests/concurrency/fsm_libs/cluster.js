@@ -33,7 +33,6 @@ var Cluster = function(options) {
 
     function validateClusterOptions(options) {
         var allowedKeys = [
-            'masterSlave',
             'replication.enabled',
             'replication.numNodes',
             'sameCollection',
@@ -56,9 +55,6 @@ var Cluster = function(options) {
                             'invalid option: ' + tojson(option) + '; valid options are: ' +
                                 tojson(allowedKeys));
         });
-
-        options.masterSlave = options.masterSlave || false;
-        assert.eq('boolean', typeof options.masterSlave);
 
         options.replication = options.replication || {};
         assert.eq('object', typeof options.replication);
@@ -169,11 +165,6 @@ var Cluster = function(options) {
                'Expected teardownFunctions.config to be an array');
         assert(options.teardownFunctions.config.every(f => (typeof f === 'function')),
                'Expected teardownFunctions.config to be an array of functions');
-
-        assert(!options.masterSlave || !options.replication.enabled,
-               "Both 'masterSlave' and " + "'replication.enabled' cannot be true");
-        assert(!options.masterSlave || !options.sharded.enabled,
-               "Both 'masterSlave' and 'sharded.enabled' cannot" + "be true");
     }
 
     function makeReplSetTestConfig(numReplSetNodes) {
@@ -317,24 +308,6 @@ var Cluster = function(options) {
             };
 
             this._addReplicaSetConns(rst);
-
-        } else if (options.masterSlave) {
-            var rt = new ReplTest('replTest');
-
-            var master = rt.start(true);
-            var slave = rt.start(false);
-            conn = master;
-
-            master.adminCommand({setParameter: 1, logLevel: verbosityLevel});
-            slave.adminCommand({setParameter: 1, logLevel: verbosityLevel});
-
-            this.teardown = function teardown() {
-                options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
-
-                rt.stop();
-            };
-
-            _conns.mongod = [master, slave];
 
         } else {  // standalone server
             conn = db.getMongo();
@@ -716,8 +689,7 @@ var Cluster = function(options) {
  * and false otherwise.
  */
 Cluster.isStandalone = function isStandalone(clusterOptions) {
-    return !clusterOptions.sharded.enabled && !clusterOptions.replication.enabled &&
-        !clusterOptions.masterSlave;
+    return !clusterOptions.sharded.enabled && !clusterOptions.replication.enabled;
 };
 
 /**

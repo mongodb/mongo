@@ -209,30 +209,3 @@ secondary = rs.getSecondary();
 authReplTest.setSecondary(secondary);
 authReplTest.testAll();
 rs.stopSet();
-
-jsTest.log("3 test master/slave");
-var rt = new ReplTest(rtName);
-
-// start and stop without auth in order to ensure
-// existence of the correct dbpath
-var master = rt.start(true, {}, false, true);
-rt.stop(true);
-var slave = rt.start(false, {}, false, true);
-rt.stop(false);
-
-// start master/slave with auth
-master = rt.start(true, mongoOptions, true);
-slave = rt.start(false, mongoOptions, true);
-var masterDB = master.getDB("admin");
-
-masterDB.createUser({user: "root", pwd: "pass", roles: ["root"]});
-masterDB.auth("root", "pass");
-
-// ensure that master/slave replication is up and running
-masterDB.foo.save({}, {writeConcern: {w: 2, wtimeout: 15000}});
-masterDB.foo.drop();
-
-authReplTest = AuthReplTest({primaryConn: master, secondaryConn: slave});
-authReplTest.createUserAndRoles(2);
-authReplTest.testAll();
-rt.stop();

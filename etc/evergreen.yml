@@ -3376,17 +3376,6 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
-  name: master_slave_jscore_passthrough
-  depends_on:
-  - name: jsCore
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=master_slave_jscore_passthrough --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
   name: replica_sets_jscore_passthrough
   depends_on:
   - name: jsCore
@@ -3750,26 +3739,6 @@ tasks:
   - func: "run tests"
     vars:
       resmoke_args: --suites=replica_sets_pv0 --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: master_slave
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=master_slave --storageEngine=wiredTiger
-      run_multiple_jobs: true
-
-- <<: *task_template
-  name: master_slave_auth
-  depends_on:
-  - name: master_slave
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      resmoke_args: --suites=master_slave_auth --storageEngine=wiredTiger
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -4769,9 +4738,6 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: slow1
@@ -4885,9 +4851,6 @@ buildvariants:
   - name: replica_sets_pv0
   - name: retryable_writes_jscore_passthrough
   - name: retryable_writes_jscore_stepdown_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: serial_run
   - name: session_jscore_passthrough
   - name: sharded_causally_consistent_jscore_passthrough
@@ -4953,8 +4916,6 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_sharded
   - name: mongosTest
-  - name: master_slave
-  - name: master_slave_auth
 
 - name: linux-64-lsm
   stepback: false
@@ -5004,8 +4965,6 @@ buildvariants:
   - name: concurrency_simultaneous
   - name: replica_sets
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: slow1
   - name: serial_run
@@ -5082,9 +5041,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: sharding_last_stable_mongos_and_mixed_shards
@@ -5187,9 +5143,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: powercycle
   - name: powercycle_fcv3.4
   - name: powercycle_replication
@@ -5281,9 +5234,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: sharding_last_stable_mongos_and_mixed_shards
@@ -5376,9 +5326,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: slow1
@@ -5493,9 +5440,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: slow1
@@ -5588,9 +5532,6 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
   - name: sharding
@@ -5668,8 +5609,6 @@ buildvariants:
   - name: bulk_gle_passthrough
   - name: replica_sets_auth
   - name: replica_sets_ese
-  - name: master_slave_auth
-  - name: master_slave
   - name: powercycle
   - name: sasl
   - name: sharding_auth
@@ -5756,9 +5695,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: sharding_last_stable_mongos_and_mixed_shards
@@ -5830,8 +5766,6 @@ buildvariants:
   - name: jsCore_compatibility
   - name: jsCore_decimal
   - name: jsonSchema
-  - name: master_slave
-  - name: master_slave_jscore_passthrough
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -6092,7 +6026,6 @@ buildvariants:
   - name: read_concern_linearizable_passthrough
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave_jscore_passthrough
   - name: sasl
   - name: sharding_auth
     distros:
@@ -6173,8 +6106,6 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session
-  - name: master_slave
-  - name: master_slave_jscore_passthrough
   - name: mongosTest
   - name: multiversion
   - name: multiversion_auth
@@ -6314,8 +6245,6 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_causal_consistency
   - name: jstestfuzz_sharded_session
-  - name: master_slave
-  - name: master_slave_jscore_passthrough
   - name: mongosTest
   - name: noPassthroughWithMongod
   - name: noPassthrough
@@ -6373,7 +6302,6 @@ buildvariants:
   - name: jsCore_decimal
   - name: mongosTest
   - name: replica_sets
-  - name: master_slave
   - name: tool
 
 - name: enterprise-osx-1010
@@ -6593,9 +6521,6 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
@@ -6761,9 +6686,6 @@ buildvariants:
   - name: jsCore_decimal
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
@@ -6955,9 +6877,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: slow1
@@ -7048,9 +6967,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: slow1
@@ -7146,9 +7062,6 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
   - name: sharding
@@ -7253,9 +7166,6 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
   - name: sharding
@@ -7354,9 +7264,6 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
   - name: sharding
@@ -7732,9 +7639,6 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
   - name: sharding
@@ -7826,9 +7730,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: sharding_last_stable_mongos_and_mixed_shards
@@ -8022,9 +7923,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: sharding_last_stable_mongos_and_mixed_shards
@@ -8110,9 +8008,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: sharding_last_stable_mongos_and_mixed_shards
@@ -8250,9 +8145,6 @@ buildvariants:
   - name: replica_sets
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: sharding_last_stable_mongos_and_mixed_shards
@@ -8354,9 +8246,6 @@ buildvariants:
   - name: jstestfuzz_sharded
   - name: jstestfuzz_sharded_session
   - name: jstestfuzz_sharded_causal_consistency
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: mongosTest
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -8567,9 +8456,6 @@ buildvariants:
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
   - name: rollback_fuzzer
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sharding
   - name: sharding_auth
   - name: sharding_op_query
@@ -8644,9 +8530,6 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
   - name: sharding
@@ -8734,9 +8617,6 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_pv0
   - name: replica_sets_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
   - name: sharding
@@ -8855,9 +8735,6 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsonSchema
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
@@ -9014,9 +8891,6 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsonSchema
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: mongosTest
   - name: multiversion_auth
   - name: multiversion
@@ -9167,9 +9041,6 @@ buildvariants:
   - name: replica_sets_initsync_static_jscore_passthrough
   - name: replica_sets_resync_static_jscore_passthrough
   - name: replica_sets_kill_secondaries_jscore_passthrough
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: sasl
   - name: sharded_collections_jscore_passthrough
   - name: sharding
@@ -9293,8 +9164,6 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session
-  - name: master_slave
-  - name: master_slave_jscore_passthrough
   - name: mmap
   - name: multiversion
   - name: multiversion_auth
@@ -9421,8 +9290,6 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session
-  - name: master_slave
-  - name: master_slave_jscore_passthrough
   - name: mmap
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -9526,8 +9393,6 @@ buildvariants:
   - name: jstestfuzz_sharded_causal_consistency
   - name: jstestfuzz_sharded_continuous_stepdown
   - name: jstestfuzz_sharded_session
-  - name: master_slave
-  - name: master_slave_jscore_passthrough
   - name: mmap
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -9598,9 +9463,6 @@ buildvariants:
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_replication
   - name: jstestfuzz_sharded
-  - name: master_slave
-  - name: master_slave_auth
-  - name: master_slave_jscore_passthrough
   - name: mmap
   - name: noPassthrough
   - name: noPassthroughWithMongod

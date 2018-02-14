@@ -571,46 +571,6 @@ TEST_F(RenameCollectionTest, RenameCollectionMakesTargetCollectionDropPendingIfD
         << " not renamed to drop-pending collection after successful rename";
 }
 
-/**
- * Sets up ReplicationCoordinator for master/slave.
- */
-void _setUpMasterSlave(ServiceContext* service) {
-    repl::ReplSettings settings;
-    settings.setOplogSizeBytes(10 * 1024 * 1024);
-    settings.setMaster(true);
-    repl::ReplicationCoordinator::set(
-        service, stdx::make_unique<repl::ReplicationCoordinatorMock>(service, settings));
-    auto replCoord = repl::ReplicationCoordinator::get(service);
-    ASSERT_TRUE(repl::ReplicationCoordinator::modeMasterSlave == replCoord->getReplicationMode());
-}
-
-TEST_F(RenameCollectionTest,
-       RenameCollectionDropsTargetCollectionIfDropTargetIsTrueAndReplModeIsMasterSlave) {
-    _setUpMasterSlave(getServiceContext());
-
-    _createCollection(_opCtx.get(), _sourceNss);
-    _createCollection(_opCtx.get(), _targetNss);
-    RenameCollectionOptions options;
-    options.dropTarget = true;
-    ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss))
-        << "source collection " << _sourceNss << " still exists after successful rename";
-    ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss)) << "target collection " << _targetNss
-                                                             << " missing after successful rename";
-
-    ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
-
-    auto renameOpTime = _opObserver->renameOpTime;
-    ASSERT_GREATER_THAN(renameOpTime, repl::OpTime());
-
-    // Confirm that the target collection is not renamed to a drop-pending collection under
-    // master/slave.
-    auto dpns = _targetNss.makeDropPendingNamespace(renameOpTime);
-    ASSERT_FALSE(_collectionExists(_opCtx.get(), dpns))
-        << "target collection " << _targetNss
-        << " renamed to drop-pending collection after successful rename";
-}
-
 TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsRejectsRenameOpTimeIfWritesAreReplicated) {
     ASSERT_TRUE(_opCtx->writesAreReplicated());
 

@@ -11,8 +11,6 @@
 
     var cmdLineOpts = db.adminCommand('getCmdLineOpts');
     assert.commandWorked(cmdLineOpts);
-    var isMasterSlave = cmdLineOpts.parsed.master === true;
-    assert(!isMasterSlave, 'Master/Slave is not supported with initial sync hooks');
 
     // The initial sync hooks only work for replica sets.
     var rst = new ReplSetTest(db.getMongo().host);

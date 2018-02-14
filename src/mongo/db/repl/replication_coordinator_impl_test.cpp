@@ -594,24 +594,6 @@ TEST_F(ReplCoordTest, NodeReturnsImmediatelyWhenAwaitReplicationIsRanAgainstASta
     ASSERT_OK(statusAndDur.status);
 }
 
-TEST_F(ReplCoordTest, NodeReturnsImmediatelyWhenAwaitReplicationIsRanAgainstAMasterSlaveNode) {
-    ReplSettings settings;
-    settings.setMaster(true);
-    init(settings);
-    auto opCtx = makeOperationContext();
-
-    OpTimeWithTermOne time(100, 1);
-
-    WriteConcernOptions writeConcern;
-    writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-    writeConcern.wNumNodes = 0;
-    writeConcern.wMode = WriteConcernOptions::kMajority;
-    // w:majority always works on master/slave
-    ReplicationCoordinator::StatusAndDuration statusAndDur =
-        getReplCoord()->awaitReplication(opCtx.get(), time, writeConcern);
-    ASSERT_OK(statusAndDur.status);
-}
-
 TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenRunningAwaitReplicationAgainstASecondaryNode) {
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -2184,24 +2166,6 @@ TEST_F(ReplCoordTest, GetReplicationModeNone) {
 }
 
 TEST_F(ReplCoordTest,
-       NodeReturnsModeMasterSlaveInResponseToGetReplicationModeWhenRunningWithTheMasterFlag) {
-    // modeMasterSlave if master set
-    ReplSettings settings;
-    settings.setMaster(true);
-    init(settings);
-    ASSERT_EQUALS(ReplicationCoordinator::modeMasterSlave, getReplCoord()->getReplicationMode());
-}
-
-TEST_F(ReplCoordTest,
-       NodeReturnsModeMasterSlaveInResponseToGetReplicationModeWhenRunningWithTheSlaveFlag) {
-    // modeMasterSlave if the slave flag was set
-    ReplSettings settings;
-    settings.setSlave(true);
-    init(settings);
-    ASSERT_EQUALS(ReplicationCoordinator::modeMasterSlave, getReplCoord()->getReplicationMode());
-}
-
-TEST_F(ReplCoordTest,
        NodeReturnsModeReplSetInResponseToGetReplicationModeWhenRunningWithTheReplSetFlag) {
     // modeReplSet if the set name was supplied.
     ReplSettings settings;
@@ -2620,36 +2584,6 @@ TEST_F(ReplCoordTest,
         ASSERT_EQUALS(client2Host, caughtUpHosts[0]);
         ASSERT_EQUALS(myHost, caughtUpHosts[1]);
     }
-}
-
-TEST_F(ReplCoordTest, NodeDoesNotIncludeItselfWhenRunningGetHostsWrittenToInMasterSlave) {
-    ReplSettings settings;
-    settings.setMaster(true);
-    init(settings);
-    HostAndPort clientHost("node2:12345");
-    auto opCtx = makeOperationContext();
-
-
-    OID client = OID::gen();
-    OpTimeWithTermOne time1(100, 1);
-    OpTimeWithTermOne time2(100, 2);
-
-    getExternalState()->setClientHostAndPort(clientHost);
-    HandshakeArgs handshake;
-    ASSERT_OK(handshake.initialize(BSON("handshake" << client)));
-    ASSERT_OK(getReplCoord()->processHandshake(opCtx.get(), handshake));
-
-    getReplCoord()->setMyLastAppliedOpTime(time2);
-    getReplCoord()->setMyLastDurableOpTime(time2);
-    ASSERT_OK(getReplCoord()->setLastOptimeForSlave(client, time1.timestamp));
-
-    std::vector<HostAndPort> caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2, false);
-    ASSERT_EQUALS(0U, caughtUpHosts.size());  // self doesn't get included in master-slave
-
-    ASSERT_OK(getReplCoord()->setLastOptimeForSlave(client, time2.timestamp));
-    caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2, false);
-    ASSERT_EQUALS(1U, caughtUpHosts.size());
-    ASSERT_EQUALS(clientHost, caughtUpHosts[0]);
 }
 
 TEST_F(ReplCoordTest, NodeReturnsNoNodesWhenGetOtherNodesInReplSetIsRunBeforeHavingAConfig) {
@@ -3479,12 +3413,6 @@ protected:
         settings.setReplSetString("replset");
         init(settings);
     }
-
-    void initMasterSlaveMode() {
-        auto settings = ReplSettings();
-        settings.setSlave(true);
-        init(settings);
-    }
 };
 
 // An equality assertion for two std::set<OpTime> values. Prints the elements of each set when
@@ -3681,25 +3609,6 @@ TEST_F(StableOpTimeTest, AdvanceCommitPointSetsStableOpTimeForStorage) {
     auto opTimeCandidates = getReplCoord()->getStableOpTimeCandidates_forTest();
     std::set<OpTime> expectedOpTimeCandidates = {OpTime({1, 2}, term)};
     ASSERT_OPTIME_SET_EQ(expectedOpTimeCandidates, opTimeCandidates);
-}
-
-TEST_F(StableOpTimeTest, SetMyLastAppliedDoesntAddTimestampCandidateInMasterSlaveMode) {
-
-    /**
-     * Test that 'setMyLastAppliedOpTime' doesn't add timestamp candidates to the stable optime
-     * list when running in master-slave mode.
-     */
-
-    initMasterSlaveMode();
-    auto repl = getReplCoord();
-
-    ASSERT(repl->getStableOpTimeCandidates_forTest().empty());
-
-    repl->setMyLastAppliedOpTime(OpTime({0, 1}, 0));
-    repl->setMyLastAppliedOpTime(OpTime({0, 2}, 0));
-
-    // Make sure no timestamps candidates were added.
-    ASSERT(repl->getStableOpTimeCandidates_forTest().empty());
 }
 
 TEST_F(StableOpTimeTest, ClearOpTimeCandidatesPastCommonPointAfterRollback) {
