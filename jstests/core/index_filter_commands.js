@@ -6,20 +6,24 @@
  *   Displays index filters for all query shapes in a collection.
  *
  * - planCacheClearFilters
- *   Clears index filter for a single query shape or,
- *   if the query shape is omitted, all filters for the collection.
+ *   Clears index filter for a single query shape or, if the query shape is omitted, all filters for
+ *   the collection.
  *
  * - planCacheSetFilter
  *   Sets index filter for a query shape. Overrides existing filter.
  *
- * Not a lot of data access in this test suite. Hint commands
- * manage a non-persistent mapping in the server of
- * query shape to list of index specs.
+ * Not a lot of data access in this test suite. Hint commands manage a non-persistent mapping in the
+ * server of query shape to list of index specs.
  *
- * Only time we might need to execute a query is to check the plan
- * cache state. We would do this with the planCacheListPlans command
- * on the same query shape with the index filters.
+ * Only time we might need to execute a query is to check the plan cache state. We would do this
+ * with the planCacheListPlans command on the same query shape with the index filters.
  *
+ * @tags: [
+ *   # This test attempts to perform queries with plan cache filters set up. The former operation
+ *   # may be routed to a secondary in the replica set, whereas the latter must be routed to the
+ *   # primary.
+ *   assumes_read_preference_unchanged,
+ * ]
  */
 
 load("jstests/libs/analyze_plan.js");

@@ -187,7 +187,7 @@ class CPPIntegrationTestCase(TestCase):
     def configure(self, fixture, *args, **kwargs):
         TestCase.configure(self, fixture, *args, **kwargs)
 
-        self.program_options["connectionString"] = self.fixture.get_connection_string()
+        self.program_options["connectionString"] = self.fixture.get_internal_connection_string()
 
     def run_test(self):
         try:
@@ -421,11 +421,13 @@ class JSTestCase(TestCase):
         is_main_test = True
         if thread_id > 0:
             is_main_test = False
-        return core.programs.mongo_shell_program(logger,
-                                                 executable=self.shell_executable,
-                                                 filename=self.js_filename,
-                                                 isMainTest=is_main_test,
-                                                 **self.shell_options)
+        return core.programs.mongo_shell_program(
+            logger,
+            executable=self.shell_executable,
+            filename=self.js_filename,
+            connection_string=self.fixture.get_driver_connection_url(),
+            isMainTest=is_main_test,
+            **self.shell_options)
 
     def _run_test_in_thread(self, thread_id):
         # Make a logger for each thread.

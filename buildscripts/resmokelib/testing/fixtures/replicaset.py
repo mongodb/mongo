@@ -37,7 +37,8 @@ class ReplicaSetFixture(interface.ReplFixture):
                  write_concern_majority_journal_default=None,
                  auth_options=None,
                  replset_config_options=None,
-                 voting_secondaries=False):
+                 voting_secondaries=False,
+                 use_replica_set_connection_string=False):
 
         interface.ReplFixture.__init__(self, logger, job_num)
 
@@ -50,6 +51,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.auth_options = auth_options
         self.replset_config_options = utils.default_if_none(replset_config_options, {})
         self.voting_secondaries = voting_secondaries
+        self.use_replica_set_connection_string = use_replica_set_connection_string
 
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
@@ -97,7 +99,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         # Initiate the replica set.
         members = []
         for (i, node) in enumerate(self.nodes):
-            member_info = {"_id": i, "host": node.get_connection_string()}
+            member_info = {"_id": i, "host": node.get_internal_connection_string()}
             if i > 0:
                 member_info["priority"] = 0
                 if i >= 7 or not self.voting_secondaries:
@@ -107,7 +109,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             members.append(member_info)
         if self.initial_sync_node:
             members.append({"_id": self.initial_sync_node_idx,
-                            "host": self.initial_sync_node.get_connection_string(),
+                            "host": self.initial_sync_node.get_internal_connection_string(),
                             "priority": 0,
                             "hidden": 1,
                             "votes": 0})
@@ -291,11 +293,27 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         return logging.loggers.new_logger(logger_name, parent=self.logger)
 
-    def get_connection_string(self):
+    def get_internal_connection_string(self):
         if self.replset_name is None:
-            raise ValueError("Must call setup() before calling get_connection_string()")
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
-        conn_strs = [node.get_connection_string() for node in self.nodes]
+        conn_strs = [node.get_internal_connection_string() for node in self.nodes]
         if self.initial_sync_node:
-            conn_strs.append(self.initial_sync_node.get_connection_string())
+            conn_strs.append(self.initial_sync_node.get_internal_connection_string())
         return self.replset_name + "/" + ",".join(conn_strs)
+
+    def get_driver_connection_url(self):
+        if self.replset_name is None:
+            raise ValueError("Must call setup() before calling get_driver_connection_url()")
+
+        if self.use_replica_set_connection_string:
+            # We use a replica set connection string when all nodes are electable because we
+            # anticipate the client will want to gracefully handle any failovers.
+            conn_strs = [node.get_internal_connection_string() for node in self.nodes]
+            if self.initial_sync_node:
+                conn_strs.append(self.initial_sync_node.get_internal_connection_string())
+            return "mongodb://" + ",".join(conn_strs) + "/?replicaSet=" + self.replset_name
+        else:
+            # We return a direct connection to the expected pimary when only the first node is
+            # electable because we want the client to error out if a stepdown occurs.
+            return self.nodes[0].get_driver_connection_url()

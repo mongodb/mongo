@@ -170,11 +170,14 @@ class ShardedClusterFixture(interface.Fixture):
                 all(shard.is_running() for shard in self.shards) and
                 self.mongos is not None and self.mongos.is_running())
 
-    def get_connection_string(self):
+    def get_internal_connection_string(self):
         if self.mongos is None:
-            raise ValueError("Must call setup() before calling get_connection_string()")
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
-        return "%s:%d" % (socket.gethostname(), self.mongos.port)
+        return self.mongos.get_internal_connection_string()
+
+    def get_driver_connection_url(self):
+        return "mongodb://" + self.get_internal_connection_string()
 
     def _new_configsvr(self):
         """
@@ -229,16 +232,11 @@ class ShardedClusterFixture(interface.Fixture):
         mongos_logger = logging.loggers.new_logger(logger_name, parent=self.logger)
 
         mongos_options = copy.deepcopy(self.mongos_options)
-        configdb_hostname = socket.gethostname()
 
         if self.separate_configsvr:
-            configdb_replset = ShardedClusterFixture._CONFIGSVR_REPLSET_NAME
-            configdb_port = self.configsvr.port
-            mongos_options["configdb"] = "%s/%s:%d" % (configdb_replset,
-                                                       configdb_hostname,
-                                                       configdb_port)
+            mongos_options["configdb"] = self.configsvr.get_internal_connection_string()
         else:
-            mongos_options["configdb"] = "%s:%d" % (configdb_hostname, self.shards[0].port)
+            mongos_options["configdb"] = "localhost:%d" % (self.shards[0].port)
 
         return _MongoSFixture(mongos_logger,
                               self.job_num,
@@ -254,9 +252,9 @@ class ShardedClusterFixture(interface.Fixture):
         for more details.
         """
 
-        hostname = socket.gethostname()
-        self.logger.info("Adding %s:%d as a shard..." % (hostname, shard.port))
-        client.admin.command({"addShard": "%s:%d" % (hostname, shard.port)})
+        connection_string = shard.get_internal_connection_string()
+        self.logger.info("Adding %s as a shard...", connection_string)
+        client.admin.command({"addShard": connection_string})
 
 
 class _MongoSFixture(interface.Fixture):
@@ -356,3 +354,12 @@ class _MongoSFixture(interface.Fixture):
 
     def is_running(self):
         return self.mongos is not None and self.mongos.poll() is None
+
+    def get_internal_connection_string(self):
+        if self.mongos is None:
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
+
+        return "localhost:%d" % self.port
+
+    def get_driver_connection_url(self):
+        return "mongodb://" + self.get_internal_connection_string()

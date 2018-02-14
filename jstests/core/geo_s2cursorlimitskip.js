@@ -1,4 +1,11 @@
 // Test various cursor behaviors
+//
+// @tags: [
+//   # This test attempts to enable profiling on a server and then get profiling data by reading
+//   # from the "system.profile" collection. The former operation must be routed to the primary in
+//   # a replica set, whereas the latter may be routed to a secondary.
+//   assumes_read_preference_unchanged,
+// ]
 
 var testDB = db.getSiblingDB("geo_s2cursorlimitskip");
 var t = testDB.geo_s2getmmm;
