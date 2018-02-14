@@ -31,7 +31,7 @@ class MasterSlaveFixture(interface.ReplFixture):
                  dbpath_prefix=None,
                  preserve_dbpath=False):
 
-        interface.ReplFixture.__init__(self, logger, job_num)
+        interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
         if "dbpath" in mongod_options:
             raise ValueError("Cannot specify mongod_options.dbpath")
@@ -42,12 +42,7 @@ class MasterSlaveFixture(interface.ReplFixture):
         self.slave_options = utils.default_if_none(slave_options, {})
         self.preserve_dbpath = preserve_dbpath
 
-        # Command line options override the YAML configuration.
-        dbpath_prefix = utils.default_if_none(config.DBPATH_PREFIX, dbpath_prefix)
-        dbpath_prefix = utils.default_if_none(dbpath_prefix, config.DEFAULT_DBPATH_PREFIX)
-        self._dbpath_prefix = os.path.join(dbpath_prefix,
-                                           "job%d" % (self.job_num),
-                                           config.FIXTURE_SUBDIR)
+        self._dbpath_prefix = os.path.join(self._dbpath_prefix, config.FIXTURE_SUBDIR)
 
         self.master = None
         self.slave = None
@@ -61,9 +56,6 @@ class MasterSlaveFixture(interface.ReplFixture):
         if self.slave is None:
             self.slave = self._new_mongod_slave()
         self.slave.setup()
-
-    def get_dbpath(self):
-        return self._dbpath_prefix
 
     def await_ready(self):
         self.master.await_ready()

@@ -9,6 +9,10 @@ selector:
 # noPassthrough tests start their own mongod's.
 executor:
   js_test:
+    archive:
+      tests:
+        - jstests/noPassthrough/backup*.js
+        - jstests/noPassthrough/wt_unclean_shutdown.js
     config:
       shell_options:
         nodb: ''

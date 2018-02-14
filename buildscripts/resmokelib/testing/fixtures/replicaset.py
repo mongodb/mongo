@@ -40,7 +40,7 @@ class ReplicaSetFixture(interface.ReplFixture):
                  voting_secondaries=False,
                  use_replica_set_connection_string=False):
 
-        interface.ReplFixture.__init__(self, logger, job_num)
+        interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
         self.mongod_executable = mongod_executable
         self.mongod_options = utils.default_if_none(mongod_options, {})
@@ -59,12 +59,7 @@ class ReplicaSetFixture(interface.ReplFixture):
         if "dbpath" in self.mongod_options:
             self._dbpath_prefix = self.mongod_options.pop("dbpath")
         else:
-            # Command line options override the YAML configuration.
-            dbpath_prefix = utils.default_if_none(config.DBPATH_PREFIX, dbpath_prefix)
-            dbpath_prefix = utils.default_if_none(dbpath_prefix, config.DEFAULT_DBPATH_PREFIX)
-            self._dbpath_prefix = os.path.join(dbpath_prefix,
-                                               "job%d" % (self.job_num),
-                                               config.FIXTURE_SUBDIR)
+            self._dbpath_prefix = os.path.join(self._dbpath_prefix, config.FIXTURE_SUBDIR)
 
         self.nodes = []
         self.replset_name = None
@@ -185,9 +180,6 @@ class ReplicaSetFixture(interface.ReplFixture):
                 if attempt == num_initiate_attempts:
                     raise
                 time.sleep(5)  # Wait a little bit before trying again.
-
-    def get_dbpath(self):
-        return self._dbpath_prefix
 
     def await_ready(self):
         self._await_primary()
