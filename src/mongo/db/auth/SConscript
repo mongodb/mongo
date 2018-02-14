@@ -86,6 +86,7 @@ env.Library(
              '$BUILD_DIR/mongo/db/service_context',
              '$BUILD_DIR/mongo/db/update/update_driver',
              '$BUILD_DIR/mongo/util/md5',
+             '$BUILD_DIR/mongo/util/icu',
              '$BUILD_DIR/mongo/util/net/network',
     ],
 )
