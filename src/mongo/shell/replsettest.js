@@ -427,8 +427,10 @@ var ReplSetTest = function(opts) {
             var member = {};
             member._id = i;
 
-            var port = this.ports[i];
-            member.host = this.host + ":" + port;
+            member.host = this.host;
+            if (!member.host.contains('/')) {
+                member.host += ":" + this.ports[i];
+            }
 
             var nodeOpts = this.nodeOptions["n" + i];
             if (nodeOpts) {

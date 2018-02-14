@@ -95,7 +95,9 @@ void HostAndPort::append(StringBuilder& ss) const {
     } else {
         ss << host();
     }
-    ss << ':' << port();
+    if (host().find('/') == std::string::npos) {
+        ss << ':' << port();
+    }
 }
 
 bool HostAndPort::empty() const {
