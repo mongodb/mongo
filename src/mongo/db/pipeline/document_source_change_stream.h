@@ -107,9 +107,6 @@ public:
         bool _documentKeyFieldsSharded = false;
     };
 
-    // The sort pattern used to merge results from multiple change streams on a mongos.
-    static const BSONObj kSortSpec;
-
     // The name of the field where the document key (_id and shard key, if present) will be found
     // after the transformation.
     static constexpr StringData kDocumentKeyField = "documentKey"_sd;

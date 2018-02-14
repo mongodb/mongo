@@ -1880,6 +1880,72 @@ TEST_F(AsyncResultsMergerTest, KillShouldNotWaitForRemoteCommandsBeforeSchedulin
     executor()->waitForEvent(killEvent);
 }
 
-}  // namespace
+TEST_F(AsyncResultsMergerTest, ShouldBeAbleToBlockUntilNextResultIsReady) {
+    std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
+    cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 1, {}));
+    makeCursorFromExistingCursors(std::move(cursors));
 
+    // Before any requests are scheduled, ARM is not ready to return results.
+    ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    // Issue a blocking wait for the next result asynchronously on a different thread.
+    auto future = launchAsync([&]() {
+        auto next = unittest::assertGet(arm->blockingNext());
+        ASSERT_FALSE(next.isEOF());
+        ASSERT_BSONOBJ_EQ(*next.getResult(), BSON("x" << 1));
+        next = unittest::assertGet(arm->blockingNext());
+        ASSERT_TRUE(next.isEOF());
+    });
+
+    // Schedule the response to the getMore which will return the next result and mark the cursor as
+    // exhausted.
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["getMore"]);
+        return CursorResponse(_nss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+    });
+
+    future.timed_get(kFutureTimeout);
+}
+
+TEST_F(AsyncResultsMergerTest, ShouldBeInterruptableDuringBlockingNext) {
+    std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
+    cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 1, {}));
+    makeCursorFromExistingCursors(std::move(cursors));
+
+    // Issue a blocking wait for the next result asynchronously on a different thread.
+    auto future = launchAsync([&]() {
+        auto nextStatus = arm->blockingNext();
+        ASSERT_EQ(nextStatus.getStatus(), ErrorCodes::Interrupted);
+    });
+
+    // Now mark the OperationContext as killed from this thread.
+    {
+        stdx::lock_guard<Client> lk(*operationContext()->getClient());
+        operationContext()->markKilled(ErrorCodes::Interrupted);
+    }
+    future.timed_get(kFutureTimeout);
+    // Be careful not to use a blocking kill here, since the main thread is in charge of running the
+    // callbacks, and we'd block on ourselves.
+    auto killEvent = arm->kill(operationContext());
+
+    assertKillCusorsCmdHasCursorId(getNthPendingRequest(0u).cmdObj, 1);
+    runReadyCallbacks();
+    executor()->waitForEvent(killEvent);
+}
+
+TEST_F(AsyncResultsMergerTest, ShouldBeAbleToBlockUntilKilled) {
+    std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
+    cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 1, {}));
+    makeCursorFromExistingCursors(std::move(cursors));
+
+    // Before any requests are scheduled, ARM is not ready to return results.
+    ASSERT_FALSE(arm->ready());
+    ASSERT_FALSE(arm->remotesExhausted());
+
+    arm->blockingKill(operationContext());
+}
+
+}  // namespace
 }  // namespace mongo

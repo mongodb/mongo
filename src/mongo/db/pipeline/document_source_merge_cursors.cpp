@@ -1,5 +1,5 @@
 /**
- * Copyright 2013 (c) 10gen Inc.
+ * Copyright (C) 2018 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -17,179 +17,196 @@
  * code of portions of this program with the OpenSSL library under certain
  * conditions as described in each individual source file and distribute
  * linked combinations including the program with the OpenSSL library. You
- * must comply with the GNU Affero General Public License in all respects for
- * all of the code used other than as permitted herein. If you modify file(s)
- * with this exception, you may extend this exception to your version of the
- * file(s), but you are not obligated to do so. If you do not wish to do so,
- * delete this exception statement from your version. If you delete this
- * exception statement from all source files in the program, then also delete
- * it in the license file.
+ * must comply with the GNU Affero General Public License in all respects
+ * for all of the code used other than as permitted herein. If you modify
+ * file(s) with this exception, you may extend this exception to your
+ * version of the file(s), but you are not obligated to do so. If you do not
+ * wish to do so, delete this exception statement from your version. If you
+ * delete this exception statement from all source files in the program,
+ * then also delete it in the license file.
  */
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_merge_cursors.h"
-
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
-
-using boost::intrusive_ptr;
-using std::make_pair;
-using std::string;
-using std::vector;
-
-constexpr StringData DocumentSourceMergeCursors::kStageName;
-
-DocumentSourceMergeCursors::DocumentSourceMergeCursors(
-    std::vector<CursorDescriptor> cursorDescriptors,
-    const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(pExpCtx), _cursorDescriptors(std::move(cursorDescriptors)), _unstarted(true) {}
 
 REGISTER_DOCUMENT_SOURCE(mergeCursors,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceMergeCursors::createFromBson);
 
-intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
-    std::vector<CursorDescriptor> cursorDescriptors,
-    const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    intrusive_ptr<DocumentSourceMergeCursors> source(
-        new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx));
-    return source;
-}
+constexpr StringData DocumentSourceMergeCursors::kStageName;
 
-intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
-    massert(17026,
-            string("Expected an Array, but got a ") + typeName(elem.type()),
-            elem.type() == Array);
-
-    std::vector<CursorDescriptor> cursorDescriptors;
-    BSONObj array = elem.embeddedObject();
-    BSONForEach(cursor, array) {
-        massert(17027,
-                string("Expected an Object, but got a ") + typeName(cursor.type()),
-                cursor.type() == Object);
-
-        // The cursor descriptors for the merge cursors stage used to lack an "ns" field; "ns" was
-        // understood to be the expression context namespace in that case. For mixed-version
-        // compatibility, we accept both the old and new formats here.
-        std::string cursorNs = cursor["ns"] ? cursor["ns"].String() : pExpCtx->ns.ns();
-
-        cursorDescriptors.emplace_back(ConnectionString(HostAndPort(cursor["host"].String())),
-                                       std::move(cursorNs),
-                                       cursor["id"].Long());
-    }
-
-    return new DocumentSourceMergeCursors(std::move(cursorDescriptors), pExpCtx);
-}
-
-Value DocumentSourceMergeCursors::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    vector<Value> cursors;
-    for (size_t i = 0; i < _cursorDescriptors.size(); i++) {
-        cursors.push_back(
-            Value(DOC("host" << Value(_cursorDescriptors[i].connectionString.toString()) << "ns"
-                             << _cursorDescriptors[i].ns
-                             << "id"
-                             << _cursorDescriptors[i].cursorId)));
-    }
-    return Value(DOC(kStageName << Value(cursors)));
-}
-
-DocumentSourceMergeCursors::CursorAndConnection::CursorAndConnection(
-    const CursorDescriptor& cursorDescriptor)
-    : connection(cursorDescriptor.connectionString),
-      cursor(connection.get(), cursorDescriptor.ns, cursorDescriptor.cursorId, 0, 0) {}
-
-vector<DBClientCursor*> DocumentSourceMergeCursors::getCursors() {
-    verify(_unstarted);
-    start();
-    vector<DBClientCursor*> out;
-    for (Cursors::const_iterator it = _cursors.begin(); it != _cursors.end(); ++it) {
-        out.push_back(&((*it)->cursor));
-    }
-
-    return out;
-}
-
-void DocumentSourceMergeCursors::start() {
-    _unstarted = false;
-
-    // open each cursor and send message asking for a batch
-    for (auto&& cursorDescriptor : _cursorDescriptors) {
-        _cursors.push_back(std::make_shared<CursorAndConnection>(cursorDescriptor));
-        verify(_cursors.back()->connection->lazySupported());
-        _cursors.back()->cursor.initLazy();  // shouldn't block
-    }
-
-    // wait for all cursors to return a batch
-    // TODO need a way to keep cursors alive if some take longer than 10 minutes.
-    for (auto&& cursor : _cursors) {
-        bool retry = false;
-        bool ok = cursor->cursor.initLazyFinish(retry);  // blocks here for first batch
-
-        uassert(
-            17028, "error reading response from " + _cursors.back()->connection->toString(), ok);
-        verify(!retry);
-    }
-
-    _currentCursor = _cursors.begin();
-}
-
-Document DocumentSourceMergeCursors::nextSafeFrom(DBClientCursor* cursor) {
-    const BSONObj next = cursor->next();
-    if (next.hasField("$err")) {
-        uassertStatusOKWithContext(getStatusFromCommandResult(next),
-                                   str::stream() << "Received error in response from "
-                                                 << cursor->originalHost());
-    }
-    return Document::fromBsonWithMetaData(next);
-}
+DocumentSourceMergeCursors::DocumentSourceMergeCursors(
+    executor::TaskExecutor* executor,
+    std::unique_ptr<ClusterClientCursorParams> cursorParams,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx)
+    : DocumentSource(expCtx), _executor(executor), _armParams(std::move(cursorParams)) {}
 
 DocumentSource::GetNextResult DocumentSourceMergeCursors::getNext() {
-    pExpCtx->checkForInterrupt();
-
-    if (_unstarted)
-        start();
-
-    // purge eof cursors and release their connections
-    while (!_cursors.empty() && !(*_currentCursor)->cursor.more()) {
-        (*_currentCursor)->connection.done();
-        _cursors.erase(_currentCursor);
-        _currentCursor = _cursors.begin();
+    // We don't expect or support tailable cursors to be executing through this stage.
+    invariant(pExpCtx->tailableMode == TailableMode::kNormal);
+    if (!_arm) {
+        _arm.emplace(pExpCtx->opCtx, _executor, _armParams.get());
     }
-
-    if (_cursors.empty())
+    auto next = uassertStatusOK(_arm->blockingNext());
+    if (next.isEOF()) {
         return GetNextResult::makeEOF();
-
-    auto next = nextSafeFrom(&((*_currentCursor)->cursor));
-
-    // advance _currentCursor, wrapping if needed
-    if (++_currentCursor == _cursors.end())
-        _currentCursor = _cursors.begin();
-
-    return std::move(next);
+    }
+    return Document::fromBsonWithMetaData(*next.getResult());
 }
 
-bool DocumentSourceMergeCursors::remotesExhausted() const {
-    return std::all_of(_cursors.begin(), _cursors.end(), [](const auto& cursorAndConn) {
-        return cursorAndConn->cursor.isDead();
-    });
+void DocumentSourceMergeCursors::serializeToArray(
+    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+    invariant(!_arm);
+    invariant(_armParams);
+    std::vector<Value> cursors;
+    for (auto&& remote : _armParams->remotes) {
+        cursors.emplace_back(Document{{"host", remote.hostAndPort.toString()},
+                                      {"ns", remote.cursorResponse.getNSS().toString()},
+                                      {"id", remote.cursorResponse.getCursorId()}});
+    }
+    array.push_back(Value(Document{{kStageName, Value(std::move(cursors))}}));
+    if (!_armParams->sort.isEmpty()) {
+        array.push_back(Value(Document{{DocumentSourceSort::kStageName, Value(_armParams->sort)}}));
+    }
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceMergeCursors::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+    invariant(!_arm);
+    invariant(_armParams);
+
+    auto next = std::next(itr);
+    if (next == container->end()) {
+        return next;
+    }
+
+    auto nextSort = dynamic_cast<DocumentSourceSort*>(next->get());
+    if (!nextSort || !nextSort->mergingPresorted()) {
+        return next;
+    }
+
+    _armParams->sort =
+        nextSort->sortKeyPattern(DocumentSourceSort::SortKeySerialization::kForSortKeyMerging)
+            .toBson();
+    if (auto sortLimit = nextSort->getLimitSrc()) {
+        // There was a limit stage absorbed into the sort stage, so we need to preserve that.
+        container->insert(std::next(next), sortLimit);
+    }
+    container->erase(next);
+    return std::next(itr);
+}
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
+    BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    uassert(
+        17026, "$mergeCursors stage expected array as argument", elem.type() == BSONType::Array);
+    const auto serializedRemotes = elem.Array();
+    uassert(50729,
+            "$mergeCursors stage expected array with at least one entry",
+            serializedRemotes.size() > 0);
+
+    boost::optional<NamespaceString> nss;
+    std::vector<ClusterClientCursorParams::RemoteCursor> remotes;
+    for (auto&& cursor : serializedRemotes) {
+        BSONElement nsElem;
+        BSONElement hostElem;
+        BSONElement idElem;
+        uassert(17027,
+                "$mergeCursors stage requires each cursor in array to be an object",
+                cursor.type() == BSONType::Object);
+        for (auto&& cursorElem : cursor.Obj()) {
+            const auto fieldName = cursorElem.fieldNameStringData();
+            if (fieldName == "ns"_sd) {
+                nsElem = cursorElem;
+            } else if (fieldName == "host"_sd) {
+                hostElem = cursorElem;
+            } else if (fieldName == "id"_sd) {
+                idElem = cursorElem;
+            } else {
+                uasserted(50730,
+                          str::stream() << "Unrecognized option " << fieldName
+                                        << " within cursor provided to $mergeCursors: "
+                                        << cursor);
+            }
+        }
+        uassert(
+            50731,
+            "$mergeCursors stage requires \'ns\' field with type string for each cursor in array",
+            nsElem.type() == BSONType::String);
+
+        // We require each cursor to have the same namespace. This isn't a fundamental limit of the
+        // system, but needs to be true due to the implementation of AsyncResultsMerger, which
+        // tracks one namespace for all cursors.
+        uassert(50720,
+                "$mergeCursors requires each cursor to have the same namespace",
+                !nss || nss->ns() == nsElem.valueStringData());
+        nss = NamespaceString(nsElem.String());
+
+        uassert(
+            50721,
+            "$mergeCursors stage requires \'host\' field with type string for each cursor in array",
+            hostElem.type() == BSONType::String);
+        auto host = uassertStatusOK(HostAndPort::parse(hostElem.valueStringData()));
+
+        uassert(50722,
+                "$mergeCursors stage requires \'id\' field with type long for each cursor in array",
+                idElem.type() == BSONType::NumberLong);
+        auto cursorId = idElem.Long();
+
+        // We are assuming that none of the cursors have been iterated at all, and so will not have
+        // any data in the initial batch.
+        // TODO SERVER-33323 We use a fake shard id because the AsyncResultsMerger won't use it for
+        // anything, and finding the real one is non-trivial.
+        std::vector<BSONObj> emptyBatch;
+        remotes.push_back({ShardId("fakeShardIdForMergeCursors"),
+                           std::move(host),
+                           CursorResponse{*nss, cursorId, emptyBatch}});
+    }
+    invariant(nss);  // We know there is at least one cursor in 'serializedRemotes', and we require
+                     // each cursor to have a 'ns' field.
+
+    auto params = stdx::make_unique<ClusterClientCursorParams>(*nss);
+    params->remotes = std::move(remotes);
+    params->readPreference = ReadPreferenceSetting::get(expCtx->opCtx);
+    return new DocumentSourceMergeCursors(
+        Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
+        std::move(params),
+        expCtx);
+}
+
+boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
+    std::vector<ClusterClientCursorParams::RemoteCursor>&& remoteCursors,
+    executor::TaskExecutor* executor,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto params = stdx::make_unique<ClusterClientCursorParams>(expCtx->ns);
+    params->remotes = std::move(remoteCursors);
+    params->readPreference = ReadPreferenceSetting::get(expCtx->opCtx);
+    return new DocumentSourceMergeCursors(executor, std::move(params), expCtx);
+}
+
+void DocumentSourceMergeCursors::detachFromOperationContext() {
+    if (_arm) {
+        _arm->detachFromOperationContext();
+    }
+}
+
+void DocumentSourceMergeCursors::reattachToOperationContext(OperationContext* opCtx) {
+    if (_arm) {
+        _arm->reattachToOperationContext(opCtx);
+    }
 }
 
 void DocumentSourceMergeCursors::doDispose() {
-    for (auto&& cursorAndConn : _cursors) {
-        // Note it is an error to call done() on a connection before consuming the reply from a
-        // request.
-        if (cursorAndConn->cursor.connectionHasPendingReplies()) {
-            continue;
-        }
-        cursorAndConn->cursor.kill();
-        cursorAndConn->connection.done();
+    if (_arm) {
+        _arm->blockingKill(pExpCtx->opCtx);
     }
-    _cursors.clear();
-    _currentCursor = _cursors.end();
 }
-}
+
+}  // namespace mongo

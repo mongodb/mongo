@@ -50,6 +50,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/async_results_merger.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/establish_cursors.h"
@@ -135,7 +136,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
     if (!qr.getSort().isEmpty() && !qr.getSort()["$natural"]) {
         BSONObjBuilder projectionBuilder;
         projectionBuilder.appendElements(qr.getProj());
-        projectionBuilder.append(ClusterClientCursorParams::kSortKeyField, kSortKeyMetaProjection);
+        projectionBuilder.append(AsyncResultsMerger::kSortKeyField, kSortKeyMetaProjection);
         newProjection = projectionBuilder.obj();
     }
 
@@ -143,8 +144,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
         invariant(qr.getSort().isEmpty());
         BSONObjBuilder projectionBuilder;
         projectionBuilder.appendElements(qr.getProj());
-        projectionBuilder.append(ClusterClientCursorParams::kSortKeyField,
-                                 kGeoNearDistanceMetaProjection);
+        projectionBuilder.append(AsyncResultsMerger::kSortKeyField, kGeoNearDistanceMetaProjection);
         newProjection = projectionBuilder.obj();
     }
 
@@ -218,7 +218,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         // by the geoNearDistance. Request the projection {$sortKey: <geoNearDistance>} from the
         // shards. Indicate to the AsyncResultsMerger that it should extract the sort key
         // {"$sortKey": <geoNearDistance>} and sort by the order {"$sortKey": 1}.
-        params.sort = ClusterClientCursorParams::kWholeSortKeySortPattern;
+        params.sort = AsyncResultsMerger::kWholeSortKeySortPattern;
         params.compareWholeSortKey = true;
         appendGeoNearDistanceProjection = true;
     }
@@ -337,10 +337,10 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     invariant(results);
 
     // Projection on the reserved sort key field is illegal in mongos.
-    if (query.getQueryRequest().getProj().hasField(ClusterClientCursorParams::kSortKeyField)) {
+    if (query.getQueryRequest().getProj().hasField(AsyncResultsMerger::kSortKeyField)) {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Projection contains illegal field '"
-                                << ClusterClientCursorParams::kSortKeyField
+                                << AsyncResultsMerger::kSortKeyField
                                 << "': "
                                 << query.getQueryRequest().getProj());
     }

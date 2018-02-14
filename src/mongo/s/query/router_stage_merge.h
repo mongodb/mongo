@@ -75,12 +75,6 @@ protected:
 
 private:
     /**
-     * Returns the next document received by the ARM, blocking indefinitely until we either have a
-     * new result or exhaust the remote cursors.
-     */
-    StatusWith<ClusterQueryResult> blockForNextNoTimeout(ExecContext execCtx);
-
-    /**
      * Awaits the next result from the ARM up to a specified time limit. If this is the user's
      * initial find or we have already obtained at least one result for this batch, this method
      * returns EOF immediately rather than blocking.

@@ -61,13 +61,6 @@ class RouterExecStage;
  * this cursor have been processed.
  */
 struct ClusterClientCursorParams {
-    // When mongos has to do a merge in order to return results to the client in the correct sort
-    // order, it requests a sortKey meta-projection using this field name.
-    static const char kSortKeyField[];
-
-    // The expected sort key pattern when 'compareWholeSortKey' is true.
-    static const BSONObj kWholeSortKeySortPattern;
-
     struct RemoteCursor {
         RemoteCursor(ShardId shardId, HostAndPort hostAndPort, CursorResponse cursorResponse)
             : shardId(std::move(shardId)),

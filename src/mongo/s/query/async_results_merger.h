@@ -75,6 +75,13 @@ class AsyncResultsMerger {
     MONGO_DISALLOW_COPYING(AsyncResultsMerger);
 
 public:
+    // When mongos has to do a merge in order to return results to the client in the correct sort
+    // order, it requests a sortKey meta-projection using this field name.
+    static constexpr StringData kSortKeyField = "$sortKey"_sd;
+
+    // The expected sort key pattern when 'compareWholeSortKey' is true.
+    static const BSONObj kWholeSortKeySortPattern;
+
     /**
      * Takes ownership of the cursors from ClusterClientCursorParams by storing their cursorIds and
      * the hosts on which they exist in _remotes.
@@ -160,6 +167,12 @@ public:
     StatusWith<ClusterQueryResult> nextReady();
 
     /**
+     * Blocks until the next result is ready, all remote cursors are exhausted, or there is an
+     * error.
+     */
+    StatusWith<ClusterQueryResult> blockingNext();
+
+    /**
      * Schedules remote work as required in order to make further results available. If there is an
      * error in scheduling this work, returns a non-ok status. On success, returns an event handle.
      * The caller can pass this event handle to 'executor' in order to be blocked until further
@@ -202,6 +215,11 @@ public:
      * operation context.
      */
     executor::TaskExecutor::EventHandle kill(OperationContext* opCtx);
+
+    /**
+     * A blocking version of kill() that will not return until this is safe to destroy.
+     */
+    void blockingKill(OperationContext*);
 
 private:
     /**

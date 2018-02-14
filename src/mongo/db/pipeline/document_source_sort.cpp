@@ -106,6 +106,8 @@ REGISTER_DOCUMENT_SOURCE(sort,
 
 DocumentSource::GetNextResult DocumentSourceSort::getNext() {
     pExpCtx->checkForInterrupt();
+    invariant(!_mergingPresorted);  // A presorted-merge should be optimized into the merge, and
+                                    // never executed.
 
     if (!_populated) {
         const auto populationResult = populate();
@@ -330,24 +332,14 @@ SortOptions DocumentSourceSort::makeSortOptions() const {
 }
 
 DocumentSource::GetNextResult DocumentSourceSort::populate() {
-    if (_mergingPresorted) {
-        typedef DocumentSourceMergeCursors DSCursors;
-        if (DSCursors* castedSource = dynamic_cast<DSCursors*>(pSource)) {
-            populateFromCursors(castedSource->getCursors());
-        } else {
-            msgasserted(17196, "can only mergePresorted from MergeCursors");
-        }
-        return DocumentSource::GetNextResult::makeEOF();
-    } else {
-        auto nextInput = pSource->getNext();
-        for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
-            loadDocument(nextInput.releaseDocument());
-        }
-        if (nextInput.isEOF()) {
-            loadingDone();
-        }
-        return nextInput;
+    auto nextInput = pSource->getNext();
+    for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
+        loadDocument(nextInput.releaseDocument());
     }
+    if (nextInput.isEOF()) {
+        loadingDone();
+    }
+    return nextInput;
 }
 
 void DocumentSourceSort::loadDocument(Document&& doc) {
@@ -371,44 +363,6 @@ void DocumentSourceSort::loadingDone() {
     }
     _output.reset(_sorter->done());
     _sorter.reset();
-    _populated = true;
-}
-
-class DocumentSourceSort::IteratorFromCursor : public MySorter::Iterator {
-public:
-    IteratorFromCursor(DocumentSourceSort* sorter, DBClientCursor* cursor)
-        : _sorter(sorter), _cursor(cursor) {}
-
-    bool more() {
-        return _cursor->more();
-    }
-    Data next() {
-        auto doc = DocumentSourceMergeCursors::nextSafeFrom(_cursor);
-        if (doc.hasSortKeyMetaField()) {
-            // We set the sort key metadata field during the first half of the sort, so just use
-            // that as the sort key here.
-            return make_pair(
-                deserializeSortKey(_sorter->_sortPattern.size(), doc.getSortKeyMetaField()), doc);
-        } else {
-            // It's possible this result is coming from a shard that is still on an old version. If
-            // that's the case, it won't tell us it's sort key - we'll have to re-compute it
-            // ourselves.
-            return _sorter->extractSortKey(std::move(doc));
-        }
-    }
-
-private:
-    DocumentSourceSort* _sorter;
-    DBClientCursor* _cursor;
-};
-
-void DocumentSourceSort::populateFromCursors(const vector<DBClientCursor*>& cursors) {
-    vector<std::shared_ptr<MySorter::Iterator>> iterators;
-    for (size_t i = 0; i < cursors.size(); i++) {
-        iterators.push_back(std::make_shared<IteratorFromCursor>(this, cursors[i]));
-    }
-
-    _output.reset(MySorter::Iterator::merge(iterators, makeSortOptions(), Comparator(*this)));
     _populated = true;
 }
 

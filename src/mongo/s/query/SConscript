@@ -25,6 +25,7 @@ env.Library(
         "cluster_client_cursor_impl.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
         "router_exec_stage",
     ],
 )
@@ -46,7 +47,7 @@ env.Library(
         "async_results_merger",
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/pipeline/document_source_lookup",
+        "$BUILD_DIR/mongo/db/pipeline/pipeline",
     ],
 )
 
@@ -68,7 +69,6 @@ env.Library(
     target="async_results_merger",
     source=[
         "async_results_merger.cpp",
-        "cluster_client_cursor_params.cpp",
         "establish_cursors.cpp",
     ],
     LIBDEPS=[
@@ -76,10 +76,7 @@ env.Library(
         "$BUILD_DIR/mongo/executor/task_executor_interface",
         "$BUILD_DIR/mongo/s/async_requests_sender",
         "$BUILD_DIR/mongo/s/client/sharding_client",
-        "$BUILD_DIR/mongo/db/pipeline/pipeline",
-    ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/pipeline/document_source_lookup",
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
     ],
 )
 
@@ -100,6 +97,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'async_results_merger',
+        'cluster_client_cursor',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/service_context_noop_init',

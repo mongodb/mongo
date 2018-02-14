@@ -34,6 +34,7 @@
 #include "mongo/db/bson/bson_helper.h"
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_check_resume_token.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -80,9 +81,6 @@ constexpr StringData DocumentSourceChangeStream::kReplaceOpType;
 constexpr StringData DocumentSourceChangeStream::kInsertOpType;
 constexpr StringData DocumentSourceChangeStream::kInvalidateOpType;
 constexpr StringData DocumentSourceChangeStream::kNewShardDetectedOpType;
-
-const BSONObj DocumentSourceChangeStream::kSortSpec =
-    BSON("_id.clusterTime.ts" << 1 << "_id.uuid" << 1 << "_id.documentKey" << 1);
 
 
 namespace {
@@ -186,7 +184,7 @@ public:
         const long long noLimit = -1;
         auto sortMergingPresorted =
             DocumentSourceSort::create(pExpCtx,
-                                       DocumentSourceChangeStream::kSortSpec,
+                                       change_stream_constants::kSortSpec,
                                        noLimit,
                                        DocumentSourceSort::kMaxMemoryUsageBytes,
                                        mergingPresorted);

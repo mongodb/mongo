@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_sort.h"
@@ -122,7 +123,7 @@ public:
         const long long noLimit = -1;
         auto sortMergingPresorted =
             DocumentSourceSort::create(pExpCtx,
-                                       DocumentSourceChangeStream::kSortSpec,
+                                       change_stream_constants::kSortSpec,
                                        noLimit,
                                        DocumentSourceSort::kMaxMemoryUsageBytes,
                                        mergingPresorted);

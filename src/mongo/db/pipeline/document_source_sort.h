@@ -155,9 +155,6 @@ protected:
     void doDispose() final;
 
 private:
-    // This is used to merge pre-sorted results from a DocumentSourceMergeCursors.
-    class IteratorFromCursor;
-
     using MySorter = Sorter<Value, Document>;
 
     // For MySorter.

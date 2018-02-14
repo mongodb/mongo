@@ -81,9 +81,6 @@ public:
                                BSONObjBuilder* result);
 
 private:
-    static std::vector<DocumentSourceMergeCursors::CursorDescriptor> parseCursors(
-        const std::vector<ClusterClientCursorParams::RemoteCursor>& cursors);
-
     static void uassertAllShardsSupportExplain(
         const std::vector<AsyncRequestsSender::Response>& shardResults);
 

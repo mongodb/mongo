@@ -142,7 +142,7 @@ void Pipeline::validatePipeline() const {
             uasserted(ErrorCodes::InvalidNamespace,
                       "{aggregate: 1} is not valid for an empty pipeline.");
         }
-    } else if (!dynamic_cast<DocumentSourceMergeCursors*>(_sources.front().get())) {
+    } else if ("$mergeCursors"_sd != _sources.front()->getSourceName()) {
         // The $mergeCursors stage can take {aggregate: 1} or a normal namespace. Aside from this,
         // {aggregate: 1} is only valid for collectionless sources, and vice-versa.
         const auto firstStageConstraints = _sources.front()->constraints(_splitState);
