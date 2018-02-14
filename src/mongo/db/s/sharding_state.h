@@ -37,8 +37,6 @@
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/executor/task_executor.h"
-#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -106,8 +104,6 @@ public:
      */
     Status canAcceptShardedCommands() const;
 
-    ConnectionString getConfigServer(OperationContext* opCtx);
-
     std::string getShardName();
 
     /**
@@ -144,40 +140,6 @@ public:
      * Sets the state of the ChunkSplitter so that it will no longer accept split requests.
      */
     void interruptChunkSplitter();
-
-    /**
-     * Refreshes the local metadata based on whether the expected version is higher than what we
-     * have cached.
-     */
-    Status onStaleShardVersion(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const ChunkVersion& expectedVersion);
-
-    /**
-     * Refreshes collection metadata by asking the config server for the latest information.
-     * Starts a new config server request.
-     *
-     * Locking Notes:
-     *   + Must NOT be called with the write lock because this call may go into the network,
-     *     and deadlocks may occur with shard-as-a-config.  Therefore, nothing here guarantees
-     *     that 'latestShardVersion' is indeed the current one on return.
-     *
-     *   + Because this call must not be issued with the DBLock held, by the time the config
-     *     server sent us back the collection metadata information, someone else may have
-     *     updated the previously stored collection metadata.  There are cases when one can't
-     *     tell which of updated or loaded metadata are the freshest. There are also cases where
-     *     the data coming from configs do not correspond to a consistent snapshot.
-     *     In these cases, return RemoteChangeDetected. (This usually means this call needs to
-     *     be issued again, at caller discretion)
-     *
-     * @return OK if remote metadata successfully loaded (may or may not have been installed)
-     * @return RemoteChangeDetected if something changed while reloading and we may retry
-     * @return !OK if something else went wrong during reload
-     * @return latestShardVersion the version that is now stored for this collection
-     */
-    Status refreshMetadataNow(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              ChunkVersion* latestShardVersion);
 
     void appendInfo(OperationContext* opCtx, BSONObjBuilder& b);
 
@@ -239,12 +201,6 @@ public:
     void setGlobalInitMethodForTest(GlobalInitFunc func);
 
     /**
-     * Schedules for the range to clean of the given namespace to be deleted.
-     * Behavior can be modified through setScheduleCleanupFunctionForTest.
-     */
-    void scheduleCleanup(const NamespaceString& nss);
-
-    /**
      * If started with --shardsvr, initializes sharding awareness from the shardIdentity document
      * on disk, if there is one.
      * If started with --shardsvr in queryableBackupMode, initializes sharding awareness from the
@@ -258,11 +214,6 @@ public:
      * Note: this function briefly takes the global lock to determine primary/secondary state.
      */
     StatusWith<bool> initializeShardingAwarenessIfNeeded(OperationContext* opCtx);
-
-    /**
-     * Return the task executor to be shared by the range deleters for all collections.
-     */
-    executor::TaskExecutor* getRangeDeleterTaskExecutor();
 
 private:
     // Progress of the sharding state initialization
@@ -291,13 +242,6 @@ private:
      */
     void _setInitializationState(InitializationState newState);
 
-    /**
-     * Refreshes collection metadata by asking the config server for the latest information and
-     * returns the latest version at the time the reload was done. This call does network I/O and
-     * should never be called with a lock.
-     */
-    ChunkVersion _refreshMetadata(OperationContext* opCtx, const NamespaceString& nss);
-
     // Tracks the active move chunk operations running on this shard
     ActiveMigrationsRegistry _activeMigrationsRegistry;
 
@@ -324,14 +268,6 @@ private:
 
     // Function for initializing the external sharding state components not owned here.
     GlobalInitFunc _globalInit;
-
-    // Task executor shared by the collection range deleters.
-    struct RangeDeleterExecutor {
-        stdx::mutex lock{};
-        std::unique_ptr<executor::TaskExecutor> taskExecutor{nullptr};
-        ~RangeDeleterExecutor();
-    };
-    RangeDeleterExecutor _rangeDeleterExecutor;
 };
 
 }  // namespace mongo

@@ -38,6 +38,7 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
@@ -99,19 +100,9 @@ Status mergeChunks(OperationContext* opCtx,
 
     auto const shardingState = ShardingState::get(opCtx);
 
-    //
-    // We now have the collection lock, refresh metadata to latest version and sanity check
-    //
-
-    ChunkVersion unusedShardVersion;
-    Status refreshStatus = shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion);
-    if (!refreshStatus.isOK()) {
-        std::string context = str::stream()
-            << "could not merge chunks, failed to refresh metadata for " << nss.ns();
-
-        warning() << context << causedBy(redact(refreshStatus));
-        return refreshStatus.withContext(context);
-    }
+    // We now have the collection distributed lock, refresh metadata to latest version and sanity
+    // check
+    forceShardFilteringMetadataRefresh(opCtx, nss);
 
     const auto metadata = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
@@ -261,22 +252,9 @@ Status mergeChunks(OperationContext* opCtx,
         configCmdObj,
         Shard::RetryPolicy::kIdempotent);
 
-    //
     // Refresh metadata to pick up new chunk definitions (regardless of the results returned from
     // running _configsvrCommitChunkMerge).
-    //
-    {
-        ChunkVersion unusedShardVersion;
-        refreshStatus = shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion);
-
-        if (!refreshStatus.isOK()) {
-            std::string context = str::stream() << "failed to refresh metadata for merge chunk ["
-                                                << redact(minKey) << "," << redact(maxKey) << ") ";
-
-            warning() << context << redact(refreshStatus);
-            return refreshStatus.withContext(context);
-        }
-    }
+    forceShardFilteringMetadataRefresh(opCtx, nss);
 
     // If we failed to get any response from the config server at all, despite retries, then we
     // should just go ahead and fail the whole operation.

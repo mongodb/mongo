@@ -43,9 +43,9 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/migration_source_manager.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/log.h"
@@ -157,7 +157,7 @@ public:
 
         // Validate shardName parameter.
         const auto shardName = cmdObj["shard"].str();
-        const auto storedShardName = ShardingState::get(opCtx)->getShardName();
+        const auto storedShardName = shardingState->getShardName();
         uassert(ErrorCodes::BadValue,
                 str::stream() << "received shardName " << shardName
                               << " which differs from stored shardName "
@@ -176,7 +176,8 @@ public:
                               << " is not of type SET",
                 givenConnStr.type() == ConnectionString::SET);
 
-        const auto storedConnStr = ShardingState::get(opCtx)->getConfigServer(opCtx);
+        const auto storedConnStr =
+            Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString();
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "Given config server set name: " << givenConnStr.getSetName()
                               << " differs from known set name: "
@@ -333,7 +334,7 @@ public:
 
         // Step 7
 
-        Status status = shardingState->onStaleShardVersion(opCtx, nss, requestedVersion);
+        const auto status = onShardVersionMismatch(opCtx, nss, requestedVersion);
 
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);

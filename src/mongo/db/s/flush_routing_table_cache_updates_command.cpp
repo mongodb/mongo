@@ -42,6 +42,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/grid.h"
@@ -142,8 +143,7 @@ public:
 
         if (request.getSyncFromConfig()) {
             LOG(1) << "Forcing remote routing table refresh for " << nss;
-            ChunkVersion unusedShardVersion;
-            uassertStatusOK(shardingState->refreshMetadataNow(opCtx, nss, &unusedShardVersion));
+            forceShardFilteringMetadataRefresh(opCtx, nss);
         }
 
         CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);

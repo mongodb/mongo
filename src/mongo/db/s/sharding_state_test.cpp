@@ -148,7 +148,7 @@ TEST_F(ShardingStateTest, ValidShardIdentitySucceeds) {
     ASSERT_OK(shardingState()->initializeFromShardIdentity(operationContext(), shardIdentity));
     ASSERT_TRUE(shardingState()->enabled());
     ASSERT_EQ(shardName(), shardingState()->getShardName());
-    ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(operationContext()).toString());
+    ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
 }
 
 TEST_F(ShardingStateTest, InitWhilePreviouslyInErrorStateWillStayInErrorState) {
@@ -216,7 +216,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithMatchingShardIdentitySucceeds) {
 
     ASSERT_TRUE(shardingState()->enabled());
     ASSERT_EQ(shardName(), shardingState()->getShardName());
-    ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(operationContext()).toString());
+    ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
 }
 
 TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
@@ -247,7 +247,7 @@ TEST_F(ShardingStateTest, InitializeAgainWithSameReplSetNameSucceeds) {
 
     ASSERT_TRUE(shardingState()->enabled());
     ASSERT_EQ(shardName(), shardingState()->getShardName());
-    ASSERT_EQ("config/a:1,b:2", shardingState()->getConfigServer(operationContext()).toString());
+    ASSERT_EQ("config/a:1,b:2", shardRegistry()->getConfigServerConnectionString().toString());
 }
 
 // The below tests check for compatible startup parameters for --shardsvr, --overrideShardIdentity,

@@ -24,6 +24,7 @@ env.Library(
     source=[
         'migration_destination_manager.cpp',
         'session_catalog_migration_destination.cpp',
+        'shard_filtering_metadata_refresh.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/db_raii',

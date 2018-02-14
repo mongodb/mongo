@@ -39,6 +39,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/s/chunk_move_write_concern_options.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
@@ -92,17 +93,7 @@ public:
 
         const auto chunkRange = uassertStatusOK(ChunkRange::fromBSON(cmdObj));
 
-        // Refresh our collection manager from the config server, we need a collection manager to
-        // start registering pending chunks. We force the remote refresh here to make the behavior
-        // consistent and predictable, generally we'd refresh anyway, and to be paranoid.
-        ChunkVersion shardVersion;
-        Status status = shardingState->refreshMetadataNow(opCtx, nss, &shardVersion);
-        if (!status.isOK()) {
-            errmsg = str::stream() << "cannot start receiving chunk "
-                                   << redact(chunkRange.toString()) << causedBy(redact(status));
-            warning() << errmsg;
-            return false;
-        }
+        const auto shardVersion = forceShardFilteringMetadataRefresh(opCtx, nss);
 
         // Process secondary throttle settings and assign defaults if necessary.
         const auto secondaryThrottle =

@@ -49,6 +49,9 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -66,9 +69,54 @@ namespace {
 // How long to wait before starting cleanup of an emigrated chunk range
 MONGO_EXPORT_SERVER_PARAMETER(orphanCleanupDelaySecs, int, 900);  // 900s = 15m
 
-// This map matches 1:1 with the set of collections in the storage catalog. It is not safe to
-// look-up values from this map without holding some form of collection lock. It is only safe to
-// add/remove values when holding X lock on the respective namespace.
+/**
+ * Lazy-instantiated task executor shared by the collection range deleters. Must outlive the
+ * CollectionShardingStateMap below.
+ */
+class RangeDeleterExecutorHolder {
+    MONGO_DISALLOW_COPYING(RangeDeleterExecutorHolder);
+
+public:
+    RangeDeleterExecutorHolder() = default;
+
+    ~RangeDeleterExecutorHolder() {
+        if (_taskExecutor) {
+            _taskExecutor->shutdown();
+            _taskExecutor->join();
+        }
+    }
+
+    executor::TaskExecutor* getOrCreateExecutor() {
+        stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+        if (!_taskExecutor) {
+            const std::string kExecName("CollectionRangeDeleter-TaskExecutor");
+
+            auto net = executor::makeNetworkInterface(kExecName);
+            auto pool = stdx::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
+            auto taskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(std::move(pool),
+                                                                                    std::move(net));
+            taskExecutor->startup();
+
+            _taskExecutor = std::move(taskExecutor);
+        }
+
+        return _taskExecutor.get();
+    }
+
+private:
+    stdx::mutex _mutex;
+    std::unique_ptr<executor::TaskExecutor> _taskExecutor{nullptr};
+};
+
+const auto getRangeDeleterExecutorHolder =
+    ServiceContext::declareDecoration<RangeDeleterExecutorHolder>();
+
+/**
+ * This map matches 1:1 with the set of collections in the storage catalog. It is not safe to
+ * look-up values from this map without holding some form of collection lock. It is only safe to
+ * add/remove values when holding X lock on the respective namespace.
+ */
 class CollectionShardingStateMap {
     MONGO_DISALLOW_COPYING(CollectionShardingStateMap);
 
@@ -118,7 +166,7 @@ private:
     CollectionsMap _collections;
 };
 
-const auto collectionShardingStateMap =
+const auto getCollectionShardingStateMap =
     ServiceContext::declareDecoration<CollectionShardingStateMap>();
 
 /**
@@ -179,12 +227,12 @@ bool isStandaloneOrPrimary(OperationContext* opCtx) {
                           repl::MemberState::RS_PRIMARY);
 }
 
-}  // unnamed namespace
+}  // namespace
 
 CollectionShardingState::CollectionShardingState(ServiceContext* sc, NamespaceString nss)
     : _nss(std::move(nss)),
       _metadataManager(std::make_shared<MetadataManager>(
-          sc, _nss, ShardingState::get(sc)->getRangeDeleterTaskExecutor())) {}
+          sc, _nss, getRangeDeleterExecutorHolder(sc).getOrCreateExecutor())) {}
 
 CollectionShardingState::~CollectionShardingState() {
     invariant(!_sourceMgr);
@@ -200,12 +248,12 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
     // Collection lock must be held to have a reference to the collection's sharding state
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns, MODE_IS));
 
-    auto& collectionsMap = collectionShardingStateMap(opCtx->getServiceContext());
+    auto& collectionsMap = getCollectionShardingStateMap(opCtx->getServiceContext());
     return &collectionsMap.getOrCreate(opCtx, ns);
 }
 
 void CollectionShardingState::report(OperationContext* opCtx, BSONObjBuilder* builder) {
-    auto& collectionsMap = collectionShardingStateMap(opCtx->getServiceContext());
+    auto& collectionsMap = getCollectionShardingStateMap(opCtx->getServiceContext());
     collectionsMap.report(builder);
 }
 

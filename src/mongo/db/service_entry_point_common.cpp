@@ -62,6 +62,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_entry_point_common.h"
@@ -692,10 +693,11 @@ void execCommandDatabase(OperationContext* opCtx,
         // If we got a stale config, wait in case the operation is stuck in a critical section
         if (auto sce = e.extraInfo<StaleConfigInfo>()) {
             if (!opCtx->getClient()->isInDirectClient()) {
-                ShardingState::get(opCtx)
-                    ->onStaleShardVersion(
-                        opCtx, NamespaceString(sce->getns()), sce->getVersionReceived())
-                    .transitional_ignore();
+                // We already have the StaleConfig exception, so just swallow any errors due to
+                // refresh
+                onShardVersionMismatch(
+                    opCtx, NamespaceString(sce->getns()), sce->getVersionReceived())
+                    .ignore();
             }
         }
 
@@ -853,10 +855,11 @@ DbResponse receivedQuery(OperationContext* opCtx,
         // If we got a stale config, wait in case the operation is stuck in a critical section
         if (auto sce = e.extraInfo<StaleConfigInfo>()) {
             if (!opCtx->getClient()->isInDirectClient()) {
-                ShardingState::get(opCtx)
-                    ->onStaleShardVersion(
-                        opCtx, NamespaceString(sce->getns()), sce->getVersionReceived())
-                    .transitional_ignore();
+                // We already have the StaleConfig exception, so just swallow any errors due to
+                // refresh
+                onShardVersionMismatch(
+                    opCtx, NamespaceString(sce->getns()), sce->getVersionReceived())
+                    .ignore();
             }
         }
 

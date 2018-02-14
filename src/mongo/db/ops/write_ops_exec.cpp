@@ -62,6 +62,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/stats/counters.h"
@@ -214,10 +215,10 @@ bool handleError(OperationContext* opCtx,
 
     if (auto staleInfo = ex.extraInfo<StaleConfigInfo>()) {
         if (!opCtx->getClient()->isInDirectClient()) {
-            ShardingState::get(opCtx)
-                ->onStaleShardVersion(opCtx, nss, staleInfo->getVersionReceived())
-                .ignore();  // We already have an error to report so ignore this one.
+            // We already have the StaleConfig exception, so just swallow any errors due to refresh
+            onShardVersionMismatch(opCtx, nss, staleInfo->getVersionReceived()).ignore();
         }
+
         // Don't try doing more ops since they will fail with the same error.
         // Command reply serializer will handle repeating this error if needed.
         out->results.emplace_back(ex.toStatus());

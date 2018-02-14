@@ -39,6 +39,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_state_recovery.h"
@@ -146,14 +147,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
           << " with expected collection version epoch " << _args.getVersionEpoch();
 
     // Force refresh of the metadata to ensure we have the latest
-    {
-        auto const shardingState = ShardingState::get(opCtx);
-
-        ChunkVersion unusedShardVersion;
-        uassertStatusOKWithContext(
-            shardingState->refreshMetadataNow(opCtx, getNss(), &unusedShardVersion),
-            str::stream() << "cannot start migrate of chunk " << _args.toString());
-    }
+    forceShardFilteringMetadataRefresh(opCtx, getNss());
 
     // Snapshot the committed metadata from the time the migration starts
     const auto collectionMetadataAndUUID = [&] {
@@ -510,9 +504,14 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     // Do a best effort attempt to incrementally refresh the metadata before leaving the critical
     // section. It is okay if the refresh fails because that will cause the metadata to be cleared
     // and subsequent callers will try to do a full refresh.
-    ChunkVersion unusedShardVersion;
-    Status refreshStatus =
-        ShardingState::get(opCtx)->refreshMetadataNow(opCtx, getNss(), &unusedShardVersion);
+    const auto refreshStatus = [&] {
+        try {
+            forceShardFilteringMetadataRefresh(opCtx, getNss());
+            return Status::OK();
+        } catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+    }();
 
     if (!refreshStatus.isOK()) {
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
