@@ -52,7 +52,7 @@ def file_list_size(files):
 def directory_size(directory):
     """ Return size (in bytes) of files in 'directory' tree. """
     dir_bytes = 0
-    for root_dir, _, files in os.walk(directory):
+    for root_dir, _, files in os.walk(unicode(directory)):
         for name in files:
             full_name = os.path.join(root_dir, name)
             try:
@@ -277,10 +277,10 @@ class Archival(object):
                 for input_file in input_files:
                     try:
                         tar_handle.add(input_file)
-                    except (IOError, tarfile.TarError) as err:
+                    except (IOError, OSError, tarfile.TarError) as err:
                         message = "{}; Unable to add {} to archive file: {}".format(
                             message, input_file, err)
-        except (IOError, tarfile.TarError) as err:
+        except (IOError, OSError, tarfile.TarError) as err:
             status, message = remove_file(temp_file)
             if status:
                 self.logger.warning("Removing tarfile due to creation failure - %s", message)

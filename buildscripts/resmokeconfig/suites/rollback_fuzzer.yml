@@ -5,6 +5,8 @@ selector:
   - jstestfuzz/out/*.js
 
 executor:
+  archive:
+    tests: true
   config:
     shell_options:
       nodb: ''
