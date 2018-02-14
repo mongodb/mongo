@@ -110,6 +110,11 @@ public:
      */
     bool hasSeenKeys();
 
+    /**
+     * Clears the in memory cache of the keys.
+     */
+    void clearCache();
+
 private:
     /**
      * This is responsible for periodically performing refresh in the background.

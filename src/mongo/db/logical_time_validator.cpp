@@ -190,11 +190,10 @@ bool LogicalTimeValidator::shouldGossipLogicalTime() {
     return _getKeyManagerCopy()->hasSeenKeys();
 }
 
-void LogicalTimeValidator::resetKeyManagerCache(ServiceContext* service) {
+void LogicalTimeValidator::resetKeyManagerCache() {
     log() << "Resetting key manager cache";
     if (auto keyManager = _getKeyManagerCopy()) {
-        keyManager->stopMonitoring();
-        keyManager->startMonitoring(service);
+        keyManager->clearCache();
         _lastSeenValidTime = SignedLogicalTime();
         _timeProofService.resetCache();
     }

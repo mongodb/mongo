@@ -191,6 +191,10 @@ bool KeysCollectionManager::hasSeenKeys() {
     return _refresher.hasSeenKeys();
 }
 
+void KeysCollectionManager::clearCache() {
+    _keysCache.resetCache();
+}
+
 void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) {
     auto refreshRequest = [this]() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
