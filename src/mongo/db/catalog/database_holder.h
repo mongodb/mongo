@@ -57,10 +57,7 @@ public:
 
         virtual void close(OperationContext* opCtx, StringData ns, const std::string& reason) = 0;
 
-        virtual bool closeAll(OperationContext* opCtx,
-                              BSONObjBuilder& result,
-                              bool force,
-                              const std::string& reason) = 0;
+        virtual void closeAll(OperationContext* opCtx, const std::string& reason) = 0;
 
         virtual std::set<std::string> getNamesWithConflictingCasing(StringData name) = 0;
     };
@@ -100,6 +97,7 @@ public:
 
     /**
      * Closes the specified database. Must be called with the database locked in X-mode.
+     * No background jobs must be in progress on the database when this function is called.
      */
     inline void close(OperationContext* const opCtx,
                       const StringData ns,
@@ -109,16 +107,12 @@ public:
 
     /**
      * Closes all opened databases. Must be called with the global lock acquired in X-mode.
+     * Will uassert if any background jobs are running when this function is called.
      *
-     * @param result Populated with the names of the databases, which were closed.
-     * @param force Force close even if something underway - use at shutdown
      * @param reason The reason for close.
      */
-    inline bool closeAll(OperationContext* const opCtx,
-                         BSONObjBuilder& result,
-                         const bool force,
-                         const std::string& reason) {
-        return this->_impl().closeAll(opCtx, result, force, reason);
+    inline void closeAll(OperationContext* const opCtx, const std::string& reason) {
+        this->_impl().closeAll(opCtx, reason);
     }
 
     /**

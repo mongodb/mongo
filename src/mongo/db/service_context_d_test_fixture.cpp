@@ -114,8 +114,7 @@ void ServiceContextMongoDTest::_dropAllDBs(OperationContext* opCtx) {
     // dropAllDatabasesExceptLocal() does not close empty databases. However the holder still
     // allocates resources to track these empty databases. These resources not released by
     // dropAllDatabasesExceptLocal() will be leaked at exit unless we call DatabaseHolder::closeAll.
-    BSONObjBuilder unused;
-    invariant(dbHolder().closeAll(opCtx, unused, false, "all databases dropped"));
+    dbHolder().closeAll(opCtx, "all databases dropped");
 }
 
 }  // namespace mongo

@@ -161,15 +161,10 @@ DatabaseImpl::~DatabaseImpl() {
 }
 
 void DatabaseImpl::close(OperationContext* opCtx, const std::string& reason) {
-    // XXX? - Do we need to close database under global lock or just DB-lock is sufficient ?
     invariant(opCtx->lockState()->isW());
 
     // Clear cache of oplog Collection pointer.
     repl::oplogCheckCloseDatabase(opCtx, this->_this);
-
-    if (BackgroundOperation::inProgForDb(_name)) {
-        log() << "warning: bg op in prog during close db? " << _name;
-    }
 
     for (auto&& pair : _collections) {
         auto* coll = pair.second;

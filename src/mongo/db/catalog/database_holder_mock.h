@@ -74,16 +74,9 @@ public:
     /**
      * Closes all opened databases. Must be called with the global lock acquired in X-mode.
      *
-     * result Populated with the names of the databases, which were closed.
-     * force Force close even if something underway - use at shutdown
      * reason The reason for close.
      */
-    bool closeAll(OperationContext* opCtx,
-                  BSONObjBuilder& result,
-                  bool force,
-                  const std::string& reason) override {
-        return true;
-    }
+    void closeAll(OperationContext* opCtx, const std::string& reason) override {}
 
     /**
      * Returns the set of existing database names that differ only in casing.
