@@ -11,7 +11,7 @@ from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.testcases import interface
 
 
-class BenchmarkTestCase(interface.ProcessTestCase):
+class BenchmarkTestCase(interface.TestCase):
     """
     A Benchmark test to execute.
     """
@@ -25,23 +25,25 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         """
         Initializes the BenchmarkTestCase with the executable to run.
         """
-
-        interface.ProcessTestCase.__init__(self, logger, "Benchmark test", program_executable)
+        interface.TestCase.__init__(self, logger, "Benchmark test", program_executable)
 
         parser.validate_benchmark_options()
 
         # 1. Set the default benchmark options, including the out file path, which is based on the
         #    executable path. Keep the existing extension (if any) to simplify parsing.
         bm_options = {
-            "benchmark_out": program_executable + ".json",
+            "benchmark_out": self.report_name(),
             "benchmark_min_time": _config.DEFAULT_BENCHMARK_MIN_TIME.total_seconds(),
-            "benchmark_repetitions": _config.DEFAULT_BENCHMARK_REPETITIONS
+            "benchmark_repetitions": _config.DEFAULT_BENCHMARK_REPETITIONS,
+            # TODO: remove the following line once we bump our Google Benchmark version to one that
+            # contains the fix for https://github.com/google/benchmark/issues/559 .
+            "benchmark_color": False
         }
 
         # 2. Override Benchmark options with options set through `program_options` in the suite
         #    configuration.
-        suite_bm_options = utils.default_if_none(program_options, {})
-        bm_options.update(suite_bm_options)
+        program_options = utils.default_if_none(program_options, {})
+        bm_options.update(program_options)
 
         # 3. Override Benchmark options with options set through resmoke's command line.
         resmoke_bm_options = {
@@ -59,10 +61,25 @@ class BenchmarkTestCase(interface.ProcessTestCase):
                     value = value.total_seconds()
                 bm_options[key] = value
 
-        self.program_options = bm_options
-        self.program_executable = program_executable
+        self.bm_executable = program_executable
+        self.bm_options = bm_options
+
+    def run_test(self):
+        try:
+            program = self._make_process()
+            self._execute(program)
+        except self.failureException:
+            raise
+        except:
+            self.logger.exception(
+                "Encountered an error running Benchmark test %s.", self.basename())
+            raise
+
+    def report_name(self):
+        """Return report name."""
+        return self.bm_executable + ".json"
 
     def _make_process(self):
         return core.programs.generic_program(self.logger,
-                                             [self.program_executable],
-                                             **self.program_options)
+                                             [self.bm_executable],
+                                             **self.bm_options)

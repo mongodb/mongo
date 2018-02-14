@@ -549,6 +549,7 @@ _DEFAULT_TEST_FILE_EXPLORER = TestFileExplorer()
 _SELECTOR_REGISTRY = {
     "cpp_integration_test": (_CppTestSelectorConfig, _CppTestSelector),
     "cpp_unit_test": (_CppTestSelectorConfig, _CppTestSelector),
+    "benchmark_test": (_CppTestSelectorConfig, _CppTestSelector),
     "db_test": (_DbTestSelectorConfig, _DbTestSelector),
     "json_schema_test": (_JsonSchemaTestSelectorConfig, _Selector),
     "js_test": (_JSTestSelectorConfig, _JSTestSelector),

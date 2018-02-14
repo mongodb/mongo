@@ -356,9 +356,10 @@ def _apply_kwargs(args, kwargs):
 
     for arg_name in kwargs:
         arg_value = str(kwargs[arg_name])
-        args.append("--%s" % (arg_name))
         if arg_value:
-            args.append(arg_value)
+            args.append("--%s=%s" % (arg_name, arg_value))
+        else:
+            args.append("--%s" % (arg_name))
 
 
 def _set_keyfile_permissions(opts):
