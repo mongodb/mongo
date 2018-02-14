@@ -466,23 +466,9 @@ const char* ExpressionArray::getOpName() const {
 /* ------------------------- ExpressionArrayElemAt -------------------------- */
 
 Value ExpressionArrayElemAt::evaluate(const Document& root) const {
-    /*
-        TODO
-            If root.FieldPath == Filter attach condition to return array of size <= indexArg
-            Ex: if filter is supposed to return an array of size 5 but you only want the 2 index
-            return a array of size 2 this optimize a called to $arrayElemAt: {$filter: [], 0} so 
-            filter doesnt have to loop through the whole array
-        
-        After TODO
-            do the same optimization for other operators such as silce and reduce
-    */
-    const Value indexArg = vpOperand[1]->evaluate(root);
-    // verify(str::equals(expr.fieldName(), "$filter"));
-   
-    root.addField("limit", indexArg);
-    
 
     const Value array = vpOperand[0]->evaluate(root);
+    const Value indexArg = vpOperand[1]->evaluate(root);
 
     if (array.nullish() || indexArg.nullish()) {
         return Value(BSONNULL);
@@ -494,13 +480,11 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
             array.isArray());
     uassert(28690,
             str::stream() << getOpName() << "'s second argument must be a numeric value,"
-                          << " but is "
-                          << typeName(indexArg.getType()),
+                          << " but is " << typeName(indexArg.getType()),
             indexArg.numeric());
     uassert(28691,
             str::stream() << getOpName() << "'s second argument must be representable as"
-                          << " a 32-bit integer: "
-                          << indexArg.coerceToDouble(),
+                          << " a 32-bit integer: " << indexArg.coerceToDouble(),
             indexArg.integral());
 
     long long i = indexArg.coerceToLong();
@@ -1746,13 +1730,15 @@ intrusive_ptr<ExpressionObject> ExpressionObject::parse(
 intrusive_ptr<Expression> ExpressionObject::optimize() {
     size_t countConstants = 0;
     for (auto&& pair : _expressions) {
+        // Check if Expression Constant
         if (dynamic_cast<ExpressionConstant*>(pair.second.get())) {
             countConstants++;
         }
         pair.second = pair.second->optimize();
     }
+    // If all values in ExpressionObject are constant evaluate to ExpressionConstant
     if (countConstants == _expressions.size()) {
-        return    ExpressionConstant::create(getExpressionContext(), evaluate(Document()));
+        return ExpressionConstant::create(getExpressionContext(), evaluate(Document()));
     }
     return this;
 }
@@ -2031,6 +2017,7 @@ Value ExpressionFilter::serialize(bool explain) const {
 Value ExpressionFilter::evaluate(const Document& root) const {
     // We are guaranteed at parse time that this isn't using our _varId.
     const Value inputVal = _input->evaluate(root);
+
     if (inputVal.nullish())
         return Value(BSONNULL);
 
@@ -2046,6 +2033,8 @@ Value ExpressionFilter::evaluate(const Document& root) const {
 
     vector<Value> output;
     auto& vars = getExpressionContext()->variables;
+
+
     for (const auto& elem : input) {
         vars.setValue(_varId, elem);
 
@@ -2053,6 +2042,7 @@ Value ExpressionFilter::evaluate(const Document& root) const {
             output.push_back(std::move(elem));
         }
     }
+
 
     return Value(std::move(output));
 }
@@ -3031,7 +3021,7 @@ const char* ExpressionOr::getOpName() const {
     return "$or";
 }
 
-/* ----------------------- Expression ---------------------------- */
+/* ----------------------- ExpressionPow ---------------------------- */
 
 intrusive_ptr<Expression> ExpressionPow::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, Value base, Value exp) {
