@@ -172,9 +172,6 @@ void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doE
                 return StatusWith<KeysCollectionDocument>(keyGenerationStatus);
             }
 
-            // Set a small deadline so the refresh will not wait forever to satisfy readConcern.
-            opCtx->setDeadlineAfterNowBy(Milliseconds(500));
-
             // An error encountered by the keyGenerator should not prevent refreshing the cache
             auto cacheRefreshStatus = _keysCache.refresh(opCtx);
 
@@ -185,11 +182,8 @@ void KeysCollectionManager::enableKeyGenerator(OperationContext* opCtx, bool doE
             return cacheRefreshStatus;
         });
     } else {
-        _refresher.switchFunc(opCtx, [this](OperationContext* opCtx) {
-            // Set a small deadline so the refresh will not wait forever to satisfy readConcern.
-            opCtx->setDeadlineAfterNowBy(Milliseconds(500));
-            return _keysCache.refresh(opCtx);
-        });
+        _refresher.switchFunc(
+            opCtx, [this](OperationContext* opCtx) { return _keysCache.refresh(opCtx); });
     }
 }
 
@@ -201,7 +195,7 @@ void KeysCollectionManager::PeriodicRunner::refreshNow(OperationContext* opCtx) 
     auto refreshRequest = [this]() {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
 
-        if (_isStopping) {
+        if (_inShutdown) {
             uasserted(ErrorCodes::ShutdownInProgress,
                       "aborting keys cache refresh because node is shutting down");
         }
@@ -235,7 +229,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
         {
             stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-            if (_isStopping) {
+            if (_inShutdown) {
                 break;
             }
 
@@ -248,6 +242,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
 
         {
             auto opCtx = cc().makeOperationContext();
+
             auto latestKeyStatusWith = (*doRefresh)(opCtx.get());
             if (latestKeyStatusWith.getStatus().isOK()) {
                 errorCount = 0;
@@ -290,7 +285,7 @@ void KeysCollectionManager::PeriodicRunner::_doPeriodicRefresh(ServiceContext* s
             _refreshRequest.reset();
         }
 
-        if (_isStopping) {
+        if (_inShutdown) {
             break;
         }
 
@@ -329,7 +324,7 @@ void KeysCollectionManager::PeriodicRunner::start(ServiceContext* service,
                                                   Milliseconds refreshInterval) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     invariant(!_backgroundThread.joinable());
-    invariant(!_isStopping);
+    invariant(!_inShutdown);
 
     _backgroundThread = stdx::thread([this, service, threadName, refreshInterval] {
         _doPeriodicRefresh(service, threadName, refreshInterval);
@@ -343,17 +338,11 @@ void KeysCollectionManager::PeriodicRunner::stop() {
             return;
         }
 
-        _isStopping = true;
+        _inShutdown = true;
         _refreshNeededCV.notify_all();
     }
 
     _backgroundThread.join();
-
-    {
-        stdx::lock_guard<stdx::mutex> lock(_mutex);
-        invariant(!_backgroundThread.joinable());
-        _isStopping = false;
-    }
 }
 
 bool KeysCollectionManager::PeriodicRunner::hasSeenKeys() {

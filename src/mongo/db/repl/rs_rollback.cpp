@@ -53,7 +53,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
@@ -1420,10 +1419,6 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     // If necessary, clear the memory of existing sessions.
     if (fixUpInfo.refetchTransactionDocs) {
         SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
-    }
-
-    if (auto validator = LogicalTimeValidator::get(opCtx)) {
-        validator->resetKeyManagerCache(opCtx->getClient()->getServiceContext());
     }
 
     // Reload the lastAppliedOpTime and lastDurableOpTime value in the replcoord and the
