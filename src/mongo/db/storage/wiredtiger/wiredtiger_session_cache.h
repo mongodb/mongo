@@ -137,7 +137,7 @@ private:
     WT_SESSION* _session;            // owned
     CursorCache _cursors;            // owned
     uint64_t _cursorGen;
-    int _cursorsCached, _cursorsOut;
+    int _cursorsOut;
 };
 
 /**
