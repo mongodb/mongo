@@ -226,23 +226,21 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
     }
 
     // Scan all indexes and return those in the catalog where the storage engine does not have the
-    // corresponding ident, or where the index is not yet marked ready. The caller is expected to
-    // rebuild these indexes.
+    // corresponding ident. The caller is expected to rebuild these indexes.
     std::vector<CollectionIndexNamePair> ret;
     for (const auto& coll : collections) {
         const BSONCollectionCatalogEntry::MetaData metaData = _catalog->getMetaData(opCtx, coll);
         for (const auto& indexMetaData : metaData.indexes) {
-            const std::string indexName = indexMetaData.name();
-            const std::string indexIdent = _catalog->getIndexIdent(opCtx, coll, indexName);
-            if (!indexMetaData.ready) {
-                log() << "Index is not marked as ready; rebuilding. NS: " << coll
-                      << " Index: " << indexName << " Ident: " << indexIdent;
-                ret.emplace_back(coll, indexName);
-            } else if (engineIdents.find(indexIdent) == engineIdents.end()) {
-                log() << "Expected index data is missing, rebuilding. NS: " << coll
-                      << " Index: " << indexName << " Ident: " << indexIdent;
-                ret.emplace_back(coll, indexName);
+            const std::string& indexName = indexMetaData.name();
+            std::string indexIdent = _catalog->getIndexIdent(opCtx, coll, indexName);
+            if (engineIdents.find(indexIdent) != engineIdents.end()) {
+                continue;
             }
+
+            log() << "Expected index data is missing, rebuilding. NS: " << coll
+                  << " Index: " << indexName << " Ident: " << indexIdent;
+
+            ret.push_back(CollectionIndexNamePair(coll, indexName));
         }
     }
 
