@@ -90,6 +90,11 @@ public:
     virtual stdx::thread::id getThreadId() const = 0;
 
     /**
+     * Indicate that shared locks should participate in two-phase locking for this Locker instance.
+     */
+    virtual void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) = 0;
+
+    /**
      * This should be the first method invoked for a particular Locker object. It acquires the
      * Global lock in the specified mode and effectively indicates the mode of the operation.
      * This is what the lock modes on the global lock mean:

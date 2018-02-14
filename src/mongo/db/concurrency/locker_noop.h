@@ -57,6 +57,10 @@ public:
         invariant(false);
     }
 
+    void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) override {
+        invariant(false);
+    }
+
     virtual LockResult lockGlobal(LockMode mode) {
         invariant(false);
     }

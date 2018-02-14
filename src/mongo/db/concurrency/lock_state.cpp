@@ -125,13 +125,10 @@ AtomicUInt64 idCounter(0);
 // Partitioned global lock statistics, so we don't hit the same bucket
 PartitionedInstanceWideLockStats globalStats;
 
+}  // namespace
 
-/**
- * Whether the particular lock's release should be held until the end of the operation. We
- * delay release of exclusive locks (locks that are for write operations) in order to ensure
- * that the data they protect is committed successfully.
- */
-bool shouldDelayUnlock(ResourceId resId, LockMode mode) {
+template <bool IsForMMAPV1>
+bool LockerImpl<IsForMMAPV1>::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
     switch (resId.getType()) {
         // The flush lock must not participate in two-phase locking because we need to temporarily
         // yield it while blocked waiting to acquire other locks.
@@ -156,15 +153,12 @@ bool shouldDelayUnlock(ResourceId resId, LockMode mode) {
 
         case MODE_IS:
         case MODE_S:
-            return false;
+            return _sharedLocksShouldTwoPhaseLock;
 
         default:
             MONGO_UNREACHABLE;
     }
 }
-
-}  // namespace
-
 
 template <bool IsForMMAPV1>
 bool LockerImpl<IsForMMAPV1>::isW() const {
@@ -455,7 +449,7 @@ void LockerImpl<IsForMMAPV1>::downgrade(ResourceId resId, LockMode newMode) {
 template <bool IsForMMAPV1>
 bool LockerImpl<IsForMMAPV1>::unlock(ResourceId resId) {
     LockRequestsMap::Iterator it = _requests.find(resId);
-    if (inAWriteUnitOfWork() && shouldDelayUnlock(it.key(), (it->mode))) {
+    if (inAWriteUnitOfWork() && _shouldDelayUnlock(it.key(), (it->mode))) {
         _resourcesToUnlockAtEndOfUnitOfWork.push(it.key());
         return false;
     }

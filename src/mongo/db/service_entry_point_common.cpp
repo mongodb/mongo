@@ -601,6 +601,10 @@ void execCommandDatabase(OperationContext* opCtx,
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         readConcernArgs = uassertStatusOK(_extractReadConcern(command, dbname, request.body));
 
+        if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
+            opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
+        }
+
         auto& oss = OperationShardingState::get(opCtx);
 
         if (!opCtx->getClient()->isInDirectClient() &&

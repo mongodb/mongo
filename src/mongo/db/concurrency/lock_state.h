@@ -101,6 +101,10 @@ public:
 
     stdx::thread::id getThreadId() const override;
 
+    void setSharedLocksShouldTwoPhaseLock(bool sharedLocksShouldTwoPhaseLock) override {
+        _sharedLocksShouldTwoPhaseLock = sharedLocksShouldTwoPhaseLock;
+    }
+
     virtual LockResult lockGlobal(LockMode mode);
     virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) {
         return _lockGlobalBegin(mode, deadline);
@@ -199,6 +203,14 @@ private:
      */
     LockMode _getModeForMMAPV1FlushLock() const;
 
+    /**
+     * Whether the particular lock's release should be held until the end of the operation. We delay
+     * release of exclusive locks (locks that are for write operations) in order to ensure that the
+     * data they protect is committed successfully. Shared locks will also participate in two-phase
+     * locking if '_sharedLocksShouldTwoPhaseLock' is true.
+     */
+    bool _shouldDelayUnlock(ResourceId resId, LockMode mode) const;
+
     // Used to disambiguate different lockers
     const LockerId _id;
 
@@ -231,6 +243,9 @@ private:
 
     // Track the thread who owns the lock for debugging purposes
     stdx::thread::id _threadId;
+
+    // If true, shared locks will participate in two-phase locking.
+    bool _sharedLocksShouldTwoPhaseLock = false;
 
     //////////////////////////////////////////////////////////////////////////////////////////
     //

@@ -304,6 +304,88 @@ TEST(LockerImpl, CanceledDeadlockUnblocks) {
     ASSERT(locker3.unlockGlobal());
 }
 
+TEST(LockerImpl, MODE_ISLocksUseTwoPhaseLockingWhenSharedLocksShouldTwoPhaseLockIsTrue) {
+    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    DefaultLockerImpl locker;
+    locker.setSharedLocksShouldTwoPhaseLock(true);
+    locker.lockGlobal(MODE_IS);
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resId, MODE_IS));
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IS));
+
+    locker.beginWriteUnitOfWork();
+
+    ASSERT_FALSE(locker.unlock(resId));
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IS));
+
+    locker.endWriteUnitOfWork();
+
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_NONE));
+
+    locker.unlockGlobal();
+}
+
+TEST(LockerImpl, MODE_ISLocksDoNotUseTwoPhaseLockingWhenSharedLocksShouldTwoPhaseLockIsFalse) {
+    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    DefaultLockerImpl locker;
+    locker.lockGlobal(MODE_IS);
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resId, MODE_IS));
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_IS));
+
+    locker.beginWriteUnitOfWork();
+
+    ASSERT_TRUE(locker.unlock(resId));
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_NONE));
+
+    locker.endWriteUnitOfWork();
+
+    locker.unlockGlobal();
+}
+
+TEST(LockerImpl, MODE_SLocksUseTwoPhaseLockingWhenSharedLocksShouldTwoPhaseLockIsTrue) {
+    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    DefaultLockerImpl locker;
+    locker.setSharedLocksShouldTwoPhaseLock(true);
+    locker.lockGlobal(MODE_IS);
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resId, MODE_S));
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_S));
+
+    locker.beginWriteUnitOfWork();
+
+    ASSERT_FALSE(locker.unlock(resId));
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_S));
+
+    locker.endWriteUnitOfWork();
+
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_NONE));
+
+    locker.unlockGlobal();
+}
+
+TEST(LockerImpl, MODE_SLocksDoNotUseTwoPhaseLockingWhenSharedLocksShouldTwoPhaseLockIsFalse) {
+    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+
+    DefaultLockerImpl locker;
+    locker.lockGlobal(MODE_IS);
+
+    ASSERT_EQ(LOCK_OK, locker.lock(resId, MODE_S));
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_S));
+
+    locker.beginWriteUnitOfWork();
+
+    ASSERT_TRUE(locker.unlock(resId));
+    ASSERT_TRUE(locker.isLockHeldForMode(resId, MODE_NONE));
+
+    locker.endWriteUnitOfWork();
+
+    locker.unlockGlobal();
+}
+
 namespace {
 /**
  * Helper function to determine if 'lockerInfo' contains a lock with ResourceId 'resourceId' and
