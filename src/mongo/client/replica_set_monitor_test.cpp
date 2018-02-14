@@ -999,20 +999,21 @@ TEST(ReplicaSetMonitorTests, NewPrimaryWithMaxElectionId) {
 
         refresher.receivedIsMaster(basicSeeds[i],
                                    -1,
-                                   BSON("setName"
-                                        << "name"
-                                        << "ismaster"
-                                        << true
-                                        << "secondary"
-                                        << false
-                                        << "hosts"
-                                        << BSON_ARRAY("a"
-                                                      << "b"
-                                                      << "c")
-                                        << "electionId"
-                                        << OID::gen()
-                                        << "ok"
-                                        << true));
+                                   BSON(
+                                       "setName"
+                                       << "name"
+                                       << "ismaster"
+                                       << true
+                                       << "secondary"
+                                       << false
+                                       << "hosts"
+                                       << BSON_ARRAY("a"
+                                                     << "b"
+                                                     << "c")
+                                       << "electionId"
+                                       << OID::fromTerm(i)  // electionId must increase every cycle.
+                                       << "ok"
+                                       << true));
 
         // Ensure the set primary is the host we just got a reply from
         HostAndPort currentPrimary = state->getMatchingHost(primaryOnly);
