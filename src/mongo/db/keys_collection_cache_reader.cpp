@@ -43,12 +43,16 @@ KeysCollectionCacheReader::KeysCollectionCacheReader(std::string purpose,
 StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::refresh(OperationContext* opCtx) {
     LogicalTime newerThanThis;
 
+    decltype(_cache)::size_type originalSize = 0;
+
     {
         stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
         auto iter = _cache.crbegin();
         if (iter != _cache.crend()) {
             newerThanThis = iter->second.getExpiresAt();
         }
+
+        originalSize = _cache.size();
     }
 
     auto refreshStatus = _client->getNewKeys(opCtx, _purpose, newerThanThis);
@@ -60,6 +64,15 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::refresh(OperationC
     auto& newKeys = refreshStatus.getValue();
 
     stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
+    if (originalSize > _cache.size()) {
+        // _cache cleared while we getting the new keys, just return the newest key without
+        // touching the _cache so the next refresh will populate it properly.
+        // Note: newKeys are sorted.
+        if (!newKeys.empty()) {
+            return std::move(newKeys.back());
+        }
+    }
+
     for (auto&& key : newKeys) {
         _cache.emplace(std::make_pair(key.getExpiresAt(), std::move(key)));
     }
@@ -106,6 +119,7 @@ StatusWith<KeysCollectionDocument> KeysCollectionCacheReader::getKey(
 void KeysCollectionCacheReader::resetCache() {
     // keys that read with non majority readConcern level can be rolled back.
     if (!_client->supportsMajorityReads()) {
+        stdx::lock_guard<stdx::mutex> lk(_cacheMutex);
         _cache.clear();
     }
 }

@@ -186,5 +186,23 @@ TEST_F(LogicalTimeValidatorTest, ShouldGossipLogicalTimeIsFalseUntilKeysAreFound
     ASSERT_OK(validator()->validate(operationContext(), newTime));
 }
 
+TEST_F(LogicalTimeValidatorTest, CanSignTimesAfterReset) {
+    validator()->enableKeyGenerator(operationContext(), true);
+
+    LogicalTime t1(Timestamp(10, 0));
+    auto newTime = validator()->trySignLogicalTime(t1);
+
+    ASSERT_EQ(t1.asTimestamp(), newTime.getTime().asTimestamp());
+    ASSERT_TRUE(newTime.getProof());
+
+    validator()->resetKeyManagerCache();
+
+    LogicalTime t2(Timestamp(20, 0));
+    auto newTime2 = validator()->trySignLogicalTime(t2);
+
+    ASSERT_EQ(t2.asTimestamp(), newTime2.getTime().asTimestamp());
+    ASSERT_TRUE(newTime2.getProof());
+}
+
 }  // unnamed namespace
 }  // namespace mongo

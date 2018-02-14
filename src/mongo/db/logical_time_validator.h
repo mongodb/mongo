@@ -114,7 +114,7 @@ public:
     /**
      * Reset the key manager cache of keys.
      */
-    void resetKeyManagerCache(ServiceContext* service);
+    void resetKeyManagerCache();
 
 private:
     /**

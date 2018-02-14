@@ -134,4 +134,9 @@ StatusWith<KeysCollectionDocument> KeysCollectionManagerDirect::getKeyForSigning
     return keyDoc;
 }
 
+void KeysCollectionManagerDirect::clearCache() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _cache.clear();
+}
+
 }  // namespace mongo

@@ -350,4 +350,8 @@ bool KeysCollectionManagerSharding::PeriodicRunner::hasSeenKeys() {
     return _hasSeenKeys;
 }
 
+void KeysCollectionManagerSharding::clearCache() {
+    _keysCache.resetCache();
+}
+
 }  // namespace mongo

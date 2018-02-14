@@ -134,7 +134,7 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     ON_BLOCK_EXIT([this, opCtx] {
         auto validator = LogicalTimeValidator::get(opCtx);
         if (validator) {
-            validator->resetKeyManagerCache(opCtx->getClient()->getServiceContext());
+            validator->resetKeyManagerCache();
         }
 
         _checkShardIdentityRollback(opCtx);

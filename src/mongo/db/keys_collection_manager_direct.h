@@ -62,6 +62,8 @@ public:
     StatusWith<KeysCollectionDocument> getKeyForSigning(OperationContext* opCtx,
                                                         const LogicalTime& forThisTime) override;
 
+    void clearCache() override;
+
 private:
     const std::string _purpose;
     const Seconds _keyValidForInterval;

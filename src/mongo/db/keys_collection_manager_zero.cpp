@@ -54,4 +54,6 @@ StatusWith<KeysCollectionDocument> KeysCollectionManagerZero::getKeyForSigning(
     return KeysCollectionDocument(kKeyId, _purpose, kTimeProofServiceKey, forThisTime);
 }
 
+void KeysCollectionManagerZero::clearCache() {}
+
 }  // namespace mongo

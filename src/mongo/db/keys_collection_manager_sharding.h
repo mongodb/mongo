@@ -107,6 +107,8 @@ public:
      */
     bool hasSeenKeys();
 
+    void clearCache() override;
+
 private:
     /**
      * This is responsible for periodically performing refresh in the background.

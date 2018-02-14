@@ -68,6 +68,11 @@ public:
      */
     virtual StatusWith<KeysCollectionDocument> getKeyForSigning(OperationContext* opCtx,
                                                                 const LogicalTime& forThisTime) = 0;
+
+    /**
+     * Clears the in memory cache of the keys.
+     */
+    virtual void clearCache() = 0;
 };
 
 }  // namespace mongo
