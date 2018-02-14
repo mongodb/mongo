@@ -103,6 +103,8 @@ public:
         cb(sinkMessage(message));
     }
 
+    void setTimeout(boost::optional<Milliseconds>) override {}
+
     explicit MockSession(TransportLayer* tl)
         : _tl(checked_cast<TransportLayerMock*>(tl)), _remote(), _local() {}
     explicit MockSession(HostAndPort remote, HostAndPort local, TransportLayer* tl)

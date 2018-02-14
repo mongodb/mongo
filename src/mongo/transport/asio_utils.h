@@ -54,6 +54,14 @@ inline Status errorCodeToStatus(const std::error_code& ec) {
     if (!ec)
         return Status::OK();
 
+#ifdef _WIN32
+    if (ec == asio::error::timed_out) {
+#else
+    if (ec == asio::error::try_again || ec == asio::error::would_block) {
+#endif
+        return {ErrorCodes::NetworkTimeout, "Socket operation timed out"};
+    }
+
     // If the ec.category() is a mongoErrorCategory() then this error was propogated from
     // mongodb code and we should just pass the error cdoe along as-is.
     ErrorCodes::Error errorCode = (ec.category() == mongoErrorCategory())

@@ -803,33 +803,19 @@ size_t sync_recv(socket_type s, state_type state, buf* bufs,
     return 0;
   }
 
-  // Read some data.
-  for (;;)
+  signed_size_type bytes = socket_ops::recv(s, bufs, count, flags, ec);
+
+  // Check if operation succeeded.
+  if (bytes > 0)
+    return bytes;
+
+  // Check for EOF.
+  if ((state & stream_oriented) && bytes == 0)
   {
-    // Try to complete the operation without blocking.
-    signed_size_type bytes = socket_ops::recv(s, bufs, count, flags, ec);
-
-    // Check if operation succeeded.
-    if (bytes > 0)
-      return bytes;
-
-    // Check for EOF.
-    if ((state & stream_oriented) && bytes == 0)
-    {
-      ec = asio::error::eof;
-      return 0;
-    }
-
-    // Operation failed.
-    if ((state & user_set_non_blocking)
-        || (ec != asio::error::would_block
-          && ec != asio::error::try_again))
-      return 0;
-
-    // Wait for socket to become ready.
-    if (socket_ops::poll_read(s, 0, -1, ec) < 0)
-      return 0;
+    ec = asio::error::eof;
   }
+
+  return 0;
 }
 
 #if defined(ASIO_HAS_IOCP)
@@ -1203,26 +1189,9 @@ size_t sync_send(socket_type s, state_type state, const buf* bufs,
     return 0;
   }
 
-  // Read some data.
-  for (;;)
-  {
-    // Try to complete the operation without blocking.
-    signed_size_type bytes = socket_ops::send(s, bufs, count, flags, ec);
-
-    // Check if operation succeeded.
-    if (bytes >= 0)
-      return bytes;
-
-    // Operation failed.
-    if ((state & user_set_non_blocking)
-        || (ec != asio::error::would_block
-          && ec != asio::error::try_again))
-      return 0;
-
-    // Wait for socket to become ready.
-    if (socket_ops::poll_write(s, 0, -1, ec) < 0)
-      return 0;
-  }
+  // Write some data
+  signed_size_type bytes = socket_ops::send(s, bufs, count, flags, ec);
+  return bytes;
 }
 
 #if defined(ASIO_HAS_IOCP)

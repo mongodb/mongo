@@ -40,7 +40,6 @@
 #include "mongo/util/net/ssl.hpp"
 #endif
 
-#include "mongo/base/checked_cast.h"
 #include "mongo/base/system_error.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
