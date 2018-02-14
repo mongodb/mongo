@@ -4,13 +4,16 @@ Interface of the different fixtures for executing JSTests against.
 
 from __future__ import absolute_import
 
+import os.path
 import time
 
 import pymongo
 import pymongo.errors
 
+from ... import config
 from ... import errors
 from ... import logging
+from ... import utils
 from ...utils import registry
 
 
@@ -38,7 +41,7 @@ class Fixture(object):
     # is defined for all subclasses of Fixture.
     REGISTERED_NAME = "Fixture"
 
-    def __init__(self, logger, job_num):
+    def __init__(self, logger, job_num, dbpath_prefix=None):
         """
         Initializes the fixture with a logger instance.
         """
@@ -53,6 +56,10 @@ class Fixture(object):
 
         self.logger = logger
         self.job_num = job_num
+
+        dbpath_prefix = utils.default_if_none(config.DBPATH_PREFIX, dbpath_prefix)
+        dbpath_prefix = utils.default_if_none(dbpath_prefix, config.DEFAULT_DBPATH_PREFIX)
+        self._dbpath_prefix = os.path.join(dbpath_prefix, "job{}".format(self.job_num))
 
     def setup(self):
         """
@@ -97,6 +104,9 @@ class Fixture(object):
         can be run, and false otherwise.
         """
         return True
+
+    def get_dbpath_prefix(self):
+        return self._dbpath_prefix
 
     def get_internal_connection_string(self):
         """

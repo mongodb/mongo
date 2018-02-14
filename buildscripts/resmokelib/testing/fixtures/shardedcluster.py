@@ -51,7 +51,7 @@ class ShardedClusterFixture(interface.Fixture):
         the mongod and mongos processes.
         """
 
-        interface.Fixture.__init__(self, logger, job_num)
+        interface.Fixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
         if "dbpath" in mongod_options:
             raise ValueError("Cannot specify mongod_options.dbpath")
@@ -70,11 +70,7 @@ class ShardedClusterFixture(interface.Fixture):
         self.configsvr_options = utils.default_if_none(configsvr_options, {})
         self.shard_options = utils.default_if_none(shard_options, {})
 
-        # Command line options override the YAML configuration.
-        dbpath_prefix = utils.default_if_none(config.DBPATH_PREFIX, dbpath_prefix)
-        dbpath_prefix = utils.default_if_none(dbpath_prefix, config.DEFAULT_DBPATH_PREFIX)
-        self._dbpath_prefix = os.path.join(dbpath_prefix, "job{}".format(self.job_num),
-                                           config.FIXTURE_SUBDIR)
+        self._dbpath_prefix = os.path.join(self._dbpath_prefix, config.FIXTURE_SUBDIR)
 
         self.configsvr = None
         self.mongos = None
@@ -101,9 +97,6 @@ class ShardedClusterFixture(interface.Fixture):
         # Start up each of the shards
         for shard in self.shards:
             shard.setup()
-
-    def get_dbpath(self):
-        return self._dbpath_prefix
 
     def await_ready(self):
         # Wait for the config server
