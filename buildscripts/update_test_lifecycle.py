@@ -40,7 +40,7 @@ from buildscripts.ciconfig import tags as ci_tags
 LOGGER = logging.getLogger(__name__)
 
 if sys.version_info[0] == 2:
-    _NUMBER_TYPES = (int, int, float)
+    _NUMBER_TYPES = (int, long, float)
 else:
     _NUMBER_TYPES = (int, float)
 

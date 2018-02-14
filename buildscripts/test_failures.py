@@ -20,7 +20,7 @@ import time
 import warnings
 
 try:
-    from urllib.parse import urlparse
+    from urlparse import urlparse
 except ImportError:
     from urllib.parse import urlparse
 
@@ -31,7 +31,7 @@ import yaml
 LOGGER = logging.getLogger(__name__)
 
 if sys.version_info[0] == 2:
-    _STRING_TYPES = (str,)
+    _STRING_TYPES = (basestring,)
 else:
     _STRING_TYPES = (str,)
 

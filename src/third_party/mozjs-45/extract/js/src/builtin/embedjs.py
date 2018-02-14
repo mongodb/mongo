@@ -36,7 +36,7 @@
 #
 # It uses the C preprocessor to process its inputs.
 
-from __future__ import with_statement, unicode_literals
+from __future__ import with_statement
 import re, sys, os, subprocess
 import shlex
 import which
@@ -107,7 +107,7 @@ def preprocess(cxx, preprocessorOption, source, args = []):
   tmpOut = 'self-hosting-preprocessed.pp';
   outputArg = shlex.split(preprocessorOption + tmpOut)
 
-  with open(tmpIn, 'w') as input:
+  with open(tmpIn, 'wb') as input:
     input.write(source)
   print(' '.join(cxx + outputArg + args + [tmpIn]))
   result = subprocess.Popen(cxx + outputArg + args + [tmpIn]).wait()

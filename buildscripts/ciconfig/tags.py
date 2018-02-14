@@ -12,7 +12,7 @@ import yaml
 
 # Setup to preserve order in yaml.dump, see https://stackoverflow.com/a/8661021
 def _represent_dict_order(self, data):
-    return self.represent_mapping("tag:yaml.org,2002:map", list(data.items()))
+    return self.represent_mapping("tag:yaml.org,2002:map", data.items())
 
 yaml.add_representer(collections.OrderedDict, _represent_dict_order)
 # End setup
@@ -55,11 +55,11 @@ class TagsConfig(object):
 
     def get_test_kinds(self):
         """List the test kinds."""
-        return list(self._conf.keys())
+        return self._conf.keys()
 
     def get_test_patterns(self, test_kind):
         """List the test patterns under 'test_kind'."""
-        return list(getdefault(self._conf, test_kind, {}).keys())
+        return getdefault(self._conf, test_kind, {}).keys()
 
     def get_tags(self, test_kind, test_pattern):
         """List the tags under 'test_kind' and 'test_pattern'."""

@@ -29,7 +29,7 @@ def exec_update(query, column, value):
     view.Close()
 
 
-print("Trimming MSI")
+print "Trimming MSI"
 
 db = msilib.OpenDatabase(args.file.name, msilib.MSIDBOPEN_DIRECT)
 

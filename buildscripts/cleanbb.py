@@ -79,7 +79,7 @@ def tryToRemove(path):
 
 def cleanup( root , nokill ):
     if nokill:
-        print("nokill requested, not killing anybody")
+        print "nokill requested, not killing anybody"
     else:
         if killprocs( root=root ) > 0:
             time.sleep(3)

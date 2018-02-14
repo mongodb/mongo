@@ -95,14 +95,14 @@ def make_tar_archive(opts):
         enclosing_file_directory = os.path.dirname(temp_file_location)
         if not os.path.exists(enclosing_file_directory):
             os.makedirs(enclosing_file_directory)
-        print("copying %s => %s" % (input_filename, temp_file_location))
+        print "copying %s => %s" % (input_filename, temp_file_location)
         if os.path.isdir(input_filename):
             shutil.copytree(input_filename, temp_file_location)
         else:
             shutil.copy2(input_filename, temp_file_location)
         tar_command.append(preferred_filename)
 
-    print(" ".join(tar_command))
+    print " ".join(tar_command)
     # execute the full tar command
     run_directory = os.path.join(os.getcwd(), enclosing_archive_directory)
     proc = Popen(tar_command, stdout=PIPE, stderr=STDOUT, bufsize=0, cwd=run_directory)
@@ -165,7 +165,7 @@ def parse_options(args):
         opts.transformations = [
             xform.replace(os.path.altsep or os.path.sep, os.path.sep).split('=', 1)
             for xform in opts.transformations]
-    except Exception as e:
+    except Exception, e:
         parser.error(e)
 
     return opts

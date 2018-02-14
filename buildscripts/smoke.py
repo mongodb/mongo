@@ -34,7 +34,7 @@
 #   jobs on the same host at once.  So something's gotta change.
 
 from datetime import datetime
-
+from itertools import izip
 import glob
 import logging
 from optparse import OptionParser
@@ -55,11 +55,11 @@ from pymongo import MongoClient
 from pymongo.errors import OperationFailure
 from pymongo import ReadPreference
 
-from . import cleanbb
-from . import utils
+import cleanbb
+import utils
 
 try:
-    import pickle as pickle
+    import cPickle as pickle
 except ImportError:
     import pickle
 
@@ -133,17 +133,17 @@ class NullMongod(object):
 
 
 def dump_stacks(signal, frame):
-    print("======================================")
-    print("DUMPING STACKS due to SIGUSR1 signal")
-    print("======================================")
+    print "======================================"
+    print "DUMPING STACKS due to SIGUSR1 signal"
+    print "======================================"
     threads = threading.enumerate();
 
-    print("Total Threads: " + str(len(threads)))
+    print "Total Threads: " + str(len(threads))
 
     for id, stack in sys._current_frames().items():
-        print("Thread %d" % (id))
-        print("".join(traceback.format_stack(stack)))
-    print("======================================")
+        print "Thread %d" % (id)
+        print "".join(traceback.format_stack(stack))
+    print "======================================"
 
 
 def buildlogger(cmd, is_global=False):
@@ -196,8 +196,8 @@ class mongod(NullMongod):
         try:
             self.check_mongo_port(int(port))
             return True
-        except Exception as e:
-            print(e, file=sys.stderr)
+        except Exception,e:
+            print >> sys.stderr, e
             return False
         
     def did_mongod_start(self, port=mongod_port, timeout=300):
@@ -207,14 +207,14 @@ class mongod(NullMongod):
             if is_up:
                 return True
             timeout = timeout - 1
-        print("timeout starting mongod", file=sys.stderr)
+        print >> sys.stderr, "timeout starting mongod"
         return False
 
     def start(self):
         global mongod_port
         global mongod
         if self.proc:
-            print("probable bug: self.proc already set in start()", file=sys.stderr)
+            print >> sys.stderr, "probable bug: self.proc already set in start()"
             return
         self.ensure_test_dirs()
         dir_name = smoke_db_prefix + "/data/db/sconsTests/"
@@ -270,7 +270,7 @@ class mongod(NullMongod):
                      '--sslAllowConnectionsWithoutCertificates']
         if self.kwargs.get('rlp_path'):
             argv += ['--basisTechRootDirectory', self.kwargs.get('rlp_path')]
-        print("running " + " ".join(argv))
+        print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 
         # If the mongod process is spawned under buildlogger.py, then the first line of output
@@ -352,7 +352,7 @@ class mongod(NullMongod):
 
     def stop(self):
         if not self.proc:
-            print("probable bug: self.proc unset in stop()", file=sys.stderr)
+            print >> sys.stderr, "probable bug: self.proc unset in stop()"
             return
         try:
             if os.sys.platform == "win32" and self.job_object is not None:
@@ -407,9 +407,9 @@ class mongod(NullMongod):
                 self.proc.terminate()
             else:
                 os.kill(self.proc.pid, 15)
-        except Exception as e:
-            print("error shutting down mongod", file=sys.stderr)
-            print(e, file=sys.stderr)
+        except Exception, e:
+            print >> sys.stderr, "error shutting down mongod"
+            print >> sys.stderr, e
         self.proc.wait()
 
         if self._stdout_pipe is not None:
@@ -424,12 +424,12 @@ class mongod(NullMongod):
         # anyway.
         retcode = self.proc.returncode
         if os.sys.platform != "win32" and retcode != 0:
-            raise Exception
+            raise(Exception('mongod process exited with non-zero code %d' % retcode))
 
     def wait_for_repl(self):
-        print("Awaiting replicated (w:2, wtimeout:5min) insert (port:" + str(self.port) + ")")
+        print "Awaiting replicated (w:2, wtimeout:5min) insert (port:" + str(self.port) + ")"
         MongoClient(port=self.port).testing.smokeWait.insert({}, w=2, wtimeout=5*60*1000)
-        print("Replicated write completed -- done wait_for_repl")
+        print "Replicated write completed -- done wait_for_repl"
 
 class Bug(Exception):
     def __str__(self):
@@ -457,7 +457,7 @@ class TestServerFailure(TestFailure):
 def check_db_hashes(master, slave):
     # Need to pause a bit so a slave might catch up...
     if not slave.slave:
-        raise Bug
+        raise(Bug("slave instance doesn't have slave attribute set"))
 
     master.wait_for_repl()
 
@@ -469,7 +469,7 @@ def check_db_hashes(master, slave):
 
     global lost_in_slave, lost_in_master, screwy_in_slave, replicated_collections
 
-    replicated_collections += list(master.dict.keys())
+    replicated_collections += master.dict.keys()
 
     for coll in replicated_collections:
         if coll not in slave.dict and coll not in lost_in_slave:
@@ -489,13 +489,13 @@ def check_db_hashes(master, slave):
                 sDocs = list(sTestDB[coll].find().sort("_id", 1))
                 mDiffDocs = list()
                 sDiffDocs = list()
-                for left, right in zip(mDocs, sDocs):
+                for left, right in izip(mDocs, sDocs):
                     if left != right:
                         mDiffDocs.append(left)
                         sDiffDocs.append(right)
 
                 stats["docs"] = {'master': mDiffDocs, 'slave': sDiffDocs }
-            except Exception as e:
+            except Exception, e:
                 stats["error-docs"] = e;
 
             screwy_in_slave[coll] = stats
@@ -506,7 +506,7 @@ def check_db_hashes(master, slave):
                 mOplog = mTestDB.connection.local[oplog];
                 oplog_entries = list(mOplog.find({"$or": [{"ns":mTestDB[coll].full_name}, \
                                                           {"op":"c"}]}).sort("$natural", 1))
-                print("oplog for %s" % mTestDB[coll].full_name)
+                print "oplog for %s" % mTestDB[coll].full_name
                 for doc in oplog_entries:
                     pprint.pprint(doc, width=200)
 
@@ -745,7 +745,7 @@ def runTest(test, result):
 
     is_mongod_still_up = test_mongod.is_mongod_up(mongod_port)
     if start_mongod and not is_mongod_still_up:
-        print("mongod is not running after test")
+        print "mongod is not running after test"
         result["mongod_running_at_end"] = is_mongod_still_up;
         raise TestServerFailure(path)
 
@@ -754,7 +754,7 @@ def runTest(test, result):
     if r != 0:
         raise TestExitFailure(path, r)
 
-    print("")
+    print ""
 
 def run_tests(tests):
     # FIXME: some suites of tests start their own mongod, so don't
@@ -825,7 +825,7 @@ def run_tests(tests):
                 result = primary.admin.command("ismaster");
                 ismaster = result["ismaster"]
                 if not ismaster:
-                    print("waiting for primary to be available ...")
+                    print "waiting for primary to be available ..."
                     time.sleep(.2)
             
             secondaryUp = False
@@ -835,7 +835,7 @@ def run_tests(tests):
                 result = sConn.admin.command("ismaster");
                 secondaryUp = result["secondary"]
                 if not secondaryUp:
-                    print("waiting for secondary to be available ...")
+                    print "waiting for secondary to be available ..."
                     time.sleep(.2)
 
         if small_oplog or small_oplog_rs:
@@ -857,7 +857,7 @@ def run_tests(tests):
                 if skipTest(test_path):
                     test_result["status"] = "skip"
 
-                    print("skipping " + test_path)
+                    print "skipping " + test_path
                 else:
                     fails.append(test)
                     runTest(test, test_result)
@@ -897,20 +897,20 @@ def run_tests(tests):
                                         use_ssl=use_ssl)
                         master.start()
 
-            except TestFailure as f:
+            except TestFailure, f:
                 test_result["end"] = time.time()
                 test_result["elapsed"] = test_result["end"] - test_result["start"]
                 test_result["error"] = str(f)
                 test_result["status"] = "fail"
                 test_report["results"].append( test_result )
                 try:
-                    print(f)
+                    print f
                     # Record the failing test and re-raise.
                     losers[f.path] = f.status
                     raise f
-                except TestServerFailure as f:
+                except TestServerFailure, f:
                     return 2
-                except TestFailure as f:
+                except TestFailure, f:
                     if not continue_on_failure:
                         return 1
         if isinstance(slave, mongod):
@@ -925,51 +925,51 @@ def run_tests(tests):
 def check_and_report_replication_dbhashes():
     def missing(lst, src, dst):
         if lst:
-            print("""The following collections were present in the %s but not the %s
-at the end of testing:""" % (src, dst))
+            print """The following collections were present in the %s but not the %s
+at the end of testing:""" % (src, dst)
             for db in lst:
-                print(db)
+                print db
 
     missing(lost_in_slave, "master", "slave")
     missing(lost_in_master, "slave", "master")
     if screwy_in_slave:
-        print("""The following collections have different hashes in the master and slave:""")
+        print """The following collections have different hashes in the master and slave:"""
         for coll in screwy_in_slave.keys():
             stats = screwy_in_slave[coll]
             # Counts are "approx" because they are collected after the dbhash runs and may not
             # reflect the states of the collections that were hashed. If the hashes differ, one
             # possibility is that a test exited with writes still in-flight.
-            print("collection: %s\t (master/slave) hashes: %s/%s counts (approx): %i/%i" % (coll, stats['hashes']['master'], stats['hashes']['slave'], stats['counts']['master'], stats['counts']['slave']))
+            print "collection: %s\t (master/slave) hashes: %s/%s counts (approx): %i/%i" % (coll, stats['hashes']['master'], stats['hashes']['slave'], stats['counts']['master'], stats['counts']['slave'])
             if "docs" in stats:
                 if (("master" in stats["docs"] and len(stats["docs"]["master"]) == 0) and
                     ("slave" in stats["docs"] and len(stats["docs"]["slave"]) == 0)):
-                    print("All docs matched!")
+                    print "All docs matched!"
                 else:
-                    print("Different Docs")
-                    print("Master docs:")
+                    print "Different Docs"
+                    print "Master docs:"
                     pprint.pprint(stats["docs"]["master"], indent=2)
-                    print("Slave docs:")
+                    print "Slave docs:"
                     pprint.pprint(stats["docs"]["slave"], indent=2)
             if "error-docs" in stats:
-                print("Error getting docs to diff:")
+                print "Error getting docs to diff:"
                 pprint.pprint(stats["error-docs"])
         return True
 
     if (small_oplog or small_oplog_rs) and not (lost_in_master or lost_in_slave or screwy_in_slave):
-        print("replication ok for %d collections" % (len(replicated_collections)))
+        print "replication ok for %d collections" % (len(replicated_collections))
 
     return False
 
 
 def report():
-    print("%d tests succeeded" % len(winners))
+    print "%d tests succeeded" % len(winners)
     num_missed = len(tests) - (len(winners) + len(losers.keys()))
     if num_missed:
-        print("%d tests didn't get run" % num_missed)
+        print "%d tests didn't get run" % num_missed
     if losers:
-        print("The following tests failed (with exit code):")
+        print "The following tests failed (with exit code):"
         for loser in losers:
-            print("%s\t%d" % (loser, losers[loser]))
+            print "%s\t%d" % (loser, losers[loser])
 
     test_result = { "start": time.time() }
     if check_and_report_replication_dbhashes():
@@ -981,7 +981,7 @@ def report():
         test_report["results"].append( test_result )
 
     if report_file:
-        f = open( report_file, "w" )
+        f = open( report_file, "wb" )
         f.write( json.dumps( test_report ) )
         f.close()
 
@@ -1244,7 +1244,7 @@ def run_old_fails():
         return # This counts as passing so we will run all tests
 
     if ('version' not in state or state['version'] != file_version()):
-        print("warning: old version of failfile.smoke detected. skipping recent fails")
+        print "warning: old version of failfile.smoke detected. skipping recent fails"
         clear_failfile()
         return
 
@@ -1308,7 +1308,7 @@ def main():
     try:
         signal.signal(signal.SIGUSR1, dump_stacks)
     except AttributeError:
-        print("Cannot catch signals on Windows")
+        print "Cannot catch signals on Windows"
 
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
@@ -1450,19 +1450,19 @@ def main():
 
     if options.ignore_files != None :
         ignore_patt = re.compile( options.ignore_files )
-        print("Ignoring files with pattern: ", ignore_patt)
+        print "Ignoring files with pattern: ", ignore_patt
 
         def ignore_test( test ):
             if ignore_patt.search( test[0] ) != None:
-                print("Ignoring test ", test[0])
+                print "Ignoring test ", test[0]
                 return False
             else:
                 return True
 
-        tests = list(filter( ignore_test, tests ))
+        tests = filter( ignore_test, tests )
 
     if not tests:
-        print("warning: no tests specified")
+        print "warning: no tests specified"
         return
 
     if options.with_cleanbb:
@@ -1480,7 +1480,7 @@ def main():
         test_report["failures"] = len(losers.keys())
         test_report["mongod_running_at_end"] = mongod().is_mongod_up(mongod_port)
         if report_file:
-            f = open( report_file, "w" )
+            f = open( report_file, "wb" )
             f.write( json.dumps( test_report, indent=4, separators=(',', ': ')) )
             f.close()
 

@@ -169,7 +169,7 @@ class AwsEc2ControlStatus(AwsEc2TestCase):
 
         code, ret = self.aws_ec2.control_instance(mode="status", image_id="bad_id")
         self.assertNotEqual(0, code, ret)
-        self.assertRegex(ret, "Invalid", ret)
+        self.assertRegexpMatches(ret, "Invalid", ret)
 
 
 class AwsEc2ControlStart(AwsEc2TestCase):

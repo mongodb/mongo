@@ -45,8 +45,8 @@ import subprocess
 import sys
 import time
 import traceback
-import urllib.request, urllib.error, urllib.parse
-from . import utils
+import urllib2
+import utils
 
 # suppress deprecation warnings that happen when
 # we import the 'buildbot.tac' file below
@@ -82,7 +82,7 @@ for path in possible_paths:
     if os.path.isfile(credentials_path):
         credentials = {}
         try:
-            exec(compile(open(credentials_path).read(), credentials_path, 'exec'), credentials, credentials)
+            execfile(credentials_path, credentials, credentials)
             username = credentials.get('slavename', credentials.get('username'))
             password = credentials.get('passwd', credentials.get('password'))
             break
@@ -94,14 +94,14 @@ URL_ROOT = os.environ.get('BUILDLOGGER_URL', 'http://buildlogs.mongodb.org/')
 TIMEOUT_SECONDS = 10
 socket.setdefaulttimeout(TIMEOUT_SECONDS)
 
-auth_handler = urllib.request.HTTPBasicAuthHandler()
+auth_handler = urllib2.HTTPBasicAuthHandler()
 auth_handler.add_password(
     realm='buildlogs',
     uri=URL_ROOT,
     user=username,
     passwd=password)
 
-url_opener = urllib.request.build_opener(auth_handler, urllib2.HTTPErrorProcessor())
+url_opener = urllib2.build_opener(auth_handler, urllib2.HTTPErrorProcessor())
 
 def url(endpoint):
     if not endpoint.endswith('/'):
@@ -115,10 +115,10 @@ def post(endpoint, data, headers=None):
     headers = headers or {}
     headers.update({'Content-Type': 'application/json; charset=utf-8'})
 
-    req = urllib.request.Request(url=url(endpoint), data=data, headers=headers)
+    req = urllib2.Request(url=url(endpoint), data=data, headers=headers)
     try:
         response = url_opener.open(req)
-    except urllib.error.URLError:
+    except urllib2.URLError:
         import traceback
         traceback.print_exc(file=sys.stderr)
         sys.stderr.flush()
@@ -145,7 +145,7 @@ def traceback_to_stderr(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except urllib.error.HTTPError as err:
+        except urllib2.HTTPError, err:
             sys.stderr.write('error: HTTP code %d\n----\n' % err.code)
             if hasattr(err, 'hdrs'):
                 for k, v in err.hdrs.items():
