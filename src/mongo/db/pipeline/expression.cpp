@@ -466,7 +466,6 @@ const char* ExpressionArray::getOpName() const {
 /* ------------------------- ExpressionArrayElemAt -------------------------- */
 
 Value ExpressionArrayElemAt::evaluate(const Document& root) const {
-
     const Value array = vpOperand[0]->evaluate(root);
     const Value indexArg = vpOperand[1]->evaluate(root);
 
@@ -2019,7 +2018,6 @@ Value ExpressionFilter::serialize(bool explain) const {
 Value ExpressionFilter::evaluate(const Document& root) const {
     // We are guaranteed at parse time that this isn't using our _varId.
     const Value inputVal = _input->evaluate(root);
-
     if (inputVal.nullish())
         return Value(BSONNULL);
 
@@ -2035,8 +2033,6 @@ Value ExpressionFilter::evaluate(const Document& root) const {
 
     vector<Value> output;
     auto& vars = getExpressionContext()->variables;
-
-
     for (const auto& elem : input) {
         vars.setValue(_varId, elem);
 
@@ -2044,7 +2040,6 @@ Value ExpressionFilter::evaluate(const Document& root) const {
             output.push_back(std::move(elem));
         }
     }
-
 
     return Value(std::move(output));
 }
