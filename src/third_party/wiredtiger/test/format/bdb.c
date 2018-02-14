@@ -116,7 +116,7 @@ bdb_insert(
 }
 
 void
-bdb_np(int next,
+bdb_np(bool next,
     void *keyp, size_t *keysizep,
     void *valuep, size_t *valuesizep, int *notfoundp)
 {

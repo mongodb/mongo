@@ -193,7 +193,6 @@ struct __wt_connection_impl {
 	WT_FH *optrack_map_fh;		/* Name to id translation file. */
 	WT_SPINLOCK optrack_map_spinlock; /* Translation file spinlock. */
 	uintmax_t optrack_pid;		/* Cache the process ID. */
-	uint16_t  optrack_uid;		/* Unique function ID */
 
 	void  **foc;			/* Free-on-close array */
 	size_t  foc_cnt;		/* Array entries */

@@ -94,7 +94,7 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
         c.close()
 
         # We must move the oldest timestamp forward in order to alter.
-        # Otherwise alter's closing of the file will fail with EBUSY.
+        # Otherwise alter closing the file will fail with EBUSY.
         self.conn.set_timestamp('oldest_timestamp=' + timestamp_str(2))
 
         # Now alter the setting and make sure we detect incorrect usage.
@@ -343,6 +343,52 @@ class test_assert04(wttest.WiredTigerTestCase, suite_subprocess):
 
         c = self.session.open_cursor(uri)
         self.assertEquals(c['key_nots'], 'value_nots1')
+        c.close()
+
+        # Confirm it is okay to set the timestamp in the middle or end of the
+        # transaction. That should set the timestamp for the whole thing.
+        c = self.session.open_cursor(uri)
+        self.session.begin_transaction()
+        c['key_ts5'] = 'value_notsyet'
+        self.session.timestamp_transaction(
+            'commit_timestamp=' + timestamp_str(20))
+        c['key_ts5'] = 'value20'
+        self.session.commit_transaction()
+        c.close()
+
+        c = self.session.open_cursor(uri)
+        self.assertEquals(c['key_ts5'], 'value20')
+        c.close()
+
+        c = self.session.open_cursor(uri)
+        self.session.begin_transaction()
+        c['key_ts6'] = 'value_notsyet'
+        c['key_ts6'] = 'value21_after'
+        self.session.timestamp_transaction(
+            'commit_timestamp=' + timestamp_str(21))
+        self.session.commit_transaction()
+        c.close()
+
+        c = self.session.open_cursor(uri)
+        self.assertEquals(c['key_ts6'], 'value21_after')
+        c.close()
+
+        # Confirm it is okay to set the timestamp on the commit call.
+        # That should set the timestamp for the whole thing.
+        c = self.session.open_cursor(uri)
+        self.session.begin_transaction()
+        c['key_ts6'] = 'value_committs1'
+        c['key_ts6'] = 'value22'
+        self.session.commit_transaction('commit_timestamp=' +
+            timestamp_str(22))
+        c.close()
+
+        c = self.session.open_cursor(uri)
+        self.session.begin_transaction()
+        c['key_nots'] = 'value23'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.commit_transaction(
+            'commit_timestamp=' + timestamp_str(23)), msg_usage)
         c.close()
 
 if __name__ == '__main__':

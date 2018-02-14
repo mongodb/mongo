@@ -247,6 +247,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_alter[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_WT_SESSION_begin_transaction[] = {
+	{ "ignore_prepare", "boolean", NULL, NULL, NULL, 0 },
 	{ "isolation", "string",
 	    NULL, "choices=[\"read-uncommitted\",\"read-committed\","
 	    "\"snapshot\"]",
@@ -440,6 +441,11 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_open_cursor[] = {
 	    "\"size\",\"tree_walk\"]",
 	    NULL, 0 },
 	{ "target", "list", NULL, NULL, NULL, 0 },
+	{ NULL, NULL, NULL, NULL, NULL, 0 }
+};
+
+static const WT_CONFIG_CHECK confchk_WT_SESSION_prepare_transaction[] = {
+	{ "prepare_timestamp", "string", NULL, NULL, NULL, 0 },
 	{ NULL, NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -1258,9 +1264,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_WT_SESSION_alter, 4
 	},
 	{ "WT_SESSION.begin_transaction",
-	  "isolation=,name=,priority=0,read_timestamp=,"
-	  "round_to_oldest=false,snapshot=,sync=",
-	  confchk_WT_SESSION_begin_transaction, 7
+	  "ignore_prepare=false,isolation=,name=,priority=0,read_timestamp="
+	  ",round_to_oldest=false,snapshot=,sync=",
+	  confchk_WT_SESSION_begin_transaction, 8
 	},
 	{ "WT_SESSION.checkpoint",
 	  "drop=,force=false,name=,target=,use_timestamp=true",
@@ -1324,6 +1330,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "raw=false,readonly=false,skip_sort_check=false,statistics=,"
 	  "target=",
 	  confchk_WT_SESSION_open_cursor, 13
+	},
+	{ "WT_SESSION.prepare_transaction",
+	  "prepare_timestamp=",
+	  confchk_WT_SESSION_prepare_transaction, 1
 	},
 	{ "WT_SESSION.rebalance",
 	  "",

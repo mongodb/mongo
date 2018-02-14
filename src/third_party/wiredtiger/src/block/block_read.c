@@ -107,6 +107,77 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	return (0);
 }
 
+/*
+ * __wt_bm_corrupt_dump --
+ *	Dump a block into the log in 1KB chunks.
+ */
+static int
+__wt_bm_corrupt_dump(WT_SESSION_IMPL *session,
+    WT_ITEM *buf, wt_off_t offset, uint32_t size, uint32_t checksum)
+    WT_GCC_FUNC_ATTRIBUTE((cold))
+{
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+	size_t chunk, i, nchunks;
+
+#define	WT_CORRUPT_FMT	"{%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "}"
+	if (buf->size == 0) {
+		__wt_errx(session,
+		    WT_CORRUPT_FMT ": empty buffer, no dump available",
+		    (uintmax_t)offset, size, checksum);
+		return (0);
+	}
+
+	WT_RET(__wt_scr_alloc(session, 4 * 1024, &tmp));
+
+	nchunks = buf->size / 1024 + (buf->size % 1024 == 0 ? 0 : 1);
+	for (chunk = i = 0;;) {
+		WT_ERR(__wt_buf_catfmt(
+		    session, tmp, "%02x ", ((uint8_t *)buf->data)[i]));
+		if (++i == buf->size || i % 1024 == 0) {
+			__wt_errx(session,
+			    WT_CORRUPT_FMT
+			    ": (chunk %" WT_SIZET_FMT " of %" WT_SIZET_FMT
+			    "): %.*s",
+			    (uintmax_t)offset, size, checksum,
+			    ++chunk, nchunks,
+			    (int)tmp->size, (char *)tmp->data);
+			if (i == buf->size)
+				break;
+			WT_ERR(__wt_buf_set(session, tmp, "", 0));
+		}
+	}
+
+err:	__wt_scr_free(session, &tmp);
+	return (ret);
+}
+
+/*
+ * __wt_bm_corrupt --
+ *	Report a block has been corrupted, external API.
+ */
+int
+__wt_bm_corrupt(WT_BM *bm,
+    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
+{
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+	wt_off_t offset;
+	uint32_t checksum, size;
+
+	/* Read the block. */
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(__wt_bm_read(bm, session, tmp, addr, addr_size));
+
+	/* Crack the cookie, dump the block. */
+	WT_ERR(__wt_block_buffer_to_addr(
+	    bm->block, addr, &offset, &size, &checksum));
+	WT_ERR(__wt_bm_corrupt_dump(session, tmp, offset, size, checksum));
+
+err:	__wt_scr_free(session, &tmp);
+	return (ret);
+}
+
 #ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_block_read_off_blind --
@@ -220,6 +291,10 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			    "of %" PRIu32 " doesn't match expected checksum "
 			    "of %" PRIu32,
 			    size, (uintmax_t)offset, swap.checksum, checksum);
+
+	if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
+		WT_IGNORE_RET(
+		    __wt_bm_corrupt_dump(session, buf, offset, size, checksum));
 
 	/* Panic if a checksum fails during an ordinary read. */
 	return (block->verify ||

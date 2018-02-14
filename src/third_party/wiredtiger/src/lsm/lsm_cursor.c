@@ -865,6 +865,45 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __clsm_position_chunk --
+ *	Position a chunk cursor.
+ */
+static int
+__clsm_position_chunk(
+    WT_CURSOR_LSM *clsm, WT_CURSOR *c, bool forward, int *cmpp)
+{
+	WT_CURSOR *cursor;
+	WT_SESSION_IMPL *session;
+
+	cursor = &clsm->iface;
+	session = (WT_SESSION_IMPL *)cursor->session;
+
+	c->set_key(c, &cursor->key);
+	WT_RET(c->search_near(c, cmpp));
+
+	while (forward ? *cmpp < 0 : *cmpp > 0) {
+		WT_RET(forward ? c->next(c) : c->prev(c));
+
+		/*
+		 * With higher isolation levels, where we have stable reads,
+		 * we're done: the cursor is now positioned as expected.
+		 *
+		 * With read-uncommitted isolation, a new record could have
+		 * appeared in between the search and stepping forward / back.
+		 * In that case, keep going until we see a key in the expected
+		 * range.
+		 */
+		if (session->txn.isolation != WT_ISO_READ_UNCOMMITTED)
+			return (0);
+
+		WT_RET(WT_LSM_CURCMP(session,
+		    clsm->lsm_tree, c, cursor, *cmpp));
+	}
+
+	return (0);
+}
+
+/*
  * __clsm_next --
  *	WT_CURSOR->next method for the LSM cursor type.
  */
@@ -877,7 +916,7 @@ __clsm_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 	u_int i;
 	int cmp;
-	bool check, deleted;
+	bool deleted;
 
 	clsm = (WT_CURSOR_LSM *)cursor;
 
@@ -887,29 +926,17 @@ __clsm_next(WT_CURSOR *cursor)
 
 	/* If we aren't positioned for a forward scan, get started. */
 	if (clsm->current == NULL || !F_ISSET(clsm, WT_CLSM_ITERATE_NEXT)) {
-		F_CLR(clsm, WT_CLSM_MULTIPLE);
 		WT_FORALL_CURSORS(clsm, c, i) {
 			if (!F_ISSET(cursor, WT_CURSTD_KEY_SET)) {
 				WT_ERR(c->reset(c));
 				ret = c->next(c);
-			} else if (c != clsm->current) {
-				c->set_key(c, &cursor->key);
-				if ((ret = c->search_near(c, &cmp)) == 0) {
-					if (cmp < 0)
-						ret = c->next(c);
-					else if (cmp == 0) {
-						if (clsm->current == NULL)
-							clsm->current = c;
-						else
-							F_SET(clsm,
-							    WT_CLSM_MULTIPLE);
-					}
-				} else
-					F_CLR(c, WT_CURSTD_KEY_SET);
-			}
+			} else if (c != clsm->current && (ret =
+			    __clsm_position_chunk(clsm, c, true, &cmp)) == 0 &&
+			    cmp == 0 && clsm->current == NULL)
+				clsm->current = c;
 			WT_ERR_NOTFOUND_OK(ret);
 		}
-		F_SET(clsm, WT_CLSM_ITERATE_NEXT);
+		F_SET(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_MULTIPLE);
 		F_CLR(clsm, WT_CLSM_ITERATE_PREV);
 
 		/* We just positioned *at* the key, now move. */
@@ -921,19 +948,16 @@ retry:		/*
 		 * forward.
 		 */
 		if (F_ISSET(clsm, WT_CLSM_MULTIPLE)) {
-			check = false;
 			WT_FORALL_CURSORS(clsm, c, i) {
 				if (!F_ISSET(c, WT_CURSTD_KEY_INT))
 					continue;
-				if (check) {
+				if (c != clsm->current) {
 					WT_ERR(WT_LSM_CURCMP(session,
 					    clsm->lsm_tree, c, clsm->current,
 					    cmp));
 					if (cmp == 0)
 						WT_ERR_NOTFOUND_OK(c->next(c));
 				}
-				if (c == clsm->current)
-					check = true;
 			}
 		}
 
@@ -1055,7 +1079,7 @@ __clsm_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 	u_int i;
 	int cmp;
-	bool check, deleted;
+	bool deleted;
 
 	clsm = (WT_CURSOR_LSM *)cursor;
 
@@ -1065,28 +1089,17 @@ __clsm_prev(WT_CURSOR *cursor)
 
 	/* If we aren't positioned for a reverse scan, get started. */
 	if (clsm->current == NULL || !F_ISSET(clsm, WT_CLSM_ITERATE_PREV)) {
-		F_CLR(clsm, WT_CLSM_MULTIPLE);
 		WT_FORALL_CURSORS(clsm, c, i) {
 			if (!F_ISSET(cursor, WT_CURSTD_KEY_SET)) {
 				WT_ERR(c->reset(c));
 				ret = c->prev(c);
-			} else if (c != clsm->current) {
-				c->set_key(c, &cursor->key);
-				if ((ret = c->search_near(c, &cmp)) == 0) {
-					if (cmp > 0)
-						ret = c->prev(c);
-					else if (cmp == 0) {
-						if (clsm->current == NULL)
-							clsm->current = c;
-						else
-							F_SET(clsm,
-							    WT_CLSM_MULTIPLE);
-					}
-				}
-			}
+			} else if (c != clsm->current && (ret =
+			    __clsm_position_chunk(clsm, c, false, &cmp)) == 0 &&
+			    cmp == 0 && clsm->current == NULL)
+				clsm->current = c;
 			WT_ERR_NOTFOUND_OK(ret);
 		}
-		F_SET(clsm, WT_CLSM_ITERATE_PREV);
+		F_SET(clsm, WT_CLSM_ITERATE_PREV | WT_CLSM_MULTIPLE);
 		F_CLR(clsm, WT_CLSM_ITERATE_NEXT);
 
 		/* We just positioned *at* the key, now move. */
@@ -1098,23 +1111,20 @@ retry:		/*
 		 * backwards.
 		 */
 		if (F_ISSET(clsm, WT_CLSM_MULTIPLE)) {
-			check = false;
 			WT_FORALL_CURSORS(clsm, c, i) {
 				if (!F_ISSET(c, WT_CURSTD_KEY_INT))
 					continue;
-				if (check) {
+				if (c != clsm->current) {
 					WT_ERR(WT_LSM_CURCMP(session,
 					    clsm->lsm_tree, c, clsm->current,
 					    cmp));
 					if (cmp == 0)
 						WT_ERR_NOTFOUND_OK(c->prev(c));
 				}
-				if (c == clsm->current)
-					check = true;
 			}
 		}
 
-		/* Move the smallest cursor backwards. */
+		/* Move the largest cursor backwards. */
 		c = clsm->current;
 		WT_ERR_NOTFOUND_OK(c->prev(c));
 	}
@@ -1279,6 +1289,7 @@ __clsm_search(WT_CURSOR *cursor)
 	WT_ERR(__cursor_needkey(cursor));
 	__cursor_novalue(cursor);
 	WT_ERR(__clsm_enter(clsm, true, false));
+	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	ret = __clsm_lookup(clsm, &cursor->value);
 

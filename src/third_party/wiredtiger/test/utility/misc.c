@@ -39,6 +39,10 @@ testutil_die(int e, const char *fmt, ...)
 {
 	va_list ap;
 
+	/* Flush output to be sure it doesn't mix with fatal errors. */
+	(void)fflush(stdout);
+	(void)fflush(stderr);
+
 	/* Allow test programs to cleanup on fatal error. */
 	if (custom_die != NULL)
 		(*custom_die)();

@@ -48,16 +48,16 @@ int
 main(int argc, char *argv[])
 {
 	TEST_OPTS *opts, _opts;
-	WT_CURSOR *maincur;
 	WT_CURSOR *balancecur, *flagcur, *joincur, *postcur;
+	WT_CURSOR *maincur;
 	WT_SESSION *session;
 	int balance, count, flag, key, key2, post, ret;
-	char cfg[128];
-	const char *tablename;
-	char posturi[256];
 	char balanceuri[256];
+	char cfg[128];
 	char flaguri[256];
 	char joinuri[256];
+	char posturi[256];
+	const char *tablename;
 
 	/* Ignore unless requested */
 	if (!testutil_is_flag_set("TESTUTIL_ENABLE_LONG_TESTS"))
@@ -177,10 +177,10 @@ void
 populate(TEST_OPTS *opts)
 {
 	WT_CURSOR *maincur;
+	WT_RAND_STATE rnd;
 	WT_SESSION *session;
 	uint32_t key;
 	int balance, i, flag, post;
-	WT_RAND_STATE rnd;
 
 	__wt_random_init_seed(NULL, &rnd);
 

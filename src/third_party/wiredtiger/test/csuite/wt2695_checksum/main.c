@@ -48,8 +48,8 @@ main(int argc, char *argv[])
 	WT_RAND_STATE rnd;
 	size_t len;
 	uint32_t hw, sw;
-	u_int i, j;
 	uint8_t *data;
+	u_int i, j;
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));

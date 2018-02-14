@@ -44,8 +44,8 @@ main(int argc, char *argv[])
 	TEST_OPTS *opts, _opts;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	char *kstr, *vstr;
 	char buf[1024];
+	char *kstr, *vstr;
 
 	opts = &_opts;
 	memset(opts, 0, sizeof(*opts));

@@ -46,6 +46,13 @@
 	if ((__ret = (a)) != 0)						\
 		return (__ret);						\
 } while (0)
+#define	WT_RET_TRACK(a) do {						\
+	int __ret;							\
+	if ((__ret = (a)) != 0)	{					\
+		WT_TRACK_OP_END(session);				\
+		return (__ret);						\
+	}								\
+} while (0)
 #define	WT_RET_MSG(session, v, ...) do {				\
 	int __ret = (v);						\
 	__wt_err(session, __ret, __VA_ARGS__);				\

@@ -200,7 +200,9 @@ struct __wt_cache {
 	uint64_t las_entry_count;       /* Count of entries in lookaside */
 	uint64_t las_pageid;		/* Lookaside table page ID counter */
 
-	WT_SPINLOCK	 las_sweep_lock;
+	uint64_t las_sweep_cnt;		/* Entries to walk per sweep. */
+	WT_RWLOCK las_sweepwalk_lock;
+	WT_SPINLOCK las_sweep_lock;
 	WT_ITEM las_sweep_key;		/* Track sweep position. */
 	uint32_t las_sweep_dropmin;	/* Minimum btree ID in current set. */
 	uint8_t *las_sweep_dropmap;	/* Bitmap of dropped btree IDs. */
