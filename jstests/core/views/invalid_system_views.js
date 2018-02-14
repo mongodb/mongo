@@ -1,6 +1,8 @@
 /**
  * Tests that invalid view definitions in system.views do not impact valid commands on existing
  * collections.
+ *
+ * @tags: [requires_collmod_command]
  */
 (function() {
     "use strict";

@@ -1,5 +1,7 @@
 // Verify invalid validator statements won't work and that we
 // can't create validated collections on restricted databases.
+//
+// @tags: [requires_collmod_command]
 (function() {
     "use strict";
 

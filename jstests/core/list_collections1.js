@@ -72,8 +72,8 @@
     //
 
     var getListCollectionsCursor = function(options, subsequentBatchSize) {
-        return new DBCommandCursor(
-            mydb.getMongo(), mydb.runCommand("listCollections", options), subsequentBatchSize);
+        var res = mydb.runCommand("listCollections", options);
+        return new DBCommandCursor(res._mongo, res, subsequentBatchSize);
     };
 
     var cursorCountMatching = function(cursor, pred) {
@@ -282,9 +282,9 @@
     assert.commandWorked(mydb.createCollection("quux"));
 
     res = mydb.runCommand("listCollections", {cursor: {batchSize: 0}});
-    cursor = new DBCommandCursor(mydb.getMongo(), res, 2);
+    cursor = new DBCommandCursor(res._mongo, res, 2);
     cursor.close();
-    cursor = new DBCommandCursor(mydb.getMongo(), res, 2);
+    cursor = new DBCommandCursor(res._mongo, res, 2);
     assert.throws(function() {
         cursor.hasNext();
     });

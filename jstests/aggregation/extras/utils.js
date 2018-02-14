@@ -276,7 +276,7 @@ function assertErrorCode(coll, pipe, code, errmsg) {
     var cursorRes = coll.runCommand("aggregate", cmd);
     if (cursorRes.ok) {
         var followupBatchSize = 0;  // default
-        var cursor = new DBCommandCursor(coll.getMongo(), cursorRes, followupBatchSize);
+        var cursor = new DBCommandCursor(cursorRes._mongo, cursorRes, followupBatchSize);
 
         var error = assert.throws(function() {
             cursor.itcount();

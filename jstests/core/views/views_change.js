@@ -1,6 +1,7 @@
 /**
  * Tests the behavior of views when the backing view or collection is changed.
- * @tags: [requires_find_command]
+ *
+ * @tags: [requires_collmod_command, requires_find_command]
  */
 (function() {
     "use strict";

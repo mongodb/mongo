@@ -1,5 +1,7 @@
 // Test the bypassDocumentValidation flag with some database commands. The test uses relevant shell
 // helpers when they're available for the respective server commands.
+//
+// @tags: [requires_collmod_command]
 
 (function() {
     'use strict';

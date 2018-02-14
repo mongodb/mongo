@@ -1,4 +1,6 @@
 // SERVER-27996/SERVER-28022 Missing invalidation for system.namespaces writes
+//
+// @tags: [requires_collmod_command]
 (function() {
     'use strict';
     let dbInvalidName = 'system_namespaces_invalidations';

@@ -1,5 +1,7 @@
 // Basic js tests for the collMod command.
 // Test setting the usePowerOf2Sizes flag, and modifying TTL indexes.
+//
+// @tags: [requires_collmod_command]
 
 function debug(x) {
     // printjson( x );

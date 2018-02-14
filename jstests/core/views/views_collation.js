@@ -1,5 +1,7 @@
 /**
  * Tests the behavior of operations when interacting with a view's default collation.
+ *
+ * @tags: [requires_collmod_command]
  */
 (function() {
     "use strict";

@@ -2737,6 +2737,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: write_concern_majority_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=write_concern_majority_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replica_sets
   commands:
   - func: "do setup"
@@ -3665,6 +3676,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
 
 - name: linux-64-repeated-execution
@@ -3782,6 +3794,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -4586,6 +4599,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - ubuntu1604-test
@@ -5020,6 +5034,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70-small
@@ -5159,6 +5174,9 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
+    distros:
+    - windows-64-vs2015-large
 
 - name: enterprise-windows-64
   display_name: "* Enterprise Windows"
@@ -5609,6 +5627,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70-small
@@ -5926,6 +5945,9 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
+    distros:
+    - rhel62-large
   - name: package
     distros:
     - ubuntu1604-packer
@@ -6078,6 +6100,7 @@ buildvariants:
   - name: ssl
   - name: sslSpecial
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-rhel-70-64-bit
   display_name: Enterprise RHEL 7.0
@@ -6491,6 +6514,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70-small
@@ -6593,6 +6617,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70-small
@@ -6728,6 +6753,7 @@ buildvariants:
   # - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel62-small
@@ -7109,6 +7135,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - suse12-test
@@ -7381,6 +7408,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - suse11-test
@@ -7955,6 +7983,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 - name: linux-64-ephemeralForTest
   display_name: Linux (ephemeralForTest)
@@ -8112,6 +8141,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-rhel-72-s390x-inmem
   display_name: Enterprise RHEL 7.2 s390x (inMemory) DEBUG
@@ -8199,6 +8229,7 @@ buildvariants:
   - name: sslSpecial
   - name: tool
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 ###########################################
 #     Experimental buildvariants          #
@@ -8350,6 +8381,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
@@ -8526,6 +8558,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-ubuntu-dynamic-1604-64-bit
   display_name: "* Shared Library Enterprise Ubuntu 16.04"
@@ -8676,6 +8709,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 - name: initsync-3dot2-rhel-62
   display_name: "~ Initial Sync 3.2 Enterprise RHEL 6.2"
@@ -8777,3 +8811,6 @@ buildvariants:
     - rhel62-large
   - name: slow1
   - name: slow1_WT
+  - name: write_concern_majority_passthrough_WT
+    distros:
+    - rhel62-large
