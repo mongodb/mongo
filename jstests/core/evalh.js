@@ -1,5 +1,7 @@
 /**
  * Test that db.eval does not support auth.
+ *
+ * @tags: [requires_eval_command]
  */
 (function() {
     'use strict';

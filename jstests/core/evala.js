@@ -1,3 +1,4 @@
+// @tags: [requires_eval_command]
 
 t = db.evala;
 t.drop();

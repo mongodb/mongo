@@ -1,4 +1,6 @@
 // Confirms that profiled insert execution contains all expected metrics with proper values.
+//
+// @tags: [assumes_write_concern_unchanged]
 
 (function() {
     "use strict";

@@ -1,4 +1,6 @@
 // test dropping a db with simultaneous commits
+//
+// @tags: [assumes_write_concern_unchanged]
 
 m = db.getMongo();
 baseName = "jstests_dur_droprace";

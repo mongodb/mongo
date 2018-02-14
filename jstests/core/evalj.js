@@ -1,3 +1,5 @@
+// @tags: [requires_eval_command]
+
 (function() {
     "use strict";
 

@@ -1,3 +1,5 @@
+// @tags: [assumes_write_concern_unchanged]
+
 //
 // Ensures that mongod respects the batch write protocol for inserts
 //

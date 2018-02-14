@@ -1,4 +1,5 @@
 // Test that client gets stack trace on failed invoke
+// @tags: [requires_eval_command]
 
 f = db.jstests_error2;
 

@@ -1,3 +1,5 @@
+// @tags: [requires_eval_command]
+
 // Use a private sister database to avoid conflicts with other tests that use system.js
 var testdb = db.getSisterDB("storefunc");
 var res;

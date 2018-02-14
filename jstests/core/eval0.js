@@ -1,3 +1,5 @@
+// @tags: [requires_eval_command]
+
 assert.writeOK(db.evalprep.insert({}), "db must exist for eval to succeed");
 db.evalprep.drop();
 assert.eq(17,

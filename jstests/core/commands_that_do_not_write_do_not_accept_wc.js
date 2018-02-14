@@ -2,6 +2,8 @@
  * This file tests commands that do not support write concern. It passes both valid and invalid
  * writeConcern fields to commands and expects the commands to fail with a writeConcernNotSupported
  * error.
+ *
+ * @tags: [assumes_write_concern_unchanged]
  */
 
 (function() {

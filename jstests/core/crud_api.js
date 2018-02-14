@@ -1,3 +1,5 @@
+// @tags: [assumes_write_concern_unchanged]
+
 (function() {
     "use strict";
 

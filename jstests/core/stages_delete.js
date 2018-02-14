@@ -1,3 +1,9 @@
+// @tags: [
+//   # This test attempts to remove documents using the stageDebug command, which doesn't support
+//   # specifying a writeConcern.
+//   assumes_write_concern_unchanged,
+// ]
+
 // Test basic delete stage functionality.
 var coll = db.stages_delete;
 var collScanStage = {cscan: {args: {direction: 1}, filter: {deleteMe: true}}};

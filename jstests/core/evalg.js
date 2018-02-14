@@ -1,4 +1,6 @@
 // SERVER-17499: Test behavior of getMore on aggregation cursor under eval command.
+//
+// @tags: [requires_eval_command]
 db.evalg.drop();
 for (var i = 0; i < 102; ++i) {
     db.evalg.insert({});

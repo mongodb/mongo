@@ -1,4 +1,6 @@
 // Tests to see what validity checks are done for 10gen specific object construction
+//
+// @tags: [requires_eval_command]
 
 // Takes a list of constructors and returns a new list with an extra entry for each constructor with
 // "new" prepended
