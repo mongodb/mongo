@@ -27,9 +27,8 @@ let ContinuousStepdown;
 (function() {
     "use strict";
 
-    load("jstests/libs/parallelTester.js");          // ScopedThread and CountDownLatch
-    load("jstests/libs/retry_on_network_error.js");  // retryOnNetworkError
-    load("jstests/replsets/rslib.js");               // reconfig
+    load("jstests/libs/parallelTester.js");  // ScopedThread and CountDownLatch
+    load("jstests/replsets/rslib.js");       // reconfig
 
     /**
      * Helper class to manage the ScopedThread instance that will continuously step down the primary
@@ -63,19 +62,14 @@ let ContinuousStepdown;
         function _continuousPrimaryStepdownFn(stopCounter, seedNode, options) {
             "use strict";
 
-            load("jstests/libs/retry_on_network_error.js");
-
             print("*** Continuous stepdown thread running with seed node " + seedNode);
 
             try {
                 // The config primary may unexpectedly step down during startup if under heavy
                 // load and too slowly processing heartbeats. When it steps down, it closes all of
-                // its connections. This can happen during the call to new ReplSetTest, so in order
-                // to account for this and make the tests stable, retry discovery of the replica
-                // set's configuration once (SERVER-22794).
-                const replSet = retryOnNetworkError(function() {
-                    return new ReplSetTest(seedNode);
-                });
+                // its connections. ReplSetTest will therefore retry discovery of the replica set's
+                // config.
+                const replSet = new ReplSetTest(seedNode);
 
                 let primary = replSet.getPrimary();
 
