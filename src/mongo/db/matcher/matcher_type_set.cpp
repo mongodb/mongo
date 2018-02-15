@@ -98,29 +98,6 @@ Status parseSingleType(BSONElement elt,
 
 constexpr StringData MatcherTypeSet::kMatchesAllNumbersAlias;
 
-const StringMap<BSONType> MatcherTypeSet::kTypeAliasMap = {
-    {typeName(BSONType::NumberDouble), BSONType::NumberDouble},
-    {typeName(BSONType::String), BSONType::String},
-    {typeName(BSONType::Object), BSONType::Object},
-    {typeName(BSONType::Array), BSONType::Array},
-    {typeName(BSONType::BinData), BSONType::BinData},
-    {typeName(BSONType::Undefined), BSONType::Undefined},
-    {typeName(BSONType::jstOID), BSONType::jstOID},
-    {typeName(BSONType::Bool), BSONType::Bool},
-    {typeName(BSONType::Date), BSONType::Date},
-    {typeName(BSONType::jstNULL), BSONType::jstNULL},
-    {typeName(BSONType::RegEx), BSONType::RegEx},
-    {typeName(BSONType::DBRef), BSONType::DBRef},
-    {typeName(BSONType::Code), BSONType::Code},
-    {typeName(BSONType::Symbol), BSONType::Symbol},
-    {typeName(BSONType::CodeWScope), BSONType::CodeWScope},
-    {typeName(BSONType::NumberInt), BSONType::NumberInt},
-    {typeName(BSONType::bsonTimestamp), BSONType::bsonTimestamp},
-    {typeName(BSONType::NumberLong), BSONType::NumberLong},
-    {typeName(BSONType::NumberDecimal), BSONType::NumberDecimal},
-    {typeName(BSONType::MaxKey), BSONType::MaxKey},
-    {typeName(BSONType::MinKey), BSONType::MinKey}};
-
 const StringMap<BSONType> MatcherTypeSet::kJsonSchemaTypeAliasMap = {
     {JSONSchemaParser::kSchemaTypeArray, BSONType::Array},
     {JSONSchemaParser::kSchemaTypeBoolean, BSONType::Bool},

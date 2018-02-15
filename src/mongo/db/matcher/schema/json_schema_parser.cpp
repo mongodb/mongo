@@ -1435,7 +1435,7 @@ StatusWithMatchExpression _parse(StringData path, BSONObj schema, bool ignoreUnk
         typeExpr = std::move(parseTypeResult.getValue());
     } else if (bsonTypeElem) {
         auto parseBsonTypeResult =
-            parseType(path, kSchemaBsonTypeKeyword, bsonTypeElem, MatcherTypeSet::kTypeAliasMap);
+            parseType(path, kSchemaBsonTypeKeyword, bsonTypeElem, kTypeAliasMap);
         if (!parseBsonTypeResult.isOK()) {
             return parseBsonTypeResult.getStatus();
         }

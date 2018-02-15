@@ -4676,4 +4676,383 @@ void ExpressionZip::_doAddDependencies(DepsTracker* deps) const {
                   });
 }
 
+/* -------------------------- ExpressionConvert ------------------------------ */
+
+namespace {
+
+/**
+ * $convert supports a big grab bag of conversions, so ConversionTable maintains a collection of
+ * conversion functions, as well as a table to organize them by inputType and targetType.
+ */
+class ConversionTable {
+public:
+    using ConversionFunc = std::function<Value(Value)>;
+
+    ConversionTable() {
+        //
+        // Conversions from NumberDouble
+        //
+        table[BSONType::NumberDouble][BSONType::NumberDouble] = &performIdentityConversion;
+        table[BSONType::NumberDouble][BSONType::Bool] = [](Value inputValue) {
+            return Value(inputValue.coerceToBool());
+        };
+        table[BSONType::NumberDouble][BSONType::NumberInt] = &performCastDoubleToInt;
+        table[BSONType::NumberDouble][BSONType::NumberLong] = &performCastDoubleToLong;
+        table[BSONType::NumberDouble][BSONType::NumberDecimal] = [](Value inputValue) {
+            return Value(inputValue.coerceToDecimal());
+        };
+
+        //
+        // Conversions from Bool
+        //
+        table[BSONType::Bool][BSONType::NumberDouble] = [](Value inputValue) {
+            return inputValue.getBool() ? Value(1.0) : Value(0.0);
+        };
+        table[BSONType::Bool][BSONType::Bool] = &performIdentityConversion;
+        table[BSONType::Bool][BSONType::NumberInt] = [](Value inputValue) {
+            return inputValue.getBool() ? Value(int{1}) : Value(int{0});
+        };
+        table[BSONType::Bool][BSONType::NumberLong] = [](Value inputValue) {
+            return inputValue.getBool() ? Value(1LL) : Value(0LL);
+        };
+        table[BSONType::Bool][BSONType::NumberDecimal] = [](Value inputValue) {
+            return inputValue.getBool() ? Value(Decimal128(1)) : Value(Decimal128(0));
+        };
+
+        //
+        // Conversions from NumberInt
+        //
+        table[BSONType::NumberInt][BSONType::NumberDouble] = [](Value inputValue) {
+            return Value(inputValue.coerceToDouble());
+        };
+        table[BSONType::NumberInt][BSONType::Bool] = [](Value inputValue) {
+            return Value(inputValue.coerceToBool());
+        };
+        table[BSONType::NumberInt][BSONType::NumberInt] = &performIdentityConversion;
+        table[BSONType::NumberInt][BSONType::NumberLong] = [](Value inputValue) {
+            return Value(static_cast<long long>(inputValue.getInt()));
+        };
+        table[BSONType::NumberInt][BSONType::NumberDecimal] = [](Value inputValue) {
+            return Value(inputValue.coerceToDecimal());
+        };
+
+        //
+        // Conversions from NumberLong
+        //
+        table[BSONType::NumberLong][BSONType::NumberDouble] = [](Value inputValue) {
+            return Value(inputValue.coerceToDouble());
+        };
+        table[BSONType::NumberLong][BSONType::Bool] = [](Value inputValue) {
+            return Value(inputValue.coerceToBool());
+        };
+        table[BSONType::NumberLong][BSONType::NumberInt] = &performCastLongToInt;
+        table[BSONType::NumberLong][BSONType::NumberLong] = &performIdentityConversion;
+        table[BSONType::NumberLong][BSONType::NumberDecimal] = [](Value inputValue) {
+            return Value(inputValue.coerceToDecimal());
+        };
+
+        //
+        // Conversions from NumberDecimal
+        //
+        table[BSONType::NumberDecimal][BSONType::NumberDouble] = &performCastDecimalToDouble;
+        table[BSONType::NumberDecimal][BSONType::Bool] = [](Value inputValue) {
+            return Value(inputValue.coerceToBool());
+        };
+        table[BSONType::NumberDecimal][BSONType::NumberInt] = [](Value inputValue) {
+            return performCastDecimalToInt(BSONType::NumberInt, inputValue);
+        };
+        table[BSONType::NumberDecimal][BSONType::NumberLong] = [](Value inputValue) {
+            return performCastDecimalToInt(BSONType::NumberLong, inputValue);
+        };
+        table[BSONType::NumberDecimal][BSONType::NumberDecimal] = &performIdentityConversion;
+    }
+
+    ConversionFunc findConversionFunc(BSONType inputType, BSONType targetType) const {
+        invariant(inputType >= 0 && inputType <= JSTypeMax);
+        invariant(targetType >= 0 && targetType <= JSTypeMax);
+
+        auto foundFunction = table[inputType][targetType];
+        uassert(ErrorCodes::ConversionFailure,
+                str::stream() << "Unsupported conversion from " << typeName(inputType) << " to "
+                              << typeName(targetType)
+                              << " in $convert with no onError value",
+                foundFunction);
+        return foundFunction;
+    }
+
+private:
+    ConversionFunc table[JSTypeMax + 1][JSTypeMax + 1];
+
+    static void validateDoubleValueIsFinite(double inputDouble) {
+        uassert(ErrorCodes::ConversionFailure,
+                "Attempt to cast NaN value to integer type in $convert with no onError value",
+                !std::isnan(inputDouble));
+        uassert(ErrorCodes::ConversionFailure,
+                "Attempt to cast infinity value to integer type in $convert with no onError value",
+                std::isfinite(inputDouble));
+    }
+
+    static Value performCastDoubleToInt(Value inputValue) {
+        double inputDouble = inputValue.getDouble();
+        validateDoubleValueIsFinite(inputDouble);
+
+        uassert(ErrorCodes::ConversionFailure,
+                str::stream()
+                    << "Conversion would overflow target type in $convert with no onError value: "
+                    << inputDouble,
+                inputDouble >= std::numeric_limits<int>::lowest() &&
+                    inputDouble <= std::numeric_limits<int>::max());
+
+        return Value(static_cast<int>(inputDouble));
+    }
+
+    static Value performCastDoubleToLong(Value inputValue) {
+        double inputDouble = inputValue.getDouble();
+        validateDoubleValueIsFinite(inputDouble);
+
+        uassert(ErrorCodes::ConversionFailure,
+                str::stream()
+                    << "Conversion would overflow target type in $convert with no onError value: "
+                    << inputDouble,
+                inputDouble >= std::numeric_limits<long long>::lowest() &&
+                    inputDouble < ExpressionConvert::kLongLongMaxPlusOneAsDouble);
+
+        return Value(static_cast<long long>(inputDouble));
+    }
+
+    static Value performCastDecimalToInt(BSONType targetType, Value inputValue) {
+        invariant(targetType == BSONType::NumberInt || targetType == BSONType::NumberLong);
+        Decimal128 inputDecimal = inputValue.getDecimal();
+
+        // Performing these checks up front allows us to provide more specific error messages than
+        // if we just gave the same error for any 'kInvalid' conversion.
+        uassert(ErrorCodes::ConversionFailure,
+                "Attempt to cast NaN value to integer type in $convert with no onError value",
+                !inputDecimal.isNaN());
+        uassert(ErrorCodes::ConversionFailure,
+                "Attempt to cast infinity value to integer type in $convert with no onError value",
+                !inputDecimal.isInfinite());
+
+        std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+        Value result;
+        if (targetType == BSONType::NumberInt) {
+            int intVal =
+                inputDecimal.toInt(&signalingFlags, Decimal128::RoundingMode::kRoundTowardZero);
+            result = Value(intVal);
+        } else if (targetType == BSONType::NumberLong) {
+            long long longVal =
+                inputDecimal.toLong(&signalingFlags, Decimal128::RoundingMode::kRoundTowardZero);
+            result = Value(longVal);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+
+        // NB: Decimal128::SignalingFlag has a values specifically for overflow, but it is used for
+        // arithmetic with Decimal128 operands, _not_ for conversions of this style. Overflowing
+        // conversions only trigger a 'kInvalid' flag.
+        uassert(ErrorCodes::ConversionFailure,
+                str::stream()
+                    << "Conversion would overflow target type in $convert with no onError value: "
+                    << inputDecimal.toString(),
+                (signalingFlags & Decimal128::SignalingFlag::kInvalid) == 0);
+        invariant(signalingFlags == Decimal128::SignalingFlag::kNoFlag);
+
+        return result;
+    }
+
+    static Value performCastDecimalToDouble(Value inputValue) {
+        Decimal128 inputDecimal = inputValue.getDecimal();
+
+        std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+        double result =
+            inputDecimal.toDouble(&signalingFlags, Decimal128::RoundingMode::kRoundTiesToEven);
+
+        uassert(ErrorCodes::ConversionFailure,
+                str::stream()
+                    << "Conversion would overflow target type in $convert with no onError value: "
+                    << inputDecimal.toString(),
+                signalingFlags == Decimal128::SignalingFlag::kNoFlag);
+
+        return Value(result);
+    }
+
+    static Value performCastLongToInt(Value inputValue) {
+        long long longValue = inputValue.getLong();
+
+        uassert(ErrorCodes::ConversionFailure,
+                str::stream()
+                    << "Conversion would overflow target type in $convert with no onError value: ",
+                longValue >= std::numeric_limits<int>::min() &&
+                    longValue <= std::numeric_limits<int>::max());
+
+        return Value(static_cast<int>(longValue));
+    }
+
+    static Value performIdentityConversion(Value inputValue) {
+        return inputValue;
+    }
+};
+
+}  // namespace
+
+const double ExpressionConvert::kLongLongMaxPlusOneAsDouble =
+    scalbn(1, std::numeric_limits<long long>::digits);
+
+REGISTER_EXPRESSION(convert, ExpressionConvert::parse);
+intrusive_ptr<Expression> ExpressionConvert::parse(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    BSONElement expr,
+    const VariablesParseState& vps) {
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "$convert expects an object of named arguments but found: "
+                          << typeName(expr.type()),
+            expr.type() == BSONType::Object);
+
+    intrusive_ptr<ExpressionConvert> newConvert(new ExpressionConvert(expCtx));
+
+    for (auto&& elem : expr.embeddedObject()) {
+        const auto field = elem.fieldNameStringData();
+        if (field == "input"_sd) {
+            newConvert->_input = parseOperand(expCtx, elem, vps);
+        } else if (field == "to"_sd) {
+            newConvert->_to = parseOperand(expCtx, elem, vps);
+        } else if (field == "onError"_sd) {
+            newConvert->_onError = parseOperand(expCtx, elem, vps);
+        } else if (field == "onNull"_sd) {
+            newConvert->_onNull = parseOperand(expCtx, elem, vps);
+        } else {
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << "$convert found an unknown argument: "
+                                    << elem.fieldNameStringData());
+        }
+    }
+
+    uassert(ErrorCodes::FailedToParse, "Missing 'input' parameter to $convert", newConvert->_input);
+    uassert(ErrorCodes::FailedToParse, "Missing 'to' parameter to $convert", newConvert->_to);
+
+    return std::move(newConvert);
+}
+
+Value ExpressionConvert::evaluate(const Document& root) const {
+    boost::optional<BSONType> targetType = _constTargetType;
+    if (!targetType) {
+        // Note: the "to" field is not lazily evaluated. We should not short circuit its execution
+        // when inputValue evaluates to nullish.
+        auto toValue = _to->evaluate(root);
+        if (!toValue.nullish()) {
+            targetType = computeTargetType(toValue);
+        } else {
+            // targetType stays as boost::none.
+        }
+    }
+    Value inputValue = _input->evaluate(root);
+
+    if (inputValue.nullish()) {
+        return _onNull ? _onNull->evaluate(root) : Value(BSONNULL);
+    } else if (!targetType) {
+        // "to" evaluated to a nullish value.
+        return Value(BSONNULL);
+    }
+
+    try {
+        return performConversion(*targetType, inputValue);
+    } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
+        if (_onError) {
+            return _onError->evaluate(root);
+        } else {
+            throw;
+        }
+    }
+}
+
+boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
+    _input = _input->optimize();
+    _to = _to->optimize();
+    if (_onError) {
+        _onError = _onError->optimize();
+    }
+    if (_onNull) {
+        _onNull = _onNull->optimize();
+    }
+
+    // The "to" value will almost always be a constant that we can parse in advance.
+    auto constTo = dynamic_cast<ExpressionConstant*>(_to.get());
+    if (constTo && !constTo->getValue().nullish()) {
+        // Note: this may throw a user error.
+        _constTargetType = computeTargetType(constTo->getValue());
+    }
+
+    // Perform constant folding if possible. This does not support folding for $convert operations
+    // that have constant _to and _input values but non-constant _onError and _onNull values.
+    // Because _onError and _onNull are evaluated lazily, conversions that do not used the _onError
+    // and _onNull values could still be legally folded if those values are not needed. Support for
+    // that case would add more complexity than it's worth, though.
+    if (ExpressionConstant::allNullOrConstant({_input, _to, _onError, _onNull})) {
+        return ExpressionConstant::create(getExpressionContext(), evaluate(Document{}));
+    }
+
+    return this;
+}
+
+Value ExpressionConvert::serialize(bool explain) const {
+    return Value(Document{{"$convert",
+                           Document{{"input", _input->serialize(explain)},
+                                    {"to", _to->serialize(explain)},
+                                    {"onError", _onError ? _onError->serialize(explain) : Value()},
+                                    {"onNull", _onNull ? _onNull->serialize(explain) : Value()}}}});
+}
+
+void ExpressionConvert::_doAddDependencies(DepsTracker* deps) const {
+    _input->addDependencies(deps);
+    _to->addDependencies(deps);
+    if (_onError) {
+        _onError->addDependencies(deps);
+    }
+    if (_onNull) {
+        _onNull->addDependencies(deps);
+    }
+}
+
+BSONType ExpressionConvert::computeTargetType(Value targetTypeName) const {
+    BSONType targetType;
+    if (targetTypeName.getType() == BSONType::String) {
+        // This will throw if the type name is invalid.
+        targetType = typeFromName(targetTypeName.getString());
+    } else if (targetTypeName.numeric()) {
+        uassert(ErrorCodes::FailedToParse,
+                "In $convert, numeric 'to' argument is not an integer",
+                targetTypeName.integral());
+
+        int typeCode = targetTypeName.coerceToInt();
+        uassert(ErrorCodes::FailedToParse,
+                str::stream()
+                    << "In $convert, numeric value for 'to' does not correspond to a BSON type: "
+                    << typeCode,
+                isValidBSONType(typeCode));
+        targetType = static_cast<BSONType>(typeCode);
+    } else {
+        uasserted(ErrorCodes::FailedToParse,
+                  str::stream() << "$convert's 'to' argument must be a string or number, but is "
+                                << typeName(targetTypeName.getType()));
+    }
+
+    // Make sure the type is one of the supported "to" types for $convert.
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "$convert with unsupported 'to' type: " << typeName(targetType),
+            targetType == BSONType::NumberDouble || targetType == BSONType::String ||
+                targetType == BSONType::jstOID || targetType == BSONType::Bool ||
+                targetType == BSONType::Date || targetType == BSONType::NumberInt ||
+                targetType == BSONType::NumberLong || targetType == BSONType::NumberDecimal);
+
+    return targetType;
+}
+
+Value ExpressionConvert::performConversion(BSONType targetType, Value inputValue) const {
+    invariant(!inputValue.nullish());
+
+    static ConversionTable table;
+    BSONType inputType = inputValue.getType();
+    return table.findConversionFunc(inputType, targetType)(inputValue);
+}
+
 }  // namespace mongo

@@ -1945,4 +1945,39 @@ private:
     ExpressionVector _inputs;
     ExpressionVector _defaults;
 };
+
+class ExpressionConvert final : public Expression {
+public:
+    explicit ExpressionConvert(const boost::intrusive_ptr<ExpressionContext>& expCtx)
+        : Expression(expCtx) {}
+
+    Value evaluate(const Document& root) const final;
+    boost::intrusive_ptr<Expression> optimize() final;
+    static boost::intrusive_ptr<Expression> parse(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        BSONElement expr,
+        const VariablesParseState& vpsIn);
+    Value serialize(bool explain) const final;
+
+    /**
+     * Constant double representation of 2^63.
+     */
+    static const double kLongLongMaxPlusOneAsDouble;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
+
+private:
+    BSONType computeTargetType(Value typeName) const;
+    Value performConversion(BSONType targetType, Value inputValue) const;
+
+    boost::intrusive_ptr<Expression> _input;
+    boost::intrusive_ptr<Expression> _to;
+    boost::intrusive_ptr<Expression> _onError;
+    boost::intrusive_ptr<Expression> _onNull;
+
+    // If the 'to' field is a constant, we evaluate it once during optimization and store the result
+    // here.
+    boost::optional<BSONType> _constTargetType;
+};
 }

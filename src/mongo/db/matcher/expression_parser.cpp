@@ -609,7 +609,7 @@ Status parseInExpression(InMatchExpression* inExpression,
 
 template <class T>
 StatusWithMatchExpression parseType(StringData name, BSONElement elt) {
-    auto typeSet = MatcherTypeSet::parse(elt, MatcherTypeSet::kTypeAliasMap);
+    auto typeSet = MatcherTypeSet::parse(elt, kTypeAliasMap);
     if (!typeSet.isOK()) {
         return typeSet.getStatus();
     }

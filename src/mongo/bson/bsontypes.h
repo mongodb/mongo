@@ -34,6 +34,7 @@
 #include "mongo/config.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -108,10 +109,22 @@ enum BSONType {
     MaxKey = 127
 };
 
+/*
+ * Maps from the set of type aliases accepted by the $type query operator to the corresponding BSON
+ * types. Excludes "number", since this alias maps to a set of BSON types.
+ */
+extern const StringMap<BSONType> kTypeAliasMap;
+
 /**
  * returns the name of the argument's type
  */
 const char* typeName(BSONType type);
+
+/**
+ * Reverse mapping of typeName(). Throws an exception with error code BadValue when passed in
+ * invalid type name.
+ */
+BSONType typeFromName(StringData name);
 
 /**
  * Prints the name of the argument's type to the given stream.

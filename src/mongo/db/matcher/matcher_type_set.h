@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -47,10 +46,6 @@ namespace mongo {
  */
 struct MatcherTypeSet {
     static constexpr StringData kMatchesAllNumbersAlias = "number"_sd;
-
-    // Maps from the set of type aliases accepted by the $type query operator to the corresponding
-    // BSON types. Excludes "number", since this alias maps to a set of BSON types.
-    static const StringMap<BSONType> kTypeAliasMap;
 
     // Maps from the set of JSON Schema primitive types to the corresponding BSON types. Excludes
     // "number" since this alias maps to a set of BSON types, and "integer" since it is not

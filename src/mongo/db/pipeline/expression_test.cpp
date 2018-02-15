@@ -33,6 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
 #include "mongo/db/pipeline/expression.h"
@@ -5284,6 +5285,1261 @@ TEST(GetComputedPathsTest, ExpressionMapNotConsideredRenameWithDottedInputPath) 
 }
 
 }  // namespace GetComputedPathsTest
+
+namespace ExpressionConvertTest {
+
+// This provides access to an ExpressionContext that has a valid ServiceContext with a
+// TimeZoneDatabase via getExpCtx(), but we'll use a different name for this test suite.
+using ExpressionConvertTest = AggregationContextFixture;
+
+TEST_F(ExpressionConvertTest, ParseAndSerializeWithoutOptionalArguments) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    ASSERT_VALUE_EQ(Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}}}")),
+                    convertExp->serialize(false));
+}
+
+TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"
+                                        << "onError"
+                                        << 0));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onError: {$const: 0}}}")),
+        convertExp->serialize(false));
+}
+
+TEST_F(ExpressionConvertTest, ParseAndSerializeWithOnNull) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"
+                                        << "onNull"
+                                        << 0));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    ASSERT_VALUE_EQ(
+        Value(fromjson("{$convert: {input: '$path1', to: {$const: 'int'}, onNull: {$const: 0}}}")),
+        convertExp->serialize(false));
+}
+
+TEST_F(ExpressionConvertTest, ConvertWithoutInputFailsToParse) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("to"
+                                        << "int"
+                                        << "onError"
+                                        << 0));
+    ASSERT_THROWS_WITH_CHECK(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Missing 'input' parameter to $convert");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, ConvertWithoutToFailsToParse) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "onError"
+                                        << 0));
+    ASSERT_THROWS_WITH_CHECK(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Missing 'to' parameter to $convert");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, InvalidTypeNameFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "dinosaur"
+                                        << "onError"
+                                        << 0));
+
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->optimize(), AssertionException, [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::BadValue);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Unknown type name");
+        });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(Document()),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::BadValue);
+                                 ASSERT_STRING_CONTAINS(exception.reason(), "Unknown type name");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, NonIntegralTypeFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << 3.6
+                                        << "onError"
+                                        << 0));
+
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->optimize(), AssertionException, [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+            ASSERT_STRING_CONTAINS(exception.reason(),
+                                   "In $convert, numeric 'to' argument is not an integer");
+        });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(Document()),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "In $convert, numeric 'to' argument is not an integer");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, NonStringNonNumericalTypeFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << BSON("dinosaur"
+                                                << "Tyrannosaurus rex")
+                                        << "onError"
+                                        << 0));
+
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(Document()),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "$convert's 'to' argument must be a string or number");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, IllegalTargetTypeFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "minKey"
+                                        << "onError"
+                                        << 0));
+
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->optimize(), AssertionException, [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+            ASSERT_STRING_CONTAINS(exception.reason(), "$convert with unsupported 'to' type");
+        });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(Document()),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "$convert with unsupported 'to' type");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, InvalidNumericTargetTypeFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << 100
+                                        << "onError"
+                                        << 0));
+
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->optimize(), AssertionException, [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+            ASSERT_STRING_CONTAINS(
+                exception.reason(),
+                "In $convert, numeric value for 'to' does not correspond to a BSON type");
+        });
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(Document()),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::FailedToParse);
+            ASSERT_STRING_CONTAINS(
+                exception.reason(),
+                "In $convert, numeric value for 'to' does not correspond to a BSON type");
+        });
+}
+
+TEST_F(ExpressionConvertTest, UnsupportedConversionFails) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "date"));
+
+    Document intInput{{"path1", Value(int{1})}};
+
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(intInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Unsupported conversion");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, ConvertNullishInput) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document nullInput{{"path1", Value(BSONNULL)}};
+    Document undefinedInput{{"path1", Value(BSONUndefined)}};
+    Document missingInput{{"path1", Value()}};
+
+    ASSERT_VALUE_EQ(convertExp->evaluate(nullInput), Value(BSONNULL));
+    ASSERT_VALUE_EQ(convertExp->evaluate(undefinedInput), Value(BSONNULL));
+    ASSERT_VALUE_EQ(convertExp->evaluate(missingInput), Value(BSONNULL));
+}
+
+TEST_F(ExpressionConvertTest, ConvertNullishInputWithOnNull) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"
+                                        << "onNull"
+                                        << "B)"
+                                        << "onError"
+                                        << "Should not be used here"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document nullInput{{"path1", Value(BSONNULL)}};
+    Document undefinedInput{{"path1", Value(BSONUndefined)}};
+    Document missingInput{{"path1", Value()}};
+
+    ASSERT_VALUE_EQ(convertExp->evaluate(nullInput), Value("B)"_sd));
+    ASSERT_VALUE_EQ(convertExp->evaluate(undefinedInput), Value("B)"_sd));
+    ASSERT_VALUE_EQ(convertExp->evaluate(missingInput), Value("B)"_sd));
+}
+
+TEST_F(ExpressionConvertTest, NullishToReturnsNull) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "inputString"
+                                        << "to"
+                                        << "$path1"
+                                        << "onNull"
+                                        << "Should not be used here"
+                                        << "onError"
+                                        << "Also should not be used"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document nullInput{{"path1", Value(BSONNULL)}};
+    Document undefinedInput{{"path1", Value(BSONUndefined)}};
+    Document missingInput{{"path1", Value()}};
+
+    ASSERT_VALUE_EQ(convertExp->evaluate(nullInput), Value(BSONNULL));
+    ASSERT_VALUE_EQ(convertExp->evaluate(undefinedInput), Value(BSONNULL));
+    ASSERT_VALUE_EQ(convertExp->evaluate(missingInput), Value(BSONNULL));
+}
+
+#define ASSERT_VALUE_CONTENTS_AND_TYPE(v, contents, type)  \
+    do {                                                   \
+        Value evaluatedResult = v;                         \
+        ASSERT_VALUE_EQ(evaluatedResult, Value(contents)); \
+        ASSERT_EQ(evaluatedResult.getType(), type);        \
+    } while (false);
+
+TEST_F(ExpressionConvertTest, NullInputOverridesNullTo) {
+    auto expCtx = getExpCtx();
+
+    auto spec =
+        BSON("$convert" << BSON("input" << Value(BSONNULL) << "to" << Value(BSONNULL) << "onNull"
+                                        << ":x"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(Document{}), ":x"_sd, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, FoldableConversion) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input" << 0 << "to"
+                                                << "double"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
+    ASSERT(constResult);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), 0.0, BSONType::NumberDouble);
+}
+
+TEST_F(ExpressionConvertTest, FoldableConversionWithOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input" << 0 << "to"
+                                                << "date"
+                                                << "onError"
+                                                << ":]"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    auto constResult = dynamic_cast<ExpressionConstant*>(convertExp.get());
+    ASSERT(constResult);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(constResult->getValue(), ":]"_sd, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ConvertNumericToBool) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "bool"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document trueIntInput{{"path1", Value(int{1})}};
+    Document trueLongInput{{"path1", Value(-1ll)}};
+    Document trueDoubleInput{{"path1", Value(2.4)}};
+    Document trueDecimalInput{{"path1", Value(Decimal128(5))}};
+
+    Document falseIntInput{{"path1", Value(int{0})}};
+    Document falseLongInput{{"path1", Value(0ll)}};
+    Document falseDoubleInput{{"path1", Value(-0.0)}};
+    Document falseDecimalInput{{"path1", Value(Decimal128(0))}};
+
+    Document doubleNaN{{"path1", std::numeric_limits<double>::quiet_NaN()}};
+    Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
+    Document doubleNegativeInfinity{{"path1", -std::numeric_limits<double>::infinity()}};
+
+    Document decimalNaN{{"path1", Decimal128::kPositiveNaN}};
+    Document decimalNegativeNaN{{"path1", Decimal128::kNegativeNaN}};
+    Document decimalInfinity{{"path1", Decimal128::kPositiveInfinity}};
+    Document decimalNegativeInfinity{{"path1", Decimal128::kNegativeInfinity}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(trueIntInput), true, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(trueLongInput), true, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(trueDoubleInput), true, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(trueDecimalInput), true, BSONType::Bool);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseIntInput), false, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseLongInput), false, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseDoubleInput), false, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseDecimalInput), false, BSONType::Bool);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(doubleNaN), true, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(doubleInfinity), true, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(doubleNegativeInfinity), true, BSONType::Bool);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(decimalNaN), true, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(decimalNegativeNaN), true, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(decimalInfinity), true, BSONType::Bool);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(decimalNegativeInfinity), true, BSONType::Bool);
+}
+
+TEST_F(ExpressionConvertTest, ConvertNumericToDouble) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "double"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document intInput{{"path1", Value(int{1})}};
+    Document longInput{{"path1", Value(0xf00000000ll)}};
+    Document decimalInput{{"path1", Value(Decimal128("5.5"))}};
+
+    Document boolFalse{{"path1", Value(false)}};
+    Document boolTrue{{"path1", Value(true)}};
+
+    Document decimalNaN{{"path1", Decimal128::kPositiveNaN}};
+    Document decimalNegativeNaN{{"path1", Decimal128::kNegativeNaN}};
+    Document decimalInfinity{{"path1", Decimal128::kPositiveInfinity}};
+    Document decimalNegativeInfinity{{"path1", Decimal128::kNegativeInfinity}};
+
+    Document largeLongInput{{"path1", Value(0xf0000000000000fll)}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(intInput), 1.0, BSONType::NumberDouble);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(longInput), 64424509440.0, BSONType::NumberDouble);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(decimalInput), 5.5, BSONType::NumberDouble);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolFalse), 0.0, BSONType::NumberDouble);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolTrue), 1.0, BSONType::NumberDouble);
+
+    Value result;
+    result = convertExp->evaluate(decimalNaN);
+    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT(std::isnan(result.getDouble()));
+
+    result = convertExp->evaluate(decimalNegativeNaN);
+    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT(std::isnan(result.getDouble()));
+
+    result = convertExp->evaluate(decimalInfinity);
+    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT_GT(result.getDouble(), 0.0);
+    ASSERT(std::isinf(result.getDouble()));
+
+    result = convertExp->evaluate(decimalNegativeInfinity);
+    ASSERT_EQ(result.getType(), BSONType::NumberDouble);
+    ASSERT_LT(result.getDouble(), 0.0);
+    ASSERT(std::isinf(result.getDouble()));
+
+    // Note that the least significant bits get lost, because the significand of a double is not
+    // wide enough for the original long long value in its entirety.
+    result = convertExp->evaluate(largeLongInput);
+    ASSERT_EQ(static_cast<long long>(result.getDouble()), 0xf00000000000000ll);
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToDouble) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "double"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document overflowInput{{"path1", Decimal128("1e309")}};
+    Document negativeOverflowInput{{"path1", Decimal128("-1e309")}};
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeOverflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToDoubleWithOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "double"
+                                        << "onError"
+                                        << ":/"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document overflowInput{{"path1", Decimal128("1e309")}};
+    Document negativeOverflowInput{{"path1", Decimal128("-1e309")}};
+
+    std::string contents = ":/";
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(overflowInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeOverflowInput), contents, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ConvertNumericToDecimal) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "decimal"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document intInput{{"path1", Value(int{1})}};
+    Document longInput{{"path1", Value(0xf00000000ll)}};
+    Document doubleInput{{"path1", Value(Decimal128("0.1"))}};
+
+    Document boolFalse{{"path1", Value(false)}};
+    Document boolTrue{{"path1", Value(true)}};
+
+    Document doubleNaN{{"path1", std::numeric_limits<double>::quiet_NaN()}};
+    Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
+    Document doubleNegativeInfinity{{"path1", -std::numeric_limits<double>::infinity()}};
+
+    Document largeLongInput{{"path1", Value(0xf0000000000000fll)}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(intInput), Decimal128(1), BSONType::NumberDecimal);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(longInput), Decimal128(0xf00000000), BSONType::NumberDecimal);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(doubleInput), Decimal128("0.1"), BSONType::NumberDecimal);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(boolFalse), Decimal128(0), BSONType::NumberDecimal);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(boolTrue), Decimal128(1), BSONType::NumberDecimal);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(doubleNaN), Decimal128::kPositiveNaN, BSONType::NumberDecimal);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(doubleInfinity),
+                                   Decimal128::kPositiveInfinity,
+                                   BSONType::NumberDecimal);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(doubleNegativeInfinity),
+                                   Decimal128::kNegativeInfinity,
+                                   BSONType::NumberDecimal);
+
+    // Unlike the similar conversion in ConvertNumericToDouble, there is more than enough precision
+    // to store the exact orignal value in a Decimal128.
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(largeLongInput), Value(0xf0000000000000fll), BSONType::NumberDecimal);
+}
+
+TEST_F(ExpressionConvertTest, ConvertDoubleToInt) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document simpleInput{{"path1", Value(1.0)}};
+
+    // Conversions to int should always truncate the fraction (i.e., round towards 0).
+    Document nonIntegerInput1{{"path1", Value(2.1)}};
+    Document nonIntegerInput2{{"path1", Value(2.9)}};
+    Document nonIntegerInput3{{"path1", Value(-2.1)}};
+    Document nonIntegerInput4{{"path1", Value(-2.9)}};
+
+    int maxInt = std::numeric_limits<int>::max();
+    int minInt = std::numeric_limits<int>::lowest();
+    Document maxInput{{"path1", Value(static_cast<double>(maxInt))}};
+    Document minInput{{"path1", Value(static_cast<double>(minInt))}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1, BSONType::NumberInt);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput1), 2, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput2), 2, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput3), -2, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput4), -2, BSONType::NumberInt);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(maxInput), maxInt, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(minInput), minInt, BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToInt) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    int maxInt = std::numeric_limits<int>::max();
+    int minInt = std::numeric_limits<int>::lowest();
+    double overflowInt =
+        std::nextafter(static_cast<double>(maxInt), std::numeric_limits<double>::max());
+    double negativeOverflowInt =
+        std::nextafter(static_cast<double>(minInt), std::numeric_limits<double>::lowest());
+    Document overflowInput{{"path1", Value(overflowInt)}};
+    Document negativeOverflowInput{{"path1", Value(negativeOverflowInt)}};
+
+    Document nanInput{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
+    Document doubleNegativeInfinity{{"path1", -std::numeric_limits<double>::infinity()}};
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeOverflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(nanInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Attempt to cast NaN value to integer");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(doubleInfinity),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Attempt to cast infinity value to integer");
+        });
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(doubleNegativeInfinity),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Attempt to cast infinity value to integer");
+        });
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToIntWithOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"
+                                        << "onError"
+                                        << ":)"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    int maxInt = std::numeric_limits<int>::max();
+    int minInt = std::numeric_limits<int>::lowest();
+    double overflowInt =
+        std::nextafter(static_cast<double>(maxInt), std::numeric_limits<double>::max());
+    double negativeOverflowInt =
+        std::nextafter(static_cast<double>(minInt), std::numeric_limits<double>::lowest());
+    Document overflowInput{{"path1", Value(overflowInt)}};
+    Document negativeOverflowInput{{"path1", Value(negativeOverflowInt)}};
+
+    Document nanInput{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
+    Document doubleNegativeInfinity{{"path1", -std::numeric_limits<double>::infinity()}};
+
+    std::string contents = ":)";
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(overflowInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeOverflowInput), contents, BSONType::String);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nanInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(doubleInfinity), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(doubleNegativeInfinity), contents, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ConvertDoubleToLong) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "long"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document simpleInput{{"path1", Value(1.0)}};
+
+    // Conversions to int should always truncate the fraction (i.e., round towards 0).
+    Document nonIntegerInput1{{"path1", Value(2.1)}};
+    Document nonIntegerInput2{{"path1", Value(2.9)}};
+    Document nonIntegerInput3{{"path1", Value(-2.1)}};
+    Document nonIntegerInput4{{"path1", Value(-2.9)}};
+
+    // maxVal is the highest double value that will not overflow long long, and minVal is the lowest
+    // double value that will not overflow long long.
+    double maxVal = std::nextafter(ExpressionConvert::kLongLongMaxPlusOneAsDouble, 0.0);
+    double minVal = static_cast<double>(std::numeric_limits<long long>::lowest());
+    Document maxInput{{"path1", Value(maxVal)}};
+    Document minInput{{"path1", Value(minVal)}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1, BSONType::NumberLong);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput1), 2, BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput2), 2, BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(nonIntegerInput3), -2, BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(nonIntegerInput4), -2, BSONType::NumberLong);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(maxInput), static_cast<long long>(maxVal), BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(minInput), static_cast<long long>(minVal), BSONType::NumberLong);
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToLong) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "long"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    double minLong = static_cast<double>(std::numeric_limits<long long>::lowest());
+    double overflowLong = ExpressionConvert::kLongLongMaxPlusOneAsDouble;
+    double negativeOverflowLong =
+        std::nextafter(static_cast<double>(minLong), std::numeric_limits<double>::lowest());
+    Document overflowInput{{"path1", Value(overflowLong)}};
+    Document negativeOverflowInput{{"path1", Value(negativeOverflowLong)}};
+
+    Document nanInput{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
+    Document doubleNegativeInfinity{{"path1", -std::numeric_limits<double>::infinity()}};
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeOverflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(nanInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Attempt to cast NaN value to integer");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(doubleInfinity),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Attempt to cast infinity value to integer");
+        });
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(doubleNegativeInfinity),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Attempt to cast infinity value to integer");
+        });
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToLongWithOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "long"
+                                        << "onError"
+                                        << ":D"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    double minLong = static_cast<double>(std::numeric_limits<long long>::lowest());
+    double overflowLong = ExpressionConvert::kLongLongMaxPlusOneAsDouble;
+    double negativeOverflowLong =
+        std::nextafter(static_cast<double>(minLong), std::numeric_limits<double>::lowest());
+    Document overflowInput{{"path1", Value(overflowLong)}};
+    Document negativeOverflowInput{{"path1", Value(negativeOverflowLong)}};
+
+    Document nanInput{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
+    Document doubleNegativeInfinity{{"path1", -std::numeric_limits<double>::infinity()}};
+
+    std::string contents = ":D";
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(overflowInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeOverflowInput), contents, BSONType::String);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nanInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(doubleInfinity), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(doubleNegativeInfinity), contents, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ConvertDecimalToInt) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document simpleInput{{"path1", Value(Decimal128("1.0"))}};
+
+    // Conversions to int should always truncate the fraction (i.e., round towards 0).
+    Document nonIntegerInput1{{"path1", Value(Decimal128("2.1"))}};
+    Document nonIntegerInput2{{"path1", Value(Decimal128("2.9"))}};
+    Document nonIntegerInput3{{"path1", Value(Decimal128("-2.1"))}};
+    Document nonIntegerInput4{{"path1", Value(Decimal128("-2.9"))}};
+
+    int maxInt = std::numeric_limits<int>::max();
+    int minInt = std::numeric_limits<int>::min();
+    Document maxInput{{"path1", Value(Decimal128(maxInt))}};
+    Document minInput{{"path1", Value(Decimal128(minInt))}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1, BSONType::NumberInt);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput1), 2, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput2), 2, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput3), -2, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput4), -2, BSONType::NumberInt);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(maxInput), maxInt, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(minInput), minInt, BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToInt) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    int maxInt = std::numeric_limits<int>::max();
+    int minInt = std::numeric_limits<int>::lowest();
+    Document overflowInput{{"path1", Decimal128(maxInt).add(Decimal128(1))}};
+    Document negativeOverflowInput{{"path1", Decimal128(minInt).subtract(Decimal128(1))}};
+
+    Document nanInput{{"path1", Decimal128::kPositiveNaN}};
+    Document negativeNaNInput{{"path1", Decimal128::kNegativeNaN}};
+    Document decimalInfinity{{"path1", Decimal128::kPositiveInfinity}};
+    Document decimalNegativeInfinity{{"path1", Decimal128::kNegativeInfinity}};
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeOverflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(nanInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Attempt to cast NaN value to integer");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeNaNInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Attempt to cast NaN value to integer");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(decimalInfinity),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Attempt to cast infinity value to integer");
+        });
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(decimalNegativeInfinity),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Attempt to cast infinity value to integer");
+        });
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToIntWithOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"
+                                        << "onError"
+                                        << ":o"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    int maxInt = std::numeric_limits<int>::max();
+    int minInt = std::numeric_limits<int>::lowest();
+    Document overflowInput{{"path1", Decimal128(maxInt).add(Decimal128(1))}};
+    Document negativeOverflowInput{{"path1", Decimal128(minInt).subtract(Decimal128(1))}};
+
+    Document nanInput{{"path1", Decimal128::kPositiveNaN}};
+    Document negativeNaNInput{{"path1", Decimal128::kNegativeNaN}};
+    Document decimalInfinity{{"path1", Decimal128::kPositiveInfinity}};
+    Document decimalNegativeInfinity{{"path1", Decimal128::kNegativeInfinity}};
+
+    std::string contents = ":o";
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(overflowInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeOverflowInput), contents, BSONType::String);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nanInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeNaNInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(decimalInfinity), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(decimalNegativeInfinity), contents, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ConvertDecimalToLong) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "long"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document simpleInput{{"path1", Value(Decimal128("1.0"))}};
+
+    // Conversions to long should always truncate the fraction (i.e., round towards 0).
+    Document nonIntegerInput1{{"path1", Value(Decimal128("2.1"))}};
+    Document nonIntegerInput2{{"path1", Value(Decimal128("2.9"))}};
+    Document nonIntegerInput3{{"path1", Value(Decimal128("-2.1"))}};
+    Document nonIntegerInput4{{"path1", Value(Decimal128("-2.9"))}};
+
+    long long maxVal = std::numeric_limits<long long>::max();
+    long long minVal = std::numeric_limits<long long>::min();
+    Document maxInput{{"path1", Value(Decimal128(std::int64_t{maxVal}))}};
+    Document minInput{{"path1", Value(Decimal128(std::int64_t{minVal}))}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1, BSONType::NumberLong);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput1), 2, BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput2), 2, BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(nonIntegerInput3), -2, BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(nonIntegerInput4), -2, BSONType::NumberLong);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(maxInput), maxVal, BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(minInput), minVal, BSONType::NumberLong);
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToLong) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "long"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    long long maxVal = std::numeric_limits<long long>::max();
+    long long minVal = std::numeric_limits<long long>::lowest();
+    Document overflowInput{{"path1", Decimal128(std::int64_t{maxVal}).add(Decimal128(1))}};
+    Document negativeOverflowInput{
+        {"path1", Decimal128(std::int64_t{minVal}).subtract(Decimal128(1))}};
+
+    Document nanInput{{"path1", Decimal128::kPositiveNaN}};
+    Document negativeNaNInput{{"path1", Decimal128::kNegativeNaN}};
+    Document decimalInfinity{{"path1", Decimal128::kPositiveInfinity}};
+    Document decimalNegativeInfinity{{"path1", Decimal128::kNegativeInfinity}};
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeOverflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(nanInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Attempt to cast NaN value to integer");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeNaNInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Attempt to cast NaN value to integer");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(decimalInfinity),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Attempt to cast infinity value to integer");
+        });
+
+    ASSERT_THROWS_WITH_CHECK(
+        convertExp->evaluate(decimalNegativeInfinity),
+        AssertionException,
+        [](const AssertionException& exception) {
+            ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+            ASSERT_STRING_CONTAINS(exception.reason(), "Attempt to cast infinity value to integer");
+        });
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToLongWithOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "long"
+                                        << "onError"
+                                        << ":p"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    long long maxVal = std::numeric_limits<long long>::max();
+    long long minVal = std::numeric_limits<long long>::lowest();
+    Document overflowInput{{"path1", Decimal128(std::int64_t{maxVal}).add(Decimal128(1))}};
+    Document negativeOverflowInput{
+        {"path1", Decimal128(std::int64_t{minVal}).subtract(Decimal128(1))}};
+
+    Document nanInput{{"path1", Decimal128::kPositiveNaN}};
+    Document negativeNaNInput{{"path1", Decimal128::kNegativeNaN}};
+    Document decimalInfinity{{"path1", Decimal128::kPositiveInfinity}};
+    Document decimalNegativeInfinity{{"path1", Decimal128::kNegativeInfinity}};
+
+    std::string contents = ":p";
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(overflowInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeOverflowInput), contents, BSONType::String);
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nanInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeNaNInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(decimalInfinity), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(decimalNegativeInfinity), contents, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ConvertIntToLong) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "long"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document simpleInput{{"path1", Value(1)}};
+
+    int maxInt = std::numeric_limits<int>::max();
+    int minInt = std::numeric_limits<int>::min();
+    Document maxInput{{"path1", Value(maxInt)}};
+    Document minInput{{"path1", Value(minInt)}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1ll, BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(maxInput), maxInt, BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(minInput), minInt, BSONType::NumberLong);
+}
+
+TEST_F(ExpressionConvertTest, ConvertLongToInt) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document simpleInput{{"path1", Value(1)}};
+
+    long long maxInt = std::numeric_limits<int>::max();
+    long long minInt = std::numeric_limits<int>::min();
+    Document maxInput{{"path1", Value(maxInt)}};
+    Document minInput{{"path1", Value(minInt)}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(maxInput), maxInt, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(minInput), minInt, BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsLongToInt) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    long long maxInt = std::numeric_limits<int>::max();
+    long long minInt = std::numeric_limits<int>::min();
+    Document overflowInput{{"path1", Value(maxInt + 1)}};
+    Document negativeOverflowInput{{"path1", Value(minInt - 1)}};
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeOverflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsLongToIntWithOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"
+                                        << "onError"
+                                        << ":|"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    long long maxInt = std::numeric_limits<int>::max();
+    long long minInt = std::numeric_limits<int>::min();
+    Document overflowInput{{"path1", Value(maxInt + 1)}};
+    Document negativeOverflowInput{{"path1", Value(minInt - 1)}};
+
+    std::string contents = ":|";
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(overflowInput), contents, BSONType::String);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeOverflowInput), contents, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBoolToInt) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "int"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document boolFalse{{"path1", Value(false)}};
+    Document boolTrue{{"path1", Value(true)}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolFalse), 0, BSONType::NumberInt);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolTrue), 1, BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertTest, ConvertBoolToLong) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "long"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document boolFalse{{"path1", Value(false)}};
+    Document boolTrue{{"path1", Value(true)}};
+
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolFalse), 0ll, BSONType::NumberLong);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolTrue), 1ll, BSONType::NumberLong);
+}
+
+}  // namespace ExpressionConvertTest
 
 class All : public Suite {
 public:
