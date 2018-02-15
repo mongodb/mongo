@@ -216,20 +216,11 @@ public:
 
     // Creates a dummy command operation to persuade `applyOps` to be non-atomic.
     StatusWith<BSONObj> doNonAtomicApplyOps(const std::string& dbName,
-                                            const std::list<BSONObj>& applyOpsList,
-                                            Timestamp dummyTs) {
-        BSONArrayBuilder builder;
-        builder.append(applyOpsList);
-        builder << BSON("ts" << dummyTs << "t" << 1LL << "h" << 1 << "op"
-                             << "c"
-                             << "ns"
-                             << "test.$cmd"
-                             << "o"
-                             << BSON("applyOps" << BSONArrayBuilder().obj()));
+                                            const std::list<BSONObj>& applyOpsList) {
         BSONObjBuilder result;
         Status status = applyOps(_opCtx,
                                  dbName,
-                                 BSON("applyOps" << builder.arr()),
+                                 BSON("applyOps" << applyOpsList << "allowAtomic" << false),
                                  repl::OplogApplication::Mode::kApplyOpsCmd,
                                  &result);
         if (!status.isOK()) {
@@ -662,8 +653,7 @@ public:
                                << "ui"
                                << autoColl.getCollection()->uuid().get()
                                << "o"
-                               << BSON("_id" << num))},
-                    startDeleteTime.addTicks(num).asTimestamp())
+                               << BSON("_id" << num))})
                     .getStatus());
         }
 
@@ -739,8 +729,7 @@ public:
                                << "o2"
                                << BSON("_id" << 0)
                                << "o"
-                               << updates[idx].first)},
-                    firstUpdateTime.addTicks(idx).asTimestamp())
+                               << updates[idx].first)})
                     .getStatus());
         }
 
@@ -781,10 +770,9 @@ public:
         // on the same collection with `{_id: 0}`. It's expected for this second insert to be
         // turned into an upsert. The goal document does not contain `field: 0`.
         BSONObjBuilder resultBuilder;
-        auto swResult = doNonAtomicApplyOps(
+        auto result = unittest::assertGet(doNonAtomicApplyOps(
             nss.db().toString(),
-            {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2
-                       << "op"
+            {BSON("ts" << insertTime.asTimestamp() << "t" << 1LL << "op"
                        << "i"
                        << "ns"
                        << nss.ns()
@@ -792,25 +780,18 @@ public:
                        << autoColl.getCollection()->uuid().get()
                        << "o"
                        << BSON("_id" << 0 << "field" << 0)),
-             BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "h" << 0xBEEFBEEFLL
-                       << "v"
-                       << 2
-                       << "op"
+             BSON("ts" << insertTime.addTicks(1).asTimestamp() << "t" << 1LL << "op"
                        << "i"
                        << "ns"
                        << nss.ns()
                        << "ui"
                        << autoColl.getCollection()->uuid().get()
                        << "o"
-                       << BSON("_id" << 0))},
-            insertTime.addTicks(1).asTimestamp());
-        ASSERT_OK(swResult);
+                       << BSON("_id" << 0))}));
 
-        BSONObj& result = swResult.getValue();
-        ASSERT_EQ(3, result.getIntField("applied"));
+        ASSERT_EQ(2, result.getIntField("applied"));
         ASSERT(result["results"].Array()[0].Bool());
         ASSERT(result["results"].Array()[1].Bool());
-        ASSERT(result["results"].Array()[2].Bool());
 
         // Reading at `insertTime` should show the original document, `{_id: 0, field: 0}`.
         auto recoveryUnit = _opCtx->recoveryUnit();
@@ -848,22 +829,22 @@ public:
         // Reserve a timestamp before the inserts should happen.
         const LogicalTime preInsertTimestamp = _clock->reserveTicks(1);
         auto swResult = doAtomicApplyOps(nss.db().toString(),
-                                         {BSON("v" << 2 << "op"
-                                                   << "i"
-                                                   << "ns"
-                                                   << nss.ns()
-                                                   << "ui"
-                                                   << autoColl.getCollection()->uuid().get()
-                                                   << "o"
-                                                   << BSON("_id" << 0)),
-                                          BSON("v" << 2 << "op"
-                                                   << "i"
-                                                   << "ns"
-                                                   << nss.ns()
-                                                   << "ui"
-                                                   << autoColl.getCollection()->uuid().get()
-                                                   << "o"
-                                                   << BSON("_id" << 1))});
+                                         {BSON("op"
+                                               << "i"
+                                               << "ns"
+                                               << nss.ns()
+                                               << "ui"
+                                               << autoColl.getCollection()->uuid().get()
+                                               << "o"
+                                               << BSON("_id" << 0)),
+                                          BSON("op"
+                                               << "i"
+                                               << "ns"
+                                               << nss.ns()
+                                               << "ui"
+                                               << autoColl.getCollection()->uuid().get()
+                                               << "o"
+                                               << BSON("_id" << 1))});
         ASSERT_OK(swResult);
 
         ASSERT_EQ(2, swResult.getValue().getIntField("applied"));
@@ -910,22 +891,22 @@ public:
 
         const LogicalTime preInsertTimestamp = _clock->reserveTicks(1);
         auto swResult = doAtomicApplyOps(nss.db().toString(),
-                                         {BSON("v" << 2 << "op"
-                                                   << "i"
-                                                   << "ns"
-                                                   << nss.ns()
-                                                   << "ui"
-                                                   << autoColl.getCollection()->uuid().get()
-                                                   << "o"
-                                                   << BSON("_id" << 0 << "field" << 0)),
-                                          BSON("v" << 2 << "op"
-                                                   << "i"
-                                                   << "ns"
-                                                   << nss.ns()
-                                                   << "ui"
-                                                   << autoColl.getCollection()->uuid().get()
-                                                   << "o"
-                                                   << BSON("_id" << 0))});
+                                         {BSON("op"
+                                               << "i"
+                                               << "ns"
+                                               << nss.ns()
+                                               << "ui"
+                                               << autoColl.getCollection()->uuid().get()
+                                               << "o"
+                                               << BSON("_id" << 0 << "field" << 0)),
+                                          BSON("op"
+                                               << "i"
+                                               << "ns"
+                                               << nss.ns()
+                                               << "ui"
+                                               << autoColl.getCollection()->uuid().get()
+                                               << "o"
+                                               << BSON("_id" << 0))});
         ASSERT_OK(swResult);
 
         ASSERT_EQ(2, swResult.getValue().getIntField("applied"));
@@ -966,19 +947,17 @@ public:
         { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
 
         BSONObjBuilder resultBuilder;
-        auto swResult = doNonAtomicApplyOps(
-            nss.db().toString(),
-            {
-                BSON("ts" << presentTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
-                          << "c"
-                          << "ui"
-                          << UUID::gen()
-                          << "ns"
-                          << nss.getCommandNS().ns()
-                          << "o"
-                          << BSON("create" << nss.coll())),
-            },
-            presentTs);
+        auto swResult = doNonAtomicApplyOps(nss.db().toString(),
+                                            {
+                                                BSON("ts" << presentTs << "t" << 1LL << "op"
+                                                          << "c"
+                                                          << "ui"
+                                                          << UUID::gen()
+                                                          << "ns"
+                                                          << nss.getCommandNS().ns()
+                                                          << "o"
+                                                          << BSON("create" << nss.coll())),
+                                            });
         ASSERT_OK(swResult);
 
         { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
@@ -1014,27 +993,25 @@ public:
         const Timestamp dummyTs = dummyLt.asTimestamp();
 
         BSONObjBuilder resultBuilder;
-        auto swResult = doNonAtomicApplyOps(
-            dbName,
-            {
-                BSON("ts" << presentTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
-                          << "c"
-                          << "ui"
-                          << UUID::gen()
-                          << "ns"
-                          << nss1.getCommandNS().ns()
-                          << "o"
-                          << BSON("create" << nss1.coll())),
-                BSON("ts" << futureTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
-                          << "c"
-                          << "ui"
-                          << UUID::gen()
-                          << "ns"
-                          << nss2.getCommandNS().ns()
-                          << "o"
-                          << BSON("create" << nss2.coll())),
-            },
-            dummyTs);
+        auto swResult = doNonAtomicApplyOps(dbName,
+                                            {
+                                                BSON("ts" << presentTs << "t" << 1LL << "op"
+                                                          << "c"
+                                                          << "ui"
+                                                          << UUID::gen()
+                                                          << "ns"
+                                                          << nss1.getCommandNS().ns()
+                                                          << "o"
+                                                          << BSON("create" << nss1.coll())),
+                                                BSON("ts" << futureTs << "t" << 1LL << "op"
+                                                          << "c"
+                                                          << "ui"
+                                                          << UUID::gen()
+                                                          << "ns"
+                                                          << nss2.getCommandNS().ns()
+                                                          << "o"
+                                                          << BSON("create" << nss2.coll())),
+                                            });
         ASSERT_OK(swResult);
 
         { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss1).getCollection()); }
@@ -1087,35 +1064,34 @@ public:
             { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss2).getCollection()); }
 
             BSONObjBuilder resultBuilder;
-            auto swResult = doNonAtomicApplyOps(
-                dbName,
-                {
-                    BSON("ts" << presentTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
-                              << "i"
-                              << "ns"
-                              << nss1.ns()
-                              << "ui"
-                              << autoColl.getCollection()->uuid().get()
-                              << "o"
-                              << doc1),
-                    BSON("ts" << futureTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
-                              << "c"
-                              << "ui"
-                              << uuid2
-                              << "ns"
-                              << nss2.getCommandNS().ns()
-                              << "o"
-                              << BSON("create" << nss2.coll())),
-                    BSON("ts" << insert2Ts << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
-                              << "i"
-                              << "ns"
-                              << nss2.ns()
-                              << "ui"
-                              << uuid2
-                              << "o"
-                              << doc2),
-                },
-                dummyTs);
+            auto swResult =
+                doNonAtomicApplyOps(dbName,
+                                    {
+                                        BSON("ts" << presentTs << "t" << 1LL << "op"
+                                                  << "i"
+                                                  << "ns"
+                                                  << nss1.ns()
+                                                  << "ui"
+                                                  << autoColl.getCollection()->uuid().get()
+                                                  << "o"
+                                                  << doc1),
+                                        BSON("ts" << futureTs << "t" << 1LL << "op"
+                                                  << "c"
+                                                  << "ui"
+                                                  << uuid2
+                                                  << "ns"
+                                                  << nss2.getCommandNS().ns()
+                                                  << "o"
+                                                  << BSON("create" << nss2.coll())),
+                                        BSON("ts" << insert2Ts << "t" << 1LL << "op"
+                                                  << "i"
+                                                  << "ns"
+                                                  << nss2.ns()
+                                                  << "ui"
+                                                  << uuid2
+                                                  << "o"
+                                                  << doc2),
+                                    });
             ASSERT_OK(swResult);
         }
 
@@ -1165,20 +1141,17 @@ public:
         { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
 
         BSONObjBuilder resultBuilder;
-        // This 'applyOps' command will not actually be atomic, however we use the atomic helper
-        // to avoid the extra 'applyOps' oplog entry that the non-atomic form creates on primaries.
-        auto swResult = doAtomicApplyOps(
-            nss.db().toString(),
-            {
-                BSON("ts" << presentTs << "t" << 1LL << "h" << 0xBEEFBEEFLL << "v" << 2 << "op"
-                          << "c"
-                          << "ui"
-                          << UUID::gen()
-                          << "ns"
-                          << nss.getCommandNS().ns()
-                          << "o"
-                          << BSON("create" << nss.coll())),
-            });
+        auto swResult = doNonAtomicApplyOps(nss.db().toString(),
+                                            {
+                                                BSON("ts" << presentTs << "t" << 1LL << "op"
+                                                          << "c"
+                                                          << "ui"
+                                                          << UUID::gen()
+                                                          << "ns"
+                                                          << nss.getCommandNS().ns()
+                                                          << "o"
+                                                          << BSON("create" << nss.coll())),
+                                            });
         ASSERT_OK(swResult);
 
         { ASSERT(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
