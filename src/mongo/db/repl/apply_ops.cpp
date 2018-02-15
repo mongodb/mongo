@@ -203,7 +203,9 @@ Status _applyOps(OperationContext* opCtx,
                     [opCtx, nss, opObj, opType, alwaysUpsert, oplogApplicationMode] {
                         if (*opType == 'c') {
                             invariant(opCtx->lockState()->isW());
-                            return repl::applyCommand_inlock(opCtx, opObj, oplogApplicationMode);
+                            uassertStatusOK(
+                                repl::applyCommand_inlock(opCtx, opObj, oplogApplicationMode));
+                            return Status::OK();
                         }
 
                         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
@@ -224,6 +226,10 @@ Status _applyOps(OperationContext* opCtx,
                         OldClientContext ctx(opCtx, nss.ns());
 
                         if (!nss.isSystemDotIndexes()) {
+                            // We return the status rather than merely aborting so failure of CRUD
+                            // ops doesn't stop the applyOps from trying to process the rest of the
+                            // ops.  This is to leave the door open to parallelizing CRUD op
+                            // application in the future.
                             return repl::applyOperation_inlock(
                                 opCtx, ctx.db(), opObj, alwaysUpsert, oplogApplicationMode);
                         }
@@ -275,7 +281,7 @@ Status _applyOps(OperationContext* opCtx,
                 result->append("codeName", ErrorCodes::errorString(ex.code()));
                 result->append("errmsg", ex.what());
                 result->append("results", ab.arr());
-                return Status(ErrorCodes::UnknownError, ex.what());
+                return Status(ex.code(), ex.what());
             }
         }
 
@@ -485,7 +491,7 @@ Status applyOps(OperationContext* opCtx,
         result->append("codeName", ErrorCodes::errorString(ex.code()));
         result->append("errmsg", ex.what());
         result->append("results", ab.arr());
-        return Status(ErrorCodes::UnknownError, ex.what());
+        return Status(ex.code(), ex.what());
     }
 
     return Status::OK();

@@ -135,6 +135,54 @@ Status getStatusFromApplyOpsResult(const BSONObj& result) {
     return getStatusFromCommandResult(newResult);
 }
 
+TEST_F(ApplyOpsTest, CommandInNestedApplyOpsReturnsSuccess) {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+    BSONObjBuilder resultBuilder;
+    NamespaceString nss("test", "foo");
+    auto innerCmdObj = BSON("op"
+                            << "c"
+                            << "ns"
+                            << nss.getCommandNS().ns()
+                            << "o"
+                            << BSON("create" << nss.coll()));
+    auto innerApplyOpsObj = BSON("op"
+                                 << "c"
+                                 << "ns"
+                                 << nss.getCommandNS().ns()
+                                 << "o"
+                                 << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
+    auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
+
+    ASSERT_OK(applyOps(opCtx.get(), nss.db().toString(), cmdObj, mode, &resultBuilder));
+    ASSERT_BSONOBJ_EQ({}, _opObserver->onApplyOpsCmdObj);
+}
+
+TEST_F(ApplyOpsTest, InsertInNestedApplyOpsReturnsSuccess) {
+    auto opCtx = cc().makeOperationContext();
+    auto mode = OplogApplication::Mode::kApplyOpsCmd;
+    BSONObjBuilder resultBuilder;
+    NamespaceString nss("test", "foo");
+    auto innerCmdObj = BSON("op"
+                            << "i"
+                            << "ns"
+                            << nss.ns()
+                            << "o"
+                            << BSON("_id"
+                                    << "a"));
+    auto innerApplyOpsObj = BSON("op"
+                                 << "c"
+                                 << "ns"
+                                 << nss.getCommandNS().ns()
+                                 << "o"
+                                 << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
+    auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
+
+    ASSERT_OK(_storage->createCollection(opCtx.get(), nss, CollectionOptions()));
+    ASSERT_OK(applyOps(opCtx.get(), nss.db().toString(), cmdObj, mode, &resultBuilder));
+    ASSERT_BSONOBJ_EQ(BSON("applyOps" << BSON_ARRAY(innerCmdObj)), _opObserver->onApplyOpsCmdObj);
+}
+
 TEST_F(ApplyOpsTest, AtomicApplyOpsWithNoOpsReturnsSuccess) {
     auto opCtx = cc().makeOperationContext();
     auto mode = OplogApplication::Mode::kApplyOpsCmd;
@@ -175,7 +223,7 @@ TEST_F(ApplyOpsTest,
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, boost::none, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_EQUALS(ErrorCodes::UnknownError,
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
     auto result = resultBuilder.obj();
     auto status = getStatusFromApplyOpsResult(result);
@@ -232,7 +280,7 @@ TEST_F(ApplyOpsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWithoutUuid) {
     auto documentToInsert = BSON("_id" << 0);
     auto cmdObj = makeApplyOpsWithInsertOperation(nss, uuid, documentToInsert);
     BSONObjBuilder resultBuilder;
-    ASSERT_EQUALS(ErrorCodes::UnknownError,
+    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   applyOps(opCtx.get(), "test", cmdObj, mode, &resultBuilder));
     auto result = resultBuilder.obj();
     auto status = getStatusFromApplyOpsResult(result);
@@ -327,7 +375,7 @@ TEST_F(ApplyOpsTest, ApplyOpsFailsToDropAdmin) {
     BSONObjBuilder resultBuilder;
     auto status =
         applyOps(opCtx.get(), nss.db().toString(), dropDatabaseCmdObj, mode, &resultBuilder);
-    ASSERT_EQUALS(ErrorCodes::UnknownError, status);
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, status);
 }
 
 }  // namespace
