@@ -325,6 +325,16 @@
     // reasons.
     testCrudOperationOnNonExistentNamespace('d', {_id: 0}, {});
 
+    assert.commandFailed(
+        db.adminCommand({
+            applyOps: [{
+                "op": "c",
+                "ns": "admin.$cmd",
+                "o": {applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}
+            }]
+        }),
+        "Applying a nested insert operation on a non-existent collection should fail");
+
     assert.commandWorked(db.createCollection(t.getName()));
     var a = assert.commandWorked(
         db.adminCommand({applyOps: [{"op": "i", "ns": t.getFullName(), "o": {_id: 5, x: 17}}]}));

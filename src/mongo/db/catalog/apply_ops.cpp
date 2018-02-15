@@ -169,7 +169,7 @@ Status _applyOps(OperationContext* opCtx,
                 MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                     if (*opType == 'c') {
                         invariant(opCtx->lockState()->isW());
-                        status = repl::applyCommand_inlock(opCtx, opObj, true);
+                        uassertStatusOK(status = repl::applyCommand_inlock(opCtx, opObj, true));
                     } else {
                         const char* names[] = {"o", "ns"};
                         BSONElement fields[2];
@@ -246,7 +246,7 @@ Status _applyOps(OperationContext* opCtx,
                                ErrorCodes::errorString(ErrorCodes::fromInt(ex.getCode())));
                 result->append("errmsg", ex.what());
                 result->append("results", ab.arr());
-                return Status(ErrorCodes::UnknownError, ex.what());
+                return ex.toStatus();
             }
             WriteUnitOfWork wuow(opCtx);
             logOpForDbHash(opCtx, nss.ns().c_str());
