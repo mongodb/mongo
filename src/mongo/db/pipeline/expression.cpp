@@ -26,7 +26,6 @@
  * it in the license file.
  */
 
-#include<iostream>
 
 #include "mongo/platform/basic.h"
 
@@ -48,7 +47,7 @@
 #include "mongo/util/string_map.h"
 #include "mongo/util/summation.h"
 
-    namespace mongo {
+namespace mongo {
 using Parser = Expression::Parser;
 
 using namespace mongoutils;
@@ -467,28 +466,8 @@ const char* ExpressionArray::getOpName() const {
 /* ------------------------- ExpressionArrayElemAt -------------------------- */
 
 Value ExpressionArrayElemAt::evaluate(const Document& root) const {
-    const Value indexArg = vpOperand[1]->evaluate(root);
-    long long i = indexArg.coerceToLong();
-
-    ExpressionFilter* filterExp = dynamic_cast<ExpressionFilter*>(vpOperand[0].get());
-    // If the input array is actualy $filter this optimizes so that filter doesnt loop through
-    // entire array instead returns an array of length <= i
-    if (filterExp) {
-        const Value array = filterExp->computeNthFilteredValue(root, i);
-
-        if (i < 0 && static_cast<size_t>(std::abs(i)) > array.getArrayLength()) {
-            // Positive indices that are too large are handled automatically by Value.
-            return Value();
-        } else if (i < 0) {
-            // Index from the back of the array.
-            i = array.getArrayLength() + i;
-        }
-        const size_t index = static_cast<size_t>(i);
-        return array[index];
-    }
-
     const Value array = vpOperand[0]->evaluate(root);
-
+    const Value indexArg = vpOperand[1]->evaluate(root);
 
     if (array.nullish() || indexArg.nullish()) {
         return Value(BSONNULL);
@@ -500,16 +479,14 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
             array.isArray());
     uassert(28690,
             str::stream() << getOpName() << "'s second argument must be a numeric value,"
-                          << " but is "
-                          << typeName(indexArg.getType()),
+                          << " but is " << typeName(indexArg.getType()),
             indexArg.numeric());
     uassert(28691,
             str::stream() << getOpName() << "'s second argument must be representable as"
-                          << " a 32-bit integer: "
-                          << indexArg.coerceToDouble(),
+                          << " a 32-bit integer: " << indexArg.coerceToDouble(),
             indexArg.integral());
 
-    
+    long long i = indexArg.coerceToLong();
     if (i < 0 && static_cast<size_t>(std::abs(i)) > array.getArrayLength()) {
         // Positive indices that are too large are handled automatically by Value.
         return Value();
@@ -2063,37 +2040,6 @@ Value ExpressionFilter::evaluate(const Document& root) const {
         }
     }
 
-
-    return Value(std::move(output));
-}
-Value ExpressionFilter::computeNthFilteredValue(const Document& root, long n) const {
-    // We are guaranteed at parse time that this isn't using our _varId.
-    const Value inputVal = _input->evaluate(root);
-    if (inputVal.nullish())
-        return Value(BSONNULL);
-
-
-    const vector<Value>& input = inputVal.getArray();
-
-    if (input.empty())
-        return inputVal;
-
-    vector<Value> output;
-    auto& vars = getExpressionContext()->variables;
-
-    long counter = 0;
-    for (const auto& elem : input) {
-        vars.setValue(_varId, elem);
-
-        if (_filter->evaluate(root).coerceToBool()) {
-            output.push_back(std::move(elem));
-            counter++;
-            std::cout << "\n\n\n\n count: " << counter << "\n\n\n\n";
-            if(counter == n) {
-                return Value(std::move(output));
-            }
-        }
-    }
 
     return Value(std::move(output));
 }
