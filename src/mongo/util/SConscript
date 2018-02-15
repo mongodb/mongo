@@ -355,7 +355,7 @@ if env['MONGO_ALLOCATOR'] == 'tcmalloc':
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/commands/server_status',
             '$BUILD_DIR/mongo/db/server_parameters',
-            '$BUILD_DIR/mongo/util/net/network',
+            '$BUILD_DIR/mongo/transport/service_executor',
         ],
         LIBDEPS_DEPENDENTS=[
             '$BUILD_DIR/mongo/mongodmain',

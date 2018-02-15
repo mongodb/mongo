@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/util/net/thread_idle_callback.h"
+#include "mongo/transport/thread_idle_callback.h"
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"

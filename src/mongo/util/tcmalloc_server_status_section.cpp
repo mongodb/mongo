@@ -41,9 +41,9 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/thread_idle_callback.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/listen.h"
-#include "mongo/util/net/thread_idle_callback.h"
 
 namespace mongo {
 

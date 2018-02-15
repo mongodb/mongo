@@ -50,7 +50,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/socket_exception.h"
-#include "mongo/util/net/thread_idle_callback.h"
 #include "mongo/util/quick_exit.h"
 
 namespace mongo {

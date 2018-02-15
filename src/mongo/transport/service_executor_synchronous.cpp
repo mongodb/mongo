@@ -36,8 +36,8 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_entry_point_utils.h"
 #include "mongo/transport/service_executor_task_names.h"
+#include "mongo/transport/thread_idle_callback.h"
 #include "mongo/util/log.h"
-#include "mongo/util/net/thread_idle_callback.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {
