@@ -37,6 +37,32 @@ function _getErrorWithCode(codeOrObj, message) {
     return e;
 }
 
+/**
+ * Executes the specified function and retries it if it fails due to exception related to network
+ * error. If it exhausts the number of allowed retries, it simply throws the last exception.
+ *
+ * Returns the return value of the input call.
+ */
+function retryOnNetworkError(func, numRetries, sleepMs) {
+    numRetries = numRetries || 1;
+    sleepMs = sleepMs || 1000;
+
+    while (true) {
+        try {
+            return func();
+        } catch (e) {
+            if (isNetworkError(e) && numRetries > 0) {
+                print("Network error occurred and the call will be retried: " +
+                      tojson({error: e.toString(), stack: e.stack}));
+                numRetries--;
+                sleep(sleepMs);
+            } else {
+                throw e;
+            }
+        }
+    }
+}
+
 // Checks if a javascript exception is a network error.
 function isNetworkError(error) {
     return error.message.indexOf("error doing query") >= 0 ||
