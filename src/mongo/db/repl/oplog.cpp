@@ -1033,11 +1033,8 @@ Status applyCommand_inlock(OperationContext* txn,
                 break;
             }
             default:
-                if (_oplogCollectionName == masterSlaveOplogName) {
-                    error() << "Failed command " << o << " on " << nsToDatabaseSubstring(ns)
-                            << " with status " << status << " during oplog application";
-                } else if (curOpToApply.acceptableErrors.find(status.code()) ==
-                           curOpToApply.acceptableErrors.end()) {
+                if (curOpToApply.acceptableErrors.find(status.code()) ==
+                    curOpToApply.acceptableErrors.end()) {
                     error() << "Failed command " << o << " on " << nsToDatabaseSubstring(ns)
                             << " with status " << status << " during oplog application";
                     return status;

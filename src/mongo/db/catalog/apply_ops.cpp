@@ -132,7 +132,7 @@ Status applyOps(OperationContext* txn,
         try {
             MONGO_WRITE_CONFLICT_RETRY_LOOP_BEGIN {
                 if (*opType == 'c') {
-                    status = repl::applyCommand_inlock(txn, temp, true);
+                    uassertStatusOK(status = repl::applyCommand_inlock(txn, temp, true));
                     break;
                 } else {
                     OldClientContext ctx(txn, ns);
@@ -148,7 +148,7 @@ Status applyOps(OperationContext* txn,
             result->append("code", ex.getCode());
             result->append("errmsg", ex.what());
             result->append("results", ab.arr());
-            return Status(ErrorCodes::UnknownError, "");
+            return ex.toStatus();
         }
 
         ab.append(status.isOK());
