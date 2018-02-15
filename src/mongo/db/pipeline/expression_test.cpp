@@ -5827,8 +5827,9 @@ TEST_F(ExpressionConvertTest, ConvertNumericToDecimal) {
 
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(intInput), Decimal128(1), BSONType::NumberDecimal);
-    ASSERT_VALUE_CONTENTS_AND_TYPE(
-        convertExp->evaluate(longInput), Decimal128(0xf00000000), BSONType::NumberDecimal);
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(longInput),
+                                   Decimal128(int64_t{0xf00000000LL}),
+                                   BSONType::NumberDecimal);
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(doubleInput), Decimal128("0.1"), BSONType::NumberDecimal);
 
