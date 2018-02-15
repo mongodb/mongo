@@ -199,5 +199,11 @@ extern bool isSSLServer;
  * "EndStartupOptionStorage" as a prerequisite.
  */
 const SSLParams& getSSLGlobalParams();
+
+/**
+ * Peeks at a fragment of a client issued TLS handshake packet. Returns a TLS alert
+ * packet if the client has selected a protocol which has been disabled by the server.
+ */
+boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(ConstDataRange cdr);
 }
 #endif  // #ifdef MONGO_CONFIG_SSL
