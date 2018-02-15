@@ -246,20 +246,9 @@ ProcessOplogResult processSessionOplog(OperationContext* opCtx,
     invariant(oplogEntry.getWallClockTime());
 
     auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, result.sessionId);
-    scopedSession->beginTxn(opCtx, result.txnNum);
-
-    try {
-        if (scopedSession->checkStatementExecuted(opCtx, result.txnNum, stmtId)) {
-            return lastResult;
-        }
-    } catch (const DBException& ex) {
-        if (ex.code() != ErrorCodes::IncompleteTransactionHistory) {
-            throw;
-        }
-
-        if (stmtId == kIncompleteHistoryStmtId) {
-            return lastResult;
-        }
+    if (!scopedSession->onMigrateBeginOnPrimary(opCtx, result.txnNum, stmtId)) {
+        // Don't continue migrating the transaction history
+        return lastResult;
     }
 
     BSONObj object(result.isPrePostImage

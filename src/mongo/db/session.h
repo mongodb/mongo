@@ -104,6 +104,13 @@ public:
                                      Date_t lastStmtIdWriteDate);
 
     /**
+     * Helper function to begin a migration on a primary node.
+     *
+     * Returns whether the specified statement should be migrated at all or skipped.
+     */
+    bool onMigrateBeginOnPrimary(OperationContext* opCtx, TxnNumber txnNumber, StmtId stmtId);
+
+    /**
      * Called after an entry for the specified session and transaction has been written to the oplog
      * during chunk migration, while the node is still primary. Must be called while the caller is
      * still in the oplog write's WUOW. Updates the on-disk state of the session to match the
