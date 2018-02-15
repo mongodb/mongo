@@ -44,7 +44,7 @@
     collNames = viewsDB.getCollectionNames().filter((function(coll) {
         return !coll.startsWith("system.");
     }));
-    assert.eq(2, collNames.length, collNames);
+    assert.eq(2, collNames.length, tojson(collNames));
     let res = viewsDB.runCommand({listCollections: 1, filter: {type: "view"}});
     assert.commandWorked(res);
 

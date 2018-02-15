@@ -39,11 +39,12 @@
 
                 if (readPref === "primary" || (!readPref && !slaveOk)) {
                     // Attempting to run the query throws an error of type NotMasterNoSlaveOk.
-                    const slaveOkErr = assert.throws(() => cursor.itcount(), [], testType);
+                    const slaveOkErr = assert.throws(() => cursor.itcount(), [], tojson(testType));
                     assert.commandFailedWithCode(slaveOkErr, ErrorCodes.NotMasterNoSlaveOk);
                 } else {
                     // Succeeds for all non-primary readPrefs, and for no readPref iff slaveOk.
-                    const docCount = assert.doesNotThrow(() => cursor.itcount(), [], testType);
+                    const docCount =
+                        assert.doesNotThrow(() => cursor.itcount(), [], tojson(testType));
                     assert.eq(docCount, 1);
                 }
             }

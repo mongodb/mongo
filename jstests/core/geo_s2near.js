@@ -60,16 +60,16 @@ assert.throws(function() {
 res = t.find({"geo": {"$near": {"$geometry": origin, $maxDistance: 2000}}}).limit(10);
 resNear = db.runCommand(
     {geoNear: t.getName(), near: [0, 0], num: 10, maxDistance: Math.PI, spherical: true});
-assert.eq(res.itcount(), resNear.results.length, 10);
+assert.eq(res.itcount(), resNear.results.length, "10");
 
 res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10);
 resNear = db.runCommand({geoNear: t.getName(), near: [0, 0], num: 10, spherical: true});
-assert.eq(res.itcount(), resNear.results.length, 10);
+assert.eq(res.itcount(), resNear.results.length, "10");
 
 // Find all the points!
 res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10000);
 resNear = db.runCommand({geoNear: t.getName(), near: [0, 0], num: 10000, spherical: true});
-assert.eq(resNear.results.length, res.itcount(), (2 * points) * (2 * points));
+assert.eq(resNear.results.length, res.itcount(), ((2 * points) * (2 * points)).toString());
 
 // longitude goes -180 to 180
 // latitude goes -90 to 90
@@ -81,7 +81,7 @@ t.insert({geo: {"type": "Point", "coordinates": [180, 90]}});
 t.insert({geo: {"type": "Point", "coordinates": [-180, 90]}});
 res = t.find({"geo": {"$near": {"$geometry": origin}}}).limit(10000);
 resNear = db.runCommand({geoNear: t.getName(), near: [0, 0], num: 10000, spherical: true});
-assert.eq(res.itcount(), resNear.results.length, (2 * points) * (2 * points) + 4);
+assert.eq(res.itcount(), resNear.results.length, ((2 * points) * (2 * points) + 4).toString());
 
 function testRadAndDegreesOK(distance) {
     // Distance for old style points is radians.

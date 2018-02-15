@@ -77,7 +77,7 @@ for (i = 0; i < 100; i++) {
               validateResult.ns,
               'incorrect namespace in db.collection.validate() result: ' + tojson(validateResult));
     assert(validateResult.valid, 'collection validation failed');
-    assert.eq(100, validateResult.nrecords, 11);
+    assert.eq(100, validateResult.nrecords, "11");
 }());
 
 /*

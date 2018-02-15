@@ -252,7 +252,7 @@
             command: function(conn) {
                 function testGetMoreForCommand(cmd) {
                     let res = conn.runCommand(cmd);
-                    assert.commandWorked(res, cmd);
+                    assert.commandWorked(res, tojson(cmd));
                     let cursor = res.cursor;
                     assert.eq(cursor.ns,
                               "test.view",
@@ -262,7 +262,7 @@
                     let getmoreCmd = {getMore: cursor.id, collection: "view"};
                     res = conn.runCommand(getmoreCmd);
 
-                    assert.commandWorked(res, getmoreCmd);
+                    assert.commandWorked(res, tojson(getmoreCmd));
                     assert.eq("test.view",
                               res.cursor.ns,
                               "expected view namespace in cursor: " + tojson(res));
@@ -317,7 +317,7 @@
                     cursor: {batchSize: 2}
                 };
                 let res = conn.runCommand(aggCmd);
-                assert.commandWorked(res, aggCmd);
+                assert.commandWorked(res, tojson(aggCmd));
                 let cursor = res.cursor;
                 assert.eq(
                     cursor.ns, "test.view", "expected view namespace in cursor: " + tojson(cursor));
@@ -328,7 +328,7 @@
                 // Then check correct execution of the killCursors command.
                 let killCursorsCmd = {killCursors: "view", cursors: [cursor.id]};
                 res = conn.runCommand(killCursorsCmd);
-                assert.commandWorked(res, killCursorsCmd);
+                assert.commandWorked(res, tojson(killCursorsCmd));
                 let expectedRes = {
                     cursorsKilled: [cursor.id],
                     cursorsNotFound: [],

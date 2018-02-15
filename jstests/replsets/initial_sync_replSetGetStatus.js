@@ -44,8 +44,8 @@
     assert(res.initialSyncStatus,
            "Response should have an 'initialSyncStatus' field: " + tojson(res));
 
-    assert.commandFailed(secondary.adminCommand({replSetGetStatus: 1, initialSync: "t"}),
-                         ErrorCodes.TypeMismatch);
+    assert.commandFailedWithCode(secondary.adminCommand({replSetGetStatus: 1, initialSync: "t"}),
+                                 ErrorCodes.TypeMismatch);
 
     assert.writeOK(coll.insert({a: 3}));
     assert.writeOK(coll.insert({a: 4}));

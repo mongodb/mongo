@@ -115,7 +115,7 @@
     res = assert.throws(function() {
         bulk.execute();
     });
-    assert.eq(1, res.getWriteErrors().length, res);
+    assert.eq(1, res.getWriteErrors().length, () => tojson(res));
 
     gle = db.runCommand({getLastError: 1, w: 0});
     assert(gle.ok, tojson(gle));

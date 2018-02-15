@@ -30,7 +30,7 @@
     assert.soon(function() {
         master = replTest.getPrimary();
         return master === conns[0];
-    }, replTest.kDefaultTimeoutMS, "node 0 did not become primary quickly enough");
+    }, "node 0 should become primary before timeout", replTest.kDefaultTimeoutMS);
 
     replTest.awaitReplication();
     jsTestLog("Checking that ops still replicate correctly");

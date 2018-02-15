@@ -108,10 +108,9 @@ doTest = function(signal) {
         sleep(1000);
     }
 
-    // the node should have the document in 15 seconds (20 for some safety against races)
     assert.soon(function() {
         return conn.getDB(name).foo.findOne({_id: 124}) != null;
-    }, 10 * 1000);
+    }, "findOne should complete within default timeout");
 
     replTest.stopSet();
 };

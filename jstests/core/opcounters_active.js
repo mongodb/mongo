@@ -19,15 +19,15 @@
 
     // Test that the serverstatus helper works
     var result = db.serverStatus();
-    assert.neq(undefined, result, result);
+    assert.neq(undefined, result, tojson(result));
     // Test that the metrics tree returns
-    assert.neq(undefined, result.metrics, result);
+    assert.neq(undefined, result.metrics, tojson(result));
     // Test that the metrics.commands tree returns
-    assert.neq(undefined, result.metrics.commands, result);
+    assert.neq(undefined, result.metrics.commands, tojson(result));
     // Test that the metrics.commands.serverStatus value is non-zero
-    assert.neq(0, result.metrics.commands.serverStatus.total, result);
+    assert.neq(0, result.metrics.commands.serverStatus.total, tojson(result));
 
     // Test that the command returns successfully when no metrics tree is present
     var result = db.serverStatus({"metrics": 0});
-    assert.eq(undefined, result.metrics, result);
+    assert.eq(undefined, result.metrics, tojson(result));
 }());

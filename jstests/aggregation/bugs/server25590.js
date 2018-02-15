@@ -8,12 +8,12 @@
 
     assert.writeOK(coll.insert({}));
 
-    assert.commandFailed(db.runCommand({aggregate: coll.getName(), pipeline: 1}),
-                         ErrorCodes.TypeMismatch);
-    assert.commandFailed(db.runCommand({aggregate: coll.getName(), pipeline: {}}),
-                         ErrorCodes.TypeMismatch);
-    assert.commandFailed(db.runCommand({aggregate: coll.getName(), pipeline: [1, 2]}),
-                         ErrorCodes.TypeMismatch);
-    assert.commandFailed(db.runCommand({aggregate: coll.getName(), pipeline: [1, null]}),
-                         ErrorCodes.TypeMismatch);
+    assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: 1}),
+                                 ErrorCodes.TypeMismatch);
+    assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: {}}),
+                                 ErrorCodes.TypeMismatch);
+    assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: [1, 2]}),
+                                 ErrorCodes.TypeMismatch);
+    assert.commandFailedWithCode(db.runCommand({aggregate: coll.getName(), pipeline: [1, null]}),
+                                 ErrorCodes.TypeMismatch);
 })();

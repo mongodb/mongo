@@ -46,8 +46,8 @@
             if (list[i].role == role.role && list[i].db == role.db)
                 return;
         }
-        doassert("Could not find value " + tojson(val) + " in " +
-                 tojson(list)(msg ? ": " + msg : ""));
+        doassert("Could not find value " + tojson(val) + " in " + tojson(list) +
+                 (msg ? ": " + msg : ""));
     }
 
     //
@@ -105,10 +105,10 @@
     // Verify that both members of the set see the same role graph.
     rstest.nodes.forEach(function(node) {
         var role = node.getDB("db1").getRole("r3");
-        assert.eq(2, role.roles.length, node);
+        assert.eq(2, role.roles.length, tojson(node));
         assertListContainsRole(role.roles, {role: "r1", db: "db1"}, node);
         assertListContainsRole(role.roles, {role: "r2", db: "db1"}, node);
-        assert.eq(3, role.inheritedRoles.length, node);
+        assert.eq(3, role.inheritedRoles.length, tojson(node));
         assertListContainsRole(role.inheritedRoles, {role: "r1", db: "db1"}, node);
         assertListContainsRole(role.inheritedRoles, {role: "r2", db: "db1"}, node);
         assertListContainsRole(role.inheritedRoles, {role: "read", db: "db1"}, node);
@@ -119,7 +119,7 @@
     rstest.getPrimary().getDB("db1").grantRolesToRole("r1", ["dbAdmin"], {w: 2});
     rstest.nodes.forEach(function(node) {
         var role = node.getDB("db1").getRole("r1");
-        assert.eq(1, role.roles.length, node);
+        assert.eq(1, role.roles.length, tojson(node));
         assertListContainsRole(role.roles, {role: "dbAdmin", db: "db1"});
     });
 
@@ -128,9 +128,9 @@
     rstest.nodes.forEach(function(node) {
         assert.eq(null, node.getDB("db1").getRole("r2"));
         var role = node.getDB("db1").getRole("r3");
-        assert.eq(1, role.roles.length, node);
+        assert.eq(1, role.roles.length, tojson(node));
         assertListContainsRole(role.roles, {role: "r1", db: "db1"}, node);
-        assert.eq(2, role.inheritedRoles.length, node);
+        assert.eq(2, role.inheritedRoles.length, tojson(node));
         assertListContainsRole(role.inheritedRoles, {role: "r1", db: "db1"}, node);
         assertListContainsRole(role.inheritedRoles, {role: "dbAdmin", db: "db1"}, node);
     });
@@ -200,11 +200,11 @@
     assert.commandWorked(rstest.getPrimary().getDB("admin").getLastErrorObj(2));
     rstest.nodes.forEach(function(node) {
         var role = node.getDB("db1").getRole("t1");
-        assert.eq(1, role.roles.length, node);
+        assert.eq(1, role.roles.length, tojson(node));
         assertListContainsRole(role.roles, {role: "read", db: "db1"}, node);
 
         var role = node.getDB("db1").getRole("t2");
-        assert.eq(1, role.roles.length, node);
+        assert.eq(1, role.roles.length, tojson(node));
         assertListContainsRole(role.roles, {role: "readWrite", db: "db1"}, node);
     });
 

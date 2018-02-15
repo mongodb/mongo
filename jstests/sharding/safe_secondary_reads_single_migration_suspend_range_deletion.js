@@ -224,12 +224,12 @@
             checkResults: function(res) {
                 assert.commandWorked(res);
                 // Expect the command to return correct results, since it will read orphaned data.
-                assert.eq(1, res.results.length, res);
+                assert.eq(1, res.results.length, tojson(res));
             },
             checkAvailableReadConcernResults: function(res) {
                 assert.commandWorked(res);
                 // Command is unversioned, so 'available' has no additional effect.
-                assert.eq(1, res.results.length, res);
+                assert.eq(1, res.results.length, tojson(res));
             },
             behavior: "unversioned"
         },
