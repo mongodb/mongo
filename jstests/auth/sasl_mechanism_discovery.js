@@ -35,9 +35,8 @@
         // Check that names with compatibility equivalence collide.
         assert.commandWorked(db.runCommand(
             {createUser: IXchar, pwd: "pwd", roles: [], mechanisms: ["SCRAM-SHA-1"]}));
-        assert.commandFailed(db.runCommand({isMaster: 1, saslSupportedMechs: IXuserid}),
-                             ErrorCodes.BadValue,
-                             "Two users exist with names exhibiting compatibility equivalence");
+        assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: IXuserid}),
+                                     ErrorCodes.BadValue);
     }
 
     // Test standalone.
