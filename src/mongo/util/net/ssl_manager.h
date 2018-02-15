@@ -206,5 +206,12 @@ const SSLParams& getSSLGlobalParams();
  * x.509 certificate.  Matches a remote host name to an x.509 host name, including wildcards.
  */
 bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName);
+
+/**
+ * Peeks at a fragment of a client issued TLS handshake packet. Returns a TLS alert
+ * packet if the client has selected a protocol which has been disabled by the server.
+ */
+boost::optional<std::array<std::uint8_t, 7>> checkTLSRequest(ConstDataRange cdr);
+
 }  // namespace mongo
 #endif  // #ifdef MONGO_CONFIG_SSL

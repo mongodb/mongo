@@ -283,6 +283,23 @@ private:
                     false);
             }
 
+            auto tlsAlert = checkTLSRequest(
+                ConstDataRange(asio::buffer_cast<const char*>(buffer), asio::buffer_size(buffer)));
+            if (tlsAlert) {
+                return opportunisticWrite(
+                    sync,
+                    _socket,
+                    asio::buffer(tlsAlert->data(), tlsAlert->size()),
+                    [ this, onComplete = std::move(onComplete) ](const std::error_code& ec,
+                                                                 size_t size) {
+                        return onComplete(
+                            {ErrorCodes::SSLHandshakeFailed,
+                             "SSL handshake failed, as client requested disabled protocol"},
+                            false);
+                    });
+            }
+
+
             _sslSocket.emplace(std::move(_socket), *_tl->_sslContext);
 
             auto handshakeCompleteCb = [ this, onComplete = std::move(onComplete) ](

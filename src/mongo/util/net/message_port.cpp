@@ -126,6 +126,18 @@ bool MessagingPort::recv(Message& m) {
                 uassert(17132,
                         "SSL handshake received but server is started without SSL support",
                         sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled);
+
+                auto tlsAlert = checkTLSRequest(
+                    ConstDataRange(reinterpret_cast<const char*>(&header), sizeof(header)));
+
+                if (tlsAlert) {
+                    _psock->send(reinterpret_cast<const char*>(tlsAlert->data()),
+                                 tlsAlert->size(),
+                                 "tls protocol mismatch");
+                    log() << "SSL handshake failed, as client requested disabled protocol";
+                    return false;
+                }
+
                 setX509PeerInfo(
                     _psock->doSSLHandshake(reinterpret_cast<const char*>(&header), sizeof(header)));
                 LOG(1) << "new ssl connection, SNI server name [" << _psock->getSNIServerName()
