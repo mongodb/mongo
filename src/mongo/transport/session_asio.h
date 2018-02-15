@@ -311,7 +311,13 @@ private:
             if (size > 0) {
                 asyncBuffers += size;
             }
-            asio::async_read(stream, asyncBuffers, std::forward<CompleteHandler>(handler));
+            asio::async_read(stream,
+                             asyncBuffers,
+                             [ size, handler = std::forward<CompleteHandler>(handler) ](
+                                 const std::error_code& ec, size_t asyncSize) mutable {
+                                 // Add back in the size read opportunistically.
+                                 handler(ec, size + asyncSize);
+                             });
         } else {
             handler(ec, size);
         }
@@ -332,7 +338,13 @@ private:
             if (size > 0) {
                 asyncBuffers += size;
             }
-            asio::async_write(stream, asyncBuffers, std::forward<CompleteHandler>(handler));
+            asio::async_write(stream,
+                              asyncBuffers,
+                              [ size, handler = std::forward<CompleteHandler>(handler) ](
+                                  const std::error_code& ec, size_t asyncSize) mutable {
+                                  // Add back in the size written opportunistically.
+                                  handler(ec, size + asyncSize);
+                              });
         } else {
             handler(ec, size);
         }
