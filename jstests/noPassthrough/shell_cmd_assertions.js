@@ -1,3 +1,6 @@
+/**
+ * Tests for the command assertion functions in mongo/shell/assert.js.
+ */
 (function() {
     "use strict";
     const conn = MongoRunner.runMongod();
@@ -17,6 +20,40 @@
         assert.doesNotThrow(() => assert.commandWorkedIgnoringWriteErrors(res));
         assert.throws(() => assert.commandFailed(res));
         assert.throws(() => assert.commandFailedWithCode(res, 0));
+    });
+
+    function _assertMsgFunctionExecution(
+        assertFunc, assertParameter, {expectException: expectException = false} = {}) {
+        var msgFunctionCalled = false;
+        var expectedAssert = assert.doesNotThrow;
+
+        if (expectException) {
+            expectedAssert = assert.throws;
+        }
+
+        expectedAssert(() => {
+            assertFunc(assertParameter, () => {
+                msgFunctionCalled = true;
+            });
+        });
+
+        assert.eq(
+            expectException, msgFunctionCalled, "msg function execution should match assertion");
+    }
+
+    tests.push(function msgFunctionOnlyCalledOnFailure() {
+        const res = db.runCommand({"ping": 1});
+
+        _assertMsgFunctionExecution(assert.commandWorked, res, {expectException: false});
+        _assertMsgFunctionExecution(
+            assert.commandWorkedIgnoringWriteErrors, res, {expectException: false});
+        _assertMsgFunctionExecution(assert.commandFailed, res, {expectException: true});
+
+        var msgFunctionCalled = false;
+        assert.throws(() => assert.commandFailedWithCode(res, 0, () => {
+            msgFunctionCalled = true;
+        }));
+        assert.eq(true, msgFunctionCalled, "msg function execution should match assertion");
     });
 
     tests.push(function rawCommandErr() {
@@ -252,5 +289,6 @@
         test();
     });
 
+    /* cleanup */
     MongoRunner.stopMongod(conn);
 })();

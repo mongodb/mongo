@@ -71,10 +71,8 @@
                 o = ops();
                 return o.length == 1;
             },
-            {
-              toString: function() {
-                  return tojson(db.currentOp().inprog);
-              }
+            () => {
+                return tojson(db.currentOp().inprog);
             },
             60000);
 
@@ -117,10 +115,8 @@
                 o2 = ops();
                 return o2.length == 1;
             },
-            {
-              toString: function() {
-                  return tojson(db.currentOp().inprog);
-              }
+            () => {
+                return tojson(db.currentOp().inprog);
             },
             60000);
 

@@ -47,13 +47,11 @@ function waitForConnections(expectedCurrentConnections, expectedTotalConnections
             return (expectedCurrentConnections == currentConnInfo.current) &&
                 (expectedTotalConnections, currentConnInfo.totalCreated);
         },
-        {
-          toString: function() {
-              return "Incorrect connection numbers. Expected " + expectedCurrentConnections +
-                  " current connections and " + expectedTotalConnections + " total" +
-                  " connections. Connection info from serverStatus: " +
-                  tojson(db.serverStatus().connections);
-          }
+        () => {
+            return "Incorrect connection numbers. Expected " + expectedCurrentConnections +
+                " current connections and " + expectedTotalConnections + " total" +
+                " connections. Connection info from serverStatus: " +
+                tojson(db.serverStatus().connections);
         },
         5 * 60000);
 }
