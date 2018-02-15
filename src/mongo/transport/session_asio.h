@@ -527,6 +527,17 @@ private:
                            "SSL handshake received but server is started without SSL support"));
             }
 
+            auto tlsAlert = checkTLSRequest(buffer);
+            if (tlsAlert) {
+                return opportunisticWrite(getSocket(),
+                                          asio::buffer(tlsAlert->data(), tlsAlert->size()))
+                    .then([] {
+                        return Future<bool>::makeReady(
+                            Status(ErrorCodes::SSLHandshakeFailed,
+                                   "SSL handshake failed, as client requested disabled protocol"));
+                    });
+            }
+
             _sslSocket.emplace(std::move(_socket), *_tl->_ingressSSLContext, "");
             auto doHandshake = [&] {
                 if (_blockingMode == Sync) {
