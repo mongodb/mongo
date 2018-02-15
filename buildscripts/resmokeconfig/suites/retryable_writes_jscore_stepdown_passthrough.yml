@@ -50,6 +50,12 @@ selector:
   - jstests/core/find1.js
   - jstests/core/sortc.js
 
+  # Assert on the ismaster field of an isMaster response. If a primary steps down after accepting
+  # an isMaster command and returns before its connection is closed, the response can contain
+  # ismaster: false.
+  - jstests/core/dbadmin.js
+  - jstests/core/ismaster.js
+
   - jstests/core/bench_test*.js # benchRun() used for writes
   - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
   - jstests/core/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
