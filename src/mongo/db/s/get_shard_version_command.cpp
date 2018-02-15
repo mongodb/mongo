@@ -99,8 +99,9 @@ public:
 
         ShardedConnectionInfo* const sci = ShardedConnectionInfo::get(opCtx->getClient(), false);
         result.appendBool("inShardedMode", sci != nullptr);
-        if (sci) {
-            result.appendTimestamp("mine", sci->getVersion(nss.ns()).toLong());
+
+        if (sci && sci->getVersion(nss.ns())) {
+            result.appendTimestamp("mine", sci->getVersion(nss.ns())->toLong());
         } else {
             result.appendTimestamp("mine", 0);
         }

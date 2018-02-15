@@ -28,14 +28,15 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <map>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
-struct ChunkVersion;
 class Client;
 class ServiceContext;
 
@@ -51,19 +52,19 @@ public:
     ~ShardedConnectionInfo();
 
     static ShardedConnectionInfo* get(Client* client, bool create);
+    static void reset(Client* client);
 
     /**
      * Returns the shard version associated with the specified namespace on this connection. If no
-     * version is associated with the namespace returns ChunkVersion::UNSHARDED.
+     * version is associated with the namespace returns boost::none.
      */
-    ChunkVersion getVersion(const std::string& ns) const;
+    boost::optional<ChunkVersion> getVersion(const std::string& ns) const;
 
     /**
      * Assigns a new version on the connection to the specified namespace.
      */
     void setVersion(const std::string& ns, const ChunkVersion& version);
 
-    static void reset(Client* client);
     static void addHook(ServiceContext* service);
 
 private:
@@ -72,9 +73,6 @@ private:
     // Map from a namespace string to the chunk version with which this connection has been
     // initialized for the specified namespace
     NSVersionMap _versions;
-
-    // If this is true, then chunk versions aren't checked, and all operations are allowed
-    bool _forceVersionOk;
 };
 
 

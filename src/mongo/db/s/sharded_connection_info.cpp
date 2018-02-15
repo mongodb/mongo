@@ -32,18 +32,12 @@
 
 #include "mongo/db/s/sharded_connection_info.h"
 
-#include <boost/optional.hpp>
-#include <boost/utility/in_place_factory.hpp>
-
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/db/client.h"
 #include "mongo/db/logical_time_metadata_hook.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/s/sharding_egress_metadata_hook_for_mongod.h"
-#include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_connection.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/stdx/memory.h"
@@ -60,9 +54,7 @@ AtomicUInt32 alreadyAddedHook{0};
 
 }  // namespace
 
-ShardedConnectionInfo::ShardedConnectionInfo() {
-    _forceVersionOk = false;
-}
+ShardedConnectionInfo::ShardedConnectionInfo() = default;
 
 ShardedConnectionInfo::~ShardedConnectionInfo() = default;
 
@@ -71,7 +63,7 @@ ShardedConnectionInfo* ShardedConnectionInfo::get(Client* client, bool create) {
 
     if (!current && create) {
         LOG(1) << "entering shard mode for connection";
-        current = boost::in_place();
+        current.emplace();
     }
 
     return current ? &current.value() : nullptr;
@@ -81,12 +73,12 @@ void ShardedConnectionInfo::reset(Client* client) {
     clientSCI(client) = boost::none;
 }
 
-ChunkVersion ShardedConnectionInfo::getVersion(const std::string& ns) const {
+boost::optional<ChunkVersion> ShardedConnectionInfo::getVersion(const std::string& ns) const {
     NSVersionMap::const_iterator it = _versions.find(ns);
     if (it != _versions.end()) {
         return it->second;
     } else {
-        return ChunkVersion::UNSHARDED();
+        return boost::none;
     }
 }
 

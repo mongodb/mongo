@@ -366,7 +366,6 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
                                                    ChunkVersion* expectedShardVersion,
                                                    ChunkVersion* actualShardVersion) {
     auto* const client = opCtx->getClient();
-
     auto& oss = OperationShardingState::get(opCtx);
 
     // If there is a version attached to the OperationContext, use it as the received version.
@@ -382,7 +381,12 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
             return true;
         }
 
-        *expectedShardVersion = info->getVersion(_nss.ns());
+        auto connectionExpectedShardVersion = info->getVersion(_nss.ns());
+        if (!connectionExpectedShardVersion) {
+            *expectedShardVersion = ChunkVersion::UNSHARDED();
+        } else {
+            *expectedShardVersion = std::move(*connectionExpectedShardVersion);
+        }
     }
 
     // An operation with read concern 'available' should never have shardVersion set.
