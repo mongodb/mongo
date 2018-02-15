@@ -66,7 +66,13 @@ class stream :
 {
 public:
   /// The native handle type of the SSL stream.
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+  typedef PCtxtHandle native_handle_type;
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
   typedef SSL* native_handle_type;
+#else
+#error "Unknown SSL Provider"
+#endif
 
   /// The type of the next layer.
   typedef typename remove_reference<Stream>::type next_layer_type;

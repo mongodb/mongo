@@ -35,7 +35,9 @@
 #include "mongo/util/assert_util.h"
 
 #ifdef MONGO_CONFIG_SSL
+#if MONGO_CONFIG_SSL_PROVIDER != SSL_PROVIDER_WINDOWS
 #error This file should not be included if compiling with SSL support
+#endif
 #endif
 
 #include "tomcrypt.h"

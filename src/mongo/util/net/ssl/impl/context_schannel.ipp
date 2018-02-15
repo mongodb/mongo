@@ -26,15 +26,53 @@
  * then also delete it in the license file.
  */
 
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+#pragma once
 
-#include "mongo/util/net/ssl/detail/engine_schannel.hpp"
+#include "asio/detail/config.hpp"
 
-#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+#include <cstring>
+#include "asio/detail/throw_error.hpp"
+#include "asio/error.hpp"
+#include "mongo/util/net/ssl/context.hpp"
+#include "mongo/util/net/ssl/error.hpp"
 
-#include "mongo/util/net/ssl/detail/engine_openssl.hpp"
+#include "asio/detail/push_options.hpp"
 
-#else
-#error "Unknown SSL Provider"
-#endif
+namespace asio {
+namespace ssl {
 
+
+context::context(context::method m)
+    : handle_(0)
+{
+}
+
+#if defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
+context::context(context&& other)
+{
+    handle_ = other.handle_;
+    other.handle_ = 0;
+}
+
+context& context::operator=(context&& other)
+{
+    context tmp(ASIO_MOVE_CAST(context)(*this));
+    handle_ = other.handle_;
+    other.handle_ = 0;
+    return *this;
+}
+#endif // defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
+
+context::~context()
+{
+}
+
+context::native_handle_type context::native_handle()
+{
+    return handle_;
+}
+
+} // namespace ssl
+} // namespace asio
+
+#include "asio/detail/pop_options.hpp"

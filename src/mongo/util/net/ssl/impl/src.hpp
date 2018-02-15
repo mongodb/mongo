@@ -19,8 +19,23 @@
 # error Do not compile Asio library source with ASIO_HEADER_ONLY defined
 #endif
 
-#include "mongo/util/net/ssl/impl/context.ipp"
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+
+#include "mongo/util/net/ssl/impl/context_schannel.ipp"
 #include "mongo/util/net/ssl/impl/error.ipp"
-#include "mongo/util/net/ssl/detail/impl/engine.ipp"
+#include "mongo/util/net/ssl/detail/impl/engine_schannel.ipp"
+
+
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+
+#include "mongo/util/net/ssl/impl/context_openssl.ipp"
+#include "mongo/util/net/ssl/impl/error.ipp"
+#include "mongo/util/net/ssl/detail/impl/engine_openssl.ipp"
+
+#else
+#error "Unknown SSL Provider"
+#endif
+
+
 
 #endif // ASIO_SSL_IMPL_SRC_HPP

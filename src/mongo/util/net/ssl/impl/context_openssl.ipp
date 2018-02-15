@@ -9,8 +9,8 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-#ifndef ASIO_SSL_IMPL_CONTEXT_IPP
-#define ASIO_SSL_IMPL_CONTEXT_IPP
+#ifndef ASIO_SSL_IMPL_CONTEXT_OPENSSL_IPP
+#define ASIO_SSL_IMPL_CONTEXT_OPENSSL_IPP
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1200)
 # pragma once
@@ -328,4 +328,4 @@ context::native_handle_type context::native_handle()
 
 #include "asio/detail/pop_options.hpp"
 
-#endif // ASIO_SSL_IMPL_CONTEXT_IPP
+#endif // ASIO_SSL_IMPL_CONTEXT_OPENSSL_IPP

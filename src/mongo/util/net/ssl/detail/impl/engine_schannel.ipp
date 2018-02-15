@@ -26,15 +26,77 @@
  * then also delete it in the license file.
  */
 
-#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+#pragma once
 
-#include "mongo/util/net/ssl/detail/engine_schannel.hpp"
+#include "asio/detail/config.hpp"
 
-#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
+#include "asio/detail/throw_error.hpp"
+#include "asio/error.hpp"
+#include "mongo/util/net/ssl/detail/engine.hpp"
+#include "mongo/util/net/ssl/error.hpp"
 
-#include "mongo/util/net/ssl/detail/engine_openssl.hpp"
+#include "asio/detail/push_options.hpp"
 
-#else
-#error "Unknown SSL Provider"
-#endif
+namespace asio {
+namespace ssl {
+namespace detail {
 
+engine::engine(SCHANNEL_CRED* context)
+{
+}
+
+engine::~engine()
+{
+}
+
+PCtxtHandle engine::native_handle()
+{
+  return nullptr;
+}
+
+engine::want engine::handshake(
+    stream_base::handshake_type type, asio::error_code& ec)
+{
+  return want::want_nothing;
+}
+
+engine::want engine::shutdown(asio::error_code& ec)
+{
+  return want::want_nothing;
+}
+
+engine::want engine::write(const asio::const_buffer& data,
+    asio::error_code& ec, std::size_t& bytes_transferred)
+{
+  return want::want_nothing;
+}
+
+engine::want engine::read(const asio::mutable_buffer& data,
+    asio::error_code& ec, std::size_t& bytes_transferred)
+{
+  return want::want_nothing;
+}
+
+asio::mutable_buffer engine::get_output(
+    const asio::mutable_buffer& data)
+{
+    return asio::mutable_buffer(nullptr, 0);
+}
+
+asio::const_buffer engine::put_input(
+    const asio::const_buffer& data)
+{
+    return asio::const_buffer(nullptr, 0);
+}
+
+const asio::error_code& engine::map_error_code(
+    asio::error_code& ec) const
+{
+  return ec;
+}
+
+#include "asio/detail/pop_options.hpp"
+
+} // namespace detail
+} // namespace ssl
+} // namespace asio

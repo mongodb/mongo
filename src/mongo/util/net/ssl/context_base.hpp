@@ -16,7 +16,10 @@
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
+
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #include "mongo/util/net/ssl/detail/openssl_types.hpp"
+#endif
 
 #include "asio/detail/push_options.hpp"
 
@@ -98,6 +101,7 @@ public:
   /// Bitmask type for SSL options.
   typedef long options;
 
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #if defined(GENERATING_DOCUMENTATION)
   /// Implement various bug workarounds.
   static const long default_workarounds = implementation_defined;
@@ -143,6 +147,7 @@ public:
 # else // defined(SSL_OP_NO_COMPRESSION)
   ASIO_STATIC_CONSTANT(long, no_compression = 0x20000L);
 # endif // defined(SSL_OP_NO_COMPRESSION)
+#endif
 #endif
 
 protected:

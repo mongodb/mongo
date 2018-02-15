@@ -28,6 +28,10 @@
 
 #pragma once
 
+// List of possible SSL providers
+#define SSL_PROVIDER_OPENSSL 1
+#define SSL_PROVIDER_WINDOWS 2
+
 // Define to target byte order (1234 vs 4321)
 @mongo_config_byte_order@
 
@@ -66,6 +70,9 @@
 
 // Defined if SSL support is enabled
 @mongo_config_ssl@
+
+// Defined if SSL support is enabled with chosen ssl provider
+@mongo_config_ssl_provider@
 
 // Defined if OpenSSL has SEQUENCE_ANY
 @mongo_config_ssl_has_asn1_any_definitions@

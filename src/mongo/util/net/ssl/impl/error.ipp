@@ -32,11 +32,22 @@ public:
     return "asio.ssl";
   }
 
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+  std::string message(int value) const
+  {
+      // TODO: call FormatMessage
+      ASIO_ASSERT(false);
+      return "asio.ssl error";
+  }
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
   std::string message(int value) const
   {
     const char* s = ::ERR_reason_error_string(value);
     return s ? s : "asio.ssl error";
   }
+#else
+#error "Unknown SSL Provider"
+#endif
 };
 
 } // namespace detail

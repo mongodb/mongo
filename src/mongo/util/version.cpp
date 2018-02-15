@@ -34,7 +34,9 @@
 #include "mongo/config.h"
 
 #ifdef MONGO_CONFIG_SSL
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #include <openssl/crypto.h>
+#endif
 #endif
 
 #include <pcrecpp.h>
@@ -145,7 +147,13 @@ void VersionInfoInterface::appendBuildInfo(BSONObjBuilder* result) const {
 
     BSONObjBuilder opensslInfo(result->subobjStart("openssl"));
 #ifdef MONGO_CONFIG_SSL
+#if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
     opensslInfo << "running" << openSSLVersion() << "compiled" << OPENSSL_VERSION_TEXT;
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
+    opensslInfo << "Windows SChannel";
+#else
+#error "Unknown SSL Provider"
+#endif  // MONGO_CONFIG_SSL_PROVIDER
 #else
     opensslInfo << "running"
                 << "disabled"
@@ -168,9 +176,9 @@ void VersionInfoInterface::appendBuildInfo(BSONObjBuilder* result) const {
 }
 
 std::string VersionInfoInterface::openSSLVersion(StringData prefix, StringData suffix) const {
-#ifndef MONGO_CONFIG_SSL
+#if !defined(MONGO_CONFIG_SSL) || MONGO_CONFIG_SSL_PROVIDER != SSL_PROVIDER_OPENSSL
     return "";
-#else
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
     return prefix.toString() + SSLeay_version(SSLEAY_VERSION) + suffix;
 #endif
 }
@@ -182,7 +190,7 @@ void VersionInfoInterface::logTargetMinOS() const {
 void VersionInfoInterface::logBuildInfo() const {
     log() << "git version: " << gitVersion();
 
-#ifdef MONGO_CONFIG_SSL
+#if defined(MONGO_CONFIG_SSL) && MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
     log() << openSSLVersion("OpenSSL version: ");
 #endif
 

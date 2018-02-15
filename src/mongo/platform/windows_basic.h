@@ -95,6 +95,8 @@
 
 #include <sspi.h>
 
+#include <schannel.h>
+
 #undef WIN32_NO_STATUS
 
 // Obtain a definition for the ntstatus type.

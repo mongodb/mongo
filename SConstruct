@@ -1634,6 +1634,7 @@ elif env.TargetOSIs('windows'):
             'version.lib',
             'winmm.lib',
             'ws2_32.lib',
+            'secur32.lib',
         ],
     )
 
@@ -2867,8 +2868,12 @@ def doConfigure(myenv):
 
     if ssl_provider == 'native':
         if conf.env.TargetOSIs('windows'):
-            # TODO: Implement native crypto for windows
-            ssl_provider = 'openssl'
+            ssl_provider = 'windows'
+            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "SSL_PROVIDER_WINDOWS")
+
+            # TODO: Implement native crypto for windows, for now use tom
+            conf.env.Append( MONGO_CRYPTO=["tom"] )
+
         elif conf.env.TargetOSIs('darwin', 'macOS'):
             conf.env.Append( MONGO_CRYPTO=["apple"] )
             if has_option("ssl"):
@@ -2880,6 +2885,8 @@ def doConfigure(myenv):
         if has_option("ssl"):
             checkOpenSSL(conf)
             # Working OpenSSL available, use it.
+            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "SSL_PROVIDER_OPENSSL")
+
             conf.env.Append( MONGO_CRYPTO=["openssl"] )
         else:
             # If we don't need an SSL build, we can get by with TomCrypt.
