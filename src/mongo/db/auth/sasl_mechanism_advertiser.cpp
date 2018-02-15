@@ -57,7 +57,7 @@ User::CredentialData getUserCredentials(OperationContext* opCtx, const std::stri
     AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
     User* rawObj = nullptr;
     User* prepObj = nullptr;
-    auto guard = MakeGuard([authManager, rawObj, prepObj] {
+    auto guard = MakeGuard([authManager, &rawObj, &prepObj] {
         if (prepObj) {
             authManager->releaseUser(prepObj);
         }
