@@ -86,6 +86,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/replication_info',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/startup_warnings_mongod',
+        '$BUILD_DIR/mongo/db/storage/mobile/storage_mobile',
         '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
         '$BUILD_DIR/mongo/util/net/network',
         '$BUILD_DIR/mongo/util/version_impl',

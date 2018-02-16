@@ -10,6 +10,7 @@ env.SConscript(
         'kv',
         'mmap_v1',
         'wiredtiger',
+        'mobile',
     ],
     exports=[
         'env'

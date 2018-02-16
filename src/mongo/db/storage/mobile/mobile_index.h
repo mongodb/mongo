@@ -1,0 +1,196 @@
+/**
+ *    Copyright (C) 2017 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#pragma once
+
+#include <set>
+
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/mobile/mobile_sqlite_statement.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/platform/basic.h"
+
+namespace mongo {
+
+class MobileIndex : public SortedDataInterface {
+public:
+    MobileIndex(OperationContext* opCtx, const IndexDescriptor* desc, const std::string& ident);
+
+    MobileIndex(bool isUnique, const Ordering& ordering, const std::string& ident);
+
+    virtual ~MobileIndex() {}
+
+    Status insert(OperationContext* opCtx,
+                  const BSONObj& key,
+                  const RecordId& recId,
+                  bool dupsAllowed) override;
+
+    void unindex(OperationContext* opCtx,
+                 const BSONObj& key,
+                 const RecordId& recId,
+                 bool dupsAllowed) override;
+
+    void fullValidate(OperationContext* opCtx,
+                      long long* numKeysOut,
+                      ValidateResults* fullResults) const override;
+
+    bool appendCustomStats(OperationContext* opCtx,
+                           BSONObjBuilder* output,
+                           double scale) const override;
+
+    long long getSpaceUsedBytes(OperationContext* opCtx) const override;
+
+    long long numEntries(OperationContext* opCtx) const override;
+
+    bool isEmpty(OperationContext* opCtx) override;
+
+    Status initAsEmpty(OperationContext* opCtx) override;
+
+    Status dupKeyCheck(OperationContext* opCtx, const BSONObj& key, const RecordId& recId) override;
+
+    // Beginning of MobileIndex-specific methods
+
+    /**
+     * Creates a SQLite table suitable for a new Mobile index.
+     */
+    static Status create(OperationContext* opCtx, const std::string& ident);
+
+    /**
+     * Performs the insert into the table with the given key and value.
+     */
+    template <typename ValueType>
+    Status doInsert(OperationContext* opCtx,
+                    const KeyString& key,
+                    const ValueType& value,
+                    bool isTransactional = true);
+
+    Ordering getOrdering() const {
+        return _ordering;
+    }
+
+    KeyString::Version getKeyStringVersion() const {
+        return _keyStringVersion;
+    }
+
+    bool isUnique() {
+        return _isUnique;
+    }
+
+    std::string getIdent() const {
+        return _ident;
+    }
+
+protected:
+    bool _isDup(OperationContext* opCtx, const BSONObj& key, RecordId recId);
+
+    Status _dupKeyError(const BSONObj& key);
+
+    /**
+     * Checks if key size is too long.
+     */
+    static Status _checkKeySize(const BSONObj& key);
+
+    /**
+     * Performs the deletion from the table matching the given key.
+     */
+    void _doDelete(OperationContext* opCtx, const KeyString& key, KeyString* value = nullptr);
+
+    virtual Status _insert(OperationContext* opCtx,
+                           const BSONObj& key,
+                           const RecordId& recId,
+                           bool dupsAllowed) = 0;
+
+    virtual void _unindex(OperationContext* opCtx,
+                          const BSONObj& key,
+                          const RecordId& recId,
+                          bool dupsAllowed) = 0;
+
+    class BulkBuilderBase;
+    class BulkBuilderStandard;
+    class BulkBuilderUnique;
+
+    const bool _isUnique;
+    const Ordering _ordering;
+    const KeyString::Version _keyStringVersion = KeyString::kLatestVersion;
+    const std::string _ident;
+};
+
+class MobileIndexStandard final : public MobileIndex {
+public:
+    MobileIndexStandard(OperationContext* opCtx,
+                        const IndexDescriptor* desc,
+                        const std::string& ident);
+
+    MobileIndexStandard(const Ordering& ordering, const std::string& ident);
+
+    SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) override;
+
+    std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
+                                                           bool isForward) const override;
+
+protected:
+    Status _insert(OperationContext* opCtx,
+                   const BSONObj& key,
+                   const RecordId& recId,
+                   bool dupsAllowed) override;
+
+    void _unindex(OperationContext* opCtx,
+                  const BSONObj& key,
+                  const RecordId& recId,
+                  bool dupsAllowed) override;
+};
+
+class MobileIndexUnique final : public MobileIndex {
+public:
+    MobileIndexUnique(OperationContext* opCtx,
+                      const IndexDescriptor* desc,
+                      const std::string& ident);
+
+    MobileIndexUnique(const Ordering& ordering, const std::string& ident);
+
+    SortedDataBuilderInterface* getBulkBuilder(OperationContext* opCtx, bool dupsAllowed) override;
+
+    std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
+                                                           bool isForward) const override;
+
+protected:
+    Status _insert(OperationContext* opCtx,
+                   const BSONObj& key,
+                   const RecordId& recId,
+                   bool dupsAllowed) override;
+
+    void _unindex(OperationContext* opCtx,
+                  const BSONObj& key,
+                  const RecordId& recId,
+                  bool dupsAllowed) override;
+
+    const bool _isPartial = false;
+};
+}  // namespace mongo

@@ -149,6 +149,7 @@ add_option('ssl-provider',
 
 add_option('mmapv1',
     choices=['auto', 'on', 'off'],
+    const='on',
     default='auto',
     help='Enable MMapV1',
     nargs='?',
@@ -164,6 +165,15 @@ add_option('wiredtiger',
     type='choice',
 )
 
+add_option('mobile-se',
+    choices=['on', 'off'],
+    const='on',
+    default='off',
+    help='Enable Mobile Storage Engine',
+    nargs='?',
+    type='choice',
+)
+
 js_engine_choices = ['mozjs', 'none']
 add_option('js-engine',
     choices=js_engine_choices,
@@ -174,7 +184,6 @@ add_option('js-engine',
 
 add_option('server-js',
     choices=['on', 'off'],
-    const='on',
     default='on',
     help='Build mongod without JavaScript support',
     type='choice',
@@ -313,6 +322,11 @@ add_option('use-system-google-benchmark',
 
 add_option('use-system-zlib',
     help='use system version of zlib library',
+    nargs=0,
+)
+
+add_option('use-system-sqlite',
+    help='use system version of sqlite library',
     nargs=0,
 )
 
@@ -1733,6 +1747,10 @@ if get_option('wiredtiger') == 'on':
         wiredtiger = True
         env.SetConfigHeaderDefine("MONGO_CONFIG_WIREDTIGER_ENABLED")
 
+mobile_se = False
+if get_option('mobile-se') == 'on':
+    mobile_se = True
+
 if env['TARGET_ARCH'] == 'i386':
     # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',
     # and the tuning to 'generic'. The choice of 'nocona' is selected because it
@@ -2936,6 +2954,11 @@ def doConfigure(myenv):
             myenv.ConfError("Cannot find wiredtiger headers")
         conf.FindSysLibDep("wiredtiger", ["wiredtiger"])
 
+    if use_system_version_of_library("sqlite"):
+        if not conf.CheckCXXHeader( "sqlite3.h" ):
+            myenv.ConfError("Cannot find sqlite headers")
+        conf.FindSysLibDep("sqlite", ["sqlite3"])
+
     conf.env.Append(
         CPPDEFINES=[
             "BOOST_SYSTEM_NO_DEPRECATED",
@@ -3249,6 +3272,7 @@ Export('module_sconscripts')
 Export("debugBuild optBuild")
 Export("wiredtiger")
 Export("mmapv1")
+Export("mobile_se")
 Export("endian")
 Export("ssl_provider")
 

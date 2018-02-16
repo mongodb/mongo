@@ -1,0 +1,87 @@
+Import("env")
+Import("mobile_se")
+env = env.Clone()
+
+
+env.InjectThirdPartyIncludePaths(libraries=['sqlite'])
+
+env.Library(
+    target='storage_mobile_core',
+    source=[
+        'mobile_index.cpp',
+        'mobile_kv_engine.cpp',
+        'mobile_record_store.cpp',
+        'mobile_recovery_unit.cpp',
+        'mobile_session.cpp',
+        'mobile_session_pool.cpp',
+        'mobile_sqlite_statement.cpp',
+        'mobile_util.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+        '$BUILD_DIR/mongo/db/storage/journal_listener',
+        '$BUILD_DIR/mongo/db/storage/key_string',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_prefix',
+        '$BUILD_DIR/mongo/db/storage/oplog_hack',
+        '$BUILD_DIR/third_party/shim_sqlite',
+        ]
+    )
+
+serveronlyLibDepsDependents = []
+if mobile_se:
+    serveronlyLibDepsDependents = ['$BUILD_DIR/mongo/mongodmain']
+
+env.Library(
+    target='storage_mobile',
+    source=[
+        'mobile_init.cpp',
+        ],
+    LIBDEPS_DEPENDENTS=serveronlyLibDepsDependents,
+    LIBDEPS=[
+        'storage_mobile_core',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
+        ]   
+    )  
+'''
+env.CppUnitTest(
+    target='storage_mobile_index_test',
+    source=[
+        'mobile_index_test.cpp'
+    ],
+    LIBDEPS=[
+        'storage_mobile_core',
+        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
+        ]
+    )
+'''
+
+env.CppUnitTest(
+    target='storage_mobile_record_store_test',
+    source=[
+        'mobile_record_store_test.cpp'
+    ],
+    LIBDEPS=[
+        'storage_mobile_core',
+        '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+    ]
+)
+
+env.CppUnitTest(
+    target='storage_mobile_kv_engine_test',
+    source=[
+        'mobile_kv_engine_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
+        'storage_mobile_core',
+    ]
+)
