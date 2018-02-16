@@ -184,46 +184,47 @@ private:
 
         auto headerBuffer = SharedBuffer::allocate(kHeaderSize);
         auto ptr = headerBuffer.get();
-        read(sync,
-             asio::buffer(ptr, kHeaderSize),
-             [ cb = std::forward<Callback>(cb), headerBuffer = std::move(headerBuffer), this ](
-                 const std::error_code& ec, size_t size) mutable {
+        read(
+            sync,
+            asio::buffer(ptr, kHeaderSize),
+            [ sync, cb = std::forward<Callback>(cb), headerBuffer = std::move(headerBuffer), this ](
+                const std::error_code& ec, size_t size) mutable {
 
-                 if (ec)
-                     return cb(errorCodeToStatus(ec));
-                 invariant(size == kHeaderSize);
+                if (ec)
+                    return cb(errorCodeToStatus(ec));
+                invariant(size == kHeaderSize);
 
-                 const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
-                 if (msgLen < kHeaderSize || msgLen > MaxMessageSizeBytes) {
-                     StringBuilder sb;
-                     sb << "recv(): message msgLen " << msgLen << " is invalid. "
-                        << "Min " << kHeaderSize << " Max: " << MaxMessageSizeBytes;
-                     const auto str = sb.str();
-                     LOG(0) << str;
+                const auto msgLen = size_t(MSGHEADER::View(headerBuffer.get()).getMessageLength());
+                if (msgLen < kHeaderSize || msgLen > MaxMessageSizeBytes) {
+                    StringBuilder sb;
+                    sb << "recv(): message msgLen " << msgLen << " is invalid. "
+                       << "Min " << kHeaderSize << " Max: " << MaxMessageSizeBytes;
+                    const auto str = sb.str();
+                    LOG(0) << str;
 
-                     return cb(Status(ErrorCodes::ProtocolError, str));
-                 }
+                    return cb(Status(ErrorCodes::ProtocolError, str));
+                }
 
-                 if (msgLen == size) {
-                     // This probably isn't a real case since all (current) messages have bodies.
-                     networkCounter.hitPhysicalIn(msgLen);
-                     return cb(Message(std::move(headerBuffer)));
-                 }
+                if (msgLen == size) {
+                    // This probably isn't a real case since all (current) messages have bodies.
+                    networkCounter.hitPhysicalIn(msgLen);
+                    return cb(Message(std::move(headerBuffer)));
+                }
 
-                 auto buffer = SharedBuffer::allocate(msgLen);
-                 memcpy(buffer.get(), headerBuffer.get(), kHeaderSize);
+                auto buffer = SharedBuffer::allocate(msgLen);
+                memcpy(buffer.get(), headerBuffer.get(), kHeaderSize);
 
-                 MsgData::View msgView(buffer.get());
-                 read(true,
-                      asio::buffer(msgView.data(), msgView.dataLen()),
-                      [ cb = std::move(cb), buffer = std::move(buffer), msgLen, this ](
-                          const std::error_code& ec, size_t size) mutable {
-                          if (ec)
-                              return cb(errorCodeToStatus(ec));
-                          networkCounter.hitPhysicalIn(msgLen);
-                          return cb(Message(std::move(buffer)));
-                      });
-             });
+                MsgData::View msgView(buffer.get());
+                read(sync,
+                     asio::buffer(msgView.data(), msgView.dataLen()),
+                     [ cb = std::move(cb), buffer = std::move(buffer), msgLen, this ](
+                         const std::error_code& ec, size_t size) mutable {
+                         if (ec)
+                             return cb(errorCodeToStatus(ec));
+                         networkCounter.hitPhysicalIn(msgLen);
+                         return cb(Message(std::move(buffer)));
+                     });
+            });
     }
 
 
