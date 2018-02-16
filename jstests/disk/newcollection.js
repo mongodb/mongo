@@ -36,3 +36,4 @@ for (var pass = 0; pass <= 1; pass++) {
 
     t.drop();
 }
+MongoRunner.stopMongod(m);

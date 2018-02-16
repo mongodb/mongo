@@ -8,6 +8,7 @@
         {"nodes": 1, "nodeOptions": {"enableMajorityReadConcern": ""}, "protocolVersion": 0});
     if (!startSetIfSupportsReadMajority(replTest)) {
         jsTest.log("skipping test since storage engine doesn't support committed reads");
+        replTest.stopSet();
         return;
     }
     replTest.initiate();

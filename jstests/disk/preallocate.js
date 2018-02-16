@@ -47,3 +47,5 @@ m.getDB(baseName).createCollection(baseName + "2");
 sleep(2000);  // give prealloc a chance
 
 assert.eq(size, getTotalNonLocalNonAdminSize());
+
+MongoRunner.stopMongod(m);

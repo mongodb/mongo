@@ -63,6 +63,7 @@
 
     if (!startSetIfSupportsReadMajority(rst)) {
         jsTest.log("skipping test since storage engine doesn't support committed reads");
+        rst.stopSet();
         return;
     }
     rst.initiate();

@@ -78,5 +78,6 @@
 
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "3.6"}));
     assertDbVersionNotAssigned(st.s, dbName);
+    st.stop();
 
 })();

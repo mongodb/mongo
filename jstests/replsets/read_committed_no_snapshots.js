@@ -17,6 +17,7 @@ load("jstests/replsets/rslib.js");  // For reconfig and startSetIfSupportsReadMa
 
     if (!startSetIfSupportsReadMajority(replTest)) {
         jsTest.log("skipping test since storage engine doesn't support committed reads");
+        replTest.stopSet();
         return;
     }
 

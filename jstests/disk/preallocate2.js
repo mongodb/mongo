@@ -17,3 +17,5 @@ if (m.getDB(baseName).serverBits() < 64)
 assert.soon(function() {
     return m.getDBs().totalSize > expectedMB * 1000000;
 }, "\n\n\nFAIL preallocate.js expected second file to bring total size over " + expectedMB + "MB");
+
+MongoRunner.stopMongod(m);

@@ -58,5 +58,6 @@
     assert(deltaLarge / deltaSmall >= 5,
            `Expected totalMillis to reflect a difference of at least 5x. 
            Recorded deltas: {small: ${deltaSmall}ms, large: ${deltaLarge}ms}.`);
+    rst.stopSet();
 
 })();

@@ -115,4 +115,5 @@
     };
 
     runPinnedCursorKillTest(testParameters);
+    MongoRunner.stopMongod(conn);
 })();

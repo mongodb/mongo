@@ -51,3 +51,5 @@ assert.writeOK(c3.insert({}));
 assert.eq(1, c3.count());
 
 checkDb2DirAbsent();
+
+MongoRunner.stopMongod(m);

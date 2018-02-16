@@ -157,6 +157,7 @@ var ApplyOpsConcurrentNonAtomicTest = function(options) {
             !supportsDocumentLevelConcurrency(adminDb)) {
             testLog('Skipping test because storage engine does not support document level ' +
                     'concurrency.');
+            replTest.stopSet();
             return;
         }
 

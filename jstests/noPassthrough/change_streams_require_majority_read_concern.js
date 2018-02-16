@@ -7,6 +7,7 @@
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
     if (!startSetIfSupportsReadMajority(rst)) {
         jsTestLog("Skipping test since storage engine doesn't support majority read concern.");
+        rst.stopSet();
         return;
     }
     rst.initiate();

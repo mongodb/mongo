@@ -63,3 +63,4 @@ m = MongoRunner.runMongod({
 });
 db = m.getDB(baseName);
 check();
+MongoRunner.stopMongod(m);
