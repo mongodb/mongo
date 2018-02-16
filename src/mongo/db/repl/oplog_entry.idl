@@ -71,6 +71,12 @@ structs:
                 type: object
                 optional: true
                 description: "Additional information about the operation applied"
+            b:
+                cpp_name: upsert
+                type: bool
+                optional: true
+                description: "If true, treats this update operation as an upsert.
+                              Added for backwards compatibility with updates from 3.6 and before."
 
     OplogEntryBase:
         description: A document in which the server stores an oplog entry.

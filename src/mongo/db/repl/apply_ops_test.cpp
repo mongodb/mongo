@@ -412,16 +412,33 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
                     << "o"
                     << BSON("_id" << 2));
 
+    NamespaceString ns3("test.c");
+    auto ui3 = UUID::gen();
+    auto op3 = BSON("op"
+                    << "u"
+                    << "ns"
+                    << ns3.ns()
+                    << "ui"
+                    << ui3
+                    << "b"
+                    << true
+                    << "o"
+                    << BSON("x" << 1)
+                    << "o2"
+                    << BSON("_id" << 3));
+
     auto oplogEntry =
-        makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSON_ARRAY(op1 << op2)));
+        makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSON_ARRAY(op1 << op2 << op3)));
 
     auto operations = ApplyOps::extractOperations(oplogEntry);
-    ASSERT_EQUALS(2U, operations.size()) << "Unexpected number of operations extracted: "
+    ASSERT_EQUALS(3U, operations.size()) << "Unexpected number of operations extracted: "
                                          << oplogEntry.toBSON();
 
     // Check extracted CRUD operations.
+    auto it = operations.cbegin();
     {
-        const auto operation1 = operations.front();
+        ASSERT(operations.cend() != it);
+        const auto& operation1 = *(it++);
         ASSERT(OpTypeEnum::kInsert == operation1.getOpType()) << "Unexpected op type: "
                                                               << operation1.toBSON();
         ASSERT_EQUALS(ui1, *operation1.getUuid());
@@ -433,7 +450,8 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
     }
 
     {
-        const auto operation2 = operations.back();
+        ASSERT(operations.cend() != it);
+        const auto& operation2 = *(it++);
         ASSERT(OpTypeEnum::kInsert == operation2.getOpType()) << "Unexpected op type: "
                                                               << operation2.toBSON();
         ASSERT_EQUALS(ui2, *operation2.getUuid());
@@ -443,6 +461,25 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
         // OpTime of CRUD operation should match applyOps.
         ASSERT_EQUALS(oplogEntry.getOpTime(), operation2.getOpTime());
     }
+
+    {
+        ASSERT(operations.cend() != it);
+        const auto& operation3 = *(it++);
+        ASSERT(OpTypeEnum::kUpdate == operation3.getOpType()) << "Unexpected op type: "
+                                                              << operation3.toBSON();
+        ASSERT_EQUALS(ui3, *operation3.getUuid());
+        ASSERT_EQUALS(ns3, operation3.getNamespace());
+        ASSERT_BSONOBJ_EQ(BSON("_id" << 3), operation3.getOperationToApply());
+
+        auto optionalUpsertBool = operation3.getUpsert();
+        ASSERT(optionalUpsertBool);
+        ASSERT(*optionalUpsertBool);
+
+        // OpTime of CRUD operation should match applyOps.
+        ASSERT_EQUALS(oplogEntry.getOpTime(), operation3.getOpTime());
+    }
+
+    ASSERT(operations.cend() == it);
 }
 
 TEST_F(ApplyOpsTest, ApplyOpsFailsToDropAdmin) {
