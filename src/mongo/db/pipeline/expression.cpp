@@ -467,6 +467,7 @@ const char* ExpressionArray::getOpName() const {
 /* ------------------------- ExpressionArrayElemAt -------------------------- */
 
 Value ExpressionArrayElemAt::evaluate(const Document& root) const {
+
     const Value indexArg = vpOperand[1]->evaluate(root);
     long long i = indexArg.coerceToLong();
 
@@ -500,13 +501,11 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
             array.isArray());
     uassert(28690,
             str::stream() << getOpName() << "'s second argument must be a numeric value,"
-                          << " but is "
-                          << typeName(indexArg.getType()),
+                          << " but is " << typeName(indexArg.getType()),
             indexArg.numeric());
     uassert(28691,
             str::stream() << getOpName() << "'s second argument must be representable as"
-                          << " a 32-bit integer: "
-                          << indexArg.coerceToDouble(),
+                          << " a 32-bit integer: " << indexArg.coerceToDouble(),
             indexArg.integral());
 
     
@@ -2094,6 +2093,7 @@ Value ExpressionFilter::computeNthFilteredValue(const Document& root, long n) co
             }
         }
     }
+
 
     return Value(std::move(output));
 }
