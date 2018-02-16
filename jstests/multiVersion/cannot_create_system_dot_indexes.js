@@ -2,6 +2,13 @@
 // lower-version node.
 (function() {
 
+    // This test should not be run on mmapv1 because the 'system.indexes' collection exists on that
+    // storage engine.
+    const isMMAPv1 = jsTest.options().storageEngine === "mmapv1";
+    if (isMMAPv1) {
+        return;
+    }
+
     const latest = "latest";
     const downgrade = "3.6";
     const downgradeFCV = "3.6";
