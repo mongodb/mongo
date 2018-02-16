@@ -2034,7 +2034,6 @@ Value ExpressionFilter::evaluate(const Document& root) const {
     int count = 0;
     for (const auto& elem : input) {
         vars.setValue(_varId, elem);
-        std::cout << "\n\n\n\n count: " << count << "\n\n\n\n";
         if (_filter->evaluate(root).coerceToBool()) {
             output.push_back(std::move(elem));
         }
