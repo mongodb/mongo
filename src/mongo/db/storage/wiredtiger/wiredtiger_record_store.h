@@ -253,10 +253,6 @@ public:
 
     int64_t cappedDeleteAsNeeded_inlock(OperationContext* opCtx, const RecordId& justInserted);
 
-    stdx::timed_mutex& cappedDeleterMutex() {
-        return _cappedDeleterMutex;
-    }
-
     // Returns false if the oplog was dropped while waiting for a deletion request.
     bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx);
 
@@ -316,7 +312,7 @@ private:
     AtomicInt64 _cappedSleepMS;
     CappedCallback* _cappedCallback;
     bool _shuttingDown;
-    stdx::mutex _cappedCallbackMutex;  // guards _cappedCallback and _shuttingDown
+    mutable stdx::mutex _cappedCallbackMutex;  // guards _cappedCallback and _shuttingDown
 
     // See comment in ::cappedDeleteAsNeeded
     int _cappedDeleteCheckCount;

@@ -657,7 +657,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
 
 WiredTigerRecordStore::~WiredTigerRecordStore() {
     {
-        stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
+        stdx::lock_guard<stdx::mutex> lk(_cappedCallbackMutex);
         _shuttingDown = true;
     }
 
@@ -725,7 +725,7 @@ const char* WiredTigerRecordStore::name() const {
 }
 
 bool WiredTigerRecordStore::inShutdown() const {
-    stdx::lock_guard<stdx::timed_mutex> lk(_cappedDeleterMutex);
+    stdx::lock_guard<stdx::mutex> lk(_cappedCallbackMutex);
     return _shuttingDown;
 }
 
