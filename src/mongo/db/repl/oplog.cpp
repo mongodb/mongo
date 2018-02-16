@@ -1445,7 +1445,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
             }
 
             if (opType[1] == 0) {
-                deleteObjects(opCtx, collection, requestNss, deleteCriteria, /*justOne*/ valueB);
+                const auto justOne = true;
+                deleteObjects(opCtx, collection, requestNss, deleteCriteria, justOne);
             } else
                 verify(opType[1] == 'b');  // "db" advertisement
             wuow.commit();
