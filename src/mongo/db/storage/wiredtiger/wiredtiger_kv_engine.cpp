@@ -222,7 +222,22 @@ public:
     }
 
     void setStableTimestamp(Timestamp stableTimestamp) {
-        _stableTimestamp.store(stableTimestamp.asULL());
+        const auto prevStable = std::uint64_t(_stableTimestamp.swap(stableTimestamp.asULL()));
+        if (_firstStableCheckpointTaken) {
+            // Early return to avoid the following `_initialDataTimestamp.load` call.
+            return;
+        }
+
+        const auto initialData = std::uint64_t(_initialDataTimestamp.load());
+        if (prevStable < initialData && stableTimestamp.asULL() >= initialData) {
+            _firstStableCheckpointTaken = true;
+
+            log() << "Triggering the first stable checkpoint. Initial Data: "
+                  << Timestamp(initialData) << " PrevStable: " << Timestamp(prevStable)
+                  << " CurrStable: " << stableTimestamp;
+            stdx::unique_lock<stdx::mutex> lock(_mutex);
+            _condvar.notify_one();
+        }
     }
 
     void setInitialDataTimestamp(Timestamp initialDataTimestamp) {
@@ -252,6 +267,7 @@ private:
     AtomicBool _shuttingDown{false};
     AtomicWord<std::uint64_t> _stableTimestamp;
     AtomicWord<std::uint64_t> _initialDataTimestamp;
+    bool _firstStableCheckpointTaken = false;
 };
 
 namespace {
