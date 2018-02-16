@@ -1734,7 +1734,7 @@ intrusive_ptr<Expression> ExpressionObject::optimize() {
             allValuesConstant = false;
         }
     }
-    // If all values in ExpressionObject are constant evaluate to ExpressionConstant
+    // If all values in ExpressionObject are constant evaluate to ExpressionConstant.
     if (allValuesConstant) {
         return ExpressionConstant::create(getExpressionContext(), evaluate(Document()));
     }

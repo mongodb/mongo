@@ -2844,7 +2844,7 @@ TEST(ExpressionObjectDependencies, LocalFilterVariablesShouldBeFilteredOutOfDepe
 //
 
 TEST(ExpressionObjectOptimizations, OptimizingAnObjectShouldOptimizeSubExpressions) {
-    // Build up the object {a: {$add: [1, 2]}}
+    // Build up the object {a: {$add: [1, 2]}}.
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
     auto addExpression =
@@ -2864,13 +2864,13 @@ TEST(ExpressionObjectOptimizations,
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
 
-    // All constants should optimize to ExpressionConstant
+    // All constants should optimize to ExpressionConstant.
     auto objectWithAllConstants = ExpressionObject::parse(expCtx, BSON("b" << 1 << "c" << 1), vps);
     auto optimizedToAllConstants = objectWithAllConstants->optimize();
     auto constants = dynamic_cast<ExpressionConstant*>(optimizedToAllConstants.get());
     ASSERT_TRUE(constants);
 
-    // Not all constants should not optimize to ExpressionConstant
+    // Not all constants should not optimize to ExpressionConstant.
     auto objectNotAllConstants = ExpressionObject::parse(expCtx,
                                                          BSON("b" << 1 << "input"
                                                                   << "$inputField"),
@@ -2879,7 +2879,7 @@ TEST(ExpressionObjectOptimizations,
     auto shouldNotBeConstant = dynamic_cast<ExpressionConstant*>(optimizedNotAllConstants.get());
     ASSERT_FALSE(shouldNotBeConstant);
 
-    // Sub expression should optimize to constant expression
+    // Sub expression should optimize to constant expression.
     auto expressionWithConstantObject = ExpressionObject::parse(
         expCtx,
         BSON("willBeConstant" << BSON("$add" << BSON_ARRAY(1 << 2)) << "alreadyConstant"
