@@ -7,9 +7,11 @@
     // For isMMAPv1.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");
 
+    const t = db.do_txn1;
+
     if (isMMAPv1(db)) {
         assert.commandFailedWithCode(
-            db.adminCommand({doTxn: []}),
+            db.adminCommand({doTxn: [{op: "i", ns: t.getFullName(), o: {_id: 1}}]}),
             ErrorCodes.CommandNotSupported,
             "doTxn should fail if document level locking isn't supported.");
 
@@ -17,7 +19,6 @@
         return;
     }
 
-    var t = db.do_txn1;
     t.drop();
 
     //
