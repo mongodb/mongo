@@ -66,35 +66,16 @@ namespace {
  * if a command is in the list of ops.
  */
 OplogApplicationValidity validateDoTxnCommand(const BSONObj& doTxnObj) {
-    auto operationContainsUUID = [](const BSONObj& opObj) {
-        auto anyTopLevelElementIsUUID = [](const BSONObj& opObj) {
-            for (const BSONElement opElement : opObj) {
-                if (opElement.type() == BSONType::BinData &&
-                    opElement.binDataType() == BinDataType::newUUID) {
-                    return true;
-                }
-            }
-            return false;
-        };
-        if (anyTopLevelElementIsUUID(opObj)) {
-            return true;
+    auto parseOp = [](const BSONObj& opObj) {
+        try {
+            return repl::ReplOperation::parse(IDLParserErrorContext("doTxn"), opObj);
+        } catch (...) {
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << "cannot apply a malformed operation in doTxn: "
+                                    << redact(opObj)
+                                    << ": "
+                                    << exceptionToStatus().toString());
         }
-
-        BSONElement opTypeElem = opObj["op"];
-        checkBSONType(BSONType::String, opTypeElem);
-        const StringData opType = opTypeElem.checkAndGetStringData();
-
-        if (opType == "c"_sd) {
-            BSONElement oElem = opObj["o"];
-            checkBSONType(BSONType::Object, oElem);
-            BSONObj o = oElem.Obj();
-
-            if (anyTopLevelElementIsUUID(o)) {
-                return true;
-            }
-        }
-
-        return false;
     };
 
     OplogApplicationValidity ret = OplogApplicationValidity::kOk;
@@ -110,17 +91,15 @@ OplogApplicationValidity validateDoTxnCommand(const BSONObj& doTxnObj) {
     for (BSONElement element : doTxnObj.firstElement().Array()) {
         checkBSONType(BSONType::Object, element);
         BSONObj opObj = element.Obj();
+        auto op = parseOp(opObj);
 
         // If the op is a command, it's illegal.
-        BSONElement opTypeElem = opObj["op"];
-        const StringData opTypeStr = opTypeElem.checkAndGetStringData();
-        auto opType = repl::OpType_parse(IDLParserErrorContext("validateDoTxnCommand"), opTypeStr);
         uassert(ErrorCodes::InvalidOptions,
                 "Commands cannot be applied via doTxn.",
-                opType != repl::OpTypeEnum::kCommand);
+                op.getOpType() != repl::OpTypeEnum::kCommand);
 
         // If the op uses any UUIDs at all then the user must possess extra privileges.
-        if (operationContainsUUID(opObj)) {
+        if (op.getUuid()) {
             ret = OplogApplicationValidity::kNeedsUseUUID;
         }
     }

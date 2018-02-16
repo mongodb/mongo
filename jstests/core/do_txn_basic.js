@@ -30,44 +30,63 @@
                                  'doTxn should fail on empty array of operations');
 
     // Non-array type for operations.
-    assert.commandFailed(db.adminCommand({doTxn: "not an array"}),
-                         'doTxn should fail on non-array type for operations');
+    assert.commandFailedWithCode(db.adminCommand({doTxn: "not an array"}),
+                                 ErrorCodes.TypeMismatch,
+                                 'doTxn should fail on non-array type for operations');
 
     // Missing 'op' field in an operation.
-    assert.commandFailed(db.adminCommand({doTxn: [{ns: t.getFullName()}]}),
-                         'doTxn should fail on operation without "op" field');
+    assert.commandFailedWithCode(db.adminCommand({doTxn: [{ns: t.getFullName(), o: {_id: 0}}]}),
+                                 ErrorCodes.FailedToParse,
+                                 'doTxn should fail on operation without "op" field');
 
     // Non-string 'op' field in an operation.
-    assert.commandFailed(db.adminCommand({doTxn: [{op: 12345, ns: t.getFullName()}]}),
-                         'doTxn should fail on operation with non-string "op" field');
+    assert.commandFailedWithCode(
+        db.adminCommand({doTxn: [{op: 12345, ns: t.getFullName(), o: {_id: 0}}]}),
+        ErrorCodes.FailedToParse,
+        'doTxn should fail on operation with non-string "op" field');
 
     // Empty 'op' field value in an operation.
-    assert.commandFailed(db.adminCommand({doTxn: [{op: '', ns: t.getFullName()}]}),
-                         'doTxn should fail on operation with empty "op" field value');
+    assert.commandFailedWithCode(
+        db.adminCommand({doTxn: [{op: '', ns: t.getFullName(), o: {_id: 0}}]}),
+        ErrorCodes.FailedToParse,
+        'doTxn should fail on operation with empty "op" field value');
 
     // Missing 'ns' field in an operation.
-    assert.commandFailed(db.adminCommand({doTxn: [{op: 'u'}]}),
-                         'doTxn should fail on operation without "ns" field');
+    assert.commandFailedWithCode(db.adminCommand({doTxn: [{op: 'u', o: {_id: 0}}]}),
+                                 ErrorCodes.FailedToParse,
+                                 'doTxn should fail on operation without "ns" field');
+
+    // Missing 'o' field in an operation.
+    assert.commandFailedWithCode(db.adminCommand({doTxn: [{op: 'u', ns: t.getFullName()}]}),
+                                 ErrorCodes.FailedToParse,
+                                 'doTxn should fail on operation without "o" field');
 
     // Non-string 'ns' field in an operation.
-    assert.commandFailed(db.adminCommand({doTxn: [{op: 'u', ns: 12345}]}),
-                         'doTxn should fail on operation with non-string "ns" field');
+    assert.commandFailedWithCode(db.adminCommand({doTxn: [{op: 'u', ns: 12345, o: {_id: 0}}]}),
+                                 ErrorCodes.FailedToParse,
+                                 'doTxn should fail on operation with non-string "ns" field');
 
     // Missing dbname in 'ns' field.
-    assert.commandFailed(db.adminCommand({doTxn: [{op: 'd', ns: t.getName(), o: {_id: 1}}]}));
+    assert.commandFailedWithCode(
+        db.adminCommand({doTxn: [{op: 'd', ns: t.getName(), o: {_id: 1}}]}),
+        ErrorCodes.InvalidNamespace,
+        'doTxn should fail with a missing dbname in the "ns" field value');
 
     // Empty 'ns' field value.
-    assert.commandFailed(db.adminCommand({doTxn: [{op: 'u', ns: ''}]}),
+    assert.commandFailed(db.adminCommand({doTxn: [{op: 'u', ns: '', o: {_id: 0}}]}),
                          'doTxn should fail with empty "ns" field value');
 
     // Valid 'ns' field value in unknown operation type 'x'.
-    assert.commandFailed(db.adminCommand({doTxn: [{op: 'x', ns: t.getFullName()}]}),
-                         'doTxn should fail on unknown operation type "x" with valid "ns" value');
+    assert.commandFailedWithCode(
+        db.adminCommand({doTxn: [{op: 'x', ns: t.getFullName(), o: {_id: 0}}]}),
+        ErrorCodes.FailedToParse,
+        'doTxn should fail on unknown operation type "x" with valid "ns" value');
 
     // Illegal operation type 'n' (no-op).
-    assert.commandFailedWithCode(db.adminCommand({doTxn: [{op: 'n', ns: t.getFullName()}]}),
-                                 ErrorCodes.InvalidOptions,
-                                 'doTxn should fail on "no op" operations.');
+    assert.commandFailedWithCode(
+        db.adminCommand({doTxn: [{op: 'n', ns: t.getFullName(), o: {_id: 0}}]}),
+        ErrorCodes.InvalidOptions,
+        'doTxn should fail on "no op" operations.');
 
     // Illegal operation type 'c' (command).
     assert.commandFailedWithCode(
@@ -75,6 +94,12 @@
             {doTxn: [{op: 'c', ns: t.getCollection('$cmd').getFullName(), o: {applyOps: []}}]}),
         ErrorCodes.InvalidOptions,
         'doTxn should fail on commands.');
+
+    // Malformed operation with unexpected field 'x'.
+    assert.commandFailedWithCode(
+        db.adminCommand({doTxn: [{op: 'i', ns: t.getFullName(), o: {_id: 0}, x: 1}]}),
+        ErrorCodes.FailedToParse,
+        'doTxn should fail on malformed operations.');
 
     assert.eq(0, t.find().count(), "Non-zero amount of documents in collection to start");
 
@@ -186,42 +211,6 @@
 
     assert.eq(false, res.results[0], "Op required upsert, which should be disallowed.");
     assert.eq(false, res.results[1], "Op required upsert, which should be disallowed.");
-
-    // Ops with transaction numbers are valid.
-    var lsid = {id: UUID()};
-    res = assert.commandWorked(db.runCommand({
-        doTxn: [
-            {
-              op: "i",
-              ns: t.getFullName(),
-              o: {_id: 7, x: 24},
-              lsid: lsid,
-              txnNumber: NumberLong(1),
-              stmdId: 0
-            },
-            {
-              op: "u",
-              ns: t.getFullName(),
-              o2: {_id: 7},
-              o: {$set: {x: 25}},
-              lsid: lsid,
-              txnNumber: NumberLong(1),
-              stmdId: 1
-            },
-            {
-              op: "d",
-              ns: t.getFullName(),
-              o: {_id: 7},
-              lsid: lsid,
-              txnNumber: NumberLong(2),
-              stmdId: 0
-            },
-        ]
-    }));
-
-    assert.eq(true, res.results[0], "Valid insert with transaction number failed");
-    assert.eq(true, res.results[1], "Valid update with transaction number failed");
-    assert.eq(true, res.results[2], "Valid delete with transaction number failed");
 
     // When applying a "u" (update) op, we default to 'UpdateNode' update semantics, and $set
     // operations add new fields in lexicographic order.

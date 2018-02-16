@@ -166,12 +166,6 @@ Status _doTxn(OperationContext* opCtx,
                                     << redact(opObj));
         }
 
-        // Cannot specify timestamp values in an atomic doTxn.
-        if (opObj.hasField("ts")) {
-            uasserted(ErrorCodes::AtomicityFailure,
-                      "cannot apply an op with a timestamp with doTxn; ");
-        }
-
         // Setting alwaysUpsert to true makes sense only during oplog replay, and doTxn commands
         // should not be executed during oplog replay.
         const bool alwaysUpsert = false;
