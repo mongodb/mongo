@@ -2844,7 +2844,7 @@ TEST(ExpressionObjectDependencies, LocalFilterVariablesShouldBeFilteredOutOfDepe
 //
 
 TEST(ExpressionObjectOptimizations, OptimizingAnObjectShouldOptimizeSubExpressions) {
-    // Build up the object {a: {$add: [1, 2]}}.
+    // Build up the object {a: {$add: [1, 2]}}
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
     auto addExpression =
@@ -2853,15 +2853,9 @@ TEST(ExpressionObjectOptimizations, OptimizingAnObjectShouldOptimizeSubExpressio
     ASSERT_EQ(object->getChildExpressions().size(), 1UL);
 
     auto optimized = object->optimize();
-    auto optimizedObject = dynamic_cast<ExpressionObject*>(optimized.get());
+    auto optimizedObject = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(optimizedObject);
-    ASSERT_EQ(optimizedObject->getChildExpressions().size(), 1UL);
-
-    // We should have optimized {$add: [1, 2]} to just the constant 3.
-    auto expConstant =
-        dynamic_cast<ExpressionConstant*>(optimizedObject->getChildExpressions()[0].second.get());
-    ASSERT_TRUE(expConstant);
-    ASSERT_VALUE_EQ(expConstant->evaluate(Document()), Value(3));
+    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document()), Value(BSON("a" << 3)));
 };
 
 TEST(ExpressionObjectOptimizations,
@@ -2892,11 +2886,11 @@ TEST(ExpressionObjectOptimizations,
                               << "string"),
         vps);
     auto optimizedWithConstant = expressionWithConstantObject->optimize();
-    auto optimizedObject = dynamic_cast<ExpressionObject*>(optimizedWithConstant.get());
-    auto expConstant =
-        dynamic_cast<ExpressionConstant*>(optimizedObject->getChildExpressions()[0].second.get());
-    ASSERT_TRUE(expConstant);
-    ASSERT_VALUE_EQ(expConstant->evaluate(Document()), Value(3));
+    auto optimizedObject = dynamic_cast<ExpressionConstant*>(optimizedWithConstant.get());
+    ASSERT_TRUE(optimizedObject);
+    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document()),
+                    Value(BSON("willBeConstant" << 3 << "alreadyConstant"
+                                                << "string")));
 };
 
 }  // namespace Object
