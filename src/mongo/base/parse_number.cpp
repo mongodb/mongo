@@ -37,6 +37,7 @@
 #include <string>
 
 #include "mongo/base/status_with.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/platform/overflow_arithmetic.h"
 
 namespace mongo {
@@ -260,4 +261,35 @@ Status parseNumberFromStringWithBase<double>(StringData stringValue, int base, d
     return Status::OK();
 }
 
+template <>
+Status parseNumberFromStringWithBase<Decimal128>(StringData stringValue,
+                                                 int base,
+                                                 Decimal128* result) {
+    if (base != 0) {
+        return Status(ErrorCodes::BadValue,
+                      "Must pass 0 as base to parseNumberFromStringWithBase<Decimal128>.");
+    }
+
+    if (stringValue.empty()) {
+        return Status(ErrorCodes::FailedToParse, "Empty string");
+    }
+
+    std::uint32_t signalingFlags = 0;
+    auto parsedDecimal = Decimal128(
+        stringValue.toString(), &signalingFlags, Decimal128::RoundingMode::kRoundTowardZero);
+
+    if (Decimal128::hasFlag(signalingFlags, Decimal128::SignalingFlag::kOverflow)) {
+        return Status(ErrorCodes::FailedToParse,
+                      "Conversion from string to decimal would overflow");
+    } else if (Decimal128::hasFlag(signalingFlags, Decimal128::SignalingFlag::kUnderflow)) {
+        return Status(ErrorCodes::FailedToParse,
+                      "Conversion from string to decimal would underflow");
+    } else if (signalingFlags != Decimal128::SignalingFlag::kNoFlag &&
+               signalingFlags != Decimal128::SignalingFlag::kInexact) {  // Ignore precision loss.
+        return Status(ErrorCodes::FailedToParse, "Failed to parse string to decimal");
+    }
+
+    *result = parsedDecimal;
+    return Status::OK();
+}
 }  // namespace mongo

@@ -140,6 +140,27 @@ public:
         return o;
     }
 
+    /**
+     * This method creates and initializes an OID from a string, throwing a BadValue exception if
+     * the string is not a valid OID.
+     */
+    static OID createFromString(StringData input) {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Invalid string length for parsing to OID, expected 24 but found "
+                              << input.size(),
+                input.size() == 24);
+        for (auto digit : input) {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Invalid character found in hex string: " << digit,
+                    ('0' <= digit && digit <= '9') || ('a' <= digit && digit <= 'f') ||
+                        ('A' <= digit && digit <= 'F'));
+        }
+
+        OID result;
+        result.init(input.toString());
+        return result;
+    }
+
     /** sets the contents to a new oid / randomized value */
     void init();
 
