@@ -2030,15 +2030,13 @@ Value ExpressionFilter::evaluate(const Document& root) const {
 
     vector<Value> output;
     auto& vars = getExpressionContext()->variables;
-
-    int count = 0;
     for (const auto& elem : input) {
         vars.setValue(_varId, elem);
+        
         if (_filter->evaluate(root).coerceToBool()) {
             output.push_back(std::move(elem));
         }
     }
-
 
     return Value(std::move(output));
 }
