@@ -2032,7 +2032,7 @@ Value ExpressionFilter::evaluate(const Document& root) const {
     auto& vars = getExpressionContext()->variables;
     for (const auto& elem : input) {
         vars.setValue(_varId, elem);
-        
+
         if (_filter->evaluate(root).coerceToBool()) {
             output.push_back(std::move(elem));
         }
