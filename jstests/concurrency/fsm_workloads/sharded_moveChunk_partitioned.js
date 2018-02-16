@@ -140,8 +140,8 @@ var $config = extendWorkload($config, function($config, $super) {
             // verify that each mongos sees as many documents in the chunk's
             // range after the move as there were before.
             var numDocsAfter = ChunkHelper.getNumDocs(mongos, ns, chunk.min._id, chunk.max._id);
-            msg =
-                'Number of chunks in partition seen by mongos changed with moveChunk.\n' + msgBase;
+            msg = 'Number of documents in range seen by mongos changed with moveChunk, range: ' +
+                tojson(bounds) + '.\n' + msgBase;
             assertWhenOwnColl.eq(numDocsAfter, numDocsBefore, msg);
 
             // If the moveChunk operation succeeded, verify that each mongos sees all data in the
