@@ -203,6 +203,12 @@ public:
      */
     virtual void writeCheckpointTimestamp(OperationContext* opCtx, const Timestamp& timestamp) = 0;
     virtual Timestamp getCheckpointTimestamp(OperationContext* opCtx) = 0;
+
+    /**
+     * Create the set of collections required for steady-state replication to work. E.g: `minvalid`
+     * or `oplogTruncateAfterPoint`.
+     */
+    virtual Status createInternalCollections(OperationContext* opCtx) = 0;
 };
 
 }  // namespace repl

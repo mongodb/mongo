@@ -449,6 +449,11 @@ void ReplicationCoordinatorImpl::appendConnectionStats(executor::ConnectionPoolS
 }
 
 bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) {
+    // Create necessary replication collections to guarantee that if a checkpoint sees data after
+    // initial sync has completed, it also sees these collections.
+    fassertStatusOK(50708,
+                    _replicationProcess->getConsistencyMarkers()->createInternalCollections(opCtx));
+
     _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(opCtx);
 
     StatusWith<LastVote> lastVote = _externalState->loadLocalLastVoteDocument(opCtx);

@@ -72,6 +72,8 @@ public:
     void writeCheckpointTimestamp(OperationContext* opCtx, const Timestamp& timestamp) override;
     Timestamp getCheckpointTimestamp(OperationContext* opCtx) override;
 
+    Status createInternalCollections(OperationContext* opCtx) override;
+
 private:
     mutable stdx::mutex _initialSyncFlagMutex;
     bool _initialSyncFlag = false;

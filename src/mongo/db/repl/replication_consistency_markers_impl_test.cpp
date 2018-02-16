@@ -172,6 +172,7 @@ TEST_F(ReplicationConsistencyMarkersTest, InitialSyncFlag) {
     ReplicationConsistencyMarkersImpl consistencyMarkers(
         getStorageInterface(), minValidNss, oplogTruncateAfterPointNss, checkpointTimestampNss);
     auto opCtx = getOperationContext();
+    ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
 
     // Initial sync flag should be unset after initializing a new storage engine.
@@ -199,6 +200,7 @@ TEST_F(ReplicationConsistencyMarkersTest, GetMinValidAfterSettingInitialSyncFlag
     ReplicationConsistencyMarkersImpl consistencyMarkers(
         getStorageInterface(), minValidNss, oplogTruncateAfterPointNss, checkpointTimestampNss);
     auto opCtx = getOperationContext();
+    ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
 
     // Initial sync flag should be unset after initializing a new storage engine.
@@ -221,6 +223,7 @@ TEST_F(ReplicationConsistencyMarkersTest, ReplicationConsistencyMarkers) {
     ReplicationConsistencyMarkersImpl consistencyMarkers(
         getStorageInterface(), minValidNss, oplogTruncateAfterPointNss, checkpointTimestampNss);
     auto opCtx = getOperationContext();
+    ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
 
     // MinValid boundaries should all be null after initializing a new storage engine.
@@ -296,6 +299,7 @@ TEST_F(ReplicationConsistencyMarkersTest, SetMinValidOnPVChange) {
     ReplicationConsistencyMarkersImpl consistencyMarkers(
         getStorageInterface(), minValidNss, oplogTruncateAfterPointNss, checkpointTimestampNss);
     auto opCtx = getOperationContext();
+    ASSERT(consistencyMarkers.createInternalCollections(opCtx).isOK());
     consistencyMarkers.initializeMinValidDocument(opCtx);
 
     auto advanceAndCheckMinValidOpTime = [&](OpTime advanceTo, OpTime expected) {

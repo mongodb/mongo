@@ -116,18 +116,7 @@ void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationCont
     // the 'minValid' document, but we still want the initialization write to go into the next
     // checkpoint since a newly initialized 'minValid' document is always valid.
     upsert.timestamp = Timestamp();
-
-    Status status = _storageInterface->putSingleton(opCtx, _minValidNss, upsert);
-
-    // If the collection doesn't exist, create it and try again.
-    if (status == ErrorCodes::NamespaceNotFound) {
-        status = _storageInterface->createCollection(opCtx, _minValidNss, CollectionOptions());
-        fassertStatusOK(40509, status);
-
-        status = _storageInterface->putSingleton(opCtx, _minValidNss, upsert);
-    }
-
-    fassertStatusOK(40467, status);
+    fassertStatusOK(40467, _storageInterface->putSingleton(opCtx, _minValidNss, upsert));
 }
 
 bool ReplicationConsistencyMarkersImpl::getInitialSyncFlag(OperationContext* opCtx) const {
@@ -331,20 +320,10 @@ ReplicationConsistencyMarkersImpl::_getOplogTruncateAfterPointDocument(
 
 void ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument(
     OperationContext* opCtx, const BSONObj& updateSpec) {
-    auto status = _storageInterface->upsertById(
-        opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"], updateSpec);
-
-    // If the collection doesn't exist, creates it and tries again.
-    if (status == ErrorCodes::NamespaceNotFound) {
-        status = _storageInterface->createCollection(
-            opCtx, _oplogTruncateAfterPointNss, CollectionOptions());
-        fassertStatusOK(40511, status);
-
-        status = _storageInterface->upsertById(
-            opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"], updateSpec);
-    }
-
-    fassertStatusOK(40512, status);
+    fassertStatusOK(
+        40512,
+        _storageInterface->upsertById(
+            opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"], updateSpec));
 }
 
 void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationContext* opCtx,
@@ -449,6 +428,19 @@ Timestamp ReplicationConsistencyMarkersImpl::getCheckpointTimestamp(OperationCon
     return out;
 }
 
+Status ReplicationConsistencyMarkersImpl::createInternalCollections(OperationContext* opCtx) {
+    for (auto nss : std::vector<NamespaceString>(
+             {_oplogTruncateAfterPointNss, _minValidNss, _checkpointTimestampNss})) {
+        auto status = _storageInterface->createCollection(opCtx, nss, CollectionOptions());
+        if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
+            return {ErrorCodes::CannotCreateCollection,
+                    str::stream() << "Failed to create collection. Ns: " << nss.ns() << " Error: "
+                                  << status.toString()};
+        }
+    }
+
+    return Status::OK();
+}
 
 }  // namespace repl
 }  // namespace mongo

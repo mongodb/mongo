@@ -83,6 +83,8 @@ public:
     void writeCheckpointTimestamp(OperationContext* opCtx, const Timestamp& timestamp);
     Timestamp getCheckpointTimestamp(OperationContext* opCtx);
 
+    Status createInternalCollections(OperationContext* opCtx);
+
 private:
     /**
      * Reads the MinValid document from disk.
@@ -91,8 +93,8 @@ private:
     boost::optional<MinValidDocument> _getMinValidDocument(OperationContext* opCtx) const;
 
     /**
-     * Updates the MinValid document according to the provided update spec. If the collection does
-     * not exist, it is created. If the document does not exist, it is upserted.
+     * Updates the MinValid document according to the provided update spec. The collection must
+     * exist, see `createInternalCollections`. If the document does not exist, it is upserted.
      *
      * This fasserts on failure.
      */
@@ -120,9 +122,8 @@ private:
         OperationContext* opCtx) const;
 
     /**
-     * Upserts the OplogTruncateAfterPoint document according to the provided update spec.
-     * If the collection does not exist, it is created. If the document does not exist,
-     * it is upserted.
+     * Upserts the OplogTruncateAfterPoint document according to the provided update spec. The
+     * collection must already exist. See `createInternalCollections`.
      *
      * This fasserts on failure.
      */

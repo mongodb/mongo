@@ -122,5 +122,9 @@ Timestamp ReplicationConsistencyMarkersMock::getCheckpointTimestamp(OperationCon
     return _checkpointTimestamp;
 }
 
+Status ReplicationConsistencyMarkersMock::createInternalCollections(OperationContext* opCtx) {
+    return Status::OK();
+}
+
 }  // namespace repl
 }  // namespace mongo
