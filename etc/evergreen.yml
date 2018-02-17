@@ -81,7 +81,7 @@ variables:
       MONGO_VERSION=$(git describe)
       # If this is a patch build, we add the patch version id to the version string so we know
       # this build was a patch, and which evergreen task it came from
-      if [ "${is_patch|}" = "true" ]; then
+      if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "false" ]; then
         MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
       fi
 
@@ -228,7 +228,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
+      remote_file: ${mongo_binaries}
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
@@ -252,6 +252,13 @@ functions:
         if [ $(echo $mongo_binary | wc -w) -ne 1 ]; then
           echo "There is more than 1 extracted mongo binary: $mongo_binary"
           exit 1
+        fi
+        # For compile bypass we need to skip the binary version check since we can tag a commit
+        # after the base commit binaries were created. This would lead to a mismatch of the binaries
+        # and the version from git describe in the compile_expansions.yml.
+        if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
+          echo "Skipping binary version check since we are bypassing compile in this patch build."
+          exit 0
         fi
         ${activate_virtualenv}
         bin_ver=$($python -c "import yaml; print(yaml.safe_load(open('compile_expansions.yml'))['version']);" | tr -d '[ \r\n]')
@@ -426,10 +433,11 @@ functions:
   "upload debugsymbols" : &upload_debugsymbols
     command: s3.put
     params:
+      optional: true
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/mongo-debugsymbols.tgz
-      remote_file: ${project}/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
+      remote_file: ${mongo_debugsymbols}
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|application/x-gzip}
@@ -439,7 +447,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
+      remote_file: ${mongo_debugsymbols}
       bucket: mciuploads
       local_file: src/mongo-debugsymbols.tgz
 
@@ -557,8 +565,57 @@ functions:
              "../../mongo-tools/$i${exe|}" --version
         done
 
+  "get modified patch files" :
+    command: shell.exec
+    params:
+      working_dir: src
+      shell: bash
+      script: |
+        set -o verbose
+        set -o errexit
+
+        # For patch builds gather the modified patch files.
+        if [ "${is_patch}" = "true" ]; then
+          # Get list of patched files
+          git diff HEAD --name-only >> patch_files.txt
+          if [ -d src/mongo/db/modules/enterprise ]; then
+            pushd src/mongo/db/modules/enterprise
+            # Update the patch_files.txt in the mongo repo.
+            git diff HEAD --name-only >> ~1/patch_files.txt
+            popd
+          fi
+        fi
+
+  "update bypass expansions" : &update_bypass_expansions
+    command: expansions.update
+    params:
+      ignore_missing_file: true
+      file: src/bypass_compile_expansions.yml
+
+  "bypass compile and fetch binaries" :
+    command: shell.exec
+    params:
+      continue_on_err: true
+      working_dir: src
+      script: |
+        set -o verbose
+        set -o errexit
+
+        # For patch builds determine if we can bypass compile.
+        if [ "${is_patch}" = "true" ]; then
+          ${activate_virtualenv}
+          $python buildscripts/bypass_compile_and_fetch_binaries.py            \
+            --project ${project}                                               \
+            --buildVariant ${build_variant}                                    \
+            --revision ${revision}                                             \
+            --patchFile patch_files.txt                                        \
+            --outFile bypass_compile_expansions.yml                            \
+            --jsonArtifact artifacts.json
+        fi
+
   "do setup" :
   - *fetch_artifacts
+  - *update_bypass_expansions
   - *fetch_binaries
   - *extract_binaries
   - *check_binary_version
@@ -685,7 +742,7 @@ functions:
             path_value="$path_value:${task_path_suffix}"
           fi
 
-          if [ "${is_patch|}" = "true" ]; then
+          if [ "${is_patch}" = "true" ]; then
             extra_args="$extra_args --tagFile=etc/test_lifecycle.yml --patchBuild"
           else
             extra_args="$extra_args --tagFile=etc/test_retrial.yml"
@@ -1669,9 +1726,9 @@ pre:
   - func: "set up virtualenv"
   - command: expansions.update
     params:
-       updates:
-       - key: activate_virtualenv
-         value: |
+      updates:
+      - key: activate_virtualenv
+        value: |
           # check if virtualenv is set up
           if [ -d "${workdir}/venv" ]; then
             if [ "Windows_NT" = "$OS" ]; then
@@ -1688,16 +1745,16 @@ pre:
             python=${python|/opt/mongodbtoolchain/v2/bin/python2}
           fi
           echo "python set to $(which python)"
-       - key: posix_workdir
-         value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
-       # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
-       # & UserKnownHostsFile, since these are local connections from one AWS instance to another.
-       - key: ssh_connection_options
-         value: -o GSSAPIAuthentication=no -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=20 -o ConnectionAttempts=20
-       - key: ssh_retries
-         value: "10"
-       - key: set_sudo
-         value: |
+      - key: posix_workdir
+        value: eval 'if [ "Windows_NT" = "$OS" ]; then echo $(cygpath -u "${workdir}"); else echo ${workdir}; fi'
+      # For ssh disable the options GSSAPIAuthentication, CheckHostIP, StrictHostKeyChecking
+      # & UserKnownHostsFile, since these are local connections from one AWS instance to another.
+      - key: ssh_connection_options
+        value: -o GSSAPIAuthentication=no -o CheckHostIP=no -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=20 -o ConnectionAttempts=20
+      - key: ssh_retries
+        value: "10"
+      - key: set_sudo
+        value: |
           set -o > /tmp/settings.log
           set +o errexit
           grep errexit /tmp/settings.log | grep on
@@ -1714,6 +1771,13 @@ pre:
           if [ $errexit_on -eq 0 ]; then
             set -o errexit
           fi
+      - key: mongo_binaries
+        value: ${project}/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
+      - key: mongo_debugsymbols
+        value: ${project}/${build_variant}/${revision}/debugsymbols/debugsymbols-${build_id}.${ext|tgz}
+      - key: mongo_shell
+        value: ${project}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
+
   - command: shell.exec
     params:
       system_log: true
@@ -1736,6 +1800,7 @@ post:
       file_location: src/report.json
   - command: attach.artifacts
     params:
+      optional: true
       ignore_artifacts_for_spawn: false
       files:
         - src/archive.json
@@ -2273,6 +2338,10 @@ tasks:
   commands:
     - command: manifest.load
     - *git_get_project
+    - func: "get modified patch files"
+    # NOTE: To disable the compile bypass feature, comment out the next line.
+    - func: "bypass compile and fetch binaries"
+    - func: "update bypass expansions"
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "build new tools" # noop if ${newtools} is not "true"
@@ -2290,6 +2359,9 @@ tasks:
           set -o errexit
           set -o verbose
 
+          if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
+            exit 0
+          fi
           rm -rf ${install_directory|/data/mongo-install-directory}
 
           ${activate_virtualenv}
@@ -2314,6 +2386,9 @@ tasks:
           set -o errexit
           set -o verbose
 
+          if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
+            exit 0
+          fi
           ${activate_virtualenv}
           if [ "${has_packages|}" = "true" ] ; then
             cd buildscripts
@@ -2365,25 +2440,30 @@ tasks:
           - "src/mongo/util/options_parser/test_config_files/**"
           - "library_dependency_graph.json"
           - "src/third_party/JSON-Schema-Test-Suite/tests/draft4/**"
+          - "bypass_compile_expansions.yml"
+          - "patch_files.txt"
+          - "artifacts.json"
         exclude_files:
           - "*_test.pdb"
     - func: "upload debugsymbols"
     - command: s3.put
       params:
+        optional: true
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongodb-binaries.tgz
-        remote_file: ${project}/${build_variant}/${revision}/binaries/mongo-${build_id}.${ext|tgz}
+        remote_file: ${mongo_binaries}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: Binaries
     - command: s3.put
       params:
+        optional: true
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/shell-archive/mongodb-shell.${ext|tgz}
-        remote_file: ${project}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
+        remote_file: ${mongo_shell}
         bucket: mciuploads
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
@@ -2411,6 +2491,14 @@ tasks:
         # We only need to upload the source tarball from one of the build variants
         # because it should be the same everywhere, so just use linux-64/windows-64-2k8.
         build_variants: [ linux-64, windows-64-2k8-ssl ]
+    # For patch builds that bypass compile, we upload links to pre-existing tarballs, except for the
+    # artifacts.tgz.
+    - command: attach.artifacts
+      params:
+        optional: true
+        ignore_artifacts_for_spawn: false
+        files:
+          - src/artifacts.json
 
 ## compile_all - build all scons targets including unittests ##
 - name: compile_all
@@ -2508,6 +2596,7 @@ tasks:
   - command: shell.exec
     params:
       working_dir: burn_in_tests_clonedir
+      shell: bash
       script: |
         set -o errexit
         set -o verbose
@@ -4068,7 +4157,7 @@ tasks:
       params:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
-        remote_file: ${project}/${build_variant}/${revision}/binaries/mongo-shell-${build_id}.${ext|tgz}
+        remote_file: ${mongo_shell}
         bucket: mciuploads
         local_file: src/mongo-shell.tgz
     - command: s3.get
