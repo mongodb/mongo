@@ -1431,18 +1431,17 @@ public:
 
         BSONObjBuilder countsBuilder;
         BSONObjBuilder timingBuilder;
-        State state(opCtx, config);
-        if (!state.sourceExists()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::NamespaceNotFound,
-                       str::stream() << "namespace does not exist: " << config.nss.ns()));
-        }
-
         try {
+            State state(opCtx, config);
+            if (!state.sourceExists()) {
+                return CommandHelpers::appendCommandStatus(
+                    result,
+                    Status(ErrorCodes::NamespaceNotFound,
+                           str::stream() << "namespace does not exist: " << config.nss.ns()));
+            }
+
             state.init();
             state.prepTempCollection();
-            ON_BLOCK_EXIT_OBJ(state, &State::dropTempCollections);
 
             int64_t progressTotal = 0;
             bool showTotal = true;
@@ -1795,7 +1794,6 @@ public:
         }
 
         state.prepTempCollection();
-        ON_BLOCK_EXIT_OBJ(state, &State::dropTempCollections);
 
         std::vector<std::shared_ptr<Chunk>> chunks;
 
