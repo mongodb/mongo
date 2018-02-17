@@ -40,7 +40,7 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
     jsTest.log('Sending an insert through the mongos to provoke a crash');
 
     var error = assert.throws(function() {
-        st.s0.getDB("testDB").runCommand({insert: "testColl", documents: [{a: 1}]})
+        st.s0.getDB("testDB").runCommand({insert: "testColl", documents: [{a: 1}]});
     });
     assert(isNetworkError(error));
 
