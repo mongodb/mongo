@@ -19,10 +19,18 @@
     load('jstests/replsets/rslib.js');
 
     var name = 'catchup_takeover_one_high_priority';
-    var replSet =
-        new ReplSetTest({name: name, nodes: [{}, {}, {rsConfig: {priority: 2}}], useBridge: true});
+    var replSet = new ReplSetTest({name: name, nodes: 3, useBridge: true});
+
+    var nodenames = replSet.nodeList();
     var nodes = replSet.startSet();
-    replSet.initiate();
+    replSet.initiateWithAnyNodeAsPrimary({
+        "_id": name,
+        "members": [
+            {"_id": 0, "host": nodenames[0]},
+            {"_id": 1, "host": nodenames[1]},
+            {"_id": 2, "host": nodenames[2], "priority": 2}
+        ]
+    });
 
     // Wait until node 2 becomes primary.
     replSet.waitForState(2, ReplSetTest.State.PRIMARY, replSet.kDefaultTimeoutMS);
