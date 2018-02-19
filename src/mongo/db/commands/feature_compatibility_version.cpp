@@ -43,6 +43,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/egress_tag_closer_manager.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/util/log.h"
@@ -268,19 +269,21 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
         log() << "setting featureCompatibilityVersion to " << toString(newVersion);
     }
 
-    // On commit, update the server parameters, and close any incoming connections with a wire
-    // version that is below the minimum.
+    // On commit, update the server parameters, and close any connections with a wire version that
+    // is below the minimum.
     opCtx->recoveryUnit()->onCommit([opCtx, newVersion]() {
         serverGlobalParams.featureCompatibility.setVersion(newVersion);
         updateMinWireVersion();
 
-        // Close all incoming connections from internal clients with binary versions lower than
-        // ours. It would be desirable to close all outgoing connections to servers with lower
-        // binary version, but it is not currently possible.
         if (newVersion != ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
+            // Close all incoming connections from internal clients with binary versions lower than
+            // ours.
             opCtx->getServiceContext()->getServiceEntryPoint()->endAllSessions(
                 transport::Session::kLatestVersionInternalClientKeepOpen |
                 transport::Session::kExternalClientKeepOpen);
+            // Close all outgoing connections to servers with binary versions lower than ours.
+            executor::EgressTagCloserManager::get(opCtx->getServiceContext())
+                .dropConnections(transport::Session::kKeepOpen);
         }
     });
 }

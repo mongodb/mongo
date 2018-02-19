@@ -179,6 +179,7 @@ env.Library(
         'async_stream',
         'async_timer_asio',
         'connection_pool_executor',
+        'egress_tag_closer_manager',
         'network_interface',
         'task_executor_interface',
     ])

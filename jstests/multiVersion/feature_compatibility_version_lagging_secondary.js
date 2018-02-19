@@ -3,13 +3,11 @@
 (function() {
     "use strict";
 
+    load("jstests/libs/feature_compatibility_version.js");
     load("jstests/libs/write_concern_util.js");
 
     const latest = "latest";
-    const downgrade = "3.4";
-
-    const upgradeFCV = "3.6";
-    const downgradeFCV = "3.4";
+    const downgrade = "last-stable";
 
     function testProtocolVersion(protocolVersion) {
         jsTestLog("Testing connections between mixed-version mixed-featureCompatibilityVersion " +
@@ -22,12 +20,7 @@
             settings: {chainingAllowed: false}
         });
         rst.startSet();
-
-        // The default value for 'catchUpTimeoutMillis' on 3.6 is -1. A 3.4 secondary will refuse to
-        // join a replica set with catchUpTimeoutMillis=-1.
-        let replSetConfig = rst.getReplSetConfig();
-        replSetConfig.settings.catchUpTimeoutMillis = 2000;
-        rst.initiate(replSetConfig);
+        rst.initiate();
 
         let primary = rst.getPrimary();
         let latestSecondary = rst.getSecondary();
@@ -35,7 +28,7 @@
         // Set the featureCompatibilityVersion to the downgrade version so that a downgrade node can
         // join the set.
         assert.commandWorked(
-            primary.getDB("admin").runCommand({setFeatureCompatibilityVersion: downgradeFCV}));
+            primary.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastStableFCV}));
 
         // Add a downgrade node to the set.
         let downgradeSecondary = rst.add({binVersion: downgrade, rsConfig: {priority: 0}});
@@ -51,7 +44,7 @@
         // Set the featureCompatibilityVersion to the upgrade version. This will not replicate to
         // the downgrade secondary, but the downgrade secondary will no longer be able to
         // communicate with the rest of the set.
-        assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: upgradeFCV}));
+        assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
         // Shut down the latest version secondary.
         rst.stop(latestSecondary);
