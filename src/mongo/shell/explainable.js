@@ -100,14 +100,14 @@ var Explainable = (function() {
             }
 
             // Add the explain option.
-            extraOpts = extraOpts || {};
+            let extraOptsCopy = Object.extend({}, (extraOpts || {}));
 
             // For compatibility with 3.4 and older versions, when the verbosity is "queryPlanner",
             // we use the explain option to the aggregate command. Otherwise we issue an explain
             // command wrapping the agg command, which is supported by newer versions of the server.
             if (this._verbosity === "queryPlanner") {
-                extraOpts.explain = true;
-                return this._collection.aggregate(pipeline, extraOpts);
+                extraOptsCopy.explain = true;
+                return this._collection.aggregate(pipeline, extraOptsCopy);
             } else {
                 // The aggregate command requires a cursor field.
                 if (!extraOpts.hasOwnProperty("cursor")) {
