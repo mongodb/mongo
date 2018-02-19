@@ -125,7 +125,7 @@ void ServiceContextMongoD::initializeGlobalStorageEngine() {
             log() << startupWarningsLog;
             log() << "** WARNING: Support for MMAPV1 storage engine has been deprecated and will be"
                   << startupWarningsLog;
-            log() << "**          removed in version 4.0. Please plan to migrate to the wiredTiger"
+            log() << "**          removed in version 4.2. Please plan to migrate to the wiredTiger"
                   << startupWarningsLog;
             log() << "**          storage engine." << startupWarningsLog;
             log() << "**          See http://dochub.mongodb.org/core/deprecated-mmapv1";
@@ -176,7 +176,7 @@ void ServiceContextMongoD::initializeGlobalStorageEngine() {
               << startupWarningsLog;
         log() << "**          storage engine has been deprecated and will be removed in"
               << startupWarningsLog;
-        log() << "**          version 4.0. See http://dochub.mongodb.org/core/deprecated-mmapv1";
+        log() << "**          version 4.2. See http://dochub.mongodb.org/core/deprecated-mmapv1";
         log() << startupWarningsLog;
     }
 
