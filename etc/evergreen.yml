@@ -5134,8 +5134,11 @@ buildvariants:
     push_arch: x86_64-ubuntu1604
     lang_environment: LANG=C
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    multiversion_platform_arch: "ubuntu1604"
-    multiversion_edition: "targeted"
+    # TODO SERVER-32600: Re-enable targeted downloads after setup_multiversion_mongodb.py is
+    # guaranteed to download x86_64 binaries for this platform.
+    #
+    # multiversion_platform_arch: "ubuntu1604"
+    # multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -8705,8 +8708,11 @@ buildvariants:
     lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    multiversion_platform_arch: "ubuntu1604"
-    multiversion_edition: "targeted"
+    # TODO SERVER-32600: Re-enable targeted downloads after setup_multiversion_mongodb.py is
+    # guaranteed to download x86_64 binaries for this platform.
+    #
+    # multiversion_platform_arch: "ubuntu1604"
+    # multiversion_edition: "targeted"
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
     build_mongoreplay: true
     hang_analyzer_dump_core: false
@@ -8861,8 +8867,11 @@ buildvariants:
     lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    multiversion_platform_arch: "ubuntu1604"
-    multiversion_edition: "targeted"
+    # TODO SERVER-32600: Re-enable targeted downloads after setup_multiversion_mongodb.py is
+    # guaranteed to download x86_64 binaries for this platform.
+    #
+    # multiversion_platform_arch: "ubuntu1604"
+    # multiversion_edition: "targeted"
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under UBSAN build.
     build_mongoreplay: true
   tasks:
