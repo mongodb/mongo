@@ -46,7 +46,7 @@ namespace {
  * All threads executing the benchmark use the same instance of the clock source,
  * to allow benchmarking to identify synchronization costs inside the now() method.
  */
-void BM_clockNow(benchmark::State& state) {
+void BM_ClockNow(benchmark::State& state) {
     static std::unique_ptr<ClockSource> clock;
     if (state.thread_index == 0) {
         if (state.range(0) > 0) {
@@ -59,7 +59,7 @@ void BM_clockNow(benchmark::State& state) {
         }
     }
 
-    for (auto _ : state) {
+    for (auto keepRunning : state) {
         benchmark::DoNotOptimize(clock->now());
     }
 
@@ -68,7 +68,7 @@ void BM_clockNow(benchmark::State& state) {
     }
 }
 
-BENCHMARK(BM_clockNow)
+BENCHMARK(BM_ClockNow)
     ->ThreadRange(1,
                   [] {
                       ProcessInfo pi;

@@ -2534,7 +2534,7 @@ tasks:
           fi
 
           ${activate_virtualenv}
-          ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations $extra_args all ${additional_targets|} MONGO_VERSION=${version}
+          ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations $extra_args all benchmarks ${additional_targets|} MONGO_VERSION=${version}
 
     - command: s3.put
       params:

@@ -40,12 +40,13 @@ env.Library(target="integration_test_main",
 bmEnv = env.Clone()
 bmEnv.InjectThirdPartyIncludePaths(libraries=['benchmark'])
 bmEnv.Library(
-    target="benchmark_main",
+    target='benchmark_main',
     source=[
         'benchmark_main.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/shim_benchmark',
     ],
 )
 
@@ -54,9 +55,12 @@ env.CppUnitTest('fixture_test', 'fixture_test.cpp')
 env.CppUnitTest('temp_dir_test', 'temp_dir_test.cpp')
 
 env.Benchmark(
-    target='benchmark_test',
+    target='system_resource_canary_bm',
     source=[
-        'benchmark_test.cpp',
+        'system_resource_canary_bm.cpp'
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/processinfo',
     ],
 )
 
