@@ -16,7 +16,7 @@
  *    As a special exception, the copyright holders give permission to link the
  *    code of portions of this program with the OpenSSL library under certain
  *    conditions as described in each individual source file and distribute
- *    linked combinations including the prograxm with the OpenSSL library. You
+ *    linked combinations including the program with the OpenSSL library. You
  *    must comply with the GNU Affero General Public License in all respects for
  *    all of the code used other than as permitted herein. If you modify file(s)
  *    with this exception, you may extend this exception to your version of the
@@ -30,21 +30,54 @@
 
 #include <benchmark/benchmark.h>
 
+#include "mongo/util/clock_source.h"
+#include "mongo/util/fast_clock_source_factory.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/system_clock_source.h"
+
+namespace mongo {
 namespace {
 
-// This is a trivial test case to sanity check that "benchmark" runs.
-// For more information on how benchmarks should be written, please refer to Google Benchmark's
-// excellent README: https://github.com/google/benchmark/blob/v1.3.0/README.md
-void BM_empty(benchmark::State& state) {
+/**
+ * Benchmark calls to the now() method of a clock source. With an argument of 0,
+ * tests the system clock source, and with larger values, uses the FastClockSource
+ * with a clock resolution of the specified number of milliseconds.
+ *
+ * All threads executing the benchmark use the same instance of the clock source,
+ * to allow benchmarking to identify synchronization costs inside the now() method.
+ */
+void BM_ClockNow(benchmark::State& state) {
+    static std::unique_ptr<ClockSource> clock;
+    if (state.thread_index == 0) {
+        if (state.range(0) > 0) {
+            clock = FastClockSourceFactory::create(Milliseconds{state.range(0)});
+        } else if (state.range(0) == 0) {
+            clock = std::make_unique<SystemClockSource>();
+        } else {
+            state.SkipWithError("poll period must be non-negative");
+            return;
+        }
+    }
+
     for (auto keepRunning : state) {
-        // The code inside this for-loop is what's being timed.
-        benchmark::DoNotOptimize(state.iterations());
+        benchmark::DoNotOptimize(clock->now());
+    }
+
+    if (state.thread_index == 0) {
+        clock.reset();
     }
 }
 
-// Register two benchmarks, one runs the "BM_empty" function in a single thread, the other runs a
-// copy per CPU core.
-BENCHMARK(BM_empty);
-BENCHMARK(BM_empty)->ThreadPerCpu();
+BENCHMARK(BM_ClockNow)
+    ->ThreadRange(1,
+                  [] {
+                      ProcessInfo pi;
+                      return static_cast<int>(pi.getNumAvailableCores().value_or(pi.getNumCores()));
+                  }())
+    ->ArgName("poll period")
+    ->Arg(0)
+    ->Arg(1)
+    ->Arg(10);
 
 }  // namespace
+}  // namespace mongo

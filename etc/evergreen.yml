@@ -2360,7 +2360,7 @@ tasks:
             extra_args="$extra_args --jobs=${num_scons_compile_all_jobs_available|}"
           fi
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations $extra_args all ${additional_targets|} MONGO_VERSION=${version}
+          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations $extra_args all benchmarks ${additional_targets|} MONGO_VERSION=${version}
 
     - command: s3.put
       params:

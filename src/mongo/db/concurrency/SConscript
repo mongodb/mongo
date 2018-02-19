@@ -53,6 +53,16 @@ env.Library(
     ],
 )
 
+env.Benchmark(
+    target='lock_manager_bm',
+    source=[
+        'd_concurrency_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+        'lock_manager',
+    ])
+
 env.CppUnitTest(
     target='lock_manager_test',
     source=['d_concurrency_test.cpp',

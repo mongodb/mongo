@@ -29,7 +29,6 @@ def build_benchmark(env, target, source, **kwargs):
 
     libdeps = kwargs.get('LIBDEPS', [])
     libdeps.append('$BUILD_DIR/mongo/unittest/benchmark_main')
-    libdeps.append('$BUILD_DIR/third_party/shim_benchmark')
 
     kwargs['LIBDEPS'] = libdeps
 
