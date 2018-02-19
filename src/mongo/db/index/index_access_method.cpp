@@ -46,8 +46,6 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/logical_clock.h"
-#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
@@ -69,8 +67,9 @@ using IndexVersion = IndexDescriptor::IndexVersion;
 namespace {
 
 /**
- * Returns true if at least one prefix of any of the indexed fields causes the index to be multikey,
- * and returns false otherwise. This function returns false if the 'multikeyPaths' vector is empty.
+ * Returns true if at least one prefix of any of the indexed fields causes the index to be
+ * multikey, and returns false otherwise. This function returns false if the 'multikeyPaths'
+ * vector is empty.
  */
 bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
     return std::any_of(multikeyPaths.cbegin(),
@@ -79,7 +78,6 @@ bool isMultikeyFromPaths(const MultikeyPaths& multikeyPaths) {
 }
 
 }  // namespace
-
 MONGO_EXPORT_SERVER_PARAMETER(failIndexKeyTooLong, bool, true);
 
 //
@@ -474,21 +472,13 @@ Status IndexAccessMethod::BulkBuilder::insert(OperationContext* opCtx,
 
 
 Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
-                                     std::unique_ptr<BulkBuilder> bulk,
+                                     BulkBuilder* bulk,
                                      bool mayInterrupt,
                                      bool dupsAllowed,
-                                     set<RecordId>* dupsToDrop,
-                                     bool assignTimestamp) {
-    // Do not track multikey path info for index builds.
-    ScopeGuard restartTracker =
-        MakeGuard([opCtx] { MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo(); });
-    if (!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo()) {
-        restartTracker.Dismiss();
-    }
-    MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo();
+                                     set<RecordId>* dupsToDrop) {
     Timer timer;
 
-    std::unique_ptr<BulkBuilder::Sorter::Iterator> i(bulk->_sorter->done());
+    std::unique_ptr<BulkBuilder::Sorter::Iterator> it(bulk->_sorter->done());
 
     stdx::unique_lock<Client> lk(*opCtx->getClient());
     ProgressMeterHolder pm(
@@ -498,25 +488,10 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
                                              10));
     lk.unlock();
 
-    std::unique_ptr<SortedDataBuilderInterface> builder;
+    auto builder = std::unique_ptr<SortedDataBuilderInterface>(
+        _newInterface->getBulkBuilder(opCtx, dupsAllowed));
 
-    writeConflictRetry(opCtx, "setting index multikey flag", "", [&] {
-        WriteUnitOfWork wunit(opCtx);
-
-        if (bulk->_everGeneratedMultipleKeys || isMultikeyFromPaths(bulk->_indexMultikeyPaths)) {
-            _btreeState->setMultikey(opCtx, bulk->_indexMultikeyPaths);
-        }
-
-        builder.reset(_newInterface->getBulkBuilder(opCtx, dupsAllowed));
-        if (assignTimestamp) {
-            fassertStatusOK(50705,
-                            opCtx->recoveryUnit()->setTimestamp(
-                                LogicalClock::get(opCtx)->getClusterTime().asTimestamp()));
-        }
-        wunit.commit();
-    });
-
-    while (i->more()) {
+    while (it->more()) {
         if (mayInterrupt) {
             opCtx->checkForInterrupt();
         }
@@ -529,8 +504,8 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
         opCtx->recoveryUnit()->setRollbackWritesDisabled();
 
         // Get the next datum and add it to the builder.
-        BulkBuilder::Sorter::Data d = i->next();
-        Status status = builder->addKey(d.first, d.second);
+        BulkBuilder::Sorter::Data data = it->next();
+        Status status = builder->addKey(data.first, data.second);
 
         if (!status.isOK()) {
             // Overlong key that's OK to skip?
@@ -543,7 +518,7 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
                 invariant(!dupsAllowed);  // shouldn't be getting DupKey errors if dupsAllowed.
 
                 if (dupsToDrop) {
-                    dupsToDrop->insert(d.second);
+                    dupsToDrop->insert(data.second);
                     continue;
                 }
             }
@@ -554,11 +529,6 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
         // If we're here either it's a dup and we're cool with it or the addKey went just
         // fine.
         pm.hit();
-        if (assignTimestamp) {
-            fassertStatusOK(50704,
-                            opCtx->recoveryUnit()->setTimestamp(
-                                LogicalClock::get(opCtx)->getClusterTime().asTimestamp()));
-        }
         wunit.commit();
     }
 
@@ -572,11 +542,6 @@ Status IndexAccessMethod::commitBulk(OperationContext* opCtx,
 
     LOG(timer.seconds() > 10 ? 0 : 1) << "\t done building bottom layer, going to commit";
 
-    std::unique_ptr<TimestampBlock> tsBlock;
-    if (assignTimestamp) {
-        tsBlock = stdx::make_unique<TimestampBlock>(
-            opCtx, LogicalClock::get(opCtx)->getClusterTime().asTimestamp());
-    }
     builder->commit(mayInterrupt);
     return Status::OK();
 }
@@ -641,6 +606,10 @@ void IndexAccessMethod::getKeys(const BSONObj& obj,
         LOG(1) << "Ignoring indexing error for idempotency reasons: " << redact(ex)
                << " when getting index keys of " << redact(obj);
     }
+}
+
+bool IndexAccessMethod::BulkBuilder::isMultikey() const {
+    return _everGeneratedMultipleKeys || isMultikeyFromPaths(_indexMultikeyPaths);
 }
 
 }  // namespace mongo

@@ -43,11 +43,12 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/logical_clock.h"
+#include "mongo/db/multi_key_path_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/stdx/mutex.h"
@@ -57,6 +58,7 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -68,6 +70,7 @@ MONGO_INITIALIZER(InitializeMultiIndexBlockFactory)(InitializerContext* const) {
         });
     return Status::OK();
 }
+
 
 /**
  * Returns true if writes to the catalog entry for the input namespace require being
@@ -490,18 +493,16 @@ Status MultiIndexBlockImpl::insert(const BSONObj& doc, const RecordId& loc) {
 
 Status MultiIndexBlockImpl::doneInserting(std::set<RecordId>* dupsOut) {
     invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
-    const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].bulk == NULL)
             continue;
         LOG(1) << "\t bulk commit starting for index: "
                << _indexes[i].block->getEntry()->descriptor()->indexName();
         Status status = _indexes[i].real->commitBulk(_opCtx,
-                                                     std::move(_indexes[i].bulk),
+                                                     _indexes[i].bulk.get(),
                                                      _allowInterruption,
                                                      _indexes[i].options.dupsAllowed,
-                                                     dupsOut,
-                                                     requiresCommitTimestamp);
+                                                     dupsOut);
         if (!status.isOK()) {
             return status;
         }
@@ -518,8 +519,23 @@ void MultiIndexBlockImpl::abortWithoutCleanup() {
 void MultiIndexBlockImpl::commit() {
     const bool requiresCommitTimestamp = requiresGhostCommitTimestamp(_opCtx, _collection->ns());
 
+    // Do not interfere with writing multikey information when committing index builds.
+    auto restartTracker =
+        MakeGuard([this] { MultikeyPathTracker::get(_opCtx).startTrackingMultikeyPathInfo(); });
+    if (!MultikeyPathTracker::get(_opCtx).isTrackingMultikeyPathInfo()) {
+        restartTracker.Dismiss();
+    }
+    MultikeyPathTracker::get(_opCtx).stopTrackingMultikeyPathInfo();
+
     for (size_t i = 0; i < _indexes.size(); i++) {
         _indexes[i].block->success();
+
+        if (_indexes[i].bulk) {
+            const auto& bulkBuilder = _indexes[i].bulk;
+            if (bulkBuilder->isMultikey()) {
+                _indexes[i].block->getEntry()->setMultikey(_opCtx, bulkBuilder->getMultikeyPaths());
+            }
+        }
     }
 
     if (requiresCommitTimestamp) {
