@@ -155,5 +155,7 @@ inline bool operator==(const OplogEntry& lhs, const OplogEntry& rhs) {
     return SimpleBSONObjComparator::kInstance.evaluate(lhs.raw == rhs.raw);
 }
 
+std::ostream& operator<<(std::ostream& s, const ReplOperation& o);
+
 }  // namespace repl
 }  // namespace mongo

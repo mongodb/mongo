@@ -608,5 +608,39 @@ TEST_F(SessionTest, CheckAutocommitOnlyAllowedAtBeginningOfTxn) {
                        ErrorCodes::IllegalOperation);
 }
 
+TEST_F(SessionTest, SameTransactionPreservesStoredStatements) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 22;
+    session.beginOrContinueTxn(opCtx(), txnNum, false);
+    WriteUnitOfWork wuow(opCtx());
+    auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+    session.addTransactionOperation(opCtx(), operation);
+    ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
+
+    // Re-opening the same transaction should have no effect.
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
+    ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
+}
+
+TEST_F(SessionTest, RollbackClearsStoredStatements) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    const TxnNumber txnNum = 24;
+    session.beginOrContinueTxn(opCtx(), txnNum, false);
+    {
+        WriteUnitOfWork wuow(opCtx());
+        auto operation = repl::OplogEntry::makeInsertOperation(kNss, kUUID, BSON("TestValue" << 0));
+        session.addTransactionOperation(opCtx(), operation);
+        ASSERT_BSONOBJ_EQ(operation.toBSON(), session.transactionOperationsForTest()[0].toBSON());
+        // Since the WriteUnitOfWork was not committed, it will implicitly roll back.
+    }
+    ASSERT_TRUE(session.transactionOperationsForTest().empty());
+}
+
 }  // anonymous
 }  // namespace mongo

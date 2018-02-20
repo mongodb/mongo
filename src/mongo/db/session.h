@@ -104,7 +104,6 @@ public:
      */
     void beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber txnNumber);
 
-
     /**
      * Called after a write under the specified transaction completes while the node is a primary
      * and specifies the statement ids which were written. Must be called while the caller is still
@@ -209,6 +208,33 @@ public:
         return _autocommit;
     }
 
+    /**
+     * Returns whether we are in a multi-document transaction, which means we have an active
+     * transaction which has autoCommit:false and has not been committed or aborted.
+     */
+    bool inMultiDocumentTransaction() const {
+        stdx::lock_guard<stdx::mutex> lk(_mutex);
+        return _txnState == MultiDocumentTransactionState::kInProgress;
+    };
+
+    /**
+     * Adds a stored operation to the list of stored operations for the current multi-document
+     * (non-autocommit) transaction.  It is illegal to add operations when no multi-document
+     * transaction is in progress.
+     */
+    void addTransactionOperation(OperationContext* opCtx, const repl::ReplOperation& operation);
+
+    /**
+     * Returns and clears the stored operations for an multi-document (non-autocommit) transaction,
+     * and marks the transaction as closed.  It is illegal to attempt to add operations to the
+     * transaction after this is called.
+     */
+    std::vector<repl::ReplOperation> endTransactionAndRetrieveOperations();
+
+    const std::vector<repl::ReplOperation>& transactionOperationsForTest() {
+        return _transactionOperations;
+    }
+
 private:
     void _beginOrContinueTxn(WithLock, TxnNumber txnNumber, boost::optional<bool> autocommit);
 
@@ -276,6 +302,21 @@ private:
     // Holds a transaction's RecoveryUnit while not active. Combined with stashing of the Locker,
     // this allows transaction state to be maintained across network operations.
     std::unique_ptr<RecoveryUnit> _stashedRecoveryUnit;
+
+    // Indicates the state of the current multi-document transaction, if any.
+    // If the transaction is in any state but kInProgress, no more operations can
+    // be collected.
+    enum class MultiDocumentTransactionState {
+        kNone,
+        kInProgress,
+        kCommitting,
+        kCommitted,
+        kAborted
+    } _txnState;
+
+    // Holds oplog data for operations which have been applied in the current multi-document
+    // transaction.  Not used for retryable writes.
+    std::vector<repl::ReplOperation> _transactionOperations;
 
     // For the active txn, tracks which statement ids have been committed and at which oplog
     // opTime. Used for fast retryability check and retrieving the previous write's data without

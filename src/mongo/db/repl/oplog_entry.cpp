@@ -289,5 +289,9 @@ std::ostream& operator<<(std::ostream& s, const OplogEntry& o) {
     return s << o.toString();
 }
 
+std::ostream& operator<<(std::ostream& s, const ReplOperation& o) {
+    return s << o.toBSON().toString();
+}
+
 }  // namespace repl
 }  // namespace mongo

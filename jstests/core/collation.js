@@ -11,6 +11,8 @@
     load("jstests/libs/get_index_helpers.js");
     // For isMMAPv1.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");
+    // For isReplSet
+    load("jstests/libs/fixture_helpers.js");
 
     var coll = db.collation;
     coll.drop();
@@ -1973,39 +1975,47 @@
     }
 
     // doTxn
-    if (!isMongos && !isMMAPv1(db)) {
+    if (FixtureHelpers.isReplSet(db) && !isMongos && !isMMAPv1(db)) {
+        const session = db.getMongo().startSession();
+        const sessionDb = session.getDatabase(db.getName());
         coll.drop();
         assert.commandWorked(
             db.createCollection("collation", {collation: {locale: "en_US", strength: 2}}));
         assert.writeOK(coll.insert({_id: "foo", x: 5, str: "bar"}));
 
         // preCondition.q respects collection default collation.
-        assert.commandFailed(db.runCommand({
+        assert.commandFailed(sessionDb.runCommand({
             doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 6}}}],
-            preCondition: [{ns: coll.getFullName(), q: {_id: "not foo"}, res: {str: "bar"}}]
+            preCondition: [{ns: coll.getFullName(), q: {_id: "not foo"}, res: {str: "bar"}}],
+            txnNumber: NumberLong("0")
         }));
         assert.eq(5, coll.findOne({_id: "foo"}).x);
-        assert.commandWorked(db.runCommand({
+        assert.commandWorked(sessionDb.runCommand({
             doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 6}}}],
-            preCondition: [{ns: coll.getFullName(), q: {_id: "FOO"}, res: {str: "bar"}}]
+            preCondition: [{ns: coll.getFullName(), q: {_id: "FOO"}, res: {str: "bar"}}],
+            txnNumber: NumberLong("1")
         }));
         assert.eq(6, coll.findOne({_id: "foo"}).x);
 
         // preCondition.res respects collection default collation.
-        assert.commandFailed(db.runCommand({
+        assert.commandFailed(sessionDb.runCommand({
             doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 7}}}],
-            preCondition: [{ns: coll.getFullName(), q: {_id: "foo"}, res: {str: "not bar"}}]
+            preCondition: [{ns: coll.getFullName(), q: {_id: "foo"}, res: {str: "not bar"}}],
+            txnNumber: NumberLong("2")
         }));
         assert.eq(6, coll.findOne({_id: "foo"}).x);
-        assert.commandWorked(db.runCommand({
+        assert.commandWorked(sessionDb.runCommand({
             doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "foo"}, o: {$set: {x: 7}}}],
-            preCondition: [{ns: coll.getFullName(), q: {_id: "foo"}, res: {str: "BAR"}}]
+            preCondition: [{ns: coll.getFullName(), q: {_id: "foo"}, res: {str: "BAR"}}],
+            txnNumber: NumberLong("3")
         }));
         assert.eq(7, coll.findOne({_id: "foo"}).x);
 
         // <operation>.o2 respects collection default collation.
-        assert.commandWorked(db.runCommand(
-            {doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "FOO"}, o: {$set: {x: 8}}}]}));
+        assert.commandWorked(sessionDb.runCommand({
+            doTxn: [{op: "u", ns: coll.getFullName(), o2: {_id: "FOO"}, o: {$set: {x: 8}}}],
+            txnNumber: NumberLong("4")
+        }));
         assert.eq(8, coll.findOne({_id: "foo"}).x);
     }
 

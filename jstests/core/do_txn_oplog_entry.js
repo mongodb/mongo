@@ -6,47 +6,60 @@
 
     // For isMMAPv1.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");
+    // For isReplSet
+    load("jstests/libs/fixture_helpers.js");
 
     if (isMMAPv1(db)) {
         jsTestLog("Skipping test as the storage engine does not support doTxn.");
         return;
     }
+    if (!FixtureHelpers.isReplSet(db)) {
+        jsTestLog("Skipping test as doTxn requires a replSet and replication is not enabled.");
+        return;
+    }
+
+    var session = db.getMongo().startSession();
+    var sessionDb = session.getDatabase("test");
+    var txnNumber = 0;
 
     var t = db.doTxn;
     t.drop();
     assert.writeOK(t.insert({_id: 1}));
 
     // Operations including commands are not allowed and should be rejected completely.
-    assert.commandFailedWithCode(db.adminCommand({
+    assert.commandFailedWithCode(sessionDb.adminCommand({
         doTxn: [
             {op: 'i', ns: t.getFullName(), o: {_id: ObjectId(), x: 1}},
             {op: 'c', ns: "invalid", o: {create: "t"}},
-        ]
+        ],
+        txnNumber: NumberLong(txnNumber++)
     }),
                                  ErrorCodes.InvalidOptions);
     assert.eq(t.count({x: 1}), 0);
 
     // Operations only including CRUD commands should be atomic, so the next insert will fail.
     var tooLong = Array(2000).join("hello");
-    assert.commandFailedWithCode(db.adminCommand({
+    assert.commandFailedWithCode(sessionDb.adminCommand({
         doTxn: [
             {op: 'i', ns: t.getFullName(), o: {_id: ObjectId(), x: 1}},
             {op: 'i', ns: t.getFullName(), o: {_id: tooLong, x: 1}},
-        ]
+        ],
+        txnNumber: NumberLong(txnNumber++)
     }),
                                  ErrorCodes.KeyTooLong);
     assert.eq(t.count({x: 1}), 0);
 
     // Operations on non-existent databases cannot be atomic.
     var newDBName = "do_txn_atomicity";
-    var newDB = db.getSiblingDB(newDBName);
+    var newDB = sessionDb.getSiblingDB(newDBName);
     assert.commandWorked(newDB.dropDatabase());
     // Updates on a non-existent database no longer implicitly create collections and will fail with
     // a NamespaceNotFound error.
-    assert.commandFailedWithCode(
-        newDB.runCommand(
-            {doTxn: [{op: "u", ns: newDBName + ".foo", o: {_id: 5, x: 17}, o2: {_id: 5, x: 16}}]}),
-        ErrorCodes.NamespaceNotFound);
+    assert.commandFailedWithCode(newDB.runCommand({
+        doTxn: [{op: "u", ns: newDBName + ".foo", o: {_id: 5, x: 17}, o2: {_id: 5, x: 16}}],
+        txnNumber: NumberLong(txnNumber++)
+    }),
+                                 ErrorCodes.NamespaceNotFound);
 
     var sawTooManyLocksError = false;
 
@@ -66,7 +79,8 @@
             multiOps.push({op: 'i', ns: newDBName + "." + multiName, o: {_id: 0, x: [0, 1]}});
         }
 
-        let res = [cappedOps, multiOps].map((doTxn) => newDB.runCommand({doTxn}));
+        let res = [cappedOps, multiOps].map(
+            (doTxn) => newDB.runCommand({doTxn: doTxn, txnNumber: NumberLong(txnNumber++)}));
         sawTooManyLocksError |= res.some((res) => res.code === ErrorCodes.TooManyLocks);
         // Transactions involving just two collections should succeed.
         if (n <= 2)

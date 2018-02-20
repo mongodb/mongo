@@ -17,6 +17,8 @@
 
     // For isMMAPv1.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");
+    // For isReplSet
+    load("jstests/libs/fixture_helpers.js");
 
     function assertFailsValidation(res) {
         if (res instanceof WriteResult || res instanceof BulkWriteResult) {
@@ -53,12 +55,16 @@
             assert.eq(1, coll.count({_id: 9}));
         }
 
-        // Test doTxn with a simple insert if not on mongos and not on MMAPv1.
-        if (!isMongos && !isMMAPv1(db)) {
+        // Test doTxn with a simple insert if a replica set, not on mongos and not on MMAPv1.
+        if (FixtureHelpers.isReplSet(db) && !isMongos && !isMMAPv1(db)) {
+            const session = db.getMongo().startSession();
+            const sessionDb = session.getDatabase(myDb.getName());
             const op = [{op: 'i', ns: coll.getFullName(), o: {_id: 10}}];
-            assertFailsValidation(myDb.runCommand({doTxn: op, bypassDocumentValidation: false}));
+            assertFailsValidation(sessionDb.runCommand(
+                {doTxn: op, bypassDocumentValidation: false, txnNumber: NumberLong("0")}));
             assert.eq(0, coll.count({_id: 10}));
-            assert.commandWorked(myDb.runCommand({doTxn: op, bypassDocumentValidation: true}));
+            assert.commandWorked(sessionDb.runCommand(
+                {doTxn: op, bypassDocumentValidation: true, txnNumber: NumberLong("1")}));
             assert.eq(1, coll.count({_id: 10}));
         }
 

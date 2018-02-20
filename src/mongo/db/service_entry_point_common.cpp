@@ -106,6 +106,7 @@ const StringMap<int> sessionCheckoutWhitelist = {{"aggregate", 1},
                                                  {"count", 1},
                                                  {"delete", 1},
                                                  {"distinct", 1},
+                                                 {"doTxn", 1},
                                                  {"eval", 1},
                                                  {"$eval", 1},
                                                  {"explain", 1},
@@ -500,6 +501,11 @@ void execCommandDatabase(OperationContext* opCtx,
         boost::optional<bool> autocommitVal = boost::none;
         if (sessionOptions && sessionOptions->getAutocommit()) {
             autocommitVal = *sessionOptions->getAutocommit();
+        } else if (sessionOptions && command->getName() == "doTxn") {
+            // Autocommit is overridden specifically for doTxn to get the oplog entry generation
+            // behavior used for multi-document transactions.
+            // The doTxn command still logically behaves as a commit.
+            autocommitVal = false;
         }
 
         OperationContextSession sessionTxnState(opCtx, shouldCheckoutSession, autocommitVal);

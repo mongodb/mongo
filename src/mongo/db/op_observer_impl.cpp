@@ -55,6 +55,7 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+using repl::OplogEntry;
 namespace {
 
 MONGO_FP_DECLARE(failCollectionUpdates);
@@ -254,6 +255,31 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     return opTimes;
 }
 
+/**
+ * Write oplog entry for applyOps/atomic transaction operations.
+ */
+OpTimeBundle replLogApplyOps(OperationContext* opCtx,
+                             const NamespaceString& cmdNss,
+                             const BSONObj& applyOpCmd,
+                             const OperationSessionInfo& sessionInfo,
+                             StmtId stmtId,
+                             const repl::OplogLink& oplogLink) {
+    OpTimeBundle times;
+    times.wallClockTime = getWallClockTimeForOpLog(opCtx);
+    times.writeOpTime = repl::logOp(opCtx,
+                                    "c",
+                                    cmdNss,
+                                    {},
+                                    applyOpCmd,
+                                    nullptr,
+                                    false,
+                                    times.wallClockTime,
+                                    sessionInfo,
+                                    stmtId,
+                                    oplogLink);
+    return times;
+}
+
 }  // namespace
 
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
@@ -313,6 +339,13 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator end,
                                bool fromMigrate) {
     Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
+    if (session && opCtx->writesAreReplicated() && session->inMultiDocumentTransaction()) {
+        for (auto iter = begin; iter != end; iter++) {
+            auto operation = OplogEntry::makeInsertOperation(nss, uuid, iter->doc);
+            session->addTransactionOperation(opCtx, operation);
+        }
+        return;
+    }
 
     const auto lastWriteDate = getWallClockTimeForOpLog(opCtx);
 
@@ -377,6 +410,12 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     }
 
     Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
+    if (session && opCtx->writesAreReplicated() && session->inMultiDocumentTransaction()) {
+        auto operation =
+            OplogEntry::makeUpdateOperation(args.nss, args.uuid, args.update, args.criteria);
+        session->addTransactionOperation(opCtx, operation);
+        return;
+    }
     const auto opTime = replLogUpdate(opCtx, session, args);
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -427,10 +466,15 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               StmtId stmtId,
                               bool fromMigrate,
                               const boost::optional<BSONObj>& deletedDoc) {
+    Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
     auto& deleteState = getDeleteState(opCtx);
     invariant(!deleteState.documentKey.isEmpty());
-
-    Session* const session = opCtx->getTxnNumber() ? OperationContextSession::get(opCtx) : nullptr;
+    if (session && opCtx->writesAreReplicated() && session->inMultiDocumentTransaction()) {
+        auto operation = OplogEntry::makeDeleteOperation(
+            nss, uuid, deletedDoc ? deletedDoc.get() : deleteState.documentKey);
+        session->addTransactionOperation(opCtx, operation);
+        return;
+    }
     const auto opTime = replLogDelete(opCtx, nss, uuid, session, stmtId, fromMigrate, deletedDoc);
 
     AuthorizationManager::get(opCtx->getServiceContext())
@@ -739,17 +783,7 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
                                 const std::string& dbName,
                                 const BSONObj& applyOpCmd) {
     const NamespaceString cmdNss{dbName, "$cmd"};
-    repl::logOp(opCtx,
-                "c",
-                cmdNss,
-                {},
-                applyOpCmd,
-                nullptr,
-                false,
-                getWallClockTimeForOpLog(opCtx),
-                {},
-                kUninitializedStmtId,
-                {});
+    replLogApplyOps(opCtx, cmdNss, applyOpCmd, {}, kUninitializedStmtId, {});
 
     AuthorizationManager::get(opCtx->getServiceContext())
         ->logOp(opCtx, "c", cmdNss, applyOpCmd, nullptr);
@@ -782,6 +816,38 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
 
 void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
     invariant(opCtx->getTxnNumber());
+    Session* const session = OperationContextSession::get(opCtx);
+    invariant(session);
+    invariant(session->inMultiDocumentTransaction());
+    auto stmts = session->endTransactionAndRetrieveOperations();
+
+    // It is possible that the transaction resulted in no changes.  In that case, we should
+    // not write an empty applyOps entry.
+    if (stmts.empty())
+        return;
+
+    BSONObjBuilder applyOpsBuilder;
+    BSONArrayBuilder opsArray(applyOpsBuilder.subarrayStart("applyOps"_sd));
+    for (auto& stmt : stmts) {
+        opsArray.append(stmt.toBSON());
+    }
+    opsArray.done();
+    const auto dbName = stmts[0].getNamespace().db().toString();
+    const NamespaceString cmdNss{dbName, "$cmd"};
+
+    OperationSessionInfo sessionInfo;
+    repl::OplogLink oplogLink;
+    sessionInfo.setSessionId(*opCtx->getLogicalSessionId());
+    sessionInfo.setTxnNumber(*opCtx->getTxnNumber());
+    StmtId stmtId(0);
+    oplogLink.prevOpTime = session->getLastWriteOpTime(*opCtx->getTxnNumber());
+    // Until we support multiple oplog entries per transaction, prevOpTime should always be null.
+    invariant(oplogLink.prevOpTime.isNull());
+
+    auto applyOpCmd = applyOpsBuilder.done();
+    auto times = replLogApplyOps(opCtx, cmdNss, applyOpCmd, sessionInfo, stmtId, oplogLink);
+
+    onWriteOpCompleted(opCtx, cmdNss, session, {stmtId}, times.writeOpTime, times.wallClockTime);
 }
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {
