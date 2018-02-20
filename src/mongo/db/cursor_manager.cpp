@@ -262,13 +262,20 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t 
     // For each collection, time out its cursors under the collection lock (to prevent the
     // collection from going away during the erase).
     for (const auto& nsTodo : todo) {
-        AutoGetCollectionForReadCommand ctx(opCtx, nsTodo);
+        // Note that we specify 'kViewsPermitted' here, even though we don't expect 'nsTodo' to be a
+        // view. Because we are not holding the mutex anymore, it is possible that the collection we
+        // are trying to access has since been destroyed and a view of the same name has been
+        // created in its place. Without 'kViewsPermitted' here, that would result in a uassert that
+        // would crash the cursor cleaner background thread.
+        AutoGetCollectionForReadCommand ctx(
+            opCtx, nsTodo, AutoGetCollection::ViewMode::kViewsPermitted);
         if (!ctx.getDb()) {
             continue;
         }
 
         Collection* const collection = ctx.getCollection();
         if (!collection) {
+            // The 'nsTodo' collection has been dropped since we held _mutex. We can safely skip it.
             continue;
         }
 
