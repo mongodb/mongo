@@ -57,6 +57,14 @@ public:
         : _tls(std::move(tls)) {}
     TransportLayerManager();
 
+    StatusWith<SessionHandle> connect(HostAndPort peer,
+                                      ConnectSSLMode sslMode,
+                                      Milliseconds timeout) override;
+    void asyncConnect(HostAndPort peer,
+                      ConnectSSLMode sslMode,
+                      Milliseconds timeout,
+                      std::function<void(StatusWith<SessionHandle>)> callback) override;
+
     Status start() override;
     void shutdown() override;
     Status setup() override;

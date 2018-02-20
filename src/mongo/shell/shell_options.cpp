@@ -281,6 +281,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
 #endif
     if (params.count("ipv6")) {
         mongo::enableIPv6();
+        shellGlobalParams.enableIPv6 = true;
     }
     if (params.count("verbose")) {
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));

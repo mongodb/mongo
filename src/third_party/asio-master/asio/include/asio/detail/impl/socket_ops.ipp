@@ -491,7 +491,7 @@ int connect(socket_type s, const socket_addr_type* addr,
 }
 
 void sync_connect(socket_type s, const socket_addr_type* addr,
-    std::size_t addrlen, asio::error_code& ec)
+    std::size_t addrlen, int timeout_ms, asio::error_code& ec)
 {
   // Perform the connect operation.
   socket_ops::connect(s, addr, addrlen, ec);
@@ -503,8 +503,15 @@ void sync_connect(socket_type s, const socket_addr_type* addr,
   }
 
   // Wait for socket to become ready.
-  if (socket_ops::poll_connect(s, -1, ec) < 0)
+  int res = socket_ops::poll_connect(s, timeout_ms, ec);
+  if (res < 0)
     return;
+
+  if (res == 0)
+  {
+    ec = asio::error::timed_out;
+    return;
+  }
 
   // Get the error code from the connect operation.
   int connect_error = 0;

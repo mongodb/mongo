@@ -104,7 +104,7 @@ ASIO_DECL int connect(socket_type s, const socket_addr_type* addr,
     std::size_t addrlen, asio::error_code& ec);
 
 ASIO_DECL void sync_connect(socket_type s, const socket_addr_type* addr,
-    std::size_t addrlen, asio::error_code& ec);
+    std::size_t addrlen, int timeout_ms, asio::error_code& ec);
 
 #if defined(ASIO_HAS_IOCP)
 

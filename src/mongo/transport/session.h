@@ -122,6 +122,16 @@ public:
     */
     virtual void setTimeout(boost::optional<Milliseconds> timeout) = 0;
 
+    /**
+     * This will return whether calling sourceMessage()/sinkMessage() will fail with an EOF error.
+     *
+     * Implementations may actually perform some I/O or call syscalls to determine this, rather
+     * than just checking a flag.
+     *
+     * This must not be called while the session is currently sourcing or sinking a message.
+     */
+    virtual bool isConnected() = 0;
+
     virtual const HostAndPort& remote() const = 0;
     virtual const HostAndPort& local() const = 0;
 

@@ -37,6 +37,8 @@
 namespace mongo {
 namespace transport {
 
+enum ConnectSSLMode { kGlobalSSLMode, kEnableSSL, kDisableSSL };
+
 /**
  * The TransportLayer moves Messages between transport::Endpoints and the database.
  * This class owns an Acceptor that generates new endpoints from which it can
@@ -62,6 +64,15 @@ public:
     friend class Session;
 
     virtual ~TransportLayer() = default;
+
+    virtual StatusWith<SessionHandle> connect(HostAndPort peer,
+                                              ConnectSSLMode sslMode,
+                                              Milliseconds timeout) = 0;
+
+    virtual void asyncConnect(HostAndPort peer,
+                              ConnectSSLMode sslMode,
+                              Milliseconds timeout,
+                              std::function<void(StatusWith<SessionHandle>)> callback) = 0;
 
     /**
      * Start the TransportLayer. After this point, the TransportLayer will begin accepting active

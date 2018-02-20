@@ -77,6 +77,19 @@ public:
         explicit Options(const ServerGlobalParams* params);
         Options() = default;
 
+        constexpr static auto kIngress = 0x1;
+        constexpr static auto kEgress = 0x10;
+
+        int mode = kIngress | kEgress;
+
+        bool isIngress() const {
+            return mode & kIngress;
+        }
+
+        bool isEgress() const {
+            return mode & kEgress;
+        }
+
         int port = ServerGlobalParams::DefaultDBPort;  // port to bind to
         std::string ipList;                            // addresses to bind to
 #ifndef _WIN32
@@ -91,6 +104,14 @@ public:
     TransportLayerASIO(const Options& opts, ServiceEntryPoint* sep);
 
     virtual ~TransportLayerASIO();
+
+    StatusWith<SessionHandle> connect(HostAndPort peer,
+                                      ConnectSSLMode sslMode,
+                                      Milliseconds timeout) final;
+    void asyncConnect(HostAndPort peer,
+                      ConnectSSLMode sslMode,
+                      Milliseconds timeout,
+                      std::function<void(StatusWith<SessionHandle>)> callback) final;
 
     Status setup() final;
     Status start() final;
@@ -111,6 +132,12 @@ private:
     using GenericAcceptor = asio::basic_socket_acceptor<asio::generic::stream_protocol>;
 
     void _acceptConnection(GenericAcceptor& acceptor);
+
+    template <typename Endpoint>
+    StatusWith<ASIOSessionHandle> _doSyncConnect(Endpoint endpoint,
+                                                 const HostAndPort& peer,
+                                                 const Milliseconds& timeout);
+
 #ifdef MONGO_CONFIG_SSL
     SSLParams::SSLModes _sslMode() const;
 #endif
@@ -144,7 +171,8 @@ private:
     std::unique_ptr<asio::io_context> _acceptorIOContext;
 
 #ifdef MONGO_CONFIG_SSL
-    std::unique_ptr<asio::ssl::context> _sslContext;
+    std::unique_ptr<asio::ssl::context> _ingressSSLContext;
+    std::unique_ptr<asio::ssl::context> _egressSSLContext;
 #endif
 
     std::vector<std::pair<SockAddr, GenericAcceptor>> _acceptors;

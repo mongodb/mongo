@@ -52,6 +52,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/log.h"
 
 using namespace mongo::repl;
@@ -109,6 +110,15 @@ public:
         if (mongo::storageGlobalParams.engine == "mobile") {
             return;
         }
+
+        transport::TransportLayerASIO::Options opts;
+        opts.mode = transport::TransportLayerASIO::Options::kEgress;
+        auto sc = getGlobalServiceContext();
+
+        sc->setTransportLayer(std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
+        ASSERT_OK(sc->getTransportLayer()->setup());
+        ASSERT_OK(sc->getTransportLayer()->start());
+
         ReplSettings replSettings;
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);
         replSettings.setMaster(true);
@@ -154,6 +164,7 @@ public:
                 ->setFollowerMode(repl::MemberState::RS_PRIMARY)
                 .ignore();
 
+            getGlobalServiceContext()->getTransportLayer()->shutdown();
 
         } catch (...) {
             FAIL("Exception while cleaning up test");

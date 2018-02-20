@@ -52,7 +52,6 @@
 
 namespace mongo {
 
-class AbstractMessagingPort;
 class Collection;
 class OperationContext;
 

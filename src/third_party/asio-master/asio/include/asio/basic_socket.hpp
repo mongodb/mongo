@@ -760,7 +760,7 @@ public:
           peer_endpoint.protocol(), ec);
       asio::detail::throw_error(ec, "connect");
     }
-    this->get_service().connect(this->get_implementation(), peer_endpoint, ec);
+    this->get_service().connect(this->get_implementation(), peer_endpoint, -1, ec);
     asio::detail::throw_error(ec, "connect");
   }
 
@@ -805,7 +805,63 @@ public:
       }
     }
 
-    this->get_service().connect(this->get_implementation(), peer_endpoint, ec);
+    this->get_service().connect(this->get_implementation(), peer_endpoint, -1,  ec);
+    ASIO_SYNC_OP_VOID_RETURN(ec);
+  }
+
+  /// Connect the socket to the specified endpoint with a timeout.
+  /**
+   * This function is used to connect a socket to the specified remote endpoint.
+   * The function call will block until the connection is successfully made or
+   * an error occurs.
+   *
+   * The socket is automatically opened if it is not already open. If the
+   * connect fails, and the socket was automatically opened, the socket is
+   * not returned to the closed state.
+   *
+   * Passing a timeout of less than zero will return an invalid_argument error.
+   *
+   * @param peer_endpoint The remote endpoint to which the socket will be
+   * connected.
+   *
+   * @param timeout The time to wait for the connection before failing 
+   *
+   * @param ec Set to indicate what error occurred, if any.
+   *
+   * @par Example
+   * @code
+   * asio::ip::tcp::socket socket(io_context);
+   * asio::ip::tcp::endpoint endpoint(
+   *     asio::ip::address::from_string("1.2.3.4"), 12345);
+   * asio::error_code ec;
+   * socket.connect(endpoint, std::chrono::seconds{30}, ec);
+   * if (ec)
+   * {
+   *   // An error occurred.
+   * }
+   * @endcode
+   */
+  template <typename Duration>
+  ASIO_SYNC_OP_VOID connect(const endpoint_type& peer_endpoint,
+      Duration timeout, asio::error_code& ec)
+  {
+    if (!is_open())
+    {
+      this->get_service().open(this->get_implementation(),
+            peer_endpoint.protocol(), ec);
+      if (ec)
+      {
+        ASIO_SYNC_OP_VOID_RETURN(ec);
+      }
+    }
+
+    auto timeout_ms = std::chrono::duration_cast<std::chrono::milliseconds>(timeout);
+    if (timeout_ms.count() < 0)
+    {
+      ec = asio::error::invalid_argument;
+      ASIO_SYNC_OP_VOID_RETURN(ec);
+    }
+    this->get_service().connect(this->get_implementation(), peer_endpoint, timeout_ms.count(), ec);
     ASIO_SYNC_OP_VOID_RETURN(ec);
   }
 

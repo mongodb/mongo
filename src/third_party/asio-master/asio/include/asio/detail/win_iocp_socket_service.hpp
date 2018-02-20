@@ -562,10 +562,10 @@ public:
 
   // Connect the socket to the specified endpoint.
   asio::error_code connect(implementation_type& impl,
-      const endpoint_type& peer_endpoint, asio::error_code& ec)
+      const endpoint_type& peer_endpoint, int timeout_ms, asio::error_code& ec)
   {
     socket_ops::sync_connect(impl.socket_,
-        peer_endpoint.data(), peer_endpoint.size(), ec);
+        peer_endpoint.data(), peer_endpoint.size(), timeout_ms, ec);
     return ec;
   }
 

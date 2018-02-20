@@ -67,6 +67,19 @@ tlEnv.Library(
     ],
 )
 
+# This library will initialize an egress transport layer in a mongo initializer
+# for C++ tests that require networking.
+env.Library(
+    target='transport_layer_egress_init',
+    source=[
+        'transport_layer_egress_init.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'transport_layer',
+        '$BUILD_DIR/mongo/db/service_context_noop_init',
+    ]
+)
+
 tlEnv.CppUnitTest(
     target='transport_layer_asio_test',
     source=[

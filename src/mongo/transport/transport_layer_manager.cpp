@@ -59,6 +59,19 @@ void TransportLayerManager::_foreach(Callable&& cb) const {
     }
 }
 
+StatusWith<SessionHandle> TransportLayerManager::connect(HostAndPort peer,
+                                                         ConnectSSLMode sslMode,
+                                                         Milliseconds timeout) {
+    return _tls.front()->connect(peer, sslMode, timeout);
+}
+
+void TransportLayerManager::asyncConnect(HostAndPort peer,
+                                         ConnectSSLMode sslMode,
+                                         Milliseconds timeout,
+                                         std::function<void(StatusWith<SessionHandle>)> callback) {
+    MONGO_UNREACHABLE;
+}
+
 // TODO Right now this and setup() leave TLs started if there's an error. In practice the server
 // exits with an error and this isn't an issue, but we should make this more robust.
 Status TransportLayerManager::start() {

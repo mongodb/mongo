@@ -94,7 +94,7 @@ public:
             std::error_code ec;
             getSocket().cancel();
             getSocket().shutdown(GenericSocket::shutdown_both, ec);
-            if (ec) {
+            if ((ec) && (ec != asio::error::not_connected)) {
                 error() << "Error shutting down socket: " << ec.message();
             }
         }
@@ -163,6 +163,120 @@ public:
         _configuredTimeout = timeout;
     }
 
+    bool isConnected() override {
+        // socket.is_open() only returns whether the socket is a valid file descriptor and
+        // if we haven't marked this socket as closed already.
+        if (!getSocket().is_open())
+            return false;
+
+        auto swPollEvents = pollASIOSocket(getSocket(), POLLIN, Milliseconds{0});
+        if (!swPollEvents.isOK()) {
+            if (swPollEvents != ErrorCodes::NetworkTimeout) {
+                warning() << "Failed to poll socket for connectivity check: "
+                          << swPollEvents.getStatus();
+                return false;
+            }
+            return true;
+        }
+
+        auto revents = swPollEvents.getValue();
+        if (revents & POLLIN) {
+            char testByte;
+            int size = ::recv(getSocket().native_handle(), &testByte, sizeof(testByte), MSG_PEEK);
+            if (size == sizeof(testByte)) {
+                return true;
+            } else if (size == -1) {
+                auto errDesc = errnoWithDescription(errno);
+                warning() << "Failed to check socket connectivity: " << errDesc;
+            }
+            // If size == 0 then we got disconnected and we should return false.
+        }
+
+        return false;
+    }
+
+protected:
+    friend class TransportLayerASIO;
+
+#ifdef MONGO_CONFIG_SSL
+    template <typename HandshakeCb>
+    void handshakeSSLForEgress(HostAndPort target, HandshakeCb onComplete) {
+        if (!_tl->_egressSSLContext) {
+            return onComplete(
+                {ErrorCodes::SSLHandshakeFailed, "SSL requested but SSL support is disabled"});
+        }
+
+        _sslSocket.emplace(std::move(_socket), *_tl->_egressSSLContext);
+        auto handshakeCompleteCb =
+            [ this, target = std::move(target), onComplete = std::move(onComplete) ](
+                const std::error_code& ec) {
+            _ranHandshake = true;
+            if (ec) {
+                onComplete(errorCodeToStatus(ec));
+                return;
+            }
+
+            auto sslManager = getSSLManager();
+            auto swPeerInfo = sslManager->parseAndValidatePeerCertificate(
+                _sslSocket->native_handle(), target.host());
+            if (!swPeerInfo.isOK()) {
+                onComplete(swPeerInfo.getStatus());
+                return;
+            }
+
+            if (swPeerInfo.getValue()) {
+                SSLPeerInfo::forSession(shared_from_this()) = std::move(*swPeerInfo.getValue());
+            }
+
+            onComplete(Status::OK());
+        };
+        if (_blockingMode == Sync) {
+            std::error_code ec;
+            _sslSocket->handshake(asio::ssl::stream_base::client, ec);
+            handshakeCompleteCb(ec);
+        } else {
+            return _sslSocket->async_handshake(asio::ssl::stream_base::client,
+                                               std::move(handshakeCompleteCb));
+        }
+    }
+#endif
+
+    void ensureSync() {
+        asio::error_code ec;
+        if (_blockingMode != Sync) {
+            getSocket().non_blocking(false, ec);
+            fassertStatusOK(40490, errorCodeToStatus(ec));
+            _blockingMode = Sync;
+        }
+
+        if (_socketTimeout != _configuredTimeout) {
+            // Change boost::none (which means no timeout) into a zero value for the socket option,
+            // which also means no timeout.
+            auto timeout = _configuredTimeout.value_or(Milliseconds{0});
+            getSocket().set_option(ASIOSocketTimeoutOption<SO_SNDTIMEO>(timeout), ec);
+            uassertStatusOK(errorCodeToStatus(ec));
+
+            getSocket().set_option(ASIOSocketTimeoutOption<SO_RCVTIMEO>(timeout), ec);
+            uassertStatusOK(errorCodeToStatus(ec));
+
+            _socketTimeout = _configuredTimeout;
+        }
+    }
+
+    void ensureAsync() {
+        if (_blockingMode == Async)
+            return;
+
+        // Socket timeouts currently only effect synchronous calls, so make sure the caller isn't
+        // expecting a socket timeout when they do an async operation.
+        invariant(!_configuredTimeout);
+
+        asio::error_code ec;
+        getSocket().non_blocking(true, ec);
+        fassertStatusOK(50706, errorCodeToStatus(ec));
+        _blockingMode = Async;
+    }
+
 private:
     template <int Name>
     class ASIOSocketTimeoutOption {
@@ -213,14 +327,6 @@ private:
         }
 #endif
         return _socket;
-    }
-
-    bool isOpen() const {
-#ifdef MONGO_CONFIG_SSL
-        return _sslSocket ? _sslSocket->lowest_layer().is_open() : _socket.is_open();
-#else
-        return _socket.is_open();
-#endif
     }
 
     template <typename Callback>
@@ -300,7 +406,7 @@ private:
                     return;
                 }
 
-                maybeHandshakeSSL(buffers, std::move(postHandshakeCb));
+                maybeHandshakeSSLForIngress(buffers, std::move(postHandshakeCb));
             };
 
             return opportunisticRead(_socket, buffers, std::move(handshakeRecvCb));
@@ -312,47 +418,12 @@ private:
     template <typename ConstBufferSequence, typename CompleteHandler>
     void write(const ConstBufferSequence& buffers, CompleteHandler&& handler) {
 #ifdef MONGO_CONFIG_SSL
+        _ranHandshake = true;
         if (_sslSocket) {
             return opportunisticWrite(*_sslSocket, buffers, std::forward<CompleteHandler>(handler));
         }
 #endif
         return opportunisticWrite(_socket, buffers, std::forward<CompleteHandler>(handler));
-    }
-
-    void ensureSync() {
-        asio::error_code ec;
-        if (_blockingMode != Sync) {
-            getSocket().non_blocking(false, ec);
-            fassertStatusOK(40490, errorCodeToStatus(ec));
-            _blockingMode = Sync;
-        }
-
-        if (_socketTimeout != _configuredTimeout) {
-            // Change boost::none (which means no timeout) into a zero value for the socket option,
-            // which also means no timeout.
-            auto timeout = _configuredTimeout.value_or(Milliseconds{0});
-            getSocket().set_option(ASIOSocketTimeoutOption<SO_SNDTIMEO>(timeout), ec);
-            uassertStatusOK(errorCodeToStatus(ec));
-
-            getSocket().set_option(ASIOSocketTimeoutOption<SO_RCVTIMEO>(timeout), ec);
-            uassertStatusOK(errorCodeToStatus(ec));
-
-            _socketTimeout = _configuredTimeout;
-        }
-    }
-
-    void ensureAsync() {
-        if (_blockingMode == Async)
-            return;
-
-        // Socket timeouts currently only effect synchronous calls, so make sure the caller isn't
-        // expecting a socket timeout when they do an async operation.
-        invariant(!_configuredTimeout);
-
-        asio::error_code ec;
-        getSocket().non_blocking(true, ec);
-        fassertStatusOK(50706, errorCodeToStatus(ec));
-        _blockingMode = Async;
     }
 
     template <typename Stream, typename MutableBufferSequence, typename CompleteHandler>
@@ -411,7 +482,7 @@ private:
 
 #ifdef MONGO_CONFIG_SSL
     template <typename MutableBufferSequence, typename HandshakeCb>
-    void maybeHandshakeSSL(const MutableBufferSequence& buffer, HandshakeCb onComplete) {
+    void maybeHandshakeSSLForIngress(const MutableBufferSequence& buffer, HandshakeCb onComplete) {
         invariant(asio::buffer_size(buffer) >= sizeof(MSGHEADER::Value));
         MSGHEADER::ConstView headerView(asio::buffer_cast<char*>(buffer));
         auto responseTo = headerView.getResponseToMsgId();
@@ -424,15 +495,14 @@ private:
         // protocol message needs to be 0 or -1. Otherwise the connection is either sending
         // garbage or a TLS Hello packet which will be caught by the TLS handshake.
         if (responseTo != 0 && responseTo != -1) {
-            if (!_tl->_sslContext) {
+            if (!_tl->_ingressSSLContext) {
                 return onComplete(
                     {ErrorCodes::SSLHandshakeFailed,
                      "SSL handshake received but server is started without SSL support"},
                     false);
             }
 
-            _sslSocket.emplace(std::move(_socket), *_tl->_sslContext);
-
+            _sslSocket.emplace(std::move(_socket), *_tl->_ingressSSLContext);
             auto handshakeCompleteCb = [ this, onComplete = std::move(onComplete) ](
                 const std::error_code& ec, size_t size) mutable {
                 auto& sslPeerInfo = SSLPeerInfo::forSession(shared_from_this());

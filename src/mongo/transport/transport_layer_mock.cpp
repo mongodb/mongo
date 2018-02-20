@@ -62,6 +62,19 @@ bool TransportLayerMock::owns(Session::Id id) {
     return _sessions.count(id) > 0;
 }
 
+StatusWith<SessionHandle> TransportLayerMock::connect(HostAndPort peer,
+                                                      ConnectSSLMode sslMode,
+                                                      Milliseconds timeout) {
+    MONGO_UNREACHABLE;
+}
+
+void TransportLayerMock::asyncConnect(HostAndPort peer,
+                                      ConnectSSLMode sslMode,
+                                      Milliseconds timeout,
+                                      std::function<void(StatusWith<SessionHandle>)> callback) {
+    MONGO_UNREACHABLE;
+}
+
 Status TransportLayerMock::setup() {
     return Status::OK();
 }

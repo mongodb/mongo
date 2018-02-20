@@ -32,6 +32,9 @@ env.Library(target="integration_test_main",
                 '$BUILD_DIR/mongo/client/connection_string',
                 '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
             ],
+            LIBDEPS_PRIVATE=[
+                '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
+            ],
 )
 
 bmEnv = env.Clone()

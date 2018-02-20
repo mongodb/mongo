@@ -53,6 +53,14 @@ public:
     SessionHandle get(Session::Id id);
     bool owns(Session::Id id);
 
+    StatusWith<SessionHandle> connect(HostAndPort peer,
+                                      ConnectSSLMode sslMode,
+                                      Milliseconds timeout) override;
+    void asyncConnect(HostAndPort peer,
+                      ConnectSSLMode sslMode,
+                      Milliseconds timeout,
+                      std::function<void(StatusWith<SessionHandle>)> callback) override;
+
     Status setup() override;
     Status start() override;
     void shutdown() override;
