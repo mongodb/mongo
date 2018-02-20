@@ -382,11 +382,10 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsCommandNotSupportedIfNotApplyOpsCom
                        ErrorCodes::CommandNotSupported);
 }
 
-TEST_F(ApplyOpsTest, ExtractOperationsReturnsEmptyArrayOperationIfApplyOpsContainsNoOperations) {
-    ASSERT_THROWS_CODE(ApplyOps::extractOperations(
-                           makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSONArray()))),
-                       DBException,
-                       ErrorCodes::EmptyArrayOperation);
+TEST_F(ApplyOpsTest, ExtractOperationsReturnsEmptyArrayIfApplyOpsContainsNoOperations) {
+    auto operations = ApplyOps::extractOperations(
+        makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSONArray())));
+    ASSERT_EQUALS(0U, operations.size());
 }
 
 TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps) {

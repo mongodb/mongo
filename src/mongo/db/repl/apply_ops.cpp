@@ -528,10 +528,9 @@ MultiApplier::Operations ApplyOps::extractOperations(const OplogEntry& applyOpsO
     auto cmdObj = applyOpsOplogEntry.getOperationToApply();
     auto operationDocs = cmdObj.firstElement().Obj();
 
-    uassert(ErrorCodes::EmptyArrayOperation,
-            str::stream() << "ApplyOps::extractOperations(): applyOps contains no operations: "
-                          << redact(applyOpsOplogEntry.toBSON()),
-            !operationDocs.isEmpty());
+    if (operationDocs.isEmpty()) {
+        return {};
+    }
 
     MultiApplier::Operations operations;
 
