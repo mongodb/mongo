@@ -586,8 +586,9 @@ public:
      * Readies the TopologyCoordinator for an attempt to stepdown that may fail.  This is used
      * when we receive a stepdown command (which can fail if not enough secondaries are caught up)
      * to ensure that we never process more than one stepdown request at a time.
-     * Returns OK if it is safe to continue with the stepdown attempt, or returns
-     * ConflictingOperationInProgess if this node is already processing a stepdown request of any
+     * Returns OK if it is safe to continue with the stepdown attempt, or returns:
+     * - NotMaster if this node is not a leader.
+     * - ConflictingOperationInProgess if this node is already processing a stepdown request of any
      * kind.
      */
     Status prepareForStepDownAttempt();

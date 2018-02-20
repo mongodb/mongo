@@ -1724,6 +1724,8 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     status = _topCoord->prepareForStepDownAttempt();
     if (!status.isOK()) {
         // This will cause us to fail if we're already in the process of stepping down.
+        // It is also possible to get here even if we're done stepping down via another path,
+        // and this will also elicit a failure from this call.
         return status;
     }
 

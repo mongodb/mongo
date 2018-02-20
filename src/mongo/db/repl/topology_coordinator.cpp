@@ -1845,6 +1845,11 @@ Status TopologyCoordinator::prepareForStepDownAttempt() {
         return Status{ErrorCodes::ConflictingOperationInProgress,
                       "This node is already in the process of stepping down"};
     }
+
+    if (_leaderMode == LeaderMode::kNotLeader) {
+        return Status{ErrorCodes::NotMaster, "This node is not a primary."};
+    }
+
     _setLeaderMode(LeaderMode::kAttemptingStepDown);
     return Status::OK();
 }
