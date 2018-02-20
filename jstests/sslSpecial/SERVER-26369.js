@@ -6,15 +6,19 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
     load("jstests/ssl/libs/ssl_helpers.js");
 
-    var st = new ShardingTest({shards: {rs0: {nodes: 1}}});
-
-    st.rs0.restart(0, {
+    const st = new ShardingTest({shards: {rs0: {nodes: 1}}});
+    let opts = {
         sslMode: "allowSSL",
-        sslPEMKeyFile: "jstests/libs/password_protected.pem",
-        sslPEMKeyPassword: "qwerty",
+        sslPEMKeyFile: "jstests/libs/client.pem",
         sslCAFile: "jstests/libs/ca.pem",
         shardsvr: ''
+    };
+    requireSSLProvider('openssl', function() {
+        // Only the OpenSSL provider supports encrypted PKCS#8
+        opts.sslPEMKeyFile = "jstests/libs/password_protected.pem";
+        opts.sslPEMKeyPassword = "qwerty";
     });
 
+    st.rs0.restart(0, opts);
     st.stop();
 })();

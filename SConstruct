@@ -2901,11 +2901,13 @@ def doConfigure(myenv):
             conf.env.Append( MONGO_CRYPTO=["windows"] )
 
         elif conf.env.TargetOSIs('darwin', 'macOS'):
+            ssl_provider = 'apple'
+            env.SetConfigHeaderDefine("MONGO_CONFIG_SSL_PROVIDER", "SSL_PROVIDER_APPLE")
             conf.env.Append( MONGO_CRYPTO=["apple"] )
-            if has_option("ssl"):
-                # TODO: Replace SSL implementation as well.
-                # For now, let openssl fill that role.
-                checkOpenSSL(conf)
+            conf.env.AppendUnique(FRAMEWORKS=[
+                'CoreFoundation',
+                'Security',
+            ])
 
     if ssl_provider == 'openssl':
         if has_option("ssl"):

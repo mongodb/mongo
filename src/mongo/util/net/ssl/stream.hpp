@@ -22,6 +22,7 @@
 #include "asio/detail/handler_type_requirements.hpp"
 #include "asio/detail/noncopyable.hpp"
 #include "asio/detail/type_traits.hpp"
+#include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/context.hpp"
 #include "mongo/util/net/ssl/detail/buffered_handshake_op.hpp"
 #include "mongo/util/net/ssl/detail/handshake_op.hpp"
@@ -67,6 +68,8 @@ public:
     typedef PCtxtHandle native_handle_type;
 #elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
     typedef SSL* native_handle_type;
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE
+    typedef ::SSLContextRef native_handle_type;
 #else
 #error "Unknown SSL Provider"
 #endif

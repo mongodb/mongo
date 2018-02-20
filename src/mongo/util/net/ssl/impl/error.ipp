@@ -15,8 +15,12 @@
 #pragma once
 #endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
+#include <string>
+
+#include "asio/detail/assert.hpp"
 #include "asio/detail/config.hpp"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/error.hpp"
 
 #include "asio/detail/push_options.hpp"
@@ -39,6 +43,12 @@ public:
     std::string message(int value) const {
         const char* s = ::ERR_reason_error_string(value);
         return s ? s : "asio.ssl error";
+    }
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE
+    std::string message(int value) const {
+        // engine_apple produces osstatus_errorcategory messages.
+        ASIO_ASSERT(false);
+        return "asio.ssl error";
     }
 #else
 #error "Unknown SSL Provider"

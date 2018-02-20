@@ -22,7 +22,9 @@
 #else  // defined(ASIO_HAS_BOOST_DATE_TIME)
 #include "asio/steady_timer.hpp"
 #endif  // defined(ASIO_HAS_BOOST_DATE_TIME)
+
 #include "asio/buffer.hpp"
+#include "mongo/util/net/ssl/apple.hpp"
 #include "mongo/util/net/ssl/detail/engine.hpp"
 
 #include "asio/detail/push_options.hpp"
@@ -40,6 +42,8 @@ struct stream_core {
     stream_core(SCHANNEL_CRED* context, asio::io_context& io_context)
 #elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
     stream_core(SSL_CTX* context, asio::io_context& io_context)
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE
+    stream_core(apple::Context* context, asio::io_context& io_context)
 #else
 #error "Unknown SSL Provider"
 #endif

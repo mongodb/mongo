@@ -33,6 +33,11 @@
 #include "mongo/util/net/ssl/impl/context_openssl.ipp"
 #include "mongo/util/net/ssl/impl/error.ipp"
 
+#elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE
+
+#include "mongo/util/net/ssl/detail/impl/engine_apple.ipp"
+#include "mongo/util/net/ssl/impl/error.ipp"
+
 #else
 #error "Unknown SSL Provider"
 #endif

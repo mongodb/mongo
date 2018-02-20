@@ -176,3 +176,34 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         }
     }
 }
+
+function determineSSLProvider() {
+    'use strict';
+    const info = getBuildInfo();
+    const ssl = (info.openssl === undefined) ? '' : info.openssl.running;
+    if (/OpenSSL/.test(ssl)) {
+        return 'openssl';
+    } else if (/Apple/.test(ssl)) {
+        return 'apple';
+    } else if (/Windows/.test(ssl)) {
+        return 'windows';
+    } else {
+        return null;
+    }
+}
+
+function requireSSLProvider(required, fn) {
+    'use strict';
+    if ((typeof required) === 'string') {
+        required = [required];
+    }
+
+    const provider = determineSSLProvider();
+    if (!required.includes(provider)) {
+        print("*****************************************************");
+        print("Skipping " + tojson(required) + " test because SSL provider is " + provider);
+        print("*****************************************************");
+        return;
+    }
+    fn();
+}
