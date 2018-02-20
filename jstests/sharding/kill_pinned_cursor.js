@@ -26,7 +26,7 @@
     st.shardColl(coll, {_id: 1}, {_id: 5}, {_id: 6}, kDBName, false);
 
     // Set up the first mongod to hang on a getMore request.
-    let cleanup = null;
+    let getMoreJoiner = null;
     let cursorId;
 
     try {
@@ -51,7 +51,7 @@
         let code = `let cursorId = ${cursorId.toString()};`;
         code += `let collName = "${coll.getName()}";`;
         code += `(${runGetMore.toString()})();`;
-        cleanup = startParallelShell(code, st.s.port);
+        getMoreJoiner = startParallelShell(code, st.s.port);
 
         // Sleep until we know the cursor is pinned on the mongod.
         assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.pinned > 0);
@@ -65,30 +65,35 @@
         assert.eq(cmdRes.cursorsAlive, []);
         assert.eq(cmdRes.cursorsNotFound, []);
         assert.eq(cmdRes.cursorsUnknown, []);
+
+        // The getMore should finish now that we've killed the cursor (even though the failpoint is
+        // still enabled).
+        getMoreJoiner();
+        getMoreJoiner = null;
+
+        // Eventually the cursor should get reaped, at which point the next call to killCursors
+        // should report that nothing was killed.
+        let killRes = null;
+        assert.soon(function() {
+            killRes = mongosDB.runCommand({killCursors: coll.getName(), cursors: [cursorId]});
+            assert.commandWorked(killRes);
+            return killRes.cursorsKilled.length == 0;
+        });
+
+        assert.eq(killRes.cursorsAlive, []);
+        assert.eq(killRes.cursorsNotFound, [cursorId]);
+        assert.eq(killRes.cursorsUnknown, []);
     } finally {
         assert.commandWorked(
             shard0DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
-        if (cleanup) {
-            cleanup();
+        if (getMoreJoiner) {
+            getMoreJoiner();
         }
     }
 
     // Eventually the cursor on the mongod should be cleaned up, now that we've disabled the
     // failpoint.
     assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.pinned == 0);
-
-    // Eventually the cursor should get reaped, at which point the next call to killCursors
-    // should report that nothing was killed.
-    let cmdRes = null;
-    assert.soon(function() {
-        cmdRes = mongosDB.runCommand({killCursors: coll.getName(), cursors: [cursorId]});
-        assert.commandWorked(cmdRes);
-        return cmdRes.cursorsKilled.length == 0;
-    });
-
-    assert.eq(cmdRes.cursorsAlive, []);
-    assert.eq(cmdRes.cursorsNotFound, [cursorId]);
-    assert.eq(cmdRes.cursorsUnknown, []);
 
     st.stop();
 })();

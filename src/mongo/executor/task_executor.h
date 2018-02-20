@@ -186,12 +186,13 @@ public:
     virtual void waitForEvent(const EventHandle& event) = 0;
 
     /**
-     * Same as waitForEvent without an OperationContext, but returns Status::OK with
-     * cv_status::timeout if the event was not triggered within deadline.
+     * Same as waitForEvent without an OperationContext, but if the OperationContext gets
+     * interrupted, will return the kill code, or, if the the deadline passes, will return
+     * Status::OK with cv_status::timeout.
      */
     virtual StatusWith<stdx::cv_status> waitForEvent(OperationContext* opCtx,
                                                      const EventHandle& event,
-                                                     Date_t deadline) = 0;
+                                                     Date_t deadline = Date_t::max()) = 0;
 
     /**
      * Schedules "work" to be run by the executor ASAP.
