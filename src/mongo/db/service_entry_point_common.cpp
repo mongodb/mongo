@@ -119,7 +119,7 @@ const StringMap<int> sessionCheckoutWhitelist = {{"delete", 1},
 // The command names for which readConcern level snapshot is allowed. The getMore command is
 // implicitly allowed to operate on a cursor which was opened under readConcern level snapshot.
 const StringMap<int> readConcernSnapshotWhitelist = {
-    {"find", 1}, {"count", 1}, {"geoSearch", 1}, {"parallelCollectionScan", 1}};
+    {"find", 1}, {"count", 1}, {"geoSearch", 1}, {"parallelCollectionScan", 1}, {"update", 1}};
 
 void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                       const QueryMessage& queryMessage,
@@ -685,7 +685,15 @@ void execCommandDatabase(OperationContext* opCtx,
             runCommandImpl(opCtx, command, request, replyBuilder, startOperationTime, behaviors);
 
         if (retval) {
-            sessionTxnState.stashTransactionResources();
+            if (opCtx->getWriteUnitOfWork()) {
+                if (!opCtx->hasStashedCursor()) {
+                    // If we are in an autocommit=true transaction and have no stashed cursor,
+                    // commit the transaction.
+                    opCtx->getWriteUnitOfWork()->commit();
+                } else {
+                    sessionTxnState.stashTransactionResources();
+                }
+            }
         } else {
             command->incrementCommandsFailed();
         }

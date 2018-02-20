@@ -239,6 +239,7 @@ private:
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
 
+    // Releases stashed locks and WiredTiger transaction. This implicitly aborts the transaction.
     void _releaseStashedTransactionResources(WithLock, OperationContext* opCtx);
 
     const LogicalSessionId _sessionId;

@@ -460,14 +460,15 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
         return;
     }
 
-    if (!opCtx->hasStashedCursor()) {
-        if (opCtx->getWriteUnitOfWork()) {
-            opCtx->setWriteUnitOfWork(nullptr);
-        }
-        return;
-    }
+    invariant(opCtx->hasStashedCursor());
 
     if (*opCtx->getTxnNumber() != _activeTxnNumber) {
+        // The session is checked out, so _activeTxnNumber cannot advance due to a user operation.
+        // However, when a chunk is migrated, session and transaction information is copied from the
+        // donor shard to the recipient. This occurs outside of the check-out mechanism and can lead
+        // to a higher _activeTxnNumber during the lifetime of a checkout. If that occurs, we abort
+        // the current transaction. Note that it would indicate a user bug to have a newer
+        // transaction on one shard while an older transaction is still active on another shard.
         uasserted(ErrorCodes::TransactionAborted,
                   str::stream() << "Transaction aborted. Active txnNumber is now "
                                 << _activeTxnNumber);
@@ -487,6 +488,12 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
 void Session::unstashTransactionResources(OperationContext* opCtx) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (opCtx->getTxnNumber() < _activeTxnNumber) {
+        // The session is checked out, so _activeTxnNumber cannot advance due to a user operation.
+        // However, when a chunk is migrated, session and transaction information is copied from the
+        // donor shard to the recipient. This occurs outside of the check-out mechanism and can lead
+        // to a higher _activeTxnNumber during the lifetime of a checkout. If that occurs, we abort
+        // the current transaction. Note that it would indicate a user bug to have a newer
+        // transaction on one shard while an older transaction is still active on another shard.
         _releaseStashedTransactionResources(lg, opCtx);
         uasserted(ErrorCodes::TransactionAborted,
                   str::stream() << "Transaction aborted. Active txnNumber is now "

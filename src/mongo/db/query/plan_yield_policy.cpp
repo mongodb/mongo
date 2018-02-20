@@ -43,7 +43,7 @@
 namespace mongo {
 
 namespace {
-MONGO_FP_DECLARE(setCheckForInterruptHang);
+MONGO_FP_DECLARE(setInterruptOnlyPlansCheckForInterruptHang);
 }  // namespace
 
 PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec, PlanExecutor::YieldPolicy policy)
@@ -101,7 +101,7 @@ Status PlanYieldPolicy::yieldOrInterrupt(stdx::function<void()> beforeYieldingFn
         ON_BLOCK_EXIT([this]() { resetTimer(); });
         OperationContext* opCtx = _planYielding->getOpCtx();
         invariant(opCtx);
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET(setCheckForInterruptHang);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(setInterruptOnlyPlansCheckForInterruptHang);
         return opCtx->checkForInterruptNoAssert();
     }
 
@@ -131,8 +131,6 @@ Status PlanYieldPolicy::yield(stdx::function<void()> beforeYieldingFn,
             // that it's time to yield. Whether or not we will actually yield, we need to check
             // if this operation has been interrupted.
             if (_policy == PlanExecutor::YIELD_AUTO) {
-                MONGO_FAIL_POINT_PAUSE_WHILE_SET(setCheckForInterruptHang);
-
                 auto interruptStatus = opCtx->checkForInterruptNoAssert();
                 if (!interruptStatus.isOK()) {
                     return interruptStatus;

@@ -580,44 +580,6 @@ TEST_F(SessionTest, StashAndUnstashResources) {
     ASSERT(opCtx()->getWriteUnitOfWork());
 }
 
-TEST_F(SessionTest, StashNotRequired) {
-    const auto sessionId = makeLogicalSessionIdForTest();
-    const TxnNumber txnNum = 20;
-    opCtx()->setLogicalSessionId(sessionId);
-    opCtx()->setTxnNumber(txnNum);
-
-    Locker* originalLocker = opCtx()->lockState();
-    RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
-    ASSERT(originalLocker);
-    ASSERT(originalRecoveryUnit);
-
-    Session session(sessionId);
-    session.refreshFromStorageIfNeeded(opCtx());
-
-    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
-
-    repl::ReadConcernArgs readConcernArgs;
-    ASSERT_OK(readConcernArgs.initialize(BSON("find"
-                                              << "test"
-                                              << repl::ReadConcernArgs::kReadConcernFieldName
-                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
-                                                      << "snapshot"))));
-    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
-
-    // Perform initial unstash which sets up a WriteUnitOfWork.
-    session.unstashTransactionResources(opCtx());
-    ASSERT(opCtx()->getWriteUnitOfWork());
-    ASSERT_EQ(originalLocker, opCtx()->lockState());
-    ASSERT_EQ(originalRecoveryUnit, opCtx()->recoveryUnit());
-
-    // Attempt stash. As no stashing is required the original Locker and RecoveryUnit remain in
-    // place.
-    session.stashTransactionResources(opCtx());
-    ASSERT_EQUALS(originalLocker, opCtx()->lockState());
-    ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
-    ASSERT(!opCtx()->getWriteUnitOfWork());
-}
-
 TEST_F(SessionTest, CheckAutocommitOnlyAllowedAtBeginningOfTxn) {
     const auto sessionId = makeLogicalSessionIdForTest();
     Session session(sessionId);
