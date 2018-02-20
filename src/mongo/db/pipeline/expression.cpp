@@ -4785,11 +4785,12 @@ private:
 
     static void validateDoubleValueIsFinite(double inputDouble) {
         uassert(ErrorCodes::ConversionFailure,
-                "Attempt to cast NaN value to integer type in $convert with no onError value",
+                "Attempt to convert NaN value to integer type in $convert with no onError value",
                 !std::isnan(inputDouble));
-        uassert(ErrorCodes::ConversionFailure,
-                "Attempt to cast infinity value to integer type in $convert with no onError value",
-                std::isfinite(inputDouble));
+        uassert(
+            ErrorCodes::ConversionFailure,
+            "Attempt to convert infinity value to integer type in $convert with no onError value",
+            std::isfinite(inputDouble));
     }
 
     static Value performCastDoubleToInt(Value inputValue) {
@@ -4827,11 +4828,12 @@ private:
         // Performing these checks up front allows us to provide more specific error messages than
         // if we just gave the same error for any 'kInvalid' conversion.
         uassert(ErrorCodes::ConversionFailure,
-                "Attempt to cast NaN value to integer type in $convert with no onError value",
+                "Attempt to convert NaN value to integer type in $convert with no onError value",
                 !inputDecimal.isNaN());
-        uassert(ErrorCodes::ConversionFailure,
-                "Attempt to cast infinity value to integer type in $convert with no onError value",
-                !inputDecimal.isInfinite());
+        uassert(
+            ErrorCodes::ConversionFailure,
+            "Attempt to convert infinity value to integer type in $convert with no onError value",
+            !inputDecimal.isInfinite());
 
         std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
         Value result;
@@ -4871,7 +4873,8 @@ private:
                 str::stream()
                     << "Conversion would overflow target type in $convert with no onError value: "
                     << inputDecimal.toString(),
-                signalingFlags == Decimal128::SignalingFlag::kNoFlag);
+                signalingFlags == Decimal128::SignalingFlag::kNoFlag ||
+                    signalingFlags == Decimal128::SignalingFlag::kInexact);
 
         return Value(result);
     }
@@ -4934,18 +4937,12 @@ intrusive_ptr<Expression> ExpressionConvert::parse(
 }
 
 Value ExpressionConvert::evaluate(const Document& root) const {
-    boost::optional<BSONType> targetType = _constTargetType;
-    if (!targetType) {
-        // Note: the "to" field is not lazily evaluated. We should not short circuit its execution
-        // when inputValue evaluates to nullish.
-        auto toValue = _to->evaluate(root);
-        if (!toValue.nullish()) {
-            targetType = computeTargetType(toValue);
-        } else {
-            // targetType stays as boost::none.
-        }
-    }
+    auto toValue = _to->evaluate(root);
     Value inputValue = _input->evaluate(root);
+    boost::optional<BSONType> targetType;
+    if (!toValue.nullish()) {
+        targetType = computeTargetType(toValue);
+    }
 
     if (inputValue.nullish()) {
         return _onNull ? _onNull->evaluate(root) : Value(BSONNULL);
@@ -4973,13 +4970,6 @@ boost::intrusive_ptr<Expression> ExpressionConvert::optimize() {
     }
     if (_onNull) {
         _onNull = _onNull->optimize();
-    }
-
-    // The "to" value will almost always be a constant that we can parse in advance.
-    auto constTo = dynamic_cast<ExpressionConstant*>(_to.get());
-    if (constTo && !constTo->getValue().nullish()) {
-        // Note: this may throw a user error.
-        _constTargetType = computeTargetType(constTo->getValue());
     }
 
     // Perform constant folding if possible. This does not support folding for $convert operations
@@ -5013,6 +5003,24 @@ void ExpressionConvert::_doAddDependencies(DepsTracker* deps) const {
     }
 }
 
+namespace {
+bool isTargetTypeSupported(BSONType targetType) {
+    switch (targetType) {
+        case BSONType::NumberDouble:
+        case BSONType::String:
+        case BSONType::jstOID:
+        case BSONType::Bool:
+        case BSONType::Date:
+        case BSONType::NumberInt:
+        case BSONType::NumberLong:
+        case BSONType::NumberDecimal:
+            return true;
+        default:
+            return false;
+    }
+}
+}
+
 BSONType ExpressionConvert::computeTargetType(Value targetTypeName) const {
     BSONType targetType;
     if (targetTypeName.getType() == BSONType::String) {
@@ -5039,10 +5047,7 @@ BSONType ExpressionConvert::computeTargetType(Value targetTypeName) const {
     // Make sure the type is one of the supported "to" types for $convert.
     uassert(ErrorCodes::FailedToParse,
             str::stream() << "$convert with unsupported 'to' type: " << typeName(targetType),
-            targetType == BSONType::NumberDouble || targetType == BSONType::String ||
-                targetType == BSONType::jstOID || targetType == BSONType::Bool ||
-                targetType == BSONType::Date || targetType == BSONType::NumberInt ||
-                targetType == BSONType::NumberLong || targetType == BSONType::NumberDecimal);
+            isTargetTypeSupported(targetType));
 
     return targetType;
 }

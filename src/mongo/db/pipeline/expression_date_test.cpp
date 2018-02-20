@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2017 MongoDB Inc.
+ * Copyright (C) 2018 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -30,7 +30,6 @@
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_value_test_util.h"
-#include "mongo/db/pipeline/value_comparator.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

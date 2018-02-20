@@ -354,7 +354,7 @@ public:
      * It is not safe to obtain this value by casting std::numeric_limits<long long>::max() to
      * double, because the conversion loses precision, and the C++ standard leaves it up to the
      * implentation to decide whether to round up to 2^63 or round down to the next representable
-     * value (2^63 - 2^11).
+     * value (2^63 - 2^10).
      */
     static const double kLongLongMaxPlusOneAsDouble;
 

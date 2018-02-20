@@ -392,8 +392,9 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='agg_expression_test',
     source=[
-        'expression_test.cpp',
+        'expression_convert_test.cpp',
         'expression_date_test.cpp',
+        'expression_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',

@@ -109,7 +109,7 @@ enum BSONType {
     MaxKey = 127
 };
 
-/*
+/**
  * Maps from the set of type aliases accepted by the $type query operator to the corresponding BSON
  * types. Excludes "number", since this alias maps to a set of BSON types.
  */
