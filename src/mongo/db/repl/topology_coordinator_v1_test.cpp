@@ -1767,6 +1767,23 @@ TEST_F(TopoCoordTest, HeartbeatFrequencyShouldBeHalfElectionTimeoutWhenArbiter) 
     ASSERT_EQUALS(expected, action.getNextHeartbeatStartDate());
 }
 
+TEST_F(TopoCoordTest, PrepareStepDownAttemptFailsIfNotLeader) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version"
+                      << 5
+                      << "members"
+                      << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                               << "host1:27017"))
+                      << "protocolVersion"
+                      << 1),
+                 0);
+    getTopoCoord().changeMemberState_forTest(MemberState::RS_SECONDARY);
+    Status expectedStatus(ErrorCodes::NotMaster, "This node is not a primary. ");
+
+    ASSERT_EQUALS(expectedStatus, getTopoCoord().prepareForStepDownAttempt());
+}
+
 class PrepareHeartbeatResponseV1Test : public TopoCoordTest {
 public:
     virtual void setUp() {
