@@ -317,6 +317,10 @@ public:
      * Redacts "cmdObj" in-place to a form suitable for writing to logs.
      *
      * The default implementation does nothing.
+     *
+     * This is NOT used to implement user-configurable redaction of PII. Instead, that is
+     * implemented via the set of redact() free functions, which are no-ops when log redaction is
+     * disabled. All PII must pass through one of the redact() overloads before being logged.
      */
     virtual void redactForLogging(mutablebson::Document* cmdObj) const {}
 

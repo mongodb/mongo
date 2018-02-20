@@ -128,7 +128,7 @@ void generateLegacyQueryErrorResponse(const AssertionException* exception,
 
     log(LogComponent::kQuery) << "assertion " << exception->toString() << " ns:" << queryMessage.ns
                               << " query:" << (queryMessage.query.valid(BSONVersion::kLatest)
-                                                   ? queryMessage.query.toString()
+                                                   ? redact(queryMessage.query)
                                                    : "query object is corrupt");
     if (queryMessage.ntoskip || queryMessage.ntoreturn) {
         log(LogComponent::kQuery) << " ntoskip:" << queryMessage.ntoskip

@@ -382,7 +382,7 @@ static Status _checkAuthorizationImpl(Command* c,
             c->redactForLogging(&cmdToLog);
             return Status(ErrorCodes::Unauthorized,
                           str::stream() << "not authorized on " << dbname << " to execute command "
-                                        << cmdToLog.toString());
+                                        << redact(cmdToLog.getObject()));
         }
         if (!status.isOK()) {
             return status;
