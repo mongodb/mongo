@@ -182,6 +182,15 @@
         assert.eq(true, called, 'msg function should have been called');
     });
 
+    tests.push(function eqShouldPassOnObjectsWithSameContent() {
+        const a = {'foo': true};
+        const b = {'foo': true};
+
+        assert.doesNotThrow(() => {
+            assert.eq(a, b);
+        }, [], 'eq should not throw exception on two objects with the same content');
+    });
+
     /* assert.eq.automsg tests */
 
     tests.push(function eqAutomsgShouldCreateMessage() {
@@ -205,6 +214,15 @@
         assert.doesNotThrow(() => {
             assert.neq(2, 3);
         });
+    });
+
+    tests.push(function neqShouldFailOnObjectsWithSameContent() {
+        const a = {'foo': true};
+        const b = {'foo': true};
+
+        assert.throws(() => {
+            assert.neq(a, b);
+        }, [], 'neq should throw exception on two objects with the same content');
     });
 
     /* assert.hasFields tests */

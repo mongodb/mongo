@@ -152,14 +152,22 @@ assert = (function() {
 
     assert._debug = false;
 
-    assert.eq = function(a, b, msg) {
-        _validateAssertionMessage(msg);
-
+    function _isEq(a, b) {
         if (a == b) {
-            return;
+            return true;
         }
 
         if ((a != null && b != null) && friendlyEqual(a, b)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    assert.eq = function(a, b, msg) {
+        _validateAssertionMessage(msg);
+
+        if (_isEq(a, b)) {
             return;
         }
 
@@ -192,7 +200,7 @@ assert = (function() {
     assert.neq = function(a, b, msg) {
         _validateAssertionMessage(msg);
 
-        if (a != b) {
+        if (!_isEq(a, b)) {
             return;
         }
 
