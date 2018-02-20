@@ -185,6 +185,17 @@ var authCommandsLib = {
 
     tests: [
         {
+          testname: "abortTxn",
+          command: {abortTransaction: 1},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_all,
+              },
+          ]
+        },
+        {
           testname: "addShard",
           command: {addShard: "x"},
           skipStandalone: true,
@@ -2063,6 +2074,17 @@ var authCommandsLib = {
                 privileges:
                     [{resource: {db: secondDbName, collection: "bar"}, actions: ["collStats"]}]
               }
+          ]
+        },
+        {
+          testname: "commitTxn",
+          command: {commitTransaction: 1},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_all,
+              },
           ]
         },
         {

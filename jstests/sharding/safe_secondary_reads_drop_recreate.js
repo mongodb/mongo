@@ -83,6 +83,7 @@
         _recvChunkStart: {skip: "primary only"},
         _recvChunkStatus: {skip: "primary only"},
         _transferMods: {skip: "primary only"},
+        abortTransaction: {skip: "primary only"},
         addShard: {skip: "primary only"},
         addShardToZone: {skip: "primary only"},
         aggregate: {
@@ -113,6 +114,7 @@
         cloneCollectionAsCapped: {skip: "primary only"},
         collMod: {skip: "primary only"},
         collStats: {skip: "does not return user data"},
+        commitTransaction: {skip: "primary only"},
         compact: {skip: "does not return user data"},
         configureFailPoint: {skip: "does not return user data"},
         connPoolStats: {skip: "does not return user data"},
