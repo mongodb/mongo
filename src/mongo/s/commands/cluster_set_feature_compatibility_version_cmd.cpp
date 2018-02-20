@@ -67,15 +67,13 @@ public:
     }
 
     std::string help() const override {
-        // TODO: update this comment when FCV 3.4 is removed (SERVER-33179).
         return str::stream()
             << "Set the API version for the cluster. If set to \""
-            << FeatureCompatibilityVersionCommandParser::kVersion34
-            << "\", then 3.6 features are disabled. If \""
             << FeatureCompatibilityVersionCommandParser::kVersion36
-            << "\", then 3.6 features are enabled, and all nodes in the cluster must be version "
-            << "3.6. If \"4.0\", then 4.0 features are enabled. See "
-            << feature_compatibility_version::kDochubLink << ".";
+            << "\", then 4.0 features are disabled. If \""
+            << FeatureCompatibilityVersionCommandParser::kVersion40
+            << "\", then 4.0 features are enabled, and all nodes in the cluster must be version "
+            << "4.0. See " << feature_compatibility_version::kDochubLink << ".";
     }
 
     Status checkAuthForCommand(Client* client,

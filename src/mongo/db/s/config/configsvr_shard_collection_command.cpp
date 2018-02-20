@@ -643,11 +643,6 @@ void migrateAndFurtherSplitInitialChunks(OperationContext* opCtx,
 
 boost::optional<UUID> getUUIDFromPrimaryShard(const NamespaceString& nss,
                                               ScopedDbConnection& conn) {
-    // UUIDs were introduced in featureCompatibilityVersion 3.6.
-    if (!serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
-        return boost::none;
-    }
-
     // Obtain the collection's UUID from the primary shard's listCollections response.
     BSONObj res;
     {

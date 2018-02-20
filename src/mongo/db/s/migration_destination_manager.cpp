@@ -561,25 +561,21 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
             donorOptionsBob.appendElements(entry["options"].Obj());
         }
 
-        if (serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
-            BSONObj info;
-            if (entry["info"].isABSONObj()) {
-                info = entry["info"].Obj();
-            }
-            if (info["uuid"].eoo()) {
-                setStateFailWarn(str::stream()
-                                 << "The donor shard did not return a UUID for collection "
-                                 << _nss.ns()
-                                 << " as part of its listCollections response: "
-                                 << entry
-                                 << ", but this node expects to see a UUID since its "
-                                    "feature compatibility version is 3.6. Please follow "
-                                    "the online documentation to set the same feature "
-                                    "compatibility version across the cluster.");
-                return;
-            }
-            donorOptionsBob.append(info["uuid"]);
+        BSONObj info;
+        if (entry["info"].isABSONObj()) {
+            info = entry["info"].Obj();
         }
+        if (info["uuid"].eoo()) {
+            setStateFailWarn(str::stream()
+                             << "The donor shard did not return a UUID for collection "
+                             << _nss.ns()
+                             << " as part of its listCollections response: "
+                             << entry
+                             << ", but this node expects to see a UUID.");
+            return;
+        }
+        donorOptionsBob.append(info["uuid"]);
+
         donorOptions = donorOptionsBob.obj();
     }
 

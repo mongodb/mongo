@@ -163,13 +163,6 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
 
             bool opHasUUIDs = operationContainsUUID(opObj);
 
-            if (serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
-                uassert(ErrorCodes::OplogOperationUnsupported,
-                        "applyOps with UUID requires upgrading to FeatureCompatibilityVersion 3.6",
-                        !opHasUUIDs);
-            }
-
             // If the op uses any UUIDs at all then the user must possess extra privileges.
             if (opHasUUIDs && ret == OplogApplicationValidity::kOk)
                 ret = OplogApplicationValidity::kNeedsUseUUID;

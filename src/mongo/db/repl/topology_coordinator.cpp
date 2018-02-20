@@ -940,10 +940,7 @@ std::pair<ReplSetHeartbeatArgs, Milliseconds> TopologyCoordinator::prepareHeartb
         hbArgs.setSetName(ourSetName);
         hbArgs.setConfigVersion(-2);
     }
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
-        hbArgs.setHeartbeatVersion(1);
-    }
+    hbArgs.setHeartbeatVersion(1);
 
     const Milliseconds timeoutPeriod(
         _rsConfig.isInitialized() ? _rsConfig.getHeartbeatTimeoutPeriodMillis()
@@ -979,10 +976,7 @@ std::pair<ReplSetHeartbeatArgsV1, Milliseconds> TopologyCoordinator::prepareHear
         hbArgs.setConfigVersion(-2);
         hbArgs.setTerm(OpTime::kInitialTerm);
     }
-    if (serverGlobalParams.featureCompatibility.getVersion() !=
-        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34) {
-        hbArgs.setHeartbeatVersion(1);
-    }
+    hbArgs.setHeartbeatVersion(1);
 
     const Milliseconds timeoutPeriod(
         _rsConfig.isInitialized() ? _rsConfig.getHeartbeatTimeoutPeriodMillis()

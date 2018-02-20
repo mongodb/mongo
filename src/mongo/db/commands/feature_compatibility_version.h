@@ -75,12 +75,6 @@ public:
         switch (version) {
             case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior:
                 return FeatureCompatibilityVersionCommandParser::kVersionUnset;
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34:
-                return FeatureCompatibilityVersionCommandParser::kVersion34;
-            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36:
-                return FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo36;
-            case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34:
-                return FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo34;
             case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36:
                 return FeatureCompatibilityVersionCommandParser::kVersion36;
             case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
@@ -93,20 +87,6 @@ public:
                 MONGO_UNREACHABLE;
         }
     }
-
-    /**
-     * Records intent to perform a 3.4 -> 3.6 upgrade by updating the on-disk feature
-     * compatibility version document to have 'version'=3.4, 'targetVersion'=3.6.
-     * Should be called before schemas are modified.
-     */
-    static void setTargetUpgrade_DEPRECATED(OperationContext* opCtx);
-
-    /**
-     * Records intent to perform a 3.6 -> 3.4 downgrade by updating the on-disk feature
-     * compatibility version document to have 'version'=3.4, 'targetVersion'=3.4.
-     * Should be called before schemas are modified.
-     */
-    static void setTargetDowngrade_DEPRECATED(OperationContext* opCtx);
 
     /**
      * Records intent to perform a 3.6 -> 4.0 upgrade by updating the on-disk feature
@@ -123,9 +103,9 @@ public:
     static void setTargetDowngrade(OperationContext* opCtx);
 
     /**
-     * Records the completion of a 3.4 <-> 3.6 or 3.6 <-> 4.0 upgrade or downgrade by updating the
-     * on-disk feature compatibility version document to have 'version'=version and unsetting the
-     * 'targetVersion' field.
+     * Records the completion of a 3.6 <-> 4.0 upgrade or downgrade by updating the on-disk feature
+     * compatibility version document to have 'version'=version and unsetting the 'targetVersion'
+     * field.
      * Should be called after schemas are modified.
      */
     static void unsetTargetUpgradeOrDowngrade(OperationContext* opCtx, StringData version);

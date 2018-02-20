@@ -207,18 +207,11 @@ public:
         bool skipUUIDCheck = nss.coll() == "system.indexes" || nss.coll() == "system.namespaces";
 
         if (!skipUUIDCheck) {
-            ServerGlobalParams::FeatureCompatibility::Version version =
-                serverGlobalParams.featureCompatibility.getVersion();
-
-            if (version >=
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
-                // All collections must have a UUID.
-                if (!opts.uuid) {
-                    results.errors.push_back(str::stream() << "UUID missing on collection "
-                                                           << nss.ns()
-                                                           << " but SchemaVersion=3.6");
-                    results.valid = false;
-                }
+            // All collections must have a UUID.
+            if (!opts.uuid) {
+                results.errors.push_back(str::stream() << "UUID missing on collection " << nss.ns()
+                                                       << " but SchemaVersion=3.6");
+                results.valid = false;
             }
         }
 

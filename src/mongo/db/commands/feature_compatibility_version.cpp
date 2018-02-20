@@ -89,17 +89,14 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
             }
 
             if (elem.String() != FeatureCompatibilityVersionCommandParser::kVersion40 &&
-                elem.String() != FeatureCompatibilityVersionCommandParser::kVersion36 &&
-                elem.String() != FeatureCompatibilityVersionCommandParser::kVersion34) {
+                elem.String() != FeatureCompatibilityVersionCommandParser::kVersion36) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() << "Invalid value for " << fieldName << ", found "
                                             << elem.String()
                                             << ", expected '"
                                             << FeatureCompatibilityVersionCommandParser::kVersion40
-                                            << "', '"
-                                            << FeatureCompatibilityVersionCommandParser::kVersion36
                                             << "' or '"
-                                            << FeatureCompatibilityVersionCommandParser::kVersion34
+                                            << FeatureCompatibilityVersionCommandParser::kVersion36
                                             << "'. Contents of "
                                             << FeatureCompatibilityVersion::kParameterName
                                             << " document in "
@@ -130,48 +127,17 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
         }
     }
 
-    if (versionString == FeatureCompatibilityVersionCommandParser::kVersion34) {
-        if (targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion40) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Invalid state for "
-                                        << FeatureCompatibilityVersion::kParameterName
-                                        << " document in "
-                                        << FeatureCompatibilityVersion::kCollection
-                                        << ": "
-                                        << featureCompatibilityVersionDoc
-                                        << ". See "
-                                        << feature_compatibility_version::kDochubLink
-                                        << ".");
-        } else if (targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion36) {
-            version = ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36;
-        } else if (targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion34) {
-            version = ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34;
-        } else {
-            version = ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34;
-        }
-    } else if (versionString == FeatureCompatibilityVersionCommandParser::kVersion36) {
+    if (versionString == FeatureCompatibilityVersionCommandParser::kVersion36) {
         if (targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion40) {
             version = ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40;
         } else if (targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion36) {
             version = ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo36;
-        } else if (targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion34) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Invalid state for "
-                                        << FeatureCompatibilityVersion::kParameterName
-                                        << " document in "
-                                        << FeatureCompatibilityVersion::kCollection
-                                        << ": "
-                                        << featureCompatibilityVersionDoc
-                                        << ". See "
-                                        << feature_compatibility_version::kDochubLink
-                                        << ".");
         } else {
             version = ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36;
         }
     } else if (versionString == FeatureCompatibilityVersionCommandParser::kVersion40) {
         if (targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion40 ||
-            targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion36 ||
-            targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion34) {
+            targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion36) {
             return Status(ErrorCodes::BadValue,
                           str::stream() << "Invalid state for "
                                         << FeatureCompatibilityVersion::kParameterName
@@ -201,26 +167,6 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
     }
 
     return version;
-}
-
-void FeatureCompatibilityVersion::setTargetUpgrade_DEPRECATED(OperationContext* opCtx) {
-    // Sets both 'version' and 'targetVersion' fields.
-    _runUpdateCommand(opCtx, [](auto updateMods) {
-        updateMods.append(FeatureCompatibilityVersion::kVersionField,
-                          FeatureCompatibilityVersionCommandParser::kVersion34);
-        updateMods.append(FeatureCompatibilityVersion::kTargetVersionField,
-                          FeatureCompatibilityVersionCommandParser::kVersion36);
-    });
-}
-
-void FeatureCompatibilityVersion::setTargetDowngrade_DEPRECATED(OperationContext* opCtx) {
-    // Sets both 'version' and 'targetVersion' fields.
-    _runUpdateCommand(opCtx, [](auto updateMods) {
-        updateMods.append(FeatureCompatibilityVersion::kVersionField,
-                          FeatureCompatibilityVersionCommandParser::kVersion34);
-        updateMods.append(FeatureCompatibilityVersion::kTargetVersionField,
-                          FeatureCompatibilityVersionCommandParser::kVersion34);
-    });
 }
 
 void FeatureCompatibilityVersion::setTargetUpgrade(OperationContext* opCtx) {
@@ -346,14 +292,8 @@ void FeatureCompatibilityVersion::updateMinWireVersion() {
             spec.outgoing.minWireVersion = LATEST_WIRE_VERSION;
             return;
         case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36:
-        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36:
-        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34:
             spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION - 1;
             spec.outgoing.minWireVersion = LATEST_WIRE_VERSION - 1;
-            return;
-        case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34:
-            spec.incomingInternalClient.minWireVersion = LATEST_WIRE_VERSION - 2;
-            spec.outgoing.minWireVersion = LATEST_WIRE_VERSION - 2;
             return;
         case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior:
             // getVersion() does not return this value.
@@ -365,16 +305,13 @@ void FeatureCompatibilityVersion::_validateVersion(StringData version) {
     uassert(40284,
             str::stream() << "featureCompatibilityVersion must be '"
                           << FeatureCompatibilityVersionCommandParser::kVersion40
-                          << "', '"
-                          << FeatureCompatibilityVersionCommandParser::kVersion36
                           << "' or '"
-                          << FeatureCompatibilityVersionCommandParser::kVersion34
+                          << FeatureCompatibilityVersionCommandParser::kVersion36
                           << "'. See "
                           << feature_compatibility_version::kDochubLink
                           << ".",
             version == FeatureCompatibilityVersionCommandParser::kVersion40 ||
-                version == FeatureCompatibilityVersionCommandParser::kVersion36 ||
-                version == FeatureCompatibilityVersionCommandParser::kVersion34);
+                version == FeatureCompatibilityVersionCommandParser::kVersion36);
 }
 
 void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
@@ -448,27 +385,6 @@ public:
                 featureCompatibilityVersionBuilder.append(
                     FeatureCompatibilityVersion::kVersionField,
                     FeatureCompatibilityVersionCommandParser::kVersion36);
-                return;
-            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36:
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersion::kVersionField,
-                    FeatureCompatibilityVersionCommandParser::kVersion34);
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersion::kTargetVersionField,
-                    FeatureCompatibilityVersionCommandParser::kVersion36);
-                return;
-            case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34:
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersion::kVersionField,
-                    FeatureCompatibilityVersionCommandParser::kVersion34);
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersion::kTargetVersionField,
-                    FeatureCompatibilityVersionCommandParser::kVersion34);
-                return;
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34:
-                featureCompatibilityVersionBuilder.append(
-                    FeatureCompatibilityVersion::kVersionField,
-                    FeatureCompatibilityVersionCommandParser::kVersion34);
                 return;
             case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior:
                 // getVersion() does not return this value.

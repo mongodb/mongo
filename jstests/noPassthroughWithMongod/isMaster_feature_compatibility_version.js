@@ -54,15 +54,4 @@
     assert.eq(res.minWireVersion, 0, tojson(res));
     assert.lt(res.minWireVersion, res.maxWireVersion, tojson(res));
 
-    // When the featureCompatibilityVersion is equal to the deprecated downgrade version, running
-    // isMaster with internalClient returns minWireVersion + 1 == maxWireVersion.
-    // TODO(SERVER-33179) remove this section once fCV 3.4 is removed.
-    const downgradeVersion = "3.6";
-    const deprecatedDowngradeVersion = "3.4";
-    assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: downgradeVersion}));
-    assert.commandWorked(
-        adminDB.runCommand({setFeatureCompatibilityVersion: deprecatedDowngradeVersion}));
-    res = adminDB.runCommand(isMasterCommand);
-    assert.commandWorked(res);
-    assert.eq(res.minWireVersion + 2, res.maxWireVersion, tojson(res));
 })();

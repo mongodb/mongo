@@ -152,13 +152,11 @@ void openCatalog(OperationContext* opCtx) {
                                     << collName);
 
             auto uuid = collection->uuid();
-            // TODO (SERVER-32597): When the minimum featureCompatibilityVersion becomes 3.6, we
-            // can change this condition to be an invariant.
-            if (uuid) {
-                LOG(1) << "openCatalog: registering uuid " << uuid->toString() << " for collection "
-                       << collName;
-                uuidCatalog.registerUUIDCatalogEntry(*uuid, collection);
-            }
+            invariant(uuid);
+
+            LOG(1) << "openCatalog: registering uuid " << uuid->toString() << " for collection "
+                   << collName;
+            uuidCatalog.registerUUIDCatalogEntry(*uuid, collection);
 
             // If this is the oplog collection, re-establish the replication system's cached pointer
             // to the oplog.

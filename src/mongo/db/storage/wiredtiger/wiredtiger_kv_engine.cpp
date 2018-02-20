@@ -510,21 +510,21 @@ void WiredTigerKVEngine::cleanShutdown() {
         // There are two cases to consider where the server will shutdown before the in-memory FCV
         // state is set. One is when `EncryptionHooks::restartRequired` is true. The other is when
         // the server shuts down because it refuses to acknowledge an FCV value more than one
-        // version behind (e.g: 3.6 errors when reading 3.2).
+        // version behind (e.g: 4.0 errors when reading 3.4).
         //
         // In the first case, we ideally do not perform a file format downgrade (but it is
-        // acceptable). In the second, the server must downgrade to allow a 3.4 binary to start
+        // acceptable). In the second, the server must downgrade to allow a 3.6 binary to start
         // up. Ideally, our internal FCV value would allow for older values, even if only to
         // immediately shutdown. This would allow downstream logic, such as this method, to make
         // an informed decision.
         const bool needsDowngrade = !_readOnly &&
             serverGlobalParams.featureCompatibility.getVersion() ==
-                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34;
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36;
 
         invariantWTOK(_conn->close(_conn, closeConfig));
         _conn = nullptr;
 
-        // If FCV 3.4, enable WT logging on all tables.
+        // If FCV 3.6, enable WT logging on all tables.
         if (needsDowngrade) {
             // Steps for downgrading:
             //
@@ -534,8 +534,8 @@ void WiredTigerKVEngine::cleanShutdown() {
             // 2) Enable WiredTiger logging on all tables.
             //
             // 3) Reconfigure the WiredTiger to release compatibility 2.9. The WiredTiger version
-            //    shipped with MongoDB 3.4 will always refuse to start up without this reconfigure
-            //    being successful. Doing this last prevents MongoDB running in 3.4 with only some
+            //    shipped with MongoDB 3.6 will always refuse to start up without this reconfigure
+            //    being successful. Doing this last prevents MongoDB running in 3.6 with only some
             //    underlying tables being logged.
             LOG(1) << "Downgrading WiredTiger tables to release compatibility 2.9";
             WT_CONNECTION* conn;

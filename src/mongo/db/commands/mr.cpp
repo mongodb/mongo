@@ -423,8 +423,7 @@ void State::prepTempCollection() {
             CollectionOptions options;
             options.setNoIdIndex();
             options.temp = true;
-            if (enableCollectionUUIDs &&
-                serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
+            if (enableCollectionUUIDs) {
                 options.uuid.emplace(UUID::gen());
             }
             incColl = incCtx.db()->createCollection(_opCtx, _config.incLong.ns(), options);
@@ -510,7 +509,7 @@ void State::prepTempCollection() {
 
         CollectionOptions options = finalOptions;
         options.temp = true;
-        if (enableCollectionUUIDs && serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
+        if (enableCollectionUUIDs) {
             // If a UUID for the final output collection was sent by mongos (i.e., the final output
             // collection is sharded), use the UUID mongos sent when creating the temp collection.
             // When the temp collection is renamed to the final output collection, the UUID will be
@@ -1754,8 +1753,7 @@ public:
 
         Config config(dbname, cmdObj.firstElement().embeddedObjectUserCheck());
 
-        if (cmdObj["finalOutputCollIsSharded"].trueValue() &&
-            serverGlobalParams.featureCompatibility.isSchemaVersion36()) {
+        if (cmdObj["finalOutputCollIsSharded"].trueValue()) {
             uassert(ErrorCodes::InvalidOptions,
                     "This shard has feature compatibility version 3.6, so it expects mongos to "
                     "send the UUID to use for the sharded output collection. Was the mapReduce "

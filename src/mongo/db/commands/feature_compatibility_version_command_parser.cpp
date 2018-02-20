@@ -38,11 +38,8 @@
 
 namespace mongo {
 
-constexpr StringData FeatureCompatibilityVersionCommandParser::kVersion34;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersion36;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersion40;
-constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo36;
-constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo34;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo40;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo36;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersionUnset;
@@ -88,15 +85,12 @@ StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersion
     const std::string version = versionElem.String();
 
     if (version != FeatureCompatibilityVersionCommandParser::kVersion40 &&
-        version != FeatureCompatibilityVersionCommandParser::kVersion36 &&
-        version != FeatureCompatibilityVersionCommandParser::kVersion34) {
+        version != FeatureCompatibilityVersionCommandParser::kVersion36) {
         return {ErrorCodes::BadValue,
                 str::stream() << "Invalid command argument. Expected '"
                               << FeatureCompatibilityVersionCommandParser::kVersion40
-                              << "', '"
-                              << FeatureCompatibilityVersionCommandParser::kVersion36
                               << "' or '"
-                              << FeatureCompatibilityVersionCommandParser::kVersion34
+                              << FeatureCompatibilityVersionCommandParser::kVersion36
                               << "', found "
                               << version
                               << " in: "
