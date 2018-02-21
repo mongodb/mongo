@@ -277,7 +277,7 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx,
 
     if (opCtx->getTxnNumber()) {
         checkedOutSession->scopedSession->beginOrContinueTxn(
-            opCtx, *opCtx->getTxnNumber(), autocommit);  
+            opCtx, *opCtx->getTxnNumber(), autocommit);
     }
 }
 

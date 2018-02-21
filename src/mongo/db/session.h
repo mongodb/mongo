@@ -82,7 +82,7 @@ public:
      * been called. If an attempt is made to start a transaction with number less than the latest
      * transaction this session has seen, an exception will be thrown.
      *
-     * Sets the autocommit parameter for this transaction. If it is boost::none, no autocommit 
+     * Sets the autocommit parameter for this transaction. If it is boost::none, no autocommit
      * parameter was passed into the request. If this is the first statement of a transaction,
      * the autocommit parameter will default to true.
      *
@@ -210,9 +210,7 @@ public:
     }
 
 private:
-    void _beginOrContinueTxn(WithLock,
-                             TxnNumber txnNumber,
-                             boost::optional<bool> autocommit);
+    void _beginOrContinueTxn(WithLock, TxnNumber txnNumber, boost::optional<bool> autocommit);
 
     void _beginOrContinueTxnOnMigration(WithLock, TxnNumber txnNumber);
 

@@ -523,7 +523,7 @@ void Session::_releaseStashedTransactionResources(WithLock wl, OperationContext*
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
     _checkValid(wl);
     _checkTxnValid(wl, txnNumber);
-    
+
     // Check for continuing an existing transaction
     if (txnNumber == _activeTxnNumber)
         return;
