@@ -240,8 +240,11 @@ void SessionCatalog::_releaseSession(const LogicalSessionId& lsid) {
     sri->availableCondVar.notify_one();
 }
 
-OperationContextSession::OperationContextSession(OperationContext* opCtx, bool checkOutSession)
+OperationContextSession::OperationContextSession(OperationContext* opCtx,
+                                                 bool checkOutSession,
+                                                 boost::optional<bool> autocommit)
     : _opCtx(opCtx) {
+
     if (!opCtx->getLogicalSessionId()) {
         return;
     }
@@ -273,7 +276,8 @@ OperationContextSession::OperationContextSession(OperationContext* opCtx, bool c
     checkedOutSession->scopedSession->refreshFromStorageIfNeeded(opCtx);
 
     if (opCtx->getTxnNumber()) {
-        checkedOutSession->scopedSession->beginTxn(opCtx, *opCtx->getTxnNumber());
+        checkedOutSession->scopedSession->beginOrContinueTxn(
+            opCtx, *opCtx->getTxnNumber(), autocommit);  
     }
 }
 

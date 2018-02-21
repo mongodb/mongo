@@ -82,13 +82,28 @@ public:
      * been called. If an attempt is made to start a transaction with number less than the latest
      * transaction this session has seen, an exception will be thrown.
      *
+     * Sets the autocommit parameter for this transaction. If it is boost::none, no autocommit 
+     * parameter was passed into the request. If this is the first statement of a transaction,
+     * the autocommit parameter will default to true.
+     *
+     * Autocommit can only be specified on the first statement of a transaction. If otherwise,
+     * this function will throw.
+     *
      * Throws if the session has been invalidated or if an attempt is made to start a transaction
      * older than the active.
      *
      * In order to avoid the possibility of deadlock, this method must not be called while holding a
      * lock.
      */
-    void beginTxn(OperationContext* opCtx, TxnNumber txnNumber);
+    void beginOrContinueTxn(OperationContext* opCtx,
+                            TxnNumber txnNumber,
+                            boost::optional<bool> autocommit);
+    /**
+     * Similar to beginOrContinueTxn except it is used specifically for shard migrations and does
+     * not check or modify the autocommit parameter.
+     */
+    void beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber txnNumber);
+
 
     /**
      * Called after a write under the specified transaction completes while the node is a primary
@@ -190,10 +205,25 @@ public:
      */
     void unstashTransactionResources(OperationContext* opCtx);
 
-private:
-    void _beginTxn(WithLock, TxnNumber txnNumber);
+    bool getAutocommit() const {
+        return _autocommit;
+    }
 
+private:
+    void _beginOrContinueTxn(WithLock,
+                             TxnNumber txnNumber,
+                             boost::optional<bool> autocommit);
+
+    void _beginOrContinueTxnOnMigration(WithLock, TxnNumber txnNumber);
+
+    // Checks if there is a conflicting operation on the current Session
     void _checkValid(WithLock) const;
+
+    // Checks that a new txnNumber is higher than the activeTxnNumber so
+    // we don't start a txn that is too old.
+    void _checkTxnValid(WithLock, TxnNumber txnNumber) const;
+
+    void _setActiveTxn(WithLock, TxnNumber txnNumber);
 
     void _checkIsActiveTransaction(WithLock, TxnNumber txnNumber) const;
 
@@ -252,6 +282,9 @@ private:
     // opTime. Used for fast retryability check and retrieving the previous write's data without
     // having to scan through the oplog.
     CommittedStatementTimestampMap _activeTxnCommittedStatements;
+
+    // Set in _beginOrContinueTxn and applies to the activeTxn on the session.
+    bool _autocommit{true};
 };
 
 }  // namespace mongo

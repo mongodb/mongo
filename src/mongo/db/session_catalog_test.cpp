@@ -70,7 +70,7 @@ TEST_F(SessionCatalogTest, OperationContextSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
     {
-        OperationContextSession ocs(opCtx(), true);
+        OperationContextSession ocs(opCtx(), true, boost::none);
         auto session = OperationContextSession::get(opCtx());
 
         ASSERT(session);
@@ -82,7 +82,7 @@ TEST_F(SessionCatalogTest, OperationContextSession) {
     }
 
     {
-        OperationContextSession ocs(opCtx(), false);
+        OperationContextSession ocs(opCtx(), false, boost::none);
         auto session = OperationContextSession::get(opCtx());
 
         ASSERT(!session);
@@ -107,7 +107,7 @@ TEST_F(SessionCatalogTest, GetOrCreateSessionAfterCheckOutSession) {
     opCtx()->setLogicalSessionId(lsid);
 
     boost::optional<OperationContextSession> ocs;
-    ocs.emplace(opCtx(), true);
+    ocs.emplace(opCtx(), true, boost::none);
 
     stdx::async(stdx::launch::async, [&] {
         Client::initThreadIfNotAlready();
@@ -136,10 +136,10 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
     {
-        OperationContextSession outerScopedSession(opCtx(), true);
+        OperationContextSession outerScopedSession(opCtx(), true, boost::none);
 
         {
-            OperationContextSession innerScopedSession(opCtx(), true);
+            OperationContextSession innerScopedSession(opCtx(), true, boost::none);
 
             auto session = OperationContextSession::get(opCtx());
             ASSERT(session);
@@ -163,10 +163,10 @@ DEATH_TEST_F(SessionCatalogTest,
     opCtx()->setTxnNumber(1);
 
     {
-        OperationContextSession outerScopedSession(opCtx(), true);
+        OperationContextSession outerScopedSession(opCtx(), true, boost::none);
 
         {
-            OperationContextSession innerScopedSession(opCtx(), true);
+            OperationContextSession innerScopedSession(opCtx(), true, boost::none);
             innerScopedSession.stashTransactionResources();
         }
     }
@@ -179,10 +179,10 @@ DEATH_TEST_F(SessionCatalogTest,
     opCtx()->setTxnNumber(1);
 
     {
-        OperationContextSession outerScopedSession(opCtx(), true);
+        OperationContextSession outerScopedSession(opCtx(), true, boost::none);
 
         {
-            OperationContextSession innerScopedSession(opCtx(), true);
+            OperationContextSession innerScopedSession(opCtx(), true, boost::none);
             innerScopedSession.unstashTransactionResources();
         }
     }
@@ -192,12 +192,12 @@ TEST_F(SessionCatalogTest, OnlyCheckOutSessionWithCheckOutSessionTrue) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
     {
-        OperationContextSession ocs(opCtx(), true);
+        OperationContextSession ocs(opCtx(), true, boost::none);
         ASSERT(OperationContextSession::get(opCtx()));
     }
 
     {
-        OperationContextSession ocs(opCtx(), false);
+        OperationContextSession ocs(opCtx(), false, boost::none);
         ASSERT(!OperationContextSession::get(opCtx()));
     }
 }

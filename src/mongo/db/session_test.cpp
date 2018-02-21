@@ -132,7 +132,7 @@ TEST_F(SessionTest, SessionEntryNotWrittenOnBegin) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 20;
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     ASSERT_EQ(sessionId, session.getSessionId());
     ASSERT(session.getLastWriteOpTime(txnNum).isNull());
@@ -150,7 +150,7 @@ TEST_F(SessionTest, SessionEntryWrittenAtFirstWrite) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 21;
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     const auto opTime = [&] {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -183,7 +183,7 @@ TEST_F(SessionTest, StartingNewerTransactionUpdatesThePersistedSession) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const auto writeTxnRecordFn = [&](TxnNumber txnNum, StmtId stmtId, repl::OpTime prevOpTime) {
-        session.beginTxn(opCtx(), txnNum);
+        session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
         WriteUnitOfWork wuow(opCtx());
@@ -222,10 +222,11 @@ TEST_F(SessionTest, StartingOldTxnShouldAssert) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 20;
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
-    ASSERT_THROWS_CODE(
-        session.beginTxn(opCtx(), txnNum - 1), AssertionException, ErrorCodes::TransactionTooOld);
+    ASSERT_THROWS_CODE(session.beginOrContinueTxn(opCtx(), txnNum - 1, boost::none),
+                       AssertionException,
+                       ErrorCodes::TransactionTooOld);
     ASSERT(session.getLastWriteOpTime(txnNum).isNull());
 }
 
@@ -241,7 +242,7 @@ TEST_F(SessionTest, SessionTransactionsCollectionNotDefaultCreated) {
     ASSERT(client.runCommand(nss.db().toString(), BSON("drop" << nss.coll()), dropResult));
 
     const TxnNumber txnNum = 21;
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
@@ -256,7 +257,7 @@ TEST_F(SessionTest, CheckStatementExecuted) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     const auto writeTxnRecordFn = [&](StmtId stmtId, repl::OpTime prevOpTime) {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -297,7 +298,7 @@ TEST_F(SessionTest, CheckStatementExecutedForOldTransactionThrows) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     ASSERT_THROWS_CODE(session.checkStatementExecuted(opCtx(), txnNum - 1, 0),
                        AssertionException,
@@ -320,7 +321,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForOldTransactionThrows) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -347,7 +348,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryForInvalidatedTransactionThrows) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
     WriteUnitOfWork wuow(opCtx());
@@ -367,7 +368,7 @@ TEST_F(SessionTest, WriteOpCompletedOnPrimaryCommitIgnoresInvalidation) {
     session.refreshFromStorageIfNeeded(opCtx());
 
     const TxnNumber txnNum = 100;
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -462,7 +463,7 @@ TEST_F(SessionTest, ErrorOnlyWhenStmtIdBeingCheckedIsNotInCache) {
 
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     auto firstOpTime = ([&]() {
         AutoGetCollection autoColl(opCtx(), kNss, MODE_IX);
@@ -548,7 +549,7 @@ TEST_F(SessionTest, StashAndUnstashResources) {
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
 
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"
@@ -593,7 +594,7 @@ TEST_F(SessionTest, StashNotRequired) {
     Session session(sessionId);
     session.refreshFromStorageIfNeeded(opCtx());
 
-    session.beginTxn(opCtx(), txnNum);
+    session.beginOrContinueTxn(opCtx(), txnNum, boost::none);
 
     repl::ReadConcernArgs readConcernArgs;
     ASSERT_OK(readConcernArgs.initialize(BSON("find"

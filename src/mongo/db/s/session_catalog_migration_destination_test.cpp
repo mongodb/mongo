@@ -178,7 +178,7 @@ public:
                                     const LogicalSessionId& sessionId,
                                     const TxnNumber& txnNum) {
         auto scopedSession = SessionCatalog::get(opCtx)->getOrCreateSession(opCtx, sessionId);
-        scopedSession->beginTxn(opCtx, txnNum);
+        scopedSession->beginOrContinueTxnOnMigration(opCtx, txnNum);
         return scopedSession;
     }
 
@@ -249,7 +249,8 @@ public:
             // requests with txnNumbers aren't allowed. To get around this, we have to manually set
             // up the session state and perform the insert.
             initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
-            OperationContextSession sessionTxnState(innerOpCtx.get(), true);
+            OperationContextSession sessionTxnState(innerOpCtx.get(), true, boost::none);
+
             const auto reply = performInserts(innerOpCtx.get(), insertRequest);
             ASSERT(reply.results.size() == 1);
             ASSERT(reply.results[0].isOK());
@@ -357,7 +358,6 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
     returnOplog({oplog1, oplog2, oplog3});
 
     finishSessionExpectSuccess(&sessionMigration);
-
     auto opCtx = operationContext();
     auto session = getSessionWithTxn(opCtx, sessionId, 2);
     TransactionHistoryIterator historyIter(session->getLastWriteOpTime(2));

@@ -475,12 +475,29 @@ void execCommandDatabase(OperationContext* opCtx,
         rpc::TrackingMetadata::get(opCtx).initWithOperName(command->getName());
 
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-        initializeOperationSessionInfo(
+        auto sessionOptions = initializeOperationSessionInfo(
             opCtx,
             request.body,
             command->requiresAuth(),
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet,
             opCtx->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking());
+
+        // Session ids are forwarded in requests, so commands that require roundtrips between
+        // servers may result in a deadlock when a server tries to check out a session it is already
+        // using to service an earlier operation in the command's chain. To avoid this, only check
+        // out sessions for commands that require them (i.e. write commands).
+        // Session checkout is also prevented for commands run within DBDirectClient. If checkout is
+        // required, it is expected to be handled by the outermost command.
+        const bool shouldCheckoutSession =
+            sessionCheckoutWhitelist.find(command->getName()) != sessionCheckoutWhitelist.cend() &&
+            !opCtx->getClient()->isInDirectClient();
+
+        boost::optional<bool> autocommitVal = boost::none;
+        if (sessionOptions && sessionOptions->getAutocommit()) {
+            autocommitVal = *sessionOptions->getAutocommit();
+        }
+
+        OperationContextSession sessionTxnState(opCtx, shouldCheckoutSession, autocommitVal);
 
         const auto dbname = request.getDatabase().toString();
         uassert(
@@ -526,17 +543,6 @@ void execCommandDatabase(OperationContext* opCtx,
             Command::generateHelpResponse(opCtx, replyBuilder, *command);
             return;
         }
-
-        // Session ids are forwarded in requests, so commands that require roundtrips between
-        // servers may result in a deadlock when a server tries to check out a session it is already
-        // using to service an earlier operation in the command's chain. To avoid this, only check
-        // out sessions for commands that require them (i.e. write commands).
-        // Session checkout is also prevented for commands run within DBDirectClient. If checkout is
-        // required, it is expected to be handled by the outermost command.
-        const bool shouldCheckoutSession =
-            sessionCheckoutWhitelist.find(command->getName()) != sessionCheckoutWhitelist.cend() &&
-            !opCtx->getClient()->isInDirectClient();
-        OperationContextSession sessionTxnState(opCtx, shouldCheckoutSession);
 
         ImpersonationSessionGuard guard(opCtx);
         uassertStatusOK(Command::checkAuthorization(command, opCtx, request));

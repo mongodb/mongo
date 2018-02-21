@@ -112,6 +112,9 @@ structs:
                       operation executes."
         type: TxnNumber
         optional: true
+      autocommit:
+        type: bool
+        optional: true
 
   SessionsCollectionFetchResultIndividualResult:
     description: "Individual result"

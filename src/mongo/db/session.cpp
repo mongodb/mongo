@@ -258,12 +258,22 @@ void Session::refreshFromStorageIfNeeded(OperationContext* opCtx) {
     }
 }
 
-void Session::beginTxn(OperationContext* opCtx, TxnNumber txnNumber) {
+void Session::beginOrContinueTxn(OperationContext* opCtx,
+                                 TxnNumber txnNumber,
+                                 boost::optional<bool> autocommit) {
     invariant(!opCtx->lockState()->isLocked());
 
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    _beginTxn(lg, txnNumber);
+    _beginOrContinueTxn(lg, txnNumber, autocommit);
 }
+
+void Session::beginOrContinueTxnOnMigration(OperationContext* opCtx, TxnNumber txnNumber) {
+    invariant(!opCtx->lockState()->isLocked());
+
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    _beginOrContinueTxnOnMigration(lg, txnNumber);
+}
+
 
 void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
                                           TxnNumber txnNumber,
@@ -296,7 +306,7 @@ void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
 }
 
 bool Session::onMigrateBeginOnPrimary(OperationContext* opCtx, TxnNumber txnNumber, StmtId stmtId) {
-    beginTxn(opCtx, txnNumber);
+    beginOrContinueTxnOnMigration(opCtx, txnNumber);
 
     try {
         if (checkStatementExecuted(opCtx, txnNumber, stmtId)) {
@@ -413,9 +423,28 @@ bool Session::checkStatementExecutedNoOplogEntryFetch(TxnNumber txnNumber, StmtI
     return bool(_checkStatementExecuted(lg, txnNumber, stmtId));
 }
 
-void Session::_beginTxn(WithLock wl, TxnNumber txnNumber) {
+void Session::_beginOrContinueTxn(WithLock wl,
+                                  TxnNumber txnNumber,
+                                  boost::optional<bool> autocommit) {
     _checkValid(wl);
+    _checkTxnValid(wl, txnNumber);
 
+    if (txnNumber == _activeTxnNumber) {
+        // Continuing an existing transaction.
+        uassert(ErrorCodes::IllegalOperation,
+                "Specifying 'autocommit' is only allowed at the beginning of a transaction",
+                autocommit == boost::none);
+
+        return;
+    }
+
+    // Start a new transaction with an autocommit field
+    _setActiveTxn(wl, txnNumber);
+    _autocommit = (autocommit != boost::none) ? *autocommit : true;  // autocommit defaults to true
+    _isSnapshotTxn = false;
+}
+
+void Session::_checkTxnValid(WithLock, TxnNumber txnNumber) const {
     uassert(ErrorCodes::TransactionTooOld,
             str::stream() << "Cannot start transaction " << txnNumber << " on session "
                           << getSessionId()
@@ -423,15 +452,6 @@ void Session::_beginTxn(WithLock wl, TxnNumber txnNumber) {
                           << _activeTxnNumber
                           << " has already started.",
             txnNumber >= _activeTxnNumber);
-
-    // Check for continuing an existing transaction
-    if (txnNumber == _activeTxnNumber)
-        return;
-
-    _activeTxnNumber = txnNumber;
-    _activeTxnCommittedStatements.clear();
-    _hasIncompleteHistory = false;
-    _isSnapshotTxn = false;
 }
 
 void Session::stashTransactionResources(OperationContext* opCtx) {
@@ -498,6 +518,23 @@ void Session::_releaseStashedTransactionResources(WithLock wl, OperationContext*
     _stashedRecoveryUnit.reset(nullptr);
     _stashedLocker.reset(nullptr);
     _isSnapshotTxn = false;
+}
+
+void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {
+    _checkValid(wl);
+    _checkTxnValid(wl, txnNumber);
+    
+    // Check for continuing an existing transaction
+    if (txnNumber == _activeTxnNumber)
+        return;
+
+    _setActiveTxn(wl, txnNumber);
+}
+
+void Session::_setActiveTxn(WithLock, TxnNumber txnNumber) {
+    _activeTxnNumber = txnNumber;
+    _activeTxnCommittedStatements.clear();
+    _hasIncompleteHistory = false;
 }
 
 void Session::_checkValid(WithLock) const {
@@ -612,7 +649,7 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
             // invalidated and immediately refreshed while there were no writes for newTxnNumber
             // yet. In this case _activeTxnNumber will be less than newTxnNumber and we will fail to
             // update the cache even though the write was successful.
-            _beginTxn(lg, newTxnNumber);
+            _beginOrContinueTxn(lg, newTxnNumber, boost::none);
         }
 
         if (newTxnNumber == _activeTxnNumber) {

@@ -38,13 +38,15 @@
 
 namespace mongo {
 
-void initializeOperationSessionInfo(OperationContext* opCtx,
-                                    const BSONObj& requestBody,
-                                    bool requiresAuth,
-                                    bool isReplSetMemberOrMongos,
-                                    bool supportsDocLocking) {
+boost::optional<OperationSessionInfoFromClient> initializeOperationSessionInfo(
+    OperationContext* opCtx,
+    const BSONObj& requestBody,
+    bool requiresAuth,
+    bool isReplSetMemberOrMongos,
+    bool supportsDocLocking) {
+
     if (!requiresAuth) {
-        return;
+        return boost::none;
     }
 
     {
@@ -54,7 +56,7 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
         if (authSession && authSession->isUsingLocalhostBypass() &&
             !authSession->getAuthenticatedUserNames().more()) {
-            return;
+            return boost::none;
         }
     }
 
@@ -88,6 +90,14 @@ void initializeOperationSessionInfo(OperationContext* opCtx,
 
         opCtx->setTxnNumber(*osi.getTxnNumber());
     }
+
+    if (osi.getAutocommit()) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Autocommit requires a transaction number to be specified",
+                opCtx->getTxnNumber());
+    }
+
+    return osi;
 }
 
 }  // namespace mongo
