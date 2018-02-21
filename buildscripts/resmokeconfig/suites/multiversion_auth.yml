@@ -19,9 +19,6 @@ selector:
   # TODO: SERVER-30161
   - jstests/multiVersion/dumprestore.js
   - jstests/multiVersion/dumprestore_sharded.js
-  # TODO: SERVER-31993
-  - jstests/multiVersion/add_invalid_shard.js
-  - jstests/multiVersion/new_mongos_old_mongod_wire_version_clash.js
   # TODO: SERVER-32636
   - jstests/multiVersion/feature_compatibility_version_lagging_secondary.js
 
