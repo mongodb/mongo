@@ -300,6 +300,10 @@ public:
         appendRecordId(rid);
     }
 
+    static size_t getKeySize(const char* buffer,
+                             size_t len,
+                             Ordering ord,
+                             const TypeBits& typeBits);
     static BSONObj toBson(StringData data, Ordering ord, const TypeBits& types);
     static BSONObj toBson(const char* buffer, size_t len, Ordering ord, const TypeBits& types);
 
