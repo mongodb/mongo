@@ -500,6 +500,17 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target='producer_consumer_queue_test',
+    source=[
+        'producer_consumer_queue_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+    ]
+)
+
+env.CppUnitTest(
     target='duration_test',
     source=[
         'duration_test.cpp',
