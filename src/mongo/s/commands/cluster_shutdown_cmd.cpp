@@ -46,7 +46,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         // Never returns
-        shutdownHelper();
+        shutdownHelper(cmdObj);
         return true;
     }
 

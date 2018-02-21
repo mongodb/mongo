@@ -59,7 +59,7 @@ public:
     }
 
 protected:
-    static void shutdownHelper();
+    static void shutdownHelper(const BSONObj& cmdObj);
 };
 
 }  // namespace mongo

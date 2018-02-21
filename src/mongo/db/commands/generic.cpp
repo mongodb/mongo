@@ -473,7 +473,7 @@ void CmdShutdown::addRequiredPrivileges(const std::string& dbname,
     out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
 }
 
-void CmdShutdown::shutdownHelper() {
+void CmdShutdown::shutdownHelper(const BSONObj& cmdObj) {
     MONGO_FAIL_POINT_BLOCK(crashOnShutdown, crashBlock) {
         const std::string crashHow = crashBlock.getData()["how"].str();
         if (crashHow == "fault") {
@@ -482,7 +482,7 @@ void CmdShutdown::shutdownHelper() {
         ::abort();
     }
 
-    log() << "terminating, shutdown command received";
+    log() << "terminating, shutdown command received " << cmdObj;
 
 #if defined(_WIN32)
     // Signal the ServiceMain thread to shutdown.

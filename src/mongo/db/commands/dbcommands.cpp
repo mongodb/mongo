@@ -132,7 +132,7 @@ public:
         }
 
         // Never returns
-        shutdownHelper();
+        shutdownHelper(cmdObj);
         return true;
     }
 
