@@ -54,7 +54,6 @@
 
 namespace mongo {
 
-using std::cout;
 using std::endl;
 
 Status addMongodOptions(moe::OptionSection* options) {
@@ -1072,7 +1071,7 @@ Status storeMongodOptions(const moe::Environment& params) {
 
     if (params.count("storage.mmapv1.preallocDataFiles")) {
         mmapv1GlobalOptions.prealloc = params["storage.mmapv1.preallocDataFiles"].as<bool>();
-        cout << "note: noprealloc may hurt performance in many applications" << endl;
+        log() << "note: noprealloc may hurt performance in many applications" << endl;
     }
     if (params.count("storage.mmapv1.smallFiles")) {
         mmapv1GlobalOptions.smallfiles = params["storage.mmapv1.smallFiles"].as<bool>();
