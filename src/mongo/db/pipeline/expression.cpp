@@ -469,8 +469,8 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
     const Value indexArg = vpOperand[1]->evaluate(root);
     long long i = indexArg.coerceToLong();
 
-    const Value array = dynamic_cast<ExpressionFilter*>(vpOperand[0])
-        ? vpOperand[0]->computeNthFilterArray(root, i)
+    const Value array = dynamic_cast<ExpressionFilter*>(vpOperand[0].get())
+        ?dynamic_cast<ExpressionFilter*>(vpOperand[0].get())->computeNthFilteredValue(root, i)
         : vpOperand[0]->evaluate(root);
     // const Value array = vpOperand[0]->evaluate(root);
 
@@ -2039,6 +2039,35 @@ Value ExpressionFilter::evaluate(const Document& root) const {
 
         if (_filter->evaluate(root).coerceToBool()) {
             output.push_back(std::move(elem));
+        }
+    }
+
+    return Value(std::move(output));
+}
+
+Value ExpressionFilter::computeNthFilteredValue(const Document& root, long long n) const {
+      // We are guaranteed at parse time that this isn't using our _varId.
+    const Value inputVal = _input->evaluate(root);
+    if (inputVal.nullish())
+        return Value(BSONNULL);
+
+
+
+    const vector<Value>& input = inputVal.getArray();
+
+    if (input.empty())
+        return inputVal;
+
+    vector<Value> output;
+    auto& vars = getExpressionContext()->variables;
+    for (const auto& elem : input) {
+        vars.setValue(_varId, elem);
+
+        if (_filter->evaluate(root).coerceToBool()) {
+            output.push_back(std::move(elem));
+            if(output.size() == n) {
+                return  Value(std::move(output));
+            }
         }
     }
 
