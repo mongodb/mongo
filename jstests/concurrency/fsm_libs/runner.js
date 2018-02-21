@@ -701,6 +701,7 @@ var runner = (function() {
         var bgCleanup = [];
         var errors = [];
         var configServerData = [];
+        let activeException = false;
 
         try {
             prepareCollections(bgWorkloads, bgContext, cluster, clusterOptions, executionOptions);
@@ -760,6 +761,9 @@ var runner = (function() {
                                      configServerData,
                                      cleanupOptions);
                 });
+            } catch (err) {
+                activeException = true;
+                throw err;
             } finally {
                 // Set a flag so background threads know to terminate.
                 bgThreadMgr.markAllForTermination();
@@ -791,8 +795,14 @@ var runner = (function() {
                 }
 
                 throwError(workloadErrors);
+            } catch (err) {
+                activeException = true;
+                throw err;
             } finally {
-                cluster.teardown();
+                // We preserve the data files when an FSM workload failed so that they can later be
+                // archived to S3.
+                const opts = activeException ? {noCleanData: true} : {};
+                cluster.teardown(opts);
             }
         }
     }

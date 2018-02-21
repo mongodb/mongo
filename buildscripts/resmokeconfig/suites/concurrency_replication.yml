@@ -6,6 +6,8 @@ selector:
 
 # Concurrency tests that run against a replica set start one themselves.
 executor:
+  archive:
+    tests: true
   config:
     shell_options:
       nodb: ''

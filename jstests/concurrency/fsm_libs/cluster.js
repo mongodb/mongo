@@ -233,7 +233,7 @@ var Cluster = function(options) {
 
             conn = st.s;  // mongos
 
-            this.teardown = function teardown() {
+            this.teardown = function teardown(opts) {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
                 options.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
 
@@ -243,8 +243,7 @@ var Cluster = function(options) {
                 if (this.shouldPerformContinuousStepdowns()) {
                     TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
                 }
-
-                st.stop();
+                st.stop(opts);
             };
 
             if (this.shouldPerformContinuousStepdowns()) {
@@ -302,10 +301,9 @@ var Cluster = function(options) {
             conn = rst.getPrimary();
             replSets = [rst];
 
-            this.teardown = function teardown() {
+            this.teardown = function teardown(opts) {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
-
-                rst.stopSet();
+                rst.stopSet(undefined, undefined, opts);
             };
 
             this._addReplicaSetConns(rst);
