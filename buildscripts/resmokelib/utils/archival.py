@@ -322,7 +322,8 @@ class Archival(object):
         self._archive_file_worker.join(timeout=timeout)
         self.check_thread(self._archive_file_worker, False)
 
-        self.logger.info("Total tar/gzip archive time is %0.2f seconds", self.archive_time)
+        self.logger.info("Total tar/gzip archive time is %0.2f seconds, for %d file(s) %d MB",
+                         self.archive_time, self.num_files, self.size_mb)
 
     def files_archived_num(self):
         """ Returns the number of the archived files. """

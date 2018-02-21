@@ -223,11 +223,11 @@ var Cluster = function(options) {
 
             conn = st.s;  // mongos
 
-            this.teardown = function teardown() {
+            this.teardown = function teardown(opts) {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
                 options.teardownFunctions.mongos.forEach(this.executeOnMongosNodes);
 
-                st.stop();
+                st.stop(opts);
             };
 
             // Save all mongos and mongod connections
@@ -273,10 +273,9 @@ var Cluster = function(options) {
             conn = rst.getPrimary();
             replSets = [rst];
 
-            this.teardown = function teardown() {
+            this.teardown = function teardown(opts) {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
-
-                rst.stopSet();
+                rst.stopSet(undefined, undefined, opts);
             };
 
             this._addReplicaSetConns(rst);
