@@ -32,6 +32,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -67,8 +68,16 @@ public:
         return Status::OK();
     }
 
+    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+        const auto nsElt = cmdObj.firstElement();
+        uassert(ErrorCodes::InvalidNamespace,
+                "'movePrimary' must be of type String",
+                nsElt.type() == BSONType::String);
+        return nsElt.str();
+    }
+
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const std::string& dbname_unused,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
@@ -76,6 +85,36 @@ public:
                 result,
                 Status(ErrorCodes::IllegalOperation,
                        "_movePrimary can only be run on shard servers"));
+        }
+
+        auto movePrimaryRequest = MovePrimary::parse(IDLParserErrorContext("_movePrimary"), cmdObj);
+        const auto dbname = parseNs("", cmdObj);
+
+        uassert(
+            ErrorCodes::InvalidNamespace,
+            str::stream() << "invalid db name specified: " << dbname,
+            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
+
+        if (dbname == NamespaceString::kAdminDb || dbname == NamespaceString::kConfigDb ||
+            dbname == NamespaceString::kLocalDb) {
+            return CommandHelpers::appendCommandStatus(
+                result,
+                {ErrorCodes::InvalidOptions,
+                 str::stream() << "Can't move primary for " << dbname << " database"});
+        }
+
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "_movePrimary must be called with majority writeConcern, got "
+                              << cmdObj,
+                opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
+
+        const std::string to = movePrimaryRequest.getTo().toString();
+
+        if (to.empty()) {
+            return CommandHelpers::appendCommandStatus(
+                result,
+                {ErrorCodes::InvalidOptions,
+                 str::stream() << "you have to specify where you want to move it"});
         }
 
         return true;

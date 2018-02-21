@@ -18,9 +18,6 @@
     st.ensurePrimaryShard(kDbName, shard0);
     assert.eq(shard0, mongos.getDB('config').databases.findOne({_id: kDbName}).primary);
 
-    // Can run on shards.
-    assert.commandWorked(st.d0.getDB('admin').runCommand({_movePrimary: kDbName, to: shard1}));
-
     // Can run only against the admin database.
     assert.commandFailedWithCode(
         mongos.getDB('test').runCommand({movePrimary: kDbName, to: shard0}),

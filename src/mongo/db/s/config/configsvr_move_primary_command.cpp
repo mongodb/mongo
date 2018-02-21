@@ -134,6 +134,15 @@ public:
                               << cmdObj,
                 opCtx->getWriteConcern().wMode == WriteConcernOptions::kMajority);
 
+        const std::string to = movePrimaryRequest.getTo().toString();
+
+        if (to.empty()) {
+            return CommandHelpers::appendCommandStatus(
+                result,
+                {ErrorCodes::InvalidOptions,
+                 str::stream() << "you have to specify where you want to move it"});
+        }
+
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
         auto const catalogCache = Grid::get(opCtx)->catalogCache();
         auto const catalogManager = ShardingCatalogManager::get(opCtx);
@@ -152,16 +161,29 @@ public:
                                           opCtx, dbname, repl::ReadConcernLevel::kLocalReadConcern))
                           .value;
 
-        const std::string to = movePrimaryRequest.getTo().toString();
-
-        if (to.empty()) {
-            return CommandHelpers::appendCommandStatus(
-                result,
-                {ErrorCodes::InvalidOptions,
-                 str::stream() << "you have to specify where you want to move it"});
-        }
-
         const auto fromShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbType.getPrimary()));
+
+        // fcv 4.0 logic for movePrimary (being tested under the 'forTest' flag while in
+        // development).
+        if (movePrimaryRequest.getForTest()) {
+            const NamespaceString nss(dbname);
+
+            ShardMovePrimary shardMovePrimaryRequest;
+            shardMovePrimaryRequest.set_movePrimary(nss);
+            shardMovePrimaryRequest.setTo(movePrimaryRequest.getTo());
+
+            auto cmdResponse = uassertStatusOK(fromShard->runCommandWithFixedRetryAttempts(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                "admin",
+                CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
+                    cmdObj, shardMovePrimaryRequest.toBSON())),
+                Shard::RetryPolicy::kIdempotent));
+
+            CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+
+            return true;
+        }
 
         const auto toShard = [&]() {
             auto toShardStatus = shardRegistry->getShard(opCtx, to);
