@@ -404,8 +404,11 @@ var ShardingTest = function(params) {
             }
         }
 
-        for (var i = 0; i < _alldbpaths.length; i++) {
-            resetDbpath(MongoRunner.dataPath + _alldbpaths[i]);
+        if (!opts || !opts.noCleanData) {
+            print("ShardingTest stop deleting all dbpaths");
+            for (var i = 0; i < _alldbpaths.length; i++) {
+                resetDbpath(MongoRunner.dataPath + _alldbpaths[i]);
+            }
         }
 
         var timeMillis = new Date().getTime() - _startTime.getTime();

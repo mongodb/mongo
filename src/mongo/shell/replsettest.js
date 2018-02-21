@@ -1992,7 +1992,7 @@ var ReplSetTest = function(opts) {
             return;
         }
 
-        if (_alldbpaths) {
+        if ((!opts || !opts.noCleanData) && _alldbpaths) {
             print("ReplSetTest stopSet deleting all dbpaths");
             for (var i = 0; i < _alldbpaths.length; i++) {
                 resetDbpath(_alldbpaths[i]);
