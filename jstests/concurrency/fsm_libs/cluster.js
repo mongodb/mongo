@@ -164,13 +164,14 @@ var Cluster = function(options) {
                "Both 'masterSlave' and 'sharded.enabled' cannot" + "be true");
     }
 
-    function makeReplSetTestConfig(numReplSetNodes) {
+    function makeReplSetTestConfig(numReplSetNodes, firstNodeOnlyVote) {
         const REPL_SET_VOTING_LIMIT = 7;
         // Workaround for SERVER-26893 to specify when numReplSetNodes > REPL_SET_VOTING_LIMIT.
+        var firstNodeNotVoting = firstNodeOnlyVote ? 1 : REPL_SET_VOTING_LIMIT;
         var rstConfig = [];
         for (var i = 0; i < numReplSetNodes; i++) {
             rstConfig[i] = {};
-            if (i >= REPL_SET_VOTING_LIMIT) {
+            if (i >= firstNodeNotVoting) {
                 rstConfig[i].rsConfig = {priority: 0, votes: 0};
             }
         }
@@ -213,7 +214,8 @@ var Cluster = function(options) {
             // TODO: allow 'options' to specify an 'rs' config
             if (options.replication.enabled) {
                 shardConfig.rs = {
-                    nodes: makeReplSetTestConfig(options.replication.numNodes),
+                    nodes: makeReplSetTestConfig(options.replication.numNodes,
+                                                 !this.shouldPerformContinuousStepdowns()),
                     // Increase the oplog size (in MB) to prevent rollover
                     // during write-heavy workloads
                     oplogSize: 1024,
@@ -284,7 +286,8 @@ var Cluster = function(options) {
             }
         } else if (options.replication.enabled) {
             var replSetConfig = {
-                nodes: makeReplSetTestConfig(options.replication.numNodes),
+                nodes: makeReplSetTestConfig(options.replication.numNodes,
+                                             !this.shouldPerformContinuousStepdowns()),
                 // Increase the oplog size (in MB) to prevent rollover during write-heavy workloads
                 oplogSize: 1024,
                 nodeOptions: {verbose: verbosityLevel},
