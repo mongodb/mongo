@@ -2853,15 +2853,9 @@ TEST(ExpressionObjectOptimizations, OptimizingAnObjectShouldOptimizeSubExpressio
     ASSERT_EQ(object->getChildExpressions().size(), 1UL);
 
     auto optimized = object->optimize();
-    auto optimizedObject = dynamic_cast<ExpressionObject*>(optimized.get());
+    auto optimizedObject = dynamic_cast<ExpressionConstant*>(optimized.get());
     ASSERT_TRUE(optimizedObject);
-    ASSERT_EQ(optimizedObject->getChildExpressions().size(), 1UL);
-
-    // We should have optimized {$add: [1, 2]} to just the constant 3.
-    auto expConstant =
-        dynamic_cast<ExpressionConstant*>(optimizedObject->getChildExpressions()[0].second.get());
-    ASSERT_TRUE(expConstant);
-    ASSERT_VALUE_EQ(expConstant->evaluate(Document()), Value(3));
+    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document()), Value(BSON("a" << 3)));
 };
 
 TEST(ExpressionObjectOptimizations,
@@ -2870,13 +2864,13 @@ TEST(ExpressionObjectOptimizations,
     intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     VariablesParseState vps = expCtx->variablesParseState;
 
-    // All constants should optimize to ExpressionConstant
+    // All constants should optimize to ExpressionConstant.
     auto objectWithAllConstants = ExpressionObject::parse(expCtx, BSON("b" << 1 << "c" << 1), vps);
     auto optimizedToAllConstants = objectWithAllConstants->optimize();
     auto constants = dynamic_cast<ExpressionConstant*>(optimizedToAllConstants.get());
     ASSERT_TRUE(constants);
 
-    // Not all constants should not optimize to ExpressionConstant
+    // Not all constants should not optimize to ExpressionConstant.
     auto objectNotAllConstants = ExpressionObject::parse(expCtx,
                                                          BSON("b" << 1 << "input"
                                                                   << "$inputField"),
@@ -2885,18 +2879,18 @@ TEST(ExpressionObjectOptimizations,
     auto shouldNotBeConstant = dynamic_cast<ExpressionConstant*>(optimizedNotAllConstants.get());
     ASSERT_FALSE(shouldNotBeConstant);
 
-    // Sub expression should optimize to constant expression
+    // Sub expression should optimize to constant expression.
     auto expressionWithConstantObject = ExpressionObject::parse(
         expCtx,
         BSON("willBeConstant" << BSON("$add" << BSON_ARRAY(1 << 2)) << "alreadyConstant"
                               << "string"),
         vps);
     auto optimizedWithConstant = expressionWithConstantObject->optimize();
-    auto optimizedObject = dynamic_cast<ExpressionObject*>(optimizedWithConstant.get());
-    auto expConstant =
-        dynamic_cast<ExpressionConstant*>(optimizedObject->getChildExpressions()[0].second.get());
-    ASSERT_TRUE(expConstant);
-    ASSERT_VALUE_EQ(expConstant->evaluate(Document()), Value(3));
+    auto optimizedObject = dynamic_cast<ExpressionConstant*>(optimizedWithConstant.get());
+    ASSERT_TRUE(optimizedObject);
+    ASSERT_VALUE_EQ(optimizedObject->evaluate(Document()),
+                    Value(BSON("willBeConstant" << 3 << "alreadyConstant"
+                                                << "string")));
 };
 
 }  // namespace Object
