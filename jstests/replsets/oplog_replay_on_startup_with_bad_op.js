@@ -22,9 +22,6 @@
     var lastTs = lastOplogDoc.ts;
     var newTs = Timestamp(lastTs.t + 1, 1);
     var term = lastOplogDoc.t;
-    if (typeof(term) == 'undefined') {
-        term = -1;  // Use a dummy term for PV0.
-    }
 
     assert.writeOK(oplog.insert({
         ts: newTs,

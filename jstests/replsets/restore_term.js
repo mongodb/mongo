@@ -22,11 +22,7 @@ load("jstests/replsets/rslib.js");
     var rst = new ReplSetTest({name: name, nodes: 2});
 
     rst.startSet();
-    // Initiate the replset in protocol version 1.
-    var conf = rst.getReplSetConfig();
-    conf.settings = conf.settings || {};
-    conf.protocolVersion = 1;
-    rst.initiate(conf);
+    rst.initiate();
     rst.awaitSecondaryNodes();
 
     var primary = rst.getPrimary();

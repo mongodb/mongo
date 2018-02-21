@@ -249,12 +249,10 @@ function RollbackTest(name = "RollbackTest", replSet) {
         curSecondary.reconnect([arbiter]);
 
         log(`Waiting for the new primary ${curSecondary.host} to be elected`);
-        if (rst.getReplSetConfig().protocolVersion > 0) {
-            assert.soonNoExcept(() => {
-                const res = curSecondary.adminCommand({replSetStepUp: 1});
-                return res.ok;
-            });
-        }
+        assert.soonNoExcept(() => {
+            const res = curSecondary.adminCommand({replSetStepUp: 1});
+            return res.ok;
+        });
 
         const newPrimary = rst.getPrimary();
 
@@ -262,15 +260,6 @@ function RollbackTest(name = "RollbackTest", replSet) {
         // should never be possible with 2 electable nodes and the sequence of operations thus far.
         assert.eq(newPrimary, curSecondary, "Did not elect a new node as primary");
         log(`Elected the old secondary ${newPrimary.host} as the new primary`);
-
-        if (rst.getReplSetConfig().protocolVersion === 0) {
-            // Add a sleep and a dummy write to ensure the new primary has an optime greater than
-            // the last optime on the node that will undergo rollback. This greater optime ensures
-            // that the new primary is eligible to become a sync source in pv0.
-            sleep(1000);
-            dbName = "ensureEligiblePV0";
-            assert.writeOK(newPrimary.getDB(dbName).testColl.insert({id: 0}));
-        }
 
         // The old primary is the new secondary; the old secondary just got elected as the new
         // primary, so we update the topology to reflect this change.

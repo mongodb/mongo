@@ -149,4 +149,16 @@ TEST(Basic, FromStringToString) {
     std::string fromStr("541b1a00e8a23afa832b218e");
     ASSERT_EQUALS(OID(fromStr).toString(), fromStr);
 }
+
+TEST(Basic, FromTerm) {
+    auto term = 7;
+    auto oid = OID::fromTerm(term);
+
+    auto oidStr = oid.toString();
+    auto oidHead = oidStr.substr(0, 8);
+    auto oidTail = oidStr.substr(oidStr.length() - 1);
+
+    ASSERT_EQUALS("7fffffff", oidHead);
+    ASSERT_EQUALS(term, std::stoi(oidTail));
+}
 }

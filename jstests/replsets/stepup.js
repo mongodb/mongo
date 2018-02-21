@@ -9,27 +9,14 @@ load("jstests/replsets/rslib.js");
     var rst = new ReplSetTest({name: name, nodes: 2});
 
     rst.startSet();
-    // Initiate the replset in protocol version 0.
-    var conf = rst.getReplSetConfig();
-    conf.protocolVersion = 0;
-    rst.initiate(conf);
+    rst.initiate();
     rst.awaitReplication();
 
     var primary = rst.getPrimary();
     var secondary = rst.getSecondary();
-    var res = secondary.adminCommand({replSetStepUp: 1});
-    assert.commandFailedWithCode(res, ErrorCodes.CommandNotSupported);
-
-    // Upgrade protocol version
-    conf = rst.getReplSetConfigFromNode();
-    conf.protocolVersion = 1;
-    conf.version++;
-    reconfig(rst, conf);
-    // Wait for the upgrade to finish.
-    assert.writeOK(primary.getDB("test").bar.insert({x: 1}, {writeConcern: {w: 2}}));
 
     // Step up the primary. Return OK because it's already the primary.
-    res = primary.adminCommand({replSetStepUp: 1});
+    var res = primary.adminCommand({replSetStepUp: 1});
     assert.commandWorked(res);
     assert.eq(primary, rst.getPrimary());
 

@@ -29,11 +29,9 @@ var doTest = function(signal) {
     // elected master.
     var master = replTest.getPrimary();
 
-    var isPV1 = (replTest.getReplSetConfigFromNode().protocolVersion == 1);
-    if (isPV1) {
-        // Ensure the primary logs an n-op to the oplog upon transitioning to primary.
-        assert.gt(master.getDB("local").oplog.rs.count({op: 'n', o: {msg: 'new primary'}}), 0);
-    }
+    // Ensure the primary logs an n-op to the oplog upon transitioning to primary.
+    assert.gt(master.getDB("local").oplog.rs.count({op: 'n', o: {msg: 'new primary'}}), 0);
+
     // Calling getPrimary also makes available the liveNodes structure,
     // which looks like this:
     // liveNodes = {master: masterNode,
@@ -133,12 +131,8 @@ var doTest = function(signal) {
     printjson(result);
     var lastOp = result.lastOp;
     var lastOplogOp = master.getDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
-    if (replTest.getReplSetConfigFromNode().protocolVersion != 1) {
-        assert.eq(lastOplogOp['ts'], lastOp);
-    } else {
-        assert.eq(lastOplogOp['ts'], lastOp['ts']);
-        assert.eq(lastOplogOp['t'], lastOp['t']);
-    }
+    assert.eq(lastOplogOp['ts'], lastOp['ts']);
+    assert.eq(lastOplogOp['t'], lastOp['t']);
 
     ts.forEach(function(z) {
         assert.eq(2, z.getIndexKeys().length, "A " + z.getMongo());

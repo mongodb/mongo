@@ -18,9 +18,6 @@
     var nojournal = Array.contains(conn.adminCommand({getCmdLineOpts: 1}).argv, '--nojournal');
     var storageEngine = jsTest.options().storageEngine;
     var term = conn.getCollection('local.oplog.rs').find().sort({$natural: -1}).limit(1).next().t;
-    if (typeof(term) == 'undefined') {
-        term = -1;  // Use a dummy term for PV0.
-    }
 
     function runTest({
         oplogEntries,
