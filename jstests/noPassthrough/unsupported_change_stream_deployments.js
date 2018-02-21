@@ -27,13 +27,6 @@
     assertChangeStreamNotSupportedOnConnection(conn);
     assert.eq(0, MongoRunner.stopMongod(conn));
 
-    // Test master/slave deployments.
-    const masterSlaveFixture = new ReplTest("change_stream");
-    const master = masterSlaveFixture.start(true, {enableMajorityReadConcern: ""});
-    assert.writeOK(master.getDB("test").ensure_db_exists.insert({}));
-    assertChangeStreamNotSupportedOnConnection(master);
-    masterSlaveFixture.stop();
-
     // Test a sharded cluster with standalone shards.
     const clusterWithStandalones = new ShardingTest(
         {shards: 2, other: {shardOptions: {enableMajorityReadConcern: ""}}, config: 1});
