@@ -484,7 +484,7 @@ public:
         return _rollback->runRollback(_opCtx.get());
     }
 
-    BSONObj makeSessionOp(NamespaceString nss, UUID sessionId, long txnNum) {
+    BSONObj makeSessionOp(NamespaceString nss, UUID sessionId, TxnNumber txnNum) {
         auto uuid = UUID::gen();
         BSONObjBuilder bob;
         bob.append("ts", Timestamp(2, 1));
@@ -797,7 +797,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsSessionIdFromOplogEntry) {
 
     NamespaceString nss("test.coll");
     auto sessionId = UUID::gen();
-    auto sessionOpObj = makeSessionOp(nss, sessionId, 1);
+    auto sessionOpObj = makeSessionOp(nss, sessionId, 1L);
     auto sessionOp = std::make_pair(sessionOpObj, RecordId(recordId));
 
     // Run the rollback and make sure the correct session id was recorded.
@@ -824,7 +824,7 @@ TEST_F(RollbackImplObserverInfoTest, RollbackRecordsSessionIdFromApplyOpsSubOp) 
 
     NamespaceString nss("test.coll");
     auto sessionId = UUID::gen();
-    auto sessionOpObj = makeSessionOp(nss, sessionId, 1);
+    auto sessionOpObj = makeSessionOp(nss, sessionId, 1L);
 
     // Create the applyOps command object.
     BSONArrayBuilder subops;
