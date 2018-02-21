@@ -612,10 +612,12 @@ private:
  * ops - This only modifies the isForCappedCollection field on each op. It does not alter the ops
  *      vector in any other way.
  * writerVectors - Set of operations for each worker thread to apply.
+ * applyOpsOperations - If provided, stores extracted applyOps operations.
  */
 void fillWriterVectors(OperationContext* opCtx,
                        MultiApplier::Operations* ops,
-                       std::vector<MultiApplier::OperationPtrs>* writerVectors) {
+                       std::vector<MultiApplier::OperationPtrs>* writerVectors,
+                       std::vector<MultiApplier::Operations>* applyOpsOperations) {
     const auto serviceContext = opCtx->getServiceContext();
     const auto storageEngine = serviceContext->getGlobalStorageEngine();
 
@@ -649,6 +651,24 @@ void fillWriterVectors(OperationContext* opCtx,
                 // bulk insert them.
                 op.isForCappedCollection = true;
             }
+        }
+
+        // Extract applyOps operations and fill writers with extracted operations using this
+        // function.
+        if (supportsDocLocking && op.isCommand() &&
+            op.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+            try {
+                applyOpsOperations->emplace_back(ApplyOps::extractOperations(op));
+                fillWriterVectors(
+                    opCtx, &applyOpsOperations->back(), writerVectors, applyOpsOperations);
+            } catch (...) {
+                fassertFailedWithStatusNoTrace(
+                    50711,
+                    exceptionToStatus().withContext(str::stream()
+                                                    << "Unable to extract operations from applyOps "
+                                                    << redact(op.toBSON())));
+            }
+            continue;
         }
 
         auto& writer = (*writerVectors)[hash % numWriters];
@@ -1550,29 +1570,12 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());
         scheduleWritesToOplog(opCtx, workerPool, ops);
 
-        // Used by fillWriterVectors() only. May be overridden to point to extracted applyOps
-        // operations.
-        MultiApplier::Operations* opsPtr = &ops;
-
-        // Holds extracted applyOps operations.
-        // The operations in 'applyOpsOperations', rather than the original applyOps command, will
-        // be processed by the writer threads.
-        MultiApplier::Operations applyOpsOperations;
-        const auto& firstOplogEntry = ops.front();
-        if (storageEngine->supportsDocLocking() && firstOplogEntry.isCommand() &&
-            OplogEntry::CommandType::kApplyOps == firstOplogEntry.getCommandType()) {
-            try {
-                applyOpsOperations = ApplyOps::extractOperations(firstOplogEntry);
-                opsPtr = &applyOpsOperations;
-            } catch (...) {
-                warning() << "Unable to extract operations from applyOps "
-                          << redact(firstOplogEntry.toBSON()) << ": " << exceptionToStatus()
-                          << ". Applying as standalone command.";
-            }
-        }
+        // Holds extracted applyOps operations. Keep in scope until all operations in 'ops' and
+        // 'applyOpsOperations' have been applied.
+        std::vector<MultiApplier::Operations> applyOpsOperations;
 
         std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
-        fillWriterVectors(opCtx, opsPtr, &writerVectors);
+        fillWriterVectors(opCtx, &ops, &writerVectors, &applyOpsOperations);
 
         // Wait for writes to finish before applying ops.
         workerPool->join();
