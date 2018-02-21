@@ -354,15 +354,12 @@ bool RangeDeleter::deleteNow(OperationContext* txn,
     taskDetails.stats.queueEndTS = jsTime();
 
     taskDetails.stats.deleteStartTS = jsTime();
-    bool result = _env->deleteRange(txn, taskDetails, &taskDetails.stats.deletedDocCount, errMsg);
-
+    bool result = _env->deleteRange(txn,
+                                    taskDetails,
+                                    &taskDetails.stats.deletedDocCount,
+                                    taskDetails.stats.waitForReplDurationMs,
+                                    errMsg);
     taskDetails.stats.deleteEndTS = jsTime();
-
-    if (result) {
-        taskDetails.stats.waitForReplStartTS = jsTime();
-        result = _waitForMajority(txn, errMsg);
-        taskDetails.stats.waitForReplEndTS = jsTime();
-    }
 
     {
         stdx::lock_guard<stdx::mutex> sl(_queueMutex);
@@ -485,8 +482,11 @@ void RangeDeleter::doWork() {
         {
             auto txn = client->makeOperationContext();
             nextTask->stats.deleteStartTS = jsTime();
-            bool delResult =
-                _env->deleteRange(txn.get(), *nextTask, &nextTask->stats.deletedDocCount, &errMsg);
+            bool delResult = _env->deleteRange(txn.get(),
+                                               *nextTask,
+                                               &nextTask->stats.deletedDocCount,
+                                               nextTask->stats.waitForReplDurationMs,
+                                               &errMsg);
             nextTask->stats.deleteEndTS = jsTime();
 
             if (delResult) {

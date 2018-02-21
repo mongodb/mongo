@@ -104,6 +104,7 @@ DeletedRange RangeDeleterMockEnv::getLastDelete() const {
 bool RangeDeleterMockEnv::deleteRange(OperationContext* txn,
                                       const RangeDeleteEntry& taskDetails,
                                       long long int* deletedDocs,
+                                      Milliseconds& replWaitDuration,
                                       string* errMsg) {
     {
         stdx::unique_lock<stdx::mutex> sl(_pauseDeleteMutex);

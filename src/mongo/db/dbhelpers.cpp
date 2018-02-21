@@ -270,6 +270,7 @@ long long Helpers::removeRange(OperationContext* txn,
                                const KeyRange& range,
                                BoundInclusion boundInclusion,
                                const WriteConcernOptions& writeConcern,
+                               Milliseconds& replWaitDuration,
                                RemoveSaver* callback,
                                bool fromMigrate,
                                bool onlyRemoveOrphanedDocs) {
@@ -327,7 +328,7 @@ long long Helpers::removeRange(OperationContext* txn,
 
     long long numDeleted = 0;
 
-    Milliseconds millisWaitingForReplication{0};
+    replWaitDuration = Milliseconds::zero();
 
     while (1) {
         // Scoping for write lock.
@@ -447,14 +448,14 @@ long long Helpers::removeRange(OperationContext* txn,
             } else {
                 uassertStatusOK(replStatus.status);
             }
-            millisWaitingForReplication += replStatus.duration;
+            replWaitDuration += replStatus.duration;
         }
     }
 
     if (writeConcern.shouldWaitForOtherNodes())
         log(LogComponent::kSharding)
             << "Helpers::removeRangeUnlocked time spent waiting for replication: "
-            << durationCount<Milliseconds>(millisWaitingForReplication) << "ms" << endl;
+            << durationCount<Milliseconds>(replWaitDuration) << "ms" << endl;
 
     MONGO_LOG_COMPONENT(1, LogComponent::kSharding) << "end removal of " << min << " to " << max
                                                     << " in " << ns << " (took "

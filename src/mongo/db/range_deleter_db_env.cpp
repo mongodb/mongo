@@ -61,6 +61,7 @@ using std::string;
 bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
                                     const RangeDeleteEntry& taskDetails,
                                     long long int* deletedDocs,
+                                    Milliseconds& replWaitDuration,
                                     std::string* errMsg) {
     const string ns(taskDetails.options.range.ns);
     const BSONObj inclusiveLower(taskDetails.options.range.minKey);
@@ -92,6 +93,7 @@ bool RangeDeleterDBEnv::deleteRange(OperationContext* txn,
                                  KeyRange(ns, inclusiveLower, exclusiveUpper, keyPattern),
                                  BoundInclusion::kIncludeStartKeyOnly,
                                  writeConcern,
+                                 replWaitDuration,
                                  removeSaverPtr,
                                  fromMigrate,
                                  onlyRemoveOrphans);

@@ -254,6 +254,7 @@ struct DeleteJobStats {
     Date_t deleteEndTS;
     Date_t waitForReplStartTS;
     Date_t waitForReplEndTS;
+    Milliseconds waitForReplDurationMs;
 
     long long int deletedDocCount;
 
@@ -314,6 +315,7 @@ struct RangeDeleterEnv {
     virtual bool deleteRange(OperationContext* txn,
                              const RangeDeleteEntry& taskDetails,
                              long long int* deletedDocs,
+                             Milliseconds& replWaitDuration,
                              std::string* errMsg) = 0;
 
     /**

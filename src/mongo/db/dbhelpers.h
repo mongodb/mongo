@@ -141,10 +141,12 @@ struct Helpers {
     /**
      * Takes a namespace range, specified by a min and max and qualified by an index pattern,
      * and removes all the documents in that range found by iterating
-     * over the given index. Caller is responsible for insuring that min/max are
+     * over the given index. Caller is responsible for ensuring that min/max are
      * compatible with the given keyPattern (e.g min={a:100} is compatible with
      * keyPattern={a:1,b:1} since it can be extended to {a:100,b:minKey}, but
      * min={b:100} is not compatible).
+     *
+     * Returns time spent waiting for majority replication in replWaitDuration.
      *
      * Caller must hold a write lock on 'ns'
      *
@@ -157,6 +159,7 @@ struct Helpers {
                                  const KeyRange& range,
                                  BoundInclusion boundInclusion,
                                  const WriteConcernOptions& secondaryThrottle,
+                                 Milliseconds& replWaitDuration,
                                  RemoveSaver* callback = NULL,
                                  bool fromMigrate = false,
                                  bool onlyRemoveOrphanedDocs = false);

@@ -46,13 +46,16 @@ struct RangeDeleterDBEnv : public RangeDeleterEnv {
      * Note that secondaryThrottle will be ignored if current process is not part
      * of a replica set.
      *
-     * docsDeleted would contain the number of docs deleted if the deletion was successful.
+     * deletedDocs would contain the number of docs deleted if the deletion was successful.
+     *
+     * Returns time spent waiting for majority replication in replWaitDuration.
      *
      * Does not throw Exceptions.
      */
     virtual bool deleteRange(OperationContext* txn,
                              const RangeDeleteEntry& taskDetails,
                              long long int* deletedDocs,
+                             Milliseconds& replWaitDuration,
                              std::string* errMsg);
 
     /**

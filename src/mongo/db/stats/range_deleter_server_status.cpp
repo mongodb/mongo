@@ -84,6 +84,11 @@ public:
                 entryBuilder.append("deleteStart", (*it)->deleteStartTS);
                 entryBuilder.append("deleteEnd", (*it)->deleteEndTS);
 
+                const auto waitForReplDurationMs =
+                    durationCount<Milliseconds>((*it)->waitForReplDurationMs);
+                if (waitForReplDurationMs > 0) {
+                    entryBuilder.append("waitForReplDurationMs", waitForReplDurationMs);
+                }
                 if ((*it)->waitForReplEndTS > Date_t()) {
                     entryBuilder.append("waitForReplStart", (*it)->waitForReplStartTS);
                     entryBuilder.append("waitForReplEnd", (*it)->waitForReplEndTS);
