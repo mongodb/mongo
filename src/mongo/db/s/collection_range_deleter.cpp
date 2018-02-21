@@ -202,66 +202,74 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
             wrote = e.toStatus();
             warning() << e.what();
         }
-
-        if (!wrote.isOK() || wrote.getValue() == 0) {
-            if (wrote.isOK()) {
-                LOG(0) << "No documents remain to delete in " << nss << " range "
-                       << redact(range->toString());
-            }
-
-            stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
-            self->_pop(wrote.getStatus());
-            if (!self->_orphans.empty()) {
-                LOG(1) << "Deleting " << nss.ns() << " range "
-                       << redact(self->_orphans.front().range.toString()) << " next.";
-            }
-
-            return Date_t{};
-        }
     }  // drop autoColl
 
-    invariant(range);
-    invariantOK(wrote.getStatus());
-    invariant(wrote.getValue() > 0);
-
-    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-    const auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-
-    // Wait for replication outside the lock
-    const auto status = [&] {
-        try {
-            WriteConcernResult unusedWCResult;
-            return waitForWriteConcern(opCtx, clientOpTime, kMajorityWriteConcern, &unusedWCResult);
-        } catch (const DBException& e) {
-            return e.toStatus();
+    if (!wrote.isOK() || wrote.getValue() == 0) {
+        if (wrote.isOK()) {
+            LOG(0) << "No documents remain to delete in " << nss << " range "
+                   << redact(range->toString());
         }
-    }();
 
-    if (!status.isOK()) {
-        LOG(0) << "Error when waiting for write concern after removing " << nss << " range "
-               << redact(range->toString()) << " : " << redact(status.reason());
+        // Wait for majority replication even when wrote isn't OK or == 0, because it might have
+        // been OK and/or > 0 previously, and the deletions must be persistent before notifying
+        // clients in _pop().
 
+        LOG(0) << "Waiting for majority replication of local deletions in " << nss.ns() << " range "
+               << redact(range->toString());
+
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        const auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+
+        // Wait for replication outside the lock
+        const auto status = [&] {
+            try {
+                WriteConcernResult unusedWCResult;
+                return waitForWriteConcern(
+                    opCtx, clientOpTime, kMajorityWriteConcern, &unusedWCResult);
+            } catch (const DBException& e) {
+                return e.toStatus();
+            }
+        }();
+
+        // Get the lock again to finish off this range (including notifying, if necessary).
         // Don't allow lock interrupts while cleaning up.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         auto* const css = CollectionShardingState::get(opCtx, nss);
-
+        auto* const self = forTestOnly ? forTestOnly : &css->_metadataManager->_rangesToClean;
         stdx::lock_guard<stdx::mutex> scopedLock(css->_metadataManager->_managerLock);
-        auto* const self = &css->_metadataManager->_rangesToClean;
 
-        // If range were already popped (e.g. by dropping nss during the waitForWriteConcern above)
-        // its notification would have been triggered, so this check suffices to ensure that it is
-        // safe to pop the range here
-        if (!notification.ready()) {
-            invariant(!self->isEmpty() && self->_orphans.front().notification == notification);
-            LOG(0) << "Abandoning deletion of latest range in " << nss.ns() << " after "
-                   << wrote.getValue() << " local deletions because of replication failure";
-            self->_pop(status);
+        if (!status.isOK()) {
+            LOG(0) << "Error when waiting for write concern after removing " << nss << " range "
+                   << redact(range->toString()) << " : " << redact(status.reason());
+
+            // If range were already popped (e.g. by dropping nss during the waitForWriteConcern
+            // above) its notification would have been triggered, so this check suffices to ensure
+            // that it is safe to pop the range here
+            if (!notification.ready()) {
+                invariant(!self->isEmpty() && self->_orphans.front().notification == notification);
+                LOG(0) << "Abandoning deletion of latest range in " << nss.ns() << " after local "
+                       << "deletions because of replication failure";
+                self->_pop(status);
+            }
+        } else {
+            LOG(0) << "Finished deleting documents in " << nss.ns() << " range "
+                   << redact(range->toString());
+
+            self->_pop(wrote.getStatus());
         }
-    } else {
-        LOG(1) << "Deleted " << wrote.getValue() << " documents in " << nss.ns() << " range "
-               << redact(range->toString());
+
+        if (!self->_orphans.empty()) {
+            LOG(1) << "Deleting " << nss.ns() << " range "
+                   << redact(self->_orphans.front().range.toString()) << " next.";
+        }
+
+        return Date_t{};
     }
+
+    invariant(range);
+    invariantOK(wrote.getStatus());
+    invariant(wrote.getValue() > 0);
 
     notification.abandon();
     return Date_t{};
