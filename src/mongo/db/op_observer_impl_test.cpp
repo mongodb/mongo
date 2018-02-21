@@ -268,7 +268,7 @@ public:
                               NamespaceString nss,
                               TxnNumber txnNum,
                               StmtId stmtId) {
-        session->beginTxn(opCtx, txnNum);
+        session->beginOrContinueTxn(opCtx, txnNum, boost::none);
 
         {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
