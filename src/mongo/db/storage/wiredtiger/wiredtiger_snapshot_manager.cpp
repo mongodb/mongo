@@ -31,24 +31,21 @@
 
 #include "mongo/platform/basic.h"
 
-#include <algorithm>
+#include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 
-#include "mongo/base/checked_cast.h"
+#include <algorithm>
+#include <cstdio>
+
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-Status WiredTigerSnapshotManager::prepareForCreateSnapshot(OperationContext* opCtx) {
-    WiredTigerRecoveryUnit::get(opCtx)->prepareForCreateSnapshot(opCtx);
-    return Status::OK();
-}
 
 void WiredTigerSnapshotManager::setCommittedSnapshot(const Timestamp& timestamp) {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
@@ -57,19 +54,9 @@ void WiredTigerSnapshotManager::setCommittedSnapshot(const Timestamp& timestamp)
     _committedSnapshot = timestamp;
 }
 
-void WiredTigerSnapshotManager::cleanupUnneededSnapshots() {}
-
 void WiredTigerSnapshotManager::dropAllSnapshots() {
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     _committedSnapshot = boost::none;
-}
-
-void WiredTigerSnapshotManager::shutdown() {
-    stdx::lock_guard<stdx::mutex> lock(_mutex);
-    if (!_session)
-        return;
-    invariantWTOK(_session->close(_session, NULL));
-    _session = nullptr;
 }
 
 boost::optional<Timestamp> WiredTigerSnapshotManager::getMinSnapshotForNextCommittedRead() const {

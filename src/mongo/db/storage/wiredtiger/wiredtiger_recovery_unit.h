@@ -127,14 +127,6 @@ public:
 
     static void appendGlobalStats(BSONObjBuilder& b);
 
-    /**
-     * Prepares this RU to be the basis for a named snapshot.
-     *
-     * Begins a WT transaction, and invariants if we are already in one.
-     * Bans being in a WriteUnitOfWork until the next call to abandonSnapshot().
-     */
-    void prepareForCreateSnapshot(OperationContext* opCtx);
-
 private:
     void _abort();
     void _commit();

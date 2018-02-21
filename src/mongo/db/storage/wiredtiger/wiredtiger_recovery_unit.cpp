@@ -68,16 +68,6 @@ WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
     _abort();
 }
 
-void WiredTigerRecoveryUnit::prepareForCreateSnapshot(OperationContext* opCtx) {
-    invariant(!_active);  // Can't already be in a WT transaction.
-    invariant(!_inUnitOfWork);
-    invariant(!_readFromMajorityCommittedSnapshot);
-
-    // Starts the WT transaction that will be the basis for creating a named snapshot.
-    getSession();
-    _areWriteUnitOfWorksBanned = true;
-}
-
 void WiredTigerRecoveryUnit::_commit() {
     try {
         if (_session && _active) {
@@ -264,16 +254,14 @@ void WiredTigerRecoveryUnit::_txnOpen() {
         auto status =
             _sessionCache->snapshotManager().beginTransactionAtTimestamp(_readAtTimestamp, session);
         if (!status.isOK() && status.code() == ErrorCodes::BadValue) {
-            uasserted(
-                ErrorCodes::SnapshotTooOld,
-                str::stream()
-                    << "Read timestamp "
-                    << _readAtTimestamp.toString()
-                    << " is older than the oldest available timestamp: "
-                    << _sessionCache->getKVEngine()->getPreviousSetOldestTimestamp().toString());
+            uasserted(ErrorCodes::SnapshotTooOld,
+                      str::stream() << "Read timestamp " << _readAtTimestamp.toString()
+                                    << " is older than the oldest available timestamp.");
         }
         uassertStatusOK(status);
     } else if (_readFromMajorityCommittedSnapshot) {
+        // We reset _majorityCommittedSnapshot to the actual read timestamp used when the
+        // transaction was started.
         _majorityCommittedSnapshot =
             _sessionCache->snapshotManager().beginTransactionOnCommittedSnapshot(session);
     } else if (_isOplogReader) {

@@ -35,7 +35,6 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/mutex.h"
 
 namespace mongo {
@@ -46,28 +45,14 @@ class WiredTigerSnapshotManager final : public SnapshotManager {
     MONGO_DISALLOW_COPYING(WiredTigerSnapshotManager);
 
 public:
-    explicit WiredTigerSnapshotManager(WT_CONNECTION* conn) {
-        invariantWTOK(conn->open_session(conn, NULL, NULL, &_session));
-        _conn = conn;
-    }
+    WiredTigerSnapshotManager() = default;
 
-    ~WiredTigerSnapshotManager() {
-        shutdown();
-    }
-
-    Status prepareForCreateSnapshot(OperationContext* opCtx) final;
     void setCommittedSnapshot(const Timestamp& timestamp) final;
-    void cleanupUnneededSnapshots() final;
     void dropAllSnapshots() final;
 
     //
     // WT-specific methods
     //
-
-    /**
-     * Prepares for a shutdown of the WT_CONNECTION.
-     */
-    void shutdown();
 
     Status beginTransactionAtTimestamp(Timestamp pointInTime, WT_SESSION* session) const;
 
@@ -94,9 +79,7 @@ public:
     boost::optional<Timestamp> getMinSnapshotForNextCommittedRead() const;
 
 private:
-    mutable stdx::mutex _mutex;  // Guards all members.
+    mutable stdx::mutex _mutex;  // Guards _committedSnapshot.
     boost::optional<Timestamp> _committedSnapshot;
-    WT_SESSION* _session;
-    WT_CONNECTION* _conn;
 };
 }

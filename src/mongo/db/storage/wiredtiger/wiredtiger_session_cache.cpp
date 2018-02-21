@@ -175,10 +175,10 @@ uint64_t WiredTigerSession::genTableId() {
 // -----------------------
 
 WiredTigerSessionCache::WiredTigerSessionCache(WiredTigerKVEngine* engine)
-    : _engine(engine), _conn(engine->getConnection()), _snapshotManager(_conn), _shuttingDown(0) {}
+    : _engine(engine), _conn(engine->getConnection()), _shuttingDown(0) {}
 
 WiredTigerSessionCache::WiredTigerSessionCache(WT_CONNECTION* conn)
-    : _engine(NULL), _conn(conn), _snapshotManager(_conn), _shuttingDown(0) {}
+    : _engine(NULL), _conn(conn), _shuttingDown(0) {}
 
 WiredTigerSessionCache::~WiredTigerSessionCache() {
     shuttingDown();
@@ -202,7 +202,6 @@ void WiredTigerSessionCache::shuttingDown() {
     }
 
     closeAll();
-    _snapshotManager.shutdown();
 }
 
 void WiredTigerSessionCache::waitUntilDurable(bool forceCheckpoint, bool stableCheckpoint) {

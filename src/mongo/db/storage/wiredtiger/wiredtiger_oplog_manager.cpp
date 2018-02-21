@@ -35,6 +35,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_oplog_manager.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/log.h"

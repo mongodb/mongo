@@ -1024,28 +1024,8 @@ bool WiredTigerKVEngine::initRsOplogBackgroundThread(StringData ns) {
 }
 
 void WiredTigerKVEngine::setOldestTimestamp(Timestamp oldestTimestamp) {
-    invariant(oldestTimestamp != Timestamp::min());
-
-    char commitTSConfigString["force=true,oldest_timestamp=,commit_timestamp="_sd.size() +
-                              (2 * 8 * 2) /* 8 hexadecimal characters */ + 1 /* trailing null */];
-    auto size = std::snprintf(commitTSConfigString,
-                              sizeof(commitTSConfigString),
-                              "force=true,oldest_timestamp=%llx,commit_timestamp=%llx",
-                              oldestTimestamp.asULL(),
-                              oldestTimestamp.asULL());
-    if (size < 0) {
-        int e = errno;
-        error() << "error snprintf " << errnoWithDescription(e);
-        fassertFailedNoTrace(40677);
-    }
-
-    invariant(static_cast<std::size_t>(size) < sizeof(commitTSConfigString));
-    invariantWTOK(_conn->set_timestamp(_conn, commitTSConfigString));
-
-    _oplogManager->setOplogReadTimestamp(oldestTimestamp);
-    stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
-    _previousSetOldestTimestamp = oldestTimestamp;
-    LOG(1) << "Forced a new oldest_timestamp. Value: " << oldestTimestamp;
+    constexpr bool doForce = true;
+    _setOldestTimestamp(oldestTimestamp, doForce);
 }
 
 void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
@@ -1088,45 +1068,32 @@ void WiredTigerKVEngine::setStableTimestamp(Timestamp stableTimestamp) {
     // Communicate to WiredTiger that it can clean up timestamp data earlier than the timestamp
     // provided.  No future queries will need point-in-time reads at a timestamp prior to the one
     // provided here.
-    _advanceOldestTimestamp(stableTimestamp);
+    _setOldestTimestamp(stableTimestamp);
 }
 
-void WiredTigerKVEngine::_advanceOldestTimestamp(Timestamp oldestTimestamp) {
-    Timestamp timestampToSet;
-    {
-        stdx::unique_lock<stdx::mutex> lock(_oplogManagerMutex);
-        if (!_oplogManager) {
-            // No oplog yet, so don't bother setting oldest_timestamp.
-            return;
-        }
-        auto oplogReadTimestamp = _oplogManager->getOplogReadTimestamp();
-        if (oplogReadTimestamp < oldestTimestamp.asULL()) {
-            // For one node replica sets, the commit point might race ahead of the oplog read
-            // timestamp.
-            oldestTimestamp = Timestamp(oplogReadTimestamp);
-            if (_previousSetOldestTimestamp > oldestTimestamp) {
-                // Do not go backwards.
-                return;
-            }
-        }
+void WiredTigerKVEngine::_setOldestTimestamp(Timestamp oldestTimestamp, bool force) {
 
-        // Lag the oldest_timestamp by one timestamp set, to give a bit more history.
-        invariant(_previousSetOldestTimestamp <= oldestTimestamp);
-        timestampToSet = _previousSetOldestTimestamp;
-        _previousSetOldestTimestamp = oldestTimestamp;
-    }
-
-    if (timestampToSet == Timestamp()) {
+    if (oldestTimestamp == Timestamp()) {
         // Nothing to set yet.
         return;
     }
 
-    char oldestTSConfigString["oldest_timestamp="_sd.size() + (8 * 2) /* 16 hexadecimal digits */ +
+    char oldestTSConfigString["force=true,oldest_timestamp=,commit_timestamp="_sd.size() +
+                              (2 * 8 * 2) /* 2 timestamps of 16 hexadecimal digits each */ +
                               1 /* trailing null */];
-    auto size = std::snprintf(oldestTSConfigString,
-                              sizeof(oldestTSConfigString),
-                              "oldest_timestamp=%llx",
-                              timestampToSet.asULL());
+    int size = 0;
+    if (force) {
+        size = std::snprintf(oldestTSConfigString,
+                             sizeof(oldestTSConfigString),
+                             "force=true,oldest_timestamp=%llx,commit_timestamp=%llx",
+                             oldestTimestamp.asULL(),
+                             oldestTimestamp.asULL());
+    } else {
+        size = std::snprintf(oldestTSConfigString,
+                             sizeof(oldestTSConfigString),
+                             "oldest_timestamp=%llx",
+                             oldestTimestamp.asULL());
+    }
     if (size < 0) {
         int e = errno;
         error() << "error snprintf " << errnoWithDescription(e);
@@ -1134,7 +1101,12 @@ void WiredTigerKVEngine::_advanceOldestTimestamp(Timestamp oldestTimestamp) {
     }
     invariant(static_cast<std::size_t>(size) < sizeof(oldestTSConfigString));
     invariantWTOK(_conn->set_timestamp(_conn, oldestTSConfigString));
-    LOG(2) << "oldest_timestamp set to " << timestampToSet;
+
+    if (force) {
+        LOG(2) << "oldest_timestamp and commit_timestamp force set to " << oldestTimestamp;
+    } else {
+        LOG(2) << "oldest_timestamp set to " << oldestTimestamp;
+    }
 }
 
 void WiredTigerKVEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
@@ -1194,9 +1166,6 @@ void WiredTigerKVEngine::haltOplogManager() {
     invariant(_oplogManagerCount > 0);
     _oplogManagerCount--;
     if (_oplogManagerCount == 0) {
-        // Destructor may lock the mutex, so we must unlock here.
-        // Oplog managers only destruct at shutdown or test exit, so it is safe to unlock here.
-        lock.unlock();
         _oplogManager->halt();
     }
 }
