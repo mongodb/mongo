@@ -1074,10 +1074,7 @@ bool SyncTail::tryPopAndWaitForMore(OperationContext* opCtx,
     }
 
     // Check for ops that must be processed one at a time.
-    if (entry.isCommand() ||  // commands.
-        // Index builds are achieved through the use of an insert op, not a command op.
-        // The following line is the same as what the insert code uses to detect an index build.
-        (!entry.getNamespace().isEmpty() && entry.getNamespace().coll() == "system.indexes")) {
+    if (entry.isCommand()) {
         if (ops->getCount() == 1) {
             // apply commands one-at-a-time
             _networkQueue->consume(opCtx);
