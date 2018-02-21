@@ -40,11 +40,13 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/views/durable_view_catalog.h"
@@ -780,6 +782,35 @@ void OpObserverImpl::onTransactionCommit(OperationContext* opCtx) {
 
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx) {
     invariant(opCtx->getTxnNumber());
+}
+
+void OpObserverImpl::onReplicationRollback(OperationContext* opCtx,
+                                           const RollbackObserverInfo& rbInfo) {
+
+    // Invalidate any in-memory auth data if necessary.
+    const auto& rollbackNamespaces = rbInfo.rollbackNamespaces;
+    if (rollbackNamespaces.count(AuthorizationManager::versionCollectionNamespace) == 1 ||
+        rollbackNamespaces.count(AuthorizationManager::usersCollectionNamespace) == 1 ||
+        rollbackNamespaces.count(AuthorizationManager::rolesCollectionNamespace) == 1) {
+        AuthorizationManager::get(opCtx->getServiceContext())->invalidateUserCache();
+    }
+
+    // If there were ops rolled back that were part of operations on a session, then invalidate the
+    // session cache.
+    if (rbInfo.rollbackSessionIds.size() > 0) {
+        SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
+    }
+
+    // Reset the key manager cache.
+    auto validator = LogicalTimeValidator::get(opCtx);
+    if (validator) {
+        validator->resetKeyManagerCache();
+    }
+
+    // Check if the shard identity document rolled back.
+    if (rbInfo.shardIdentityRolledBack) {
+        fassertFailedNoTrace(50712);
+    }
 }
 
 }  // namespace mongo

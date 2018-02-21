@@ -136,6 +136,30 @@ Status RollbackTest::ReplicationCoordinatorRollbackMock::setFollowerMode(
     return ReplicationCoordinatorMock::setFollowerMode(newState);
 }
 
+std::pair<BSONObj, RecordId> RollbackTest::makeCRUDOp(OpTypeEnum opType,
+                                                      Timestamp ts,
+                                                      UUID uuid,
+                                                      StringData nss,
+                                                      BSONObj o,
+                                                      boost::optional<BSONObj> o2,
+                                                      int recordId) {
+    invariant(opType != OpTypeEnum::kCommand);
+
+    BSONObjBuilder bob;
+    bob.append("ts", ts);
+    bob.append("h", 1LL);
+    bob.append("op", OpType_serializer(opType));
+    uuid.appendToBuilder(&bob, "ui");
+    bob.append("ns", nss);
+    bob.append("o", o);
+    if (o2) {
+        bob.append("o2", *o2);
+    }
+
+    return std::make_pair(bob.obj(), RecordId(recordId));
+}
+
+
 std::pair<BSONObj, RecordId> RollbackTest::makeCommandOp(
     Timestamp ts, OptionalCollectionUUID uuid, StringData nss, BSONObj cmdObj, int recordId) {
 

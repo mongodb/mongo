@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -80,6 +81,18 @@ public:
      * Inserts a document into the oplog.
      */
     Status _insertOplogEntry(const BSONObj& doc);
+
+    /**
+     * Creates an oplog entry with a recordId for a CRUD operation (insert, update, delete). Also
+     * works for creating a no-op entry.
+     */
+    static std::pair<BSONObj, RecordId> makeCRUDOp(OpTypeEnum opType,
+                                                   Timestamp ts,
+                                                   UUID uuid,
+                                                   StringData nss,
+                                                   BSONObj o,
+                                                   boost::optional<BSONObj> o2,
+                                                   int recordId);
 
     /**
      * Creates an oplog entry with a recordId for a command operation.

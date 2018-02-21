@@ -99,6 +99,8 @@ public:
                        OptionalCollectionUUID uuid) override {}
     void onTransactionCommit(OperationContext* opCtx) override{};
     void onTransactionAbort(OperationContext* opCtx) override{};
+    void onReplicationRollback(OperationContext* opCtx,
+                               const RollbackObserverInfo& rbInfo) override {}
 };
 
 }  // namespace mongo

@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/repl/rollback.h"
 #include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo {
@@ -83,6 +84,15 @@ struct TTLCollModInfo {
     std::string indexName;
 };
 
+/**
+ * The OpObserver interface contains methods that get called on certain database events. It provides
+ * a way for various server subsystems to be notified of other events throughout the server.
+ *
+ * In order to call any OpObserver method, you must be in a 'WriteUnitOfWork'. This means that any
+ * locks acquired for writes in that WUOW are still held. So, you can assume that any locks required
+ * to perform the operation being observed are still held. These rules should apply for all observer
+ * methods unless otherwise specified.
+ */
 class OpObserver {
 public:
     virtual ~OpObserver() = default;
@@ -232,6 +242,38 @@ public:
      * RecoveryUnit onRollback() is called.  It must not be called when no transaction is active.
      */
     virtual void onTransactionAbort(OperationContext* opCtx) = 0;
+
+    /**
+     * A structure to hold information about a replication rollback suitable to be passed along to
+     * any external subsystems that need to be notified of a rollback occurring.
+     */
+    struct RollbackObserverInfo {
+        // Set of all namespaces from ops being rolled back.
+        std::set<NamespaceString> rollbackNamespaces = {};
+
+        // Set of all session ids from ops being rolled back.
+        std::set<UUID> rollbackSessionIds = {};
+
+        // True if the shard identity document was rolled back.
+        bool shardIdentityRolledBack = false;
+    };
+
+    /**
+     * This function will get called after the replication system has completed a rollback. This
+     * means that all on-disk, replicated data will have been reverted to the rollback common point
+     * by the time this function is called. Subsystems may use this method to invalidate any in
+     * memory caches or, optionally, rebuild any data structures from the data that is now on disk.
+     * This function should not write any persistent state.
+     *
+     * When this function is called, there will be no locks held on the given OperationContext, and
+     * it will not be called inside an existing WriteUnitOfWork. Any work done inside this handler
+     * is expected to handle this on its own.
+     *
+     * This method is only applicable to the "rollback to a stable timestamp" algorithm, and is not
+     * called when using any other rollback algorithm i.e "rollback via refetch".
+     */
+    virtual void onReplicationRollback(OperationContext* opCtx,
+                                       const RollbackObserverInfo& rbInfo) = 0;
 };
 
 }  // namespace mongo

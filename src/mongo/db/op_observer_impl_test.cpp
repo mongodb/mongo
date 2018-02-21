@@ -28,23 +28,29 @@
 
 
 #include "mongo/db/op_observer_impl.h"
+#include "keys_collection_client_sharded.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/field_parser.h"
+#include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/logical_clock.h"
+#include "mongo/db/logical_time_validator.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session_catalog.h"
+#include "mongo/s/config_server_test_fixture.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
 namespace {
 
 class OpObserverTest : public ServiceContextMongoDTest {
-
-private:
+public:
     void setUp() override {
         // Set up mongod.
         ServiceContextMongoDTest::setUp();
@@ -239,6 +245,134 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     ASSERT_EQUALS(repl::ReplClientInfo::forClient(&cc()).getLastOp(), renameOpTime);
 }
 
+/**
+ * Test fixture for testing OpObserver behavior specific to the SessionCatalog.
+ */
+class OpObserverSessionCatalogTest : public OpObserverTest {
+public:
+    void setUp() override {
+        OpObserverTest::setUp();
+        auto opCtx = cc().makeOperationContext();
+        SessionCatalog::reset_forTest(getServiceContext());
+        SessionCatalog::create(getServiceContext());
+        auto sessionCatalog = SessionCatalog::get(getServiceContext());
+        sessionCatalog->onStepUp(opCtx.get());
+    }
+
+    /**
+     * Simulate a new write occurring on given session with the given transaction number and
+     * statement id.
+     */
+    void simulateSessionWrite(OperationContext* opCtx,
+                              ScopedSession session,
+                              NamespaceString nss,
+                              TxnNumber txnNum,
+                              StmtId stmtId) {
+        session->beginTxn(opCtx, txnNum);
+
+        {
+            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+            WriteUnitOfWork wuow(opCtx);
+            auto opTime = repl::OpTime(Timestamp(10, 1), 1);  // Dummy timestamp.
+            session->onWriteOpCompletedOnPrimary(opCtx, txnNum, {stmtId}, opTime, Date_t::now());
+            wuow.commit();
+        }
+    }
+};
+
+TEST_F(OpObserverSessionCatalogTest, OnRollbackInvalidatesSessionCatalogIfSessionOpsRolledBack) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString nss("testDB", "testColl");
+
+    // Create a session.
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    auto sessionId = makeLogicalSessionIdForTest();
+    auto session = sessionCatalog->getOrCreateSession(opCtx.get(), sessionId);
+
+    // Simulate a write occurring on that session.
+    const TxnNumber txnNum = 0;
+    const StmtId stmtId = 1000;
+    simulateSessionWrite(opCtx.get(), session, nss, txnNum, stmtId);
+
+    // Check that the statement executed.
+    ASSERT(session->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
+
+    // The OpObserver should invalidate in-memory session state, so the check after this should
+    // fail.
+    OpObserver::RollbackObserverInfo rbInfo;
+    rbInfo.rollbackSessionIds = {UUID::gen()};
+    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+    ASSERT_THROWS_CODE(session->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+}
+
+TEST_F(OpObserverSessionCatalogTest,
+       OnRollbackDoesntInvalidateSessionCatalogIfNoSessionOpsRolledBack) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    const NamespaceString nss("testDB", "testColl");
+
+    // Create a session.
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    auto sessionId = makeLogicalSessionIdForTest();
+    auto session = sessionCatalog->getOrCreateSession(opCtx.get(), sessionId);
+
+    // Simulate a write occurring on that session.
+    const TxnNumber txnNum = 0;
+    const StmtId stmtId = 1000;
+    simulateSessionWrite(opCtx.get(), session, nss, txnNum, stmtId);
+
+    // Check that the statement executed.
+    ASSERT(session->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
+
+    // The OpObserver should not invalidate the in-memory session state, so the check after this
+    // should still succeed.
+    OpObserver::RollbackObserverInfo rbInfo;
+    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+    ASSERT(session->checkStatementExecutedNoOplogEntryFetch(txnNum, stmtId));
+}
+
+TEST_F(OpObserverTest, OnRollbackInvalidatesAuthCacheWhenAuthNamespaceRolledBack) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    auto authMgr = AuthorizationManager::get(getServiceContext());
+    auto initCacheGen = authMgr->getCacheGeneration();
+
+    // Verify that the rollback op observer invalidates the user cache for each auth namespace by
+    // checking that the cache generation changes after a call to the rollback observer method.
+    auto nss = AuthorizationManager::rolesCollectionNamespace;
+    OpObserver::RollbackObserverInfo rbInfo;
+    rbInfo.rollbackNamespaces = {AuthorizationManager::rolesCollectionNamespace};
+    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+    ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
+
+    initCacheGen = authMgr->getCacheGeneration();
+    rbInfo.rollbackNamespaces = {AuthorizationManager::usersCollectionNamespace};
+    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+    ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
+
+    initCacheGen = authMgr->getCacheGeneration();
+    rbInfo.rollbackNamespaces = {AuthorizationManager::versionCollectionNamespace};
+    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+    ASSERT_NE(initCacheGen, authMgr->getCacheGeneration());
+}
+
+TEST_F(OpObserverTest, OnRollbackDoesntInvalidateAuthCacheWhenNoAuthNamespaceRolledBack) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    auto authMgr = AuthorizationManager::get(getServiceContext());
+    auto initCacheGen = authMgr->getCacheGeneration();
+
+    // Verify that the rollback op observer doesn't invalidate the user cache.
+    auto nss = AuthorizationManager::rolesCollectionNamespace;
+    OpObserver::RollbackObserverInfo rbInfo;
+    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
+    auto newCacheGen = authMgr->getCacheGeneration();
+    ASSERT_EQ(newCacheGen, initCacheGen);
+}
+
 TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
@@ -269,6 +403,17 @@ DEATH_TEST_F(OpObserverTest, EachOnDeleteRequiresAboutToDelete, "invariant") {
     opObserver.aboutToDelete(opCtx.get(), nss, {});
     opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
     opObserver.onDelete(opCtx.get(), nss, {}, {}, false, {});
+}
+
+DEATH_TEST_F(OpObserverTest,
+             NodeCrashesIfShardIdentityDocumentRolledBack,
+             "Fatal Assertion 50712") {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+
+    OpObserver::RollbackObserverInfo rbInfo;
+    rbInfo.shardIdentityRolledBack = true;
+    opObserver.onReplicationRollback(opCtx.get(), rbInfo);
 }
 
 }  // namespace
