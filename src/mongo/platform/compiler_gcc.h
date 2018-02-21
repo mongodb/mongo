@@ -43,12 +43,19 @@
 #define MONGO_COMPILER_COLD_FUNCTION
 #define MONGO_COMPILER_NORETURN __attribute__((__noreturn__))
 // MONGO_WARN_UNUSED_RESULT is only supported in the semantics we want for classes in Clang, not in
-// GCC.
+// GCC < 7.
 #define MONGO_WARN_UNUSED_RESULT_CLASS [[gnu::warn_unused_result]]
 #else
 #define MONGO_COMPILER_COLD_FUNCTION __attribute__((__cold__))
 #define MONGO_COMPILER_NORETURN __attribute__((__noreturn__, __cold__))
+
+// GCC 7 added support for [[nodiscard]] with the semantics we want.
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(nodiscard)
+#define MONGO_WARN_UNUSED_RESULT_CLASS [[nodiscard]]
+#else
 #define MONGO_WARN_UNUSED_RESULT_CLASS
+#endif
+
 #endif
 
 #define MONGO_COMPILER_VARIABLE_UNUSED __attribute__((__unused__))
