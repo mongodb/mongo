@@ -48,12 +48,6 @@ var RenameAcrossDatabasesTest = function(options) {
         replTest.startSet();
         replTest.initiate();
 
-        // TODO(SERVER-32597) remove this when fCV 4.0 becomes the default on clean startup.
-        if (nodes[0].binVersion == 'latest') {
-            assert.commandWorked(
-                replTest.getPrimary().adminCommand({setFeatureCompatibilityVersion: '4.0'}));
-        }
-
         // If provided in 'options', we set the featureCompatibilityVersion. We do this prior to
         // adding any other members to the replica set.
         if (options.setFeatureCompatibilityVersion) {

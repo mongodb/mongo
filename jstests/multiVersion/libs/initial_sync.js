@@ -26,12 +26,6 @@ var multversionInitialSyncTest = function(
     // Wait for a primary node.
     var primary = rst.getPrimary();
 
-    // TODO(SERVER-32597) remove this when fCV 4.0 becomes the default on clean startup.
-    if (replSetVersion == "latest") {
-        assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
-        rst.awaitReplication();
-    }
-
     // Set 'featureCompatibilityVersion' if given.
     if (fcv) {
         jsTestLog("Setting FCV to '" + fcv + "' on the primary.");

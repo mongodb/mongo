@@ -19,10 +19,6 @@
     const primary = rst.getPrimary();
     const primaryDB = primary.getDB("test");
 
-    // TODO(SERVER-32597) remove this when fCV 4.0 becomes the default on clean startup.
-    assert.commandWorked(primaryDB.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-    rst.awaitReplication();
-
     for (let versions
              of[{from: lastStableFCV, to: latestFCV}, {from: latestFCV, to: lastStableFCV}]) {
         jsTestLog("Changing FeatureCompatibilityVersion from " + versions.from + " to " +
