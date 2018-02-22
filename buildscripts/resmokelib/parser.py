@@ -441,8 +441,10 @@ def create_test_membership_map(fail_on_missing_selector=False, test_kind=None):
                 continue
             suite = testing.suite.Suite(suite_name, suite_config)
         except IOError as err:
-            # If unittests.txt or integration_tests.txt aren't there we'll ignore the error because
-            # unittests haven't been built yet (this is highly likely using find interactively).
+            # We ignore errors from missing files referenced in the test suite's "selector"
+            # section. Certain test suites (e.g. unittests.yml) have a dedicated text file to
+            # capture the list of tests they run; the text file may not be available if the
+            # associated SCons target hasn't been built yet.
             if err.filename in _config.EXTERNAL_SUITE_SELECTORS:
                 if not fail_on_missing_selector:
                     continue
