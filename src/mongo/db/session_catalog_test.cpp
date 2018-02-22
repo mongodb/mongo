@@ -31,6 +31,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/stdx/future.h"
@@ -156,34 +157,81 @@ TEST_F(SessionCatalogTest, NestedOperationContextSession) {
     ASSERT(!OperationContextSession::get(opCtx()));
 }
 
-DEATH_TEST_F(SessionCatalogTest,
-             CannotStashInNestedOperationContext,
-             "Invariant failure checkedOutSession->checkOutNestingLevel == 1") {
+TEST_F(SessionCatalogTest, StashInNestedSessionIsANoop) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(1);
 
     {
         OperationContextSession outerScopedSession(opCtx(), true, boost::none);
 
+        Locker* originalLocker = opCtx()->lockState();
+        RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
+        ASSERT(originalLocker);
+        ASSERT(originalRecoveryUnit);
+
+        // Set the readConcern on the OperationContext.
+        repl::ReadConcernArgs readConcernArgs;
+        ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                                  << "test"
+                                                  << repl::ReadConcernArgs::kReadConcernFieldName
+                                                  << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                          << "snapshot"))));
+        repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
+        // Perform initial unstash, which sets up a WriteUnitOfWork.
+        outerScopedSession.unstashTransactionResources();
+        ASSERT_EQUALS(originalLocker, opCtx()->lockState());
+        ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+        ASSERT(opCtx()->getWriteUnitOfWork());
+
         {
             OperationContextSession innerScopedSession(opCtx(), true, boost::none);
+
+            // Indicate that there is a stashed cursor. If we were not in a nested session, this
+            // would ensure that stashing is not a noop.
+            opCtx()->setStashedCursor();
+
             innerScopedSession.stashTransactionResources();
+
+            // The stash was a noop, so the locker, RecoveryUnit, and WriteUnitOfWork on the
+            // OperationContext are unaffected.
+            ASSERT_EQUALS(originalLocker, opCtx()->lockState());
+            ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+            ASSERT(opCtx()->getWriteUnitOfWork());
         }
     }
 }
 
-DEATH_TEST_F(SessionCatalogTest,
-             CannotUnstashInNestedOperationContext,
-             "Invariant failure checkedOutSession->checkOutNestingLevel == 1") {
+TEST_F(SessionCatalogTest, UnstashInNestedSessionIsANoop) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx()->setTxnNumber(1);
 
     {
         OperationContextSession outerScopedSession(opCtx(), true, boost::none);
 
+        Locker* originalLocker = opCtx()->lockState();
+        RecoveryUnit* originalRecoveryUnit = opCtx()->recoveryUnit();
+        ASSERT(originalLocker);
+        ASSERT(originalRecoveryUnit);
+
+        // Set the readConcern on the OperationContext.
+        repl::ReadConcernArgs readConcernArgs;
+        ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                                  << "test"
+                                                  << repl::ReadConcernArgs::kReadConcernFieldName
+                                                  << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                          << "snapshot"))));
+        repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
         {
             OperationContextSession innerScopedSession(opCtx(), true, boost::none);
+
             innerScopedSession.unstashTransactionResources();
+
+            // The unstash was a noop, so the OperationContext did not get a WriteUnitOfWork.
+            ASSERT_EQUALS(originalLocker, opCtx()->lockState());
+            ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
+            ASSERT_FALSE(opCtx()->getWriteUnitOfWork());
         }
     }
 }

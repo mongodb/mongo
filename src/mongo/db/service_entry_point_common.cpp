@@ -96,25 +96,28 @@ MONGO_FP_DECLARE(skipCheckingForNotMasterInCommandDispatch);
 namespace {
 using logger::LogComponent;
 
-// The command names for which to check out a session.
-//
-// Note: Eval should check out a session because it defaults to running under a global write lock,
-// so if it didn't, and the function it was given contains any of these whitelisted commands, they
-// would try to check out a session under a lock, which is not allowed.  Similarly,
-// refreshLogicalSessionCacheNow triggers a bulk update under a lock on the sessions collection.
-const StringMap<int> sessionCheckoutWhitelist = {{"delete", 1},
+// The command names for which to check out a session. These are commands that support retryable
+// writes, readConcern snapshot, or multi-statement transactions. We additionally check out the
+// session for commands that can take a lock and then run another whitelisted command in
+// DBDirectClient. Otherwise, the nested command would try to check out a session under a lock,
+// which is not allowed.
+const StringMap<int> sessionCheckoutWhitelist = {{"applyOps", 1},
+                                                 {"count", 1},
+                                                 {"delete", 1},
                                                  {"eval", 1},
                                                  {"$eval", 1},
+                                                 {"explain", 1},
+                                                 {"find", 1},
                                                  {"findandmodify", 1},
                                                  {"findAndModify", 1},
-                                                 {"insert", 1},
-                                                 {"refreshLogicalSessionCacheNow", 1},
-                                                 {"update", 1},
-                                                 {"find", 1},
-                                                 {"getMore", 1},
-                                                 {"count", 1},
                                                  {"geoSearch", 1},
-                                                 {"parallelCollectionScan", 1}};
+                                                 {"getMore", 1},
+                                                 {"group", 1},
+                                                 {"insert", 1},
+                                                 {"mapReduce", 1},
+                                                 {"parallelCollectionScan", 1},
+                                                 {"refreshLogicalSessionCacheNow", 1},
+                                                 {"update", 1}};
 
 // The command names for which readConcern level snapshot is allowed. The getMore command is
 // implicitly allowed to operate on a cursor which was opened under readConcern level snapshot.
@@ -486,12 +489,9 @@ void execCommandDatabase(OperationContext* opCtx,
         // Session ids are forwarded in requests, so commands that require roundtrips between
         // servers may result in a deadlock when a server tries to check out a session it is already
         // using to service an earlier operation in the command's chain. To avoid this, only check
-        // out sessions for commands that require them (i.e. write commands).
-        // Session checkout is also prevented for commands run within DBDirectClient. If checkout is
-        // required, it is expected to be handled by the outermost command.
+        // out sessions for commands that require them.
         const bool shouldCheckoutSession =
-            sessionCheckoutWhitelist.find(command->getName()) != sessionCheckoutWhitelist.cend() &&
-            !opCtx->getClient()->isInDirectClient();
+            sessionCheckoutWhitelist.find(command->getName()) != sessionCheckoutWhitelist.cend();
 
         boost::optional<bool> autocommitVal = boost::none;
         if (sessionOptions && sessionOptions->getAutocommit()) {
