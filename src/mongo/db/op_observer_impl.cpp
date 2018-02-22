@@ -602,9 +602,11 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
                 kUninitializedStmtId,
                 {});
 
-    if (dbName == FeatureCompatibilityVersion::kDatabase) {
-        FeatureCompatibilityVersion::onDropCollection(opCtx);
-    } else if (dbName == NamespaceString::kSessionTransactionsTableNamespace.db()) {
+    uassert(50714,
+            "dropping the admin database is not allowed.",
+            dbName != FeatureCompatibilityVersion::kDatabase);
+
+    if (dbName == NamespaceString::kSessionTransactionsTableNamespace.db()) {
         SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
     }
 
@@ -636,10 +638,12 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                  {});
     }
 
+    uassert(50715,
+            "dropping the admin.system.version collection is not allowed.",
+            collectionName.ns() != FeatureCompatibilityVersion::kCollection);
+
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, collectionName);
-    } else if (collectionName.ns() == FeatureCompatibilityVersion::kCollection) {
-        FeatureCompatibilityVersion::onDropCollection(opCtx);
     } else if (collectionName == NamespaceString::kSessionTransactionsTableNamespace) {
         SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
     }

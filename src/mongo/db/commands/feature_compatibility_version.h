@@ -152,18 +152,6 @@ public:
     static void onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc);
 
     /**
-     * Examines the _id of a document removed from admin.system.version. If it is the
-     * featureCompatibilityVersion document, resets the server parameter to its default value
-     * on commit.
-     */
-    static void onDelete(OperationContext* opCtx, const BSONObj& doc);
-
-    /**
-     * Resets the server parameter to its default value on commit.
-     */
-    static void onDropCollection(OperationContext* opCtx);
-
-    /**
      * Sets the server's outgoing and incomingInternalClient minWireVersions according to the
      * current featureCompatibilityVersion value.
      */

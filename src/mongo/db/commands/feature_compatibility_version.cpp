@@ -335,32 +335,6 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
     });
 }
 
-void FeatureCompatibilityVersion::onDelete(OperationContext* opCtx, const BSONObj& doc) {
-    auto idElement = doc["_id"];
-    if (idElement.type() != BSONType::String ||
-        idElement.String() != FeatureCompatibilityVersion::kParameterName) {
-        return;
-    }
-
-    log() << "setting featureCompatibilityVersion to "
-          << FeatureCompatibilityVersionCommandParser::kVersion34;
-    opCtx->recoveryUnit()->onCommit([]() {
-        serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo34);
-        updateMinWireVersion();
-    });
-}
-
-void FeatureCompatibilityVersion::onDropCollection(OperationContext* opCtx) {
-    log() << "setting featureCompatibilityVersion to "
-          << FeatureCompatibilityVersionCommandParser::kVersion36;
-    opCtx->recoveryUnit()->onCommit([]() {
-        serverGlobalParams.featureCompatibility.setVersion(
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36);
-        updateMinWireVersion();
-    });
-}
-
 void FeatureCompatibilityVersion::updateMinWireVersion() {
     WireSpec& spec = WireSpec::instance();
 
