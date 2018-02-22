@@ -1027,6 +1027,49 @@ TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
     ASSERT(R2.isLocked());
 }
 
+TEST_F(DConcurrencyTestFixture, ReleaseAndReacquireTicket) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+    auto opctx2 = clientOpctxPairs[1].second.get();
+    // Limit the locker to 1 ticket at a time.
+    UseGlobalThrottling throttle(opctx1, 1);
+
+    Lock::GlobalRead R1(opctx1, Date_t::now());
+    ASSERT(R1.isLocked());
+
+    {
+        // A second Locker should not be able to acquire a ticket.
+        Lock::GlobalRead R2(opctx2, Date_t::now());
+        ASSERT(!R2.isLocked());
+    }
+
+    opctx1->lockState()->releaseTicket();
+
+    {
+        // Now a second Locker can acquire a ticket.
+        Lock::GlobalRead R2(opctx2, Date_t::now());
+        ASSERT(R2.isLocked());
+    }
+
+    opctx1->lockState()->reacquireTicket();
+
+    {
+        // Now a second Locker cannot acquire a ticket.
+        Lock::GlobalRead R2(opctx2, Date_t::now());
+        ASSERT(!R2.isLocked());
+    }
+}
+
+TEST_F(DConcurrencyTestFixture, LockerWithReleasedTicketCanBeUnlocked) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+
+    Lock::GlobalRead R1(opctx1, Date_t::now());
+    ASSERT(R1.isLocked());
+
+    opctx1->lockState()->releaseTicket();
+}
+
 TEST_F(DConcurrencyTestFixture, DBLockTimeout) {
     auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(2);
     auto opctx1 = clientOpctxPairs[0].second.get();

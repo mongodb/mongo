@@ -300,6 +300,18 @@ public:
      */
     virtual void restoreLockState(const LockSnapshot& stateToRestore) = 0;
 
+    /**
+     * Releases the ticket associated with the Locker. This allows locks to be held without
+     * contributing to reader/writer throttling.
+     */
+    virtual void releaseTicket() = 0;
+
+    /**
+     * Reacquires a ticket for the Locker. This must only be called after releaseTicket(). It
+     * restores the ticket under its previous LockMode.
+     */
+    virtual void reacquireTicket() = 0;
+
     //
     // These methods are legacy from LockerImpl and will eventually go away or be converted to
     // calls into the Locker methods

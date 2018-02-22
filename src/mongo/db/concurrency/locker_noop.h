@@ -137,6 +137,14 @@ public:
         invariant(false);
     }
 
+    virtual void releaseTicket() {
+        invariant(false);
+    }
+
+    virtual void reacquireTicket() {
+        invariant(false);
+    }
+
     virtual void dump() const {
         invariant(false);
     }

@@ -478,6 +478,7 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     opCtx->setWriteUnitOfWork(nullptr);
 
     _stashedLocker = opCtx->releaseLockState();
+    _stashedLocker->releaseTicket();
     _stashedRecoveryUnit.reset(opCtx->releaseRecoveryUnit());
 
     opCtx->setLockState(stdx::make_unique<DefaultLockerImpl>());
@@ -504,6 +505,7 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
     if (_stashedLocker) {
         invariant(_stashedRecoveryUnit);
         opCtx->releaseLockState();
+        _stashedLocker->reacquireTicket();
         opCtx->setLockState(std::move(_stashedLocker));
         opCtx->setRecoveryUnit(_stashedRecoveryUnit.release(),
                                OperationContext::RecoveryUnitState::kNotInUnitOfWork);

@@ -565,6 +565,10 @@ TEST_F(SessionTest, StashAndUnstashResources) {
     ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
     ASSERT(opCtx()->getWriteUnitOfWork());
 
+    // Take a lock. This is expected in order to stash resources.
+    Lock::GlobalRead lk(opCtx(), Date_t::now());
+    ASSERT(lk.isLocked());
+
     // Stash resources. The original Locker and RecoveryUnit now belong to the stash.
     opCtx()->setStashedCursor();
     session.stashTransactionResources(opCtx());
@@ -578,6 +582,9 @@ TEST_F(SessionTest, StashAndUnstashResources) {
     ASSERT_EQUALS(originalLocker, opCtx()->lockState());
     ASSERT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
     ASSERT(opCtx()->getWriteUnitOfWork());
+
+    // Commit the WriteUnitOfWork. This allows us to release locks.
+    opCtx()->getWriteUnitOfWork()->commit();
 }
 
 TEST_F(SessionTest, CheckAutocommitOnlyAllowedAtBeginningOfTxn) {

@@ -297,21 +297,37 @@ LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode) {
 }
 
 template <bool IsForMMAPV1>
+void LockerImpl<IsForMMAPV1>::reacquireTicket() {
+    invariant(_modeForTicket != MODE_NONE);
+    auto acquireTicketResult = _acquireTicket(_modeForTicket, Date_t::max());
+    invariant(acquireTicketResult == LOCK_OK);
+}
+
+template <bool IsForMMAPV1>
+LockResult LockerImpl<IsForMMAPV1>::_acquireTicket(LockMode mode, Date_t deadline) {
+    const bool reader = isSharedLockMode(mode);
+    auto holder = shouldAcquireTicket() ? ticketHolders[mode] : nullptr;
+    if (holder) {
+        _clientState.store(reader ? kQueuedReader : kQueuedWriter);
+        if (deadline == Date_t::max()) {
+            holder->waitForTicket();
+        } else if (!holder->waitForTicketUntil(deadline)) {
+            _clientState.store(kInactive);
+            return LOCK_TIMEOUT;
+        }
+    }
+    _clientState.store(reader ? kActiveReader : kActiveWriter);
+    return LOCK_OK;
+}
+
+template <bool IsForMMAPV1>
 LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(LockMode mode, Date_t deadline) {
     dassert(isLocked() == (_modeForTicket != MODE_NONE));
     if (_modeForTicket == MODE_NONE) {
-        const bool reader = isSharedLockMode(mode);
-        auto holder = shouldAcquireTicket() ? ticketHolders[mode] : nullptr;
-        if (holder) {
-            _clientState.store(reader ? kQueuedReader : kQueuedWriter);
-            if (deadline == Date_t::max()) {
-                holder->waitForTicket();
-            } else if (!holder->waitForTicketUntil(deadline)) {
-                _clientState.store(kInactive);
-                return LOCK_TIMEOUT;
-            }
+        auto acquireTicketResult = _acquireTicket(mode, deadline);
+        if (acquireTicketResult != LOCK_OK) {
+            return acquireTicketResult;
         }
-        _clientState.store(reader ? kActiveReader : kActiveWriter);
         _modeForTicket = mode;
     }
     const LockResult result = lockBegin(resourceIdGlobal, mode);
@@ -806,16 +822,32 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(ResourceId resId,
 }
 
 template <bool IsForMMAPV1>
+void LockerImpl<IsForMMAPV1>::releaseTicket() {
+    invariant(_modeForTicket != MODE_NONE);
+    _releaseTicket();
+}
+
+template <bool IsForMMAPV1>
+void LockerImpl<IsForMMAPV1>::_releaseTicket() {
+    auto holder = shouldAcquireTicket() ? ticketHolders[_modeForTicket] : nullptr;
+    if (holder) {
+        holder->release();
+    }
+    _clientState.store(kInactive);
+}
+
+template <bool IsForMMAPV1>
 bool LockerImpl<IsForMMAPV1>::_unlockImpl(LockRequestsMap::Iterator* it) {
     if (globalLockManager.unlock(it->objAddr())) {
         if (it->key() == resourceIdGlobal) {
             invariant(_modeForTicket != MODE_NONE);
-            auto holder = shouldAcquireTicket() ? ticketHolders[_modeForTicket] : nullptr;
-            _modeForTicket = MODE_NONE;
-            if (holder) {
-                holder->release();
+
+            // We may have already released our ticket through a call to releaseTicket().
+            if (_clientState.load() != kInactive) {
+                _releaseTicket();
             }
-            _clientState.store(kInactive);
+
+            _modeForTicket = MODE_NONE;
         }
 
         scoped_spinlock scopedLock(_lock);

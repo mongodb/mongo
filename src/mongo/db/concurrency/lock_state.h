@@ -144,6 +144,10 @@ public:
 
     virtual void restoreLockState(const LockSnapshot& stateToRestore);
 
+    virtual void releaseTicket();
+
+    virtual void reacquireTicket();
+
     /**
      * Allows for lock requests to be requested in a non-blocking way. There can be only one
      * outstanding pending lock request per locker object.
@@ -210,6 +214,17 @@ private:
      * locking if '_sharedLocksShouldTwoPhaseLock' is true.
      */
     bool _shouldDelayUnlock(ResourceId resId, LockMode mode) const;
+
+    /**
+     * Releases the ticket for the Locker.
+     */
+    void _releaseTicket();
+
+    /**
+     * Acquires a ticket for the Locker under 'mode'. Returns LOCK_TIMEOUT if it cannot acquire a
+     * ticket within 'deadline'.
+     */
+    LockResult _acquireTicket(LockMode mode, Date_t deadline);
 
     // Used to disambiguate different lockers
     const LockerId _id;
