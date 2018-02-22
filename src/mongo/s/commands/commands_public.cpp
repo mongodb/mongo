@@ -535,27 +535,23 @@ public:
                 return commandResponse.response;
             }();
 
-            BSONObjIterator j(res);
-            // We don't know the order that we will encounter the count and size
-            // So we save them until we've iterated through all the fields before
-            // updating unscaledCollSize.
-            long long shardObjCount;
-            long long shardAvgObjSize;
-            while (j.more()) {
-                BSONElement e = j.next();
-                if (str::equals(e.fieldName(), "ns") || str::equals(e.fieldName(), "ok") ||
-                    str::equals(e.fieldName(), "lastExtentSize") ||
+            // We don't know the order that we will encounter the count and size, so we save them
+            // until we've iterated through all the fields before updating unscaledCollSize
+            const auto shardObjCount = static_cast<long long>(res["count"].Number());
+            long long shardAvgObjSize = 0;
+
+            for (const auto& e : res) {
+                if (str::equals(e.fieldName(), "ns") ||              //
+                    str::equals(e.fieldName(), "ok") ||              //
+                    str::equals(e.fieldName(), "lastExtentSize") ||  //
                     str::equals(e.fieldName(), "paddingFactor")) {
                     continue;
-                } else if (str::equals(e.fieldName(), "count") ||
-                           str::equals(e.fieldName(), "size") ||
-                           str::equals(e.fieldName(), "storageSize") ||
-                           str::equals(e.fieldName(), "numExtents") ||
+                } else if (str::equals(e.fieldName(), "count") ||        //
+                           str::equals(e.fieldName(), "size") ||         //
+                           str::equals(e.fieldName(), "storageSize") ||  //
+                           str::equals(e.fieldName(), "numExtents") ||   //
                            str::equals(e.fieldName(), "totalIndexSize")) {
                     counts[e.fieldName()] += e.numberLong();
-                    if (str::equals(e.fieldName(), "count")) {
-                        shardObjCount = e.numberLong();
-                    }
                 } else if (str::equals(e.fieldName(), "avgObjSize")) {
                     shardAvgObjSize = e.numberLong();
                 } else if (str::equals(e.fieldName(), "indexSizes")) {
@@ -564,16 +560,6 @@ public:
                         BSONElement temp = k.next();
                         indexSizes[temp.fieldName()] += temp.numberLong();
                     }
-                }
-                // no longer used since 2.2
-                else if (str::equals(e.fieldName(), "flags")) {
-                    if (!result.hasField(e.fieldName()))
-                        result.append(e);
-                }
-                // flags broken out in 2.4+
-                else if (str::equals(e.fieldName(), "systemFlags")) {
-                    if (!result.hasField(e.fieldName()))
-                        result.append(e);
                 } else if (str::equals(e.fieldName(), "userFlags")) {
                     if (!result.hasField(e.fieldName()))
                         result.append(e);
@@ -584,8 +570,6 @@ public:
                     if (!result.hasField(e.fieldName()))
                         result.append(e);
                 } else if (str::equals(e.fieldName(), "indexDetails")) {
-                    // skip this field in the rollup
-                } else if (str::equals(e.fieldName(), "wiredTiger")) {
                     // skip this field in the rollup
                 } else if (str::equals(e.fieldName(), "nindexes")) {
                     int myIndexes = e.numberInt();
