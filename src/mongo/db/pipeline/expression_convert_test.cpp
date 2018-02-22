@@ -284,12 +284,10 @@ TEST_F(ExpressionConvertTest, UnsupportedConversionFails) {
         {Value(OID()), "int"},
         {Value(OID()), "long"},
         {Value(OID()), "decimal"},
-        {Value(Date_t::fromMillisSinceEpoch(0)), "objectId"},
-        {Value(0.0), "date"},
+        {Value(Date_t{}), "objectId"},
+        {Value(Date_t{}), "int"},
         {Value(int{1}), "date"},
         {Value(true), "date"},
-        {Value(0LL), "date"},
-        {Value(Decimal128("0")), "date"},
     };
 
     // Attempt every possible unsupported conversion.
@@ -469,6 +467,19 @@ TEST_F(ExpressionConvertTest, BoolIdentityConversion) {
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseBoolInput), false, BSONType::Bool);
 }
 
+TEST_F(ExpressionConvertTest, DateIdentityConversion) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "date"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document dateInput{{"path1", Value(Date_t{})}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(dateInput), Date_t{}, BSONType::Date);
+}
+
 TEST_F(ExpressionConvertTest, IntIdentityConversion) {
     auto expCtx = getExpCtx();
 
@@ -521,6 +532,20 @@ TEST_F(ExpressionConvertTest, DecimalIdentityConversion) {
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(decimalNegativeInfinity),
                                    Decimal128::kNegativeInfinity,
                                    BSONType::NumberDecimal);
+}
+
+TEST_F(ExpressionConvertTest, ConvertDateToBool) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "bool"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    // All date inputs evaluate as true.
+    Document dateInput{{"path1", Value(Date_t{})}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(dateInput), true, BSONType::Bool);
 }
 
 TEST_F(ExpressionConvertTest, ConvertIntToBool) {
@@ -667,12 +692,31 @@ TEST_F(ExpressionConvertTest, ConvertNumericToDouble) {
     // wide enough for the original long long value in its entirety.
     Document largeLongInput{{"path1", Value(0xf0000000000000fLL)}};
     result = convertExp->evaluate(largeLongInput);
-    ASSERT_EQ(static_cast<long long>(result.getDouble()), 0xf00000000000000ll);
+    ASSERT_EQ(static_cast<long long>(result.getDouble()), 0xf00000000000000LL);
 
     // Again, some precision is lost in the conversion from Decimal128 to double.
     Document preciseDecimalInput{{"path1", Value(Decimal128("1.125000000000000000005"))}};
     result = convertExp->evaluate(preciseDecimalInput);
     ASSERT_EQ(result.getDouble(), 1.125);
+}
+
+TEST_F(ExpressionConvertTest, ConvertDateToDouble) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "double"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document dateInput{{"path1", Value(Date_t::fromMillisSinceEpoch(123))}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(dateInput), 123.0, BSONType::NumberDouble);
+
+    // Note that the least significant bits get lost, because the significand of a double is not
+    // wide enough for the original 64-bit Date_t value in its entirety.
+    Document largeDateInput{{"path1", Value(Date_t::fromMillisSinceEpoch(0xf0000000000000fLL))}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(largeDateInput), 0xf00000000000000LL, BSONType::NumberDouble);
 }
 
 TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToDouble) {
@@ -771,6 +815,24 @@ TEST_F(ExpressionConvertTest, ConvertNumericToDecimal) {
     Document largeLongInput{{"path1", Value(0xf0000000000000fLL)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(largeLongInput), Value(0xf0000000000000fLL), BSONType::NumberDecimal);
+}
+
+TEST_F(ExpressionConvertTest, ConvertDateToDecimal) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "decimal"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document dateInput{{"path1", Value(Date_t::fromMillisSinceEpoch(123))}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(dateInput), Decimal128(123), BSONType::NumberDecimal);
+
+    Document largeDateInput{{"path1", Value(Date_t::fromMillisSinceEpoch(0xf0000000000000fLL))}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(largeDateInput), Value(0xf0000000000000fLL), BSONType::NumberDecimal);
 }
 
 TEST_F(ExpressionConvertTest, ConvertDoubleToInt) {
@@ -1317,6 +1379,19 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDecimalToLongWithOnError) {
         convertExp->evaluate(decimalNegativeInfinity), "X"_sd, BSONType::String);
 }
 
+TEST_F(ExpressionConvertTest, ConvertDateToLong) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "long"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document dateInput{{"path1", Value(Date_t::fromMillisSinceEpoch(123LL))}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(dateInput), 123LL, BSONType::NumberLong);
+}
+
 TEST_F(ExpressionConvertTest, ConvertIntToLong) {
     auto expCtx = getExpCtx();
 
@@ -1440,6 +1515,224 @@ TEST_F(ExpressionConvertTest, ConvertBoolToLong) {
 
     Document boolTrue{{"path1", Value(true)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolTrue), 1ll, BSONType::NumberLong);
+}
+
+TEST_F(ExpressionConvertTest, ConvertNumberToDate) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "date"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document longInput{{"path1", Value(0ll)}};
+    ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(longInput).getDate()),
+              "1970-01-01T00:00:00.000Z");
+
+    Document doubleInput{{"path1", Value(431568000000.0)}};
+    ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(doubleInput).getDate()),
+              "1983-09-05T00:00:00.000Z");
+
+    Document doubleInputWithFraction{{"path1", Value(431568000000.987)}};
+    ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(doubleInputWithFraction).getDate()),
+              "1983-09-05T00:00:00.000Z");
+
+    Document decimalInput{{"path1", Value(Decimal128("872835240000"))}};
+    ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(decimalInput).getDate()),
+              "1997-08-29T06:14:00.000Z");
+
+    Document decimalInputWithFraction{{"path1", Value(Decimal128("872835240000.987"))}};
+    ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(decimalInputWithFraction).getDate()),
+              "1997-08-29T06:14:00.000Z");
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDate) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "date"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document doubleOverflowInput{{"path1", Value(1.0e100)}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(doubleOverflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    Document doubleNegativeOverflowInput{{"path1", Value(-1.0e100)}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(doubleNegativeOverflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    Document doubleNaN{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(doubleNaN),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "Attempt to convert NaN value to integer type");
+                             });
+
+    Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(doubleInfinity),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "Attempt to convert infinity value to integer type");
+                             });
+
+    Document doubleNegativeInfinity{{"path1", -std::numeric_limits<double>::infinity()}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(doubleNegativeInfinity),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "Attempt to convert infinity value to integer type");
+                             });
+
+    Document decimalOverflowInput{{"path1", Value(Decimal128("1.0e100"))}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(decimalOverflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    Document decimalNegativeOverflowInput{{"path1", Value(Decimal128("1.0e100"))}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(decimalNegativeOverflowInput),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(exception.reason(),
+                                                        "Conversion would overflow target type");
+                             });
+
+    Document decimalNaN{{"path1", Decimal128::kPositiveNaN}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(decimalNaN),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "Attempt to convert NaN value to integer type");
+                             });
+
+    Document decimalNegativeNaN{{"path1", Decimal128::kNegativeNaN}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(decimalNegativeNaN),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "Attempt to convert NaN value to integer type");
+                             });
+
+    Document decimalInfinity{{"path1", Decimal128::kPositiveInfinity}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(decimalInfinity),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "Attempt to convert infinity value to integer type");
+                             });
+
+    Document decimalNegativeInfinity{{"path1", Decimal128::kNegativeInfinity}};
+    ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(decimalNegativeInfinity),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::ConversionFailure);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "Attempt to convert infinity value to integer type");
+                             });
+}
+
+TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDateWithOnError) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "date"
+                                        << "onError"
+                                        << "X"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    // Int is explicitly disallowed for date conversions. Clients must use 64-bit long instead.
+    Document intInput{{"path1", Value(int{0})}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(intInput), "X"_sd, BSONType::String);
+
+    Document doubleOverflowInput{{"path1", Value(1.0e100)}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(doubleOverflowInput), "X"_sd, BSONType::String);
+
+    Document doubleNegativeOverflowInput{{"path1", Value(-1.0e100)}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(doubleNegativeOverflowInput), "X"_sd, BSONType::String);
+
+    Document doubleNaN{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(doubleNaN), "X"_sd, BSONType::String);
+
+    Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(doubleInfinity), "X"_sd, BSONType::String);
+
+    Document doubleNegativeInfinity{{"path1", -std::numeric_limits<double>::infinity()}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(doubleNegativeInfinity), "X"_sd, BSONType::String);
+
+    Document decimalOverflowInput{{"path1", Value(Decimal128("1.0e100"))}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(decimalOverflowInput), "X"_sd, BSONType::String);
+
+    Document decimalNegativeOverflowInput{{"path1", Value(Decimal128("1.0e100"))}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(decimalNegativeOverflowInput), "X"_sd, BSONType::String);
+
+    Document decimalNaN{{"path1", Decimal128::kPositiveNaN}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(decimalNaN), "X"_sd, BSONType::String);
+
+    Document decimalNegativeNaN{{"path1", Decimal128::kNegativeNaN}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(decimalNegativeNaN), "X"_sd, BSONType::String);
+
+    Document decimalInfinity{{"path1", Decimal128::kPositiveInfinity}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(decimalInfinity), "X"_sd, BSONType::String);
+
+    Document decimalNegativeInfinity{{"path1", Decimal128::kNegativeInfinity}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(decimalNegativeInfinity), "X"_sd, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ConvertObjectIdToDate) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "date"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    convertExp = convertExp->optimize();
+
+    Document oidInput{{"path1", Value(OID("59E8A8D8FEDCBA9876543210"))}};
+
+    ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(oidInput).getDate()),
+              "2017-10-19T13:30:00.000Z");
 }
 
 }  // namespace ExpressionConvertTest

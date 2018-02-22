@@ -4773,10 +4773,18 @@ public:
         table[BSONType::NumberDouble][BSONType::Bool] = [](Value inputValue) {
             return Value(inputValue.coerceToBool());
         };
+        table[BSONType::NumberDouble][BSONType::Date] = &performCastNumberToDate;
         table[BSONType::NumberDouble][BSONType::NumberInt] = &performCastDoubleToInt;
         table[BSONType::NumberDouble][BSONType::NumberLong] = &performCastDoubleToLong;
         table[BSONType::NumberDouble][BSONType::NumberDecimal] = [](Value inputValue) {
             return Value(inputValue.coerceToDecimal());
+        };
+
+        //
+        // Conversions from jstOID
+        //
+        table[BSONType::jstOID][BSONType::Date] = [](Value inputValue) {
+            return Value(inputValue.getOid().asDateT());
         };
 
         //
@@ -4794,6 +4802,24 @@ public:
         };
         table[BSONType::Bool][BSONType::NumberDecimal] = [](Value inputValue) {
             return inputValue.getBool() ? Value(Decimal128(1)) : Value(Decimal128(0));
+        };
+
+        //
+        // Conversions from Date
+        //
+        table[BSONType::Date][BSONType::NumberDouble] = [](Value inputValue) {
+            return Value(static_cast<double>(inputValue.getDate().toMillisSinceEpoch()));
+        };
+        table[BSONType::Date][BSONType::Bool] = [](Value inputValue) {
+            return Value(inputValue.coerceToBool());
+        };
+        table[BSONType::Date][BSONType::Date] = &performIdentityConversion;
+        table[BSONType::Date][BSONType::NumberLong] = [](Value inputValue) {
+            return Value(inputValue.getDate().toMillisSinceEpoch());
+        };
+        table[BSONType::Date][BSONType::NumberDecimal] = [](Value inputValue) {
+            return Value(
+                Decimal128(static_cast<int64_t>(inputValue.getDate().toMillisSinceEpoch())));
         };
 
         //
@@ -4822,6 +4848,7 @@ public:
         table[BSONType::NumberLong][BSONType::Bool] = [](Value inputValue) {
             return Value(inputValue.coerceToBool());
         };
+        table[BSONType::NumberLong][BSONType::Date] = &performCastNumberToDate;
         table[BSONType::NumberLong][BSONType::NumberInt] = &performCastLongToInt;
         table[BSONType::NumberLong][BSONType::NumberLong] = &performIdentityConversion;
         table[BSONType::NumberLong][BSONType::NumberDecimal] = [](Value inputValue) {
@@ -4835,6 +4862,7 @@ public:
         table[BSONType::NumberDecimal][BSONType::Bool] = [](Value inputValue) {
             return Value(inputValue.coerceToBool());
         };
+        table[BSONType::NumberDecimal][BSONType::Date] = &performCastNumberToDate;
         table[BSONType::NumberDecimal][BSONType::NumberInt] = [](Value inputValue) {
             return performCastDecimalToInt(BSONType::NumberInt, inputValue);
         };
@@ -4966,6 +4994,27 @@ private:
                     longValue <= std::numeric_limits<int>::max());
 
         return Value(static_cast<int>(longValue));
+    }
+
+    static Value performCastNumberToDate(Value inputValue) {
+        long long millisSinceEpoch;
+
+        switch (inputValue.getType()) {
+            case BSONType::NumberLong:
+                millisSinceEpoch = inputValue.getLong();
+                break;
+            case BSONType::NumberDouble:
+                millisSinceEpoch = performCastDoubleToLong(inputValue).getLong();
+                break;
+            case BSONType::NumberDecimal:
+                millisSinceEpoch =
+                    performCastDecimalToInt(BSONType::NumberLong, inputValue).getLong();
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+
+        return Value(Date_t::fromMillisSinceEpoch(millisSinceEpoch));
     }
 
     static Value performIdentityConversion(Value inputValue) {
