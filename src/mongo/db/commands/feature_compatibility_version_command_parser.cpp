@@ -37,9 +37,6 @@
 #include "mongo/util/version.h"
 
 namespace mongo {
-namespace {
-constexpr StringData kVersion32 = "3.2"_sd;
-}  // namespace
 
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersion34;
 constexpr StringData FeatureCompatibilityVersionCommandParser::kVersion36;
@@ -89,15 +86,6 @@ StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersion
     }
 
     const std::string version = versionElem.String();
-
-    if (version == kVersion32) {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Invalid command argument: '" << kVersion32
-                              << "'. You must downgrade to MongoDB 3.4 to enable "
-                                 "featureCompatibilityVersion 3.2. See "
-                              << feature_compatibility_version::kDochubLink
-                              << "."};
-    }
 
     if (version != FeatureCompatibilityVersionCommandParser::kVersion40 &&
         version != FeatureCompatibilityVersionCommandParser::kVersion36 &&
