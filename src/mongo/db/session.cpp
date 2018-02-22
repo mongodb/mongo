@@ -600,18 +600,8 @@ UpdateRequest Session::_makeUpdateRequest(WithLock,
         return newTxnRecord.toBSON();
     }();
     updateRequest.setUpdates(updateBSON);
-
-    if (_lastWrittenSessionRecord) {
-        updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName
-                                    << _sessionId.toBSON()
-                                    << SessionTxnRecord::kTxnNumFieldName
-                                    << _lastWrittenSessionRecord->getTxnNum()
-                                    << SessionTxnRecord::kLastWriteOpTimeFieldName
-                                    << _lastWrittenSessionRecord->getLastWriteOpTime()));
-    } else {
-        updateRequest.setQuery(updateBSON);
-        updateRequest.setUpsert(true);
-    }
+    updateRequest.setQuery(BSON(SessionTxnRecord::kSessionIdFieldName << _sessionId.toBSON()));
+    updateRequest.setUpsert(true);
 
     return updateRequest;
 }

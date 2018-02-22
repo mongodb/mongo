@@ -193,17 +193,16 @@
     })));
     assert.eq({_id: 0, a: 1}, sessionDb.coll.findOne({_id: 0}));
 
-    // readConcern 'snapshot' is not yet supported by multi-statement updates.
+    // readConcern 'snapshot' is supported by multi-statement updates.
     assert.commandWorked(sessionDb.coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    assert.commandWorked(sessionDb.runCommand({
         update: collName,
         updates: [{q: {_id: 0}, u: {$inc: {a: 1}}}, {q: {_id: 1}, u: {$inc: {a: 1}}}],
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.WriteConflict);
-    assert.eq({_id: 0, a: 1}, sessionDb.coll.findOne({_id: 0}));
-    assert.eq({_id: 1}, sessionDb.coll.findOne({_id: 1}));
+    }));
+    assert.eq({_id: 0, a: 2}, sessionDb.coll.findOne({_id: 0}));
+    assert.eq({_id: 1, a: 1}, sessionDb.coll.findOne({_id: 1}));
 
     // readConcern 'snapshot' is not supported by delete.
     // TODO SERVER-33354: Add snapshot support for delete.
