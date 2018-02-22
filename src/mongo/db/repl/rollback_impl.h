@@ -154,6 +154,10 @@ public:
 
     /**
      * Runs the rollback algorithm.
+     *
+     * This method transitions to the ROLLBACK state and then performs the steps of the rollback
+     * process. It is required for this method to transition back to SECONDARY before returning,
+     * even if rollback did not complete successfully.
      */
     Status runRollback(OperationContext* opCtx);
 

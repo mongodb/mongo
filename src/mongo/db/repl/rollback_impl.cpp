@@ -96,6 +96,10 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
     _listener->onTransitionToRollback();
 
+    // After successfully transitioning to the ROLLBACK state, we must always transition back to
+    // SECONDARY, even if we fail at any point during the rollback process.
+    ON_BLOCK_EXIT([this, opCtx] { _transitionFromRollbackToSecondary(opCtx); });
+
     // Wait for all background index builds to complete before starting the rollback process.
     status = _awaitBgIndexCompletion(opCtx);
     if (!status.isOK()) {
@@ -145,10 +149,6 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
         return status;
     }
     _listener->onRecoverFromOplog();
-
-    // At this point these functions need to always be called before returning, even on failure.
-    // These functions fassert on failure.
-    ON_BLOCK_EXIT([this, opCtx] { _transitionFromRollbackToSecondary(opCtx); });
 
     status = _triggerOpObserver(opCtx);
     if (!status.isOK()) {

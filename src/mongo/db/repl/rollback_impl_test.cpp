@@ -250,12 +250,18 @@ TEST_F(RollbackImplTest, RollbackReturnsInvalidSyncSourceWhenNoRemoteOplog) {
     ASSERT_OK(_insertOplogEntry(makeOp(1)));
 
     ASSERT_EQUALS(ErrorCodes::InvalidSyncSource, _rollback->runRollback(_opCtx.get()));
+
+    // Make sure we transitioned back to SECONDARY state.
+    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
 }
 
 TEST_F(RollbackImplTest, RollbackReturnsOplogStartMissingWhenNoLocalOplog) {
     _remoteOplog->setOperations({makeOpAndRecordId(1)});
 
     ASSERT_EQUALS(ErrorCodes::OplogStartMissing, _rollback->runRollback(_opCtx.get()));
+
+    // Make sure we transitioned back to SECONDARY state.
+    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
 }
 
 TEST_F(RollbackImplTest, RollbackReturnsNoMatchingDocumentWhenNoCommonPoint) {
@@ -263,6 +269,9 @@ TEST_F(RollbackImplTest, RollbackReturnsNoMatchingDocumentWhenNoCommonPoint) {
     ASSERT_OK(_insertOplogEntry(makeOp(2)));
 
     ASSERT_EQUALS(ErrorCodes::NoMatchingDocument, _rollback->runRollback(_opCtx.get()));
+
+    // Make sure we transitioned back to SECONDARY state.
+    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
 }
 
 TEST_F(RollbackImplTest, RollbackPersistsDocumentAfterCommonPointToOplogTruncateAfterPoint) {
@@ -346,6 +355,9 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfRecoverToStableTimestampFails
     // Make sure rollback failed, and didn't execute the recover to timestamp logic.
     ASSERT_EQUALS(recoverToTimestampStatus, rollbackStatus);
     ASSERT_EQUALS(currTimestamp, _storageInterface->getCurrentTimestamp());
+
+    // Make sure we transitioned back to SECONDARY state.
+    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
 }
 
 TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
@@ -364,6 +376,9 @@ TEST_F(RollbackImplTest, RollbackReturnsBadStatusIfIncrementRollbackIDFails) {
     // Check that a bad status was returned since incrementing the rollback id should have
     // failed.
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, status.code());
+
+    // Make sure we transitioned back to SECONDARY state.
+    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
 }
 
 TEST_F(RollbackImplTest, RollbackCallsRecoverFromOplog) {
@@ -397,6 +412,9 @@ TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownEarly) {
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
     ASSERT(_recoveredToStableTimestamp);
     ASSERT_FALSE(_recoveredFromOplog);
+
+    // Make sure we transitioned back to SECONDARY state.
+    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
 }
 
 TEST_F(RollbackImplTest, RollbackSucceeds) {
@@ -440,6 +458,7 @@ TEST_F(RollbackImplTest, RollbackSkipsCommonPointWhenShutDownEarly) {
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
     ASSERT(_transitionedToRollback);
     ASSERT_EQUALS(Timestamp(0, 0), _commonPointFound);
+    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
 }
 
 TEST_F(RollbackImplTest, RollbackSkipsTriggerOpObserverWhenShutDownEarly) {
@@ -457,6 +476,7 @@ TEST_F(RollbackImplTest, RollbackSkipsTriggerOpObserverWhenShutDownEarly) {
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
     ASSERT(_recoveredFromOplog);
     ASSERT_FALSE(_triggeredOpObserver);
+    ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
 }
 
 /**
