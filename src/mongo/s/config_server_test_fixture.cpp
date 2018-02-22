@@ -244,20 +244,20 @@ Status ConfigServerTestFixture::deleteToConfigCollection(OperationContext* opCtx
                                                          const BSONObj& doc,
                                                          const bool multi) {
     auto deleteResponse = getConfigShard()->runCommand(opCtx,
-                                                      kReadPref,
-                                                      ns.db().toString(),
-                                                      [&]() {
-                                                          write_ops::Delete deleteOp(ns);
-                                                          deleteOp.setDeletes({[&] {
-                                                              write_ops::DeleteOpEntry entry;
-                                                              entry.setQ(doc);
-                                                              entry.setMulti(multi);
-                                                              return entry;
-                                                          }()});
-                                                          return deleteOp.toBSON({});
-                                                      }(),
-                                                      Shard::kDefaultConfigCommandTimeout,
-                                                      Shard::RetryPolicy::kNoRetry);
+                                                       kReadPref,
+                                                       ns.db().toString(),
+                                                       [&]() {
+                                                           write_ops::Delete deleteOp(ns);
+                                                           deleteOp.setDeletes({[&] {
+                                                               write_ops::DeleteOpEntry entry;
+                                                               entry.setQ(doc);
+                                                               entry.setMulti(multi);
+                                                               return entry;
+                                                           }()});
+                                                           return deleteOp.toBSON({});
+                                                       }(),
+                                                       Shard::kDefaultConfigCommandTimeout,
+                                                       Shard::RetryPolicy::kNoRetry);
 
 
     BatchedCommandResponse batchResponse;
