@@ -145,7 +145,7 @@ std::shared_ptr<ChunkManager> CatalogCacheTestFixture::makeChunkManager(
 
     auto routingInfo = future.timed_get(kFutureTimeout);
     ASSERT(routingInfo->cm());
-    ASSERT(!routingInfo->primary());
+    ASSERT(routingInfo->primary());
 
     return routingInfo->cm();
 }

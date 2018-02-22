@@ -436,7 +436,11 @@ void ParallelSortClusteredCursor::startInit(OperationContext* opCtx) {
         if (routingInfoStatus != ErrorCodes::NamespaceNotFound) {
             auto routingInfo = uassertStatusOK(std::move(routingInfoStatus));
             manager = routingInfo.cm();
-            primary = routingInfo.primary();
+            // ParallelSortClusteredCursor has two states - either !cm && primary, which means
+            // unsharded collection, or cm && !primary, which means sharded collection.
+            if (!manager) {
+                primary = routingInfo.primary();
+            }
         }
     }
 

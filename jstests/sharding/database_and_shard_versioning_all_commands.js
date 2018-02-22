@@ -62,7 +62,7 @@
         buildInfo: {skip: "executes locally on mongos (not sent to any remote node)"},
         clearLog: {skip: "executes locally on mongos (not sent to any remote node)"},
         collMod: {
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
@@ -107,7 +107,7 @@
         copydb:
             {skip: "Not captured by the profiler; will be tested separately (TODO SERVER-33429)"},
         count: {
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             command: {count: collName, query: {x: 1}},
         },
@@ -154,7 +154,7 @@
             command: {delete: collName, deletes: [{q: {_id: 1}, limit: 1}]}
         },
         distinct: {
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             command: {distinct: collName, key: "x"},
         },
@@ -164,7 +164,7 @@
         dropDatabase:
             {skip: "Not captured by the profiler; will be tested separately (TODO SERVER-33429)"},
         dropIndexes: {
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
@@ -366,7 +366,7 @@
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
             },
-            sendsDbVersion: false,
+            sendsDbVersion: true,
             sendsShardVersion: true,
             command: {reIndex: collName},
             cleanUp: function(mongosConn) {

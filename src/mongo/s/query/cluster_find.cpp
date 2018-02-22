@@ -174,11 +174,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // Get the set of shards on which we will run the query.
 
     std::vector<std::shared_ptr<Shard>> shards;
-    if (primary) {
-        shards.emplace_back(std::move(primary));
-    } else {
-        invariant(chunkManager);
-
+    if (chunkManager) {
         std::set<ShardId> shardIds;
         chunkManager->getShardIdsForQuery(opCtx,
                                           query.getQueryRequest().getFilter(),
@@ -188,6 +184,8 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         for (auto id : shardIds) {
             shards.emplace_back(uassertStatusOK(shardRegistry->getShard(opCtx, id)));
         }
+    } else {
+        shards.emplace_back(std::move(primary));
     }
 
     // Construct the query and parameters.

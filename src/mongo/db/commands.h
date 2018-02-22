@@ -128,6 +128,7 @@ struct CommandHelpers {
             arg == "$clusterTime" ||                     //
             arg == "maxTimeMS" ||                        //
             arg == "readConcern" ||                      //
+            arg == "databaseVersion" ||                  //
             arg == "shardVersion" ||                     //
             arg == "tracking_info" ||                    //
             arg == "writeConcern" ||                     //

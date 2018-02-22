@@ -120,7 +120,10 @@ CatalogCache::~CatalogCache() = default;
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName) {
     try {
-        return {CachedDatabaseInfo(_getDatabase(opCtx, dbName))};
+        auto dbEntry = _getDatabase(opCtx, dbName);
+        auto primaryShard = uassertStatusOK(
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->primaryShardId));
+        return {CachedDatabaseInfo(std::move(dbEntry), std::move(primaryShard))};
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -148,17 +151,12 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
 
         auto it = collections.find(nss.ns());
         if (it == collections.end()) {
-            auto shardStatus =
-                Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->primaryShardId);
-            if (!shardStatus.isOK()) {
-                return {ErrorCodes::Error(40371),
-                        str::stream() << "The primary shard for collection " << nss.ns()
-                                      << " could not be loaded due to error "
-                                      << shardStatus.getStatus().toString()};
-            }
-
             return {CachedCollectionRoutingInfo(
-                dbEntry->primaryShardId, nss, std::move(shardStatus.getValue()))};
+                nss,
+                {dbEntry,
+                 uassertStatusOK(
+                     Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->primaryShardId))},
+                nullptr)};
         }
 
         auto& collEntry = it->second;
@@ -199,7 +197,12 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
             continue;
         }
 
-        return {CachedCollectionRoutingInfo(dbEntry->primaryShardId, collEntry.routingInfo)};
+        return {CachedCollectionRoutingInfo(
+            nss,
+            {dbEntry,
+             uassertStatusOK(
+                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->primaryShardId))},
+            collEntry.routingInfo)};
     }
 }
 
@@ -476,8 +479,9 @@ void CatalogCache::Stats::report(BSONObjBuilder* builder) const {
     builder->append("countFailedRefreshes", countFailedRefreshes.load());
 }
 
-CachedDatabaseInfo::CachedDatabaseInfo(std::shared_ptr<CatalogCache::DatabaseInfoEntry> db)
-    : _db(std::move(db)) {}
+CachedDatabaseInfo::CachedDatabaseInfo(std::shared_ptr<CatalogCache::DatabaseInfoEntry> db,
+                                       std::shared_ptr<Shard> primaryShard)
+    : _db(std::move(db)), _primaryShard(std::move(primaryShard)) {}
 
 const ShardId& CachedDatabaseInfo::primaryId() const {
     return _db->primaryShardId;
@@ -491,13 +495,9 @@ boost::optional<DatabaseVersion> CachedDatabaseInfo::databaseVersion() const {
     return _db->databaseVersion;
 }
 
-CachedCollectionRoutingInfo::CachedCollectionRoutingInfo(ShardId primaryId,
+CachedCollectionRoutingInfo::CachedCollectionRoutingInfo(NamespaceString nss,
+                                                         CachedDatabaseInfo db,
                                                          std::shared_ptr<ChunkManager> cm)
-    : _primaryId(std::move(primaryId)), _cm(std::move(cm)) {}
-
-CachedCollectionRoutingInfo::CachedCollectionRoutingInfo(ShardId primaryId,
-                                                         NamespaceString nss,
-                                                         std::shared_ptr<Shard> primary)
-    : _primaryId(std::move(primaryId)), _nss(std::move(nss)), _primary(std::move(primary)) {}
+    : _nss(std::move(nss)), _db(std::move(db)), _cm(std::move(cm)) {}
 
 }  // namespace mongo
