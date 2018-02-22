@@ -618,5 +618,26 @@ TEST_F(SessionTest, StashNotRequired) {
     ASSERT(!opCtx()->getWriteUnitOfWork());
 }
 
+TEST_F(SessionTest, CheckAutocommitOnlyAllowedAtBeginningOfTxn) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    Session session(sessionId);
+    session.refreshFromStorageIfNeeded(opCtx());
+
+    // Autocommit should be true by default
+    ASSERT(session.getAutocommit());
+
+    const TxnNumber txnNum = 100;
+    session.beginOrContinueTxn(opCtx(), txnNum, false);
+
+    // Autocommit should be set to false
+    ASSERT_FALSE(session.getAutocommit());
+
+    // Trying to set autocommit after the first statement of a transaction
+    // should throw an error.
+    ASSERT_THROWS_CODE(session.beginOrContinueTxn(opCtx(), txnNum, true),
+                       AssertionException,
+                       ErrorCodes::IllegalOperation);
+}
+
 }  // anonymous
 }  // namespace mongo
