@@ -198,6 +198,8 @@ void scheduleWork(executor::TaskExecutor* executor,
 
 }  // namespace
 
+MONGO_FP_DECLARE(hangBetweenAssigningUUIDsAndSetFCV);
+
 ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl(
     ServiceContext* service,
     DropPendingCollectionReaper* dropPendingCollectionReaper,
@@ -427,6 +429,7 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                 return schemaStatus;
             }
         }
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangBetweenAssigningUUIDsAndSetFCV);
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
     } catch (const DBException& ex) {
         return ex.toStatus();

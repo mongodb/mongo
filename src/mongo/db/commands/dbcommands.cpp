@@ -360,6 +360,12 @@ public:
         result.append("slowms", serverGlobalParams.slowMS);
         result.append("sampleRate", serverGlobalParams.sampleRate);
 
+        if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+            errmsg =
+                "profiling level cannot be set when featureCompatibilityVersion is uninitialized";
+            return false;
+        }
+
         if (!readOnly) {
             if (!db) {
                 // When setting the profiling level, create the database if it didn't already exist.
