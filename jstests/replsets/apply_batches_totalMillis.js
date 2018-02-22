@@ -53,11 +53,11 @@
     let timeAfterLarge = getTotalMillis(secondary);
     let deltaLarge = timeAfterLarge - timeAfterSmall;
 
-    // The two times should differ by a very noticeable factor.
-    deltaSmall = deltaSmall || 1;
-    assert(deltaLarge / deltaSmall >= 5,
-           `Expected totalMillis to reflect a difference of at least 5x. 
-           Recorded deltas: {small: ${deltaSmall}ms, large: ${deltaLarge}ms}.`);
+    jsTestLog(`Recorded deltas: {small: ${deltaSmall}ms, large: ${deltaLarge}ms}.`);
+
+    // We should have recorded at least as much time on the second load as we did on the first.
+    // This is a crude comparison that is only taken to check that the timer is used correctly.
+    assert(deltaLarge >= deltaSmall, "Expected a higher net totalMillis for the larger load.");
     rst.stopSet();
 
 })();
