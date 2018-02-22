@@ -54,8 +54,7 @@
 namespace mongo {
 namespace {
 
-void fassertOnRepeatedExecution(OperationContext* opCtx,
-                                const LogicalSessionId& lsid,
+void fassertOnRepeatedExecution(const LogicalSessionId& lsid,
                                 TxnNumber txnNumber,
                                 StmtId stmtId,
                                 const repl::OpTime& firstOpTime,
@@ -113,8 +112,7 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                 result.committedStatements.emplace(*entry.getStatementId(), entry.getOpTime());
             if (!insertRes.second) {
                 const auto& existingOpTime = insertRes.first->second;
-                fassertOnRepeatedExecution(opCtx,
-                                           lsid,
+                fassertOnRepeatedExecution(lsid,
                                            result.lastTxnRecord->getTxnNum(),
                                            *entry.getStatementId(),
                                            existingOpTime,
@@ -289,7 +287,7 @@ void Session::onWriteOpCompletedOnPrimary(OperationContext* opCtx,
         const auto stmtOpTime = _checkStatementExecuted(ul, txnNumber, stmtId);
         if (stmtOpTime) {
             fassertOnRepeatedExecution(
-                opCtx, _sessionId, txnNumber, stmtId, *stmtOpTime, lastStmtIdWriteOpTime);
+                _sessionId, txnNumber, stmtId, *stmtOpTime, lastStmtIdWriteOpTime);
         }
     }
 
@@ -622,66 +620,61 @@ void Session::_registerUpdateCacheOnCommit(OperationContext* opCtx,
                                            TxnNumber newTxnNumber,
                                            std::vector<StmtId> stmtIdsWritten,
                                            const repl::OpTime& lastStmtIdWriteOpTime) {
-    opCtx->recoveryUnit()->onCommit([
-        this,
-        opCtx,
-        newTxnNumber,
-        stmtIdsWritten = std::move(stmtIdsWritten),
-        lastStmtIdWriteOpTime
-    ] {
-        RetryableWritesStats::get(opCtx)->incrementTransactionsCollectionWriteCount();
+    opCtx->recoveryUnit()->onCommit(
+        [ this, newTxnNumber, stmtIdsWritten = std::move(stmtIdsWritten), lastStmtIdWriteOpTime ] {
+            RetryableWritesStats::get(getGlobalServiceContext())
+                ->incrementTransactionsCollectionWriteCount();
 
-        stdx::lock_guard<stdx::mutex> lg(_mutex);
+            stdx::lock_guard<stdx::mutex> lg(_mutex);
 
-        if (!_isValid)
-            return;
+            if (!_isValid)
+                return;
 
-        // The cache of the last written record must always be advanced after a write so that
-        // subsequent writes have the correct point to start from.
-        if (!_lastWrittenSessionRecord) {
-            _lastWrittenSessionRecord.emplace();
+            // The cache of the last written record must always be advanced after a write so that
+            // subsequent writes have the correct point to start from.
+            if (!_lastWrittenSessionRecord) {
+                _lastWrittenSessionRecord.emplace();
 
-            _lastWrittenSessionRecord->setSessionId(_sessionId);
-            _lastWrittenSessionRecord->setTxnNum(newTxnNumber);
-            _lastWrittenSessionRecord->setLastWriteOpTime(lastStmtIdWriteOpTime);
-        } else {
-            if (newTxnNumber > _lastWrittenSessionRecord->getTxnNum())
+                _lastWrittenSessionRecord->setSessionId(_sessionId);
                 _lastWrittenSessionRecord->setTxnNum(newTxnNumber);
-
-            if (lastStmtIdWriteOpTime > _lastWrittenSessionRecord->getLastWriteOpTime())
                 _lastWrittenSessionRecord->setLastWriteOpTime(lastStmtIdWriteOpTime);
-        }
+            } else {
+                if (newTxnNumber > _lastWrittenSessionRecord->getTxnNum())
+                    _lastWrittenSessionRecord->setTxnNum(newTxnNumber);
 
-        if (newTxnNumber > _activeTxnNumber) {
-            // This call is necessary in order to advance the txn number and reset the cached state
-            // in the case where just before the storage transaction commits, the cache entry gets
-            // invalidated and immediately refreshed while there were no writes for newTxnNumber
-            // yet. In this case _activeTxnNumber will be less than newTxnNumber and we will fail to
-            // update the cache even though the write was successful.
-            _beginOrContinueTxn(lg, newTxnNumber, boost::none);
-        }
+                if (lastStmtIdWriteOpTime > _lastWrittenSessionRecord->getLastWriteOpTime())
+                    _lastWrittenSessionRecord->setLastWriteOpTime(lastStmtIdWriteOpTime);
+            }
 
-        if (newTxnNumber == _activeTxnNumber) {
-            for (const auto stmtId : stmtIdsWritten) {
-                if (stmtId == kIncompleteHistoryStmtId) {
-                    _hasIncompleteHistory = true;
-                    continue;
-                }
+            if (newTxnNumber > _activeTxnNumber) {
+                // This call is necessary in order to advance the txn number and reset the cached
+                // state in the case where just before the storage transaction commits, the cache
+                // entry gets invalidated and immediately refreshed while there were no writes for
+                // newTxnNumber yet. In this case _activeTxnNumber will be less than newTxnNumber
+                // and we will fail to update the cache even though the write was successful.
+                _beginOrContinueTxn(lg, newTxnNumber, boost::none);
+            }
 
-                const auto insertRes =
-                    _activeTxnCommittedStatements.emplace(stmtId, lastStmtIdWriteOpTime);
-                if (!insertRes.second) {
-                    const auto& existingOpTime = insertRes.first->second;
-                    fassertOnRepeatedExecution(opCtx,
-                                               _sessionId,
-                                               newTxnNumber,
-                                               stmtId,
-                                               existingOpTime,
-                                               lastStmtIdWriteOpTime);
+            if (newTxnNumber == _activeTxnNumber) {
+                for (const auto stmtId : stmtIdsWritten) {
+                    if (stmtId == kIncompleteHistoryStmtId) {
+                        _hasIncompleteHistory = true;
+                        continue;
+                    }
+
+                    const auto insertRes =
+                        _activeTxnCommittedStatements.emplace(stmtId, lastStmtIdWriteOpTime);
+                    if (!insertRes.second) {
+                        const auto& existingOpTime = insertRes.first->second;
+                        fassertOnRepeatedExecution(_sessionId,
+                                                   newTxnNumber,
+                                                   stmtId,
+                                                   existingOpTime,
+                                                   lastStmtIdWriteOpTime);
+                    }
                 }
             }
-        }
-    });
+        });
 
     MONGO_FAIL_POINT_BLOCK(onPrimaryTransactionalWrite, customArgs) {
         const auto& data = customArgs.getData();
