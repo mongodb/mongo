@@ -90,7 +90,9 @@ public:
 
     Status removeIndex(OperationContext* opCtx, StringData indexName) final;
 
-    Status prepareForIndexBuild(OperationContext* opCtx, const IndexDescriptor* spec) final;
+    Status prepareForIndexBuild(OperationContext* opCtx,
+                                const IndexDescriptor* spec,
+                                bool isBackgroundSecondaryBuild) final;
 
     void indexBuildSuccess(OperationContext* opCtx, StringData indexName) final;
 

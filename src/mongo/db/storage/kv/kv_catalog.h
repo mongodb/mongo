@@ -75,7 +75,7 @@ public:
 
     std::string getIndexIdent(OperationContext* opCtx, StringData ns, StringData idName) const;
 
-    const BSONCollectionCatalogEntry::MetaData getMetaData(OperationContext* opCtx, StringData ns);
+    BSONCollectionCatalogEntry::MetaData getMetaData(OperationContext* opCtx, StringData ns) const;
     void putMetaData(OperationContext* opCtx,
                      StringData ns,
                      BSONCollectionCatalogEntry::MetaData& md);

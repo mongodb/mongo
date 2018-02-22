@@ -75,8 +75,14 @@ public:
 
     struct IndexMetaData {
         IndexMetaData() {}
-        IndexMetaData(BSONObj s, bool r, RecordId h, bool m, KVPrefix prefix)
-            : spec(s), ready(r), head(h), multikey(m), prefix(prefix) {}
+        IndexMetaData(
+            BSONObj s, bool r, RecordId h, bool m, KVPrefix prefix, bool isBackgroundSecondaryBuild)
+            : spec(s),
+              ready(r),
+              head(h),
+              multikey(m),
+              prefix(prefix),
+              isBackgroundSecondaryBuild(isBackgroundSecondaryBuild) {}
 
         void updateTTLSetting(long long newExpireSeconds);
 
@@ -89,6 +95,7 @@ public:
         RecordId head;
         bool multikey;
         KVPrefix prefix = KVPrefix::kNotPrefixed;
+        bool isBackgroundSecondaryBuild;
 
         // If non-empty, 'multikeyPaths' is a vector with size equal to the number of elements in
         // the index key pattern. Each element in the vector is an ordered set of positions

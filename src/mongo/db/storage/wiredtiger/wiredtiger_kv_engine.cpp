@@ -838,6 +838,10 @@ Status WiredTigerKVEngine::dropIdent(OperationContext* opCtx, StringData ident) 
         return Status::OK();
     }
 
+    if (ret == ENOENT) {
+        return Status::OK();
+    }
+
     invariantWTOK(ret);
     return Status::OK();
 }

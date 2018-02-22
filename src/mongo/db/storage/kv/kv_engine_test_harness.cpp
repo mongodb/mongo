@@ -250,7 +250,8 @@ TEST(KVCatalogTest, Idx1) {
                                                                        false,
                                                                        RecordId(),
                                                                        false,
-                                                                       KVPrefix::kNotPrefixed));
+                                                                       KVPrefix::kNotPrefixed,
+                                                                       false));
         catalog->putMetaData(&opCtx, "a.b", md);
         uow.commit();
     }
@@ -279,7 +280,8 @@ TEST(KVCatalogTest, Idx1) {
                                                                        false,
                                                                        RecordId(),
                                                                        false,
-                                                                       KVPrefix::kNotPrefixed));
+                                                                       KVPrefix::kNotPrefixed,
+                                                                       false));
         catalog->putMetaData(&opCtx, "a.b", md);
         uow.commit();
     }
@@ -326,7 +328,8 @@ TEST(KVCatalogTest, DirectoryPerDb1) {
                                                                        false,
                                                                        RecordId(),
                                                                        false,
-                                                                       KVPrefix::kNotPrefixed));
+                                                                       KVPrefix::kNotPrefixed,
+                                                                       false));
         catalog->putMetaData(&opCtx, "a.b", md);
         ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "a/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
@@ -370,7 +373,8 @@ TEST(KVCatalogTest, Split1) {
                                                                        false,
                                                                        RecordId(),
                                                                        false,
-                                                                       KVPrefix::kNotPrefixed));
+                                                                       KVPrefix::kNotPrefixed,
+                                                                       false));
         catalog->putMetaData(&opCtx, "a.b", md);
         ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "index/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
@@ -414,7 +418,8 @@ TEST(KVCatalogTest, DirectoryPerAndSplit1) {
                                                                        false,
                                                                        RecordId(),
                                                                        false,
-                                                                       KVPrefix::kNotPrefixed));
+                                                                       KVPrefix::kNotPrefixed,
+                                                                       false));
         catalog->putMetaData(&opCtx, "a.b", md);
         ASSERT_STRING_CONTAINS(catalog->getIndexIdent(&opCtx, "a.b", "foo"), "a/index/");
         ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(&opCtx, "a.b", "foo")));
@@ -463,7 +468,8 @@ TEST(KVCatalogTest, RestartForPrefixes) {
                                                                            false,
                                                                            RecordId(),
                                                                            false,
-                                                                           fooIndexPrefix));
+                                                                           fooIndexPrefix,
+                                                                           false));
             md.prefix = abCollPrefix;
             catalog->putMetaData(&opCtx, "a.b", md);
             uow.commit();

@@ -1,20 +1,34 @@
 /**
- * Starts a replica set, builds an index in background.
- * Kills the secondary with a failpoint once the index build starts.
- * It should *not* build an index on the secondary on restart.
+ * Starts a replica set, builds an index in background.  Kills the secondary with a failpoint once
+ * the index build starts.  It should *not* build an index on the secondary on restart due to
+ * `--noIndexBuildRetry` option being supplied.
  */
 
 // @tags: [requires_persistence, requires_journaling, requires_replication]
 (function() {
     'use strict';
 
+    // Assert that running `mongod` with `--noIndexBuildRetry` and `--replSet` does not startup.
+    {
+        // If code breaks the incompatibility between `--noIndexBuildRetry` and `--replSet`, using
+        // `notAStorageEngine` will cause a failure later in execution that returns a different
+        // exit code (100).
+        var process = MongoRunner.runMongod({
+            noIndexBuildRetry: "",
+            replSet: "rs0",
+            storageEngine: "notAStorageEngine",
+            waitForConnect: false
+        });
+        var exitCode = waitProgram(process.pid);
+        assert.eq(1, exitCode);
+    }
+
     // Skip db hash check because secondary will have different number of indexes due to the
     // --noIndexBuildRetry command line option.
     TestData.skipCheckDBHashes = true;
 
     // Set up replica set.
-    var replTest = new ReplSetTest(
-        {name: 'bgIndexNoRetry', nodes: 3, nodeOptions: {noIndexBuildRetry: "", syncdelay: 1}});
+    var replTest = new ReplSetTest({name: 'bgIndexNoRetry', nodes: 3});
     var nodenames = replTest.nodeList();
 
     var nodes = replTest.startSet();
@@ -61,7 +75,8 @@
     // that the index can be rebuilt on startup and this test is only for the one triggered by (A).
     secondDB.adminCommand({fsync: 1});
     replTest.stop(second, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL});
-    replTest.start(second, {}, /*restart*/ true, /*wait=*/true);
+    replTest.start(
+        second, {"noReplSet": true, "noIndexBuildRetry": ""}, /*restart*/ true, /*wait=*/false);
 
     // Make sure secondary comes back.
     assert.soon(function() {

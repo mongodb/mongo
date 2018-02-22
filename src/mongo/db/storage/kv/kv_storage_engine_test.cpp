@@ -125,7 +125,8 @@ public:
 
         DatabaseCatalogEntry* dbce = _storageEngine->getDatabaseCatalogEntry(opCtx, collNs.db());
         CollectionCatalogEntry* cce = dbce->getCollectionCatalogEntry(collNs.ns());
-        auto ret = cce->prepareForIndexBuild(opCtx, descriptor.get());
+        const bool isBackgroundSecondaryBuild = false;
+        auto ret = cce->prepareForIndexBuild(opCtx, descriptor.get(), isBackgroundSecondaryBuild);
         if (!ret.isOK()) {
             return ret;
         }

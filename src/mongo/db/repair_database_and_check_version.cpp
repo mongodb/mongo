@@ -44,6 +44,7 @@
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/quick_exit.h"
@@ -265,6 +266,17 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> swIndexesToRebuild =
             storageEngine->reconcileCatalogAndIdents(opCtx);
         fassertStatusOK(40593, swIndexesToRebuild);
+
+        if (!swIndexesToRebuild.getValue().empty() && serverGlobalParams.indexBuildRetry) {
+            log() << "note: restart the server with --noIndexBuildRetry "
+                  << "to skip index rebuilds";
+        }
+
+        if (!serverGlobalParams.indexBuildRetry) {
+            log() << "  not rebuilding interrupted indexes";
+            swIndexesToRebuild.getValue().clear();
+        }
+
         for (auto&& collIndexPair : swIndexesToRebuild.getValue()) {
             const std::string& coll = collIndexPair.first;
             const std::string& indexName = collIndexPair.second;

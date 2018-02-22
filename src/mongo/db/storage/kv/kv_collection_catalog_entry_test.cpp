@@ -97,7 +97,9 @@ public:
 
         {
             WriteUnitOfWork wuow(opCtx.get());
-            ASSERT_OK(getCollectionCatalogEntry()->prepareForIndexBuild(opCtx.get(), &desc));
+            const bool isSecondaryBackgroundIndexBuild = false;
+            ASSERT_OK(getCollectionCatalogEntry()->prepareForIndexBuild(
+                opCtx.get(), &desc, isSecondaryBackgroundIndexBuild));
             wuow.commit();
         }
 

@@ -178,11 +178,13 @@ Status KVCollectionCatalogEntry::removeIndex(OperationContext* opCtx, StringData
 }
 
 Status KVCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
-                                                      const IndexDescriptor* spec) {
+                                                      const IndexDescriptor* spec,
+                                                      bool isBackgroundSecondaryBuild) {
     MetaData md = _getMetaData(opCtx);
 
     KVPrefix prefix = KVPrefix::getNextPrefix(ns());
-    IndexMetaData imd(spec->infoObj(), false, RecordId(), false, prefix);
+    IndexMetaData imd(
+        spec->infoObj(), false, RecordId(), false, prefix, isBackgroundSecondaryBuild);
     if (indexTypeSupportsPathLevelMultikeyTracking(spec->getAccessMethodName())) {
         const auto feature =
             KVCatalog::FeatureTracker::RepairableFeature::kPathLevelMultikeyTracking;

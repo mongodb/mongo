@@ -110,7 +110,9 @@ public:
 
     virtual Status removeIndex(OperationContext* opCtx, StringData indexName) = 0;
 
-    virtual Status prepareForIndexBuild(OperationContext* opCtx, const IndexDescriptor* spec) = 0;
+    virtual Status prepareForIndexBuild(OperationContext* opCtx,
+                                        const IndexDescriptor* spec,
+                                        bool isBackgroundSecondaryBuild) = 0;
 
     virtual void indexBuildSuccess(OperationContext* opCtx, StringData indexName) = 0;
 

@@ -209,19 +209,26 @@ Status addMongodOptions(moe::OptionSection* options) {
                            "collections within a database into a shared record store.")
         .hidden();
 
+    // Only allow `noIndexBuildRetry` on standalones to quickly access data. Running with
+    // `noIndexBuildRetry` is risky in a live replica set. For example, trying to drop a
+    // collection that did not have its indexes rebuilt results in a crash.
     general_options
         .addOptionChaining("noIndexBuildRetry",
                            "noIndexBuildRetry",
                            moe::Switch,
                            "don't retry any index builds that were interrupted by shutdown")
-        .setSources(moe::SourceAllLegacy);
+        .setSources(moe::SourceAllLegacy)
+        .incompatibleWith("replication.replSet")
+        .incompatibleWith("replication.replSetName");
 
     general_options
         .addOptionChaining("storage.indexBuildRetry",
                            "",
                            moe::Bool,
                            "don't retry any index builds that were interrupted by shutdown")
-        .setSources(moe::SourceYAMLConfig);
+        .setSources(moe::SourceYAMLConfig)
+        .incompatibleWith("replication.replSet")
+        .incompatibleWith("replication.replSetName");
 
     storage_options
         .addOptionChaining("noprealloc",

@@ -289,8 +289,8 @@ Status NamespaceDetailsCollectionCatalogEntry::removeIndex(OperationContext* opC
     return Status::OK();
 }
 
-Status NamespaceDetailsCollectionCatalogEntry::prepareForIndexBuild(OperationContext* opCtx,
-                                                                    const IndexDescriptor* desc) {
+Status NamespaceDetailsCollectionCatalogEntry::prepareForIndexBuild(
+    OperationContext* opCtx, const IndexDescriptor* desc, bool isBackgroundSecondaryBuild) {
     BSONObj spec = desc->infoObj();
     // 1) entry in system.indexs
     // TODO SERVER-30638: using timestamp 0 for these inserts.

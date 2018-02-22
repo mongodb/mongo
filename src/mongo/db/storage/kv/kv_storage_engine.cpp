@@ -219,7 +219,7 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
         const auto& identForColl = _catalog->getCollectionIdent(coll);
         if (engineIdents.find(identForColl) == engineIdents.end()) {
             return {ErrorCodes::UnrecoverableRollbackError,
-                    str::stream() << "Expected collection does not exist. NS: " << coll
+                    str::stream() << "Expected collection does not exist. Collection: " << coll
                                   << " Ident: "
                                   << identForColl};
         }
@@ -227,20 +227,66 @@ KVStorageEngine::reconcileCatalogAndIdents(OperationContext* opCtx) {
 
     // Scan all indexes and return those in the catalog where the storage engine does not have the
     // corresponding ident. The caller is expected to rebuild these indexes.
+    //
+    // Also, remove unfinished builds except those that were background index builds started on a
+    // secondary.
     std::vector<CollectionIndexNamePair> ret;
     for (const auto& coll : collections) {
-        const BSONCollectionCatalogEntry::MetaData metaData = _catalog->getMetaData(opCtx, coll);
+        BSONCollectionCatalogEntry::MetaData metaData = _catalog->getMetaData(opCtx, coll);
+
+        // Batch up the indexes to remove them from `metaData` outside of the iterator.
+        std::vector<std::string> indexesToDrop;
         for (const auto& indexMetaData : metaData.indexes) {
             const std::string& indexName = indexMetaData.name();
             std::string indexIdent = _catalog->getIndexIdent(opCtx, coll, indexName);
-            if (engineIdents.find(indexIdent) != engineIdents.end()) {
+
+            const bool foundIdent = engineIdents.find(indexIdent) != engineIdents.end();
+            // An index drop will immediately remove the ident, but the `indexMetaData` catalog
+            // entry still exists implying the drop hasn't necessarily been replicated to a
+            // majority of nodes. The code will rebuild the index, despite potentially
+            // encountering another `dropIndex` command.
+            if (indexMetaData.ready && !foundIdent) {
+                log() << "Expected index data is missing, rebuilding. Collection: " << coll
+                      << " Index: " << indexName;
+                ret.emplace_back(coll, indexName);
                 continue;
             }
 
-            log() << "Expected index data is missing, rebuilding. NS: " << coll
-                  << " Index: " << indexName << " Ident: " << indexIdent;
+            // If the index was kicked off as a background secondary index build, replication
+            // recovery will not run into the oplog entry to recreate the index. If the index
+            // table is not found, or the index build did not successfully complete, this code
+            // will return the index to be rebuilt.
+            if (indexMetaData.isBackgroundSecondaryBuild && (!foundIdent || !indexMetaData.ready)) {
+                log()
+                    << "Expected background index build did not complete, rebuilding. Collection: "
+                    << coll << " Index: " << indexName;
+                ret.emplace_back(coll, indexName);
+                continue;
+            }
 
-            ret.push_back(CollectionIndexNamePair(coll, indexName));
+            // The last anomaly is when the index build did not complete, nor was the index build
+            // a secondary background index build. This implies the index build was on a primary
+            // and the `createIndexes` command never successfully returned, or the index build was
+            // a foreground secondary index build, meaning replication recovery will build the
+            // index when it replays the oplog. In these cases the index entry in the catalog
+            // should be dropped.
+            if (!indexMetaData.ready && !indexMetaData.isBackgroundSecondaryBuild) {
+                log() << "Dropping unfinished index. Collection: " << coll
+                      << " Index: " << indexName;
+                // Ensure the `ident` is dropped while we have the `indexIdent` value.
+                fassertStatusOK(50713, _engine->dropIdent(opCtx, indexIdent));
+                indexesToDrop.push_back(indexName);
+                continue;
+            }
+        }
+
+        for (auto&& indexName : indexesToDrop) {
+            dassert(metaData.eraseIndex(indexName));
+        }
+        if (indexesToDrop.size() > 0) {
+            WriteUnitOfWork wuow(opCtx);
+            _catalog->putMetaData(opCtx, coll, metaData);
+            wuow.commit();
         }
     }
 

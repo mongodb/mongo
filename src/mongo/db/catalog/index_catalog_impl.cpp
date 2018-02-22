@@ -60,6 +60,7 @@
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -405,7 +406,15 @@ Status IndexCatalogImpl::IndexBuildBlock::init() {
 
     /// ----------   setup on disk structures ----------------
 
-    Status status = _collection->getCatalogEntry()->prepareForIndexBuild(_opCtx, descriptor.get());
+    bool isBackgroundSecondaryBuild = false;
+    if (auto replCoord = repl::ReplicationCoordinator::get(_opCtx)) {
+        isBackgroundSecondaryBuild =
+            replCoord->getReplicationMode() == repl::ReplicationCoordinator::Mode::modeReplSet &&
+            replCoord->getMemberState().secondary() && _spec["background"].trueValue();
+    }
+
+    Status status = _collection->getCatalogEntry()->prepareForIndexBuild(
+        _opCtx, descriptor.get(), isBackgroundSecondaryBuild);
     if (!status.isOK())
         return status;
 

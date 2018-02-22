@@ -470,8 +470,8 @@ BSONObj KVCatalog::_findEntry(OperationContext* opCtx, StringData ns, RecordId* 
     return data.releaseToBson().getOwned();
 }
 
-const BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData(OperationContext* opCtx,
-                                                                  StringData ns) {
+BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData(OperationContext* opCtx,
+                                                            StringData ns) const {
     BSONObj obj = _findEntry(opCtx, ns);
     LOG(3) << " fetched CCE metadata: " << obj;
     BSONCollectionCatalogEntry::MetaData md;

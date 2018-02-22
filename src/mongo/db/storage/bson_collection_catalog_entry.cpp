@@ -278,6 +278,7 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {
 
             sub.append("head", static_cast<long long>(indexes[i].head.repr()));
             sub.append("prefix", indexes[i].prefix.toBSONValue());
+            sub.append("backgroundSecondary", indexes[i].isBackgroundSecondaryBuild);
             sub.doneFast();
         }
         arr.doneFast();
@@ -314,6 +315,9 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
             }
 
             imd.prefix = KVPrefix::fromBSONElement(idx["prefix"]);
+            auto bgSecondary = BSONElement(idx["backgroundSecondary"]);
+            // Opt-in to rebuilding behavior for old-format index catalog objects.
+            imd.isBackgroundSecondaryBuild = bgSecondary.eoo() || bgSecondary.trueValue();
             indexes.push_back(imd);
         }
     }
