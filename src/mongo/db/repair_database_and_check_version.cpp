@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -61,9 +62,10 @@ using std::endl;
 
 namespace {
 
-constexpr StringData upgradeLink = "http://dochub.mongodb.org/core/4.0-upgrade-fcv"_sd;
-constexpr StringData mustDowngradeErrorMsg =
-    "UPGRADE PROBLEM: The data files need to be fully upgraded to version 3.6 before attempting an upgrade to 4.0; see http://dochub.mongodb.org/core/4.0-upgrade-fcv for more details."_sd;
+const std::string mustDowngradeErrorMsg = str::stream()
+    << "UPGRADE PROBLEM: The data files need to be fully upgraded to version 3.6 before attempting "
+       "an upgrade to 4.0; see "
+    << feature_compatibility_version_documentation::kUpgradeLink << " for more details.";
 
 Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
                                                          const std::vector<std::string>& dbNames) {
@@ -426,7 +428,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
                                        "featureCompatibilityVersion document. The data files need "
                                        "to be fully upgraded to version 3.4 before attempting an "
                                        "upgrade to 3.6. If you are upgrading to 3.6, see "
-                                    << upgradeLink
+                                    << feature_compatibility_version_documentation::kUpgradeLink
                                     << "."};
                     }
                     fcvDocumentExists = true;

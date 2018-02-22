@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/util/version.h"
 
@@ -62,7 +63,7 @@ StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersion
                               << " in: "
                               << cmdObj
                               << ". See "
-                              << feature_compatibility_version::kDochubLink
+                              << feature_compatibility_version_documentation::kCompatibilityLink
                               << "."};
     }
 
@@ -78,7 +79,7 @@ StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersion
                                 << " in "
                                 << cmdObj
                                 << ". See "
-                                << feature_compatibility_version::kDochubLink
+                                << feature_compatibility_version_documentation::kCompatibilityLink
                                 << ".");
     }
 
@@ -96,7 +97,7 @@ StatusWith<std::string> FeatureCompatibilityVersionCommandParser::extractVersion
                               << " in: "
                               << cmdObj
                               << ". See "
-                              << feature_compatibility_version::kDochubLink
+                              << feature_compatibility_version_documentation::kCompatibilityLink
                               << "."};
     }
 

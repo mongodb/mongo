@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2016 MongoDB Inc.
+ *    Copyright (C) 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,33 +28,10 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/base/string_data.h"
-
 namespace mongo {
-
-class BSONObj;
-template <typename T>
-class StatusWith;
-
-class FeatureCompatibilityVersionCommandParser {
-public:
-    /**
-     * Known server release versions.
-     */
-    static constexpr StringData kVersion36 = "3.6"_sd;
-    static constexpr StringData kVersion40 = "4.0"_sd;
-    static constexpr StringData kVersionUpgradingTo40 = "upgrading to 4.0"_sd;
-    static constexpr StringData kVersionDowngradingTo36 = "downgrading to 3.6"_sd;
-    static constexpr StringData kVersionUnset = "Unset"_sd;
-
-    /**
-     * Interprets the specified BSON as a command and extracts the desired compatibility version
-     * from it.
-     */
-    static StatusWith<std::string> extractVersionFromCommand(StringData commandName,
-                                                             const BSONObj& cmdObj);
-};
-
-}  // namespace mongo
+namespace feature_compatibility_version_documentation {
+constexpr StringData kCompatibilityLink =
+    "http://dochub.mongodb.org/core/4.0-feature-compatibility"_sd;
+constexpr StringData kUpgradeLink = "http://dochub.mongodb.org/core/4.0-upgrade-fcv"_sd;
+}
+}

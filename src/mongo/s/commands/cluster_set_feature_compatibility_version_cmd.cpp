@@ -31,6 +31,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
+#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -73,7 +74,8 @@ public:
             << "\", then 4.0 features are disabled. If \""
             << FeatureCompatibilityVersionCommandParser::kVersion40
             << "\", then 4.0 features are enabled, and all nodes in the cluster must be version "
-            << "4.0. See " << feature_compatibility_version::kDochubLink << ".";
+            << "4.0. See " << feature_compatibility_version_documentation::kCompatibilityLink
+            << ".";
     }
 
     Status checkAuthForCommand(Client* client,

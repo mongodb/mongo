@@ -216,9 +216,18 @@ Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo s
             << server.maxWireVersion << ") is incompatible with client min wire version ("
             << client.minWireVersion << "," << client.maxWireVersion << ").";
         if (client.maxWireVersion < server.minWireVersion) {
-            return Status(ErrorCodes::IncompatibleWithUpgradedServer, errmsg);
+            return Status(ErrorCodes::IncompatibleWithUpgradedServer,
+                          str::stream()
+                              << errmsg
+                              << "You (client) are attempting to connect to a node (server) that "
+                                 "no longer accepts connections with your(client’s) binary "
+                                 "version.Please upgrade the client’s binary version.");
         }
-        return Status(ErrorCodes::IncompatibleServerVersion, errmsg);
+        return Status(ErrorCodes::IncompatibleServerVersion,
+                      str::stream() << errmsg << "You (client) are attempting to connect to a node "
+                                                 "(server) with a binary version with which "
+                                                 "you(client) no longer accept connections.Please "
+                                                 "upgrade the server’s binary version.");
     }
 
     return Status::OK();

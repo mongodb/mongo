@@ -33,6 +33,7 @@
 #include "mongo/db/commands/feature_compatibility_version.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
@@ -73,39 +74,40 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
         } else if (fieldName == FeatureCompatibilityVersion::kVersionField ||
                    fieldName == FeatureCompatibilityVersion::kTargetVersionField) {
             if (elem.type() != BSONType::String) {
-                return Status(ErrorCodes::TypeMismatch,
-                              str::stream() << fieldName
-                                            << " must be of type String, but was of type "
-                                            << typeName(elem.type())
-                                            << ". Contents of "
-                                            << FeatureCompatibilityVersion::kParameterName
-                                            << " document in "
-                                            << FeatureCompatibilityVersion::kCollection
-                                            << ": "
-                                            << featureCompatibilityVersionDoc
-                                            << ". See "
-                                            << feature_compatibility_version::kDochubLink
-                                            << ".");
+                return Status(
+                    ErrorCodes::TypeMismatch,
+                    str::stream() << fieldName << " must be of type String, but was of type "
+                                  << typeName(elem.type())
+                                  << ". Contents of "
+                                  << FeatureCompatibilityVersion::kParameterName
+                                  << " document in "
+                                  << FeatureCompatibilityVersion::kCollection
+                                  << ": "
+                                  << featureCompatibilityVersionDoc
+                                  << ". See "
+                                  << feature_compatibility_version_documentation::kCompatibilityLink
+                                  << ".");
             }
 
             if (elem.String() != FeatureCompatibilityVersionCommandParser::kVersion40 &&
                 elem.String() != FeatureCompatibilityVersionCommandParser::kVersion36) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream() << "Invalid value for " << fieldName << ", found "
-                                            << elem.String()
-                                            << ", expected '"
-                                            << FeatureCompatibilityVersionCommandParser::kVersion40
-                                            << "' or '"
-                                            << FeatureCompatibilityVersionCommandParser::kVersion36
-                                            << "'. Contents of "
-                                            << FeatureCompatibilityVersion::kParameterName
-                                            << " document in "
-                                            << FeatureCompatibilityVersion::kCollection
-                                            << ": "
-                                            << featureCompatibilityVersionDoc
-                                            << ". See "
-                                            << feature_compatibility_version::kDochubLink
-                                            << ".");
+                return Status(
+                    ErrorCodes::BadValue,
+                    str::stream() << "Invalid value for " << fieldName << ", found "
+                                  << elem.String()
+                                  << ", expected '"
+                                  << FeatureCompatibilityVersionCommandParser::kVersion40
+                                  << "' or '"
+                                  << FeatureCompatibilityVersionCommandParser::kVersion36
+                                  << "'. Contents of "
+                                  << FeatureCompatibilityVersion::kParameterName
+                                  << " document in "
+                                  << FeatureCompatibilityVersion::kCollection
+                                  << ": "
+                                  << featureCompatibilityVersionDoc
+                                  << ". See "
+                                  << feature_compatibility_version_documentation::kCompatibilityLink
+                                  << ".");
             }
 
             if (fieldName == FeatureCompatibilityVersion::kVersionField) {
@@ -114,16 +116,17 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
                 targetVersionString = elem.String();
             }
         } else {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Unrecognized field '" << fieldName << "'. Contents of "
-                                        << FeatureCompatibilityVersion::kParameterName
-                                        << " document in "
-                                        << FeatureCompatibilityVersion::kCollection
-                                        << ": "
-                                        << featureCompatibilityVersionDoc
-                                        << ". See "
-                                        << feature_compatibility_version::kDochubLink
-                                        << ".");
+            return Status(
+                ErrorCodes::BadValue,
+                str::stream() << "Unrecognized field '" << fieldName << "'. Contents of "
+                              << FeatureCompatibilityVersion::kParameterName
+                              << " document in "
+                              << FeatureCompatibilityVersion::kCollection
+                              << ": "
+                              << featureCompatibilityVersionDoc
+                              << ". See "
+                              << feature_compatibility_version_documentation::kCompatibilityLink
+                              << ".");
         }
     }
 
@@ -138,32 +141,33 @@ StatusWith<ServerGlobalParams::FeatureCompatibility::Version> FeatureCompatibili
     } else if (versionString == FeatureCompatibilityVersionCommandParser::kVersion40) {
         if (targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion40 ||
             targetVersionString == FeatureCompatibilityVersionCommandParser::kVersion36) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream() << "Invalid state for "
-                                        << FeatureCompatibilityVersion::kParameterName
-                                        << " document in "
-                                        << FeatureCompatibilityVersion::kCollection
-                                        << ": "
-                                        << featureCompatibilityVersionDoc
-                                        << ". See "
-                                        << feature_compatibility_version::kDochubLink
-                                        << ".");
+            return Status(
+                ErrorCodes::BadValue,
+                str::stream() << "Invalid state for " << FeatureCompatibilityVersion::kParameterName
+                              << " document in "
+                              << FeatureCompatibilityVersion::kCollection
+                              << ": "
+                              << featureCompatibilityVersionDoc
+                              << ". See "
+                              << feature_compatibility_version_documentation::kCompatibilityLink
+                              << ".");
         } else {
             version = ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40;
         }
     } else {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Missing required field '"
-                                    << FeatureCompatibilityVersion::kVersionField
-                                    << "''. Contents of "
-                                    << FeatureCompatibilityVersion::kParameterName
-                                    << " document in "
-                                    << FeatureCompatibilityVersion::kCollection
-                                    << ": "
-                                    << featureCompatibilityVersionDoc
-                                    << ". See "
-                                    << feature_compatibility_version::kDochubLink
-                                    << ".");
+                      str::stream()
+                          << "Missing required field '"
+                          << FeatureCompatibilityVersion::kVersionField
+                          << "''. Contents of "
+                          << FeatureCompatibilityVersion::kParameterName
+                          << " document in "
+                          << FeatureCompatibilityVersion::kCollection
+                          << ": "
+                          << featureCompatibilityVersionDoc
+                          << ". See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << ".");
     }
 
     return version;
@@ -308,7 +312,7 @@ void FeatureCompatibilityVersion::_validateVersion(StringData version) {
                           << "' or '"
                           << FeatureCompatibilityVersionCommandParser::kVersion36
                           << "'. See "
-                          << feature_compatibility_version::kDochubLink
+                          << feature_compatibility_version_documentation::kCompatibilityLink
                           << ".",
             version == FeatureCompatibilityVersionCommandParser::kVersion40 ||
                 version == FeatureCompatibilityVersionCommandParser::kVersion36);
@@ -394,18 +398,20 @@ public:
 
     virtual Status set(const BSONElement& newValueElement) {
         return Status(ErrorCodes::IllegalOperation,
-                      str::stream() << FeatureCompatibilityVersion::kParameterName
-                                    << " cannot be set via setParameter. See "
-                                    << feature_compatibility_version::kDochubLink
-                                    << ".");
+                      str::stream()
+                          << FeatureCompatibilityVersion::kParameterName
+                          << " cannot be set via setParameter. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << ".");
     }
 
     virtual Status setFromString(const std::string& str) {
         return Status(ErrorCodes::IllegalOperation,
-                      str::stream() << FeatureCompatibilityVersion::kParameterName
-                                    << " cannot be set via setParameter. See "
-                                    << feature_compatibility_version::kDochubLink
-                                    << ".");
+                      str::stream()
+                          << FeatureCompatibilityVersion::kParameterName
+                          << " cannot be set via setParameter. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << ".");
     }
 } featureCompatibilityVersionParameter;
 

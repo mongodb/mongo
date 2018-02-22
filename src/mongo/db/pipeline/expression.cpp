@@ -36,7 +36,7 @@
 #include <cstdio>
 #include <vector>
 
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
+#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -151,7 +151,7 @@ intrusive_ptr<Expression> Expression::parseExpression(
         // introduce a dependency cycle.
         str::stream() << opName
                       << " is not allowed in the current feature compatibility version. See "
-                      << feature_compatibility_version::kDochubLink
+                      << feature_compatibility_version_documentation::kCompatibilityLink
                       << " for more information.",
         !expCtx->maxFeatureCompatibilityVersion || !entry.requiredMinVersion ||
             (*entry.requiredMinVersion <= *expCtx->maxFeatureCompatibilityVersion));
@@ -1335,21 +1335,21 @@ intrusive_ptr<Expression> ExpressionDateFromString::parse(
             ErrorCodes::QueryFeatureNotAllowed,
             str::stream() << "\"format\" option to $dateFromString is not allowed with the current "
                              "feature compatibility version. See "
-                          << feature_compatibility_version::kDochubLink
+                          << feature_compatibility_version_documentation::kCompatibilityLink
                           << " for more information.",
             !formatElem);
         uassert(
             ErrorCodes::QueryFeatureNotAllowed,
             str::stream() << "\"onNull\" option to $dateFromString is not allowed with the current "
                              "feature compatibility version. See "
-                          << feature_compatibility_version::kDochubLink
+                          << feature_compatibility_version_documentation::kCompatibilityLink
                           << " for more information.",
             !onNullElem);
         uassert(ErrorCodes::QueryFeatureNotAllowed,
                 str::stream()
                     << "\"onError\" option to $dateFromString is not allowed with the current "
                        "feature compatibility version. See "
-                    << feature_compatibility_version::kDochubLink
+                    << feature_compatibility_version_documentation::kCompatibilityLink
                     << " for more information.",
                 !onErrorElem);
     }
@@ -1684,14 +1684,14 @@ intrusive_ptr<Expression> ExpressionDateToString::parse(
             ErrorCodes::QueryFeatureNotAllowed,
             str::stream() << "\"onNull\" option to $dateToString is not allowed with the current "
                              "feature compatibility version. See "
-                          << feature_compatibility_version::kDochubLink
+                          << feature_compatibility_version_documentation::kCompatibilityLink
                           << " for more information.",
             !onNullElem);
 
         uassert(ErrorCodes::QueryFeatureNotAllowed,
                 str::stream() << "\"format\" option to $dateToString is required with the current "
                                  "feature compatibility version. See "
-                              << feature_compatibility_version::kDochubLink
+                              << feature_compatibility_version_documentation::kCompatibilityLink
                               << " for more information.",
                 formatElem);
     }

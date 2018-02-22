@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
+#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -89,7 +90,7 @@ public:
           << FeatureCompatibilityVersionCommandParser::kVersion40
           << "\", then 4.0 features are enabled, and all nodes in the cluster must be binary "
              "version 4.0. See "
-          << feature_compatibility_version::kDochubLink << ".";
+          << feature_compatibility_version_documentation::kCompatibilityLink << ".";
         return h.str();
     }
 
