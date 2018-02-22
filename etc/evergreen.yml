@@ -59,71 +59,17 @@ variables:
   depends_on:
   - name: compile_all
 
-# Used to list modules to retrieve from GitHub and apply patches if necessary.
-- &git_get_project
-  command: git.get_project
-  params: &git_get_project_params
-    directory: src
-    revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
-      enterprise: ${enterprise_rev}
-      rocksdb: ${rocksdb_rev}
-      wtdevelop: ${wtdevelop_rev}
-
-- &generate_compile_expansions
-  command: shell.exec
-  params:
-    working_dir: src
-    script: |
-      set -o errexit
-      set -o verbose
-
-      # We get the raw version string (r1.2.3-45-gabcdef) from git
-      MONGO_VERSION=$(git describe)
-      # If this is a patch build, we add the patch version id to the version string so we know
-      # this build was a patch, and which evergreen task it came from
-      if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "false" ]; then
-        MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
-      fi
-
-      ${activate_virtualenv}
-      # shared scons cache testing
-      # if 'scons_cache_scope' enabled and project level 'disable_shared_scons_cache' is not true
-      # 'scons_cache_scope' is set on a per variant basis
-      # 'disable_shared_scons_cache' is set on a project level and applies to all variants
-
-      # Shared - if scons_cache_scope is set, then use new shared scons cache settings
-      if [ ! -z ${scons_cache_scope} ]; then
-
-        if [ "${disable_shared_scons_cache}" = "true" ]; then
-
-          echo "SCons Cache disabled. All shared scons settings will be ignored"
-          scons_cache_scope=none
-
-        else
-          scons_cache_scope=${scons_cache_scope}
-        fi
-
-        if [ $scons_cache_scope = "shared" ]; then
-          echo "Shared cache - mounting file system"
-          sudo mount /efs || mount /efs
-        fi
-
-        echo "Shared Cache with setting: ${scons_cache_scope}"
-        MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
-
-      # Legacy Expansion generation
-      else
-        echo "Using legacy expansion generation"
-        # Proceed with regular expansions generated
-        # This script converts the generated version string into a sanitized version string for
-        # use by scons and uploading artifacts as well as information about for the scons cache.
-        MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
-      fi
-
-- &apply_compile_expansions
-  command: expansions.update
-  params:
-    file: src/compile_expansions.yml
+- &benchmark_template
+  name: benchmark_template
+  depends_on:
+  - name: compile_benchmarks
+  commands:
+  - func: "do benchmark setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --help
+      run_multiple_jobs: false
+  - func: "send benchmark results"
 
 - &jepsen_config_vars
   jepsen_key_time_limit: --key-time-limit 15
@@ -227,11 +173,21 @@ variables:
   mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path}
   mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1\"
 
+
 #######################################
 #            Functions                #
 #######################################
 
 functions:
+
+  "git get project" : &git_get_project
+    command: git.get_project
+    params:
+      directory: ${git_project_directory|src}
+      revisions: # for each module include revision as <module_name> : ${<module_name>_rev}
+        enterprise: ${enterprise_rev}
+        rocksdb: ${rocksdb_rev}
+        wtdevelop: ${wtdevelop_rev}
 
   "fetch artifacts" : &fetch_artifacts
     command: s3.get
@@ -288,6 +244,15 @@ functions:
           echo "The mongo version is $mongo_ver, expected version is $bin_ver"
           exit 1
         fi
+
+  "fetch benchmarks" : &fetch_benchmarks
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${project}/${build_variant}/${revision}/benchmarks/${build_id}.tgz
+      bucket: mciuploads
+      extract_to: src
 
   "get buildnumber" : &get_buildnumber
     command: keyval.inc
@@ -698,6 +663,13 @@ functions:
   - *monitor_process_threads
   - *collect_system_resource_info
 
+  "do benchmark setup" :
+  - *git_get_project
+  - *update_bypass_expansions
+  - *get_buildnumber
+  - *set_up_credentials
+  - *fetch_benchmarks
+
   "set up virtualenv" :
     command: shell.exec
     type: test
@@ -868,6 +840,85 @@ functions:
           if [ -f run_tests_system_failure ]; then
             exit $(cat run_tests_system_failure)
           fi
+
+  "scons compile" :
+    command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
+          exit 0
+        fi
+        rm -rf ${install_directory|/data/mongo-install-directory}
+
+        extra_args=""
+        if [ ${targets} = "all" ] && [ -n "${num_scons_compile_all_jobs_available|}" ]; then
+          echo "Changing SCons to run with --jobs=${num_scons_compile_all_jobs_available|}"
+          extra_args="$extra_args --jobs=${num_scons_compile_all_jobs_available|}"
+        fi
+
+        ${activate_virtualenv}
+        ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations $extra_args ${targets} ${additional_targets|} MONGO_VERSION=${version}
+
+  "generate compile expansions" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        # We get the raw version string (r1.2.3-45-gabcdef) from git
+        MONGO_VERSION=$(git describe)
+        # If this is a patch build, we add the patch version id to the version string so we know
+        # this build was a patch, and which evergreen task it came from
+        if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "false" ]; then
+          MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+        fi
+
+        ${activate_virtualenv}
+        # shared scons cache testing
+        # if 'scons_cache_scope' enabled and project level 'disable_shared_scons_cache' is not true
+        # 'scons_cache_scope' is set on a per variant basis
+        # 'disable_shared_scons_cache' is set on a project level and applies to all variants
+
+        # Shared - if scons_cache_scope is set, then use new shared scons cache settings
+        if [ ! -z ${scons_cache_scope} ]; then
+
+          if [ "${disable_shared_scons_cache}" = "true" ]; then
+
+            echo "SCons Cache disabled. All shared scons settings will be ignored"
+            scons_cache_scope=none
+
+          else
+            scons_cache_scope=${scons_cache_scope}
+          fi
+
+          if [ $scons_cache_scope = "shared" ]; then
+            echo "Shared cache - mounting file system"
+            sudo mount /efs || mount /efs
+          fi
+
+          echo "Shared Cache with setting: ${scons_cache_scope}"
+          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+
+        # Legacy Expansion generation
+        else
+          echo "Using legacy expansion generation"
+          # Proceed with regular expansions generated
+          # This script converts the generated version string into a sanitized version string for
+          # use by scons and uploading artifacts as well as information about for the scons cache.
+          MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+        fi
+
+  "apply compile expansions" :
+    command: expansions.update
+    params:
+      file: src/compile_expansions.yml
 
   "do jepsen setup" :
     - command: shell.exec
@@ -2388,7 +2439,7 @@ tasks:
   depends_on: []
   commands:
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project"
     - func: "get modified patch files"
     # NOTE: To disable the compile bypass feature, comment out the next line.
     - func: "bypass compile and fetch binaries"
@@ -2398,10 +2449,12 @@ tasks:
     - func: "build new tools" # noop if ${newtools} is not "true"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
-    - *generate_compile_expansions
+    - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions
-    - *apply_compile_expansions
-
+    - func: "apply compile expansions"
+    - func: "scons compile"
+      vars:
+        targets: core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|}
     - command: shell.exec
       type: test
       params:
@@ -2413,10 +2466,6 @@ tasks:
           if [ "${is_patch}" = "true" ] && [ "${bypass_compile|false}" = "true" ]; then
             exit 0
           fi
-          rm -rf ${install_directory|/data/mongo-install-directory}
-
-          ${activate_virtualenv}
-          ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations core tools dbtest integration_tests dist dist-debugsymbols distsrc-${ext|tgz} ${msi_target|} MONGO_VERSION=${version}
 
           mv mongodb-src-*.${ext|tgz} distsrc.${ext|tgz}
           mv mongodb-*-debugsymbols.${ext|tgz} mongo-debugsymbols.tgz || true
@@ -2557,7 +2606,7 @@ tasks:
 - name: compile_all
   commands:
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project"
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "build new tools" # noop if ${newtools} is not "true"
@@ -2565,29 +2614,12 @@ tasks:
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
     - func: "setup android toolchain" # noop if ${setup_android_toolchain} is not "true"
     - func: "build cdriver" # noop if ${build_cdriver} is not "true"
-    - *generate_compile_expansions
+    - func: "generate compile expansions"
     # Then we load the generated version data into the agent so we can use it in task definitions.
-    - *apply_compile_expansions
-
-    - command: shell.exec
-      type: test
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-
-          rm -rf ${install_directory|/data/mongo-install-directory}
-
-          extra_args=""
-          if [ -n "${num_scons_compile_all_jobs_available|}" ]; then
-            echo "Changing SCons to run with --jobs=${num_scons_compile_all_jobs_available|}"
-            extra_args="$extra_args --jobs=${num_scons_compile_all_jobs_available|}"
-          fi
-
-          ${activate_virtualenv}
-          ${compile_env|} $python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} --use-new-tools --build-mongoreplay="${build_mongoreplay}" --detect-odr-violations $extra_args all benchmarks ${additional_targets|} MONGO_VERSION=${version}
-
+    - func: "apply compile expansions"
+    - func: "scons compile"
+      vars:
+        targets: all
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -2618,12 +2650,48 @@ tasks:
     - func: "scons cache pruning"
     - func: "umount shared scons directory"
 
+- name: compile_benchmarks
+  depends_on: []
+  commands:
+    - command: manifest.load
+    - func: "git get project"
+    - func: "get buildnumber"
+    - func: "set up credentials"
+    - func: "build new tools" # noop if ${newtools} is not "true"
+    - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+    - func: "generate compile expansions"
+    # Then we load the generated version data into the agent so we can use it in task definitions
+    - func: "apply compile expansions"
+    - func: "scons compile"
+      vars:
+        targets: benchmarks
+    - command: archive.targz_pack
+      params:
+        target: "benchmarks.tgz"
+        source_dir: "src"
+        include:
+          - "./build/benchmarks.txt"
+          - "./build/**_bm"
+          - "./build/**_bm.gcno"
+          - "./build/**_bm.exe"
+          - "./build/**_bm.pdb"
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: benchmarks.tgz
+        remote_file: ${project}/${build_variant}/${revision}/benchmarks/${build_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: application/tar
+        display_name: Benchmarks
+
 ## lint ##
 - name: lint
   depends_on: []
   commands:
     - command: manifest.load
-    - *git_get_project
+    - func: "git get project"
     - command: shell.exec
       type: test
       params:
@@ -2640,13 +2708,12 @@ tasks:
   depends_on:
   - name: compile
   commands:
-  - <<: *git_get_project
+  - func: "git get project"
     # The repository is cloned in a directory distinct from src for the modified test detection
     # because the extraction of the artifacts performed in the 'do setup' causes
     # 'git diff --name-only' to see all tests as modified on Windows (git 1.9.5). See SERVER-30634.
-    params:
-      <<: *git_get_project_params
-      directory: burn_in_tests_clonedir
+    vars:
+      git_project_directory: burn_in_tests_clonedir
   - func: "do setup"
   - command: shell.exec
     params:
@@ -2676,6 +2743,15 @@ tasks:
       resmoke_wrapper: $python buildscripts/burn_in_tests.py --testListFile=jstests/new_tests.json
       resmoke_args: --repeat=2
       run_multiple_jobs: true
+
+- <<: *benchmark_template
+  name: benchmarks_orphaned
+  commands:
+  - func: "do benchmark setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=benchmarks
+      run_multiple_jobs: false
 
 - <<: *run_jepsen_template
   name: jepsen_register_findAndModify_WT
@@ -4194,7 +4270,7 @@ tasks:
         bucket: mciuploads
         local_file: src/distsrc.${ext|tgz}
         build_variants: [ linux-64, windows-64-2k8-ssl ]
-    - *apply_compile_expansions
+    - func: "apply compile expansions"
     - func: "fetch debugsymbols archive"
     - func: "set up remote credentials"
       vars:
@@ -4633,7 +4709,7 @@ tasks:
 - name: fetch_test_lifecycle
   depends_on: []
   commands:
-  - *git_get_project
+  - func: "git get project"
   - func: "fetch test_lifecycle.yml"
     vars:
       # This task is meant to fail if there is an error while fetching test_lifecycle.yml since
@@ -4644,7 +4720,7 @@ tasks:
   exec_timeout_secs: 21600 # 6 hour timeout for the task overall
   depends_on: []
   commands:
-  - *git_get_project
+  - func: "git get project"
   - command: shell.exec
     timeout_secs: 14400 # Timeout if there is no output for 4 hours
     type: test
@@ -5956,9 +6032,13 @@ buildvariants:
   - name: compile_all
     distros:
     - windows-64-vs2015-large
+  - name: compile_benchmarks
+    distros:
+    - windows-64-vs2015-large
   - name: burn_in_tests
   - name: audit
   - name: auth_audit
+  - name: benchmarks_orphaned
   - name: dbtest
   - name: ese
   - name: external_auth
@@ -6561,6 +6641,9 @@ buildvariants:
   - name: compile_all
     distros:
     - rhel62-large
+  - name: compile_benchmarks
+    distros:
+    - rhel62-large
   - name: lint
   - name: burn_in_tests
   - name: rollback_fuzzer
@@ -6575,6 +6658,9 @@ buildvariants:
   - name: audit
   - name: auth
   - name: auth_audit
+  - name: benchmarks_orphaned
+    distros:
+    - centos6-perf
   - name: bulk_gle_passthrough
   - name: causally_consistent_jscore_passthrough
   - name: causally_consistent_jscore_passthrough_auth
@@ -6870,9 +6956,13 @@ buildvariants:
   - name: compile_all
     distros:
     - rhel70
+  - name: compile_benchmarks
+    distros:
+    - rhel70
   - name: audit
   - name: auth
   - name: auth_audit
+  - name: benchmarks_orphaned
   - name: dbtest
   - name: ese
   - name: jsCore
