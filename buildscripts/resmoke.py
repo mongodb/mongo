@@ -134,7 +134,7 @@ def find_suites_by_test(suites):
     """
 
     memberships = {}
-    test_membership = resmokelib.parser.create_test_membership_map()
+    test_membership = resmokelib.suitesconfig.create_test_membership_map()
     for suite in suites:
         for test in suite.tests:
             memberships[test] = test_membership[test]
@@ -142,7 +142,7 @@ def find_suites_by_test(suites):
 
 
 def _list_suites_and_exit(logger, exit_code=0):
-    suite_names = resmokelib.parser.get_named_suites()
+    suite_names = resmokelib.suitesconfig.get_named_suites()
     logger.info("Suites available to execute:\n%s", "\n".join(suite_names))
     sys.exit(exit_code)
 
@@ -168,7 +168,9 @@ class Main(object):
         Returns a list of resmokelib.testing.suite.Suite instances to execute.
         """
 
-        return resmokelib.parser.get_suites(self.__values, self.__args)
+        return resmokelib.suitesconfig.get_suites(
+            suite_files=self.__values.suite_files.split(","),
+            test_files=self.__args)
 
     def run(self):
         """
