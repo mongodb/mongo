@@ -90,7 +90,7 @@ public:
      * transaction resources while minimizing the critical section between generating a new
      * timestamp and setting it using setTimestamp.
      */
-    virtual void prepareSnapshot() {}
+    virtual void preallocateSnapshot() {}
 
     /**
      * Informs this RecoveryUnit that all future reads through it should be from a snapshot

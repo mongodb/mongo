@@ -179,7 +179,7 @@ void WiredTigerRecoveryUnit::abandonSnapshot() {
     _areWriteUnitOfWorksBanned = false;
 }
 
-void WiredTigerRecoveryUnit::prepareSnapshot() {
+void WiredTigerRecoveryUnit::preallocateSnapshot() {
     // Begin a new transaction, if one is not already started.
     getSession();
 }

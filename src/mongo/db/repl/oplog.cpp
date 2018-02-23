@@ -155,7 +155,7 @@ void _getNextOpTimes(OperationContext* opCtx,
     }
 
     // Allow the storage engine to start the transaction outside the critical section.
-    opCtx->recoveryUnit()->prepareSnapshot();
+    opCtx->recoveryUnit()->preallocateSnapshot();
     stdx::lock_guard<stdx::mutex> lk(newOpMutex);
 
     auto ts = LogicalClock::get(opCtx)->reserveTicks(count).asTimestamp();

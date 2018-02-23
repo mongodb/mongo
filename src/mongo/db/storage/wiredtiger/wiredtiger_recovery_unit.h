@@ -70,7 +70,7 @@ public:
     void registerChange(Change* change) override;
 
     void abandonSnapshot() override;
-    void prepareSnapshot() override;
+    void preallocateSnapshot() override;
 
     Status setReadFromMajorityCommittedSnapshot() override;
     bool isReadingFromMajorityCommittedSnapshot() const override {
