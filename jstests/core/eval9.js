@@ -1,3 +1,4 @@
+// @tags: [requires_eval_command]
 
 a = [1, "asd", null, [2, 3], new Date(), {x: 1}];
 

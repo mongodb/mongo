@@ -1,5 +1,7 @@
-// Basic tests for a form of stack recursion that's been shown to cause C++
-// side stack overflows in the past. See SERVER-19614.
+// Basic tests for a form of stack recursion that's been shown to cause C++ side stack overflows in
+// the past. See SERVER-19614.
+//
+// @tags: [requires_eval_command]
 
 (function() {
     "use strict";

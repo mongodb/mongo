@@ -6,6 +6,8 @@
  * - Confirm that writes can progress after fsyncUnlock
  * - Confirm that the command can be run repeatedly without breaking things
  * - Confirm that the pseudo commands and eval can perform fsyncLock/Unlock
+ *
+ * @tags: [requires_eval_command]
  */
 (function() {
     "use strict";

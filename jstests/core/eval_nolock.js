@@ -1,3 +1,4 @@
+// @tags: [requires_eval_command]
 
 t = db.eval_nolock;
 t.drop();

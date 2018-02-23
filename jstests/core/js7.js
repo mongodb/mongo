@@ -1,3 +1,5 @@
+// @tags: [requires_eval_command]
+
 t = db.jstests_js7;
 t.drop();
 

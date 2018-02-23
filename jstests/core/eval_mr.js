@@ -1,4 +1,6 @@
 // Test that the eval command can't be used to invoke the mapReduce command.  SERVER-17889.
+//
+// @tags: [requires_eval_command]
 (function() {
     "use strict";
     db.eval_mr.drop();

@@ -1,4 +1,4 @@
-
+// @tags: [requires_eval_command]
 assert.eq(17,
           db.eval(function() {
               return 11 + 6;

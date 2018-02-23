@@ -3,70 +3,47 @@ selector:
     roots:
     - jstests/core/*.js
     exclude_files:
-    # Tests that won't work with an injected 'majority' readConcern
-    # and/or an injected 'majority' writeConcern. Where a function is
-    # listed the reason is we don't have a reliable solution to override
-    # the write concern for that function.
-    - jstests/core/batch_write_command*.js # these tests use various write concerns
-    - jstests/core/bench_test*.js # benchRun() used for writes
-    - jstests/core/capped_update.js # uses godinsert and can't run under replication.
-    - jstests/core/crud_api.js # has specific w:0 tests
-    - jstests/core/error2.js # db.eval() used
-    - jstests/core/eval0.js # db.eval() used
-    - jstests/core/eval1.js # db.eval() used
-    - jstests/core/eval3.js # db.eval() used
-    - jstests/core/eval4.js # db.eval() used
-    - jstests/core/eval5.js # db.eval() used
-    - jstests/core/eval6.js # db.eval() used
-    - jstests/core/eval7.js # db.eval() used
-    - jstests/core/eval9.js # db.eval() used
-    - jstests/core/evala.js # db.eval() used
-    - jstests/core/evalb.js # db.eval() used
-    - jstests/core/evalc.js # db.eval() used
-    - jstests/core/evald.js # db.eval() used
-    - jstests/core/evale.js # db.eval() used
-    - jstests/core/evalg.js # db.eval() used
-    - jstests/core/eval_mr.js # db.eval() used
-    - jstests/core/eval_nolock.js # db.eval() used
-    - jstests/core/geo_s2cursorlimitskip.js # drops system.profile collection and counts ops.
-    - jstests/core/js3.js # db.dbEval() used
-    - jstests/core/js7.js # db.eval() used
-    - jstests/core/js9.js # db.eval() used
-    - jstests/core/mr_merge.js # mr temp tables aren't replicated
-    - jstests/core/mr_merge2.js # mr temp tables aren't replicated
-    - jstests/core/mr_outreduce.js # mr temp tables aren't replicated
-    - jstests/core/mr_outreduce2.js # mr temp tables aren't replicated
-    - jstests/core/opcounters_active.js  # off by n problem with opcounters
-    - jstests/core/opcounters_write_cmd.js # off by n problem with opcounters
-    - jstests/core/profile1.js # system.profile not replicated
-    - jstests/core/profile2.js # system.profile not replicated
-    - jstests/core/profile3.js # system.profile not replicated
-    - jstests/core/profile4.js # system.profile not replicated
-    - jstests/core/profile5.js # system.profile not replicated
-    - jstests/core/read_after_optime.js # verifies read after optime fails on standalone
-    - jstests/core/remove8.js # db.eval() used
-    - jstests/core/rename4.js # db.eval() used
-    - jstests/core/shell1.js # tests setSlaveOk() variations on standalone mongod
-    - jstests/core/shellkillop.js # db.eval() used
-    - jstests/core/shell_writeconcern.js # checks write concern shell helpers
-    - jstests/core/storefunc.js # db.eval() used
-    - jstests/core/write_result.js # Tests invalid writeConcern, we shouldn't override.
-    # Tests that need triaging & remediation | blacklist decision
-    # Comments list possible problem point under review.
-    - jstests/core/capped6.js # Uses captrunc test command.
-    - jstests/core/convert_to_capped_nonexistant.js # Uses convertToCapped and captrunc command.
-    - jstests/core/stages_delete.js # Uses stageDebug command for deletes.
-
+    # These tests are not expected to pass with replica-sets:
+    - jstests/core/dbadmin.js
+    - jstests/core/opcounters_write_cmd.js
+    - jstests/core/read_after_optime.js
+    - jstests/core/capped_update.js
+    # These tests use benchRun(), which isn't configured to use the overridden writeConcern.
+    - jstests/core/bench_test*.js
+    exclude_with_any_tags:
+    ##
+    # The next three tags correspond to the special errors thrown by the
+    # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+    # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to
+    # be warranted.
+    ##
+    # "Cowardly refusing to override read concern of command: ..."
+    - assumes_read_concern_unchanged
+    # "Cowardly refusing to override write concern of command: ..."
+    - assumes_write_concern_unchanged
+    # "Cowardly refusing to run test with overridden write concern when it uses a command that can
+    #  only perform w=1 writes: ..."
+    - requires_eval_command
 
 executor:
   js_test:
     config:
       shell_options:
-        eval: "var testingReplication = true; load('jstests/libs/override_methods/set_majority_read_and_write_concerns.js');"
+        global_vars:
+          TestData:
+            defaultReadConcernLevel: majority
+        eval: >-
+          var testingReplication = true;
+          load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         readMode: commands
     hooks:
-    - class: ValidateCollections
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
     - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
     fixture:
       class: ReplicaSetFixture
       mongod_options:

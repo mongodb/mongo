@@ -1,6 +1,8 @@
 //
 // Tests the behavior of single writes using write commands
 //
+// @tags: [assumes_write_concern_unchanged]
+//
 
 var coll = db.write_result;
 coll.drop();

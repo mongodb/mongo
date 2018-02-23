@@ -1,4 +1,6 @@
 // Tests whether the geospatial search is stable under btree updates
+//
+// @tags: [assumes_write_concern_unchanged]
 
 var coll = db.getCollection("jstests_geo_update_btree");
 coll.drop();
