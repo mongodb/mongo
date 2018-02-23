@@ -1,0 +1,8 @@
+test_kind: benchmark_test
+
+selector:
+  root: build/benchmarks.txt
+  # TODO: SERVER-33203 Add path glob for canary tests.
+
+executor:
+  config: {}
