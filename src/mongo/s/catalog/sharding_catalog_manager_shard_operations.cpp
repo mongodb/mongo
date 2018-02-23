@@ -340,16 +340,26 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                     << " as a shard: "
                                     << status.reason());
     }
-    if (((serverGlobalParams.featureCompatibility.getVersion() ==
-          ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) &&
-         maxWireVersion < WireVersion::LATEST_WIRE_VERSION) ||
-        ((serverGlobalParams.featureCompatibility.getVersion() !=
-          ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36) &&
-         maxWireVersion < WireVersion::LATEST_WIRE_VERSION - 1)) {
-        return {ErrorCodes::IncompatibleServerVersion,
-                str::stream() << "Cannot add " << connectionString.toString()
-                              << " as a shard because its binary version is not compatible with "
-                                 "the cluster's featureCompatibilityVersion."};
+
+    switch (serverGlobalParams.featureCompatibility.getVersion()) {
+        case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36:
+        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36:
+        case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo34:
+            if (maxWireVersion < WireVersion::LATEST_WIRE_VERSION) {
+                return {ErrorCodes::IncompatibleServerVersion,
+                        str::stream() << "Cannot add " << connectionString.toString()
+                                      << " as a shard because its binary version is below the "
+                                         "cluster's feature compatibility version."};
+            }
+            break;
+        default:
+            if (maxWireVersion < WireVersion::LATEST_WIRE_VERSION - 1) {
+                return {ErrorCodes::IncompatibleServerVersion,
+                        str::stream() << "Cannot add " << connectionString.toString()
+                                      << " as a shard because its binary version is below the "
+                                         "cluster's feature compatibility version."};
+            }
+            break;
     }
 
     // Check whether there is a master. If there isn't, the replica set may not have been
@@ -660,18 +670,28 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return batchResponseStatus;
     }
 
-    // The featureCompatibilityVersion should be the same throughout the cluster. We don't
-    // explicitly send writeConcern majority to the added shard, because a 3.4 mongod will reject
-    // it (setFCV did not support writeConcern until 3.6), and a 3.6 mongod will still default to
-    // majority writeConcern.
+    // Since addShard runs under the fcvLock, it is guaranteed the fcv state won't change, but it's
+    // possible an earlier setFCV failed partway, so we handle all possible fcv states. Note, if
+    // the state is upgrading (downgrading), a user cannot switch to downgrading (upgrading) without
+    // first finishing the upgrade (downgrade).
     //
-    // TODO SERVER-32045: propagate the user's writeConcern
-    auto versionResponse = _runCommandForAddShard(
-        opCtx,
-        targeter.get(),
-        "admin",
-        BSON(FeatureCompatibilityVersion::kCommandName << FeatureCompatibilityVersion::toString(
-                 serverGlobalParams.featureCompatibility.getVersion())));
+    // Note, we don't explicitly send writeConcern majority to the added shard, because a 3.4 mongod
+    // will reject it (setFCV did not support writeConcern until 3.6), and a 3.6 mongod will still
+    // default to majority writeConcern.
+    // TODO SERVER-32045: propagate the user's writeConcern.
+    BSONObj setFCVCmd;
+    switch (serverGlobalParams.featureCompatibility.getVersion()) {
+        case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo36:
+        case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo36:
+            setFCVCmd = BSON(FeatureCompatibilityVersion::kCommandName
+                             << FeatureCompatibilityVersionCommandParser::kVersion36);
+            break;
+        default:
+            setFCVCmd = BSON(FeatureCompatibilityVersion::kCommandName
+                             << FeatureCompatibilityVersionCommandParser::kVersion34);
+            break;
+    }
+    auto versionResponse = _runCommandForAddShard(opCtx, targeter.get(), "admin", setFCVCmd);
     if (!versionResponse.isOK()) {
         return versionResponse.getStatus();
     }
