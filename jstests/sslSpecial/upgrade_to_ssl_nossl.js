@@ -9,7 +9,15 @@
 
 load("jstests/ssl/libs/ssl_helpers.js");
 
-var rst = new ReplSetTest({name: 'sslSet', nodes: 3, nodeOptions: {sslMode: "disabled"}});
+var rst = new ReplSetTest({
+    name: 'sslSet',
+    nodes: [
+        {},
+        {},
+        {rsConfig: {priority: 0}},
+    ],
+    nodeOptions: {sslMode: "disabled"}
+});
 rst.startSet();
 rst.initiate();
 
