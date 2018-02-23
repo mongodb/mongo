@@ -3996,7 +3996,7 @@ tasks:
       <<: *powercycle_test
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 
-- name: powercycle_fcv3.4
+- name: powercycle_fcv3.6
   exec_timeout_secs: 7200 # 2 hour timeout for the task overall
   depends_on:
   - name: compile
@@ -4014,7 +4014,7 @@ tasks:
     vars:
       <<: *powercycle_test
       client_options: --numCrudClients=20 --numFsmClients=20
-      mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path} --fcv=3.4
+      mongod_options: --mongodUsablePorts ${standard_port} ${secret_port} --dbPath=${db_path} --logPath=${log_path} --fcv=3.6
       mongod_extra_options: --mongodOptions=\"--setParameter enableTestCommands=1 --storageEngine wiredTiger\"
 
 - name: powercycle_replication
@@ -5144,7 +5144,7 @@ buildvariants:
   - name: replica_sets_auth
   - name: replica_sets_jscore_passthrough
   - name: powercycle
-  - name: powercycle_fcv3.4
+  - name: powercycle_fcv3.6
   - name: powercycle_replication
   - name: powercycle_replication_smalloplog
   - name: powercycle_syncdelay
@@ -6115,7 +6115,7 @@ buildvariants:
   - name: parallel
   - name: parallel_compatibility
   - name: powercycle
-  - name: powercycle_fcv3.4
+  - name: powercycle_fcv3.6
   - name: powercycle_replication
   - name: powercycle_syncdelay
   - name: read_concern_linearizable_passthrough
