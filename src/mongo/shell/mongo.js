@@ -249,7 +249,7 @@ connect = function(url, user, pass) {
 
     chatty("connecting to: " + url);
     var m = new Mongo(url);
-    db = m.getDB(m.defaultDB);
+    var db = m.getDB(m.defaultDB);
 
     if (user && pass) {
         if (!db.auth(user, pass)) {
