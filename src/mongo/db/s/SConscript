@@ -12,8 +12,11 @@ env.Library(
     target='sharding_api_d',
     source=[
         'collection_metadata.cpp',
+        'database_sharding_state.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/decorable',
         '$BUILD_DIR/mongo/db/range_arithmetic',
         '$BUILD_DIR/mongo/s/sharding_routing_table',
     ],

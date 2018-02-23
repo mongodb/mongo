@@ -51,7 +51,7 @@ namespace mongo {
  * The semantics for a const Database are that you can mutate individual collections but not add or
  * remove them.
  */
-class Database {
+class Database : public Decorable<Database> {
 public:
     typedef StringMap<Collection*> CollectionMap;
 
