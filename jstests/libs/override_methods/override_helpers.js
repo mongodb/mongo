@@ -42,9 +42,13 @@ var OverrideHelpers = (function() {
             var newCode;
             if (typeof jsCode === "function") {
                 // Load the override file and immediately invoke the supplied function.
+                // clang-format off
                 newCode = `load("${overrideFile}"); (${jsCode})();`;
+                // clang-format on
             } else {
+                // clang-format off
                 newCode = `load("${overrideFile}"); ${jsCode};`;
+                // clang-format on
             }
 
             return startParallelShellOriginal(newCode, port, noConnect);
@@ -62,7 +66,8 @@ var OverrideHelpers = (function() {
             // represents an OP_QUERY find on that collection. We skip calling overrideFunc() in
             // this case because the operation doesn't represent a command.
             if (!(collection instanceof DBCollection &&
-                  (collection.getName() === "$cmd" || collection.getName().startsWith("$cmd.")))) {
+                      (collection.getName() === "$cmd" ||
+                       collection.getName().startsWith("$cmd.")))) {
                 return DBQueryOriginal.apply(this, arguments);
             }
 
@@ -83,9 +88,10 @@ var OverrideHelpers = (function() {
         };
 
         // Copy any properties (e.g. DBQuery.Option) that are set on DBQueryOriginal.
-        Object.keys(DBQueryOriginal).forEach(function(key) {
-            DBQuery[key] = DBQueryOriginal[key];
-        });
+        Object.keys(DBQueryOriginal)
+            .forEach(function(key) {
+                DBQuery[key] = DBQueryOriginal[key];
+            });
 
         Mongo.prototype.runCommand = function(dbName, commandObj, options) {
             const commandName = Object.keys(commandObj)[0];

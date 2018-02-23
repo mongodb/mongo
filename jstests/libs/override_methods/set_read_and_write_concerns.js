@@ -12,7 +12,9 @@
             " property on the global TestData object");
     }
 
-    const kDefaultReadConcern = {level: TestData.defaultReadConcernLevel};
+    const kDefaultReadConcern = {
+        level: TestData.defaultReadConcernLevel
+    };
     const kDefaultWriteConcern =
         (TestData.hasOwnProperty("defaultWriteConcern")) ? TestData.defaultWriteConcern : {
             w: "majority",
