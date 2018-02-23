@@ -36,7 +36,7 @@ namespace mongo {
 class OperationContext;
 
 /**
- * Must be invoked whenever code, which is executing on a shard encounters a StaleConfing exception
+ * Must be invoked whenever code, which is executing on a shard encounters a StaleConfig exception
  * and should be passed the 'version received' from the exception. If the shard's current version is
  * behind 'shardVersionReceived', causes the shard's filtering metadata to be refreshed from the
  * config server, otherwise does nothing and immediately returns. If there are other threads
@@ -47,8 +47,10 @@ class OperationContext;
  * NOTE: Does network I/O and acquires collection lock on the specified namespace, so it must not be
  * called with a lock
  *
- * NOTE: None of the callers of this function expect it to throw and it will be invalid to do so,
- * hence the noexcept qualifier.
+ * NOTE: This method is not expected to throw, because it is used in places where StaleConfig
+ * exception was just caught and if it were to throw, it would overwrite any accumulated command
+ * execution state in the response. This is specifically problematic for write commands, which are
+ * expected to return the set of write batch entries that succeeded.
  */
 Status onShardVersionMismatch(OperationContext* opCtx,
                               const NamespaceString& nss,

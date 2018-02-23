@@ -58,9 +58,15 @@ Status onShardVersionMismatch(OperationContext* opCtx,
 
     ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
 
-    // Ensure any ongoing migrations have completed
-    auto& oss = OperationShardingState::get(opCtx);
-    oss.waitForMigrationCriticalSectionSignal(opCtx);
+    // Ensure any ongoing migrations have completed before trying to do the refresh. This wait is
+    // just an optimization so that MongoS does not exhaust its maximum number of StaleConfig retry
+    // attempts while the migration is being committed.
+    try {
+        auto& oss = OperationShardingState::get(opCtx);
+        oss.waitForMigrationCriticalSectionSignal(opCtx);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 
     const auto currentShardVersion = [&] {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
