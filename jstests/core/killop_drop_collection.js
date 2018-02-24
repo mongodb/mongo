@@ -3,6 +3,8 @@
  * to complete. Interrupting a collection drop could leave the database in an inconsistent state.
  * This test confirms that killOp won't interrupt a collection drop, and that the drop occurs
  * successfully.
+ *
+ * @tags: [requires_parallel_shell]
  */
 (function() {
     "use strict";

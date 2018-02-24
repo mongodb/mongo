@@ -1,5 +1,7 @@
 // Ensures that find and modify will not apply an update to a document which, due to a concurrent
 // modification, no longer matches the query predicate.
+//
+// @tags: [requires_parallel_shell]
 (function() {
     "use strict";
 

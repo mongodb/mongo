@@ -1,4 +1,6 @@
 // Test killop applied to m/r operations and child ops of m/r operations.
+//
+// @tags: [requires_parallel_shell]
 
 t = db.jstests_mr_killop;
 t.drop();

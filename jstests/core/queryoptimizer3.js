@@ -1,4 +1,6 @@
 // Check cases where index scans are aborted due to the collection being dropped.  SERVER-4400
+//
+// @tags: [requires_parallel_shell]
 
 t = db.jstests_queryoptimizer3;
 t.drop();

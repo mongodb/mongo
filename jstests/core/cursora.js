@@ -1,3 +1,4 @@
+// @tags: [requires_parallel_shell]
 t = db.cursora;
 
 function run(n, atomic) {

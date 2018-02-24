@@ -57,6 +57,31 @@
         "updateUser",
     ]);
 
+    const kCommandsToEmulateWriteConcern = new Set([
+        "aggregate",
+        "appendOplogNote",
+        "captrunc",
+        "cleanupOrphaned",
+        "clone",
+        "cloneCollection",
+        "cloneCollectionAsCapped",
+        "convertToCapped",
+        "copydb",
+        "create",
+        "createIndexes",
+        "drop",
+        "dropDatabase",
+        "dropIndexes",
+        "emptycapped",
+        "godinsert",
+        "mapReduce",
+        "mapreduce",
+        "mapreduce.shardedfinish",
+        "moveChunk",
+        "renameCollection",
+        "revokePrivilegesFromRole",
+    ]);
+
     function runCommandWithReadAndWriteConcerns(
         conn, dbName, commandName, commandObj, func, makeFuncArgs) {
         if (typeof commandObj !== "object" || commandObj === null) {
@@ -79,10 +104,7 @@
 
         var shouldForceReadConcern = kCommandsSupportingReadConcern.has(commandName);
         var shouldForceWriteConcern = kCommandsSupportingWriteConcern.has(commandName);
-        var shouldEmulateWriteConcern =
-            (commandName === "aggregate" || commandName === "createIndexes" ||
-             commandName === "mapReduce" || commandName === "mapreduce" ||
-             commandName === "mapreduce.shardedfinish");
+        var shouldEmulateWriteConcern = kCommandsToEmulateWriteConcern.has(commandName);
 
         if (commandName === "aggregate") {
             if (OverrideHelpers.isAggregationWithOutStage(commandName, commandObjUnwrapped)) {

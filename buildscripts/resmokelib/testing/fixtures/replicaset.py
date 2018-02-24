@@ -30,7 +30,9 @@ class ReplicaSetFixture(interface.ReplFixture):
                  preserve_dbpath=False,
                  num_nodes=2,
                  auth_options=None,
-                 replset_config_options=None):
+                 replset_config_options=None,
+                 voting_secondaries=False,
+                 use_replica_set_connection_string=False):
 
         interface.ReplFixture.__init__(self, logger, job_num)
 
@@ -40,6 +42,8 @@ class ReplicaSetFixture(interface.ReplFixture):
         self.num_nodes = num_nodes
         self.auth_options = auth_options
         self.replset_config_options = utils.default_if_none(replset_config_options, {})
+        self.voting_secondaries = voting_secondaries
+        self.use_replica_set_connection_string = use_replica_set_connection_string
 
         # The dbpath in mongod_options is used as the dbpath prefix for replica set members and
         # takes precedence over other settings. The ShardedClusterFixture uses this parameter to
@@ -78,10 +82,13 @@ class ReplicaSetFixture(interface.ReplFixture):
         # Initiate the replica set.
         members = []
         for (i, node) in enumerate(self.nodes):
-            member_info = {"_id": i, "host": node.get_connection_string()}
+            member_info = {"_id": i, "host": node.get_internal_connection_string()}
             if i > 0:
                 member_info["priority"] = 0
-                member_info["votes"] = 0
+                if i >= 7 or not self.voting_secondaries:
+                    # Only 7 nodes in a replica set can vote, so the other members must still be
+                    # non-voting when this fixture is configured to have voting secondaries.
+                    member_info["votes"] = 0
             members.append(member_info)
         initiate_cmd_obj = {"replSetInitiate": {"_id": self.replset_name, "members": members}}
 
@@ -182,9 +189,23 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         return logging.loggers.new_logger(logger_name, parent=self.logger)
 
-    def get_connection_string(self):
+    def get_internal_connection_string(self):
         if self.replset_name is None:
-            raise ValueError("Must call setup() before calling get_connection_string()")
+            raise ValueError("Must call setup() before calling get_internal_connection_string()")
 
-        conn_strs = [node.get_connection_string() for node in self.nodes]
+        conn_strs = [node.get_internal_connection_string() for node in self.nodes]
         return self.replset_name + "/" + ",".join(conn_strs)
+
+    def get_driver_connection_url(self):
+        if self.replset_name is None:
+            raise ValueError("Must call setup() before calling get_driver_connection_url()")
+
+        if self.use_replica_set_connection_string:
+            # The mongo shell requires the database name when specifying a replica set connection
+            # string, so we hardcode "test" because that's the default database anyway.
+            conn_strs = [node.get_internal_connection_string() for node in self.nodes]
+            return "mongodb://" + ",".join(conn_strs) + "/test?replicaSet=" + self.replset_name
+        else:
+            # We return a direct connection to the expected pimary when only the first node is
+            # electable because we want the client to error out if a stepdown occurs.
+            return self.nodes[0].get_driver_connection_url()

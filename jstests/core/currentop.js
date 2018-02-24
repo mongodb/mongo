@@ -1,5 +1,7 @@
 /**
  * Tests that long-running operations show up in currentOp and report the locks they are holding.
+ *
+ * @tags: [requires_parallel_shell]
  */
 (function() {
     "use strict";

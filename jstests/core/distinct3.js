@@ -1,4 +1,6 @@
 // Yield and delete test case for query optimizer cursor.  SERVER-4401
+//
+// @tags: [requires_parallel_shell]
 
 t = db.jstests_distinct3;
 t.drop();

@@ -1,0 +1,93 @@
+test_kind: js_test
+
+selector:
+  js_test:
+    roots:
+    - jstests/core/**/*.js
+    exclude_files:
+    # These tests are not expected to pass with replica-sets:
+    - jstests/core/dbadmin.js
+    - jstests/core/opcounters_write_cmd.js
+    - jstests/core/read_after_optime.js
+    - jstests/core/capped_update.js
+    # These tests do not expect the mongo shell to be using a replica set connection string.
+    - jstests/core/bench_test*.js
+    - jstests/core/connection_string_validation.js
+    # The bypass_doc_validation.js test runs an applyOps command that causes the primary to generate
+    # an oplog entry without having applied the write. We skip this test to avoid causing a dbhash
+    # mismatch.
+    - jstests/core/bypass_doc_validation.js
+    # These tests use DBCommandCursor which doesn't correctly route getMore and killCursors
+    # commands to the original server the cursor was established on (prior to SERVER-23219).
+    - jstests/core/find_getmore_bsonsize.js
+    - jstests/core/find_getmore_cmd.js
+    - jstests/core/getmore_cmd_maxtimems.js
+    - jstests/core/kill_cursors.js
+    - jstests/core/list_collections1.js
+    - jstests/core/list_indexes.js
+    # These tests attempt to read from the "system.profile" collection, which may be missing entries
+    # if a write was performed on the primary of the replica set instead.
+    - jstests/core/*profile*.js
+    # The shellkillop.js test spawns a parallel shell without using startParallelShell() and
+    # therefore doesn't inherit the w="majority" write concern when performing its writes.
+    - jstests/core/shellkillop.js
+    exclude_with_any_tags:
+    ##
+    # The next three tags correspond to the special errors thrown by the
+    # set_read_and_write_concerns.js override when it refuses to replace the readConcern or
+    # writeConcern of a particular command. Above each tag are the message(s) that cause the tag to
+    # be warranted.
+    ##
+    # "Cowardly refusing to override read concern of command: ..."
+    - assumes_read_concern_unchanged
+    # "Cowardly refusing to override write concern of command: ..."
+    - assumes_write_concern_unchanged
+    # "Cowardly refusing to run test with overridden write concern when it uses a command that can
+    #  only perform w=1 writes: ..."
+    - requires_eval_command
+    ##
+    # The next two tags corresponds to the special error thrown by the
+    # set_read_preference_secondary.js override when it refuses to replace the readPreference of a
+    # particular command. Above each tag are the message(s) that cause the tag to be warranted.
+    ##
+    # "Cowardly refusing to override read preference of command: ..."
+    # "Cowardly refusing to run test with overridden read preference when it reads from a
+    #  non-replicated collection: ..."
+    - assumes_read_preference_unchanged
+    # "Cowardly refusing to a run a test that starts a parallel shell because prior to MongoDB 3.4
+    #  replica set connections couldn't be used in it."
+    - requires_parallel_shell
+
+executor:
+  js_test:
+    config:
+      shell_options:
+        global_vars:
+          TestData:
+            defaultReadConcernLevel: local
+        eval: >-
+          testingReplication = true;
+          load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+          load('jstests/libs/override_methods/set_read_preference_secondary.js');
+        # We use --readMode=legacy because until MongoDB 3.4, DBCommandCursor wouldn't route the
+        # getMore and killCursors operations to the original server the cursor was established on.
+        readMode: legacy
+      use_connection_string: true
+    hooks:
+    # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+    # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+    # validating the entire contents of the collection.
+    - class: CheckReplDBHash
+    - class: ValidateCollections
+    - class: CleanEveryN
+      n: 20
+    fixture:
+      class: ReplicaSetFixture
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1
+      # This suite requires w="majority" writes to be applied on all secondaries. By using a 2-node
+      # replica set and having secondaries vote, the majority of the replica set is all nodes.
+      num_nodes: 2
+      voting_secondaries: true
+      use_replica_set_connection_string: true

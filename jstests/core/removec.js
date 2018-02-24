@@ -1,4 +1,6 @@
 // Sanity test for removing documents with adjacent index keys.  SERVER-2008
+//
+// @tags: [requires_parallel_shell]
 
 t = db.jstests_removec;
 t.drop();

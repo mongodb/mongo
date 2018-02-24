@@ -1,5 +1,6 @@
-
 // Test db.loadServerScripts()
+//
+// @tags: [requires_parallel_shell]
 
 var testdb = db.getSisterDB("loadserverscripts");
 

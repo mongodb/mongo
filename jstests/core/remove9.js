@@ -1,4 +1,6 @@
 // SERVER-2009 Count odd numbered entries while updating and deleting even numbered entries.
+//
+// @tags: [requires_parallel_shell]
 
 t = db.jstests_remove9;
 t.drop();

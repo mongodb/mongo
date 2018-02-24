@@ -3,8 +3,17 @@
 t = db.mr_optim;
 t.drop();
 
+// We drop the output collection to ensure the test can be run multiple times successfully. We
+// explicitly avoid using the DBCollection#drop() shell helper to avoid implicitly sharding the
+// collection during the sharded_collections_jscore_passthrough.yml test suite when reading the
+// results from the output collection in the reformat() function.
+var res = db.runCommand({drop: "mr_optim_out"});
+if (res.ok !== 1) {
+    assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+}
+
 for (var i = 0; i < 1000; ++i) {
-    t.save({a: Math.random(1000), b: Math.random(10000)});
+    assert.writeOK(t.save({a: Math.random(1000), b: Math.random(10000)}));
 }
 
 function m() {
@@ -21,7 +30,7 @@ function reformat(r) {
     if (r.results)
         cursor = r.results;
     else
-        cursor = r.find();
+        cursor = r.find().sort({_id: 1});
     cursor.forEach(function(z) {
         x[z._id] = z.value;
     });

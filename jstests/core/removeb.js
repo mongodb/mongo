@@ -1,4 +1,6 @@
 // Test removal of Records that have been reused since the remove operation began.  SERVER-5198
+//
+// @tags: [requires_parallel_shell]
 
 t = db.jstests_removeb;
 t.drop();
