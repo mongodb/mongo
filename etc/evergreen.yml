@@ -1026,7 +1026,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
+      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1 --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -1035,7 +1035,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=gle_auth --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -1062,7 +1062,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
+      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1 --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -1071,7 +1071,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -1126,7 +1126,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1
+      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=mmapv1 --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -1137,7 +1137,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=sharding_gle_auth_basics_passthrough --shellWriteMode=legacy --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -1228,7 +1228,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=mmapv1
+      resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=mmapv1 --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -1239,7 +1239,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger
+      resmoke_args: --suites=core --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -1513,7 +1513,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility
+      resmoke_args: --suites=sharding_jscore_passthrough --storageEngine=wiredTiger --shellReadMode=legacy --shellWriteMode=compatibility --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
 
 - <<: *task_template
@@ -1544,7 +1544,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=mmapv1
+      resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=mmapv1 --excludeWithAnyTags=requires_find_command
 
 - <<: *task_template
   name: parallel_compatibility_WT
@@ -1554,7 +1554,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger
+      resmoke_args: --suites=parallel --shellReadMode=legacy --shellWriteMode=compatibility --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
 
 - <<: *task_template
   name: concurrency
@@ -1793,7 +1793,7 @@ tasks:
   - func: "do setup"
   - func: "run tests"
     vars:
-      resmoke_args: --suites=sharding --shellReadMode=legacy --storageEngine=wiredTiger
+      resmoke_args: --suites=sharding --shellReadMode=legacy --storageEngine=wiredTiger --excludeWithAnyTags=requires_find_command
       run_multiple_jobs: true
 
 - <<: *task_template
