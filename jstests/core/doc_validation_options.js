@@ -1,3 +1,4 @@
+// @tags: [requires_collmod_command]
 (function() {
     "use strict";
 

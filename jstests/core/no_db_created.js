@@ -1,4 +1,6 @@
 // checks that operations do not create a database
+//
+// @tags: [requires_collmod_command]
 
 (function() {
     "use strict";

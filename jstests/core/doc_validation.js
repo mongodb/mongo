@@ -1,4 +1,6 @@
 // Test basic inserts and updates with document validation.
+//
+// @tags: [requires_collmod_command]
 (function() {
     "use strict";
 

@@ -2,6 +2,8 @@
 //
 // Tests that a collMod with a bad specification does not cause any changes, and does not crash the
 // server.
+//
+// @tags: [requires_collmod_command]
 (function() {
     "use strict";
 

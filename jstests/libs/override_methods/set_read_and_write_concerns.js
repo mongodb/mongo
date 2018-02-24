@@ -69,6 +69,7 @@
         "copydb",
         "create",
         "createIndexes",
+        "deleteIndexes",
         "drop",
         "dropDatabase",
         "dropIndexes",
@@ -96,7 +97,7 @@
             commandName = Object.keys(commandObjUnwrapped)[0];
         }
 
-        if (commandName === "eval" || commandName === "$eval") {
+        if (commandName === "collMod" || commandName === "eval" || commandName === "$eval") {
             throw new Error("Cowardly refusing to run test with overridden write concern when it" +
                             " uses a command that can only perform w=1 writes: " +
                             tojson(commandObj));

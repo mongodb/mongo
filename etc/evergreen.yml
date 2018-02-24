@@ -1650,6 +1650,17 @@ tasks:
       run_multiple_jobs: true
 
 - <<: *task_template
+  name: write_concern_majority_passthrough_WT
+  depends_on:
+  - name: jsCore_WT
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=write_concern_majority_passthrough --storageEngine=wiredTiger
+      run_multiple_jobs: true
+
+- <<: *task_template
   name: replicasets
   commands:
   - func: "do setup"
@@ -2544,6 +2555,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
 
 - name: linux-64-repeated-execution
@@ -2682,6 +2694,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 - name: linux-64-duroff
   display_name: Linux (No Journal)
@@ -3567,6 +3580,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70
@@ -3666,6 +3680,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 - name: enterprise-windows-64
   display_name: "* Enterprise Windows"
@@ -4085,6 +4100,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70
@@ -4365,6 +4381,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: package
     distros:
     - ubuntu1604-packer
@@ -4557,6 +4574,7 @@ buildvariants:
   # - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
   - name: push
     distros:
     - rhel70
@@ -6027,6 +6045,7 @@ buildvariants:
   - name: tool
   - name: tool_WT
   - name: unittests
+  - name: write_concern_majority_passthrough_WT
 
 - name: ubuntu1604-asan
   display_name: ~ ASAN SSL Ubuntu 16.04
