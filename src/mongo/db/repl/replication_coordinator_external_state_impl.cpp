@@ -409,28 +409,6 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                                waitForAllEarlierOplogWritesToBeVisible(opCtx);
                            });
 
-        // Set UUIDs for all non-replicated collections. This is necessary for independent replica
-        // sets and config server replica sets started with no data files because collections in
-        // local are created prior to the featureCompatibilityVersion being set to 3.6, so the
-        // collections are not created with UUIDs. We exclude ShardServers when adding UUIDs to
-        // non-replicated collections on the primary because ShardServers are started up by default
-        // with featureCompatibilityVersion 3.4, so we don't want to assign UUIDs to them until the
-        // cluster's featureCompatibilityVersion is explicitly set to 3.6 by the config server. The
-        // below UUID addition for non-replicated collections only occurs on the primary; UUIDs are
-        // added to non-replicated collections on secondaries during InitialSync. When the config
-        // server sets the featureCompatibilityVersion to 3.6, the shard primary will add UUIDs to
-        // all the collections that need them. One special case here is if a shard is already in
-        // featureCompatibilityVersion 3.6 and a new node is started up with --shardsvr and added to
-        // that shard, the new node will still start up with featureCompatibilityVersion 3.4 and
-        // need to have UUIDs added to each collection. These UUIDs are added during InitialSync,
-        // because the new node is a secondary.
-        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
-            FeatureCompatibilityVersion::isCleanStartUp()) {
-            auto schemaStatus = updateUUIDSchemaVersionNonReplicated(opCtx, true);
-            if (!schemaStatus.isOK()) {
-                return schemaStatus;
-            }
-        }
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
     } catch (const DBException& ex) {
         return ex.toStatus();

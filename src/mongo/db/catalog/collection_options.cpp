@@ -41,8 +41,6 @@
 
 namespace mongo {
 
-bool enableCollectionUUIDs = true;
-
 // static
 bool CollectionOptions::validMaxCappedDocs(long long* max) {
     if (*max <= 0 || *max == std::numeric_limits<long long>::max()) {

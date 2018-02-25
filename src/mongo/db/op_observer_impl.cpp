@@ -650,7 +650,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 
     // Make sure the UUID values in the Collection metadata, the Collection object, and the UUID
-    // catalog are all present and equal if uuid exists and do not exist if uuid does not exist.
+    // catalog are all present and equal.
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X));
     Database* db = dbHolder().get(opCtx, nss.db());
     // Some unit tests call the op observer on an unregistered Database.
@@ -658,9 +658,9 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         return;
     }
     Collection* coll = db->getCollection(opCtx, nss.ns());
-    invariant(coll->uuid() == uuid);
+    invariant(coll->uuid() == uuid && coll->uuid());
     CollectionCatalogEntry* entry = coll->getCatalogEntry();
-    invariant(entry->isEqualToMetadataUUID(opCtx, uuid));
+    invariant(entry->isEqualToMetadataUUID(opCtx, uuid.get()));
 }
 
 void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
@@ -773,7 +773,7 @@ repl::OpTime OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
     builder.append("renameCollection", fromCollection.ns());
     builder.append("to", toCollection.ns());
     builder.append("stayTemp", stayTemp);
-    if (dropTargetUUID && enableCollectionUUIDs && !isMasterSlave(opCtx)) {
+    if (dropTargetUUID && !isMasterSlave(opCtx)) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
     } else {
         builder.append("dropTarget", dropTarget);

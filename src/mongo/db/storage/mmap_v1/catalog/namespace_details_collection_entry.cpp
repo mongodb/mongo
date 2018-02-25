@@ -449,47 +449,15 @@ void NamespaceDetailsCollectionCatalogEntry::addUUID(OperationContext* opCtx,
     }
 }
 
-void NamespaceDetailsCollectionCatalogEntry::removeUUID(OperationContext* opCtx) {
-    // Remove the UUID from CollectionOptions if a UUID exists.
-    if (ns().coll() == "system.namespaces") {
-        return;
-    }
-    RecordData namespaceData;
-    invariant(_namespacesRecordStore->findRecord(opCtx, _namespacesRecordId, &namespaceData));
-    auto namespacesBson = namespaceData.releaseToBson();
-    if (!namespacesBson["options"].isABSONObj()) {
-        return;
-    }
-    auto optionsObj = namespacesBson["options"].Obj();
-
-    if (!optionsObj["uuid"].eoo()) {
-        CollectionUUID uuid = UUID::parse(optionsObj["uuid"]).getValue();
-        _updateSystemNamespaces(opCtx,
-                                BSON("$unset" << BSON("options.uuid"
-                                                      << "")));
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
-        Collection* coll = catalog.lookupCollectionByUUID(uuid);
-        if (coll) {
-            catalog.onDropCollection(opCtx, uuid);
-        }
-    }
-}
-
 bool NamespaceDetailsCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,
-                                                                   OptionalCollectionUUID uuid) {
+                                                                   CollectionUUID uuid) {
     if (ns().coll() != "system.namespaces") {
         RecordData namespaceData;
         invariant(_namespacesRecordStore->findRecord(opCtx, _namespacesRecordId, &namespaceData));
 
         auto namespacesBson = namespaceData.releaseToBson();
-        if (uuid && namespacesBson["options"].isABSONObj()) {
-            auto optionsObj = namespacesBson["options"].Obj();
-            return !optionsObj["uuid"].eoo() &&
-                UUID::parse(optionsObj["uuid"]).getValue() == uuid.get();
-        } else {
-            return !uuid && (!namespacesBson["options"].isABSONObj() ||
-                             namespacesBson["options"].Obj()["uuid"].eoo());
-        }
+        auto optionsObj = namespacesBson["options"].Obj();
+        return !optionsObj["uuid"].eoo() && UUID::parse(optionsObj["uuid"]).getValue() == uuid;
     } else {
         return true;
     }

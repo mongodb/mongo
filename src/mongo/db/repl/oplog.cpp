@@ -788,10 +788,10 @@ std::map<std::string, ApplyOpMetadata> opsMap = {
          BSONObj& cmd,
          const OpTime& opTime,
          OplogApplication::Mode mode) -> Status {
-          OptionalCollectionUUID uuid;
           NamespaceString nss;
-          std::tie(uuid, nss) = parseCollModUUIDAndNss(opCtx, ui, ns, cmd);
-          return collModForUUIDUpgrade(opCtx, nss, cmd, uuid);
+          BSONObjBuilder resultWeDontCareAbout;
+          std::tie(std::ignore, nss) = parseCollModUUIDAndNss(opCtx, ui, ns, cmd);
+          return collMod(opCtx, nss, cmd, &resultWeDontCareAbout);
       },
       {ErrorCodes::IndexNotFound, ErrorCodes::NamespaceNotFound}}},
     {"dbCheck", {dbCheckOplogCommand, {}}},
@@ -1503,8 +1503,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    // During upgrade from 3.4 to 3.6, the feature compatibility version cannot change during
-    // initial sync because we cannot do some operations with UUIDs and others without.
+    // The feature compatibility version cannot change during initial sync.
     // We do not attempt to parse the whitelisted ops because they do not have a collection
     // namespace. If we drop the 'admin' database we will also log a 'drop' oplog entry for each
     // collection dropped. 'applyOps' will try to apply each individual operation, and those

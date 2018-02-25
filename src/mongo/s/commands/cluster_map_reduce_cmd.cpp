@@ -687,8 +687,7 @@ private:
                 Shard::RetryPolicy::kIdempotent));
         uassertStatusOK(cmdResponse.commandStatus);
 
-        // Parse the UUID for the sharded collection from the shardCollection response, if one is
-        // present. It will only be present if the cluster is in fcv=3.6.
+        // Parse the UUID for the sharded collection from the shardCollection response.
         auto shardCollResponse = ConfigsvrShardCollectionResponse::parse(
             IDLParserErrorContext("ConfigsvrShardCollectionResponse"), cmdResponse.response);
         *outUUID = std::move(shardCollResponse.getCollectionUUID());

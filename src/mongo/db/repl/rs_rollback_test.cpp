@@ -77,7 +77,6 @@ private:
 
 void RSRollbackTest::setUp() {
     RollbackTest::setUp();
-    enableCollectionUUIDs = true;
     auto observerRegistry = stdx::make_unique<OpObserverRegistry>();
     observerRegistry->addObserver(stdx::make_unique<UUIDCatalogObserver>());
     _serviceContextMongoDTest.getServiceContext()->setOpObserver(

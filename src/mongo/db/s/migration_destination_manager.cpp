@@ -609,7 +609,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                 donorUUID.emplace(UUID::parse(donorOptions));
             }
 
-            if (!collection->getCatalogEntry()->isEqualToMetadataUUID(opCtx, donorUUID)) {
+            if (collection->uuid() != donorUUID) {
                 setStateFailWarn(
                     str::stream()
                     << "Cannot receive chunk "

@@ -38,17 +38,10 @@ class NamespaceString;
 class OperationContext;
 
 /**
- * If upgrade is true, adds UUIDs to all collections of all databases. If upgrade is false, removes
- * UUIDs from all collections of all databases. It updates non-replicated collections by indirectly
- * calling updateUUIDSchemaVersionNonReplicated().
+ * Adds UUIDs to all replicated collections of all databases if they do not already have UUIDs. If
+ * this function is not necessary for SERVER-33247, it can be removed.
  */
-void updateUUIDSchemaVersion(OperationContext* opCtx, bool upgrade);
-
-/**
- * If upgrade is true, adds UUIDs to all non-replicated collections of all databases. If upgrade is
- * false, removes UUIDs from all non-replicated collections of all databases.
- */
-Status updateUUIDSchemaVersionNonReplicated(OperationContext* opCtx, bool upgrade);
+void addCollectionUUIDs(OperationContext* opCtx);
 
 /**
  * Performs the collection modification described in "cmdObj" on the collection "ns".
@@ -59,12 +52,11 @@ Status collMod(OperationContext* opCtx,
                BSONObjBuilder* result);
 
 /*
- * Adds uuid to the collection "ns" if uuid exists and removes any existing UUID from
- * the collection "ns" if uuid is boost::none. This is called in circumstances where
- * we may be upgrading or downgrading and we need to update the UUID.
+ * Adds uuid to the collection "ns" if the collection does not already have a UUID.
+ * This is called if a collection failed to be assigned a UUID during upgrade to 3.6.
  */
 Status collModForUUIDUpgrade(OperationContext* opCtx,
                              const NamespaceString& ns,
                              const BSONObj& cmdObj,
-                             OptionalCollectionUUID uuid);
+                             CollectionUUID uuid);
 }  // namespace mongo

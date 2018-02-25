@@ -146,21 +146,16 @@ public:
     virtual void setIsTemp(OperationContext* opCtx, bool isTemp) = 0;
 
     /**
-     * Assigns a new UUID to this collection. This is to be called when the schemaVersion is set
-     * to 3.6 and there are collections that still do not have UUIDs.
+     * Assigns a new UUID to this collection. All collections must have UUIDs, so this is called if
+     * a collection erroneously does not have a UUID.
      */
     virtual void addUUID(OperationContext* opCtx, CollectionUUID uuid, Collection* coll) = 0;
-    /**
-     * Removes the UUID from this collection. This is to be called when the schemaVersion is set
-     * to 3.4 and there are collections that still have UUIDs.
-     */
-    virtual void removeUUID(OperationContext* opCtx) = 0;
 
     /**
      * Compare the UUID argument to the UUID obtained from the metadata. Return true if they
      * are equal, false otherwise.
      */
-    virtual bool isEqualToMetadataUUID(OperationContext* opCtx, OptionalCollectionUUID uuid) = 0;
+    virtual bool isEqualToMetadataUUID(OperationContext* opCtx, CollectionUUID uuid) = 0;
 
     /**
      * Updates size of a capped Collection.

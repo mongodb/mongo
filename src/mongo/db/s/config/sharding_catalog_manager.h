@@ -263,7 +263,7 @@ public:
      * Iterates through each entry in config.collections that does not have a UUID, generates a UUID
      * for the collection, and updates the entry with the generated UUID.
      *
-     * Remove after 3.4 -> 3.6 upgrade.
+     * If this function is not necessary for SERVER-33247, it can be removed.
      */
     void generateUUIDsForExistingShardedCollections(OperationContext* opCtx);
 

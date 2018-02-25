@@ -38,8 +38,6 @@
 
 namespace mongo {
 
-extern bool enableCollectionUUIDs;  // TODO(SERVER-27993) Replace based on upgrade/downgrade state.
-
 class CollatorFactoryInterface;
 
 /**
@@ -97,7 +95,9 @@ struct CollectionOptions {
 
     // ----
 
-    // Collection UUID. Will exist if featureCompatibilityVersion >= 3.6.
+    // Collection UUID. Present for all CollectionOptions parsed for storage, except for those
+    // corresponding to the system.namespaces and system.indexes collections on MMAP (see
+    // SERVER-29926, SERVER-30095).
     OptionalCollectionUUID uuid;
 
     bool capped = false;

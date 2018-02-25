@@ -650,11 +650,9 @@ Collection* DatabaseImpl::getCollection(OperationContext* opCtx, const Namespace
 
     if (it != _collections.end() && it->second) {
         Collection* found = it->second;
-        if (enableCollectionUUIDs) {
-            NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
-            if (auto uuid = found->uuid())
-                cache.ensureNamespaceInCache(nss, uuid.get());
-        }
+        NamespaceUUIDCache& cache = NamespaceUUIDCache::get(opCtx);
+        if (auto uuid = found->uuid())
+            cache.ensureNamespaceInCache(nss, uuid.get());
         return found;
     }
 

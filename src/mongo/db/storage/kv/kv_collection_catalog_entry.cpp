@@ -248,29 +248,9 @@ void KVCollectionCatalogEntry::addUUID(OperationContext* opCtx,
     }
 }
 
-void KVCollectionCatalogEntry::removeUUID(OperationContext* opCtx) {
-    // Remove the UUID from CollectionOptions if a UUID exists.
+bool KVCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx, CollectionUUID uuid) {
     MetaData md = _getMetaData(opCtx);
-    if (md.options.uuid) {
-        CollectionUUID uuid = md.options.uuid.get();
-        md.options.uuid = boost::none;
-        _catalog->putMetaData(opCtx, ns().toString(), md);
-        UUIDCatalog& catalog = UUIDCatalog::get(opCtx->getServiceContext());
-        Collection* coll = catalog.lookupCollectionByUUID(uuid);
-        if (coll) {
-            catalog.onDropCollection(opCtx, uuid);
-        }
-    }
-}
-
-bool KVCollectionCatalogEntry::isEqualToMetadataUUID(OperationContext* opCtx,
-                                                     OptionalCollectionUUID uuid) {
-    MetaData md = _getMetaData(opCtx);
-    if (uuid) {
-        return md.options.uuid && md.options.uuid.get() == uuid.get();
-    } else {
-        return !md.options.uuid;
-    }
+    return md.options.uuid && md.options.uuid.get() == uuid;
 }
 
 void KVCollectionCatalogEntry::updateFlags(OperationContext* opCtx, int newValue) {

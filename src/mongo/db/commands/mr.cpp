@@ -426,9 +426,8 @@ void State::prepTempCollection() {
             CollectionOptions options;
             options.setNoIdIndex();
             options.temp = true;
-            if (enableCollectionUUIDs) {
-                options.uuid.emplace(UUID::gen());
-            }
+            options.uuid.emplace(UUID::gen());
+
             incColl = incCtx.db()->createCollection(_opCtx, _config.incLong.ns(), options);
             invariant(incColl);
 
@@ -472,8 +471,7 @@ void State::prepTempCollection() {
                             << _config.outputOptions.finalNamespace.ns()
                             << " does not match UUID for the existing collection with that "
                                "name on this shard",
-                        finalColl->getCatalogEntry()->isEqualToMetadataUUID(
-                            _opCtx, _config.finalOutputCollUUID));
+                        finalColl->uuid() == _config.finalOutputCollUUID);
             }
 
             IndexCatalog::IndexIterator ii =
@@ -512,14 +510,12 @@ void State::prepTempCollection() {
 
         CollectionOptions options = finalOptions;
         options.temp = true;
-        if (enableCollectionUUIDs) {
-            // If a UUID for the final output collection was sent by mongos (i.e., the final output
-            // collection is sharded), use the UUID mongos sent when creating the temp collection.
-            // When the temp collection is renamed to the final output collection, the UUID will be
-            // preserved.
-            options.uuid.emplace(_config.finalOutputCollUUID ? *_config.finalOutputCollUUID
-                                                             : UUID::gen());
-        }
+        // If a UUID for the final output collection was sent by mongos (i.e., the final output
+        // collection is sharded), use the UUID mongos sent when creating the temp collection.
+        // When the temp collection is renamed to the final output collection, the UUID will be
+        // preserved.
+        options.uuid.emplace(_config.finalOutputCollUUID ? *_config.finalOutputCollUUID
+                                                         : UUID::gen());
         tempColl = tempCtx.db()->createCollection(_opCtx, _config.tempNamespace.ns(), options);
 
         for (vector<BSONObj>::iterator it = indexesToInsert.begin(); it != indexesToInsert.end();
