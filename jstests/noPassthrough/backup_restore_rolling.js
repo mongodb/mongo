@@ -28,6 +28,13 @@ load("jstests/noPassthrough/libs/backup_restore.js");
         return;
     }
 
+    // Skip this test if running with --nojournal and WiredTiger.
+    if (jsTest.options().noJournal) {
+        print("Skipping test because running WiredTiger without journaling isn't a valid" +
+              " replica set configuration");
+        return;
+    }
+
     // if rsync is not available on the host, then this test is skipped
     if (!runProgram('bash', '-c', 'which rsync')) {
         new BackupRestoreTest({backup: 'rolling', clientTime: 30000}).run();

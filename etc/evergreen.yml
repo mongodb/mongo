@@ -5052,18 +5052,30 @@ buildvariants:
   - name: aggregation
   - name: aggregation_auth
   - name: auth
+  - name: bulk_gle_passthrough
+  - name: concurrency
+  - name: concurrency_simultaneous
   - name: dbtest
   - name: disk_wiredtiger
   - name: failpoints
   - name: failpoints_auth
   - name: jsCore
   - name: jsCore_auth
+  - name: jsCore_compatibility
   - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: jstestfuzz_concurrent
   - name: jstestfuzz_concurrent_sharded
   - name: jstestfuzz_sharded
   - name: mongosTest
+  - name: noPassthrough
+  - name: noPassthroughWithMongod
+  - name: parallel
+  - name: parallel_compatibility
+  - name: serial_run
+  - name: sharding_jscore_passthrough
+  - name: slow1
+  - name: tool
 
 - name: linux-64-lsm
   stepback: false
