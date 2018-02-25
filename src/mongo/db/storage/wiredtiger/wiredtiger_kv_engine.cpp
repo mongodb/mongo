@@ -513,13 +513,8 @@ void WiredTigerKVEngine::cleanShutdown() {
         // state is set. One is when `EncryptionHooks::restartRequired` is true. The other is when
         // the server shuts down because it refuses to acknowledge an FCV value more than one
         // version behind (e.g: 4.0 errors when reading 3.4).
-        //
-        // In the first case, we ideally do not perform a file format downgrade (but it is
-        // acceptable). In the second, the server must downgrade to allow a 3.6 binary to start
-        // up. Ideally, our internal FCV value would allow for older values, even if only to
-        // immediately shutdown. This would allow downstream logic, such as this method, to make
-        // an informed decision.
         const bool needsDowngrade = !_readOnly &&
+            serverGlobalParams.featureCompatibility.isVersionInitialized() &&
             serverGlobalParams.featureCompatibility.getVersion() ==
                 ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36;
 

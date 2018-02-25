@@ -147,8 +147,10 @@ void FeatureCompatibilityVersion::onInsertOrUpdate(OperationContext* opCtx, cons
 
     // To avoid extra log messages when the targetVersion is set/unset, only log when the version
     // changes.
-    auto oldVersion = serverGlobalParams.featureCompatibility.getVersion();
-    if (oldVersion != newVersion) {
+    bool isDifferent = serverGlobalParams.featureCompatibility.isVersionInitialized()
+        ? serverGlobalParams.featureCompatibility.getVersion() != newVersion
+        : true;
+    if (isDifferent) {
         log() << "setting featureCompatibilityVersion to "
               << FeatureCompatibilityVersionParser::toString(newVersion);
     }

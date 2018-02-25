@@ -51,6 +51,7 @@
 namespace mongo {
 
 void ServiceContextMongoDTest::setUp() {
+    Test::setUp();
     Client::initThread(getThreadName());
 
     auto const serviceContext = getServiceContext();
@@ -86,6 +87,7 @@ void ServiceContextMongoDTest::tearDown() {
     ON_BLOCK_EXIT([&] { Client::destroy(); });
     auto opCtx = cc().makeOperationContext();
     _dropAllDBs(opCtx.get());
+    Test::tearDown();
 }
 
 ServiceContext* ServiceContextMongoDTest::getServiceContext() {

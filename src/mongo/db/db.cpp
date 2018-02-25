@@ -839,10 +839,12 @@ void shutdownTask() {
             opCtx = uniqueOpCtx.get();
         }
 
-        if (serverGlobalParams.featureCompatibility.getVersion() !=
-            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40) {
-            // If we are in latest fCV, drop the 'checkpointTimestamp' collection so if we downgrade
-            // and then upgrade again, we do not trust a stale 'checkpointTimestamp'.
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            serverGlobalParams.featureCompatibility.getVersion() ==
+                ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36) {
+            // If we are fully downgraded, drop the 'checkpointTimestamp' collection. Otherwise a
+            // 3.6 binary can apply operations without updating the 'checkpointTimestamp',
+            // corrupting data.
             log(LogComponent::kReplication)
                 << "shutdown: removing checkpointTimestamp collection...";
             Status status =

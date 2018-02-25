@@ -814,8 +814,10 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         if (collection->requiresIdIndex()) {
             if (optionsWithUUID.autoIndexId == CollectionOptions::YES ||
                 optionsWithUUID.autoIndexId == CollectionOptions::DEFAULT) {
+                // createCollection() may be called before the in-memory fCV parameter is
+                // initialized, so use the unsafe fCV getter here.
                 const auto featureCompatibilityVersion =
-                    serverGlobalParams.featureCompatibility.getVersion();
+                    serverGlobalParams.featureCompatibility.getVersionUnsafe();
                 IndexCatalog* ic = collection->getIndexCatalog();
                 fullIdIndexSpec = uassertStatusOK(ic->createIndexOnEmptyCollection(
                     opCtx,

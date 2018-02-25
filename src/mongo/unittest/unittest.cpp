@@ -37,6 +37,7 @@
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/log_manager.h"
 #include "mongo/logger/logger.h"
@@ -179,8 +180,15 @@ void Test::run() {
     }
 }
 
-void Test::setUp() {}
-void Test::tearDown() {}
+// Attempting to read the featureCompatibilityVersion parameter before it is explicitly initialized
+// with a meaningful value will trigger failures as of SERVER-32630.
+void Test::setUp() {
+    serverGlobalParams.featureCompatibility.setVersion(
+        ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+}
+void Test::tearDown() {
+    serverGlobalParams.featureCompatibility.reset();
+}
 
 namespace {
 class StringVectorAppender : public logger::MessageLogDomain::EventAppender {

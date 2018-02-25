@@ -344,7 +344,6 @@ protected:
      */
     void printCapturedLogLines() const;
 
-private:
     /**
      * Called on the test object before running the test.
      */
@@ -355,6 +354,7 @@ private:
      */
     virtual void tearDown();
 
+private:
     /**
      * The test itself.
      */

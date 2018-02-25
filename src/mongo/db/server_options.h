@@ -199,10 +199,21 @@ struct ServerGlobalParams {
         }
 
         /**
-         * This safe getter for the featureCompatibilityVersion returns a default value when the
-         * version has not yet been set.
+         * This safe getter for the featureCompatibilityVersion parameter ensures the parameter has
+         * been initialized with a meaningful value.
          */
         const Version getVersion() const {
+            invariant(isVersionInitialized());
+            return _version.load();
+        }
+
+        /**
+         * This unsafe getter for the featureCompatibilityVersion parameter returns the last-stable
+         * featureCompatibilityVersion value if the parameter has not yet been initialized with a
+         * meaningful value. This getter should only be used if the parameter is intentionally read
+         * prior to the creation/parsing of the featureCompatibilityVersion document.
+         */
+        const Version getVersionUnsafe() const {
             Version v = _version.load();
             return (v == Version::kUnsetDefault36Behavior) ? Version::kFullyDowngradedTo36 : v;
         }

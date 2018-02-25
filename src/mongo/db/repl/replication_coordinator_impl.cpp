@@ -2535,10 +2535,11 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
     }
 
     log() << "transition to " << newState << " from " << _memberState << rsLog;
-    // Initializes the featureCompatibilityVersion to the default value, because arbiters do not
-    // receive the replicated version.
+    // Initializes the featureCompatibilityVersion to the latest value, because arbiters do not
+    // receive the replicated version. This is to avoid bugs like SERVER-32639.
     if (newState.arbiter()) {
-        serverGlobalParams.featureCompatibility.reset();
+        serverGlobalParams.featureCompatibility.setVersion(
+            ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
     }
 
     _memberState = newState;

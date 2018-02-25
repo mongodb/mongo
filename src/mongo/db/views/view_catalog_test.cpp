@@ -131,6 +131,7 @@ protected:
 class ReplViewCatalogFixture : public ViewCatalogFixture {
 public:
     void setUp() override {
+        Test::setUp();
         auto service = getServiceContext();
         repl::ReplSettings settings;
 
