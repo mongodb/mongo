@@ -36,16 +36,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/chunk_version.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/stdx/memory.h"
 
 namespace mongo {
-
-class CachedCollectionRoutingInfo;
-class CachedDatabaseInfo;
-class OperationContext;
-class ShardId;
 
 /**
  * This function appends the provided writeConcernError BSONElement to the sharded response.
