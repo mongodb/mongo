@@ -2380,7 +2380,7 @@ TEST_F(ExpressionConvertTest, ConvertStringToOID) {
         convertExp->evaluate({}), OID("123456789abcdef123456789"), BSONType::jstOID);
 }
 
-TEST_F(ExpressionConvertTest, ConvertToOIDFailsForInvalidHexStrings) {
+TEST_F(ExpressionConvertTest, ConvertStringToOIDFailsForInvalidHexStrings) {
     auto expCtx = getExpCtx();
 
     auto spec = fromjson("{$convert: {input: 'InvalidHexButSizeCorrect', to: 'objectId'}}");
@@ -2408,7 +2408,7 @@ TEST_F(ExpressionConvertTest, ConvertToOIDFailsForInvalidHexStrings) {
         });
 }
 
-TEST_F(ExpressionConvertTest, ConvertToOIDWithOnError) {
+TEST_F(ExpressionConvertTest, ConvertStringToOIDWithOnError) {
     auto expCtx = getExpCtx();
     const auto onErrorValue = "><(((((>"_sd;
 
@@ -2427,6 +2427,116 @@ TEST_F(ExpressionConvertTest, ConvertToOIDWithOnError) {
                     onErrorValue + "'}}");
     convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate({}), onErrorValue, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ConvertStringToDateRejectsUnparsableString) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '60.Monday1770/06:59', to: 'date'}}");
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(convertExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
+
+    spec = fromjson("{$convert: {input: 'Definitely not a date', to: 'date'}}");
+    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(convertExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
+}
+
+TEST_F(ExpressionConvertTest, ConvertStringToDateRejectsTimezoneNameInString) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '2017-07-13T10:02:57 Europe/London', to: 'date'}}");
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(convertExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
+
+    spec = fromjson("{$convert: {input: 'July 4, 2017 Europe/London', to: 'date'}}");
+    convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(convertExp->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
+}
+
+TEST_F(ExpressionConvertTest, ConvertStringToDate) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'date'}}");
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    auto result = convertExp->evaluate({{"path1", Value("2017-07-06T12:35:37Z"_sd)}});
+    ASSERT_EQ(result.getType(), BSONType::Date);
+    ASSERT_EQ("2017-07-06T12:35:37.000Z", result.toString());
+
+    result = convertExp->evaluate({{"path1", Value("2017-07-06T12:35:37.513Z"_sd)}});
+    ASSERT_EQ(result.getType(), BSONType::Date);
+    ASSERT_EQ("2017-07-06T12:35:37.513Z", result.toString());
+
+    result = convertExp->evaluate({{"path1", Value("2017-07-06"_sd)}});
+    ASSERT_EQ(result.getType(), BSONType::Date);
+    ASSERT_EQ("2017-07-06T00:00:00.000Z", result.toString());
+}
+
+TEST_F(ExpressionConvertTest, ConvertStringWithTimezoneToDate) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'date'}}");
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    auto result = convertExp->evaluate({{"path1", Value("2017-07-14T12:02:44.771 GMT+02:00"_sd)}});
+    ASSERT_EQ(result.getType(), BSONType::Date);
+    ASSERT_EQ("2017-07-14T10:02:44.771Z", result.toString());
+
+    result = convertExp->evaluate({{"path1", Value("2017-07-14T12:02:44.771 A"_sd)}});
+    ASSERT_EQ(result.getType(), BSONType::Date);
+    ASSERT_EQ("2017-07-14T11:02:44.771Z", result.toString());
+}
+
+TEST_F(ExpressionConvertTest, ConvertVerbalStringToDate) {
+    auto expCtx = getExpCtx();
+
+    auto spec = fromjson("{$convert: {input: '$path1', to: 'date'}}");
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    auto result = convertExp->evaluate({{"path1", Value("July 4th, 2017"_sd)}});
+    ASSERT_EQ(result.getType(), BSONType::Date);
+    ASSERT_EQ("2017-07-04T00:00:00.000Z", result.toString());
+
+    result = convertExp->evaluate({{"path1", Value("July 4th, 2017 12pm"_sd)}});
+    ASSERT_EQ(result.getType(), BSONType::Date);
+    ASSERT_EQ("2017-07-04T12:00:00.000Z", result.toString());
+
+    result = convertExp->evaluate({{"path1", Value("2017-Jul-04 noon"_sd)}});
+    ASSERT_EQ(result.getType(), BSONType::Date);
+    ASSERT_EQ("2017-07-04T12:00:00.000Z", result.toString());
+}
+
+TEST_F(ExpressionConvertTest, ConvertStringToDateWithOnError) {
+    auto expCtx = getExpCtx();
+    const auto onErrorValue = "(-_-)"_sd;
+
+    auto spec =
+        fromjson("{$convert: {input: '$path1', to: 'date', onError: '" + onErrorValue + "'}}");
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    auto result = convertExp->evaluate({{"path1", Value("Not a date"_sd)}});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, onErrorValue, BSONType::String);
+
+    result = convertExp->evaluate({{"path1", Value("60.Monday1770/06:59"_sd)}});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, onErrorValue, BSONType::String);
+
+    result = convertExp->evaluate({{"path1", Value("2017-07-13T10:02:57 Europe/London"_sd)}});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, onErrorValue, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ConvertStringToDateWithOnNull) {
+    auto expCtx = getExpCtx();
+    const auto onNullValue = "(-_-)"_sd;
+
+    auto spec =
+        fromjson("{$convert: {input: '$path1', to: 'date', onNull: '" + onNullValue + "'}}");
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    auto result = convertExp->evaluate({});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, onNullValue, BSONType::String);
+
+    result = convertExp->evaluate({{"path1", Value(BSONNULL)}});
+    ASSERT_VALUE_CONTENTS_AND_TYPE(result, onNullValue, BSONType::String);
 }
 
 }  // namespace ExpressionConvertTest
