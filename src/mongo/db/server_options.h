@@ -215,7 +215,7 @@ struct ServerGlobalParams {
             return _version.store(version);
         }
 
-        const bool isVersionUpgradingOrUpgraded() {
+        bool isVersionUpgradingOrUpgraded() {
             return (getVersion() == Version::kUpgradingTo40 ||
                     getVersion() == Version::kFullyUpgradedTo40);
         }
