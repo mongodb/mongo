@@ -138,8 +138,7 @@ private:
     }
 
     void tearDown() final {
-        _manager.killAllCursors();
-        _manager.reapZombieCursors(nullptr);
+        _manager.shutdown(_opCtx.get());
 
         if (_opCtx) {
             _opCtx.reset();
@@ -338,9 +337,7 @@ TEST_F(ClusterCursorManagerTest, CheckOutCursorUpdateActiveTime) {
         getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker);
     ASSERT_OK(checkedOutCursor.getStatus());
     checkedOutCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
-    getManager()->killMortalCursorsInactiveSince(cursorRegistrationTime);
-    ASSERT(!isMockCursorKilled(0));
-    getManager()->reapZombieCursors(nullptr);
+    getManager()->killMortalCursorsInactiveSince(_opCtx.get(), cursorRegistrationTime);
     ASSERT(!isMockCursorKilled(0));
 }
 
@@ -374,9 +371,7 @@ TEST_F(ClusterCursorManagerTest, ReturnCursorUpdateActiveTime) {
     ASSERT_OK(checkedOutCursor.getStatus());
     getClockSource()->advance(Milliseconds(1));
     checkedOutCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
-    getManager()->killMortalCursorsInactiveSince(cursorCheckOutTime);
-    ASSERT(!isMockCursorKilled(0));
-    getManager()->reapZombieCursors(nullptr);
+    getManager()->killMortalCursorsInactiveSince(_opCtx.get(), cursorCheckOutTime);
     ASSERT(!isMockCursorKilled(0));
 }
 
@@ -481,9 +476,7 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceBasic) {
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
                                            UserNameIterator()));
-    getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
-    ASSERT(!isMockCursorKilled(0));
-    getManager()->reapZombieCursors(nullptr);
+    getManager()->killMortalCursorsInactiveSince(_opCtx.get(), getClockSource()->now());
     ASSERT(isMockCursorKilled(0));
 }
 
@@ -497,9 +490,7 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipUnexpired) {
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Mortal,
                                            UserNameIterator()));
-    getManager()->killMortalCursorsInactiveSince(timeBeforeCursorCreation);
-    ASSERT(!isMockCursorKilled(0));
-    getManager()->reapZombieCursors(nullptr);
+    getManager()->killMortalCursorsInactiveSince(_opCtx.get(), timeBeforeCursorCreation);
     ASSERT(!isMockCursorKilled(0));
 }
 
@@ -511,9 +502,7 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceSkipImmortal) {
                                            ClusterCursorManager::CursorType::SingleTarget,
                                            ClusterCursorManager::CursorLifetime::Immortal,
                                            UserNameIterator()));
-    getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
-    ASSERT(!isMockCursorKilled(0));
-    getManager()->reapZombieCursors(nullptr);
+    getManager()->killMortalCursorsInactiveSince(_opCtx.get(), getClockSource()->now());
     ASSERT(!isMockCursorKilled(0));
 }
 
@@ -529,14 +518,10 @@ TEST_F(ClusterCursorManagerTest, ShouldNotKillPinnedCursors) {
                                                UserNameIterator()));
     auto pin =
         assertGet(getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker));
-    getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
-    ASSERT(!isMockCursorKilled(0));
-    getManager()->reapZombieCursors(nullptr);
+    getManager()->killMortalCursorsInactiveSince(_opCtx.get(), getClockSource()->now());
     ASSERT(!isMockCursorKilled(0));
     pin.returnCursor(ClusterCursorManager::CursorState::NotExhausted);
-    getManager()->killMortalCursorsInactiveSince(getClockSource()->now());
-    ASSERT(!isMockCursorKilled(0));
-    getManager()->reapZombieCursors(nullptr);
+    getManager()->killMortalCursorsInactiveSince(_opCtx.get(), getClockSource()->now());
     ASSERT(isMockCursorKilled(0));
 }
 
@@ -558,11 +543,7 @@ TEST_F(ClusterCursorManagerTest, KillMortalCursorsInactiveSinceMultipleCursors) 
                                                UserNameIterator()));
         getClockSource()->advance(Milliseconds(1));
     }
-    getManager()->killMortalCursorsInactiveSince(cutoff);
-    for (size_t i = 0; i < numCursors; ++i) {
-        ASSERT(!isMockCursorKilled(i));
-    }
-    getManager()->reapZombieCursors(nullptr);
+    getManager()->killMortalCursorsInactiveSince(_opCtx.get(), cutoff);
     for (size_t i = 0; i < numCursors; ++i) {
         if (i < numKilledCursorsExpected) {
             ASSERT(isMockCursorKilled(i));
@@ -583,45 +564,10 @@ TEST_F(ClusterCursorManagerTest, KillAllCursors) {
                                                ClusterCursorManager::CursorLifetime::Mortal,
                                                UserNameIterator()));
     }
-    getManager()->killAllCursors();
-    for (size_t i = 0; i < numCursors; ++i) {
-        ASSERT(!isMockCursorKilled(i));
-    }
-    getManager()->reapZombieCursors(nullptr);
+    getManager()->killAllCursors(_opCtx.get());
     for (size_t i = 0; i < numCursors; ++i) {
         ASSERT(isMockCursorKilled(i));
     }
-}
-
-// Test that reaping does not call kill() on the underlying ClusterClientCursor for a killed cursor
-// that is still pinned.
-TEST_F(ClusterCursorManagerTest, ReapZombieCursorsSkipPinned) {
-    auto cursorId =
-        assertGet(getManager()->registerCursor(_opCtx.get(),
-                                               allocateMockCursor(),
-                                               nss,
-                                               ClusterCursorManager::CursorType::SingleTarget,
-                                               ClusterCursorManager::CursorLifetime::Mortal,
-                                               UserNameIterator()));
-    auto pinnedCursor =
-        getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker);
-    ASSERT(!isMockCursorKilled(0));
-    getManager()->reapZombieCursors(nullptr);
-    ASSERT(!isMockCursorKilled(0));
-}
-
-// Test that reaping does not call kill() on the underlying ClusterClientCursor for cursors that
-// haven't been killed.
-TEST_F(ClusterCursorManagerTest, ReapZombieCursorsSkipNonZombies) {
-    ASSERT_OK(getManager()->registerCursor(_opCtx.get(),
-                                           allocateMockCursor(),
-                                           nss,
-                                           ClusterCursorManager::CursorType::SingleTarget,
-                                           ClusterCursorManager::CursorLifetime::Mortal,
-                                           UserNameIterator()));
-    ASSERT(!isMockCursorKilled(0));
-    getManager()->reapZombieCursors(nullptr);
-    ASSERT(!isMockCursorKilled(0));
 }
 
 // Test that a new ClusterCursorManager's stats() is initially zero for the cursor counts.
@@ -1018,8 +964,9 @@ TEST_F(ClusterCursorManagerTest, RemotesExhausted) {
     ASSERT_FALSE(pinnedCursor.getValue().remotesExhausted());
 }
 
-// Test that killed cursors which are still pinned are not reaped.
-TEST_F(ClusterCursorManagerTest, DoNotReapKilledPinnedCursors) {
+// Test that killed cursors which are still pinned are not destroyed immediately.
+TEST_F(ClusterCursorManagerTest, DoNotDestroyKilledPinnedCursors) {
+    const Date_t cutoff = getClockSource()->now();
     auto cursorId =
         assertGet(getManager()->registerCursor(_opCtx.get(),
                                                allocateMockCursor(),
@@ -1036,8 +983,11 @@ TEST_F(ClusterCursorManagerTest, DoNotReapKilledPinnedCursors) {
     ASSERT_EQ(_opCtx->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
     ASSERT(!isMockCursorKilled(0));
 
-    // Pinned cursor should remain alive after reaping.
-    getManager()->reapZombieCursors(nullptr);
+    // The cursor cleanup system should not destroy the cursor either.
+    getManager()->killMortalCursorsInactiveSince(_opCtx.get(), cutoff);
+
+    // The cursor's operation context should be marked as interrupted, but the cursor itself should
+    // not have been destroyed.
     ASSERT(!isMockCursorKilled(0));
 
     // The cursor can be destroyed once it is returned to the manager.
@@ -1054,7 +1004,7 @@ TEST_F(ClusterCursorManagerTest, CannotRegisterCursorDuringShutdown) {
                                            UserNameIterator()));
     ASSERT(!isMockCursorKilled(0));
 
-    getManager()->shutdown(nullptr);
+    getManager()->shutdown(_opCtx.get());
 
     ASSERT(isMockCursorKilled(0));
 
@@ -1067,6 +1017,28 @@ TEST_F(ClusterCursorManagerTest, CannotRegisterCursorDuringShutdown) {
                                                UserNameIterator()));
 }
 
+TEST_F(ClusterCursorManagerTest, PinnedCursorNotKilledOnShutdown) {
+    auto cursorId =
+        assertGet(getManager()->registerCursor(_opCtx.get(),
+                                               allocateMockCursor(),
+                                               nss,
+                                               ClusterCursorManager::CursorType::SingleTarget,
+                                               ClusterCursorManager::CursorLifetime::Mortal,
+                                               UserNameIterator()));
+
+    auto pinnedCursor =
+        getManager()->checkOutCursor(nss, cursorId, _opCtx.get(), successAuthChecker);
+    getManager()->shutdown(_opCtx.get());
+
+    ASSERT_EQ(_opCtx->checkForInterruptNoAssert(), ErrorCodes::CursorKilled);
+    ASSERT(!isMockCursorKilled(0));
+
+    // Even if it's checked back in as not exhausted, it should have been marked as killed when
+    // shutdown() was called.
+    pinnedCursor.getValue().returnCursor(ClusterCursorManager::CursorState::NotExhausted);
+    ASSERT(isMockCursorKilled(0));
+}
+
 TEST_F(ClusterCursorManagerTest, CannotCheckoutCursorDuringShutdown) {
     auto cursorId =
         assertGet(getManager()->registerCursor(_opCtx.get(),
@@ -1077,7 +1049,7 @@ TEST_F(ClusterCursorManagerTest, CannotCheckoutCursorDuringShutdown) {
                                                UserNameIterator()));
     ASSERT(!isMockCursorKilled(0));
 
-    getManager()->shutdown(nullptr);
+    getManager()->shutdown(_opCtx.get());
 
     ASSERT(isMockCursorKilled(0));
 

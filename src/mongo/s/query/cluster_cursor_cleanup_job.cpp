@@ -62,8 +62,8 @@ void ClusterCursorCleanupJob::run() {
         Date_t cutoff = (cursorTimeoutValue > 0)
             ? (Date_t::now() - Milliseconds(cursorTimeoutValue))
             : Date_t::now();
-        manager->killMortalCursorsInactiveSince(cutoff);
-        manager->incrementCursorsTimedOut(manager->reapZombieCursors(opCtx.get()));
+        manager->incrementCursorsTimedOut(
+            manager->killMortalCursorsInactiveSince(opCtx.get(), cutoff));
 
         MONGO_IDLE_THREAD_BLOCK;
         sleepsecs(getClientCursorMonitorFrequencySecs());
