@@ -30,6 +30,7 @@ if __name__ == "__main__" and __package__ is None:
 from buildscripts import git
 from buildscripts import jiraclient
 from buildscripts import resmokelib
+from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.utils import globstar
 from buildscripts import test_failures as tf
 from buildscripts.ciconfig import evergreen as ci_evergreen
@@ -570,8 +571,22 @@ class JiraIssueCreator(object):
     _PROJECT = "TIGBOT"
     _MAX_DESCRIPTION_SIZE = 32767
 
-    def __init__(self, jira_server, jira_user, jira_password):
-        self._client = jiraclient.JiraClient(jira_server, jira_user, jira_password)
+    def __init__(self,
+                 server=None,
+                 username=None,
+                 password=None,
+                 access_token=None,
+                 access_token_secret=None,
+                 consumer_key=None,
+                 key_cert=None):
+        self._client = jiraclient.JiraClient(
+            server=server,
+            username=username,
+            password=password,
+            access_token=access_token,
+            access_token_secret=access_token_secret,
+            consumer_key=consumer_key,
+            key_cert=key_cert)
 
     def create_issue(self, evg_project, mongo_revision, model_config, added, removed, cleaned_up):
         """Create a JIRA issue for the test lifecycle tag update."""
@@ -845,21 +860,6 @@ class LifecycleTagsFile(object):
             return False
 
 
-def _read_jira_configuration(jira_config_file):
-    with open(jira_config_file, "r") as fstream:
-        jira_config = yaml.safe_load(fstream)
-    return (_get_jira_parameter(jira_config, "server"),
-            _get_jira_parameter(jira_config, "user"),
-            _get_jira_parameter(jira_config, "password"))
-
-
-def _get_jira_parameter(jira_config, parameter_name):
-    value = jira_config.get(parameter_name)
-    if not value:
-        LOGGER.error("Missing parameter '%s' in JIRA configuration file", parameter_name)
-    return value
-
-
 def make_lifecycle_tags_file(options, model_config):
     """Create a LifecycleTagsFile based on the script options."""
     if options.commit:
@@ -869,13 +869,7 @@ def make_lifecycle_tags_file(options, model_config):
         if not (options.git_user_name or options.git_user_email):
             LOGGER.error("Git configuration parameters are required when specifying --commit.")
             return None
-        jira_server, jira_user, jira_password = _read_jira_configuration(options.jira_config)
-        if not (jira_server and jira_user and jira_password):
-            return None
-
-        jira_issue_creator = JiraIssueCreator(jira_server,
-                                              jira_user,
-                                              jira_password)
+        jira_issue_creator = JiraIssueCreator(**utils.load_yaml_file(options.jira_config))
         git_config = (options.git_user_name, options.git_user_email)
     else:
         jira_issue_creator = None

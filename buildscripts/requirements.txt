@@ -1,4 +1,8 @@
+# Jira integration
+cryptography == 1.7.2
 jira == 1.0.10
+pyjwt == 1.5.3
+# Other
 pyyaml == 3.11
 unittest-xml-reporting == 2.1.0
 # Linters
