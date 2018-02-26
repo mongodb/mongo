@@ -11,6 +11,12 @@
         return;
     }
 
+    // TODO WT-3864: Re-enable test for LSM once transaction visibility bug in LSM is resolved.
+    if (jsTest.options().wiredTigerCollectionConfigString === "type=lsm") {
+        jsTestLog("Skipping test because we're running with WiredTiger's LSM tree.");
+        return;
+    }
+
     const rsNodeOptions = {
         // Use a higher frequency for periodic noops to speed up the test.
         setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true}
