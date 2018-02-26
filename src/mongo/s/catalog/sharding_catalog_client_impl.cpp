@@ -717,9 +717,9 @@ Status ShardingCatalogClientImpl::applyChunkOpsDeprecated(OperationContext* opCt
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
               (readConcern == repl::ReadConcernLevel::kMajorityReadConcern &&
                writeConcern.wMode == WriteConcernOptions::kMajority));
-    BSONObj cmd = BSON("doTxn" << updateOps << "preCondition" << preCondition
-                               << WriteConcernOptions::kWriteConcernField
-                               << writeConcern.toBSON());
+    BSONObj cmd = BSON("applyOps" << updateOps << "preCondition" << preCondition
+                                  << WriteConcernOptions::kWriteConcernField
+                                  << writeConcern.toBSON());
 
     auto response =
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(

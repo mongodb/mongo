@@ -1176,7 +1176,7 @@ TEST_F(ShardingCatalogClientTest, ApplyChunkOpsDeprecatedSuccessful) {
                           request.cmdObj["writeConcern"].Obj());
         ASSERT_BSONOBJ_EQ(BSON(rpc::kReplSetMetadataFieldName << 1),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
-        ASSERT_BSONOBJ_EQ(updateOps, request.cmdObj["doTxn"].Obj());
+        ASSERT_BSONOBJ_EQ(updateOps, request.cmdObj["applyOps"].Obj());
         ASSERT_BSONOBJ_EQ(preCondition, request.cmdObj["preCondition"].Obj());
 
         return BSON("ok" << 1);
