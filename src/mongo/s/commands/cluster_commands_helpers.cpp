@@ -364,6 +364,31 @@ bool appendRawResponses(OperationContext* opCtx,
     return true;
 }
 
+BSONObj extractQuery(const BSONObj& cmdObj) {
+    auto queryElem = cmdObj["query"];
+    if (!queryElem)
+        queryElem = cmdObj["q"];
+
+    if (!queryElem || queryElem.isNull())
+        return BSONObj();
+
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "Illegal type specified for query " << queryElem,
+            queryElem.type() == Object);
+    return queryElem.embeddedObject();
+}
+
+BSONObj extractCollation(const BSONObj& cmdObj) {
+    const auto collationElem = cmdObj["collation"];
+    if (!collationElem)
+        return BSONObj();
+
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "Illegal type specified for collation " << collationElem,
+            collationElem.type() == Object);
+    return collationElem.embeddedObject();
+}
+
 int getUniqueCodeFromCommandResults(const std::vector<Strategy::CommandResult>& results) {
     int commonErrCode = -1;
     for (std::vector<Strategy::CommandResult>::const_iterator it = results.begin();

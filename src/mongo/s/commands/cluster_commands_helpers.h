@@ -128,6 +128,19 @@ bool appendRawResponses(OperationContext* opCtx,
                         std::set<ErrorCodes::Error> ignoredErrors = {});
 
 /**
+ * Extracts the query from a query-embedding command ('query' or 'q' fields). If the command does
+ * not have an embedded query, returns an empty BSON object.
+ */
+BSONObj extractQuery(const BSONObj& cmdObj);
+
+/**
+ * Extracts the collation from a collation-embedding command ('collation' field). If the command
+ * does not specify a collation, returns an empty BSON object. If the 'collation' field is of wrong
+ * type, throws.
+ */
+BSONObj extractCollation(const BSONObj& cmdObj);
+
+/**
  * Utility function to compute a single error code from a vector of command results.
  *
  * @return If there is an error code common to all of the error results, returns that error
