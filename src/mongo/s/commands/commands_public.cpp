@@ -191,82 +191,6 @@ protected:
     }
 };
 
-class ValidateCmd : public PublicGridCommand {
-public:
-    ValidateCmd() : PublicGridCommand("validate") {}
-
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::validate);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& output) override {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-
-        auto routingInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        if (!routingInfo.cm()) {
-            return passthrough(opCtx, dbName, routingInfo.primaryId(), cmdObj, output);
-        }
-
-        const auto cm = routingInfo.cm();
-
-        std::vector<Strategy::CommandResult> results;
-        const BSONObj query;
-        Strategy::commandOp(opCtx,
-                            dbName,
-                            CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
-                            cm->getns().ns(),
-                            query,
-                            CollationSpec::kSimpleSpec,
-                            &results);
-
-        BSONObjBuilder rawResBuilder(output.subobjStart("raw"));
-        bool isValid = true;
-        bool errored = false;
-        for (const auto& cmdResult : results) {
-            const ShardId& shardName = cmdResult.shardTargetId;
-            BSONObj result = cmdResult.result;
-            const BSONElement valid = result["valid"];
-            if (!valid.trueValue()) {
-                isValid = false;
-            }
-            if (!result["errmsg"].eoo()) {
-                // errmsg indicates a user error, so returning the message from one shard is
-                // sufficient.
-                output.append(result["errmsg"]);
-                errored = true;
-            }
-            rawResBuilder.append(shardName.toString(), result);
-        }
-        rawResBuilder.done();
-
-        output.appendBool("valid", isValid);
-
-        int code = getUniqueCodeFromCommandResults(results);
-        if (code != 0) {
-            output.append("code", code);
-            output.append("codeName", ErrorCodes::errorString(ErrorCodes::Error(code)));
-        }
-
-        if (errored) {
-            return false;
-        }
-        return true;
-    }
-
-} validateCmd;
-
 class RenameCollectionCmd : public PublicGridCommand {
 public:
     RenameCollectionCmd() : PublicGridCommand("renameCollection") {}
@@ -1088,38 +1012,6 @@ public:
     }
 
 } geo2dFindNearCmd;
-
-class EvalCmd : public PublicGridCommand {
-public:
-    EvalCmd() : PublicGridCommand("eval", "$eval") {}
-
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        // $eval can do pretty much anything, so require all privileges.
-        RoleGraph::generateUniversalPrivileges(out);
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        RARELY {
-            warning() << "the eval command is deprecated" << startupWarningsLog;
-        }
-
-        // $eval isn't allowed to access sharded collections, but we need to leave the shard to
-        // detect that
-        const auto dbInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
-        return passthrough(opCtx, dbName, dbInfo.primaryId(), cmdObj, result);
-    }
-
-} evalCmd;
 
 class CmdListCollections : public BasicCommand {
 public:
