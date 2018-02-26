@@ -593,7 +593,7 @@ err:	WT_DHANDLE_RELEASE(dhandle);
  */
 static int
 __conn_dhandle_close_one(WT_SESSION_IMPL *session,
-    const char *uri, const char *checkpoint, bool mark_dead)
+    const char *uri, const char *checkpoint, bool removed, bool mark_dead)
 {
 	WT_DECL_RET;
 
@@ -623,6 +623,8 @@ __conn_dhandle_close_one(WT_SESSION_IMPL *session,
 		if (ret == 0)
 			ret = __wt_meta_track_sub_off(session);
 	}
+	if (removed)
+		F_SET(session->dhandle, WT_DHANDLE_DROPPED);
 
 	if (!WT_META_TRACKING(session))
 		WT_TRET(__wt_session_release_dhandle(session));
@@ -637,7 +639,7 @@ __conn_dhandle_close_one(WT_SESSION_IMPL *session,
  */
 int
 __wt_conn_dhandle_close_all(
-    WT_SESSION_IMPL *session, const char *uri, bool mark_dead)
+    WT_SESSION_IMPL *session, const char *uri, bool removed, bool mark_dead)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -655,7 +657,8 @@ __wt_conn_dhandle_close_all(
 	 * locking the live handle to fail fast if the tree is busy (e.g., with
 	 * cursors open or in a checkpoint).
 	 */
-	WT_ERR(__conn_dhandle_close_one(session, uri, NULL, mark_dead));
+	WT_ERR(__conn_dhandle_close_one(
+	    session, uri, NULL, removed, mark_dead));
 
 	bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
 	TAILQ_FOREACH(dhandle, &conn->dhhash[bucket], hashq) {
@@ -665,7 +668,8 @@ __wt_conn_dhandle_close_all(
 			continue;
 
 		WT_ERR(__conn_dhandle_close_one(
-		    session, dhandle->name, dhandle->checkpoint, mark_dead));
+		    session, dhandle->name, dhandle->checkpoint, removed,
+		    mark_dead));
 	}
 
 err:	session->dhandle = NULL;

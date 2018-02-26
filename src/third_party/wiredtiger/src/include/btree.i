@@ -1350,11 +1350,9 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
 	    F_ISSET_ATOMIC(ref->home, WT_PAGE_OVERFLOW_KEYS))
 		return (false);
 
-	/*
-	 * If the page was restored after a truncate, it can't be evicted until
-	 * the truncate completes.
-	 */
-	if (ref->page_del != NULL && !__wt_txn_visible_all(session,
+	/* A truncated page can't be evicted until the truncate completes. */
+	if (ref->page_del != NULL && ref->page_del->txnid != WT_TXN_ABORTED &&
+	    !__wt_txn_visible_all(session,
 	    ref->page_del->txnid, WT_TIMESTAMP_NULL(&ref->page_del->timestamp)))
 		return (false);
 

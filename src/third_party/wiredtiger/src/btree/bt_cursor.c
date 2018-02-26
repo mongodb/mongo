@@ -1579,7 +1579,7 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 	 * may not have a cursor position (if the higher-level truncate code
 	 * switched the cursors to have an "external" cursor key, and because
 	 * we don't save a copy of the page's write generation information,
-	 * which we need to remove records.
+	 * which we need to remove records).
 	 *
 	 * Once that's done, we can delete records without a full search, unless
 	 * we encounter a restart error because the page was modified by some
@@ -1593,22 +1593,22 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 	 * instantiated the end cursor, so we know that page is pinned in memory
 	 * and we can proceed without concern.
 	 */
-retry:	WT_RET(__wt_btcur_search(start));
+retry:	WT_ERR(__wt_btcur_search(start));
 	WT_ASSERT(session,
 	    F_MASK((WT_CURSOR *)start, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
 
 	for (;;) {
-		if ((ret = rmfunc(session, start, WT_UPDATE_TOMBSTONE)) != 0)
-			break;
+		WT_ERR(rmfunc(session, start, WT_UPDATE_TOMBSTONE));
 
 		if (stop != NULL && __cursor_equals(start, stop))
-			break;
-		if ((ret = __wt_btcur_next(start, true)) != 0)
-			break;
+			return (0);
+
+		WT_ERR(__wt_btcur_next(start, true));
+
 		start->compare = 0;		/* Exact match */
 	}
 
-	if (ret == WT_RESTART) {
+err:	if (ret == WT_RESTART) {
 		WT_STAT_CONN_INCR(session, cursor_restart);
 		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;
@@ -1642,31 +1642,31 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 	 * may not have a cursor position (if the higher-level truncate code
 	 * switched the cursors to have an "external" cursor key, and because
 	 * we don't save a copy of the page's write generation information,
-	 * which we need to remove records.
+	 * which we need to remove records).
 	 *
 	 * Once that's done, we can delete records without a full search, unless
 	 * we encounter a restart error because the page was modified by some
 	 * other thread of control; in that case, repeat the full search to
 	 * refresh the page's modification information.
 	 */
-retry:	WT_RET(__wt_btcur_search(start));
+retry:	WT_ERR(__wt_btcur_search(start));
 	WT_ASSERT(session,
 	    F_MASK((WT_CURSOR *)start, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT);
 
 	for (;;) {
 		value = (const uint8_t *)start->iface.value.data;
-		if (*value != 0 &&
-		    (ret = rmfunc(session, start, WT_UPDATE_TOMBSTONE)) != 0)
-			break;
+		if (*value != 0)
+			WT_ERR(rmfunc(session, start, WT_UPDATE_TOMBSTONE));
 
 		if (stop != NULL && __cursor_equals(start, stop))
-			break;
-		if ((ret = __wt_btcur_next(start, true)) != 0)
-			break;
+			return (0);
+
+		WT_ERR(__wt_btcur_next(start, true));
+
 		start->compare = 0;	/* Exact match */
 	}
 
-	if (ret == WT_RESTART) {
+err:	if (ret == WT_RESTART) {
 		WT_STAT_CONN_INCR(session, cursor_restart);
 		WT_STAT_DATA_INCR(session, cursor_restart);
 		goto retry;

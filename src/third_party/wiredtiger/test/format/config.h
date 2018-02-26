@@ -334,6 +334,10 @@ static CONFIG c[] = {
 	  "percent operations done inside an explicit transaction",
 	  0x0, 1, 100, 100, &g.c_txn_freq, NULL },
 
+	{ "truncate",						/* 100% */
+	  "enable truncation",
+	  C_BOOL, 100, 0, 0, &g.c_truncate, NULL },
+
 	{ "value_max",
 	  "maximum size of values",
 	  0x0, 32, 4096, MEGABYTE(10), &g.c_value_max, NULL },

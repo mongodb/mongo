@@ -185,7 +185,7 @@ op_bulk_unique(void *arg)
 
 	/* Generate a unique object name. */
 	testutil_check(__wt_snprintf(
-	    new_uri, sizeof(new_uri), "%s.%u",
+	    new_uri, sizeof(new_uri), "%s.%" PRIu64,
 	    opts->uri, __wt_atomic_add64(&opts->unique_id, 1)));
 	testutil_check(session->create(session, new_uri, NULL));
 
@@ -294,7 +294,7 @@ op_create_unique(void *arg)
 
 	/* Generate a unique object name. */
 	testutil_check(__wt_snprintf(
-	    new_uri, sizeof(new_uri), "%s.%u",
+	    new_uri, sizeof(new_uri), "%s.%" PRIu64,
 	    opts->uri, __wt_atomic_add64(&opts->unique_id, 1)));
 	testutil_check(session->create(session, new_uri, NULL));
 

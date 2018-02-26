@@ -142,10 +142,16 @@ typedef struct {
 
 /*
  * error_check --
- *	Complain and quit if a function call fails. The same as testutil_check,
- * but with a different name because it appears in the documentation.
+ *	Complain and quit if a function call fails. A special name because it
+ * appears in the documentation. Ignore ENOTSUP to allow library calls which
+ * might not be included in any particular build.
  */
-#define	error_check(call)	testutil_check(call)
+#define	error_check(call) do {						\
+	int __r;							\
+	if ((__r = (call)) != 0 && __r != ENOTSUP)			\
+		testutil_die(						\
+		    __r, "%s/%d: %s", __func__, __LINE__, #call);	\
+} while (0)
 
 /*
  * scan_end_check --

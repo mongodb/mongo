@@ -204,6 +204,32 @@ __wt_txn_unmodify(WT_SESSION_IMPL *session)
 	}
 }
 
+#ifdef HAVE_TIMESTAMPS
+/*
+ * __wt_txn_update_needs_timestamp --
+ *	Decide whether to copy a commit timestamp into an update. If the op
+ *	structure doesn't have a populated update or ref field or in prepared
+ *      state there won't be any check for an existing timestamp.
+ */
+static inline bool
+__wt_txn_update_needs_timestamp(WT_SESSION_IMPL *session, WT_TXN_OP *op)
+{
+	WT_TXN *txn;
+
+	txn = &session->txn;
+	/*
+	 * Updates in the metadata never get timestamps (either now or at
+	 * commit): metadata cannot be read at a point in time, only the most
+	 * recently committed data matches files on disk.
+	 */
+	return (op->fileid != WT_METAFILE_ID &&
+	    F_ISSET(txn, WT_TXN_HAS_TS_COMMIT) &&
+	    (op->u.upd == NULL ||
+	    __wt_timestamp_iszero(&(op->u.upd->timestamp)) ||
+	    F_ISSET(txn, WT_TXN_PREPARE)));
+}
+#endif
+
 /*
  * __wt_txn_modify --
  *	Mark a WT_UPDATE object modified by the current transaction.
@@ -224,21 +250,8 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
 	    WT_TXN_OP_INMEM : WT_TXN_OP_BASIC;
 #ifdef HAVE_TIMESTAMPS
-	/*
-	 * Mark the update with a timestamp, if we have one.
-	 *
-	 * Updates in the metadata never get timestamps (either now or at
-	 * commit): metadata cannot be read at a point in time, only the most
-	 * recently committed data matches files on disk.
-	 */
-	if (WT_IS_METADATA(session->dhandle)) {
-		if (!F_ISSET(session, WT_SESSION_LOGGING_INMEM))
-			op->type = WT_TXN_OP_BASIC_TS;
-	} else if (F_ISSET(txn, WT_TXN_HAS_TS_COMMIT)) {
+	if (__wt_txn_update_needs_timestamp(session, op))
 		__wt_timestamp_set(&upd->timestamp, &txn->commit_timestamp);
-		if (!F_ISSET(session, WT_SESSION_LOGGING_INMEM))
-			op->type = WT_TXN_OP_BASIC_TS;
-	}
 #endif
 	op->u.upd = upd;
 	upd->txnid = session->txn.id;
@@ -246,18 +259,34 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
- * __wt_txn_modify_ref --
- *	Remember a WT_REF object modified by the current transaction.
+ * __wt_txn_modify_page_delete --
+ *	Remember a page fast-deleted by the current transaction.
  */
 static inline int
-__wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
+__wt_txn_modify_page_delete(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+	WT_DECL_RET;
+	WT_TXN *txn;
 	WT_TXN_OP *op;
 
+	txn = &session->txn;
+
 	WT_RET(__txn_next_op(session, &op));
-	op->type = WT_TXN_OP_REF;
+	op->type = WT_TXN_OP_REF_DELETE;
+
+#ifdef HAVE_TIMESTAMPS
+	if (__wt_txn_update_needs_timestamp(session, op))
+		__wt_timestamp_set(
+		    &ref->page_del->timestamp, &txn->commit_timestamp);
+#endif
 	op->u.ref = ref;
-	return (__wt_txn_log_op(session, NULL));
+	ref->page_del->txnid = txn->id;
+
+	WT_ERR(__wt_txn_log_op(session, NULL));
+	return (0);
+
+err:	__wt_txn_unmodify(session);
+	return (ret);
 }
 
 /*

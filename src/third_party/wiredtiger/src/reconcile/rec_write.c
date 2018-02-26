@@ -1676,11 +1676,8 @@ __rec_child_deleted(WT_SESSION_IMPL *session,
 		 * Minor memory cleanup: if a truncate call deleted this page
 		 * and we were ever forced to instantiate the page in memory,
 		 * we would have built a list of updates in the page reference
-		 * in order to be able to abort the truncate.  It's a cheap
-		 * test to make that memory go away, we do it here because
-		 * there's really nowhere else we do the checks.  In short, if
-		 * we have such a list, and the backing address blocks are
-		 * gone, there can't be any transaction that can abort.
+		 * in order to be able to commit/rollback the truncate. We just
+		 * passed a visibility test, discard the update list.
 		 */
 		if (page_del != NULL) {
 			__wt_free(session, ref->page_del->update_list);

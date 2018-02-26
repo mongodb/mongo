@@ -100,7 +100,8 @@ def funcIDtoName(funcID):
     if (functionMap.has_key(funcID)):
         return functionMap[funcID];
     else:
-        return "NULL";
+       print("Could not find the name for func " + str(funcID));
+       return "NULL";
 
 #
 # The format of the record is written down in src/include/optrack.h

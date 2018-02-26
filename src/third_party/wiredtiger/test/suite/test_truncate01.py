@@ -32,7 +32,7 @@
 
 import wiredtiger, wttest
 from helper import confirm_empty
-from wtdataset import SimpleDataSet, ComplexDataSet
+from wtdataset import SimpleDataSet, ComplexDataSet, simple_key
 from wtscenario import make_scenarios
 
 # Test truncation arguments.
@@ -174,6 +174,39 @@ class test_truncate_cursor_end(wttest.WiredTigerTestCase):
             self.assertEquals(c1.close(), 0)
             self.assertEquals(c2.close(), 0)
             self.session.drop(uri)
+
+# Test truncation of empty objects.
+class test_truncate_empty(wttest.WiredTigerTestCase):
+    name = 'test_truncate_empty'
+
+    types = [
+        ('file', dict(type='file:')),
+        ('table', dict(type='table:'))
+    ]
+    keyfmt = [
+        ('integer', dict(keyfmt='i')),
+        ('recno', dict(keyfmt='r')),
+        ('string', dict(keyfmt='S')),
+    ]
+    scenarios = make_scenarios(types, keyfmt)
+
+    # Test truncation of empty objects using a cursor
+    def test_truncate_empty_cursor(self):
+        uri = self.type + self.name
+        self.session.create(uri,
+            ',key_format=' + self.keyfmt + ',value_format=S')
+        c1 = self.session.open_cursor(uri, None)
+        c1.set_key(simple_key(c1, 1000))
+        c2 = self.session.open_cursor(uri, None)
+        c2.set_key(simple_key(c2, 2000))
+        self.assertEquals(self.session.truncate(None, c1, c2, None), 0)
+
+    # Test truncation of empty objects using a URI
+    def test_truncate_empty_uri(self):
+        uri = self.type + self.name
+        self.session.create(uri,
+            ',key_format=' + self.keyfmt + ',value_format=S')
+        self.assertEquals(self.session.truncate(uri, None, None, None), 0)
 
 # Test session.truncate.
 class test_truncate_cursor(wttest.WiredTigerTestCase):

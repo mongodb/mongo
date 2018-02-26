@@ -6,12 +6,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-/*
- * Default hash table size; we don't need a prime number of buckets
- * because we always use a good hash function.
- */
-#define	WT_HASH_ARRAY_SIZE	512
-
 /*******************************************
  * Global per-process structure.
  *******************************************/

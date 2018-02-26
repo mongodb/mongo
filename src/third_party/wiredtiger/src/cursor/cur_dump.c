@@ -338,7 +338,7 @@ __curdump_close(WT_CURSOR *cursor)
 	cdump = (WT_CURSOR_DUMP *)cursor;
 	child = cdump->child;
 
-	CURSOR_API_CALL(cursor, session, close, NULL);
+	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 	if (child != NULL)
 		WT_TRET(child->close(child));
 	/* We shared the child's URI. */
@@ -374,6 +374,8 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	    __curdump_remove,			/* remove */
 	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __wt_cursor_notsup,			/* cache */
+	    __wt_cursor_reopen_notsup,		/* reopen */
 	    __curdump_close);			/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_DUMP *cdump;

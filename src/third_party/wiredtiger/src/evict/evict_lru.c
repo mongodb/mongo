@@ -1528,7 +1528,7 @@ retry:	while (slot < max_entries) {
 	 * candidates and we aren't finding more.
 	 */
 	if (slot < max_entries && (retries < 2 ||
-	    (retries < 10 &&
+	    (retries < WT_RETRY_MAX &&
 	    (slot == queue->evict_entries || slot > start_slot)))) {
 		start_slot = slot;
 		++retries;

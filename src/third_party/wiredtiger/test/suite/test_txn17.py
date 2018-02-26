@@ -46,7 +46,7 @@ class test_txn17(wttest.WiredTigerTestCase, suite_subprocess):
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.session.timestamp_transaction(
                     'commit_timestamp=' + timestamp_str(1 << 5000)),
-                    '/must be running/')
+                    '/only permitted in a running/')
 
         # Cannot call commit on a non-running transaction.
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

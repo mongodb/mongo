@@ -900,6 +900,8 @@ transaction_ops(WT_SESSION *session_arg)
 	error_check(session->commit_transaction(session, NULL));
 	/*! [transaction isolation] */
 
+#ifdef HAVE_TIMESTAMPS
+	{
 	/*! [transaction prepare] */
 	/*
 	 * Prepare a transaction which guarantees a subsequent commit will
@@ -911,9 +913,13 @@ transaction_ops(WT_SESSION *session_arg)
 	error_check(session->begin_transaction(session, NULL));
 	cursor->set_key(cursor, "key");
 	cursor->set_value(cursor, "value");
-	session->prepare_transaction(session, "prepare_timestamp=2a");
-	error_check(session->commit_transaction(session, NULL));
+	error_check(session->prepare_transaction(
+	    session, "prepare_timestamp=2a"));
+	error_check(session->commit_transaction(
+	    session, "commit_timestamp=2b"));
 	/*! [transaction prepare] */
+	}
+#endif
 
 	/*! [session isolation configuration] */
 	/* Open a session configured for read-uncommitted isolation. */

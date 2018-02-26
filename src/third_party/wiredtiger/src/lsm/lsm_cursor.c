@@ -1188,7 +1188,7 @@ __clsm_reset(WT_CURSOR *cursor)
 	 * we want to do is give up our position.
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
-	CURSOR_API_CALL(cursor, session, reset, NULL);
+	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	WT_TRET(__clsm_reset_cursors(clsm, NULL));
@@ -1735,7 +1735,7 @@ __wt_clsm_close(WT_CURSOR *cursor)
 	 * closing, and the cursor may never have been used.
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
-	CURSOR_API_CALL(cursor, session, close, NULL);
+	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 	WT_TRET(__clsm_close_cursors(clsm, 0, clsm->nchunks));
 	__clsm_free_chunks(session, clsm);
 
@@ -1776,6 +1776,8 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	    __clsm_remove,			/* remove */
 	    __clsm_reserve,			/* reserve */
 	    __wt_cursor_reconfigure,		/* reconfigure */
+	    __wt_cursor_notsup,			/* cache */
+	    __wt_cursor_reopen_notsup,		/* reopen */
 	    __wt_clsm_close);			/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_LSM *clsm;

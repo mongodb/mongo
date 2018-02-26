@@ -292,13 +292,17 @@ static int
 __curlog_reset(WT_CURSOR *cursor)
 {
 	WT_CURSOR_LOG *cl;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 
+	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, NULL);
 	cl = (WT_CURSOR_LOG *)cursor;
 	cl->stepp = cl->stepp_end = NULL;
 	cl->step_count = 0;
 	WT_INIT_LSN(cl->cur_lsn);
 	WT_INIT_LSN(cl->next_lsn);
-	return (0);
+
+err:	API_END_RET(session, ret);
 }
 
 /*
@@ -313,7 +317,7 @@ __curlog_close(WT_CURSOR *cursor)
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	CURSOR_API_CALL(cursor, session, close, NULL);
+	CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
 	cl = (WT_CURSOR_LOG *)cursor;
 	conn = S2C(session);
 
@@ -362,6 +366,8 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,			/* remove */
 	    __wt_cursor_notsup,			/* reserve */
 	    __wt_cursor_reconfigure_notsup,	/* reconfigure */
+	    __wt_cursor_notsup,			/* cache */
+	    __wt_cursor_reopen_notsup,		/* reopen */
 	    __curlog_close);			/* close */
 	WT_CURSOR *cursor;
 	WT_CURSOR_LOG *cl;

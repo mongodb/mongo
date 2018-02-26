@@ -32,6 +32,7 @@ static int   col_insert(TINFO *, WT_CURSOR *);
 static int   col_modify(TINFO *, WT_CURSOR *, bool);
 static int   col_remove(TINFO *, WT_CURSOR *, bool);
 static int   col_reserve(TINFO *, WT_CURSOR *, bool);
+static int   col_truncate(TINFO *, WT_CURSOR *);
 static int   col_update(TINFO *, WT_CURSOR *, bool);
 static int   nextprev(TINFO *, WT_CURSOR *, bool);
 static WT_THREAD_RET ops(void *);
@@ -40,6 +41,7 @@ static int   row_insert(TINFO *, WT_CURSOR *, bool);
 static int   row_modify(TINFO *, WT_CURSOR *, bool);
 static int   row_remove(TINFO *, WT_CURSOR *, bool);
 static int   row_reserve(TINFO *, WT_CURSOR *, bool);
+static int   row_truncate(TINFO *, WT_CURSOR *);
 static int   row_update(TINFO *, WT_CURSOR *, bool);
 static void  table_append_init(void);
 
@@ -269,10 +271,11 @@ wts_ops(int lastrun)
 	free(tinfo_list);
 }
 
-typedef enum { INSERT, MODIFY, READ, REMOVE, UPDATE } thread_op;
+typedef enum { INSERT, MODIFY, READ, REMOVE, TRUNCATE, UPDATE } thread_op;
 typedef struct {
 	thread_op op;			/* Operation */
 	uint64_t  keyno;		/* Row number */
+	uint64_t  last;			/* Inclusive end of a truncate range */
 
 	void    *kdata;			/* If an insert, the generated key */
 	size_t   ksize;
@@ -283,10 +286,10 @@ typedef struct {
 	size_t   vmemsize;
 } SNAP_OPS;
 
-#define	SNAP_TRACK(op, keyno, key, value) do {				\
+#define	SNAP_TRACK(op, tinfo) do {					\
 	if (snap != NULL &&						\
 	    (size_t)(snap - snap_list) < WT_ELEMENTS(snap_list))	\
-		snap_track(snap++, op, keyno, key, value);		\
+		snap_track(snap++, op, tinfo);				\
 } while (0)
 
 /*
@@ -294,28 +297,30 @@ typedef struct {
  *     Add a single snapshot isolation returned value to the list.
  */
 static void
-snap_track(
-    SNAP_OPS *snap, thread_op op, uint64_t keyno, WT_ITEM *key, WT_ITEM *value)
+snap_track(SNAP_OPS *snap, thread_op op, TINFO *tinfo)
 {
-	snap->op = op;
-	snap->keyno = keyno;
+	WT_ITEM *ip;
 
-	testutil_assert(key == NULL || (op == INSERT && g.type == ROW));
-	if (key != NULL) {
-		if (snap->kmemsize < key->size) {
-			snap->kdata = drealloc(snap->kdata, key->size);
-			snap->kmemsize = key->size;
+	snap->op = op;
+	snap->keyno = tinfo->keyno;
+	snap->last = op == TRUNCATE ? tinfo->last : 0;
+
+	if (op == INSERT && g.type == ROW) {
+		ip = tinfo->key;
+		if (snap->kmemsize < ip->size) {
+			snap->kdata = drealloc(snap->kdata, ip->size);
+			snap->kmemsize = ip->size;
 		}
-		memcpy(snap->kdata, key->data, snap->ksize = key->size);
+		memcpy(snap->kdata, ip->data, snap->ksize = ip->size);
 	}
 
-	testutil_assert(value != NULL || op == REMOVE);
-	if (value != NULL) {
-		if (snap->vmemsize < value->size) {
-			snap->vdata = drealloc(snap->vdata, value->size);
-			snap->vmemsize = value->size;
+	if (op != REMOVE && op != TRUNCATE)  {
+		ip = tinfo->value;
+		if (snap->vmemsize < ip->size) {
+			snap->vdata = drealloc(snap->vdata, ip->size);
+			snap->vmemsize = ip->size;
 		}
-		memcpy(snap->vdata, value->data, snap->vsize = value->size);
+		memcpy(snap->vdata, ip->data, snap->vsize = ip->size);
 	}
 }
 
@@ -332,9 +337,33 @@ snap_check(WT_CURSOR *cursor,
 	uint8_t bitfield;
 
 	for (; start < stop; ++start) {
+		/*
+		 * We don't test all of the records in a truncate range, only
+		 * the first because that matches the rest of the isolation
+		 * checks. If a truncate range was from the start of the table,
+		 * switch to the record at the end.
+		 */
+		if (start->op == TRUNCATE && start->keyno == 0) {
+			start->keyno = start->last;
+			testutil_assert(start->keyno != 0);
+		}
+
 		/* Check for subsequent changes to this record. */
-		for (p = start + 1; p < stop && p->keyno != start->keyno; ++p)
-			;
+		for (p = start + 1; p < stop; ++p) {
+			if (p->keyno == start->keyno)
+				break;
+
+			if (p->op != TRUNCATE)
+				continue;
+			if (g.c_reverse &&
+			    (p->keyno == 0 || p->keyno >= start->keyno) &&
+			    (p->last == 0 || p->last <= start->keyno))
+				break;
+			if (!g.c_reverse &&
+			    (p->keyno == 0 || p->keyno <= start->keyno) &&
+			    (p->last == 0 || p->last >= start->keyno))
+				break;
+		}
 		if (p != stop)
 			continue;
 
@@ -359,7 +388,9 @@ snap_check(WT_CURSOR *cursor,
 				break;
 			}
 		}
-		if ((ret = cursor->search(cursor)) == 0) {
+
+		switch (ret = cursor->search(cursor)) {
+		case 0:
 			if (g.type == FIX) {
 				testutil_check(
 				    cursor->get_value(cursor, &bitfield));
@@ -368,16 +399,23 @@ snap_check(WT_CURSOR *cursor,
 			} else
 				testutil_check(
 				    cursor->get_value(cursor, value));
-		} else
-			if (ret != WT_NOTFOUND)
-				return (ret);
+			break;
+		case WT_NOTFOUND:
+			break;
+		case WT_ROLLBACK:
+			return (WT_ROLLBACK);
+		default:
+			testutil_die(ret, "WT_CURSOR.search");
+		}
 
 		/* Check for simple matches. */
-		if (ret == 0 && start->op != REMOVE &&
+		if (ret == 0 &&
+		    start->op != REMOVE && start->op != TRUNCATE &&
 		    value->size == start->vsize &&
 		    memcmp(value->data, start->vdata, value->size) == 0)
 			continue;
-		if (ret == WT_NOTFOUND && start->op == REMOVE)
+		if (ret == WT_NOTFOUND &&
+		    (start->op == REMOVE || start->op == TRUNCATE))
 			continue;
 
 		/*
@@ -389,7 +427,7 @@ snap_check(WT_CURSOR *cursor,
 			if (ret == WT_NOTFOUND &&
 			    start->vsize == 1 && *(uint8_t *)start->vdata == 0)
 				continue;
-			if (start->op == REMOVE &&
+			if ((start->op == REMOVE || start->op == TRUNCATE) &&
 			    value->size == 1 && *(uint8_t *)value->data == 0)
 				continue;
 		}
@@ -551,10 +589,10 @@ ops(void *arg)
 	WT_DECL_RET;
 	WT_SESSION *session;
 	thread_op op;
-	uint64_t reset_op, session_op;
-	uint32_t rnd;
+	uint64_t reset_op, session_op, truncate_op;
+	uint32_t range, rnd;
 	u_int i, j, iso_config;
-	bool intxn, next, positioned, readonly;
+	bool greater_than, intxn, next, positioned, readonly;
 
 	tinfo = arg;
 
@@ -571,6 +609,8 @@ ops(void *arg)
 	key_gen_init(tinfo->key);
 	tinfo->value = &tinfo->_value;
 	val_gen_init(tinfo->value);
+	tinfo->lastkey = &tinfo->_lastkey;
+	key_gen_init(tinfo->lastkey);
 
 	/* Set the first operation where we'll create sessions and cursors. */
 	cursor = NULL;
@@ -579,6 +619,9 @@ ops(void *arg)
 
 	/* Set the first operation where we'll reset the session. */
 	reset_op = mmrand(&tinfo->rnd, 100, 10000);
+	/* Set the first operation where we'll truncate a range. */
+	truncate_op = g.c_truncate == 0 ?
+	    UINT64_MAX : mmrand(&tinfo->rnd, 100, 10000);
 
 	for (intxn = false; !tinfo->quit; ++tinfo->ops) {
 		/* Periodically open up a new session and cursors. */
@@ -683,7 +726,13 @@ ops(void *arg)
 		op = READ;
 		if (!readonly) {
 			i = mmrand(&tinfo->rnd, 1, 100);
-			if (i < g.c_delete_pct)
+			if (i < g.c_delete_pct && tinfo->ops > truncate_op) {
+				op = TRUNCATE;
+
+				/* Pick the next truncate operation. */
+				truncate_op +=
+				    mmrand(&tinfo->rnd, 20000, 100000);
+			} else if (i < g.c_delete_pct)
 				op = REMOVE;
 			else if (i < g.c_delete_pct + g.c_insert_pct)
 				op = INSERT;
@@ -707,8 +756,7 @@ ops(void *arg)
 			ret = read_row(tinfo, cursor);
 			if (ret == 0) {
 				positioned = true;
-				SNAP_TRACK(
-				    READ, tinfo->keyno, NULL, tinfo->value);
+				SNAP_TRACK(READ, tinfo);
 			} else {
 				if (ret == WT_ROLLBACK && intxn)
 					goto deadlock;
@@ -763,9 +811,7 @@ ops(void *arg)
 			positioned = false;
 			if (ret == 0) {
 				++tinfo->insert;
-				SNAP_TRACK(INSERT, tinfo->keyno,
-				    g.type == ROW ? tinfo->key : NULL,
-				    tinfo->value);
+				SNAP_TRACK(INSERT, tinfo);
 			} else {
 				if (ret == WT_ROLLBACK && intxn)
 					goto deadlock;
@@ -791,8 +837,7 @@ ops(void *arg)
 			}
 			if (ret == 0) {
 				positioned = true;
-				SNAP_TRACK(
-				    MODIFY, tinfo->keyno, NULL, tinfo->value);
+				SNAP_TRACK(MODIFY, tinfo);
 			} else {
 				positioned = false;
 				if (ret == WT_ROLLBACK && intxn)
@@ -806,8 +851,7 @@ ops(void *arg)
 			ret = read_row(tinfo, cursor);
 			if (ret == 0) {
 				positioned = true;
-				SNAP_TRACK(
-				    READ, tinfo->keyno, NULL, tinfo->value);
+				SNAP_TRACK(READ, tinfo);
 			} else {
 				positioned = false;
 				if (ret == WT_ROLLBACK && intxn)
@@ -816,15 +860,14 @@ ops(void *arg)
 			}
 			break;
 		case REMOVE:
+remove_instead_of_truncate:
 			switch (g.type) {
 			case ROW:
-				ret =
-				    row_remove(tinfo, cursor, positioned);
+				ret = row_remove(tinfo, cursor, positioned);
 				break;
 			case FIX:
 			case VAR:
-				ret =
-				    col_remove(tinfo, cursor, positioned);
+				ret = col_remove(tinfo, cursor, positioned);
 				break;
 			}
 			if (ret == 0) {
@@ -833,12 +876,85 @@ ops(void *arg)
 				 * Don't set positioned: it's unchanged from the
 				 * previous state, but not necessarily set.
 				 */
-				SNAP_TRACK(REMOVE, tinfo->keyno, NULL, NULL);
+				SNAP_TRACK(REMOVE, tinfo);
 			} else {
 				positioned = false;
 				if (ret == WT_ROLLBACK && intxn)
 					goto deadlock;
 				testutil_assert(ret == WT_NOTFOUND);
+			}
+			break;
+		case TRUNCATE:
+			/*
+			 * A maximum of 2 truncation operations at a time, more
+			 * than that can lead to serious thrashing.
+			 */
+			if (__wt_atomic_addv64(&g.truncate_cnt, 1) > 2) {
+				(void)__wt_atomic_subv64(&g.truncate_cnt, 1);
+				goto remove_instead_of_truncate;
+			}
+
+			if (!positioned)
+				tinfo->keyno =
+				    mmrand(&tinfo->rnd, 1, (u_int)g.rows);
+
+			/*
+			 * Truncate up to 5% of the table. If the range overlaps
+			 * the beginning/end of the table, set the key to 0 (the
+			 * truncate function then sets a cursor to NULL so that
+			 * code is tested).
+			 *
+			 * This gets tricky: there are 2 directions (truncating
+			 * from lower keys to the current position or from
+			 * the current position to higher keys), and collation
+			 * order (truncating from lower keys to higher keys or
+			 * vice-versa).
+			 */
+			greater_than = mmrand(&tinfo->rnd, 0, 1) == 1;
+			range = mmrand(&tinfo->rnd, 1, (u_int)g.rows / 20);
+			tinfo->last = tinfo->keyno;
+			if (greater_than) {
+				if (g.c_reverse) {
+					if (tinfo->keyno <= range)
+						tinfo->last = 0;
+					else
+						tinfo->last -= range;
+				} else {
+					tinfo->last += range;
+					if (tinfo->last > g.rows)
+						tinfo->last = 0;
+				}
+			} else {
+				if (g.c_reverse) {
+					tinfo->keyno += range;
+					if (tinfo->keyno > g.rows)
+						tinfo->keyno = 0;
+				} else {
+					if (tinfo->keyno <= range)
+						tinfo->keyno = 0;
+					else
+						tinfo->keyno -= range;
+				}
+			}
+			switch (g.type) {
+			case ROW:
+				ret = row_truncate(tinfo, cursor);
+				break;
+			case FIX:
+			case VAR:
+				ret = col_truncate(tinfo, cursor);
+				break;
+			}
+			positioned = false;
+			(void)__wt_atomic_subv64(&g.truncate_cnt, 1);
+
+			if (ret == 0) {
+				++tinfo->truncate;
+				SNAP_TRACK(TRUNCATE, tinfo);
+			} else {
+				testutil_assert(ret == WT_ROLLBACK);
+				if (intxn)
+					goto deadlock;
 			}
 			break;
 		case UPDATE:
@@ -855,8 +971,7 @@ update_instead_of_chosen_op:
 			}
 			if (ret == 0) {
 				positioned = true;
-				SNAP_TRACK(
-				    UPDATE, tinfo->keyno, NULL, tinfo->value);
+				SNAP_TRACK(UPDATE, tinfo);
 			} else {
 				positioned = false;
 				if (ret == WT_ROLLBACK && intxn)
@@ -937,6 +1052,7 @@ deadlock:			++tinfo->deadlock;
 	}
 	key_gen_teardown(tinfo->key);
 	val_gen_teardown(tinfo->value);
+	key_gen_teardown(tinfo->lastkey);
 
 	tinfo->state = TINFO_COMPLETE;
 	return (WT_THREAD_RET_VALUE);
@@ -1242,7 +1358,8 @@ mismatch:	if (g.type == ROW) {
 		} else {
 			if ((p = (char *)strchr(bdb_key.data, '.')) != NULL)
 				*p = '\0';
-			fprintf(stderr, "\t%.*s != %" PRIu64 "\n",
+			fprintf(stderr,
+			    "\t" "bdb-key %.*s != wt-key %" PRIu64 "\n",
 			    (int)bdb_key.size, (char *)bdb_key.data, keyno);
 		}
 		print_item("bdb-value", &bdb_value);
@@ -1463,6 +1580,72 @@ col_modify(TINFO *tinfo, WT_CURSOR *cursor, bool positioned)
 }
 
 /*
+ * row_truncate --
+ *	Truncate rows in a row-store file.
+ */
+static int
+row_truncate(TINFO *tinfo, WT_CURSOR *cursor)
+{
+	WT_CURSOR *c2;
+	WT_DECL_RET;
+	WT_SESSION *session;
+
+	session = cursor->session;
+
+	/*
+	 * The code assumes we're never truncating the entire object, assert
+	 * that fact.
+	 */
+	testutil_assert(tinfo->keyno != 0 || tinfo->last != 0);
+
+	c2 = NULL;
+	if (tinfo->keyno == 0) {
+		key_gen(tinfo->key, tinfo->last);
+		cursor->set_key(cursor, tinfo->key);
+		ret = session->truncate(session, NULL, NULL, cursor, NULL);
+	} else if (tinfo->last == 0) {
+		key_gen(tinfo->key, tinfo->keyno);
+		cursor->set_key(cursor, tinfo->key);
+		ret = session->truncate(session, NULL, cursor, NULL, NULL);
+	} else {
+		key_gen(tinfo->key, tinfo->keyno);
+		cursor->set_key(cursor, tinfo->key);
+
+		testutil_check(
+		    session->open_cursor(session, g.uri, NULL, NULL, &c2));
+		key_gen(tinfo->lastkey, tinfo->last);
+		cursor->set_key(c2, tinfo->lastkey);
+
+		ret = session->truncate(session, NULL, cursor, c2, NULL);
+		testutil_check(c2->close(c2));
+	}
+
+	if (g.logging == LOG_OPS)
+		(void)g.wt_api->msg_printf(g.wt_api, session,
+		    "%-10s%" PRIu64 ", %" PRIu64,
+		    "truncate",
+		    tinfo->keyno, tinfo->last);
+
+	switch (ret) {
+	case 0:
+		break;
+	case WT_CACHE_FULL:
+	case WT_ROLLBACK:
+		return (WT_ROLLBACK);
+	default:
+		testutil_die(ret,
+		    "row_truncate: row %" PRIu64 "-%" PRIu64,
+		    tinfo->keyno, tinfo->last);
+	}
+
+#ifdef HAVE_BERKELEY_DB
+	if (SINGLETHREADED)
+		bdb_truncate(tinfo->keyno, tinfo->last);
+#endif
+	return (0);
+}
+
+/*
  * row_update --
  *	Update a row in a row-store file.
  */
@@ -1497,12 +1680,72 @@ row_update(TINFO *tinfo, WT_CURSOR *cursor, bool positioned)
 	}
 
 #ifdef HAVE_BERKELEY_DB
-	if (!SINGLETHREADED)
-		return (0);
+	if (SINGLETHREADED)
+		bdb_update(
+		    tinfo->key->data, tinfo->key->size,
+		    tinfo->value->data, tinfo->value->size);
+#endif
+	return (0);
+}
 
-	bdb_update(
-	    tinfo->key->data, tinfo->key->size,
-	    tinfo->value->data, tinfo->value->size);
+/*
+ * col_truncate --
+ *	Truncate rows in a column-store file.
+ */
+static int
+col_truncate(TINFO *tinfo, WT_CURSOR *cursor)
+{
+	WT_CURSOR *c2;
+	WT_DECL_RET;
+	WT_SESSION *session;
+
+	session = cursor->session;
+
+	/*
+	 * The code assumes we're never truncating the entire object, assert
+	 * that fact.
+	 */
+	testutil_assert(tinfo->keyno != 0 || tinfo->last != 0);
+
+	c2 = NULL;
+	if (tinfo->keyno == 0) {
+		cursor->set_key(cursor, tinfo->last);
+		ret = session->truncate(session, NULL, NULL, cursor, NULL);
+	} else if (tinfo->last == 0) {
+		cursor->set_key(cursor, tinfo->keyno);
+		ret = session->truncate(session, NULL, cursor, NULL, NULL);
+	} else {
+		cursor->set_key(cursor, tinfo->keyno);
+
+		testutil_check(
+		    session->open_cursor(session, g.uri, NULL, NULL, &c2));
+		cursor->set_key(c2, tinfo->last);
+
+		ret = session->truncate(session, NULL, cursor, c2, NULL);
+		testutil_check(c2->close(c2));
+	}
+
+	if (g.logging == LOG_OPS)
+		(void)g.wt_api->msg_printf(g.wt_api, session,
+		    "%-10s%" PRIu64 "-%" PRIu64,
+		    "truncate",
+		    tinfo->keyno, tinfo->last);
+
+	switch (ret) {
+	case 0:
+		break;
+	case WT_CACHE_FULL:
+	case WT_ROLLBACK:
+		return (WT_ROLLBACK);
+	default:
+		testutil_die(ret,
+		    "col_truncate: row %" PRIu64 "-%" PRIu64,
+		    tinfo->keyno, tinfo->last);
+	}
+
+#ifdef HAVE_BERKELEY_DB
+	if (SINGLETHREADED)
+		bdb_truncate(tinfo->keyno, tinfo->last);
 #endif
 	return (0);
 }
@@ -1549,13 +1792,12 @@ col_update(TINFO *tinfo, WT_CURSOR *cursor, bool positioned)
 	}
 
 #ifdef HAVE_BERKELEY_DB
-	if (!SINGLETHREADED)
-		return (0);
-
-	key_gen(tinfo->key, tinfo->keyno);
-	bdb_update(
-	    tinfo->key->data, tinfo->key->size,
-	    tinfo->value->data, tinfo->value->size);
+	if (SINGLETHREADED) {
+		key_gen(tinfo->key, tinfo->keyno);
+		bdb_update(
+		    tinfo->key->data, tinfo->key->size,
+		    tinfo->value->data, tinfo->value->size);
+	}
 #endif
 	return (0);
 }
@@ -1699,12 +1941,10 @@ row_insert(TINFO *tinfo, WT_CURSOR *cursor, bool positioned)
 	}
 
 #ifdef HAVE_BERKELEY_DB
-	if (!SINGLETHREADED)
-		return (0);
-
-	bdb_update(
-	    tinfo->key->data, tinfo->key->size,
-	    tinfo->value->data, tinfo->value->size);
+	if (SINGLETHREADED)
+		bdb_update(
+		    tinfo->key->data, tinfo->key->size,
+		    tinfo->value->data, tinfo->value->size);
 #endif
 	return (0);
 }
@@ -1751,13 +1991,12 @@ col_insert(TINFO *tinfo, WT_CURSOR *cursor)
 	}
 
 #ifdef HAVE_BERKELEY_DB
-	if (!SINGLETHREADED)
-		return (0);
-
-	key_gen(tinfo->key, tinfo->keyno);
-	bdb_update(
-	    tinfo->key->data, tinfo->key->size,
-	    tinfo->value->data, tinfo->value->size);
+	if (SINGLETHREADED) {
+		key_gen(tinfo->key, tinfo->keyno);
+		bdb_update(
+		    tinfo->key->data, tinfo->key->size,
+		    tinfo->value->data, tinfo->value->size);
+	}
 #endif
 	return (0);
 }
@@ -1795,14 +2034,11 @@ row_remove(TINFO *tinfo, WT_CURSOR *cursor, bool positioned)
 	}
 
 #ifdef HAVE_BERKELEY_DB
-	if (!SINGLETHREADED)
-		return (ret);
+	if (SINGLETHREADED) {
+		int notfound;
 
-	{
-	int notfound;
-
-	bdb_remove(tinfo->keyno, &notfound);
-	(void)notfound_chk("row_remove", ret, notfound, tinfo->keyno);
+		bdb_remove(tinfo->keyno, &notfound);
+		(void)notfound_chk("row_remove", ret, notfound, tinfo->keyno);
 	}
 #endif
 	return (ret);
@@ -1839,17 +2075,7 @@ col_remove(TINFO *tinfo, WT_CURSOR *cursor, bool positioned)
 	}
 
 #ifdef HAVE_BERKELEY_DB
-	if (!SINGLETHREADED)
-		return (ret);
-
-	/*
-	 * Deleting a fixed-length item is the same as setting the bits to 0;
-	 * do the same thing for the BDB store.
-	 */
-	if (g.type == FIX) {
-		key_gen(tinfo->key, tinfo->keyno);
-		bdb_update(tinfo->key->data, tinfo->key->size, "", 1);
-	} else {
+	if (SINGLETHREADED) {
 		int notfound;
 
 		bdb_remove(tinfo->keyno, &notfound);

@@ -58,6 +58,12 @@ errors = [
         more than the configured cache size to complete. The operation
         may be retried; if a transaction is in progress, it should be
         rolled back and the operation retried in a new transaction.'''),
+    Error('WT_PREPARE_CONFLICT', -31808,
+        'conflict with a prepared update', '''
+        This error is generated when the application attempts to update
+        an already updated record which is in prepared state. An updated
+        record will be in prepared state, when the transaction that performed
+        the update is in prepared state.'''),
 ]
 
 # Update the #defines in the wiredtiger.in file.

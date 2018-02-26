@@ -30,7 +30,7 @@ __drop_file(
 	WT_RET(__wt_schema_backup_check(session, filename));
 	/* Close all btree handles associated with this file. */
 	WT_WITH_HANDLE_LIST_WRITE_LOCK(session,
-	    ret = __wt_conn_dhandle_close_all(session, uri, force));
+	    ret = __wt_conn_dhandle_close_all(session, uri, true, force));
 	WT_RET(ret);
 
 	/* Remove the metadata entry (ignore missing items). */

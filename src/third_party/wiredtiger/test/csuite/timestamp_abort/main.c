@@ -70,7 +70,6 @@ static const char * const uri_local = "table:local";
 static const char * const uri_oplog = "table:oplog";
 static const char * const uri_collection = "table:collection";
 
-static const char * const stable_store = "table:stable";
 static const char * const ckpt_file = "checkpoint_done";
 
 static bool compat, inmem, use_ts;
@@ -118,7 +117,6 @@ usage(void)
 static WT_THREAD_RET
 thread_ts_run(void *arg)
 {
-	WT_CURSOR *cur_stable;
 	WT_SESSION *session;
 	THREAD_DATA *td;
 	uint64_t i, last_ts, oldest_ts, this_ts;
@@ -128,9 +126,6 @@ thread_ts_run(void *arg)
 	last_ts = 0;
 
 	testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-	testutil_check(session->open_cursor(
-	    session, stable_store, NULL, NULL, &cur_stable));
-
 	/*
 	 * Every N records we will record our stable timestamp into the stable
 	 * table. That will define our threshold where we expect to find records
@@ -170,9 +165,6 @@ thread_ts_run(void *arg)
 			testutil_check(
 			    td->conn->set_timestamp(td->conn, tscfg));
 			last_ts = oldest_ts;
-			cur_stable->set_key(cur_stable, td->info);
-			cur_stable->set_value(cur_stable, oldest_ts);
-			testutil_check(cur_stable->insert(cur_stable));
 		} else
 ts_wait:		__wt_sleep(0, 1000);
 	}
@@ -392,8 +384,6 @@ run_workload(uint32_t nth)
 	 * Don't log the stable timestamp table so that we know what timestamp
 	 * was stored at the checkpoint.
 	 */
-	testutil_check(session->create(session, stable_store,
-	    "key_format=Q,value_format=Q,log=(enabled=false)"));
 	testutil_check(session->close(session, NULL));
 
 	/*
@@ -507,12 +497,12 @@ main(int argc, char *argv[])
 	FILE *fp;
 	REPORT c_rep[MAX_TH], l_rep[MAX_TH], o_rep[MAX_TH];
 	WT_CONNECTION *conn;
-	WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_stable;
+	WT_CURSOR *cur_coll, *cur_local, *cur_oplog;
 	WT_RAND_STATE rnd;
 	WT_SESSION *session;
 	pid_t pid;
 	uint64_t absent_coll, absent_local, absent_oplog, count, key, last_key;
-	uint64_t stable_fp, stable_val, val[MAX_TH+1];
+	uint64_t stable_fp, stable_val;
 	uint32_t i, nth, timeout;
 	int ch, status, ret;
 	const char *working_dir;
@@ -653,7 +643,7 @@ main(int argc, char *argv[])
 	 */
 	testutil_check(__wt_snprintf(buf, sizeof(buf),
 	    "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && "
-	    "cp -p WiredTigerLog.* ../%s.SAVE",
+	    "cp -p * ../%s.SAVE",
 	     home, home, home));
 	if ((status = system(buf)) < 0)
 		testutil_die(status, "system: %s", buf);
@@ -673,26 +663,17 @@ main(int argc, char *argv[])
 	    uri_local, NULL, NULL, &cur_local));
 	testutil_check(session->open_cursor(session,
 	    uri_oplog, NULL, NULL, &cur_oplog));
-	testutil_check(session->open_cursor(session,
-	    stable_store, NULL, NULL, &cur_stable));
 
 	/*
 	 * Find the biggest stable timestamp value that was saved.
 	 */
 	stable_val = 0;
-	memset(val, 0, sizeof(val));
-	while (cur_stable->next(cur_stable) == 0) {
-		testutil_check(cur_stable->get_key(cur_stable, &key));
-		testutil_check(cur_stable->get_value(cur_stable, &val[key]));
-		if (val[key] > stable_val)
-			stable_val = val[key];
-
-		if (use_ts)
-			printf("Stable: key %" PRIu64 " value %" PRIu64 "\n",
-			    key, val[key]);
-	}
-	if (use_ts)
+	if (use_ts) {
+		testutil_check(
+		    conn->query_timestamp(conn, buf, "get=recovery"));
+		sscanf(buf, "%" SCNx64, &stable_val);
 		printf("Got stable_val %" PRIu64 "\n", stable_val);
+	}
 
 	count = 0;
 	absent_coll = absent_local = absent_oplog = 0;
@@ -761,11 +742,11 @@ main(int argc, char *argv[])
 				 * larger than the saved one.
 				 */
 				if (!inmem &&
-				    stable_fp != 0 && stable_fp <= val[i]) {
+				    stable_fp != 0 && stable_fp <= stable_val) {
 					printf("%s: COLLECTION no record with "
 					    "key %" PRIu64 " record ts %" PRIu64
 					    " <= stable ts %" PRIu64 "\n",
-					    fname, key, stable_fp, val[i]);
+					    fname, key, stable_fp, stable_val);
 					absent_coll++;
 				}
 				if (c_rep[i].first_miss == INVALID_KEY)
@@ -778,6 +759,18 @@ main(int argc, char *argv[])
 				 * after absent records, a hole in our data.
 				 */
 				c_rep[i].exist_key = key;
+				fatal = true;
+			} else if (!inmem &&
+			    stable_fp != 0 && stable_fp > stable_val) {
+				/*
+				 * If we found a record, the stable timestamp
+				 * written to our file better be no larger
+				 * than the checkpoint one.
+				 */
+				printf("%s: COLLECTION record with "
+				    "key %" PRIu64 " record ts %" PRIu64
+				    " > stable ts %" PRIu64 "\n",
+				    fname, key, stable_fp, stable_val);
 				fatal = true;
 			}
 			/*
