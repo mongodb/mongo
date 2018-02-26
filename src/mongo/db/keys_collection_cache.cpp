@@ -67,7 +67,9 @@ StatusWith<KeysCollectionDocument> KeysCollectionCache::refresh(OperationContext
         // _cache cleared while we getting the new keys, just return the newest key without
         // touching the _cache so the next refresh will populate it properly.
         // Note: newKeys are sorted.
-        return std::move(newKeys.back());
+        if (!newKeys.empty()) {
+            return std::move(newKeys.back());
+        }
     }
 
     for (auto&& key : newKeys) {
