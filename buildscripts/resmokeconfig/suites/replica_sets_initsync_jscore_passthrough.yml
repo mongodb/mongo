@@ -77,6 +77,9 @@ selector:
   - jstests/core/profile_update.js
   # The downstream syncing node affects the top output.
   - jstests/core/top.js
+  # Restarting the catalog on the sync source will cause the downstream node to copy only a subset
+  # of the required data.
+  - jstests/core/restart_catalog.js
 
 run_hook_interval: &run_hook_interval 20
 executor:
