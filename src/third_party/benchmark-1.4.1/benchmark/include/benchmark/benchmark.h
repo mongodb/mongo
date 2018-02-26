@@ -1025,7 +1025,12 @@ class Fixture : public internal::Benchmark {
 // Check that __COUNTER__ is defined and that __COUNTER__ increases by 1
 // every time it is expanded. X + 1 == X + 0 is used in case X is defined to be
 // empty. If X is empty the expression becomes (+1 == +0).
-#if defined(__COUNTER__) && (__COUNTER__ + 1 == __COUNTER__ + 0)
+//
+// MONGODB MODIFICATION: all of our supported compilers support __COUNTER__ so we don't need to test
+// for it here.  This test interferes with -E -fdirectives-only since it is illegal to use
+// __COUNTER__ in an #if clause with that flag because its value could change between the partial
+// preprocessing and the compile phases.
+#if true // defined(__COUNTER__) && (__COUNTER__ + 1 == __COUNTER__ + 0)
 #define BENCHMARK_PRIVATE_UNIQUE_ID __COUNTER__
 #else
 #define BENCHMARK_PRIVATE_UNIQUE_ID __LINE__
