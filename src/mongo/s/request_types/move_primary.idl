@@ -70,6 +70,7 @@ structs:
     
     ShardMovePrimary:
         description: "The internal movePrimary command on a primary shard"
+        generate_comparison_operators: true
         strict: false
         fields:
             _movePrimary:

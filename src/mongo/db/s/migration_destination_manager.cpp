@@ -314,7 +314,7 @@ BSONObj MigrationDestinationManager::getMigrationStatusReport() {
 }
 
 Status MigrationDestinationManager::start(const NamespaceString& nss,
-                                          ScopedRegisterReceiveChunk scopedRegisterReceiveChunk,
+                                          ScopedReceiveChunk scopedReceiveChunk,
                                           const MigrationSessionId& sessionId,
                                           const ConnectionString& fromShardConnString,
                                           const ShardId& fromShard,
@@ -326,7 +326,7 @@ Status MigrationDestinationManager::start(const NamespaceString& nss,
                                           const WriteConcernOptions& writeConcern) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     invariant(!_sessionId);
-    invariant(!_scopedRegisterReceiveChunk);
+    invariant(!_scopedReceiveChunk);
 
     _state = READY;
     _stateChangedCV.notify_all();
@@ -348,7 +348,7 @@ Status MigrationDestinationManager::start(const NamespaceString& nss,
     _numSteady = 0;
 
     _sessionId = sessionId;
-    _scopedRegisterReceiveChunk = std::move(scopedRegisterReceiveChunk);
+    _scopedReceiveChunk = std::move(scopedReceiveChunk);
 
     // TODO: If we are here, the migrate thread must have completed, otherwise _active above
     // would be false, so this would never block. There is no better place with the current
@@ -474,7 +474,7 @@ void MigrationDestinationManager::_migrateThread(BSONObj min,
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _sessionId.reset();
-    _scopedRegisterReceiveChunk.reset();
+    _scopedReceiveChunk.reset();
     _isActiveCV.notify_all();
 }
 
@@ -487,7 +487,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* opCtx,
                                                  const WriteConcernOptions& writeConcern) {
     invariant(isActive());
     invariant(_sessionId);
-    invariant(_scopedRegisterReceiveChunk);
+    invariant(_scopedReceiveChunk);
     invariant(!min.isEmpty());
     invariant(!max.isEmpty());
 

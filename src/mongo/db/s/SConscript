@@ -70,6 +70,7 @@ env.Library(
     target='sharding',
     source=[
         'active_migrations_registry.cpp',
+        'active_move_primaries_registry.cpp',
         'chunk_move_write_concern_options.cpp',
         'chunk_splitter.cpp',
         'collection_range_deleter.cpp',
@@ -262,6 +263,7 @@ env.CppUnitTest(
     target='shard_test',
     source=[
         'active_migrations_registry_test.cpp',
+        'active_move_primaries_registry_test.cpp',
         'catalog_cache_loader_mock.cpp',
         'migration_chunk_cloner_source_legacy_test.cpp',
         'namespace_metadata_change_notifications_test.cpp',

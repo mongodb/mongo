@@ -120,29 +120,29 @@ public:
         // where we might have changed a shard's host by removing/adding a shard with the same name.
         Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
-        auto scopedRegisterMigration =
+        auto scopedMigration =
             uassertStatusOK(shardingState->registerDonateChunk(moveChunkRequest));
 
         Status status = {ErrorCodes::InternalError, "Uninitialized value"};
 
         // Check if there is an existing migration running and if so, join it
-        if (scopedRegisterMigration.mustExecute()) {
+        if (scopedMigration.mustExecute()) {
             try {
                 _runImpl(opCtx, moveChunkRequest);
                 status = Status::OK();
             } catch (const DBException& e) {
                 status = e.toStatus();
             } catch (const std::exception& e) {
-                scopedRegisterMigration.complete(
+                scopedMigration.signalComplete(
                     {ErrorCodes::InternalError,
                      str::stream() << "Severe error occurred while running moveChunk command: "
                                    << e.what()});
                 throw;
             }
 
-            scopedRegisterMigration.complete(status);
+            scopedMigration.signalComplete(status);
         } else {
-            status = scopedRegisterMigration.waitForCompletion(opCtx);
+            status = scopedMigration.waitForCompletion(opCtx);
         }
 
         if (status == ErrorCodes::ChunkTooBig) {

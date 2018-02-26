@@ -32,6 +32,8 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/sharding_state.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/util/log.h"
 
@@ -87,7 +89,11 @@ public:
                        "_movePrimary can only be run on shard servers"));
         }
 
-        auto movePrimaryRequest = MovePrimary::parse(IDLParserErrorContext("_movePrimary"), cmdObj);
+        auto shardingState = ShardingState::get(opCtx);
+        uassertStatusOK(shardingState->canAcceptShardedCommands());
+
+        const auto movePrimaryRequest =
+            ShardMovePrimary::parse(IDLParserErrorContext("_movePrimary"), cmdObj);
         const auto dbname = parseNs("", cmdObj);
 
         uassert(
@@ -116,6 +122,25 @@ public:
                 {ErrorCodes::InvalidOptions,
                  str::stream() << "you have to specify where you want to move it"});
         }
+
+        // Make sure we're as up-to-date as possible with shard information. This catches the case
+        // where we might have changed a shard's host by removing/adding a shard with the same name.
+        Grid::get(opCtx)->shardRegistry()->reload(opCtx);
+
+        auto scopedMovePrimary =
+            uassertStatusOK(shardingState->registerMovePrimary(movePrimaryRequest));
+
+        Status status = {ErrorCodes::InternalError, "Uninitialized value"};
+
+        // Check if there is an existing movePrimary running and if so, join it
+        if (scopedMovePrimary.mustExecute()) {
+            status = Status::OK();
+            scopedMovePrimary.signalComplete(status);
+        } else {
+            status = scopedMovePrimary.waitForCompletion(opCtx);
+        }
+
+        uassertStatusOK(status);
 
         return true;
     }

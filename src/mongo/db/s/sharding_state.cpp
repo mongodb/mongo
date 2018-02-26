@@ -390,13 +390,13 @@ StatusWith<bool> ShardingState::initializeShardingAwarenessIfNeeded(OperationCon
     }
 }
 
-StatusWith<ScopedRegisterDonateChunk> ShardingState::registerDonateChunk(
-    const MoveChunkRequest& args) {
+StatusWith<ScopedDonateChunk> ShardingState::registerDonateChunk(const MoveChunkRequest& args) {
     return _activeMigrationsRegistry.registerDonateChunk(args);
 }
 
-StatusWith<ScopedRegisterReceiveChunk> ShardingState::registerReceiveChunk(
-    const NamespaceString& nss, const ChunkRange& chunkRange, const ShardId& fromShardId) {
+StatusWith<ScopedReceiveChunk> ShardingState::registerReceiveChunk(const NamespaceString& nss,
+                                                                   const ChunkRange& chunkRange,
+                                                                   const ShardId& fromShardId) {
     return _activeMigrationsRegistry.registerReceiveChunk(nss, chunkRange, fromShardId);
 }
 
@@ -406,6 +406,15 @@ boost::optional<NamespaceString> ShardingState::getActiveDonateChunkNss() {
 
 BSONObj ShardingState::getActiveMigrationStatusReport(OperationContext* opCtx) {
     return _activeMigrationsRegistry.getActiveMigrationStatusReport(opCtx);
+}
+
+StatusWith<ScopedMovePrimary> ShardingState::registerMovePrimary(
+    const ShardMovePrimary& requestArgs) {
+    return _activeMovePrimariesRegistry.registerMovePrimary(requestArgs);
+}
+
+boost::optional<NamespaceString> ShardingState::getActiveMovePrimaryNss() {
+    return _activeMovePrimariesRegistry.getActiveMovePrimaryNss();
 }
 
 void ShardingState::appendInfo(OperationContext* opCtx, BSONObjBuilder& builder) {

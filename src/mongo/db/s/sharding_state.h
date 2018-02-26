@@ -35,6 +35,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/active_move_primaries_registry.h"
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/stdx/functional.h"
@@ -156,26 +157,26 @@ public:
 
     /**
      * If there are no migrations running on this shard, registers an active migration with the
-     * specified arguments and returns a ScopedRegisterDonateChunk, which must be signaled by the
+     * specified arguments and returns a ScopedDonateChunk, which must be signaled by the
      * caller before it goes out of scope.
      *
      * If there is an active migration already running on this shard and it has the exact same
-     * arguments, returns a ScopedRegisterDonateChunk, which can be used to join the existing one.
+     * arguments, returns a ScopedDonateChunk, which can be used to join the existing one.
      *
-     * Othwerwise returns a ConflictingOperationInProgress error.
+     * Otherwise returns a ConflictingOperationInProgress error.
      */
-    StatusWith<ScopedRegisterDonateChunk> registerDonateChunk(const MoveChunkRequest& args);
+    StatusWith<ScopedDonateChunk> registerDonateChunk(const MoveChunkRequest& args);
 
     /**
      * If there are no migrations running on this shard, registers an active receive operation with
-     * the specified session id and returns a ScopedRegisterReceiveChunk, which will unregister it
+     * the specified session id and returns a ScopedReceiveChunk, which will unregister it
      * when it goes out of scope.
      *
      * Otherwise returns a ConflictingOperationInProgress error.
      */
-    StatusWith<ScopedRegisterReceiveChunk> registerReceiveChunk(const NamespaceString& nss,
-                                                                const ChunkRange& chunkRange,
-                                                                const ShardId& fromShardId);
+    StatusWith<ScopedReceiveChunk> registerReceiveChunk(const NamespaceString& nss,
+                                                        const ChunkRange& chunkRange,
+                                                        const ShardId& fromShardId);
 
     /**
      * If a migration has been previously registered through a call to registerDonateChunk returns
@@ -193,6 +194,26 @@ public:
      * Takes an IS lock on the namespace of the active migration, if one is active.
      */
     BSONObj getActiveMigrationStatusReport(OperationContext* opCtx);
+
+    /**
+     * If there are no movePrimary operations running on this shard, registers an active
+     * movePrimary operation with the specified arguments. Returns a ScopedMovePrimary, which must
+     * be signaled by the caller before it goes out of scope.
+     *
+     * If there is an active movePrimary operation already running on this shard and it has the
+     * exact same arguments, returns a ScopedMovePrimary, which can be used to join the already
+     * running movePrimary command.
+     *
+     * Otherwise returns a ConflictingOperationInProgress error.
+     */
+    StatusWith<ScopedMovePrimary> registerMovePrimary(const ShardMovePrimary& requestArgs);
+
+    /**
+     * If a movePrimary command has been previously registered through a call to
+     * registerMovePrimary,
+     * returns that namespace. Otherwise returns boost::none.
+     */
+    boost::optional<NamespaceString> getActiveMovePrimaryNss();
 
     /**
      * For testing only. Mock the initialization method used by initializeFromConfigConnString and
@@ -244,6 +265,9 @@ private:
 
     // Tracks the active move chunk operations running on this shard
     ActiveMigrationsRegistry _activeMigrationsRegistry;
+
+    // Tracks the active move primary operations running on this shard
+    ActiveMovePrimariesRegistry _activeMovePrimariesRegistry;
 
     // Handles asynchronous auto-splitting of chunks
     std::unique_ptr<ChunkSplitter> _chunkSplitter;

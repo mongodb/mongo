@@ -117,12 +117,12 @@ public:
             uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj)));
 
         // Ensure this shard is not currently receiving or donating any chunks.
-        auto scopedRegisterReceiveChunk(
+        auto scopedReceiveChunk(
             uassertStatusOK(shardingState->registerReceiveChunk(nss, chunkRange, fromShard)));
 
         uassertStatusOK(MigrationDestinationManager::get(opCtx)->start(
             nss,
-            std::move(scopedRegisterReceiveChunk),
+            std::move(scopedReceiveChunk),
             migrationSessionId,
             statusWithFromShardConnectionString.getValue(),
             fromShard,
