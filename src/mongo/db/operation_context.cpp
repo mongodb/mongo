@@ -382,15 +382,17 @@ OperationContext::RecoveryUnitState OperationContext::setRecoveryUnit(RecoveryUn
     return oldState;
 }
 
-std::unique_ptr<Locker> OperationContext::releaseLockState() {
-    dassert(_locker);
-    return std::move(_locker);
+void OperationContext::setLockState(std::unique_ptr<Locker> locker) {
+    invariant(!_locker);
+    invariant(locker);
+    _locker = std::move(locker);
 }
 
-void OperationContext::setLockState(std::unique_ptr<Locker> locker) {
-    dassert(!_locker);
-    dassert(locker);
-    _locker = std::move(locker);
+std::unique_ptr<Locker> OperationContext::swapLockState(std::unique_ptr<Locker> locker) {
+    invariant(_locker);
+    invariant(locker);
+    _locker.swap(locker);
+    return locker;
 }
 
 Date_t OperationContext::getExpirationDateForWaitForValue(Milliseconds waitFor) {

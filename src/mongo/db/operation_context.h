@@ -131,10 +131,9 @@ public:
     void setLockState(std::unique_ptr<Locker> locker);
 
     /**
-     * Releases the locker to the caller. Call during OperationContext cleanup or initialization,
-     * only.
+     * Swaps the locker, releasing the old locker to the caller.
      */
-    std::unique_ptr<Locker> releaseLockState();
+    std::unique_ptr<Locker> swapLockState(std::unique_ptr<Locker> locker);
 
     /**
      * Raises a AssertionException if this operation is in a killed state.

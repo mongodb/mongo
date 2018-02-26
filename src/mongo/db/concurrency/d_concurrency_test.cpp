@@ -87,7 +87,6 @@ public:
      */
     ServiceContext::UniqueOperationContext makeOpCtx() const {
         auto opCtx = _client->makeOperationContext();
-        opCtx->releaseLockState();
         return opCtx;
     }
 
@@ -105,8 +104,7 @@ public:
             auto client = getGlobalServiceContext()->makeClient(
                 str::stream() << "test client for thread " << i);
             auto opCtx = client->makeOperationContext();
-            opCtx->releaseLockState();
-            opCtx->setLockState(stdx::make_unique<LockerType>());
+            opCtx->swapLockState(stdx::make_unique<LockerType>());
             clients.emplace_back(std::move(client), std::move(opCtx));
         }
         return clients;
@@ -166,13 +164,13 @@ private:
 
 TEST_F(DConcurrencyTestFixture, WriteConflictRetryInstantiatesOK) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     writeConflictRetry(opCtx.get(), "", "", [] {});
 }
 
 TEST_F(DConcurrencyTestFixture, WriteConflictRetryRetriesFunctionOnWriteConflictException) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto&& opDebug = CurOp::get(opCtx.get())->debug();
     ASSERT_EQUALS(0LL, opDebug.writeConflicts);
     ASSERT_EQUALS(100, writeConflictRetry(opCtx.get(), "", "", [&opDebug] {
@@ -186,7 +184,7 @@ TEST_F(DConcurrencyTestFixture, WriteConflictRetryRetriesFunctionOnWriteConflict
 
 TEST_F(DConcurrencyTestFixture, WriteConflictRetryPropagatesNonWriteConflictException) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     ASSERT_THROWS_CODE(writeConflictRetry(opCtx.get(),
                                           "",
                                           "",
@@ -201,7 +199,7 @@ TEST_F(DConcurrencyTestFixture, WriteConflictRetryPropagatesNonWriteConflictExce
 TEST_F(DConcurrencyTestFixture,
        WriteConflictRetryPropagatesWriteConflictExceptionIfAlreadyInAWriteUnitOfWork) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     Lock::GlobalWrite globalWrite(opCtx.get());
     WriteUnitOfWork wuow(opCtx.get());
     ASSERT_THROWS(writeConflictRetry(opCtx.get(), "", "", [] { throw WriteConflictException(); }),
@@ -292,21 +290,21 @@ TEST_F(DConcurrencyTestFixture, ResourceMutex) {
 
 TEST_F(DConcurrencyTestFixture, GlobalRead) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     Lock::GlobalRead globalRead(opCtx.get());
     ASSERT(opCtx->lockState()->isR());
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalWrite) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     Lock::GlobalWrite globalWrite(opCtx.get());
     ASSERT(opCtx->lockState()->isW());
 }
 
 TEST_F(DConcurrencyTestFixture, GlobalWriteAndGlobalRead) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
 
     Lock::GlobalWrite globalWrite(opCtx.get());
@@ -323,7 +321,7 @@ TEST_F(DConcurrencyTestFixture, GlobalWriteAndGlobalRead) {
 TEST_F(DConcurrencyTestFixture,
        GlobalWriteRequiresExplicitDowngradeToIntentWriteModeIfDestroyedWhileHoldingDatabaseLock) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
 
     const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
@@ -371,7 +369,7 @@ TEST_F(DConcurrencyTestFixture,
 TEST_F(DConcurrencyTestFixture,
        GlobalWriteRequiresSupportsDowngradeToIntentWriteModeWhileHoldingDatabaseLock) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
 
     const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
@@ -418,7 +416,7 @@ TEST_F(DConcurrencyTestFixture,
 TEST_F(DConcurrencyTestFixture,
        NestedGlobalWriteSupportsDowngradeToIntentWriteModeWhileHoldingDatabaseLock) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
 
     const ResourceId globalId(RESOURCE_GLOBAL, ResourceId::SINGLETON_GLOBAL);
@@ -608,7 +606,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockX_TimeoutDueToGlobalLockX) {
 
 TEST_F(DConcurrencyTestFixture, TempReleaseGlobalWrite) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
     Lock::GlobalWrite globalWrite(opCtx.get());
 
@@ -622,7 +620,7 @@ TEST_F(DConcurrencyTestFixture, TempReleaseGlobalWrite) {
 
 TEST_F(DConcurrencyTestFixture, TempReleaseRecursive) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
     Lock::GlobalWrite globalWrite(opCtx.get());
     Lock::DBLock lk(opCtx.get(), "SomeDBName", MODE_X);
@@ -638,7 +636,7 @@ TEST_F(DConcurrencyTestFixture, TempReleaseRecursive) {
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesS) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     Lock::DBLock dbRead(opCtx.get(), "db", MODE_S);
 
     const ResourceId resIdDb(RESOURCE_DATABASE, std::string("db"));
@@ -647,7 +645,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesS) {
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesX) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     Lock::DBLock dbWrite(opCtx.get(), "db", MODE_X);
 
     const ResourceId resIdDb(RESOURCE_DATABASE, std::string("db"));
@@ -656,7 +654,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesX) {
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesISForAdminIS) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     Lock::DBLock dbRead(opCtx.get(), "admin", MODE_IS);
 
     ASSERT(opCtx->lockState()->getLockMode(resourceIdAdminDB) == MODE_IS);
@@ -664,7 +662,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesISForAdminIS) {
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesSForAdminS) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     Lock::DBLock dbRead(opCtx.get(), "admin", MODE_S);
 
     ASSERT(opCtx->lockState()->getLockMode(resourceIdAdminDB) == MODE_S);
@@ -672,7 +670,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesSForAdminS) {
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesXForAdminIX) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     Lock::DBLock dbWrite(opCtx.get(), "admin", MODE_IX);
 
     ASSERT(opCtx->lockState()->getLockMode(resourceIdAdminDB) == MODE_X);
@@ -680,7 +678,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesXForAdminIX) {
 
 TEST_F(DConcurrencyTestFixture, DBLockTakesXForAdminX) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     Lock::DBLock dbWrite(opCtx.get(), "admin", MODE_X);
 
     ASSERT(opCtx->lockState()->getLockMode(resourceIdAdminDB) == MODE_X);
@@ -688,7 +686,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesXForAdminX) {
 
 TEST_F(DConcurrencyTestFixture, MultipleWriteDBLocksOnSameThread) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     Lock::DBLock r1(opCtx.get(), "db1", MODE_X);
     Lock::DBLock r2(opCtx.get(), "db1", MODE_X);
 
@@ -697,7 +695,7 @@ TEST_F(DConcurrencyTestFixture, MultipleWriteDBLocksOnSameThread) {
 
 TEST_F(DConcurrencyTestFixture, MultipleConflictingDBLocksOnSameThread) {
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
     Lock::DBLock r1(opCtx.get(), "db1", MODE_X);
     Lock::DBLock r2(opCtx.get(), "db1", MODE_S);
@@ -710,7 +708,7 @@ TEST_F(DConcurrencyTestFixture, IsDbLockedForSMode) {
     const std::string dbName("db");
 
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
     Lock::DBLock dbLock(opCtx.get(), dbName, MODE_S);
 
@@ -724,7 +722,7 @@ TEST_F(DConcurrencyTestFixture, IsDbLockedForXMode) {
     const std::string dbName("db");
 
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
     Lock::DBLock dbLock(opCtx.get(), dbName, MODE_X);
 
@@ -738,7 +736,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {
     const std::string ns("db1.coll");
 
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
 
     Lock::DBLock dbLock(opCtx.get(), "db1", MODE_IS);
@@ -769,7 +767,7 @@ TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IX) {
     const std::string ns("db1.coll");
 
     auto opCtx = makeOpCtx();
-    opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+    opCtx->swapLockState(stdx::make_unique<MMAPV1LockerImpl>());
     auto lockState = opCtx->lockState();
 
     Lock::DBLock dbLock(opCtx.get(), "db1", MODE_IX);
