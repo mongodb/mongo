@@ -126,7 +126,10 @@ env.Substfile(
     ],
     SUBST_DICT=replacements)
 
+env.Command('wiredtiger_ext.h', 'src/include/wiredtiger_ext.h', Copy("$TARGET", "$SOURCE"))
+
 env.Alias('generated-sources', "wiredtiger.h")
+env.Alias('generated-sources', "wiredtiger_ext.h")
 
 #
 # WiredTiger library
