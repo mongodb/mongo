@@ -217,6 +217,8 @@ var Cluster = function(options) {
                     // Increase the oplog size (in MB) to prevent rollover
                     // during write-heavy workloads
                     oplogSize: 1024,
+                    // Set the electionTimeoutMillis to 1 day to prevent unintended elections
+                    settings: {electionTimeoutMillis: 60 * 60 * 24 * 1000},
                     verbose: verbosityLevel
                 };
                 shardConfig.rsOptions = {};
@@ -286,7 +288,9 @@ var Cluster = function(options) {
                 nodes: makeReplSetTestConfig(options.replication.numNodes),
                 // Increase the oplog size (in MB) to prevent rollover during write-heavy workloads
                 oplogSize: 1024,
-                nodeOptions: {verbose: verbosityLevel}
+                nodeOptions: {verbose: verbosityLevel},
+                // Set the electionTimeoutMillis to 1 day to prevent unintended elections
+                settings: {electionTimeoutMillis: 60 * 60 * 24 * 1000}
             };
 
             var rst = new ReplSetTest(replSetConfig);
