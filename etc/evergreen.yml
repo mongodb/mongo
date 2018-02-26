@@ -4604,16 +4604,19 @@ tasks:
 
         # Create the jira credentials configuration file
         cat > ~/.jira.yml <<END_OF_CREDS
-        user: "${testlifecycle_jira_user}"
-        password: "${testlifecycle_jira_password}"
         server: "https://jira.mongodb.org"
+        access_token: "${testlifecycle_jira_access_token}"
+        access_token_secret: "${testlifecycle_jira_access_token_secret}"
+        consumer_key: "${testlifecycle_jira_consumer_key}"
+        key_cert: |
+        $(echo "${testlifecycle_jira_key_certificate}" | sed  's/^/  /')
         END_OF_CREDS
 
         set -o verbose
 
         ${activate_virtualenv}
-        # Install Python jira client with pip until it is available in the toolchain
-        pip install jira==1.0.10
+        # Install Python modules to support OAuth with pip until it is available in the toolchain.
+        pip install cryptography==1.7.2 pyjwt==1.5.3
 
         # We use a small batch size to avoid hitting the load balancer timeout if the Evergreen
         # API query is not fast enough.

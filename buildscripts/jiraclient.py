@@ -12,11 +12,34 @@ class JiraClient(object):
     FIXED_RESOLUTION_NAME = "Fixed"
     WONT_FIX_RESOLUTION_NAME = "Won't Fix"
 
-    def __init__(self, server, username, password):
+    def __init__(self,
+                 server,
+                 username=None,
+                 password=None,
+                 access_token=None,
+                 access_token_secret=None,
+                 consumer_key=None,
+                 key_cert=None):
         """Initialize the JiraClient with the server URL and user credentials."""
         opts = {"server": server, "verify": True}
-        auth = (username, password)
-        self._jira = jira.JIRA(options=opts, basic_auth=auth)
+        basic_auth = None
+        oauth_dict = None
+        if access_token and access_token_secret and consumer_key and key_cert:
+            oauth_dict = {
+                "access_token": access_token,
+                "access_token_secret": access_token_secret,
+                "consumer_key": consumer_key,
+                "key_cert": key_cert
+            }
+        elif username and password:
+            basic_auth = (username, password)
+        else:
+            raise TypeError("Must specify Basic Auth (using arguments username & password)"
+                            " or OAuth (using arguments access_token, access_token_secret,"
+                            " consumer_key & key_cert_file) credentials")
+        self._jira = jira.JIRA(
+            options=opts, basic_auth=basic_auth, oauth=oauth_dict, validate=True)
+
         self._transitions = {}
         self._resolutions = {}
 
