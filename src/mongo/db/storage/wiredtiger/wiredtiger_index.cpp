@@ -1388,9 +1388,10 @@ Status WiredTigerIndexUniqueV2::_insert(WT_CURSOR* c,
         c->set_value(c, emptyItem.Get());
         ret = WT_OP_CHECK(c->insert(c));
 
-        // If prefix key insertion failed, throw an exception which will be retried.
+        // An entry with prefix key already exists. This can happen only during rolling upgrade when
+        // both old and new format index key could be present.
         if (ret == WT_DUPLICATE_KEY) {
-            throw WriteConflictException();
+            return dupKeyError(key);
         }
         invariantWTOK(ret);
 
@@ -1535,9 +1536,6 @@ void WiredTigerIndexUnique::_unindex(WT_CURSOR* c,
     invariantWTOK(c->update(c));
 }
 
-/**
- * This is duplicate of `WiredTigerIndexStandard::_unindex` at the moment; might change later.
- */
 void WiredTigerIndexUniqueV2::_unindex(WT_CURSOR* c,
                                        const BSONObj& key,
                                        const RecordId& id,
@@ -1548,16 +1546,27 @@ void WiredTigerIndexUniqueV2::_unindex(WT_CURSOR* c,
     int ret = WT_OP_CHECK(c->remove(c));
     if (ret != WT_NOTFOUND) {
         invariantWTOK(ret);
-    } else {
-        // WT_NOTFOUND is only expected during a background index build. Insert a dummy value and
-        // delete it again to trigger a write conflict in case this is being concurrently indexed by
-        // the background indexer.
-        setKey(c, item.Get());
-        c->set_value(c, emptyItem.Get());
-        invariantWTOK(WT_OP_CHECK(c->insert(c)));
-        setKey(c, item.Get());
-        invariantWTOK(WT_OP_CHECK(c->remove(c)));
+        return;
     }
+
+    // WT_NOTFOUND is possible if index key is in old format. Retry removal of key using old format.
+    KeyString oldFormatKey(keyStringVersion(), key, _ordering);
+    WiredTigerItem keyItem(oldFormatKey.getBuffer(), oldFormatKey.getSize());
+    setKey(c, keyItem.Get());
+
+    ret = WT_OP_CHECK(c->remove(c));
+    if (ret != WT_NOTFOUND) {
+        invariantWTOK(ret);
+        return;
+    }
+    // Otherwise WT_NOTFOUND is only expected during a background index build. Insert a dummy value
+    // and delete it again to trigger a write conflict in case this is being concurrently indexed
+    // by the background indexer.
+    setKey(c, item.Get());
+    c->set_value(c, emptyItem.Get());
+    invariantWTOK(WT_OP_CHECK(c->insert(c)));
+    setKey(c, item.Get());
+    invariantWTOK(WT_OP_CHECK(c->remove(c)));
 }
 // ------------------------------
 
