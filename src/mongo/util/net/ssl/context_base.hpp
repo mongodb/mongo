@@ -12,8 +12,8 @@
 #define ASIO_SSL_CONTEXT_BASE_HPP
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1200)
-# pragma once
-#endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
+#pragma once
+#endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
 
@@ -28,138 +28,134 @@ namespace ssl {
 
 /// The context_base class is used as a base for the basic_context class
 /// template so that we have a common place to define various enums.
-class context_base
-{
+class context_base {
 public:
-  /// Different methods supported by a context.
-  enum method
-  {
-    /// Generic SSL version 2.
-    sslv2,
+    /// Different methods supported by a context.
+    enum method {
+        /// Generic SSL version 2.
+        sslv2,
 
-    /// SSL version 2 client.
-    sslv2_client,
+        /// SSL version 2 client.
+        sslv2_client,
 
-    /// SSL version 2 server.
-    sslv2_server,
+        /// SSL version 2 server.
+        sslv2_server,
 
-    /// Generic SSL version 3.
-    sslv3,
+        /// Generic SSL version 3.
+        sslv3,
 
-    /// SSL version 3 client.
-    sslv3_client,
+        /// SSL version 3 client.
+        sslv3_client,
 
-    /// SSL version 3 server.
-    sslv3_server,
+        /// SSL version 3 server.
+        sslv3_server,
 
-    /// Generic TLS version 1.
-    tlsv1,
+        /// Generic TLS version 1.
+        tlsv1,
 
-    /// TLS version 1 client.
-    tlsv1_client,
+        /// TLS version 1 client.
+        tlsv1_client,
 
-    /// TLS version 1 server.
-    tlsv1_server,
+        /// TLS version 1 server.
+        tlsv1_server,
 
-    /// Generic SSL/TLS.
-    sslv23,
+        /// Generic SSL/TLS.
+        sslv23,
 
-    /// SSL/TLS client.
-    sslv23_client,
+        /// SSL/TLS client.
+        sslv23_client,
 
-    /// SSL/TLS server.
-    sslv23_server,
+        /// SSL/TLS server.
+        sslv23_server,
 
-    /// Generic TLS version 1.1.
-    tlsv11,
+        /// Generic TLS version 1.1.
+        tlsv11,
 
-    /// TLS version 1.1 client.
-    tlsv11_client,
+        /// TLS version 1.1 client.
+        tlsv11_client,
 
-    /// TLS version 1.1 server.
-    tlsv11_server,
+        /// TLS version 1.1 server.
+        tlsv11_server,
 
-    /// Generic TLS version 1.2.
-    tlsv12,
+        /// Generic TLS version 1.2.
+        tlsv12,
 
-    /// TLS version 1.2 client.
-    tlsv12_client,
+        /// TLS version 1.2 client.
+        tlsv12_client,
 
-    /// TLS version 1.2 server.
-    tlsv12_server,
+        /// TLS version 1.2 server.
+        tlsv12_server,
 
-    /// Generic TLS.
-    tls,
+        /// Generic TLS.
+        tls,
 
-    /// TLS client.
-    tls_client,
+        /// TLS client.
+        tls_client,
 
-    /// TLS server.
-    tls_server
-  };
+        /// TLS server.
+        tls_server
+    };
 
-  /// Bitmask type for SSL options.
-  typedef long options;
+    /// Bitmask type for SSL options.
+    typedef long options;
 
 #if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 #if defined(GENERATING_DOCUMENTATION)
-  /// Implement various bug workarounds.
-  static const long default_workarounds = implementation_defined;
+    /// Implement various bug workarounds.
+    static const long default_workarounds = implementation_defined;
 
-  /// Always create a new key when using tmp_dh parameters.
-  static const long single_dh_use = implementation_defined;
+    /// Always create a new key when using tmp_dh parameters.
+    static const long single_dh_use = implementation_defined;
 
-  /// Disable SSL v2.
-  static const long no_sslv2 = implementation_defined;
+    /// Disable SSL v2.
+    static const long no_sslv2 = implementation_defined;
 
-  /// Disable SSL v3.
-  static const long no_sslv3 = implementation_defined;
+    /// Disable SSL v3.
+    static const long no_sslv3 = implementation_defined;
 
-  /// Disable TLS v1.
-  static const long no_tlsv1 = implementation_defined;
+    /// Disable TLS v1.
+    static const long no_tlsv1 = implementation_defined;
 
-  /// Disable TLS v1.1.
-  static const long no_tlsv1_1 = implementation_defined;
+    /// Disable TLS v1.1.
+    static const long no_tlsv1_1 = implementation_defined;
 
-  /// Disable TLS v1.2.
-  static const long no_tlsv1_2 = implementation_defined;
+    /// Disable TLS v1.2.
+    static const long no_tlsv1_2 = implementation_defined;
 
-  /// Disable compression. Compression is disabled by default.
-  static const long no_compression = implementation_defined;
+    /// Disable compression. Compression is disabled by default.
+    static const long no_compression = implementation_defined;
 #else
-  ASIO_STATIC_CONSTANT(long, default_workarounds = SSL_OP_ALL);
-  ASIO_STATIC_CONSTANT(long, single_dh_use = SSL_OP_SINGLE_DH_USE);
-  ASIO_STATIC_CONSTANT(long, no_sslv2 = SSL_OP_NO_SSLv2);
-  ASIO_STATIC_CONSTANT(long, no_sslv3 = SSL_OP_NO_SSLv3);
-  ASIO_STATIC_CONSTANT(long, no_tlsv1 = SSL_OP_NO_TLSv1);
-# if defined(SSL_OP_NO_TLSv1_1)
-  ASIO_STATIC_CONSTANT(long, no_tlsv1_1 = SSL_OP_NO_TLSv1_1);
-# else // defined(SSL_OP_NO_TLSv1_1)
-  ASIO_STATIC_CONSTANT(long, no_tlsv1_1 = 0x10000000L);
-# endif // defined(SSL_OP_NO_TLSv1_1)
-# if defined(SSL_OP_NO_TLSv1_2)
-  ASIO_STATIC_CONSTANT(long, no_tlsv1_2 = SSL_OP_NO_TLSv1_2);
-# else // defined(SSL_OP_NO_TLSv1_2)
-  ASIO_STATIC_CONSTANT(long, no_tlsv1_2 = 0x08000000L);
-# endif // defined(SSL_OP_NO_TLSv1_2)
-# if defined(SSL_OP_NO_COMPRESSION)
-  ASIO_STATIC_CONSTANT(long, no_compression = SSL_OP_NO_COMPRESSION);
-# else // defined(SSL_OP_NO_COMPRESSION)
-  ASIO_STATIC_CONSTANT(long, no_compression = 0x20000L);
-# endif // defined(SSL_OP_NO_COMPRESSION)
+    ASIO_STATIC_CONSTANT(long, default_workarounds = SSL_OP_ALL);
+    ASIO_STATIC_CONSTANT(long, single_dh_use = SSL_OP_SINGLE_DH_USE);
+    ASIO_STATIC_CONSTANT(long, no_sslv2 = SSL_OP_NO_SSLv2);
+    ASIO_STATIC_CONSTANT(long, no_sslv3 = SSL_OP_NO_SSLv3);
+    ASIO_STATIC_CONSTANT(long, no_tlsv1 = SSL_OP_NO_TLSv1);
+#if defined(SSL_OP_NO_TLSv1_1)
+    ASIO_STATIC_CONSTANT(long, no_tlsv1_1 = SSL_OP_NO_TLSv1_1);
+#else   // defined(SSL_OP_NO_TLSv1_1)
+    ASIO_STATIC_CONSTANT(long, no_tlsv1_1 = 0x10000000L);
+#endif  // defined(SSL_OP_NO_TLSv1_1)
+#if defined(SSL_OP_NO_TLSv1_2)
+    ASIO_STATIC_CONSTANT(long, no_tlsv1_2 = SSL_OP_NO_TLSv1_2);
+#else   // defined(SSL_OP_NO_TLSv1_2)
+    ASIO_STATIC_CONSTANT(long, no_tlsv1_2 = 0x08000000L);
+#endif  // defined(SSL_OP_NO_TLSv1_2)
+#if defined(SSL_OP_NO_COMPRESSION)
+    ASIO_STATIC_CONSTANT(long, no_compression = SSL_OP_NO_COMPRESSION);
+#else   // defined(SSL_OP_NO_COMPRESSION)
+    ASIO_STATIC_CONSTANT(long, no_compression = 0x20000L);
+#endif  // defined(SSL_OP_NO_COMPRESSION)
 #endif
 #endif
 
 protected:
-  /// Protected destructor to prevent deletion through this type.
-  ~context_base()
-  {
-  }
+    /// Protected destructor to prevent deletion through this type.
+    ~context_base() {}
 };
 
-} // namespace ssl
-} // namespace asio
+}  // namespace ssl
+}  // namespace asio
 
 #include "asio/detail/pop_options.hpp"
 
-#endif // ASIO_SSL_CONTEXT_BASE_HPP
+#endif  // ASIO_SSL_CONTEXT_BASE_HPP

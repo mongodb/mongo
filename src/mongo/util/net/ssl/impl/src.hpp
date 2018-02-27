@@ -16,27 +16,26 @@
 #include "asio/detail/config.hpp"
 
 #if defined(ASIO_HEADER_ONLY)
-# error Do not compile Asio library source with ASIO_HEADER_ONLY defined
+#error Do not compile Asio library source with ASIO_HEADER_ONLY defined
 #endif
 
 #if MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS
 
-#include "mongo/util/net/ssl/impl/context_schannel.ipp"
-#include "mongo/util/net/ssl/impl/error.ipp"
 #include "mongo/util/net/ssl/detail/impl/engine_schannel.ipp"
 #include "mongo/util/net/ssl/detail/impl/schannel.ipp"
+#include "mongo/util/net/ssl/impl/context_schannel.ipp"
+#include "mongo/util/net/ssl/impl/error.ipp"
 
 
 #elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
 
+#include "mongo/util/net/ssl/detail/impl/engine_openssl.ipp"
 #include "mongo/util/net/ssl/impl/context_openssl.ipp"
 #include "mongo/util/net/ssl/impl/error.ipp"
-#include "mongo/util/net/ssl/detail/impl/engine_openssl.ipp"
 
 #else
 #error "Unknown SSL Provider"
 #endif
 
 
-
-#endif // ASIO_SSL_IMPL_SRC_HPP
+#endif  // ASIO_SSL_IMPL_SRC_HPP

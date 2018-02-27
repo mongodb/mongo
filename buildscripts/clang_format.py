@@ -275,7 +275,7 @@ class ClangFormat(object):
 
         return formatted
 
-files_re = re.compile('\\.(h|cpp|js)$')
+files_re = re.compile('\\.(h|hpp|ipp|cpp|js)$')
 
 def is_interesting_file(file_name):
     """"Return true if this file should be checked

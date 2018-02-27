@@ -12,8 +12,8 @@
 #define ASIO_SSL_DETAIL_READ_OP_HPP
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1200)
-# pragma once
-#endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
+#pragma once
+#endif  // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
 
@@ -27,41 +27,35 @@ namespace ssl {
 namespace detail {
 
 template <typename MutableBufferSequence>
-class read_op
-{
+class read_op {
 public:
-  read_op(const MutableBufferSequence& buffers)
-    : buffers_(buffers)
-  {
-  }
+    read_op(const MutableBufferSequence& buffers) : buffers_(buffers) {}
 
-  engine::want operator()(engine& eng,
-      asio::error_code& ec,
-      std::size_t& bytes_transferred) const
-  {
-    asio::mutable_buffer buffer =
-      asio::detail::buffer_sequence_adapter<asio::mutable_buffer,
-        MutableBufferSequence>::first(buffers_);
+    engine::want operator()(engine& eng,
+                            asio::error_code& ec,
+                            std::size_t& bytes_transferred) const {
+        asio::mutable_buffer buffer =
+            asio::detail::buffer_sequence_adapter<asio::mutable_buffer,
+                                                  MutableBufferSequence>::first(buffers_);
 
-    return eng.read(buffer, ec, bytes_transferred);
-  }
+        return eng.read(buffer, ec, bytes_transferred);
+    }
 
-  template <typename Handler>
-  void call_handler(Handler& handler,
-      const asio::error_code& ec,
-      const std::size_t& bytes_transferred) const
-  {
-    handler(ec, bytes_transferred);
-  }
+    template <typename Handler>
+    void call_handler(Handler& handler,
+                      const asio::error_code& ec,
+                      const std::size_t& bytes_transferred) const {
+        handler(ec, bytes_transferred);
+    }
 
 private:
-  MutableBufferSequence buffers_;
+    MutableBufferSequence buffers_;
 };
 
-} // namespace detail
-} // namespace ssl
-} // namespace asio
+}  // namespace detail
+}  // namespace ssl
+}  // namespace asio
 
 #include "asio/detail/pop_options.hpp"
 
-#endif // ASIO_SSL_DETAIL_READ_OP_HPP
+#endif  // ASIO_SSL_DETAIL_READ_OP_HPP
