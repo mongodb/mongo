@@ -27,6 +27,7 @@
 
 #include "mongo/base/initializer.h"
 
+#include "mongo/base/deinitializer_context.h"
 #include "mongo/base/global_initializer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/quick_exit.h"
@@ -37,8 +38,8 @@ namespace mongo {
 Initializer::Initializer() {}
 Initializer::~Initializer() {}
 
-Status Initializer::execute(const InitializerContext::ArgumentVector& args,
-                            const InitializerContext::EnvironmentMap& env) const {
+Status Initializer::executeInitializers(const InitializerContext::ArgumentVector& args,
+                                        const InitializerContext::EnvironmentMap& env) {
     std::vector<std::string> sortedNodes;
     Status status = _graph.topSort(&sortedNodes);
     if (Status::OK() != status)
@@ -47,7 +48,14 @@ Status Initializer::execute(const InitializerContext::ArgumentVector& args,
     InitializerContext context(args, env);
 
     for (size_t i = 0; i < sortedNodes.size(); ++i) {
-        InitializerFunction fn = _graph.getInitializerFunction(sortedNodes[i]);
+        InitializerDependencyNode* node = _graph.getInitializerNode(sortedNodes[i]);
+
+        // If already initialized then this node is a legacy initializer without re-initialization
+        // support.
+        if (node->isInitialized())
+            continue;
+
+        auto const& fn = node->getInitializerFunction();
         if (!fn) {
             return Status(ErrorCodes::InternalError,
                           "topSort returned a node that has no associated function: \"" +
@@ -61,13 +69,43 @@ Status Initializer::execute(const InitializerContext::ArgumentVector& args,
 
         if (Status::OK() != status)
             return status;
+
+        node->setInitialized(true);
+    }
+    return Status::OK();
+}
+
+Status Initializer::executeDeinitializers() {
+    std::vector<std::string> sortedNodes;
+    Status status = _graph.topSort(&sortedNodes);
+    if (Status::OK() != status)
+        return status;
+
+    DeinitializerContext context;
+
+    // Execute deinitialization in reverse order from initialization.
+    for (auto it = sortedNodes.rbegin(), end = sortedNodes.rend(); it != end; ++it) {
+        InitializerDependencyNode* node = _graph.getInitializerNode(*it);
+        auto const& fn = node->getDeinitializerFunction();
+        if (fn) {
+            try {
+                status = fn(&context);
+            } catch (const DBException& xcp) {
+                return xcp.toStatus();
+            }
+
+            if (Status::OK() != status)
+                return status;
+
+            node->setInitialized(false);
+        }
     }
     return Status::OK();
 }
 
 Status runGlobalInitializers(const InitializerContext::ArgumentVector& args,
                              const InitializerContext::EnvironmentMap& env) {
-    return getGlobalInitializer().execute(args, env);
+    return getGlobalInitializer().executeInitializers(args, env);
 }
 
 Status runGlobalInitializers(int argc, const char* const* argv, const char* const* envp) {
@@ -87,6 +125,10 @@ Status runGlobalInitializers(int argc, const char* const* argv, const char* cons
     }
 
     return runGlobalInitializers(args, env);
+}
+
+Status runGlobalDeinitializers() {
+    return getGlobalInitializer().executeDeinitializers();
 }
 
 void runGlobalInitializersOrDie(int argc, const char* const* argv, const char* const* envp) {

@@ -34,9 +34,12 @@
 #include "mongo/base/make_string_vector.h"
 #include "mongo/unittest/unittest.h"
 
-#define ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS) \
-    (GRAPH).addInitializer(                             \
-        (NAME), (FN), MONGO_MAKE_STRING_VECTOR PREREQS, MONGO_MAKE_STRING_VECTOR DEPS)
+#define ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS)      \
+    (GRAPH).addInitializer((NAME),                           \
+                           (FN),                             \
+                           DeinitializerFunction(),          \
+                           MONGO_MAKE_STRING_VECTOR PREREQS, \
+                           MONGO_MAKE_STRING_VECTOR DEPS)
 
 #define ASSERT_ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS) \
     ASSERT_EQUALS(Status::OK(), ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS))

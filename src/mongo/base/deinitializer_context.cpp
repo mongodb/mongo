@@ -1,4 +1,4 @@
-/*    Copyright 2012 10gen Inc.
+/*    Copyright 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,33 +25,6 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/base/global_initializer_registerer.h"
+#include "mongo/base/deinitializer_context.h"
 
-#include <cstdlib>
-#include <iostream>
-
-#include "mongo/base/global_initializer.h"
-#include "mongo/base/initializer.h"
-
-namespace mongo {
-
-GlobalInitializerRegisterer::GlobalInitializerRegisterer(std::string name,
-                                                         std::vector<std::string> prerequisites,
-                                                         std::vector<std::string> dependents,
-                                                         InitializerFunction initFn,
-                                                         DeinitializerFunction deinitFn) {
-    Status status = getGlobalInitializer().getInitializerDependencyGraph().addInitializer(
-        std::move(name),
-        std::move(initFn),
-        std::move(deinitFn),
-        std::move(prerequisites),
-        std::move(dependents));
-
-
-    if (Status::OK() != status) {
-        std::cerr << "Attempt to add global initializer failed, status: " << status << std::endl;
-        ::abort();
-    }
-}
-
-}  // namespace mongo
+namespace mongo {}  // namespace mongo

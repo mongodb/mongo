@@ -49,9 +49,12 @@
  *
  */
 
-#define ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS) \
-    (GRAPH).addInitializer(                             \
-        (NAME), (FN), MONGO_MAKE_STRING_VECTOR PREREQS, MONGO_MAKE_STRING_VECTOR DEPS)
+#define ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS)      \
+    (GRAPH).addInitializer((NAME),                           \
+                           (FN),                             \
+                           DeinitializerFunction(),          \
+                           MONGO_MAKE_STRING_VECTOR PREREQS, \
+                           MONGO_MAKE_STRING_VECTOR DEPS)
 
 #define ASSERT_ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS) \
     ASSERT_EQUALS(Status::OK(), ADD_INITIALIZER(GRAPH, NAME, FN, PREREQS, DEPS))
@@ -157,8 +160,8 @@ TEST(InitializerTest, SuccessfulInitialization) {
                                set7,
                                set8);
     clearCounts();
-    ASSERT_OK(initializer.execute(InitializerContext::ArgumentVector(),
-                                  InitializerContext::EnvironmentMap()));
+    ASSERT_OK(initializer.executeInitializers(InitializerContext::ArgumentVector(),
+                                              InitializerContext::EnvironmentMap()));
     for (int i = 0; i < 9; ++i)
         ASSERT_EQUALS(1, globalCounts[i]);
 }
@@ -177,8 +180,8 @@ TEST(InitializerTest, Step5Misimplemented) {
                                set8);
     clearCounts();
     ASSERT_EQUALS(ErrorCodes::UnknownError,
-                  initializer.execute(InitializerContext::ArgumentVector(),
-                                      InitializerContext::EnvironmentMap()));
+                  initializer.executeInitializers(InitializerContext::ArgumentVector(),
+                                                  InitializerContext::EnvironmentMap()));
     ASSERT_EQUALS(1, globalCounts[0]);
     ASSERT_EQUALS(1, globalCounts[1]);
     ASSERT_EQUALS(1, globalCounts[2]);

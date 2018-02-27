@@ -1,4 +1,4 @@
-/*    Copyright 2012 10gen Inc.
+/*    Copyright 2018 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,33 +25,27 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/base/global_initializer_registerer.h"
+#pragma once
 
-#include <cstdlib>
-#include <iostream>
+#include <map>
+#include <string>
+#include <vector>
 
-#include "mongo/base/global_initializer.h"
-#include "mongo/base/initializer.h"
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
-GlobalInitializerRegisterer::GlobalInitializerRegisterer(std::string name,
-                                                         std::vector<std::string> prerequisites,
-                                                         std::vector<std::string> dependents,
-                                                         InitializerFunction initFn,
-                                                         DeinitializerFunction deinitFn) {
-    Status status = getGlobalInitializer().getInitializerDependencyGraph().addInitializer(
-        std::move(name),
-        std::move(initFn),
-        std::move(deinitFn),
-        std::move(prerequisites),
-        std::move(dependents));
+/**
+ * Context of a deinitialization process. Passed as a parameter to deinitialization functions.
+ *
+ * See mongo/base/initializer.h and mongo/base/initializer_dependency_graph.h for more details.
+ */
+class DeinitializerContext {
+public:
+    DeinitializerContext() = default;
 
-
-    if (Status::OK() != status) {
-        std::cerr << "Attempt to add global initializer failed, status: " << status << std::endl;
-        ::abort();
-    }
-}
+    DeinitializerContext(DeinitializerContext const&) = delete;
+    DeinitializerContext& operator=(DeinitializerContext const&) = delete;
+};
 
 }  // namespace mongo

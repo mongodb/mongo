@@ -36,19 +36,21 @@ namespace mongo {
 InitializerDependencyGraph::InitializerDependencyGraph() {}
 InitializerDependencyGraph::~InitializerDependencyGraph() {}
 
-Status InitializerDependencyGraph::addInitializer(const std::string& name,
-                                                  const InitializerFunction& fn,
-                                                  const std::vector<std::string>& prerequisites,
-                                                  const std::vector<std::string>& dependents) {
-    if (!fn)
+Status InitializerDependencyGraph::addInitializer(std::string name,
+                                                  InitializerFunction initFn,
+                                                  DeinitializerFunction deinitFn,
+                                                  std::vector<std::string> prerequisites,
+                                                  std::vector<std::string> dependents) {
+    if (!initFn)
         return Status(ErrorCodes::BadValue, "Illegal to supply a NULL function");
 
-    NodeData& newNode = _nodes[name];
-    if (newNode.fn) {
+    InitializerDependencyNode& newNode = _nodes[name];
+    if (newNode.initFn) {
         return Status(ErrorCodes::DuplicateKey, name);
     }
 
-    newNode.fn = fn;
+    newNode.initFn = std::move(initFn);
+    newNode.deinitFn = std::move(deinitFn);
 
     for (size_t i = 0; i < prerequisites.size(); ++i) {
         newNode.prerequisites.insert(prerequisites[i]);
@@ -61,12 +63,12 @@ Status InitializerDependencyGraph::addInitializer(const std::string& name,
     return Status::OK();
 }
 
-InitializerFunction InitializerDependencyGraph::getInitializerFunction(
-    const std::string& name) const {
-    NodeMap::const_iterator iter = _nodes.find(name);
+InitializerDependencyNode* InitializerDependencyGraph::getInitializerNode(const std::string& name) {
+    NodeMap::iterator iter = _nodes.find(name);
     if (iter == _nodes.end())
-        return InitializerFunction();
-    return iter->second.fn;
+        return nullptr;
+
+    return &iter->second;
 }
 
 Status InitializerDependencyGraph::topSort(std::vector<std::string>* sortedNames) const {
@@ -92,7 +94,7 @@ Status InitializerDependencyGraph::topSort(std::vector<std::string>* sortedNames
             return status;
     }
     for (const auto& node : _nodes) {
-        if (!node.second.fn) {
+        if (!node.second.initFn) {
             std::ostringstream os;
             os << "No implementation provided for initializer " << node.first;
             return {ErrorCodes::BadValue, os.str()};

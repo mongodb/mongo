@@ -56,6 +56,7 @@ env.Library(
         'base/data_type.cpp',
         'base/data_type_string_data.cpp',
         'base/data_type_terminated.cpp',
+        'base/deinitializer_context.cpp',
         'base/error_codes.cpp',
         'base/error_extra_info.cpp',
         'base/global_initializer.cpp',
