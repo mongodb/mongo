@@ -773,17 +773,18 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                   << spec);
             }
 
-            if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() != key) ||
-                SimpleBSONObjComparator::kInstance.evaluate(
-                    desc->infoObj().getObjectField("collation") != collation)) {
-                return Status(ErrorCodes::IndexKeySpecsConflict,
-                              str::stream() << "Index must have unique name."
-                                            << "The existing index: "
-                                            << desc->infoObj()
-                                            << " has the same name as the requested index: "
-                                            << spec);
-            }
-
+            // if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() != key) ||
+            //     SimpleBSONObjComparator::kInstance.evaluate(
+            //         desc->infoObj().getObjectField("collation") != collation)) {
+            //     return Status(ErrorCodes::IndexKeySpecsConflict,
+            //                   str::stream() << "Index must have unique name."
+            //                                 << "The existing index: "
+            //                                 << desc->infoObj()
+            //                                 << " has the same name as the requested index: "
+            //                                 << spec);
+            // }
+            
+// Similar to the Line  776
             IndexDescriptor temp(_collection, _getAccessMethodName(opCtx, key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
                 return Status(ErrorCodes::IndexOptionsConflict,
@@ -814,7 +815,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                             << desc->infoObj());
 
             return Status(ErrorCodes::CannotCreateIndex,
-                          str::stream() << "index already exists with different name: " << name);
+                          str::stream() << "Index with the same keys but a diferent name already exists.");
         }
     }
 
