@@ -29,6 +29,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -40,12 +41,13 @@ class OpTime;
 }  // namespace repl
 
 /**
- * Renames the collection "source" to "target" and drops the existing collection named "target"
- * iff "dropTarget" is true. "stayTemp" indicates whether a collection should maintain its
- * temporariness.
+ * Renames the collection from "source" to "target" and drops the existing collection with UUID
+ * dropTargetUUID iff "dropTarget" is true. "stayTemp" indicates whether a collection should
+ * maintain its temporariness.
  */
 struct RenameCollectionOptions {
     bool dropTarget = false;
+    OptionalCollectionUUID dropTargetUUID;
     bool stayTemp = false;
 };
 Status renameCollection(OperationContext* opCtx,

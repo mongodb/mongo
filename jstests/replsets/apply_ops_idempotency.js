@@ -106,6 +106,25 @@
             assert.commandWorked(y.renameCollection(x.getName(), true));
             assert.commandWorked(z.renameCollection(y.getName()));
         },
+        renameCollectionWithinDatabaseDroppingTargetByUUID: (mydb) => {
+            assert.commandWorked(mydb.createCollection("x"));
+            assert.commandWorked(mydb.createCollection("y"));
+            assert.commandWorked(mydb.createCollection("z"));
+
+            assert.commandWorked(mydb.x.renameCollection('xx'));
+            // When replayed on a up-to-date db, this oplog entry may drop
+            // collection z rather than collection x if the dropTarget is not
+            // specified by UUID. (See SERVER-33087)
+            assert.commandWorked(mydb.y.renameCollection('xx', true));
+            assert.commandWorked(mydb.xx.renameCollection('yy'));
+            assert.commandWorked(mydb.z.renameCollection('xx'));
+        },
+        renameCollectionWithinDatabaseDropTargetEvenWhenSourceIsEmpty: (mydb) => {
+            assert.commandWorked(mydb.createCollection("x"));
+            assert.commandWorked(mydb.createCollection("y"));
+            assert.commandWorked(mydb.x.renameCollection('y', true));
+            assert(mydb.y.drop());
+        },
         renameCollectionAcrossDatabases: (mydb) => {
             let otherdb = mydb.getSiblingDB(mydb + '_');
             let [x, y] = getCollections(mydb, ['x', 'y']);
