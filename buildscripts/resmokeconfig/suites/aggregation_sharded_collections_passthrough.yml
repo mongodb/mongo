@@ -6,20 +6,6 @@ selector:
   exclude_files:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
-  # The following tests start their own ShardingTest.
-  - jstests/aggregation/bugs/server6179.js
-  - jstests/aggregation/bugs/server7781.js
-  - jstests/aggregation/mongos_merge.js
-  - jstests/aggregation/mongos_slaveok.js
-  - jstests/aggregation/shard_targeting.js
-  - jstests/aggregation/sources/addFields/use_cases.js
-  - jstests/aggregation/sources/addFields/weather.js
-  - jstests/aggregation/sources/collStats/shard_host_info.js
-  - jstests/aggregation/sources/facet/use_cases.js
-  - jstests/aggregation/sources/graphLookup/sharded.js
-  - jstests/aggregation/sources/lookup/lookup.js
-  - jstests/aggregation/sources/replaceRoot/address.js
-  - jstests/aggregation/testshard1.js
   # The following tests start their own ReplSetTest.
   - jstests/aggregation/testSlave.js
   - jstests/aggregation/sources/changeStream/*.js
@@ -43,6 +29,7 @@ selector:
   - assumes_no_implicit_index_creation
   - assumes_unsharded_collection
   - cannot_create_unique_index_when_using_hashed_shard_key
+  - requires_sharding
 
 executor:
   archive:
