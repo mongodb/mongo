@@ -11,20 +11,20 @@ from ...utils import registry
 _HOOKS = {}
 
 
-def make_custom_behavior(class_name, *args, **kwargs):
+def make_hook(class_name, *args, **kwargs):
     """
-    Factory function for creating CustomBehavior instances.
+    Factory function for creating Hook instances.
     """
 
     if class_name not in _HOOKS:
-        raise ValueError("Unknown custom behavior class '%s'" % (class_name))
+        raise ValueError("Unknown hook class '%s'" % class_name)
 
     return _HOOKS[class_name](*args, **kwargs)
 
 
-class CustomBehavior(object):
+class Hook(object):
     """
-    The common interface all CustomBehaviors will inherit from.
+    The common interface all Hooks will inherit from.
     """
 
     __metaclass__ = registry.make_registry_metaclass(_HOOKS)
@@ -34,7 +34,7 @@ class CustomBehavior(object):
     @staticmethod
     def start_dynamic_test(hook_test_case, test_report):
         """
-        If a CustomBehavior wants to add a test case that will show up
+        If a Hook wants to add a test case that will show up
         in the test report, it should use this method to add it to the
         report, since we will need to count it as a dynamic test to get
         the stats in the summary information right.
@@ -43,7 +43,7 @@ class CustomBehavior(object):
 
     def __init__(self, hook_logger, fixture, description):
         """
-        Initializes the CustomBehavior with the specified fixture.
+        Initializes the Hook with the specified fixture.
         """
 
         if not isinstance(hook_logger, loggers.HookLogger):

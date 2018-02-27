@@ -15,10 +15,9 @@ from . import cleanup
 from . import jsfile
 from ..fixtures import replicaset
 from ... import errors
-from ... import utils
 
 
-class BackgroundInitialSync(jsfile.JsCustomBehavior):
+class BackgroundInitialSync(jsfile.JSHook):
     """
     After every test, this hook checks if a background node has finished initial sync and if so,
     validates it, tears it down, and restarts it.
@@ -42,8 +41,8 @@ class BackgroundInitialSync(jsfile.JsCustomBehavior):
 
         description = "Background Initial Sync"
         js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
-        jsfile.JsCustomBehavior.__init__(self, hook_logger, fixture, js_filename,
-                                         description, shell_options)
+        jsfile.JSHook.__init__(self, hook_logger, fixture, js_filename,
+                               description, shell_options)
 
         self.use_resync = use_resync
         self.n = n
@@ -126,7 +125,7 @@ class BackgroundInitialSync(jsfile.JsCustomBehavior):
         self.__restart_init_sync(test_report, sync_node, sync_node_conn)
 
 
-class IntermediateInitialSync(jsfile.JsCustomBehavior):
+class IntermediateInitialSync(jsfile.JSHook):
     """
     This hook accepts a parameter 'n' that specifies a number of tests after which it will start up
     a node to initial sync, wait for replication to finish, and then validate the data. It also
@@ -145,7 +144,7 @@ class IntermediateInitialSync(jsfile.JsCustomBehavior):
 
         description = "Intermediate Initial Sync"
         js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
-        jsfile.JsCustomBehavior.__init__(self, hook_logger, fixture, js_filename, description)
+        jsfile.JSHook.__init__(self, hook_logger, fixture, js_filename, description)
 
         self.use_resync = use_resync
         self.n = n

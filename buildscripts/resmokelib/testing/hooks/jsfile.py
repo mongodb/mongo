@@ -16,11 +16,11 @@ from ... import errors
 from ...utils import registry
 
 
-class JsCustomBehavior(interface.CustomBehavior):
+class JSHook(interface.Hook):
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
     def __init__(self, hook_logger, fixture, js_filename, description, shell_options=None):
-        interface.CustomBehavior.__init__(self, hook_logger, fixture, description)
+        interface.Hook.__init__(self, hook_logger, fixture, description)
         self.hook_test_case = self.make_dynamic_test(jstest.JSTestCase,
                                                      js_filename,
                                                      shell_options=shell_options,
@@ -48,7 +48,7 @@ class JsCustomBehavior(interface.CustomBehavior):
         test_name = "{}:{}".format(test.short_name(), self.__class__.__name__)
         self.hook_test_case.test_name = test_name
 
-        interface.CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
+        interface.Hook.start_dynamic_test(self.hook_test_case, test_report)
         try:
             self._after_test_impl(test, test_report, description)
         except pymongo.errors.OperationFailure as err:

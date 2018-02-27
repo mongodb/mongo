@@ -21,7 +21,7 @@ from ..testcases import interface as testcase
 from ... import errors
 
 
-class PeriodicKillSecondaries(interface.CustomBehavior):
+class PeriodicKillSecondaries(interface.Hook):
     """
     Periodically kills the secondaries in a replica set and verifies
     that they can reach the SECONDARY state without having connectivity
@@ -41,7 +41,7 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
 
         description = ("PeriodicKillSecondaries (kills the secondary after running tests for a"
                        " configurable period of time)")
-        interface.CustomBehavior.__init__(self, hook_logger, rs_fixture, description)
+        interface.Hook.__init__(self, hook_logger, rs_fixture, description)
 
         self._period_secs = period_secs
         self._start_time = None
@@ -79,7 +79,7 @@ class PeriodicKillSecondaries(interface.CustomBehavior):
         test_name = "{}:{}".format(self._last_test_name, self.__class__.__name__)
         self.hook_test_case = self.make_dynamic_test(testcase.TestCase, "Hook", test_name)
 
-        interface.CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
+        interface.Hook.start_dynamic_test(self.hook_test_case, test_report)
         try:
             self._kill_secondaries()
             self._check_secondaries_and_restart_fixture()

@@ -247,23 +247,23 @@ class TestSuiteExecutor(object):
 
     def _make_hooks(self, job_num, fixture):
         """
-        Creates the custom behaviors for the job's fixture.
+        Creates the hooks for the job's fixture.
         """
 
-        behaviors = []
+        hooks = []
 
-        for behavior_config in self.hooks_config:
-            behavior_config = behavior_config.copy()
-            behavior_class = behavior_config.pop("class")
+        for hook_config in self.hooks_config:
+            hook_config = hook_config.copy()
+            hook_class = hook_config.pop("class")
 
-            hook_logger = self.logger.new_hook_logger(behavior_class, fixture.logger)
-            behavior = _hooks.make_custom_behavior(behavior_class,
-                                                   hook_logger,
-                                                   fixture,
-                                                   **behavior_config)
-            behaviors.append(behavior)
+            hook_logger = self.logger.new_hook_logger(hook_class, fixture.logger)
+            hook = _hooks.make_hook(hook_class,
+                                    hook_logger,
+                                    fixture,
+                                    **hook_config)
+            hooks.append(hook)
 
-        return behaviors
+        return hooks
 
     def _make_job(self, job_num):
         """

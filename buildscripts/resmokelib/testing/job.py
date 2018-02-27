@@ -19,8 +19,7 @@ class Job(object):
 
     def __init__(self, logger, fixture, hooks, report, archival, suite_options):
         """
-        Initializes the job with the specified fixture and custom
-        behaviors.
+        Initializes the job with the specified fixture and hooks.
         """
 
         self.logger = logger

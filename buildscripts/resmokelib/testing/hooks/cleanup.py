@@ -12,7 +12,7 @@ from ..testcases import interface as testcase
 from ... import errors
 
 
-class CleanEveryN(interface.CustomBehavior):
+class CleanEveryN(interface.Hook):
     """
     Restarts the fixture after it has ran 'n' tests.
     On mongod-related fixtures, this will clear the dbpath.
@@ -22,7 +22,7 @@ class CleanEveryN(interface.CustomBehavior):
 
     def __init__(self, hook_logger, fixture, n=DEFAULT_N):
         description = "CleanEveryN (restarts the fixture after running `n` tests)"
-        interface.CustomBehavior.__init__(self, hook_logger, fixture, description)
+        interface.Hook.__init__(self, hook_logger, fixture, description)
 
         # Try to isolate what test triggers the leak by restarting the fixture each time.
         if "detect_leaks=1" in os.getenv("ASAN_OPTIONS", ""):
@@ -38,10 +38,10 @@ class CleanEveryN(interface.CustomBehavior):
         if self.tests_run < self.n:
             return
 
-        test_name  = "{}:{}".format(test.short_name(), self.__class__.__name__)
+        test_name = "{}:{}".format(test.short_name(), self.__class__.__name__)
         self.hook_test_case = self.make_dynamic_test(testcase.TestCase, "Hook", test_name)
 
-        interface.CustomBehavior.start_dynamic_test(self.hook_test_case, test_report)
+        interface.Hook.start_dynamic_test(self.hook_test_case, test_report)
         try:
             self.hook_test_case.logger.info(
                 "%d tests have been run against the fixture, stopping it...",
@@ -49,7 +49,7 @@ class CleanEveryN(interface.CustomBehavior):
             self.tests_run = 0
 
             if not self.fixture.teardown():
-                raise errors.ServerFailure("%s did not exit cleanly" % (self.fixture))
+                raise errors.ServerFailure("%s did not exit cleanly" % self.fixture)
 
             self.hook_test_case.logger.info("Starting the fixture back up again...")
             self.fixture.setup()

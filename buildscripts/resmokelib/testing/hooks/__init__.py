@@ -6,10 +6,10 @@ before or after each suite.
 
 from __future__ import absolute_import
 
-from .interface import make_custom_behavior
+from .interface import make_hook
 from ...utils import autoloader as _autoloader
 
 
-# We dynamically load all modules in the hooks/ package so that any CustomBehavior classes declared
+# We dynamically load all modules in the hooks/ package so that any Hook classes declared
 # within them are automatically registered.
 _autoloader.load_all_modules(name=__name__, path=__path__)

@@ -19,7 +19,7 @@ from buildscripts.resmokelib.testing.fixtures import replicaset
 from buildscripts.resmokelib.testing.fixtures import shardedcluster
 
 
-class ContinuousStepdown(interface.CustomBehavior):
+class ContinuousStepdown(interface.Hook):
     """The ContinuousStepdown hook regularly connects to replica sets and sends a replSetStepDown
     command.
     """
@@ -41,8 +41,8 @@ class ContinuousStepdown(interface.CustomBehavior):
             stepdown_duration_secs: the number of seconds to step down the primary.
             stepdown_interval_ms: the number of milliseconds between stepdowns.
         """
-        interface.CustomBehavior.__init__(self, hook_logger, fixture,
-                                          ContinuousStepdown.DESCRIPTION)
+        interface.Hook.__init__(self, hook_logger, fixture,
+                                ContinuousStepdown.DESCRIPTION)
 
         self._fixture = fixture
         self._config_stepdown = config_stepdown
