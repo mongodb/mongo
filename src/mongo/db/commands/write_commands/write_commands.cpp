@@ -303,11 +303,9 @@ public:
     }
 
     Status explain(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& cmdObj,
+                   const OpMsgRequest& opMsgRequest,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const final {
-        const auto opMsgRequest(OpMsgRequest::fromDBAndBody(dbname, cmdObj));
         const auto batch = UpdateOp::parse(opMsgRequest);
         uassert(ErrorCodes::InvalidLength,
                 "explained write batches must be of size 1",
@@ -370,11 +368,9 @@ public:
     }
 
     Status explain(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& cmdObj,
+                   const OpMsgRequest& opMsgRequest,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const final {
-        const auto opMsgRequest(OpMsgRequest::fromDBAndBody(dbname, cmdObj));
         const auto batch = DeleteOp::parse(opMsgRequest);
         uassert(ErrorCodes::InvalidLength,
                 "explained write batches must be of size 1",

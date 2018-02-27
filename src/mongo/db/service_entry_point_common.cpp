@@ -319,8 +319,7 @@ void appendReplyMetadata(OperationContext* opCtx,
  * Given the specified command, returns an effective read concern which should be used or an error
  * if the read concern is not valid for the command.
  */
-StatusWith<repl::ReadConcernArgs> _extractReadConcern(const Command* command,
-                                                      const std::string& dbName,
+StatusWith<repl::ReadConcernArgs> _extractReadConcern(const CommandInvocation* invocation,
                                                       const BSONObj& cmdObj) {
     repl::ReadConcernArgs readConcernArgs;
 
@@ -329,7 +328,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(const Command* command,
         return readConcernParseStatus;
     }
 
-    if (!command->supportsReadConcern(dbName, cmdObj, readConcernArgs.getLevel())) {
+    if (!invocation->supportsReadConcern(readConcernArgs.getLevel())) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Command does not support read concern "
                               << readConcernArgs.toString()};
@@ -388,11 +387,12 @@ LogicalTime computeOperationTime(OperationContext* opCtx,
 }
 
 bool runCommandImpl(OperationContext* opCtx,
-                    Command* command,
+                    CommandInvocation* invocation,
                     const OpMsgRequest& request,
                     rpc::ReplyBuilderInterface* replyBuilder,
                     LogicalTime startOperationTime,
                     const ServiceEntryPointCommon::Hooks& behaviors) {
+    const Command* command = invocation->definition();
     auto bytesToReserve = command->reserveBytesForReply();
 
 // SERVER-22100: In Windows DEBUG builds, the CRT heap debugging overhead, in conjunction with the
@@ -409,14 +409,13 @@ bool runCommandImpl(OperationContext* opCtx,
     // run expects const db std::string (can't bind to temporary)
     const std::string db = request.getDatabase().toString();
 
-    BSONObjBuilder inPlaceReplyBob = replyBuilder->getInPlaceReplyBuilder(bytesToReserve);
+    CommandReplyBuilder crb(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
 
-    behaviors.waitForReadConcern(opCtx, command, db, request, cmd);
+    behaviors.waitForReadConcern(opCtx, invocation, db, request, cmd);
 
-    bool result;
-    if (!command->supportsWriteConcern(cmd)) {
+    if (!invocation->supportsWriteConcern()) {
         behaviors.uassertCommandDoesNotSpecifyWriteConcern(cmd);
-        result = command->publicRun(opCtx, request, inPlaceReplyBob);
+        invocation->run(opCtx, &crb);
     } else {
         auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, cmd, db));
 
@@ -428,10 +427,9 @@ bool runCommandImpl(OperationContext* opCtx,
         opCtx->setWriteConcern(wcResult);
         ON_BLOCK_EXIT([&] {
             behaviors.waitForWriteConcern(
-                opCtx, command->getName(), lastOpBeforeRun, &inPlaceReplyBob);
+                opCtx, invocation->definition()->getName(), lastOpBeforeRun, crb.getBodyBuilder());
         });
-
-        result = command->publicRun(opCtx, request, inPlaceReplyBob);
+        invocation->run(opCtx, &crb);
 
         // Nothing in run() should change the writeConcern.
         dassert(SimpleBSONObjComparator::kInstance.evaluate(opCtx->getWriteConcern().toBSON() ==
@@ -440,9 +438,11 @@ bool runCommandImpl(OperationContext* opCtx,
 
     behaviors.waitForLinearizableReadConcern(opCtx);
 
-    CommandHelpers::appendCommandStatus(inPlaceReplyBob, result);
-
-    behaviors.attachCurOpErrInfo(opCtx, inPlaceReplyBob);
+    const bool ok = [&] {
+        auto body = crb.getBodyBuilder();
+        return CommandHelpers::extractOrAppendOk(body);
+    }();
+    behaviors.attachCurOpErrInfo(opCtx, crb.getBodyBuilder().asTempObj());
 
     auto operationTime = computeOperationTime(
         opCtx, startOperationTime, repl::ReadConcernArgs::get(opCtx).getLevel());
@@ -450,16 +450,15 @@ bool runCommandImpl(OperationContext* opCtx,
     // An uninitialized operation time means the cluster time is not propagated, so the operation
     // time should not be attached to the response.
     if (operationTime != LogicalTime::kUninitialized) {
-        operationTime.appendAsOperationTime(&inPlaceReplyBob);
+        auto body = crb.getBodyBuilder();
+        operationTime.appendAsOperationTime(&body);
     }
-
-    inPlaceReplyBob.doneFast();
 
     BSONObjBuilder metadataBob;
     appendReplyMetadata(opCtx, request, &metadataBob);
     replyBuilder->setMetadata(metadataBob.done());
 
-    return result;
+    return ok;
 }
 
 /**
@@ -474,8 +473,8 @@ void execCommandDatabase(OperationContext* opCtx,
                          const OpMsgRequest& request,
                          rpc::ReplyBuilderInterface* replyBuilder,
                          const ServiceEntryPointCommon::Hooks& behaviors) {
-
     auto startOperationTime = getClientOperationTime(opCtx);
+    auto invocation = command->parse(opCtx, request);
     try {
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -628,7 +627,7 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-        readConcernArgs = uassertStatusOK(_extractReadConcern(command, dbname, request.body));
+        readConcernArgs = uassertStatusOK(_extractReadConcern(invocation.get(), request.body));
 
         // TODO SERVER-33354: Remove whitelist.
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
@@ -695,8 +694,8 @@ void execCommandDatabase(OperationContext* opCtx,
         }
 
         sessionTxnState.unstashTransactionResources();
-        retval =
-            runCommandImpl(opCtx, command, request, replyBuilder, startOperationTime, behaviors);
+        retval = runCommandImpl(
+            opCtx, invocation.get(), request, replyBuilder, startOperationTime, behaviors);
 
         if (retval) {
             if (opCtx->getWriteUnitOfWork()) {
@@ -729,7 +728,7 @@ void execCommandDatabase(OperationContext* opCtx,
         // Note: the read concern may not have been successfully or yet placed on the opCtx, so
         // parsing it separately here.
         const std::string db = request.getDatabase().toString();
-        auto readConcernArgsStatus = _extractReadConcern(command, db, request.body);
+        auto readConcernArgsStatus = _extractReadConcern(invocation.get(), request.body);
         auto operationTime = readConcernArgsStatus.isOK()
             ? computeOperationTime(
                   opCtx, startOperationTime, readConcernArgsStatus.getValue().getLevel())

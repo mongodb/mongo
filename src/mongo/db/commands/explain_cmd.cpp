@@ -154,13 +154,9 @@ public:
         }
 
         // Actually call the nested command's explain(...) method.
-        Status explainStatus =
-            commToExplain->explain(opCtx, dbname, explainObj, verbosity.getValue(), &result);
-        if (!explainStatus.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, explainStatus);
-        }
-
-        return true;
+        commToExplain->parse(opCtx, OpMsgRequest::fromDBAndBody(dbname, explainObj))
+            ->explain(opCtx, verbosity.getValue(), &result);
+        return CommandHelpers::extractOrAppendOk(result);
     }
 
 } cmdExplain;

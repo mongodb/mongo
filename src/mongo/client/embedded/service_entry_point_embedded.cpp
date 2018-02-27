@@ -92,7 +92,7 @@ public:
     }
 
     void waitForReadConcern(OperationContext*,
-                            const Command*,
+                            const CommandInvocation*,
                             const std::string&,
                             const OpMsgRequest&,
                             const BSONObj&) const override {}
@@ -100,13 +100,13 @@ public:
     void waitForWriteConcern(OperationContext* opCtx,
                              const std::string& commandName,
                              const repl::OpTime& lastOpBeforeRun,
-                             BSONObjBuilder* commandResponseBuilder) const override {}
+                             BSONObjBuilder commandResponseBuilder) const override {}
 
     void waitForLinearizableReadConcern(OperationContext*) const override {}
 
     void uassertCommandDoesNotSpecifyWriteConcern(const BSONObj&) const override {}
 
-    void attachCurOpErrInfo(OperationContext*, BSONObjBuilder&) const override {}
+    void attachCurOpErrInfo(OperationContext*, const BSONObj&) const override {}
 };
 
 DbResponse ServiceEntryPointEmbedded::handleRequest(OperationContext* opCtx, const Message& m) {

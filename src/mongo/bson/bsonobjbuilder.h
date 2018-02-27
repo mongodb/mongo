@@ -172,6 +172,14 @@ public:
         }
     }
 
+    /**
+     * The start offset of the object being built by this builder within its buffer.
+     * Needed for the object-resuming constructor.
+     */
+    std::size_t offset() const {
+        return _offset;
+    }
+
     /** add all the fields from the object specified to this object */
     BSONObjBuilder& appendElements(const BSONObj& x);
 

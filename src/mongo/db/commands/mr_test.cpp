@@ -423,11 +423,11 @@ Status MapReduceCommandTest::_runCommand(StringData mapCode, StringData reduceCo
     ASSERT(command) << "Unable to look up mapReduce command";
 
     auto request = OpMsgRequest::fromDBAndBody(inputNss.db(), _makeCmdObj(mapCode, reduceCode));
-    BSONObjBuilder result;
-    auto success = command->publicRun(_opCtx.get(), request, result);
-    if (!success) {
-        auto status = getStatusFromCommandResult(result.obj());
-        ASSERT_NOT_OK(status);
+    BufBuilder bb;
+    CommandReplyBuilder crb(BSONObjBuilder{bb});
+    command->parse(_opCtx.get(), request)->run(_opCtx.get(), &crb);
+    auto status = getStatusFromCommandResult(crb.getBodyBuilder().asTempObj());
+    if (!status.isOK()) {
         return status.withContext(str::stream() << "mapReduce command failed: " << request.body);
     }
 
