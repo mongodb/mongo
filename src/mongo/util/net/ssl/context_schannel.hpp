@@ -30,20 +30,17 @@
 
 #include "asio/detail/config.hpp"
 
-#include <string>
 #include "asio/buffer.hpp"
 #include "asio/io_context.hpp"
 #include "mongo/util/net/ssl/context_base.hpp"
+#include <string>
 
 #include "asio/detail/push_options.hpp"
 
 namespace asio {
 namespace ssl {
 
-class context
-    : public context_base,
-    private noncopyable
-{
+class context : public context_base, private noncopyable {
 public:
     /// The native handle type of the SSL context.
     typedef SCHANNEL_CRED* native_handle_type;
@@ -77,7 +74,7 @@ public:
     * @li As a target for move-assignment.
     */
     ASIO_DECL context& operator=(context&& other);
-#endif // defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
+#endif  // defined(ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
 
     /// Destructor.
     ASIO_DECL ~context();
@@ -91,6 +88,8 @@ public:
     ASIO_DECL native_handle_type native_handle();
 
 private:
+    SCHANNEL_CRED _cred;
+
     // The underlying native implementation.
     native_handle_type handle_;
 };
@@ -98,8 +97,8 @@ private:
 #include "asio/detail/pop_options.hpp"
 
 #if defined(ASIO_HEADER_ONLY)
-# include "mongo/util/net/ssl/impl/context_schannel.ipp"
-#endif // defined(ASIO_HEADER_ONLY)
+#include "mongo/util/net/ssl/impl/context_schannel.ipp"
+#endif  // defined(ASIO_HEADER_ONLY)
 
-} // namespace ssl
-} // namespace asio
+}  // namespace ssl
+}  // namespace asio

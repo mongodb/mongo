@@ -24,6 +24,7 @@
 #include "mongo/util/net/ssl/impl/context_schannel.ipp"
 #include "mongo/util/net/ssl/impl/error.ipp"
 #include "mongo/util/net/ssl/detail/impl/engine_schannel.ipp"
+#include "mongo/util/net/ssl/detail/impl/schannel.ipp"
 
 
 #elif MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_OPENSSL
