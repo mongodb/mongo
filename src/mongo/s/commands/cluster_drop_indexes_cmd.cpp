@@ -78,7 +78,6 @@ public:
         // receiving its first chunk for the collection (see SERVER-31715).
         auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
             opCtx,
-            dbName,
             nss,
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             ReadPreferenceSetting::get(opCtx),

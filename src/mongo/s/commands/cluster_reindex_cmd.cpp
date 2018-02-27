@@ -70,12 +70,10 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& output) override {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-        LOG(1) << "reIndex: " << nss << " cmd:" << redact(cmdObj);
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
             opCtx,
-            dbName,
             nss,
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             ReadPreferenceSetting::get(opCtx),

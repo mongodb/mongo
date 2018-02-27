@@ -80,7 +80,6 @@ Status SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext
 Status SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
     try {
         scatterGatherOnlyVersionIfUnsharded(opCtx,
-                                            SessionsCollection::kSessionsDb.toString(),
                                             NamespaceString(SessionsCollection::kSessionsFullNS),
                                             SessionsCollection::generateCreateIndexesCmd(),
                                             ReadPreferenceSetting::get(opCtx),

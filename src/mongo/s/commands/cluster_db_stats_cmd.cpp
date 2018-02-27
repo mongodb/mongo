@@ -124,7 +124,6 @@ public:
         auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
             dbName,
-            boost::none,
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent);

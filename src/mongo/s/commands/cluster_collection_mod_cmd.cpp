@@ -71,7 +71,6 @@ public:
 
         auto shardResponses = scatterGatherOnlyVersionIfUnsharded(
             opCtx,
-            dbName,
             nss,
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             ReadPreferenceSetting::get(opCtx),

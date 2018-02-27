@@ -609,10 +609,12 @@ void Strategy::explainFind(OperationContext* opCtx,
     // We will time how long it takes to run the commands on the shards.
     Timer timer;
 
+    const auto routingInfo = uassertStatusOK(
+        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, qr.nss()));
     auto shardResponses =
         scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                   qr.nss().db().toString(),
                                                    qr.nss(),
+                                                   routingInfo,
                                                    explainCmd,
                                                    readPref,
                                                    Shard::RetryPolicy::kIdempotent,

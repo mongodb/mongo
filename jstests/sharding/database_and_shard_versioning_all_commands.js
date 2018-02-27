@@ -74,10 +74,8 @@
             }
         },
         collStats: {
-            sendsDbVersion: false,
-            // It's a known bug that collStats uses ShardConnection without connection versioning
-            // (SERVER-33434).
-            sendsShardVersion: false,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
@@ -126,10 +124,8 @@
         createUser: {skip: "always targets the config server"},
         currentOp: {skip: "not on a user database"},
         dataSize: {
-            sendsDbVersion: false,
-            // It's a known bug that dataSize uses ScopedDbConnection, which does not do connection
-            // versioning (SERVER-33434).
-            sendsShardVersion: false,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));

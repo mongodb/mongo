@@ -443,8 +443,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                     // should not participate in the shard version protocol.
                     shardResults =
                         scatterGatherUnversionedTargetAllShards(opCtx,
-                                                                executionNss.db().toString(),
-                                                                executionNss,
+                                                                executionNss.db(),
                                                                 targetedCommand,
                                                                 ReadPreferenceSetting::get(opCtx),
                                                                 Shard::RetryPolicy::kIdempotent);
@@ -453,8 +452,8 @@ DispatchShardPipelineResults dispatchShardPipeline(
                     // shards, and should participate in the shard version protocol.
                     shardResults = scatterGatherVersionedTargetByRoutingTable(
                         opCtx,
-                        executionNss.db().toString(),
                         executionNss,
+                        executionNsRoutingInfo,
                         targetedCommand,
                         ReadPreferenceSetting::get(opCtx),
                         Shard::RetryPolicy::kIdempotent,

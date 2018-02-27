@@ -94,10 +94,12 @@ public:
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
+            const auto routingInfo = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
-                                                           dbname,
                                                            nss,
+                                                           routingInfo,
                                                            explainCmd,
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,
@@ -171,8 +173,8 @@ public:
         try {
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
-                dbName,
                 nss,
+                routingInfo,
                 CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,

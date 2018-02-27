@@ -129,7 +129,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
  */
 std::vector<AsyncRequestsSender::Response> gatherResponses(
     OperationContext* opCtx,
-    const std::string& dbName,
+    StringData dbName,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const std::vector<AsyncRequestsSender::Request>& requests) {
@@ -190,50 +190,35 @@ BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version) {
 
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShards(
     OperationContext* opCtx,
-    const std::string& dbName,
-    boost::optional<NamespaceString> nss,
+    StringData dbName,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
-    // Some commands, such as $currentOp, operate on a collectionless namespace. If a full namespace
-    // is specified, its database must match the dbName.
-    invariant(!nss || (nss->db() == dbName));
-
-    auto requests = buildUnversionedRequestsForAllShards(opCtx, cmdObj);
-
-    return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
+    return gatherResponses(
+        opCtx, dbName, readPref, retryPolicy, buildUnversionedRequestsForAllShards(opCtx, cmdObj));
 }
 
 std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
-    const std::string& dbName,
     const NamespaceString& nss,
+    const CachedCollectionRoutingInfo& routingInfo,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
     const BSONObj& collation) {
-    // The database in the full namespace must match the dbName.
-    invariant(nss.db() == dbName);
-
-    auto routingInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-    auto requests =
+    const auto requests =
         buildVersionedRequestsForTargetedShards(opCtx, routingInfo, cmdObj, query, collation);
 
-    return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
+    return gatherResponses(opCtx, nss.db(), readPref, retryPolicy, requests);
 }
 
 std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
     OperationContext* opCtx,
-    const std::string& dbName,
     const NamespaceString& nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
-    // The database in the full namespace must match the dbName.
-    invariant(nss.db() == dbName);
-
     auto routingInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
@@ -251,7 +236,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
             opCtx, routingInfo, cmdObj, BSONObj(), BSONObj());
     }
 
-    return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
+    return gatherResponses(opCtx, nss.db(), readPref, retryPolicy, requests);
 }
 
 bool appendRawResponses(OperationContext* opCtx,

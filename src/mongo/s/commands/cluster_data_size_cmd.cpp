@@ -34,16 +34,17 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/commands/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
 
-class ValidateCmd : public BasicCommand {
+class DataSizeCmd : public BasicCommand {
 public:
-    ValidateCmd() : BasicCommand("validate") {}
+    DataSizeCmd() : BasicCommand("dataSize", "datasize") {}
 
     std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsCollectionRequired(dbname, cmdObj).ns();
+        return CommandHelpers::parseNsFullyQualified(dbname, cmdObj);
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -54,27 +55,52 @@ public:
         return false;
     }
 
+    bool supportsWriteConcern(const BSONObj& cmd) const override {
+        return false;
+    }
+
     void addRequiredPrivileges(const std::string& dbname,
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) const override {
         ActionSet actions;
-        actions.addAction(ActionType::validate);
+        actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
     }
 
     bool run(OperationContext* opCtx,
              const std::string& dbName,
              const BSONObj& cmdObj,
-             BSONObjBuilder& output) override {
+             BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        const auto routingInfo =
+        auto routingInfo =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
-        auto results = scatterGatherVersionedTargetByRoutingTable(
+        const auto cm = routingInfo.cm();
+
+        BSONObj min = cmdObj.getObjectField("min");
+        BSONObj max = cmdObj.getObjectField("max");
+
+        if (cm) {
+            auto keyPattern = cmdObj["keyPattern"];
+
+            uassert(ErrorCodes::BadValue,
+                    "keyPattern must be empty or must be an object that equals the shard key",
+                    !keyPattern || (keyPattern.type() == Object &&
+                                    SimpleBSONObjComparator::kInstance.evaluate(
+                                        cm->getShardKeyPattern().toBSON() == keyPattern.Obj())));
+
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "min value " << min << " does not have shard key",
+                    cm->getShardKeyPattern().isShardKey(min));
+            min = cm->getShardKeyPattern().normalizeShardKey(min);
+
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "max value " << max << " does not have shard key",
+                    cm->getShardKeyPattern().isShardKey(max));
+            max = cm->getShardKeyPattern().normalizeShardKey(max);
+        }
+
+        auto shardResults = scatterGatherVersionedTargetByRoutingTable(
             opCtx,
             nss,
             routingInfo,
@@ -84,53 +110,31 @@ public:
             {},
             {});
 
-        Status firstFailedShardStatus = Status::OK();
-        bool isValid = true;
+        // yes these are doubles...
+        double size = 0;
+        double numObjects = 0;
+        int millis = 0;
 
-        BSONObjBuilder rawResBuilder(output.subobjStart("raw"));
-        for (const auto& cmdResult : results) {
-            const auto& shardId = cmdResult.shardId;
+        for (const auto& shardResult : shardResults) {
+            const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
+            uassertStatusOK(shardResponse.status);
 
-            const auto& swResponse = cmdResult.swResponse;
-            if (!swResponse.isOK()) {
-                rawResBuilder.append(shardId.toString(),
-                                     BSON("error" << swResponse.getStatus().toString()));
-                if (firstFailedShardStatus.isOK())
-                    firstFailedShardStatus = swResponse.getStatus();
-                continue;
-            }
+            const auto& res = shardResponse.data;
+            uassertStatusOK(getStatusFromCommandResult(res));
 
-            const auto& response = swResponse.getValue();
-            if (!response.isOK()) {
-                rawResBuilder.append(shardId.toString(),
-                                     BSON("error" << response.status.toString()));
-                if (firstFailedShardStatus.isOK())
-                    firstFailedShardStatus = response.status;
-                continue;
-            }
-
-            rawResBuilder.append(shardId.toString(), response.data);
-
-            const auto status = getStatusFromCommandResult(response.data);
-            if (!status.isOK()) {
-                if (firstFailedShardStatus.isOK())
-                    firstFailedShardStatus = status;
-                continue;
-            }
-
-            if (!response.data["valid"].trueValue()) {
-                isValid = false;
-            }
+            size += res["size"].number();
+            numObjects += res["numObjects"].number();
+            millis += res["millis"].numberInt();
         }
-        rawResBuilder.done();
 
-        if (firstFailedShardStatus.isOK())
-            output.appendBool("valid", isValid);
+        result.append("size", size);
+        result.append("numObjects", numObjects);
+        result.append("millis", millis);
 
-        return CommandHelpers::appendCommandStatus(output, firstFailedShardStatus);
+        return true;
     }
 
-} validateCmd;
+} dataSizeCmd;
 
 }  // namespace
 }  // namespace mongo

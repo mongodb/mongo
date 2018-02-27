@@ -68,8 +68,7 @@ BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);
  */
 std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShards(
     OperationContext* opCtx,
-    const std::string& dbName,
-    boost::optional<NamespaceString> nss,
+    StringData dbName,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy);
@@ -84,8 +83,8 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
  */
 std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
-    const std::string& dbName,
     const NamespaceString& nss,
+    const CachedCollectionRoutingInfo& routingInfo,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
@@ -105,7 +104,6 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
  */
 std::vector<AsyncRequestsSender::Response> scatterGatherOnlyVersionIfUnsharded(
     OperationContext* opCtx,
-    const std::string& dbName,
     const NamespaceString& nss,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,

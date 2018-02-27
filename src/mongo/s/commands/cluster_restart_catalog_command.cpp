@@ -34,12 +34,14 @@
 namespace mongo {
 namespace {
 
-/**
- * Forwards the testing-only restartCatalog command to all shards.
- */
 class ClusterRestartCatalogCmd : public BasicCommand {
 public:
     ClusterRestartCatalogCmd() : BasicCommand("restartCatalog") {}
+
+    std::string help() const override {
+        return "Internal command for testing only. Forwards the restartCatalog command to all "
+               "shards.";
+    }
 
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
@@ -68,33 +70,21 @@ public:
         return false;
     }
 
-    std::string help() const override {
-        return "restart catalog\n"
-               "Internal command for testing only. Forwards the restartCatalog command to\n"
-               "all shards.\n";
-    }
-
     bool run(OperationContext* opCtx,
              const std::string& db,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        // This command doesn't operate on a collection namespace, so just pass in an empty
-        // NamespaceString.
-        const auto namespaceStringForCommand = boost::none;
         auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
             db,
-            namespaceStringForCommand,
             CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent);
 
-        std::string errmsg;
-        appendRawResponses(opCtx, &errmsg, &result, shardResponses);
-
         // Intentionally not adding the error message to 'result', as it will already contain all
         // the errors from the shards in a field named 'raw'.
-        return errmsg.length() > 0 ? false : true;
+        std::string errmsg;
+        return appendRawResponses(opCtx, &errmsg, &result, shardResponses);
     }
 };
 

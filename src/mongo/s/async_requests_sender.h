@@ -124,7 +124,7 @@ public:
      */
     AsyncRequestsSender(OperationContext* opCtx,
                         executor::TaskExecutor* executor,
-                        const std::string db,
+                        StringData dbName,
                         const std::vector<AsyncRequestsSender::Request>& requests,
                         const ReadPreferenceSetting& readPreference,
                         Shard::RetryPolicy retryPolicy);

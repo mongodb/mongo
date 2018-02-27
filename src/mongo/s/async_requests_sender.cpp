@@ -52,13 +52,13 @@ const int kMaxNumFailedHostRetryAttempts = 3;
 
 AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
                                          executor::TaskExecutor* executor,
-                                         const std::string db,
+                                         StringData dbName,
                                          const std::vector<AsyncRequestsSender::Request>& requests,
                                          const ReadPreferenceSetting& readPreference,
                                          Shard::RetryPolicy retryPolicy)
     : _opCtx(opCtx),
       _executor(executor),
-      _db(std::move(db)),
+      _db(dbName.toString()),
       _readPreference(readPreference),
       _retryPolicy(retryPolicy) {
     for (const auto& request : requests) {
