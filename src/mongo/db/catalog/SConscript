@@ -132,34 +132,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='catalog_raii',
-    source=[
-        'catalog_raii.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/views/views',
-        'collection',
-        'database',
-        'uuid_catalog',
-    ],
-)
-
-env.CppUnitTest(
-    target='catalog_raii_test',
-    source=[
-        'catalog_raii_test.cpp',
-    ],
-    LIBDEPS=[
-        'database_holder_mock',
-        '$BUILD_DIR/mongo/db/catalog/catalog_raii',
-        '$BUILD_DIR/mongo/db/service_context_noop_init',
-        '$BUILD_DIR/mongo/db/auth/authorization_manager_mock_init',
-    ],
-)
-
 env.CppUnitTest(
     target='database_test',
     source=[

@@ -562,7 +562,7 @@ env.CppUnitTest(
     ],
 )
 
-# TODO: This library should probably be folded into catalog/catalog,
+# TODO: This library should probably be folded into catalog_raii,
 # with which it is currently circular.
 env.Library(
     target='db_raii',
@@ -570,10 +570,52 @@ env.Library(
         'db_raii.cpp',
     ],
     LIBDEPS=[
-        'catalog/catalog_raii',
+        'catalog_raii',
         'curop',
         's/sharding',
         'stats/top',
+    ],
+)
+
+env.Library(
+    target='catalog_raii',
+    source=[
+        'catalog_raii.cpp',
+        'retryable_writes_stats.cpp',
+        'session.cpp',
+        'session_catalog.cpp',
+        'transaction_history_iterator.cpp',
+        env.Idlc('session_txn_record.idl')[0],
+        env.Idlc('transactions_stats.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'catalog/collection',
+        'catalog/database',
+        'catalog/database_holder',
+        'catalog/uuid_catalog',
+        'commands/server_status',
+        'concurrency/lock_manager',
+        'curop_metrics',
+        'dbdirectclient',
+        'index/index_access_method',
+        'logical_session_id',
+        'namespace_string',
+        'repl/oplog_entry',
+        'views/views',
+    ],
+)
+
+env.CppUnitTest(
+    target='catalog_raii_test',
+    source=[
+        'catalog_raii_test.cpp',
+    ],
+    LIBDEPS=[
+        'auth/authorization_manager_mock_init',
+        'catalog/database_holder_mock',
+        'catalog_raii',
+        'service_context_noop_init',
     ],
 )
 
@@ -1687,29 +1729,17 @@ env.Library(
         'ops/insert.cpp',
         'ops/update.cpp',
         'ops/write_ops_retryability.cpp',
-        'retryable_writes_stats.cpp',
-        'session.cpp',
-        'session_catalog.cpp',
-        'transaction_history_iterator.cpp',
         env.Idlc('ops/single_write_result.idl')[0],
-        env.Idlc('session_txn_record.idl')[0],
-        env.Idlc('transactions_stats.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        'catalog_raii',
         'catalog/collection_info_cache',
         'concurrency/lock_manager',
-        'curop_metrics',
-        'dbdirectclient',
-        'index/index_access_method',
         'introspect',
-        'logical_session_id',
         'matcher/expressions_mongod_only',
-        'namespace_string',
         'query_exec',
         'query/command_request_response',
-        'repl/oplog_entry',
         'repl/repl_coordinator_interface',
         'service_context',
         'update/update_driver',

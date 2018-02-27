@@ -30,7 +30,7 @@
 
 #include <string>
 
-#include "mongo/db/catalog/catalog_raii.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/timer.h"
 

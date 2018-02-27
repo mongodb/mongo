@@ -32,7 +32,7 @@
 
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 
-#include "mongo/db/catalog/catalog_raii.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"

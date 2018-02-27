@@ -31,7 +31,7 @@
 #include "mongo/s/client/shard_local.h"
 
 #include "mongo/client/read_preference.h"
-#include "mongo/db/catalog/catalog_raii.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_and_modify_request.h"

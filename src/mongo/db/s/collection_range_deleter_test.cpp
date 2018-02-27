@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/query.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/catalog/catalog_raii.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
