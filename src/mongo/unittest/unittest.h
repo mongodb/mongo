@@ -37,6 +37,7 @@
 #include <cmath>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -89,19 +90,19 @@
 #define ASSERT_LESS_THAN_OR_EQUALS(a, b) ASSERT_LTE(a, b)
 #define ASSERT_GREATER_THAN_OR_EQUALS(a, b) ASSERT_GTE(a, b)
 
-#define ASSERT_EQ(a, b) _ASSERT_COMPARISON(EQ, a, b)
-#define ASSERT_NE(a, b) _ASSERT_COMPARISON(NE, a, b)
-#define ASSERT_LT(a, b) _ASSERT_COMPARISON(LT, a, b)
-#define ASSERT_LTE(a, b) _ASSERT_COMPARISON(LTE, a, b)
-#define ASSERT_GT(a, b) _ASSERT_COMPARISON(GT, a, b)
-#define ASSERT_GTE(a, b) _ASSERT_COMPARISON(GTE, a, b)
+#define ASSERT_EQ(a, b) ASSERT_COMPARISON_(kEq, a, b)
+#define ASSERT_NE(a, b) ASSERT_COMPARISON_(kNe, a, b)
+#define ASSERT_LT(a, b) ASSERT_COMPARISON_(kLt, a, b)
+#define ASSERT_LTE(a, b) ASSERT_COMPARISON_(kLe, a, b)
+#define ASSERT_GT(a, b) ASSERT_COMPARISON_(kGt, a, b)
+#define ASSERT_GTE(a, b) ASSERT_COMPARISON_(kGe, a, b)
 
 /**
  * Binary comparison utility macro.  Do not use directly.
  */
-#define _ASSERT_COMPARISON(COMPARISON, a, b)                                                       \
-    if (::mongo::unittest::ComparisonAssertion_##COMPARISON ca =                                   \
-            ::mongo::unittest::ComparisonAssertion_##COMPARISON(__FILE__, __LINE__, #a, #b, a, b)) \
+#define ASSERT_COMPARISON_(OP, a, b)                                                           \
+    if (auto ca = ::mongo::unittest::ComparisonAssertion<::mongo::unittest::ComparisonOp::OP>( \
+            __FILE__, __LINE__, #a, #b, a, b))                                                 \
     ca.failure().stream()
 
 /**
@@ -421,8 +422,7 @@ protected:
     virtual void setupTests();
 
 private:
-    // TODO(C++11): Make this hold unique_ptrs.
-    typedef std::vector<std::shared_ptr<TestHolder>> TestHolderList;
+    typedef std::vector<std::unique_ptr<TestHolder>> TestHolderList;
 
     std::string _name;
     TestHolderList _tests;
@@ -506,45 +506,79 @@ private:
     bool _enabled;
 };
 
-#define DECLARE_COMPARISON_ASSERTION(NAME, OPERATOR)                                          \
-    class ComparisonAssertion_##NAME {                                                        \
-        typedef void (ComparisonAssertion_##NAME::*bool_type)() const;                        \
-                                                                                              \
-    public:                                                                                   \
-        template <typename A, typename B>                                                     \
-        ComparisonAssertion_##NAME(const std::string& theFile,                                \
-                                   unsigned theLine,                                          \
-                                   StringData aExpression,                                    \
-                                   StringData bExpression,                                    \
-                                   const A& a,                                                \
-                                   const B& b) {                                              \
-            if (a OPERATOR b) {                                                               \
-                return;                                                                       \
-            }                                                                                 \
-            std::ostringstream os;                                                            \
-            os << "Expected " << aExpression << " " #OPERATOR " " << bExpression << " (" << a \
-               << " " #OPERATOR " " << b << ")";                                              \
-            _assertion.reset(new TestAssertionFailure(theFile, theLine, os.str()));           \
-        }                                                                                     \
-        operator bool_type() const {                                                          \
-            return _assertion.get() ? &ComparisonAssertion_##NAME::comparison_failed : NULL;  \
-        }                                                                                     \
-        TestAssertionFailure failure() {                                                      \
-            return *_assertion;                                                               \
-        }                                                                                     \
-                                                                                              \
-    private:                                                                                  \
-        void comparison_failed() const {}                                                     \
-        std::shared_ptr<TestAssertionFailure> _assertion;                                     \
+enum class ComparisonOp { kEq, kNe, kLt, kLe, kGt, kGe };
+
+template <ComparisonOp op>
+class ComparisonAssertion {
+private:
+    template <ComparisonOp val>
+    using OpTag = std::integral_constant<ComparisonOp, val>;
+
+    static auto comparator(OpTag<ComparisonOp::kEq>) {
+        return [](auto&& a, auto&& b) { return a == b; };
+    }
+    static auto comparator(OpTag<ComparisonOp::kNe>) {
+        return [](auto&& a, auto&& b) { return a != b; };
+    }
+    static auto comparator(OpTag<ComparisonOp::kLt>) {
+        return [](auto&& a, auto&& b) { return a < b; };
+    }
+    static auto comparator(OpTag<ComparisonOp::kLe>) {
+        return [](auto&& a, auto&& b) { return a <= b; };
+    }
+    static auto comparator(OpTag<ComparisonOp::kGt>) {
+        return [](auto&& a, auto&& b) { return a > b; };
+    }
+    static auto comparator(OpTag<ComparisonOp::kGe>) {
+        return [](auto&& a, auto&& b) { return a >= b; };
     }
 
-DECLARE_COMPARISON_ASSERTION(EQ, ==);
-DECLARE_COMPARISON_ASSERTION(NE, !=);
-DECLARE_COMPARISON_ASSERTION(LT, <);
-DECLARE_COMPARISON_ASSERTION(LTE, <=);
-DECLARE_COMPARISON_ASSERTION(GT, >);
-DECLARE_COMPARISON_ASSERTION(GTE, >=);
-#undef DECLARE_COMPARISON_ASSERTION
+    static constexpr StringData name(OpTag<ComparisonOp::kEq>) {
+        return "=="_sd;
+    }
+    static constexpr StringData name(OpTag<ComparisonOp::kNe>) {
+        return "!="_sd;
+    }
+    static constexpr StringData name(OpTag<ComparisonOp::kLt>) {
+        return "<"_sd;
+    }
+    static constexpr StringData name(OpTag<ComparisonOp::kLe>) {
+        return "<="_sd;
+    }
+    static constexpr StringData name(OpTag<ComparisonOp::kGt>) {
+        return ">"_sd;
+    }
+    static constexpr StringData name(OpTag<ComparisonOp::kGe>) {
+        return ">="_sd;
+    }
+
+public:
+    template <typename A, typename B>
+    ComparisonAssertion(const std::string& theFile,
+                        unsigned theLine,
+                        StringData aExpression,
+                        StringData bExpression,
+                        const A& a,
+                        const B& b) {
+        if (comparator(OpTag<op>{})(a, b)) {
+            return;
+        }
+        std::ostringstream os;
+        StringData opName = name(OpTag<op>{});
+        os << "Expected " << aExpression << " " << opName << " " << bExpression << " (" << a << " "
+           << opName << " " << b << ")";
+        _assertion = std::make_unique<TestAssertionFailure>(theFile, theLine, os.str());
+    }
+    explicit operator bool() const {
+        return static_cast<bool>(_assertion);
+    }
+    TestAssertionFailure failure() {
+        return *_assertion;
+    }
+
+private:
+    std::unique_ptr<TestAssertionFailure> _assertion;
+};
 
 /**
  * Get the value out of a StatusWith<T>, or throw an exception if it is not OK.

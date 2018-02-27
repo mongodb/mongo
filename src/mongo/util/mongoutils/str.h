@@ -53,6 +53,10 @@ namespace str {
     since the following doesn't work:
 
        (std::stringstream() << 1).str();
+
+    TODO: To avoid implicit conversions in relational operation expressions, this stream
+    class should provide a full symmetric set of relational operators vs itself, vs
+    std::string, vs mongo::StringData, and vs const char*, but that's a lot of functions.
 */
 class stream {
 public:
