@@ -333,8 +333,8 @@ TEST_F(ExpressionConvertTest, ConvertNullishInput) {
                                         << "int"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document nullInput{{"path1", Value(BSONNULL)}};
-    Document undefinedInput{{"path1", Value(BSONUndefined)}};
+    Document nullInput{{"path1", BSONNULL}};
+    Document undefinedInput{{"path1", BSONUndefined}};
     Document missingInput{{"path1", Value()}};
 
     ASSERT_VALUE_EQ(convertExp->evaluate(nullInput), Value(BSONNULL));
@@ -355,8 +355,8 @@ TEST_F(ExpressionConvertTest, ConvertNullishInputWithOnNull) {
                                         << "Should not be used here"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document nullInput{{"path1", Value(BSONNULL)}};
-    Document undefinedInput{{"path1", Value(BSONUndefined)}};
+    Document nullInput{{"path1", BSONNULL}};
+    Document undefinedInput{{"path1", BSONUndefined}};
     Document missingInput{{"path1", Value()}};
 
     ASSERT_VALUE_EQ(convertExp->evaluate(nullInput), Value("B)"_sd));
@@ -377,8 +377,8 @@ TEST_F(ExpressionConvertTest, NullishToReturnsNull) {
                                         << "Also should not be used"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document nullInput{{"path1", Value(BSONNULL)}};
-    Document undefinedInput{{"path1", Value(BSONUndefined)}};
+    Document nullInput{{"path1", BSONNULL}};
+    Document undefinedInput{{"path1", BSONUndefined}};
     Document missingInput{{"path1", Value()}};
 
     ASSERT_VALUE_EQ(convertExp->evaluate(nullInput), Value(BSONNULL));
@@ -441,7 +441,7 @@ TEST_F(ExpressionConvertTest, DoubleIdentityConversion) {
                                         << "double"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document doubleInput{{"path1", Value(2.4)}};
+    Document doubleInput{{"path1", 2.4}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(doubleInput), 2.4, BSONType::NumberDouble);
 
     Document doubleNaN{{"path1", std::numeric_limits<double>::quiet_NaN()}};
@@ -470,11 +470,39 @@ TEST_F(ExpressionConvertTest, BoolIdentityConversion) {
                                         << "bool"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document trueBoolInput{{"path1", Value(true)}};
+    Document trueBoolInput{{"path1", true}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(trueBoolInput), true, BSONType::Bool);
 
-    Document falseBoolInput{{"path1", Value(false)}};
+    Document falseBoolInput{{"path1", false}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseBoolInput), false, BSONType::Bool);
+}
+
+TEST_F(ExpressionConvertTest, StringIdentityConversion) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "string"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document stringInput{{"path1", "More cowbell"_sd}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(stringInput), "More cowbell"_sd, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, ObjectIdIdentityConversion) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "objectId"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document oidInput{{"path1", OID("0123456789abcdef01234567")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(oidInput), OID("0123456789abcdef01234567"), BSONType::jstOID);
 }
 
 TEST_F(ExpressionConvertTest, DateIdentityConversion) {
@@ -486,7 +514,7 @@ TEST_F(ExpressionConvertTest, DateIdentityConversion) {
                                         << "date"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document dateInput{{"path1", Value(Date_t{})}};
+    Document dateInput{{"path1", Date_t{}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(dateInput), Date_t{}, BSONType::Date);
 }
 
@@ -499,7 +527,7 @@ TEST_F(ExpressionConvertTest, IntIdentityConversion) {
                                         << "int"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document intInput{{"path1", Value(int{123})}};
+    Document intInput{{"path1", int{123}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(intInput), int{123}, BSONType::NumberInt);
 }
 
@@ -512,7 +540,7 @@ TEST_F(ExpressionConvertTest, LongIdentityConversion) {
                                         << "long"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document longInput{{"path1", Value(123LL)}};
+    Document longInput{{"path1", 123LL}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(longInput), 123LL, BSONType::NumberLong);
 }
 
@@ -525,7 +553,7 @@ TEST_F(ExpressionConvertTest, DecimalIdentityConversion) {
                                         << "decimal"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document decimalInput{{"path1", Value(Decimal128("2.4"))}};
+    Document decimalInput{{"path1", Decimal128("2.4")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(decimalInput), Decimal128("2.4"), BSONType::NumberDecimal);
 
@@ -554,7 +582,7 @@ TEST_F(ExpressionConvertTest, ConvertDateToBool) {
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
     // All date inputs evaluate as true.
-    Document dateInput{{"path1", Value(Date_t{})}};
+    Document dateInput{{"path1", Date_t{}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(dateInput), true, BSONType::Bool);
 }
 
@@ -567,10 +595,10 @@ TEST_F(ExpressionConvertTest, ConvertIntToBool) {
                                         << "bool"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document trueIntInput{{"path1", Value(int{1})}};
+    Document trueIntInput{{"path1", int{1}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(trueIntInput), true, BSONType::Bool);
 
-    Document falseIntInput{{"path1", Value(int{0})}};
+    Document falseIntInput{{"path1", int{0}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseIntInput), false, BSONType::Bool);
 }
 
@@ -583,10 +611,10 @@ TEST_F(ExpressionConvertTest, ConvertLongToBool) {
                                         << "bool"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document trueLongInput{{"path1", Value(-1ll)}};
+    Document trueLongInput{{"path1", -1LL}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(trueLongInput), true, BSONType::Bool);
 
-    Document falseLongInput{{"path1", Value(0ll)}};
+    Document falseLongInput{{"path1", 0LL}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseLongInput), false, BSONType::Bool);
 }
 
@@ -599,10 +627,10 @@ TEST_F(ExpressionConvertTest, ConvertDoubleToBool) {
                                         << "bool"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document trueDoubleInput{{"path1", Value(2.4)}};
+    Document trueDoubleInput{{"path1", 2.4}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(trueDoubleInput), true, BSONType::Bool);
 
-    Document falseDoubleInput{{"path1", Value(-0.0)}};
+    Document falseDoubleInput{{"path1", -0.0}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseDoubleInput), false, BSONType::Bool);
 
     Document doubleNaN{{"path1", std::numeric_limits<double>::quiet_NaN()}};
@@ -625,16 +653,16 @@ TEST_F(ExpressionConvertTest, ConvertDecimalToBool) {
                                         << "bool"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document trueDecimalInput{{"path1", Value(Decimal128(5))}};
+    Document trueDecimalInput{{"path1", Decimal128(5)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(trueDecimalInput), true, BSONType::Bool);
 
-    Document falseDecimalInput{{"path1", Value(Decimal128(0))}};
+    Document falseDecimalInput{{"path1", Decimal128(0)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseDecimalInput), false, BSONType::Bool);
 
-    Document preciseZero{{"path1", Value(Decimal128("0.00"))}};
+    Document preciseZero{{"path1", Decimal128("0.00")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(preciseZero), false, BSONType::Bool);
 
-    Document negativeZero{{"path1", Value(Decimal128("-0.00"))}};
+    Document negativeZero{{"path1", Decimal128("-0.00")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(negativeZero), false, BSONType::Bool);
 
     Document decimalNaN{{"path1", Decimal128::kPositiveNaN}};
@@ -660,20 +688,20 @@ TEST_F(ExpressionConvertTest, ConvertNumericToDouble) {
                                         << "double"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document intInput{{"path1", Value(int{1})}};
+    Document intInput{{"path1", int{1}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(intInput), 1.0, BSONType::NumberDouble);
 
-    Document longInput{{"path1", Value(0xf00000000ll)}};
+    Document longInput{{"path1", 0xf00000000LL}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(longInput), 64424509440.0, BSONType::NumberDouble);
 
-    Document decimalInput{{"path1", Value(Decimal128("5.5"))}};
+    Document decimalInput{{"path1", Decimal128("5.5")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(decimalInput), 5.5, BSONType::NumberDouble);
 
-    Document boolFalse{{"path1", Value(false)}};
+    Document boolFalse{{"path1", false}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolFalse), 0.0, BSONType::NumberDouble);
 
-    Document boolTrue{{"path1", Value(true)}};
+    Document boolTrue{{"path1", true}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolTrue), 1.0, BSONType::NumberDouble);
 
     Document decimalNaN{{"path1", Decimal128::kPositiveNaN}};
@@ -700,12 +728,12 @@ TEST_F(ExpressionConvertTest, ConvertNumericToDouble) {
 
     // Note that the least significant bits get lost, because the significand of a double is not
     // wide enough for the original long long value in its entirety.
-    Document largeLongInput{{"path1", Value(0xf0000000000000fLL)}};
+    Document largeLongInput{{"path1", 0xf0000000000000fLL}};
     result = convertExp->evaluate(largeLongInput);
     ASSERT_EQ(static_cast<long long>(result.getDouble()), 0xf00000000000000LL);
 
     // Again, some precision is lost in the conversion from Decimal128 to double.
-    Document preciseDecimalInput{{"path1", Value(Decimal128("1.125000000000000000005"))}};
+    Document preciseDecimalInput{{"path1", Decimal128("1.125000000000000000005")}};
     result = convertExp->evaluate(preciseDecimalInput);
     ASSERT_EQ(result.getDouble(), 1.125);
 }
@@ -719,12 +747,12 @@ TEST_F(ExpressionConvertTest, ConvertDateToDouble) {
                                         << "double"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document dateInput{{"path1", Value(Date_t::fromMillisSinceEpoch(123))}};
+    Document dateInput{{"path1", Date_t::fromMillisSinceEpoch(123)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(dateInput), 123.0, BSONType::NumberDouble);
 
     // Note that the least significant bits get lost, because the significand of a double is not
     // wide enough for the original 64-bit Date_t value in its entirety.
-    Document largeDateInput{{"path1", Value(Date_t::fromMillisSinceEpoch(0xf0000000000000fLL))}};
+    Document largeDateInput{{"path1", Date_t::fromMillisSinceEpoch(0xf0000000000000fLL)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(largeDateInput), 0xf00000000000000LL, BSONType::NumberDouble);
 }
@@ -785,24 +813,24 @@ TEST_F(ExpressionConvertTest, ConvertNumericToDecimal) {
                                         << "decimal"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document intInput{{"path1", Value(int{1})}};
+    Document intInput{{"path1", int{1}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(intInput), Decimal128(1), BSONType::NumberDecimal);
 
-    Document longInput{{"path1", Value(0xf00000000ll)}};
+    Document longInput{{"path1", 0xf00000000LL}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(longInput),
                                    Decimal128(std::int64_t{0xf00000000LL}),
                                    BSONType::NumberDecimal);
 
-    Document doubleInput{{"path1", Value(0.1)}};
+    Document doubleInput{{"path1", 0.1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(doubleInput), Decimal128("0.1"), BSONType::NumberDecimal);
 
-    Document boolFalse{{"path1", Value(false)}};
+    Document boolFalse{{"path1", false}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(boolFalse), Decimal128(0), BSONType::NumberDecimal);
 
-    Document boolTrue{{"path1", Value(true)}};
+    Document boolTrue{{"path1", true}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(boolTrue), Decimal128(1), BSONType::NumberDecimal);
 
@@ -822,9 +850,9 @@ TEST_F(ExpressionConvertTest, ConvertNumericToDecimal) {
 
     // Unlike the similar conversion in ConvertNumericToDouble, there is more than enough precision
     // to store the exact orignal value in a Decimal128.
-    Document largeLongInput{{"path1", Value(0xf0000000000000fLL)}};
+    Document largeLongInput{{"path1", 0xf0000000000000fLL}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
-        convertExp->evaluate(largeLongInput), Value(0xf0000000000000fLL), BSONType::NumberDecimal);
+        convertExp->evaluate(largeLongInput), 0xf0000000000000fLL, BSONType::NumberDecimal);
 }
 
 TEST_F(ExpressionConvertTest, ConvertDateToDecimal) {
@@ -836,13 +864,13 @@ TEST_F(ExpressionConvertTest, ConvertDateToDecimal) {
                                         << "decimal"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document dateInput{{"path1", Value(Date_t::fromMillisSinceEpoch(123))}};
+    Document dateInput{{"path1", Date_t::fromMillisSinceEpoch(123)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(dateInput), Decimal128(123), BSONType::NumberDecimal);
 
-    Document largeDateInput{{"path1", Value(Date_t::fromMillisSinceEpoch(0xf0000000000000fLL))}};
+    Document largeDateInput{{"path1", Date_t::fromMillisSinceEpoch(0xf0000000000000fLL)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
-        convertExp->evaluate(largeDateInput), Value(0xf0000000000000fLL), BSONType::NumberDecimal);
+        convertExp->evaluate(largeDateInput), 0xf0000000000000fLL, BSONType::NumberDecimal);
 }
 
 TEST_F(ExpressionConvertTest, ConvertDoubleToInt) {
@@ -854,28 +882,28 @@ TEST_F(ExpressionConvertTest, ConvertDoubleToInt) {
                                         << "int"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document simpleInput{{"path1", Value(1.0)}};
+    Document simpleInput{{"path1", 1.0}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1, BSONType::NumberInt);
 
     // Conversions to int should always truncate the fraction (i.e., round towards 0).
-    Document nonIntegerInput1{{"path1", Value(2.1)}};
+    Document nonIntegerInput1{{"path1", 2.1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput1), 2, BSONType::NumberInt);
 
-    Document nonIntegerInput2{{"path1", Value(2.9)}};
+    Document nonIntegerInput2{{"path1", 2.9}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput2), 2, BSONType::NumberInt);
 
-    Document nonIntegerInput3{{"path1", Value(-2.1)}};
+    Document nonIntegerInput3{{"path1", -2.1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput3), -2, BSONType::NumberInt);
 
-    Document nonIntegerInput4{{"path1", Value(-2.9)}};
+    Document nonIntegerInput4{{"path1", -2.9}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput4), -2, BSONType::NumberInt);
 
     int maxInt = std::numeric_limits<int>::max();
-    Document maxInput{{"path1", Value(static_cast<double>(maxInt))}};
+    Document maxInput{{"path1", static_cast<double>(maxInt)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(maxInput), maxInt, BSONType::NumberInt);
 
     int minInt = std::numeric_limits<int>::lowest();
-    Document minInput{{"path1", Value(static_cast<double>(minInt))}};
+    Document minInput{{"path1", static_cast<double>(minInt)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(minInput), minInt, BSONType::NumberInt);
 }
 
@@ -891,7 +919,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToInt) {
     int maxInt = std::numeric_limits<int>::max();
     double overflowInt =
         std::nextafter(static_cast<double>(maxInt), std::numeric_limits<double>::max());
-    Document overflowInput{{"path1", Value(overflowInt)}};
+    Document overflowInput{{"path1", overflowInt}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -903,7 +931,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToInt) {
     int minInt = std::numeric_limits<int>::lowest();
     double negativeOverflowInt =
         std::nextafter(static_cast<double>(minInt), std::numeric_limits<double>::lowest());
-    Document negativeOverflowInput{{"path1", Value(negativeOverflowInt)}};
+    Document negativeOverflowInput{{"path1", negativeOverflowInt}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeOverflowInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -912,7 +940,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToInt) {
                                                         "Conversion would overflow target type");
                              });
 
-    Document nanInput{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    Document nanInput{{"path1", std::numeric_limits<double>::quiet_NaN()}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(nanInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -956,17 +984,17 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToIntWithOnError) {
     int maxInt = std::numeric_limits<int>::max();
     double overflowInt =
         std::nextafter(static_cast<double>(maxInt), std::numeric_limits<double>::max());
-    Document overflowInput{{"path1", Value(overflowInt)}};
+    Document overflowInput{{"path1", overflowInt}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(overflowInput), "X"_sd, BSONType::String);
 
     int minInt = std::numeric_limits<int>::lowest();
     double negativeOverflowInt =
         std::nextafter(static_cast<double>(minInt), std::numeric_limits<double>::lowest());
-    Document negativeOverflowInput{{"path1", Value(negativeOverflowInt)}};
+    Document negativeOverflowInput{{"path1", negativeOverflowInt}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(negativeOverflowInput), "X"_sd, BSONType::String);
 
-    Document nanInput{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    Document nanInput{{"path1", std::numeric_limits<double>::quiet_NaN()}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nanInput), "X"_sd, BSONType::String);
 
     Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
@@ -986,33 +1014,33 @@ TEST_F(ExpressionConvertTest, ConvertDoubleToLong) {
                                         << "long"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document simpleInput{{"path1", Value(1.0)}};
+    Document simpleInput{{"path1", 1.0}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1, BSONType::NumberLong);
 
     // Conversions to int should always truncate the fraction (i.e., round towards 0).
-    Document nonIntegerInput1{{"path1", Value(2.1)}};
+    Document nonIntegerInput1{{"path1", 2.1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput1), 2, BSONType::NumberLong);
 
-    Document nonIntegerInput2{{"path1", Value(2.9)}};
+    Document nonIntegerInput2{{"path1", 2.9}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput2), 2, BSONType::NumberLong);
 
-    Document nonIntegerInput3{{"path1", Value(-2.1)}};
+    Document nonIntegerInput3{{"path1", -2.1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(nonIntegerInput3), -2, BSONType::NumberLong);
 
-    Document nonIntegerInput4{{"path1", Value(-2.9)}};
+    Document nonIntegerInput4{{"path1", -2.9}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(nonIntegerInput4), -2, BSONType::NumberLong);
 
     // maxVal is the highest double value that will not overflow long long.
     double maxVal = std::nextafter(ExpressionConvert::kLongLongMaxPlusOneAsDouble, 0.0);
-    Document maxInput{{"path1", Value(maxVal)}};
+    Document maxInput{{"path1", maxVal}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(maxInput), static_cast<long long>(maxVal), BSONType::NumberLong);
 
     // minVal is the lowest double value that will not overflow long long.
     double minVal = static_cast<double>(std::numeric_limits<long long>::lowest());
-    Document minInput{{"path1", Value(minVal)}};
+    Document minInput{{"path1", minVal}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(minInput), static_cast<long long>(minVal), BSONType::NumberLong);
 }
@@ -1027,7 +1055,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToLong) {
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
     double overflowLong = ExpressionConvert::kLongLongMaxPlusOneAsDouble;
-    Document overflowInput{{"path1", Value(overflowLong)}};
+    Document overflowInput{{"path1", overflowLong}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -1039,7 +1067,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToLong) {
     double minLong = static_cast<double>(std::numeric_limits<long long>::lowest());
     double negativeOverflowLong =
         std::nextafter(static_cast<double>(minLong), std::numeric_limits<double>::lowest());
-    Document negativeOverflowInput{{"path1", Value(negativeOverflowLong)}};
+    Document negativeOverflowInput{{"path1", negativeOverflowLong}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeOverflowInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -1048,7 +1076,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToLong) {
                                                         "Conversion would overflow target type");
                              });
 
-    Document nanInput{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    Document nanInput{{"path1", std::numeric_limits<double>::quiet_NaN()}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(nanInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -1090,17 +1118,17 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsDoubleToLongWithOnError) {
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
     double overflowLong = ExpressionConvert::kLongLongMaxPlusOneAsDouble;
-    Document overflowInput{{"path1", Value(overflowLong)}};
+    Document overflowInput{{"path1", overflowLong}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(overflowInput), "X"_sd, BSONType::String);
 
     double minLong = static_cast<double>(std::numeric_limits<long long>::lowest());
     double negativeOverflowLong =
         std::nextafter(static_cast<double>(minLong), std::numeric_limits<double>::lowest());
-    Document negativeOverflowInput{{"path1", Value(negativeOverflowLong)}};
+    Document negativeOverflowInput{{"path1", negativeOverflowLong}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(negativeOverflowInput), "X"_sd, BSONType::String);
 
-    Document nanInput{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    Document nanInput{{"path1", std::numeric_limits<double>::quiet_NaN()}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nanInput), "X"_sd, BSONType::String);
 
     Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
@@ -1120,28 +1148,28 @@ TEST_F(ExpressionConvertTest, ConvertDecimalToInt) {
                                         << "int"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document simpleInput{{"path1", Value(Decimal128("1.0"))}};
+    Document simpleInput{{"path1", Decimal128("1.0")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1, BSONType::NumberInt);
 
     // Conversions to int should always truncate the fraction (i.e., round towards 0).
-    Document nonIntegerInput1{{"path1", Value(Decimal128("2.1"))}};
+    Document nonIntegerInput1{{"path1", Decimal128("2.1")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput1), 2, BSONType::NumberInt);
 
-    Document nonIntegerInput2{{"path1", Value(Decimal128("2.9"))}};
+    Document nonIntegerInput2{{"path1", Decimal128("2.9")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput2), 2, BSONType::NumberInt);
 
-    Document nonIntegerInput3{{"path1", Value(Decimal128("-2.1"))}};
+    Document nonIntegerInput3{{"path1", Decimal128("-2.1")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput3), -2, BSONType::NumberInt);
 
-    Document nonIntegerInput4{{"path1", Value(Decimal128("-2.9"))}};
+    Document nonIntegerInput4{{"path1", Decimal128("-2.9")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput3), -2, BSONType::NumberInt);
 
     int maxInt = std::numeric_limits<int>::max();
-    Document maxInput{{"path1", Value(Decimal128(maxInt))}};
+    Document maxInput{{"path1", Decimal128(maxInt)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(maxInput), maxInt, BSONType::NumberInt);
 
     int minInt = std::numeric_limits<int>::min();
-    Document minInput{{"path1", Value(Decimal128(minInt))}};
+    Document minInput{{"path1", Decimal128(minInt)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(minInput), minInt, BSONType::NumberInt);
 }
 
@@ -1257,30 +1285,30 @@ TEST_F(ExpressionConvertTest, ConvertDecimalToLong) {
                                         << "long"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document simpleInput{{"path1", Value(Decimal128("1.0"))}};
+    Document simpleInput{{"path1", Decimal128("1.0")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1, BSONType::NumberLong);
 
     // Conversions to long should always truncate the fraction (i.e., round towards 0).
-    Document nonIntegerInput1{{"path1", Value(Decimal128("2.1"))}};
+    Document nonIntegerInput1{{"path1", Decimal128("2.1")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput1), 2, BSONType::NumberLong);
 
-    Document nonIntegerInput2{{"path1", Value(Decimal128("2.9"))}};
+    Document nonIntegerInput2{{"path1", Decimal128("2.9")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nonIntegerInput2), 2, BSONType::NumberLong);
 
-    Document nonIntegerInput3{{"path1", Value(Decimal128("-2.1"))}};
+    Document nonIntegerInput3{{"path1", Decimal128("-2.1")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(nonIntegerInput3), -2, BSONType::NumberLong);
 
-    Document nonIntegerInput4{{"path1", Value(Decimal128("-2.9"))}};
+    Document nonIntegerInput4{{"path1", Decimal128("-2.9")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(nonIntegerInput4), -2, BSONType::NumberLong);
 
     long long maxVal = std::numeric_limits<long long>::max();
-    Document maxInput{{"path1", Value(Decimal128(std::int64_t{maxVal}))}};
+    Document maxInput{{"path1", Decimal128(std::int64_t{maxVal})}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(maxInput), maxVal, BSONType::NumberLong);
 
     long long minVal = std::numeric_limits<long long>::min();
-    Document minInput{{"path1", Value(Decimal128(std::int64_t{minVal}))}};
+    Document minInput{{"path1", Decimal128(std::int64_t{minVal})}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(minInput), minVal, BSONType::NumberLong);
 }
 
@@ -1398,7 +1426,7 @@ TEST_F(ExpressionConvertTest, ConvertDateToLong) {
                                         << "long"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document dateInput{{"path1", Value(Date_t::fromMillisSinceEpoch(123LL))}};
+    Document dateInput{{"path1", Date_t::fromMillisSinceEpoch(123LL)}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(dateInput), 123LL, BSONType::NumberLong);
 }
 
@@ -1411,15 +1439,15 @@ TEST_F(ExpressionConvertTest, ConvertIntToLong) {
                                         << "long"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document simpleInput{{"path1", Value(1)}};
+    Document simpleInput{{"path1", 1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1LL, BSONType::NumberLong);
 
     int maxInt = std::numeric_limits<int>::max();
-    Document maxInput{{"path1", Value(maxInt)}};
+    Document maxInput{{"path1", maxInt}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(maxInput), maxInt, BSONType::NumberLong);
 
     int minInt = std::numeric_limits<int>::min();
-    Document minInput{{"path1", Value(minInt)}};
+    Document minInput{{"path1", minInt}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(minInput), minInt, BSONType::NumberLong);
 }
 
@@ -1432,15 +1460,15 @@ TEST_F(ExpressionConvertTest, ConvertLongToInt) {
                                         << "int"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document simpleInput{{"path1", Value(1)}};
+    Document simpleInput{{"path1", 1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(simpleInput), 1, BSONType::NumberInt);
 
     long long maxInt = std::numeric_limits<int>::max();
-    Document maxInput{{"path1", Value(maxInt)}};
+    Document maxInput{{"path1", maxInt}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(maxInput), maxInt, BSONType::NumberInt);
 
     long long minInt = std::numeric_limits<int>::min();
-    Document minInput{{"path1", Value(minInt)}};
+    Document minInput{{"path1", minInt}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(minInput), minInt, BSONType::NumberInt);
 }
 
@@ -1454,7 +1482,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsLongToInt) {
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
     long long maxInt = std::numeric_limits<int>::max();
-    Document overflowInput{{"path1", Value(maxInt + 1)}};
+    Document overflowInput{{"path1", maxInt + 1}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(overflowInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -1464,7 +1492,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsLongToInt) {
                              });
 
     long long minInt = std::numeric_limits<int>::min();
-    Document negativeOverflowInput{{"path1", Value(minInt - 1)}};
+    Document negativeOverflowInput{{"path1", minInt - 1}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(negativeOverflowInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -1486,11 +1514,11 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsLongToIntWithOnError) {
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
     long long maxInt = std::numeric_limits<int>::max();
-    Document overflowInput{{"path1", Value(maxInt + 1)}};
+    Document overflowInput{{"path1", maxInt + 1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(overflowInput), "X"_sd, BSONType::String);
 
     long long minInt = std::numeric_limits<int>::min();
-    Document negativeOverflowInput{{"path1", Value(minInt - 1)}};
+    Document negativeOverflowInput{{"path1", minInt - 1}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(negativeOverflowInput), "X"_sd, BSONType::String);
 }
@@ -1504,10 +1532,10 @@ TEST_F(ExpressionConvertTest, ConvertBoolToInt) {
                                         << "int"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document boolFalse{{"path1", Value(false)}};
+    Document boolFalse{{"path1", false}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolFalse), 0, BSONType::NumberInt);
 
-    Document boolTrue{{"path1", Value(true)}};
+    Document boolTrue{{"path1", true}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolTrue), 1, BSONType::NumberInt);
 }
 
@@ -1520,11 +1548,11 @@ TEST_F(ExpressionConvertTest, ConvertBoolToLong) {
                                         << "long"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document boolFalse{{"path1", Value(false)}};
-    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolFalse), 0ll, BSONType::NumberLong);
+    Document boolFalse{{"path1", false}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolFalse), 0LL, BSONType::NumberLong);
 
-    Document boolTrue{{"path1", Value(true)}};
-    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolTrue), 1ll, BSONType::NumberLong);
+    Document boolTrue{{"path1", true}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(boolTrue), 1LL, BSONType::NumberLong);
 }
 
 TEST_F(ExpressionConvertTest, ConvertNumberToDate) {
@@ -1536,23 +1564,23 @@ TEST_F(ExpressionConvertTest, ConvertNumberToDate) {
                                         << "date"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document longInput{{"path1", Value(0ll)}};
+    Document longInput{{"path1", 0LL}};
     ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(longInput).getDate()),
               "1970-01-01T00:00:00.000Z");
 
-    Document doubleInput{{"path1", Value(431568000000.0)}};
+    Document doubleInput{{"path1", 431568000000.0}};
     ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(doubleInput).getDate()),
               "1983-09-05T00:00:00.000Z");
 
-    Document doubleInputWithFraction{{"path1", Value(431568000000.987)}};
+    Document doubleInputWithFraction{{"path1", 431568000000.987}};
     ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(doubleInputWithFraction).getDate()),
               "1983-09-05T00:00:00.000Z");
 
-    Document decimalInput{{"path1", Value(Decimal128("872835240000"))}};
+    Document decimalInput{{"path1", Decimal128("872835240000")}};
     ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(decimalInput).getDate()),
               "1997-08-29T06:14:00.000Z");
 
-    Document decimalInputWithFraction{{"path1", Value(Decimal128("872835240000.987"))}};
+    Document decimalInputWithFraction{{"path1", Decimal128("872835240000.987")}};
     ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(decimalInputWithFraction).getDate()),
               "1997-08-29T06:14:00.000Z");
 }
@@ -1566,7 +1594,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDate) {
                                         << "date"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
-    Document doubleOverflowInput{{"path1", Value(1.0e100)}};
+    Document doubleOverflowInput{{"path1", 1.0e100}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(doubleOverflowInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -1575,7 +1603,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDate) {
                                                         "Conversion would overflow target type");
                              });
 
-    Document doubleNegativeOverflowInput{{"path1", Value(-1.0e100)}};
+    Document doubleNegativeOverflowInput{{"path1", -1.0e100}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(doubleNegativeOverflowInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -1584,7 +1612,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDate) {
                                                         "Conversion would overflow target type");
                              });
 
-    Document doubleNaN{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    Document doubleNaN{{"path1", std::numeric_limits<double>::quiet_NaN()}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(doubleNaN),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -1614,7 +1642,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDate) {
                                      "Attempt to convert infinity value to integer type");
                              });
 
-    Document decimalOverflowInput{{"path1", Value(Decimal128("1.0e100"))}};
+    Document decimalOverflowInput{{"path1", Decimal128("1.0e100")}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(decimalOverflowInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -1623,7 +1651,7 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDate) {
                                                         "Conversion would overflow target type");
                              });
 
-    Document decimalNegativeOverflowInput{{"path1", Value(Decimal128("1.0e100"))}};
+    Document decimalNegativeOverflowInput{{"path1", Decimal128("1.0e100")}};
     ASSERT_THROWS_WITH_CHECK(convertExp->evaluate(decimalNegativeOverflowInput),
                              AssertionException,
                              [](const AssertionException& exception) {
@@ -1685,18 +1713,18 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDateWithOnError) {
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
 
     // Int is explicitly disallowed for date conversions. Clients must use 64-bit long instead.
-    Document intInput{{"path1", Value(int{0})}};
+    Document intInput{{"path1", int{0}}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(intInput), "X"_sd, BSONType::String);
 
-    Document doubleOverflowInput{{"path1", Value(1.0e100)}};
+    Document doubleOverflowInput{{"path1", 1.0e100}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(doubleOverflowInput), "X"_sd, BSONType::String);
 
-    Document doubleNegativeOverflowInput{{"path1", Value(-1.0e100)}};
+    Document doubleNegativeOverflowInput{{"path1", -1.0e100}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(doubleNegativeOverflowInput), "X"_sd, BSONType::String);
 
-    Document doubleNaN{{"path1", Value(std::numeric_limits<double>::quiet_NaN())}};
+    Document doubleNaN{{"path1", std::numeric_limits<double>::quiet_NaN()}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(doubleNaN), "X"_sd, BSONType::String);
 
     Document doubleInfinity{{"path1", std::numeric_limits<double>::infinity()}};
@@ -1706,11 +1734,11 @@ TEST_F(ExpressionConvertTest, ConvertOutOfBoundsNumberToDateWithOnError) {
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(doubleNegativeInfinity), "X"_sd, BSONType::String);
 
-    Document decimalOverflowInput{{"path1", Value(Decimal128("1.0e100"))}};
+    Document decimalOverflowInput{{"path1", Decimal128("1.0e100")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(decimalOverflowInput), "X"_sd, BSONType::String);
 
-    Document decimalNegativeOverflowInput{{"path1", Value(Decimal128("1.0e100"))}};
+    Document decimalNegativeOverflowInput{{"path1", Decimal128("1.0e100")}};
     ASSERT_VALUE_CONTENTS_AND_TYPE(
         convertExp->evaluate(decimalNegativeOverflowInput), "X"_sd, BSONType::String);
 
@@ -1737,9 +1765,8 @@ TEST_F(ExpressionConvertTest, ConvertObjectIdToDate) {
                                         << "to"
                                         << "date"));
     auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
-    convertExp = convertExp->optimize();
 
-    Document oidInput{{"path1", Value(OID("59E8A8D8FEDCBA9876543210"))}};
+    Document oidInput{{"path1", OID("59E8A8D8FEDCBA9876543210")}};
 
     ASSERT_EQ(dateToISOStringUTC(convertExp->evaluate(oidInput).getDate()),
               "2017-10-19T13:30:00.000Z");
@@ -2537,6 +2564,249 @@ TEST_F(ExpressionConvertTest, ConvertStringToDateWithOnNull) {
 
     result = convertExp->evaluate({{"path1", Value(BSONNULL)}});
     ASSERT_VALUE_CONTENTS_AND_TYPE(result, onNullValue, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, FormatDouble) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "string"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document zeroInput{{"path1", 0.0}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(zeroInput), "0"_sd, BSONType::String);
+
+    Document negativeZeroInput{{"path1", -0.0}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeZeroInput), "-0"_sd, BSONType::String);
+
+    Document positiveIntegerInput{{"path1", 1337.0}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positiveIntegerInput), "1337"_sd, BSONType::String);
+
+    Document negativeIntegerInput{{"path1", -1337.0}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeIntegerInput), "-1337"_sd, BSONType::String);
+
+    Document positiveFractionalInput{{"path1", 0.1337}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positiveFractionalInput), "0.1337"_sd, BSONType::String);
+
+    Document negativeFractionalInput{{"path1", -0.1337}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeFractionalInput), "-0.1337"_sd, BSONType::String);
+
+    Document positiveLargeInput{{"path1", 1.3e37}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positiveLargeInput), "1.3e+37"_sd, BSONType::String);
+
+    Document negativeLargeInput{{"path1", -1.3e37}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeLargeInput), "-1.3e+37"_sd, BSONType::String);
+
+    Document positiveTinyInput{{"path1", 1.3e-37}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positiveTinyInput), "1.3e-37"_sd, BSONType::String);
+
+    Document negativeTinyInput{{"path1", -1.3e-37}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeTinyInput), "-1.3e-37"_sd, BSONType::String);
+
+    Document infinityInput{{"path1", std::numeric_limits<double>::infinity()}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(infinityInput), "Infinity"_sd, BSONType::String);
+
+    Document negativeInfinityInput{{"path1", -std::numeric_limits<double>::infinity()}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeInfinityInput), "-Infinity"_sd, BSONType::String);
+
+    Document nanInput{{"path1", std::numeric_limits<double>::quiet_NaN()}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nanInput), "NaN"_sd, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, FormatObjectId) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "string"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document zeroInput{{"path1", OID("000000000000000000000000")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(zeroInput), "000000000000000000000000"_sd, BSONType::String);
+
+    Document simpleInput{{"path1", OID("0123456789abcdef01234567")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(simpleInput), "0123456789abcdef01234567"_sd, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, FormatBool) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "string"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document trueInput{{"path1", true}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(trueInput), "true"_sd, BSONType::String);
+
+    Document falseInput{{"path1", false}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(falseInput), "false"_sd, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, FormatDate) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "string"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document epochInput{{"path1", Date_t::fromMillisSinceEpoch(0LL)}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(epochInput), "1970-01-01T00:00:00.000Z"_sd, BSONType::String);
+
+    Document dateInput{{"path1", Date_t::fromMillisSinceEpoch(872835240000)}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(dateInput), "1997-08-29T06:14:00.000Z"_sd, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, FormatInt) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "string"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document zeroInput{{"path1", int{0}}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(zeroInput), "0"_sd, BSONType::String);
+
+    Document positiveInput{{"path1", int{1337}}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positiveInput), "1337"_sd, BSONType::String);
+
+    Document negativeInput{{"path1", int{-1337}}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeInput), "-1337"_sd, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, FormatLong) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "string"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document zeroInput{{"path1", 0LL}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(zeroInput), "0"_sd, BSONType::String);
+
+    Document positiveInput{{"path1", 1337133713371337LL}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positiveInput), "1337133713371337"_sd, BSONType::String);
+
+    Document negativeInput{{"path1", -1337133713371337LL}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeInput), "-1337133713371337"_sd, BSONType::String);
+}
+
+TEST_F(ExpressionConvertTest, FormatDecimal) {
+    auto expCtx = getExpCtx();
+
+    auto spec = BSON("$convert" << BSON("input"
+                                        << "$path1"
+                                        << "to"
+                                        << "string"));
+    auto convertExp = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+
+    Document zeroInput{{"path1", Decimal128("0")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(zeroInput), "0"_sd, BSONType::String);
+
+    Document negativeZeroInput{{"path1", Decimal128("-0")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeZeroInput), "-0"_sd, BSONType::String);
+
+    Document preciseZeroInput{{"path1", Decimal128("0.0")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(preciseZeroInput), "0.0"_sd, BSONType::String);
+
+    Document negativePreciseZeroInput{{"path1", Decimal128("-0.0")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativePreciseZeroInput), "-0.0"_sd, BSONType::String);
+
+    Document extraPreciseZeroInput{{"path1", Decimal128("0.0000")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(extraPreciseZeroInput), "0.0000"_sd, BSONType::String);
+
+    Document positiveIntegerInput{{"path1", Decimal128("1337")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positiveIntegerInput), "1337"_sd, BSONType::String);
+
+    Document largeIntegerInput{{"path1", Decimal128("13370000000000000000000000000000000")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(largeIntegerInput),
+                                   "1.337000000000000000000000000000000E+34"_sd,
+                                   BSONType::String);
+
+    Document negativeIntegerInput{{"path1", Decimal128("-1337")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeIntegerInput), "-1337"_sd, BSONType::String);
+
+    Document positiveFractionalInput{{"path1", Decimal128("0.1337")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positiveFractionalInput), "0.1337"_sd, BSONType::String);
+
+    Document positivePreciseFractionalInput{{"path1", Decimal128("0.133700")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positivePreciseFractionalInput), "0.133700"_sd, BSONType::String);
+
+    Document negativeFractionalInput{{"path1", Decimal128("-0.1337")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeFractionalInput), "-0.1337"_sd, BSONType::String);
+
+    Document negativePreciseFractionalInput{{"path1", Decimal128("-0.133700")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativePreciseFractionalInput), "-0.133700"_sd, BSONType::String);
+
+    Document positiveLargeInput{{"path1", Decimal128("1.3e37")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positiveLargeInput), "1.3E+37"_sd, BSONType::String);
+
+    Document negativeLargeInput{{"path1", Decimal128("-1.3e37")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeLargeInput), "-1.3E+37"_sd, BSONType::String);
+
+    Document positiveTinyInput{{"path1", Decimal128("1.3e-37")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(positiveTinyInput), "1.3E-37"_sd, BSONType::String);
+
+    Document negativeTinyInput{{"path1", Decimal128("-1.3e-37")}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeTinyInput), "-1.3E-37"_sd, BSONType::String);
+
+    Document infinityInput{{"path1", Decimal128::kPositiveInfinity}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(infinityInput), "Infinity"_sd, BSONType::String);
+
+    Document negativeInfinityInput{{"path1", Decimal128::kNegativeInfinity}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeInfinityInput), "-Infinity"_sd, BSONType::String);
+
+    Document nanInput{{"path1", Decimal128::kPositiveNaN}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convertExp->evaluate(nanInput), "NaN"_sd, BSONType::String);
+
+    Document negativeNaNInput{{"path1", Decimal128::kNegativeNaN}};
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convertExp->evaluate(negativeNaNInput), "NaN"_sd, BSONType::String);
 }
 
 }  // namespace ExpressionConvertTest
