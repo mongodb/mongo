@@ -55,6 +55,7 @@
         [{$project: {dateToStringWithoutFormat: {$dateToString: {date: "$date"}}}}],
         [{$project: {conversion: {$convert: {input: "$a", to: "int"}}}}],
         [{$project: {conversionWithOnNull: {$convert: {input: "$a", to: "int", onNull: 0}}}}],
+        [{$project: {conversionWithOnError: {$convert: {input: "$a", to: "int", onError: 0}}}}],
         // Test using one of the prohibited expressions inside of an $expr within a MatchExpression
         // embedded in the pipeline.
         [{$match: {$expr: {$eq: [{$trim: {input: "$a"}}, "hi"]}}}],

@@ -142,4 +142,6 @@ load("jstests/replsets/rslib.js");
     testValidator({$expr: {$eq: [{$convert: {input: "$a", to: "int"}}, 2018]}}, {a: "2017"});
     testValidator({$expr: {$eq: [{$convert: {input: "$a", to: "int", onNull: 0}}, 2018]}},
                   {a: null});
+    testValidator({$expr: {$eq: [{$convert: {input: "$a", to: "int", onError: 0}}, 2018]}},
+                  {a: "hello"});
 }());

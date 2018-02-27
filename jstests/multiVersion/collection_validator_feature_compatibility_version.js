@@ -103,6 +103,10 @@
         {
           validator: {$expr: {$eq: [{$convert: {input: "$a", to: "int", onNull: 0}}, 2018]}},
           nonMatchingDocument: {a: null}
+        },
+        {
+          validator: {$expr: {$eq: [{$convert: {input: "$a", to: "int", onError: 0}}, 2018]}},
+          nonMatchingDocument: {a: "hello"}
         }
     ];
 

@@ -119,6 +119,8 @@ load("jstests/replsets/rslib.js");
     testView([{$project: {dateToStringWithoutFormat: {$dateToString: {date: "$date"}}}}]);
     testView([{$project: {conversion: {$convert: {input: "$a", to: "int"}}}}]);
     testView([{$project: {conversionWithOnNull: {$convert: {input: "$a", to: "int", onNull: 0}}}}]);
+    testView(
+        [{$project: {conversionWithOnError: {$convert: {input: "$a", to: "int", onError: 0}}}}]);
 
     // Test using one of the prohibited expressions inside of an $expr within a MatchExpression
     // embedded in the pipeline.
