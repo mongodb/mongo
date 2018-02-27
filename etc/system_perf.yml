@@ -78,11 +78,11 @@ functions:
         working_dir: work
         script: |
           cat > bootstrap.yml <<EOF
-          cluster_type: ${cluster}
+          infrastructure_provisioning: ${cluster}
           platform: ${platform}
-          setup: ${setup}
+          mongodb_setup: ${setup}
           storageEngine: ${storageEngine}
-          test: ${test}
+          test_control: ${test}
           production: true
           mongodb_binary_archive: "https://s3.amazonaws.com/mciuploads/${project}/${version_id}/${revision}/${platform}/mongod-${version_id}.tar.gz"
           workloads_dir: ../src/workloads/workloads

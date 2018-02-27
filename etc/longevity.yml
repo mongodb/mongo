@@ -55,11 +55,11 @@ functions:
         working_dir: work
         script: |
           cat > bootstrap.yml <<EOF
-          cluster_type: ${cluster}
+          infrastructure_provisioning: ${cluster}
           platform: ${platform}
-          setup: ${setup}
+          mongodb_setup: ${setup}
           storageEngine: ${storageEngine}
-          test: ${test}.longevity
+          test_control: ${test}.longevity
           production: true
           workloads_dir: ../src/workloads/workloads
           ycsb_dir: ../src/YCSB/YCSB
