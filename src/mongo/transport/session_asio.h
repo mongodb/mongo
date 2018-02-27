@@ -120,20 +120,20 @@ public:
     Status sinkMessage(Message message) override {
         ensureSync();
 
-        std::error_code ec;
+        Status status = Status::OK();
         size_t size;
         bool called = false;
 
         write(asio::buffer(message.buf(), message.size()),
-              [&](const std::error_code& ec_, size_t size_) {
-                  ec = ec_;
+              [&](const Status& status_, size_t size_) {
+                  status = status_;
                   size = size_;
                   called = true;
               });
         invariant(called);
 
-        if (ec)
-            return errorCodeToStatus(ec);
+        if (!status.isOK())
+            return status;
 
         invariant(size == size_t(message.size()));
         networkCounter.hitPhysicalOut(message.size());
@@ -147,9 +147,9 @@ public:
             message,  // keep the buffer alive.
             cb = std::move(cb),
             this
-        ](const std::error_code& ec, size_t size) {
-            if (ec) {
-                cb(errorCodeToStatus(ec));
+        ](const Status& status, size_t size) {
+            if (!status.isOK()) {
+                cb(status);
                 return;
             }
             invariant(size == size_t(message.size()));
@@ -337,9 +337,13 @@ private:
         auto ptr = headerBuffer.get();
         read(asio::buffer(ptr, kHeaderSize),
              [ cb = std::forward<Callback>(cb), headerBuffer = std::move(headerBuffer), this ](
-                 const std::error_code& ec, size_t size) mutable {
-                 if (ec) {
-                     return cb(errorCodeToStatus(ec));
+                 const Status& status, size_t size) mutable {
+
+                 if (!status.isOK())
+                     return cb(status);
+
+                 if (checkForHTTPRequest(asio::buffer(headerBuffer.get(), size))) {
+                     return sendHTTPResponse([cb = std::move(cb)](Status status) { cb(status); });
                  }
 
                  invariant(size == kHeaderSize);
@@ -367,11 +371,9 @@ private:
                  MsgData::View msgView(buffer.get());
                  read(asio::buffer(msgView.data(), msgView.dataLen()),
                       [ cb = std::move(cb), buffer = std::move(buffer), msgLen, this ](
-                          const std::error_code& ec, size_t size) mutable {
-                          if (ec) {
-                              return cb(errorCodeToStatus(ec));
-                          }
-
+                          const Status& status, size_t size) mutable {
+                          if (!status.isOK())
+                              return cb(status);
                           networkCounter.hitPhysicalIn(msgLen);
                           return cb(Message(std::move(buffer)));
                       });
@@ -390,19 +392,18 @@ private:
                     if (needsRead) {
                         read(buffers, handler);
                     } else {
-                        std::error_code ec;
-                        handler(ec, asio::buffer_size(buffers));
+                        handler(Status::OK(), asio::buffer_size(buffers));
                     }
                 } else {
-                    handler(std::error_code(status.code(), mongoErrorCategory()), 0);
+                    handler(status, 0);
                 }
             };
 
             auto handshakeRecvCb = [ this, postHandshakeCb = std::move(postHandshakeCb), buffers ](
-                const std::error_code& ec, size_t size) mutable {
+                const Status& status, size_t size) mutable {
                 _ranHandshake = true;
-                if (ec) {
-                    postHandshakeCb(errorCodeToStatus(ec), size);
+                if (!status.isOK()) {
+                    postHandshakeCb(status, size);
                     return;
                 }
 
@@ -446,10 +447,10 @@ private:
                              [ size, handler = std::forward<CompleteHandler>(handler) ](
                                  const std::error_code& ec, size_t asyncSize) mutable {
                                  // Add back in the size read opportunistically.
-                                 handler(ec, size + asyncSize);
+                                 handler(errorCodeToStatus(ec), size + asyncSize);
                              });
         } else {
-            handler(ec, size);
+            handler(errorCodeToStatus(ec), size);
         }
     }
 
@@ -473,10 +474,10 @@ private:
                               [ size, handler = std::forward<CompleteHandler>(handler) ](
                                   const std::error_code& ec, size_t asyncSize) mutable {
                                   // Add back in the size written opportunistically.
-                                  handler(ec, size + asyncSize);
+                                  handler(errorCodeToStatus(ec), size + asyncSize);
                               });
         } else {
-            handler(ec, size);
+            handler(errorCodeToStatus(ec), size);
         }
     }
 
@@ -487,6 +488,9 @@ private:
         MSGHEADER::ConstView headerView(asio::buffer_cast<char*>(buffer));
         auto responseTo = headerView.getResponseToMsgId();
 
+        if (checkForHTTPRequest(buffer)) {
+            return onComplete(Status::OK(), false);
+        }
         // This logic was taken from the old mongo/util/net/sock.cpp.
         //
         // It lets us run both TLS and unencrypted mongo over the same port.
@@ -533,7 +537,7 @@ private:
                     }
                 }
 
-                onComplete(ec ? errorCodeToStatus(ec) : Status::OK(), true);
+                onComplete(errorCodeToStatus(ec), true);
             };
 
             if (_blockingMode == Sync) {
@@ -557,6 +561,43 @@ private:
         }
     }
 #endif
+
+    template <typename Buffer>
+    bool checkForHTTPRequest(const Buffer& buffers) {
+        invariant(asio::buffer_size(buffers) >= 4);
+        const StringData bufferAsStr(asio::buffer_cast<const char*>(buffers), 4);
+        return (bufferAsStr == "GET "_sd);
+    }
+
+    // Called from read() to send an HTTP response back to a client that's trying to use HTTP
+    // over a native MongoDB port.
+    template <typename Callback>
+    void sendHTTPResponse(Callback&& postHandshakeCb) {
+        constexpr auto userMsg =
+            "It looks like you are trying to access MongoDB over HTTP"
+            " on the native driver port.\r\n"_sd;
+
+        static const std::string httpResp = str::stream() << "HTTP/1.0 200 OK\r\n"
+                                                             "Connection: close\r\n"
+                                                             "Content-Type: text/plain\r\n"
+                                                             "Content-Length: "
+                                                          << userMsg.size() << "\r\n\r\n"
+                                                          << userMsg;
+
+        write(asio::buffer(httpResp.data(), httpResp.size()),
+              [ cb = std::move(postHandshakeCb), this ](const Status& status, size_t size) mutable {
+                  if (!status.isOK()) {
+                      cb({ErrorCodes::ProtocolError,
+                          str::stream()
+                              << "Client sent an HTTP request over a native MongoDB connection, "
+                                 "but there was an error sending a response: "
+                              << status.toString()});
+                      return;
+                  }
+                  cb({ErrorCodes::ProtocolError,
+                      "Client sent an HTTP request over a native MongoDB connection"});
+              });
+    }
 
     enum BlockingMode {
         Unknown,
