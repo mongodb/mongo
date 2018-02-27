@@ -36,7 +36,6 @@
 
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/util/log.h"

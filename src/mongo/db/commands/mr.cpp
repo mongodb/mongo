@@ -59,7 +59,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"

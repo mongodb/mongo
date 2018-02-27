@@ -50,7 +50,7 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"

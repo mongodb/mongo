@@ -51,7 +51,6 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"

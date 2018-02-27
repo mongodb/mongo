@@ -64,7 +64,7 @@ env.Library(
         'ftdc_mongod.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'ftdc_server'
     ],

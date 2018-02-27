@@ -43,7 +43,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"

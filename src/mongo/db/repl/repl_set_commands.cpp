@@ -53,9 +53,8 @@
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/update_position_args.h"
@@ -79,7 +78,7 @@ class ReplExecutorSSM : public ServerStatusMetric {
 public:
     ReplExecutorSSM() : ServerStatusMetric("repl.executor") {}
     virtual void appendAtLeaf(BSONObjBuilder& b) const {
-        getGlobalReplicationCoordinator()->appendDiagnosticBSON(&b);
+        ReplicationCoordinator::get(getGlobalServiceContext())->appendDiagnosticBSON(&b);
     }
 } replExecutorSSM;
 

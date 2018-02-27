@@ -44,7 +44,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"

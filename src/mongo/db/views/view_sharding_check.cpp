@@ -34,7 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"

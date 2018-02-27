@@ -325,7 +325,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'grid',
     ],

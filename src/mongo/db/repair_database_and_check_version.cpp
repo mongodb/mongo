@@ -44,7 +44,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/log.h"
@@ -225,7 +225,9 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Databas
 unsigned long long checkIfReplMissingFromCommandLine(OperationContext* opCtx) {
     // This is helpful for the query below to work as you can't open files when readlocked
     Lock::GlobalWrite lk(opCtx);
-    if (!repl::getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
+    if (!repl::ReplicationCoordinator::get(getGlobalServiceContext())
+             ->getSettings()
+             .usingReplSets()) {
         DBDirectClient c(opCtx);
         return c.count(kSystemReplSetCollection.ns());
     }

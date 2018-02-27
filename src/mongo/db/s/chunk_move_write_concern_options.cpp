@@ -34,7 +34,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/util/log.h"
