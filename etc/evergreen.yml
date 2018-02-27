@@ -87,18 +87,37 @@ variables:
 
       ${activate_virtualenv}
       # shared scons cache testing
-      # if 'shared_scons_cache' enabled and project level 'disable_shared_scons_cache' is not true
-      # 'shared_scons_cache is set on a per variant basis
+      # if 'scons_cache_scope' enabled and project level 'disable_shared_scons_cache' is not true
+      # 'scons_cache_scope' is set on a per variant basis
       # 'disable_shared_scons_cache' is set on a project level and applies to all variants
-      if [ "${shared_scons_cache}" = "true" ] && [ "${disable_shared_scons_cache}" != "true" ]; then
-        echo "Shared cache - mounting file system"
-        sudo mount /efs -v || mount /efs
-        MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=shared IS_PATCH=${is_patch} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+
+      # Shared - if scons_cache_scope is set, then use new shared scons cache settings
+      if [ ! -z ${scons_cache_scope} ]; then
+
+        if [ "${disable_shared_scons_cache}" = "true" ]; then
+
+          echo "SCons Cache disabled. All shared scons settings will be ignored"
+          scons_cache_scope=none
+
+        else
+          scons_cache_scope=${scons_cache_scope}
+        fi
+
+        if [ $scons_cache_scope = "shared" ]; then
+          echo "Shared cache - mounting file system"
+          sudo mount /efs || mount /efs
+        fi
+
+        echo "Shared Cache with setting: ${scons_cache_scope}"
+        MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} SCONS_CACHE_SCOPE=$scons_cache_scope IS_PATCH=${is_patch} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions_shared_cache.py --out compile_expansions.yml
+
+      # Legacy Expansion generation
       else
-      # Proceed with regular expansions generated
-      # This script converts the generated version string into a sanitized version string for
-      # use by scons and uploading artifacts as well as information about for the scons cache.
-      MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+        echo "Using legacy expansion generation"
+        # Proceed with regular expansions generated
+        # This script converts the generated version string into a sanitized version string for
+        # use by scons and uploading artifacts as well as information about for the scons cache.
+        MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
       fi
 
 - &apply_compile_expansions
@@ -512,6 +531,51 @@ functions:
         if [ "${setup_android_toolchain|}" = "true" ]; then
             ${activate_virtualenv}
             PYTHON=$python ${compile_env|} src/buildscripts/setup-android-toolchain.sh
+        fi
+
+  "scons cache pruning" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+        # removes files from the (local) or shared scons cache when it's over a
+        # threshold, to the $prune_ratio percentage. Ideally override
+        # these default values in the distro config in evergreen.
+
+        ${activate_virtualenv}
+        prune_scons_cache="$python buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}"
+        $prune_scons_cache
+        if [ "${scons_cache_scope}" = "shared" ]; then
+            if [ "${shared_scons_pruning}" = "true" ] && [ "${is_patch}" != "true" ]; then
+              echo "shared_scons_pruning is set to true, checking last prune time"
+              if $python buildscripts/prune_check.py; then
+                echo "Pruning shared cache"
+                $prune_scons_cache
+              else
+                echo "We are less than the 'shared_scons_pruning' num seconds threshold, pruning will be skipped"
+              fi
+            else
+              echo "Shared cache enabled but 'shared_scons_pruning' is not enabled for this variant or we are running a patch build, pruning will be skipped"
+            fi
+        else
+            echo "Legacy local shared cache prune"
+            if [ -d "${scons_cache_path}" ]; then
+              $prune_scons_cache
+            fi
+        fi
+
+  "umount shared scons directory" :
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o errexit
+        set -o verbose
+
+        if [ "${scons_cache_scope}" = "shared" ]; then
+            sudo umount /efs || umount /efs || true
         fi
 
   "build cdriver" :
@@ -2196,31 +2260,6 @@ post:
       optional: true
 
   # Cleanup steps.
-  - command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        # removes files from the (local) scons cache when it's over a
-        # threshold, to the $prune_ratio percentage. Ideally override
-        # these default values in the distro config in evergreen.
-
-        ${activate_virtualenv}
-        if [ -d "${scons_cache_path}" ]; then
-            $python buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
-        fi
-
-  - command: shell.exec
-    type: test
-    params:
-      working_dir: src
-      shell: bash
-      script: |
-        set -o verbose
-        set -o errexit
-
-        # umount shared scons mounts
-        sudo umount /efs || umount /efs
-
   - func: "cleanup environment"
 
 timeout:
@@ -2500,6 +2539,8 @@ tasks:
         ignore_artifacts_for_spawn: false
         files:
           - src/artifacts.json
+    - func: "scons cache pruning"
+    - func: "umount shared scons directory"
 
 ## compile_all - build all scons targets including unittests ##
 - name: compile_all
@@ -2563,6 +2604,8 @@ tasks:
     # Run the android embedded CAPI tests in the android emulator
     # noop if ${enable_android_emu_tests} is not "true"
     - func: "run android emulator tests"
+    - func: "scons cache pruning"
+    - func: "umount shared scons directory"
 
 ## lint ##
 - name: lint
@@ -4767,7 +4810,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --repeat=10 --shuffle
-    use_scons_cache: true
+    scons_cache_scope: shared
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -4899,7 +4942,7 @@ buildvariants:
     # Running WiredTiger with --nojournal in a replica set is no longer supported,
     # so this variant does not include replica set tests.
     test_flags: --nojournal --excludeWithAnyTags=requires_journaling,requires_replication,requires_mmapv1
-    use_scons_cache: true
+    scons_cache_scope: shared
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -4934,7 +4977,7 @@ buildvariants:
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     test_flags: --wiredTigerCollectionConfig=type=lsm --wiredTigerIndexConfig=type=lsm --excludeWithAnyTags=requires_mmapv1
-    use_scons_cache: true
+    scons_cache_scope: shared
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -6831,7 +6874,8 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_mmapv1
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
     compile_flags: MONGO_DISTMOD=ubuntu1604 --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    shared_scons_cache: true
+    scons_cache_scope: shared
+    shared_scons_pruning: true
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -8233,7 +8277,7 @@ buildvariants:
     multiversion_platform: rhel62
     multiversion_edition: enterprise
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    use_scons_cache: true
+    scons_cache_scope: shared
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -8452,7 +8496,7 @@ buildvariants:
     test_flags: --storageEngine=ephemeralForTest --excludeWithAnyTags=requires_persistence,requires_fsync,SERVER-21420,SERVER-21658,requires_journaling,requires_mmapv1,requires_wiredtiger
     compile_flags: -j$(grep -c ^processor /proc/cpuinfo) --dbg=off --opt=on --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    use_scons_cache: true
+    scons_cache_scope: shared
     build_mongoreplay: true
   tasks:
   - name: compile
@@ -9122,7 +9166,7 @@ buildvariants:
     lang_environment: LANG=C
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars --link-model=dynamic
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    shared_scons_cache: true
+    scons_cache_scope: shared
     scons_cache_mode: all
     build_mongoreplay: true
   tasks:

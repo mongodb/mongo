@@ -90,7 +90,7 @@ def generate_scons_cache_expansions():
     # Set the scons shared cache setting
 
     # Global shared cache using EFS
-    if os.getenv("USE_SCONS_CACHE") == "shared":
+    if os.getenv("SCONS_CACHE_SCOPE") == "shared":
         default_cache_path = os.path.join("/efs", system_uuid, "scons-cache")
         expansions["scons_cache_path"] = default_cache_path
 
@@ -102,7 +102,7 @@ def generate_scons_cache_expansions():
             expansions["scons_cache_args"] = "--cache={0} --cache-dir='{1}'".format(scons_cache_mode, default_cache_path)
 
     # Local shared cache - host-based
-    elif os.getenv("USE_SCONS_CACHE") == "local":
+    elif os.getenv("SCONS_CACHE_SCOPE") == "local":
 
         if sys.platform.startswith("win"):
             default_cache_path_base = r"z:\data\scons-cache"
@@ -115,7 +115,7 @@ def generate_scons_cache_expansions():
     # No cache
     else:
         # Anything else is 'none'
-        print("No shared cache used")
+        print("No cache used")
 
     return expansions
 
