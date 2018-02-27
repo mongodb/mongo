@@ -40,21 +40,40 @@ namespace mongo {
 
 #if defined(__linux__)
 namespace {
-void _check(int ret) {
-    if (ret == 0)
-        return;
-    int err = errno;
+
+/**
+ * Accepts an errno code, prints its error message, and exits.
+ */
+void failWithErrno(int err) {
     severe() << "error in Ticketholder: " << errnoWithDescription(err);
     fassertFailed(28604);
 }
+
+/*
+ * Checks the return value from a Linux semaphore function call, and fails with the set errno if the
+ * call was unsucessful.
+ */
+void check(int ret) {
+    if (ret == 0)
+        return;
+    failWithErrno(errno);
 }
 
+/**
+ * Takes a Date_t deadline and sets the appropriate values in a timespec structure.
+ */
+void tsFromDate(const Date_t& deadline, struct timespec& ts) {
+    ts.tv_sec = deadline.toTimeT();
+    ts.tv_nsec = (deadline.toMillisSinceEpoch() % 1000) * 1'000'000;
+}
+}  // namespace
+
 TicketHolder::TicketHolder(int num) : _outof(num) {
-    _check(sem_init(&_sem, 0, num));
+    check(sem_init(&_sem, 0, num));
 }
 
 TicketHolder::~TicketHolder() {
-    _check(sem_destroy(&_sem));
+    check(sem_destroy(&_sem));
 }
 
 bool TicketHolder::tryAcquire() {
@@ -62,36 +81,48 @@ bool TicketHolder::tryAcquire() {
         if (errno == EAGAIN)
             return false;
         if (errno != EINTR)
-            _check(-1);
+            failWithErrno(errno);
     }
     return true;
 }
 
-void TicketHolder::waitForTicket() {
-    while (0 != sem_wait(&_sem)) {
-        if (errno != EINTR)
-            _check(-1);
-    }
+void TicketHolder::waitForTicket(OperationContext* opCtx) {
+    waitForTicketUntil(opCtx, Date_t::max());
 }
 
-bool TicketHolder::waitForTicketUntil(Date_t until) {
-    const long long millisSinceEpoch = until.toMillisSinceEpoch();
+bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
+    const Milliseconds intervalMs(500);
     struct timespec ts;
 
-    ts.tv_sec = millisSinceEpoch / 1000;
-    ts.tv_nsec = (millisSinceEpoch % 1000) * (1000 * 1000);
-    while (0 != sem_timedwait(&_sem, &ts)) {
-        if (errno == ETIMEDOUT)
-            return false;
+    // To support interrupting ticket acquisition while still benefiting from semaphores, we do a
+    // timed wait on an interval to periodically check for interrupts.
+    // The wait period interval is the smaller of the default interval and the provided
+    // deadline.
+    Date_t deadline = std::min(until, Date_t::now() + intervalMs);
+    tsFromDate(deadline, ts);
 
-        if (errno != EINTR)
-            _check(-1);
+    while (0 != sem_timedwait(&_sem, &ts)) {
+        if (errno == ETIMEDOUT) {
+            // If we reached the deadline without being interrupted, we have completely timed out.
+            if (deadline == until)
+                return false;
+
+            deadline = std::min(until, Date_t::now() + intervalMs);
+            tsFromDate(deadline, ts);
+        } else if (errno != EINTR) {
+            failWithErrno(errno);
+        }
+
+        // To correctly handle errors from sem_timedwait, we should check for interrupts last.
+        // It is possible to unset 'errno' after a call to checkForInterrupt().
+        if (opCtx)
+            opCtx->checkForInterrupt();
     }
     return true;
 }
 
 void TicketHolder::release() {
-    _check(sem_post(&_sem));
+    check(sem_post(&_sem));
 }
 
 Status TicketHolder::resize(int newSize) {
@@ -123,7 +154,7 @@ Status TicketHolder::resize(int newSize) {
 
 int TicketHolder::available() const {
     int val = 0;
-    _check(sem_getvalue(&_sem, &val));
+    check(sem_getvalue(&_sem, &val));
     return val;
 }
 
@@ -146,18 +177,26 @@ bool TicketHolder::tryAcquire() {
     return _tryAcquire();
 }
 
-void TicketHolder::waitForTicket() {
+void TicketHolder::waitForTicket(OperationContext* opCtx) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    while (!_tryAcquire()) {
-        _newTicket.wait(lk);
+    if (opCtx) {
+        opCtx->waitForConditionOrInterrupt(_newTicket, lk, [this] { return _tryAcquire(); });
+    } else {
+        _newTicket.wait(lk, [this] { return _tryAcquire(); });
     }
 }
 
-bool TicketHolder::waitForTicketUntil(Date_t until) {
+bool TicketHolder::waitForTicketUntil(OperationContext* opCtx, Date_t until) {
     stdx::unique_lock<stdx::mutex> lk(_mutex);
 
-    return _newTicket.wait_until(lk, until.toSystemTimePoint(), [this] { return _tryAcquire(); });
+    if (opCtx) {
+        return opCtx->waitForConditionOrInterruptUntil(
+            _newTicket, lk, until, [this] { return _tryAcquire(); });
+    } else {
+        return _newTicket.wait_until(
+            lk, until.toSystemTimePoint(), [this] { return _tryAcquire(); });
+    }
 }
 
 void TicketHolder::release() {

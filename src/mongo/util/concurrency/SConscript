@@ -37,8 +37,11 @@ env.CppUnitTest(
 
 env.Library('ticketholder',
             ['ticketholder.cpp'],
-            LIBDEPS=['$BUILD_DIR/mongo/base',
-                     '$BUILD_DIR/third_party/shim_boost'])
+            LIBDEPS=[
+                '$BUILD_DIR/mongo/base',
+                '$BUILD_DIR/mongo/db/service_context',
+                '$BUILD_DIR/third_party/shim_boost',
+            ])
 
 
 env.CppUnitTest(

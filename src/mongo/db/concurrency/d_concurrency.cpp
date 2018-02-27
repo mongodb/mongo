@@ -166,7 +166,7 @@ void Lock::GlobalLock::_enqueue(LockMode lockMode, Date_t deadline) {
         _pbwm.lock(MODE_IS);
     }
 
-    _result = _opCtx->lockState()->lockGlobalBegin(lockMode, deadline);
+    _result = _opCtx->lockState()->lockGlobalBegin(_opCtx, lockMode, deadline);
 }
 
 void Lock::GlobalLock::waitForLockUntil(Date_t deadline) {

@@ -535,7 +535,7 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
 
     if (_stashedLocker) {
         invariant(_stashedRecoveryUnit);
-        _stashedLocker->reacquireTicket();
+        _stashedLocker->reacquireTicket(opCtx);
 
         // We intentionally do not capture the return value of swapLockState(), which is just an
         // empty locker. At the end of the operation, if the transaction is not complete, we will

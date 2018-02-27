@@ -119,8 +119,11 @@ public:
     virtual LockResult lockGlobal(LockMode mode) {
         return lockGlobal(nullptr, mode);
     }
+    virtual LockResult lockGlobalBegin(OperationContext* opCtx, LockMode mode, Date_t deadline) {
+        return _lockGlobalBegin(opCtx, mode, deadline);
+    }
     virtual LockResult lockGlobalBegin(LockMode mode, Date_t deadline) {
-        return _lockGlobalBegin(mode, deadline);
+        return _lockGlobalBegin(nullptr, mode, deadline);
     }
     virtual LockResult lockGlobalComplete(OperationContext* opCtx, Date_t deadline);
     virtual LockResult lockGlobalComplete(Date_t deadline) {
@@ -178,8 +181,7 @@ public:
     }
 
     virtual void releaseTicket();
-
-    virtual void reacquireTicket();
+    virtual void reacquireTicket(OperationContext* opCtx);
 
     /**
      * Allows for lock requests to be requested in a non-blocking way. There can be only one
@@ -234,7 +236,7 @@ private:
     /**
      * Like lockGlobalBegin, but accepts a deadline for acquiring a ticket.
      */
-    LockResult _lockGlobalBegin(LockMode, Date_t deadline);
+    LockResult _lockGlobalBegin(OperationContext* opCtx, LockMode, Date_t deadline);
 
     /**
      * The main functionality of the unlock method, except accepts iterator in order to avoid
@@ -267,7 +269,7 @@ private:
      * Acquires a ticket for the Locker under 'mode'. Returns LOCK_TIMEOUT if it cannot acquire a
      * ticket within 'deadline'.
      */
-    LockResult _acquireTicket(LockMode mode, Date_t deadline);
+    LockResult _acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline);
 
     // Used to disambiguate different lockers
     const LockerId _id;

@@ -293,7 +293,7 @@ Locker::ClientState LockerImpl<IsForMMAPV1>::getClientState() const {
 
 template <bool IsForMMAPV1>
 LockResult LockerImpl<IsForMMAPV1>::lockGlobal(OperationContext* opCtx, LockMode mode) {
-    LockResult result = _lockGlobalBegin(mode, Date_t::max());
+    LockResult result = _lockGlobalBegin(opCtx, mode, Date_t::max());
 
     if (result == LOCK_WAITING) {
         result = lockGlobalComplete(opCtx, Date_t::max());
@@ -307,34 +307,41 @@ LockResult LockerImpl<IsForMMAPV1>::lockGlobal(OperationContext* opCtx, LockMode
 }
 
 template <bool IsForMMAPV1>
-void LockerImpl<IsForMMAPV1>::reacquireTicket() {
+void LockerImpl<IsForMMAPV1>::reacquireTicket(OperationContext* opCtx) {
     invariant(_modeForTicket != MODE_NONE);
-    auto acquireTicketResult = _acquireTicket(_modeForTicket, Date_t::max());
+    auto acquireTicketResult = _acquireTicket(opCtx, _modeForTicket, Date_t::max());
     invariant(acquireTicketResult == LOCK_OK);
 }
 
 template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::_acquireTicket(LockMode mode, Date_t deadline) {
+LockResult LockerImpl<IsForMMAPV1>::_acquireTicket(OperationContext* opCtx,
+                                                   LockMode mode,
+                                                   Date_t deadline) {
     const bool reader = isSharedLockMode(mode);
     auto holder = shouldAcquireTicket() ? ticketHolders[mode] : nullptr;
     if (holder) {
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);
+
+        // If the ticket wait is interrupted, restore the state of the client.
+        auto restoreStateOnErrorGuard = MakeGuard([&] { _clientState.store(kInactive); });
         if (deadline == Date_t::max()) {
-            holder->waitForTicket();
-        } else if (!holder->waitForTicketUntil(deadline)) {
-            _clientState.store(kInactive);
+            holder->waitForTicket(opCtx);
+        } else if (!holder->waitForTicketUntil(opCtx, deadline)) {
             return LOCK_TIMEOUT;
         }
+        restoreStateOnErrorGuard.Dismiss();
     }
     _clientState.store(reader ? kActiveReader : kActiveWriter);
     return LOCK_OK;
 }
 
 template <bool IsForMMAPV1>
-LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(LockMode mode, Date_t deadline) {
+LockResult LockerImpl<IsForMMAPV1>::_lockGlobalBegin(OperationContext* opCtx,
+                                                     LockMode mode,
+                                                     Date_t deadline) {
     dassert(isLocked() == (_modeForTicket != MODE_NONE));
     if (_modeForTicket == MODE_NONE) {
-        auto acquireTicketResult = _acquireTicket(mode, deadline);
+        auto acquireTicketResult = _acquireTicket(opCtx, mode, deadline);
         if (acquireTicketResult != LOCK_OK) {
             return acquireTicketResult;
         }

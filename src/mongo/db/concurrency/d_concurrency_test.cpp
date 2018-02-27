@@ -1117,7 +1117,7 @@ TEST_F(DConcurrencyTestFixture, ReleaseAndReacquireTicket) {
         ASSERT(R2.isLocked());
     }
 
-    opctx1->lockState()->reacquireTicket();
+    opctx1->lockState()->reacquireTicket(opctx1);
 
     {
         // Now a second Locker cannot acquire a ticket.
@@ -1134,6 +1134,46 @@ TEST_F(DConcurrencyTestFixture, LockerWithReleasedTicketCanBeUnlocked) {
     ASSERT(R1.isLocked());
 
     opctx1->lockState()->releaseTicket();
+}
+
+TEST_F(DConcurrencyTestFixture, TicketAcquireCanBeInterrupted) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(1);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+    // Limit the locker to 0 tickets at a time.
+    UseGlobalThrottling throttle(opctx1, 0);
+
+    // This thread should block because it cannot acquire a ticket.
+    auto result = runTaskAndKill(opctx1, [&] { Lock::GlobalRead R2(opctx1, Date_t::max()); });
+
+    ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
+}
+
+TEST_F(DConcurrencyTestFixture, TicketReacquireCanBeInterrupted) {
+    auto clientOpctxPairs = makeKClientsWithLockers<DefaultLockerImpl>(2);
+    auto opctx1 = clientOpctxPairs[0].second.get();
+    auto opctx2 = clientOpctxPairs[1].second.get();
+    // Limit the locker to 1 ticket at a time.
+    UseGlobalThrottling throttle(opctx1, 1);
+
+    Lock::GlobalRead R1(opctx1, Date_t::now());
+    ASSERT(R1.isLocked());
+
+    {
+        // A second Locker should not be able to acquire a ticket.
+        Lock::GlobalRead R2(opctx2, Date_t::now());
+        ASSERT(!R2.isLocked());
+    }
+
+    opctx1->lockState()->releaseTicket();
+
+    // Now a second Locker can acquire a ticket.
+    Lock::GlobalRead R2(opctx2, Date_t::now());
+    ASSERT(R2.isLocked());
+
+    // This thread should block because it cannot acquire a ticket.
+    auto result = runTaskAndKill(opctx1, [&] { opctx1->lockState()->reacquireTicket(opctx1); });
+
+    ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
 }
 
 TEST_F(DConcurrencyTestFixture, DBLockTimeout) {
