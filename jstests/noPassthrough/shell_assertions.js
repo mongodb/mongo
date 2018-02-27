@@ -430,6 +430,24 @@
         });
     });
 
+    tests.push(function ltPassesWhenLessThanWithTimestamps() {
+        assert.doesNotThrow(() => {
+            assert.lt(Timestamp(3, 0), Timestamp(10, 0));
+        });
+    });
+
+    tests.push(function ltFailsWhenNotLessThanWithTimestamps() {
+        assert.throws(() => {
+            assert.lt(Timestamp(0, 10), Timestamp(0, 3));
+        });
+    });
+
+    tests.push(function ltFailsWhenEqualWithTimestamps() {
+        assert.throws(() => {
+            assert.lt(Timestamp(5, 0), Timestamp(5, 0));
+        });
+    });
+
     /* assert.gt tests */
 
     tests.push(function gtPassesWhenGreaterThan() {
@@ -487,6 +505,24 @@
     tests.push(function gtePassesWhenEqual() {
         assert.doesNotThrow(() => {
             assert.gte(5, 5);
+        });
+    });
+
+    tests.push(function gtePassesWhenGreaterThanWithTimestamps() {
+        assert.doesNotThrow(() => {
+            assert.gte(Timestamp(0, 10), Timestamp(0, 3));
+        });
+    });
+
+    tests.push(function gteFailsWhenNotGreaterThanWithTimestamps() {
+        assert.throws(() => {
+            assert.gte(Timestamp(0, 3), Timestamp(0, 10));
+        });
+    });
+
+    tests.push(function gtePassesWhenEqualWIthTimestamps() {
+        assert.doesNotThrow(() => {
+            assert.gte(Timestamp(5, 0), Timestamp(5, 0));
         });
     });
 

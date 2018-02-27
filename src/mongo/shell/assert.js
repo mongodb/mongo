@@ -706,10 +706,37 @@ assert = (function() {
         doassert("supposed to be null (" + (_processMsg(msg) || "") + ") was: " + tojson(what));
     };
 
+    function _shouldUseBsonWoCompare(a, b) {
+        const bsonTypes = [
+            Timestamp,
+        ];
+
+        if (typeof a !== "object" || typeof b !== "object") {
+            return false;
+        }
+
+        for (let t of bsonTypes) {
+            if (a instanceof t && b instanceof t) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function _compare(f, a, b) {
+        if (_shouldUseBsonWoCompare(a, b)) {
+            const result = bsonWoCompare({_: a}, {_: b});
+            return f(result, 0);
+        }
+
+        return f(a, b);
+    }
+
     function _assertCompare(f, a, b, description, msg) {
         _validateAssertionMessage(msg);
 
-        if (f(a, b)) {
+        if (_compare(f, a, b)) {
             return;
         }
 
@@ -743,9 +770,17 @@ assert = (function() {
     assert.between = function(a, b, c, msg, inclusive) {
         _validateAssertionMessage(msg);
 
-        if ((inclusive == undefined || inclusive == true) && a <= b && b <= c) {
-            return;
-        } else if (a < b && b < c) {
+        let compareFn = (a, b) => {
+            return a < b;
+        };
+
+        if ((inclusive == undefined || inclusive == true)) {
+            compareFn = (a, b) => {
+                return a <= b;
+            };
+        }
+
+        if (_compare(compareFn, a, b) && _compare(compareFn, b, c)) {
             return;
         }
 
