@@ -773,18 +773,17 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                   << spec);
             }
 
-            // if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() != key) ||
-            //     SimpleBSONObjComparator::kInstance.evaluate(
-            //         desc->infoObj().getObjectField("collation") != collation)) {
-            //     return Status(ErrorCodes::IndexKeySpecsConflict,
-            //                   str::stream() << "Index must have unique name."
-            //                                 << "The existing index: "
-            //                                 << desc->infoObj()
-            //                                 << " has the same name as the requested index: "
-            //                                 << spec);
-            // }
-            
-// Similar to the Line  776
+            if (SimpleBSONObjComparator::kInstance.evaluate(desc->keyPattern() != key) ||
+                SimpleBSONObjComparator::kInstance.evaluate(
+                    desc->infoObj().getObjectField("collation") != collation)) {
+                return Status(ErrorCodes::IndexKeySpecsConflict,
+                              str::stream() << "Index must have unique name."
+                                            << "The existing index: "
+                                            << desc->infoObj()
+                                            << " has the same name as the requested index: "
+                                            << spec);
+            }
+
             IndexDescriptor temp(_collection, _getAccessMethodName(opCtx, key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
                 return Status(ErrorCodes::IndexOptionsConflict,
@@ -803,9 +802,10 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
         const bool findInProgressIndexes = true;
         const IndexDescriptor* desc =
             findIndexByKeyPatternAndCollationSpec(opCtx, key, collation, findInProgressIndexes);
-            if (desc) {
-                  LOG(2) << "index already exists with diff name " << name << " pattern: " << key
-                         << " collation: " << collation;
+        if (desc) {
+            LOG(2) << "index already exists with diff name " << name
+                   << " pattern: " << key
+                   << " collation: " << collation;
 
             IndexDescriptor temp(_collection, _getAccessMethodName(opCtx, key), spec);
             if (!desc->areIndexOptionsEquivalent(&temp))
