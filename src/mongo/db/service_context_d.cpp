@@ -42,6 +42,7 @@
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/unclean_shutdown.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
@@ -106,6 +107,7 @@ void ServiceContextMongoD::createLockFile() {
             fassertFailedNoTrace(34416);
         }
         warning() << "Detected unclean shutdown - " << _lockFile->getFilespec() << " is not empty.";
+        startingAfterUncleanShutdown(this) = true;
     }
 }
 

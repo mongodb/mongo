@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/unclean_shutdown.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -115,14 +116,40 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
         _catalogRecordStore.get(), _options.directoryPerDB, _options.directoryForIndexes));
     _catalog->init(opCtx);
 
-    std::vector<std::string> collections;
-    _catalog->getAllCollections(&collections);
+    // We populate 'identsKnownToStorageEngine' only if we are loading after an unclean shutdown.
+    std::vector<std::string> identsKnownToStorageEngine;
+    const bool loadingFromUncleanShutdown = startingAfterUncleanShutdown(getGlobalServiceContext());
+    if (loadingFromUncleanShutdown) {
+        identsKnownToStorageEngine = _engine->getAllIdents(opCtx);
+        std::sort(identsKnownToStorageEngine.begin(), identsKnownToStorageEngine.end());
+    }
+
+    std::vector<std::string> collectionsKnownToCatalog;
+    _catalog->getAllCollections(&collectionsKnownToCatalog);
 
     KVPrefix maxSeenPrefix = KVPrefix::kNotPrefixed;
-    for (size_t i = 0; i < collections.size(); i++) {
-        std::string coll = collections[i];
+    for (const auto& coll : collectionsKnownToCatalog) {
         NamespaceString nss(coll);
-        string dbName = nss.db().toString();
+        std::string dbName = nss.db().toString();
+
+        if (loadingFromUncleanShutdown) {
+            // If we are loading the catalog after an unclean shutdown, it's possible that there are
+            // collections in the catalog that are unknown to the storage engine. If we can't find
+            // it in the list of storage engine idents, remove the collection and move on to the
+            // next one.
+            const auto collectionIdent = _catalog->getCollectionIdent(coll);
+            if (!std::binary_search(identsKnownToStorageEngine.begin(),
+                                    identsKnownToStorageEngine.end(),
+                                    collectionIdent)) {
+                log() << "Dropping collection " << coll
+                      << " unknown to storage engine after unclean shutdown";
+
+                WriteUnitOfWork wuow(opCtx);
+                fassertStatusOK(50716, _catalog->dropCollection(opCtx, coll));
+                wuow.commit();
+                continue;
+            }
+        }
 
         // No rollback since this is only for committed dbs.
         KVDatabaseCatalogEntryBase*& db = _dbs[dbName];
@@ -137,6 +164,10 @@ void KVStorageEngine::loadCatalog(OperationContext* opCtx) {
 
     KVPrefix::setLargestPrefix(maxSeenPrefix);
     opCtx->recoveryUnit()->abandonSnapshot();
+
+    // Unset the unclean shutdown flag to avoid executing special behavior if this method is called
+    // after startup.
+    startingAfterUncleanShutdown(getGlobalServiceContext()) = false;
 }
 
 void KVStorageEngine::closeCatalog(OperationContext* opCtx) {

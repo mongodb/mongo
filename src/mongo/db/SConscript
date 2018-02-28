@@ -466,9 +466,10 @@ env.Library(
         'client.cpp',
         'multi_key_path_tracker.cpp',
         'operation_context.cpp',
+        'operation_context_group.cpp',
         'service_context.cpp',
         'service_context_noop.cpp',
-        'operation_context_group.cpp'
+        'unclean_shutdown.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/logical_session_id',
