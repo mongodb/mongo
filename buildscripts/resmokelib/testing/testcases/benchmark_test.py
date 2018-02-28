@@ -26,8 +26,13 @@ class BenchmarkTestCase(interface.TestCase):
         Initializes the BenchmarkTestCase with the executable to run.
         """
         interface.TestCase.__init__(self, logger, "Benchmark test", program_executable)
-
         parser.validate_benchmark_options()
+
+        self.bm_executable = program_executable
+        self.suite_bm_options = program_options
+
+    def configure(self, fixture, *args, **kwargs):
+        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         # 1. Set the default benchmark options, including the out file path, which is based on the
         #    executable path. Keep the existing extension (if any) to simplify parsing.

@@ -6,3 +6,5 @@ selector:
 
 executor:
   config: {}
+  hooks:
+  - class: CombineBenchmarkResults

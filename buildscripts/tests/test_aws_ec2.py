@@ -2,13 +2,11 @@
 
 """Unit test for buildscripts/aws_ec2.py."""
 
+from __future__ import absolute_import
+
 import datetime
-import os
-import sys
 import unittest
 
-if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.getcwd())
 from buildscripts import aws_ec2
 
 _AMI = "ami-ed6bec86"

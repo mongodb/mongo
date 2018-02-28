@@ -5,15 +5,14 @@
    Note - Tests require sshd to be enabled on localhost with paswordless login
    and can fail otherwise."""
 
+from __future__ import absolute_import
+
 import os
 import shutil
-import sys
 import tempfile
 import time
 import unittest
 
-if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.getcwd())
 from buildscripts import remote_operations as rop
 
 
