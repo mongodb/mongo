@@ -45,7 +45,8 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
+#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -667,12 +668,12 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     switch (serverGlobalParams.featureCompatibility.getVersion()) {
         case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
         case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
-            setFCVCmd = BSON(FeatureCompatibilityVersion::kCommandName
-                             << FeatureCompatibilityVersionCommandParser::kVersion40);
+            setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
+                             << FeatureCompatibilityVersionParser::kVersion40);
             break;
         default:
-            setFCVCmd = BSON(FeatureCompatibilityVersion::kCommandName
-                             << FeatureCompatibilityVersionCommandParser::kVersion36);
+            setFCVCmd = BSON(FeatureCompatibilityVersionCommandParser::kCommandName
+                             << FeatureCompatibilityVersionParser::kVersion36);
             break;
     }
     auto versionResponse = _runCommandForAddShard(opCtx, targeter.get(), "admin", setFCVCmd);

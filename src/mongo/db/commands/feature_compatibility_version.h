@@ -31,7 +31,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 
@@ -49,11 +48,7 @@ extern bool internalValidateFeaturesAsMaster;
 class FeatureCompatibilityVersion {
 public:
     static constexpr StringData kCollection = "admin.system.version"_sd;
-    static constexpr StringData kCommandName = "setFeatureCompatibilityVersion"_sd;
     static constexpr StringData kDatabase = "admin"_sd;
-    static constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
-    static constexpr StringData kVersionField = "version"_sd;
-    static constexpr StringData kTargetVersionField = "targetVersion"_sd;
 
     /**
      * Should be taken in shared mode by any operations that should not run while
@@ -63,30 +58,6 @@ public:
      * operations and does not run with itself.
      */
     static Lock::ResourceMutex fcvLock;
-
-    /**
-     * Parses the featureCompatibilityVersion document from admin.system.version, and returns the
-     * state represented by the combination of the targetVersion and version.
-     */
-    static StatusWith<ServerGlobalParams::FeatureCompatibility::Version> parse(
-        const BSONObj& featureCompatibilityVersionDoc);
-
-    static StringData toString(ServerGlobalParams::FeatureCompatibility::Version version) {
-        switch (version) {
-            case ServerGlobalParams::FeatureCompatibility::Version::kUnsetDefault36Behavior:
-                return FeatureCompatibilityVersionCommandParser::kVersionUnset;
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo36:
-                return FeatureCompatibilityVersionCommandParser::kVersion36;
-            case ServerGlobalParams::FeatureCompatibility::Version::kUpgradingTo40:
-                return FeatureCompatibilityVersionCommandParser::kVersionUpgradingTo40;
-            case ServerGlobalParams::FeatureCompatibility::Version::kDowngradingTo36:
-                return FeatureCompatibilityVersionCommandParser::kVersionDowngradingTo36;
-            case ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40:
-                return FeatureCompatibilityVersionCommandParser::kVersion40;
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }
 
     /**
      * Records intent to perform a 3.6 -> 4.0 upgrade by updating the on-disk feature

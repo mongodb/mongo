@@ -57,6 +57,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -1077,7 +1078,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         requestNss.ns() == FeatureCompatibilityVersion::kCollection) {
         std::string oID;
         auto status = bsonExtractStringField(o, "_id", &oID);
-        if (status.isOK() && oID == FeatureCompatibilityVersion::kParameterName) {
+        if (status.isOK() && oID == FeatureCompatibilityVersionParser::kParameterName) {
             return Status(ErrorCodes::OplogOperationUnsupported,
                           str::stream() << "Applying operation on feature compatibility version "
                                            "document not supported in initial sync: "

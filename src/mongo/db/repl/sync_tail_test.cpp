@@ -42,6 +42,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -1767,7 +1768,7 @@ TEST_F(SyncTailTest, FailOnInsertFCVDocument) {
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     auto op = makeInsertDocumentOplogEntry(
-        nextOpTime(), fcvNS, BSON("_id" << FeatureCompatibilityVersion::kParameterName));
+        nextOpTime(), fcvNS, BSON("_id" << FeatureCompatibilityVersionParser::kParameterName));
     ASSERT_EQUALS(runOpInitialSync(op), ErrorCodes::OplogOperationUnsupported);
 }
 

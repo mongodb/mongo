@@ -51,6 +51,16 @@ env.Library(
 )
 
 env.Library(
+    target="feature_compatibility_version_parser",
+    source=[
+        "feature_compatibility_version_parser.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target="core",
     source=[
         "authentication_commands.cpp",
@@ -116,6 +126,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         '$BUILD_DIR/mongo/util/ntservice',
         '$BUILD_DIR/mongo/util/processinfo',
+        'feature_compatibility_version_parser',
         'server_status_core',
     ],
 )

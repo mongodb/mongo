@@ -32,6 +32,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version_command_parser.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
@@ -70,9 +71,9 @@ public:
     std::string help() const override {
         return str::stream()
             << "Set the API version for the cluster. If set to \""
-            << FeatureCompatibilityVersionCommandParser::kVersion36
+            << FeatureCompatibilityVersionParser::kVersion36
             << "\", then 4.0 features are disabled. If \""
-            << FeatureCompatibilityVersionCommandParser::kVersion40
+            << FeatureCompatibilityVersionParser::kVersion40
             << "\", then 4.0 features are enabled, and all nodes in the cluster must be version "
             << "4.0. See " << feature_compatibility_version_documentation::kCompatibilityLink
             << ".";

@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/namespace_uuid_cache.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_time_validator.h"
@@ -527,7 +528,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     } else if (nss.isAdminDotSystemDotVersion()) {
         auto _id = deleteState.documentKey["_id"];
         if (_id.type() == BSONType::String &&
-            _id.String() == FeatureCompatibilityVersion::kParameterName)
+            _id.String() == FeatureCompatibilityVersionParser::kParameterName)
             uasserted(40670, "removing FeatureCompatibilityVersion document is not allowed");
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {

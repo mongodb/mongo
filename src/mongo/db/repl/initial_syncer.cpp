@@ -42,6 +42,7 @@
 #include "mongo/client/fetcher.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/jsobj.h"
@@ -612,7 +613,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
     BSONObjBuilder queryBob;
     queryBob.append("find", nsToCollectionSubstring(FeatureCompatibilityVersion::kCollection));
     auto filterBob = BSONObjBuilder(queryBob.subobjStart("filter"));
-    filterBob.append("_id", FeatureCompatibilityVersion::kParameterName);
+    filterBob.append("_id", FeatureCompatibilityVersionParser::kParameterName);
     filterBob.done();
 
     _fCVFetcher = stdx::make_unique<Fetcher>(
@@ -673,7 +674,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
         return;
     }
 
-    auto fCVParseSW = FeatureCompatibilityVersion::parse(docs.front());
+    auto fCVParseSW = FeatureCompatibilityVersionParser::parse(docs.front());
     if (!fCVParseSW.isOK()) {
         onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, fCVParseSW.getStatus());
         return;
@@ -688,7 +689,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
             lock,
             Status(ErrorCodes::IncompatibleServerVersion,
                    str::stream() << "Sync source had unsafe feature compatibility version: "
-                                 << FeatureCompatibilityVersion::toString(version)));
+                                 << FeatureCompatibilityVersionParser::toString(version)));
         return;
     }
 
