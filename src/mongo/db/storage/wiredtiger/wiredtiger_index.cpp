@@ -772,12 +772,7 @@ private:
 /**
  * Bulk builds a V2 format unique index.
  *
- * This is a copy of `UniqueBulkBuilder` at the moment; it would change later.
- *
- * In order to support V2 format unique indexes in dupsAllowed mode this class only does an actual
- * insert after it sees a key after the one we are trying to insert. This allows us to gather up all
- * duplicate ids and insert them all together. This is necessary since bulk cursors can only
- * append data.
+ * This is similar to `StandardBulkBuilder`, with duplicate check added in.
  */
 class WiredTigerIndex::UniqueV2BulkBuilder : public BulkBuilder {
 public:
@@ -785,10 +780,7 @@ public:
                         OperationContext* opCtx,
                         bool dupsAllowed,
                         KVPrefix prefix)
-        : BulkBuilder(idx, opCtx, prefix),
-          _idx(idx),
-          _dupsAllowed(dupsAllowed),
-          _keyString(idx->keyStringVersion()) {}
+        : BulkBuilder(idx, opCtx, prefix), _idx(idx), _dupsAllowed(dupsAllowed) {}
 
     Status addKey(const BSONObj& newKey, const RecordId& id) {
         {
@@ -797,71 +789,42 @@ public:
                 return s;
         }
 
-        const int cmp = newKey.woCompare(_key, _ordering);
-        if (cmp != 0) {
-            if (!_key.isEmpty()) {   // _key.isEmpty() is only true on the first call to addKey().
-                invariant(cmp > 0);  // newKey must be > the last key
-                // We are done with dups of the last key so we can insert it now.
-                doInsert();
-            }
-            invariant(_records.empty());
-        } else {
-            // Dup found!
+        // Do a duplicate check
+        const int cmp = newKey.woCompare(_previousKey, _ordering);
+        if (cmp == 0) {
+            // Duplicate found!
             if (!_dupsAllowed) {
                 return _idx->dupKeyError(newKey);
             }
-
-            // If we get here, we are in the weird mode where dups are allowed on a unique
-            // index, so add ourselves to the list of duplicate ids. This also replaces the
-            // _key which is correct since any dups seen later are likely to be newer.
+        } else {
+            // _previousKey.isEmpty() is only true on the first call to addKey().
+            // newKey must be > the last key
+            invariant(_previousKey.isEmpty() || cmp > 0);
         }
 
-        _key = newKey.getOwned();
-        _keyString.resetToKey(_key, _idx->ordering());
-        _records.push_back(std::make_pair(id, _keyString.getTypeBits()));
+        KeyString keyString(_idx->keyStringVersion(), newKey, _idx->_ordering, id);
 
-        return Status::OK();
-    }
-
-    void commit(bool mayInterrupt) {
-        WriteUnitOfWork uow(_opCtx);
-        if (!_records.empty()) {
-            // This handles inserting the last unique key.
-            doInsert();
-        }
-        uow.commit();
-    }
-
-private:
-    void doInsert() {
-        invariant(!_records.empty());
-
-        KeyString value(_idx->keyStringVersion());
-        for (size_t i = 0; i < _records.size(); i++) {
-            value.appendRecordId(_records[i].first);
-            // When there is only one record, we can omit AllZeros TypeBits. Otherwise they need
-            // to be included.
-            if (!(_records[i].second.isAllZeros() && _records.size() == 1)) {
-                value.appendTypeBits(_records[i].second);
-            }
-        }
-
-        WiredTigerItem keyItem(_keyString.getBuffer(), _keyString.getSize());
-        WiredTigerItem valueItem(value.getBuffer(), value.getSize());
-
+        // Can't use WiredTigerCursor since we aren't using the cache.
+        WiredTigerItem keyItem(keyString.getBuffer(), keyString.getSize());
         setKey(_cursor, keyItem.Get());
+
+        WiredTigerItem valueItem = keyString.getTypeBits().isAllZeros()
+            ? emptyItem
+            : WiredTigerItem(keyString.getTypeBits().getBuffer(),
+                             keyString.getTypeBits().getSize());
+
         _cursor->set_value(_cursor, valueItem.Get());
 
         invariantWTOK(_cursor->insert(_cursor));
 
-        _records.clear();
+        _previousKey = newKey.getOwned();
+        return Status::OK();
     }
 
+private:
     WiredTigerIndex* _idx;
     const bool _dupsAllowed;
-    BSONObj _key;
-    KeyString _keyString;
-    std::vector<std::pair<RecordId, KeyString::TypeBits>> _records;
+    BSONObj _previousKey;
 };
 
 namespace {
