@@ -40,12 +40,8 @@
     // Cannot read with default read concern.
     assert.eq(null, testDB.coll.findOne({_id: "insert-1"}));
     // But read in the same transaction returns the doc.
-    let res = sessionDb.runCommand({
-        find: collName,
-        filter: {_id: "insert-1"},
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber)
-    });
+    let res = sessionDb.runCommand(
+        {find: collName, filter: {_id: "insert-1"}, txnNumber: NumberLong(txnNumber)});
     assert.commandWorked(res);
     assert.docEq([{_id: "insert-1"}], res.cursor.firstBatch);
 
@@ -53,7 +49,6 @@
     assert.commandWorked(sessionDb.runCommand({
         insert: collName,
         documents: [{_id: "insert-2"}],
-        readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber),
     }));
 

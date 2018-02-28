@@ -36,6 +36,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/stdx/unordered_map.h"
@@ -58,6 +59,28 @@ class Session {
     MONGO_DISALLOW_COPYING(Session);
 
 public:
+    /**
+     * Holds state for a snapshot read or multi-statement transaction in between network operations.
+     */
+    class TxnResources {
+    public:
+        /**
+         * Stashes transaction state from 'opCtx' in the newly constructed TxnResources.
+         */
+        TxnResources(OperationContext* opCtx);
+
+        /**
+         * Releases stashed transaction state onto 'opCtx'. Must only be called once.
+         */
+        void release(OperationContext* opCtx);
+
+    private:
+        bool _released = false;
+        std::unique_ptr<Locker> _locker;
+        std::unique_ptr<RecoveryUnit> _recoveryUnit;
+        repl::ReadConcernArgs _readConcernArgs;
+    };
+
     using CommittedStatementTimestampMap = stdx::unordered_map<StmtId, repl::OpTime>;
 
     static const BSONObj kDeadEndSentinel;
@@ -292,16 +315,8 @@ private:
     // means a new transaction has begun on the session, but it hasn't yet performed any writes.
     TxnNumber _activeTxnNumber{kUninitializedTxnNumber};
 
-    // Set when the first command in a transaction specifies readConcern level snapshot.
-    bool _isSnapshotTxn{false};
-
-    // Holds a transaction's Locker while not active. Combined with stashing of the RecoveryUnit,
-    // this allows transaction state to be maintained across network operations.
-    std::unique_ptr<Locker> _stashedLocker;
-
-    // Holds a transaction's RecoveryUnit while not active. Combined with stashing of the Locker,
-    // this allows transaction state to be maintained across network operations.
-    std::unique_ptr<RecoveryUnit> _stashedRecoveryUnit;
+    // Holds transaction resources between network operations.
+    boost::optional<TxnResources> _txnResourceStash;
 
     // Indicates the state of the current multi-document transaction, if any.
     // If the transaction is in any state but kInProgress, no more operations can

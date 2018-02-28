@@ -576,6 +576,9 @@ TEST_F(SessionTest, StashAndUnstashResources) {
     ASSERT_NOT_EQUALS(originalRecoveryUnit, opCtx()->recoveryUnit());
     ASSERT(!opCtx()->getWriteUnitOfWork());
 
+    // Unset the read concern on the OperationContext. This is needed to unstash.
+    repl::ReadConcernArgs::get(opCtx()) = repl::ReadConcernArgs();
+
     // Unstash the stashed resources. This restores the original Locker and RecoveryUnit to the
     // OperationContext.
     session.unstashTransactionResources(opCtx());

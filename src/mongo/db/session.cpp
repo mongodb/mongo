@@ -443,7 +443,6 @@ void Session::_beginOrContinueTxn(WithLock wl,
     // Start a new transaction with an autocommit field
     _setActiveTxn(wl, txnNumber);
     _autocommit = (autocommit != boost::none) ? *autocommit : true;  // autocommit defaults to true
-    _isSnapshotTxn = false;
     _txnState = _autocommit ? MultiDocumentTransactionState::kNone
                             : MultiDocumentTransactionState::kInProgress;
     invariant(_transactionOperations.empty());
@@ -469,6 +468,47 @@ void Session::_checkTxnValid(WithLock, TxnNumber txnNumber) const {
                  _txnState != MultiDocumentTransactionState::kCommitting));
 }
 
+Session::TxnResources::TxnResources(OperationContext* opCtx) {
+    opCtx->getWriteUnitOfWork()->release();
+    opCtx->setWriteUnitOfWork(nullptr);
+
+    _locker = opCtx->swapLockState(stdx::make_unique<DefaultLockerImpl>());
+    _locker->releaseTicket();
+
+    _recoveryUnit = std::unique_ptr<RecoveryUnit>(opCtx->releaseRecoveryUnit());
+    opCtx->setRecoveryUnit(opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit(),
+                           OperationContext::kNotInUnitOfWork);
+
+    _readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+}
+
+void Session::TxnResources::release(OperationContext* opCtx) {
+    // Perform operations that can fail the release before marking the TxnResources as released.
+    auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    uassert(ErrorCodes::InvalidOptions,
+            "Only the first command in a transaction may specify a readConcern",
+            readConcernArgs.isEmpty());
+
+    _locker->reacquireTicket(opCtx);
+
+    invariant(!_released);
+    _released = true;
+
+    // We intentionally do not capture the return value of swapLockState(), which is just an empty
+    // locker. At the end of the operation, if the transaction is not complete, we will stash the
+    // operation context's locker and replace it with a new empty locker.
+    invariant(opCtx->lockState()->getClientState() == Locker::ClientState::kInactive);
+    opCtx->swapLockState(std::move(_locker));
+
+    opCtx->setRecoveryUnit(_recoveryUnit.release(),
+                           OperationContext::RecoveryUnitState::kNotInUnitOfWork);
+
+    opCtx->setWriteUnitOfWork(WriteUnitOfWork::createForSnapshotResume(opCtx));
+
+    // 'readConcernArgs' is a mutable reference to the ReadConcernArgs decoration on opCtx.
+    readConcernArgs = _readConcernArgs;
+}
+
 void Session::stashTransactionResources(OperationContext* opCtx) {
     // We must lock the Client to change the Locker on the OperationContext and the Session mutex to
     // access Session state. We must lock the Client before the Session mutex, since the Client
@@ -478,9 +518,6 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
     invariant(!isMMAPV1());
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     stdx::lock_guard<stdx::mutex> lg(_mutex);
-    if (!_isSnapshotTxn) {
-        return;
-    }
 
     invariant(opCtx->hasStashedCursor() || !_autocommit);
 
@@ -496,14 +533,8 @@ void Session::stashTransactionResources(OperationContext* opCtx) {
                                 << _activeTxnNumber);
     }
 
-    opCtx->getWriteUnitOfWork()->release();
-    opCtx->setWriteUnitOfWork(nullptr);
-
-    _stashedLocker = opCtx->swapLockState(stdx::make_unique<DefaultLockerImpl>());
-    _stashedLocker->releaseTicket();
-    _stashedRecoveryUnit.reset(opCtx->releaseRecoveryUnit());
-    opCtx->setRecoveryUnit(opCtx->getServiceContext()->getGlobalStorageEngine()->newRecoveryUnit(),
-                           OperationContext::kNotInUnitOfWork);
+    invariant(!_txnResourceStash);
+    _txnResourceStash = TxnResources(opCtx);
 }
 
 void Session::unstashTransactionResources(OperationContext* opCtx) {
@@ -533,25 +564,14 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
         return;
     }
 
-    if (_stashedLocker) {
-        invariant(_stashedRecoveryUnit);
-        _stashedLocker->reacquireTicket(opCtx);
-
-        // We intentionally do not capture the return value of swapLockState(), which is just an
-        // empty locker. At the end of the operation, if the transaction is not complete, we will
-        // stash the operation context's locker and replace it with a new empty locker.
-        invariant(opCtx->lockState()->getClientState() == Locker::ClientState::kInactive);
-        opCtx->swapLockState(std::move(_stashedLocker));
-
-        opCtx->setRecoveryUnit(_stashedRecoveryUnit.release(),
-                               OperationContext::RecoveryUnitState::kNotInUnitOfWork);
-        opCtx->setWriteUnitOfWork(WriteUnitOfWork::createForSnapshotResume(opCtx));
+    if (_txnResourceStash) {
+        _txnResourceStash->release(opCtx);
+        _txnResourceStash = boost::none;
     } else {
         auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
         if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
             _txnState == MultiDocumentTransactionState::kInProgress) {
             opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
-            _isSnapshotTxn = true;
         }
     }
 }
@@ -561,9 +581,7 @@ void Session::_releaseStashedTransactionResources(WithLock wl, OperationContext*
         opCtx->setWriteUnitOfWork(nullptr);
     }
 
-    _stashedRecoveryUnit.reset(nullptr);
-    _stashedLocker.reset(nullptr);
-    _isSnapshotTxn = false;
+    _txnResourceStash = boost::none;
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {

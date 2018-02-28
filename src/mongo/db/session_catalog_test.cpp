@@ -29,6 +29,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -67,32 +68,59 @@ TEST_F(SessionCatalogTest, CheckoutAndReleaseSession) {
     ASSERT_EQ(*opCtx()->getLogicalSessionId(), scopedSession->getSessionId());
 }
 
-TEST_F(SessionCatalogTest, OperationContextSession) {
+TEST_F(SessionCatalogTest, OperationContextCheckedOutSession) {
+    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+    const TxnNumber txnNum = 20;
+    opCtx()->setTxnNumber(txnNum);
+
+    OperationContextSession ocs(opCtx(), true, boost::none);
+    auto session = OperationContextSession::get(opCtx());
+    ASSERT(session);
+    ASSERT_EQ(*opCtx()->getLogicalSessionId(), session->getSessionId());
+    session->refreshFromStorageIfNeeded(opCtx());
+    session->beginOrContinueTxn(opCtx(), txnNum, boost::none);
+
+    // Set the readConcern level on the operation to snapshot. This ensures that unstash sets up a
+    // WriteUnitOfWork on the OperationContext.
+    repl::ReadConcernArgs readConcernArgs;
+    ASSERT_OK(readConcernArgs.initialize(BSON("find"
+                                              << "test"
+                                              << repl::ReadConcernArgs::kReadConcernFieldName
+                                              << BSON(repl::ReadConcernArgs::kLevelFieldName
+                                                      << "snapshot"))));
+    repl::ReadConcernArgs::get(opCtx()) = readConcernArgs;
+
+    // Confirm that unstash can be executed against a top-level checked-out Session.
+    ocs.unstashTransactionResources();
+
+    // Stashing requires we are holding locks and either have a stashed cursor or are in a
+    // multi-statement transaction.
+    opCtx()->setStashedCursor();
+    Lock::GlobalRead lk(opCtx(), Date_t::now());
+    ASSERT(lk.isLocked());
+
+    // Confirm that stash can be executed against a top-level checked-out Session.
+    ocs.stashTransactionResources();
+
+    // TODO SERVER-33672: This can be removed when it no longer causes a hang to destroy the
+    // SessionCatalog when a Session contains stashed transaction resources.
+    repl::ReadConcernArgs::get(opCtx()) = repl::ReadConcernArgs();
+    ocs.unstashTransactionResources();
+    opCtx()->getWriteUnitOfWork()->commit();
+}
+
+TEST_F(SessionCatalogTest, OperationContextNonCheckedOutSession) {
     opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
 
-    {
-        OperationContextSession ocs(opCtx(), true, boost::none);
-        auto session = OperationContextSession::get(opCtx());
+    OperationContextSession ocs(opCtx(), false, boost::none);
+    auto session = OperationContextSession::get(opCtx());
 
-        ASSERT(session);
-        ASSERT_EQ(*opCtx()->getLogicalSessionId(), session->getSessionId());
+    ASSERT(!session);
 
-        // Confirm that stash and unstash can be executed against a top-level checked-out Session.
-        ocs.stashTransactionResources();
-        ocs.unstashTransactionResources();
-    }
-
-    {
-        OperationContextSession ocs(opCtx(), false, boost::none);
-        auto session = OperationContextSession::get(opCtx());
-
-        ASSERT(!session);
-
-        // Confirm that stash and unstash can be executed against a top-level not-checked-out
-        // Session.
-        ocs.stashTransactionResources();
-        ocs.unstashTransactionResources();
-    }
+    // Confirm that unstash can be executed against a top-level not-checked-out Session (this is a
+    // noop). We do not expect stash to be executed against a top-level not-checked-out Session,
+    // since we will not be in a snapshot read or multi-statement transaction.
+    ocs.unstashTransactionResources();
 }
 
 TEST_F(SessionCatalogTest, GetOrCreateNonExistentSession) {
