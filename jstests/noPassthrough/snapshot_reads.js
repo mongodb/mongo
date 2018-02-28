@@ -10,18 +10,18 @@
     rst.startSet();
     rst.initiate();
 
+    const primaryDB = rst.getPrimary().getDB(dbName);
+    if (!primaryDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
+        rst.stopSet();
+        return;
+    }
+
     function runTest({useCausalConsistency}) {
-        const primaryDB = rst.getPrimary().getDB(dbName);
         primaryDB.coll.drop();
 
         const session =
             primaryDB.getMongo().startSession({causalConsistency: useCausalConsistency});
         const sessionDb = session.getDatabase(dbName);
-
-        if (!primaryDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
-            rst.stopSet();
-            return;
-        }
 
         const bulk = primaryDB.coll.initializeUnorderedBulkOp();
         for (let x = 0; x < 10; ++x) {
