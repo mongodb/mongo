@@ -71,7 +71,8 @@ public:
                 PositionRequirement::kNone,
                 _mergeType,
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kAllowed};
+                FacetRequirement::kAllowed,
+                TransactionRequirement::kAllowed};
     }
 
     GetNextResult getNext() final;

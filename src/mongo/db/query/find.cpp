@@ -572,8 +572,7 @@ std::string runQuery(OperationContext* opCtx,
     }
 
     // We have a parsed query. Time to get the execution plan for it.
-    auto exec = uassertStatusOK(
-        getExecutorFind(opCtx, collection, nss, std::move(cq), PlanExecutor::YIELD_AUTO));
+    auto exec = uassertStatusOK(getExecutorLegacyFind(opCtx, collection, nss, std::move(cq)));
 
     const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
 

@@ -57,7 +57,8 @@ public:
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kAllowed};
+                FacetRequirement::kAllowed,
+                TransactionRequirement::kAllowed};
     }
 
     GetNextResult getNext() final;

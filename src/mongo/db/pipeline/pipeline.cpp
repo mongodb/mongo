@@ -120,11 +120,7 @@ StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> Pipeline::createTopLevelO
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(new Pipeline(std::move(stages), expCtx),
                                                         PipelineDeleter(expCtx->opCtx));
     try {
-        if (isFacetPipeline) {
-            pipeline->validateFacetPipeline();
-        } else {
-            pipeline->validatePipeline();
-        }
+        pipeline->validate(isFacetPipeline);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -133,7 +129,17 @@ StatusWith<std::unique_ptr<Pipeline, PipelineDeleter>> Pipeline::createTopLevelO
     return std::move(pipeline);
 }
 
-void Pipeline::validatePipeline() const {
+void Pipeline::validate(bool isFacetPipeline) const {
+    if (isFacetPipeline) {
+        validateFacetPipeline();
+    } else {
+        validateTopLevelPipeline();
+    }
+
+    validateCommon();
+}
+
+void Pipeline::validateTopLevelPipeline() const {
     // Verify that the specified namespace is valid for the initial stage of this pipeline.
     const NamespaceString& nss = pCtx->ns;
 
@@ -173,9 +179,6 @@ void Pipeline::validatePipeline() const {
             }
         }
     }
-
-    // Verify that each stage is in a legal position within the pipeline.
-    ensureAllStagesAreInLegalPositions();
 }
 
 void Pipeline::validateFacetPipeline() const {
@@ -194,14 +197,12 @@ void Pipeline::validateFacetPipeline() const {
         invariant(stageConstraints.requiredPosition == PositionRequirement::kNone);
         invariant(!stageConstraints.isIndependentOfAnyCollection);
     }
-
-    // Facet pipelines cannot have any stages which are initial sources. We've already validated the
-    // first stage, and the 'ensureAllStagesAreInLegalPositions' method checks that there are no
-    // initial sources in positions 1...N, so we can just return its result directly.
-    ensureAllStagesAreInLegalPositions();
 }
 
-void Pipeline::ensureAllStagesAreInLegalPositions() const {
+void Pipeline::validateCommon() const {
+    // TODO SERVER-33551: Don't use presence of WUOW to decide whether we are in a snapshot read or
+    // multi-doc transaction.
+    const bool isSnapshotReadOrTxn = static_cast<bool>(pCtx->opCtx->getWriteUnitOfWork());
     size_t i = 0;
     for (auto&& stage : _sources) {
         auto constraints = stage->constraints(_splitState);
@@ -229,6 +230,14 @@ void Pipeline::ensureAllStagesAreInLegalPositions() const {
         uassert(40644,
                 str::stream() << stage->getSourceName() << " can only be run on mongoS",
                 !(constraints.hostRequirement == HostTypeRequirement::kMongoS && !pCtx->inMongos));
+
+        if (isSnapshotReadOrTxn) {
+            uassert(50742,
+                    str::stream() << "Stage not supported with readConcern level \"snapshot\" "
+                                     "or inside of a multi-document transaction: "
+                                  << stage->getSourceName(),
+                    constraints.isAllowedInTransaction());
+        }
     }
 }
 

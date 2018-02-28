@@ -49,7 +49,8 @@ public:
                 PositionRequirement::kFirst,
                 HostTypeRequirement::kMongoS,
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed};
+                FacetRequirement::kNotAllowed,
+                TransactionRequirement::kAllowed};
     }
 
     GetNextResult getNext() final;

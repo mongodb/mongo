@@ -98,7 +98,8 @@ public:
                                      PositionRequirement::kFirst,
                                      HostTypeRequirement::kLocalOnly,
                                      DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed);
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kNotAllowed);
 
         constraints.isIndependentOfAnyCollection = true;
         constraints.requiresInputDocSource = false;

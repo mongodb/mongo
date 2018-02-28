@@ -216,7 +216,8 @@ public:
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kAllowed};
+                FacetRequirement::kAllowed,
+                TransactionRequirement::kAllowed};
     }
 
     DocumentSource::GetNextResult getNext() final {
@@ -671,7 +672,8 @@ public:
                 PositionRequirement::kNone,
                 HostTypeRequirement::kPrimaryShard,
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kAllowed};
+                FacetRequirement::kAllowed,
+                TransactionRequirement::kAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSourceNeedsPrimaryShard> create() {

@@ -49,7 +49,8 @@ public:
                 PositionRequirement::kLast,
                 HostTypeRequirement::kPrimaryShard,
                 DiskUseRequirement::kWritesPersistentData,
-                FacetRequirement::kNotAllowed};
+                FacetRequirement::kNotAllowed,
+                TransactionRequirement::kNotAllowed};
     }
 
     // Virtuals for SplittableDocumentSource

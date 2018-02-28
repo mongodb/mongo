@@ -51,7 +51,8 @@ public:
                                      PositionRequirement::kNone,
                                      HostTypeRequirement::kNone,
                                      DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kAllowed);
+                                     FacetRequirement::kAllowed,
+                                     TransactionRequirement::kAllowed);
 
         constraints.canSwapWithMatch = true;
         return constraints;

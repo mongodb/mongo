@@ -91,8 +91,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     Collection* collection,
     const NamespaceString& nss,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
-    PlanExecutor::YieldPolicy yieldPolicy,
     size_t plannerOptions = QueryPlannerParams::DEFAULT);
+
+/**
+ * Returns a plan executor for a legacy OP_QUERY find.
+ */
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorLegacyFind(
+    OperationContext* opCtx,
+    Collection* collection,
+    const NamespaceString& nss,
+    std::unique_ptr<CanonicalQuery> canonicalQuery);
 
 /**
  * If possible, turn the provided QuerySolution into a QuerySolution that uses a DistinctNode

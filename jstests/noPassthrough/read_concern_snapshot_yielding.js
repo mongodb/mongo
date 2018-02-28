@@ -237,6 +237,19 @@
             res.cursor.nextBatch.length, TestData.numDocs - initialFindBatchSize, tojson(res));
     }, {"originatingCommand.filter": {x: 1}}, {op: "getmore"});
 
+    // Test aggregate.
+    testCommand(function() {
+        const res = assert.commandWorked(db.runCommand({
+            aggregate: "coll",
+            pipeline: [{$match: {x: 1}}],
+            readConcern: {level: "snapshot"},
+            cursor: {},
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
+        assert.eq(res.cursor.firstBatch.length, TestData.numDocs, tojson(res));
+    }, {"command.pipeline": [{$match: {x: 1}}]}, {"command.pipeline": [{$match: {x: 1}}]});
+
     // Test update.
     // We cannot provide a 'profilerFilter' because profiling is turned off for write commands in
     // transactions.

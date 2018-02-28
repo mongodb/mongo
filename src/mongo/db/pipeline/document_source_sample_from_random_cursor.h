@@ -49,7 +49,8 @@ public:
                 PositionRequirement::kFirst,
                 HostTypeRequirement::kAnyShard,
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed};
+                FacetRequirement::kNotAllowed,
+                TransactionRequirement::kAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSourceSampleFromRandomCursor> create(

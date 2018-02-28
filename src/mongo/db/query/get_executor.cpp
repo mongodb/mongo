@@ -641,9 +641,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getOplogStartHack(
         opCtx, std::move(ws), std::move(cs), std::move(cq), collection, PlanExecutor::YIELD_AUTO);
 }
 
-}  // namespace
-
-StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> _getExecutorFind(
     OperationContext* opCtx,
     Collection* collection,
     const NamespaceString& nss,
@@ -663,6 +661,35 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
     return getExecutor(opCtx, collection, std::move(canonicalQuery), yieldPolicy, plannerOptions);
+}
+
+}  // namespace
+
+StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
+    OperationContext* opCtx,
+    Collection* collection,
+    const NamespaceString& nss,
+    unique_ptr<CanonicalQuery> canonicalQuery,
+    size_t plannerOptions) {
+    auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    auto yieldPolicy = readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+        ? PlanExecutor::INTERRUPT_ONLY
+        : PlanExecutor::YIELD_AUTO;
+    return _getExecutorFind(
+        opCtx, collection, nss, std::move(canonicalQuery), yieldPolicy, plannerOptions);
+}
+
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorLegacyFind(
+    OperationContext* opCtx,
+    Collection* collection,
+    const NamespaceString& nss,
+    std::unique_ptr<CanonicalQuery> canonicalQuery) {
+    return _getExecutorFind(opCtx,
+                            collection,
+                            nss,
+                            std::move(canonicalQuery),
+                            PlanExecutor::YIELD_AUTO,
+                            QueryPlannerParams::DEFAULT);
 }
 
 namespace {

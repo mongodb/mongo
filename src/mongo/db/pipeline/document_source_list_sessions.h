@@ -90,7 +90,8 @@ public:
                 PositionRequirement::kFirst,
                 HostTypeRequirement::kNone,
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed};
+                FacetRequirement::kNotAllowed,
+                TransactionRequirement::kNotAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

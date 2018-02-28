@@ -53,7 +53,8 @@ public:
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,
                 DiskUseRequirement::kWritesTmpData,
-                FacetRequirement::kAllowed};
+                FacetRequirement::kAllowed,
+                TransactionRequirement::kAllowed};
     }
 
     /**

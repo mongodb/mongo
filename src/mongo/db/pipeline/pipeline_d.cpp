@@ -214,8 +214,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         return {cq.getStatus()};
     }
 
-    return getExecutorFind(
-        opCtx, collection, nss, std::move(cq.getValue()), PlanExecutor::YIELD_AUTO, plannerOpts);
+    return getExecutorFind(opCtx, collection, nss, std::move(cq.getValue()), plannerOpts);
 }
 
 BSONObj removeSortKeyMetaProjection(BSONObj projectionObj) {

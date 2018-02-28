@@ -263,7 +263,8 @@ DocumentSource::StageConstraints DocumentSourceFacet::constraints(
             PositionRequirement::kNone,
             host,
             mayUseDisk ? DiskUseRequirement::kWritesTmpData : DiskUseRequirement::kNoDiskUse,
-            FacetRequirement::kNotAllowed};
+            FacetRequirement::kNotAllowed,
+            TransactionRequirement::kAllowed};
 }
 
 DocumentSource::GetDepsReturn DocumentSourceFacet::getDependencies(DepsTracker* deps) const {

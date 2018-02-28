@@ -2181,7 +2181,8 @@ public:
                 PositionRequirement::kNone,
                 HostTypeRequirement::kMongoS,
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kNotAllowed};
+                FacetRequirement::kNotAllowed,
+                TransactionRequirement::kAllowed};
     }
 
     static boost::intrusive_ptr<DocumentSourceMustRunOnMongoS> create() {
@@ -2337,9 +2338,10 @@ TEST(PipelineInitialSource, MatchInitialQuery) {
     ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 4));
 }
 
-namespace Namespaces {
+// Contains test cases for validation done on pipeline creation.
+namespace pipeline_validate {
 
-using PipelineInitialSourceNSTest = AggregationContextFixture;
+using PipelineValidateTest = AggregationContextFixture;
 
 class DocumentSourceCollectionlessMock : public DocumentSourceMock {
 public:
@@ -2350,7 +2352,8 @@ public:
                                      PositionRequirement::kFirst,
                                      HostTypeRequirement::kNone,
                                      DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed);
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kAllowed);
         constraints.isIndependentOfAnyCollection = true;
         constraints.requiresInputDocSource = false;
         return constraints;
@@ -2361,7 +2364,7 @@ public:
     }
 };
 
-TEST_F(PipelineInitialSourceNSTest, AggregateOneNSNotValidForEmptyPipeline) {
+TEST_F(PipelineValidateTest, AggregateOneNSNotValidForEmptyPipeline) {
     const std::vector<BSONObj> rawPipeline = {};
     auto ctx = getExpCtx();
 
@@ -2370,7 +2373,7 @@ TEST_F(PipelineInitialSourceNSTest, AggregateOneNSNotValidForEmptyPipeline) {
     ASSERT_NOT_OK(Pipeline::parse(rawPipeline, ctx).getStatus());
 }
 
-TEST_F(PipelineInitialSourceNSTest, AggregateOneNSNotValidIfInitialStageRequiresCollection) {
+TEST_F(PipelineValidateTest, AggregateOneNSNotValidIfInitialStageRequiresCollection) {
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {}}")};
     auto ctx = getExpCtx();
 
@@ -2379,7 +2382,7 @@ TEST_F(PipelineInitialSourceNSTest, AggregateOneNSNotValidIfInitialStageRequires
     ASSERT_NOT_OK(Pipeline::parse(rawPipeline, ctx).getStatus());
 }
 
-TEST_F(PipelineInitialSourceNSTest, AggregateOneNSValidIfInitialStageIsCollectionless) {
+TEST_F(PipelineValidateTest, AggregateOneNSValidIfInitialStageIsCollectionless) {
     auto collectionlessSource = DocumentSourceCollectionlessMock::create();
     auto ctx = getExpCtx();
 
@@ -2388,7 +2391,7 @@ TEST_F(PipelineInitialSourceNSTest, AggregateOneNSValidIfInitialStageIsCollectio
     ASSERT_OK(Pipeline::create({collectionlessSource}, ctx).getStatus());
 }
 
-TEST_F(PipelineInitialSourceNSTest, CollectionNSNotValidIfInitialStageIsCollectionless) {
+TEST_F(PipelineValidateTest, CollectionNSNotValidIfInitialStageIsCollectionless) {
     auto collectionlessSource = DocumentSourceCollectionlessMock::create();
     auto ctx = getExpCtx();
 
@@ -2397,7 +2400,7 @@ TEST_F(PipelineInitialSourceNSTest, CollectionNSNotValidIfInitialStageIsCollecti
     ASSERT_NOT_OK(Pipeline::create({collectionlessSource}, ctx).getStatus());
 }
 
-TEST_F(PipelineInitialSourceNSTest, AggregateOneNSValidForFacetPipelineRegardlessOfInitialStage) {
+TEST_F(PipelineValidateTest, AggregateOneNSValidForFacetPipelineRegardlessOfInitialStage) {
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {}}")};
     auto ctx = getExpCtx();
 
@@ -2406,7 +2409,7 @@ TEST_F(PipelineInitialSourceNSTest, AggregateOneNSValidForFacetPipelineRegardles
     ASSERT_OK(Pipeline::parseFacetPipeline(rawPipeline, ctx).getStatus());
 }
 
-TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsValidAsFirstStage) {
+TEST_F(PipelineValidateTest, ChangeStreamIsValidAsFirstStage) {
     const std::vector<BSONObj> rawPipeline = {fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();
     setMockReplicationCoordinatorOnOpCtx(ctx->opCtx);
@@ -2414,7 +2417,7 @@ TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsValidAsFirstStage) {
     ASSERT_OK(Pipeline::parse(rawPipeline, ctx).getStatus());
 }
 
-TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStage) {
+TEST_F(PipelineValidateTest, ChangeStreamIsNotValidIfNotFirstStage) {
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {custom: 'filter'}}"),
                                               fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();
@@ -2424,7 +2427,7 @@ TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStage) {
     ASSERT_EQ(parseStatus, ErrorCodes::duplicateCodeForTest(40602));
 }
 
-TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStageInFacet) {
+TEST_F(PipelineValidateTest, ChangeStreamIsNotValidIfNotFirstStageInFacet) {
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {custom: 'filter'}}"),
                                               fromjson("{$changeStream: {}}")};
     auto ctx = getExpCtx();
@@ -2435,7 +2438,61 @@ TEST_F(PipelineInitialSourceNSTest, ChangeStreamIsNotValidIfNotFirstStageInFacet
     ASSERT(std::string::npos != parseStatus.reason().find("$changeStream"));
 }
 
-}  // namespace Namespaces
+class DocumentSourceDisallowedWithSnapshotReads : public DocumentSourceMock {
+public:
+    DocumentSourceDisallowedWithSnapshotReads() : DocumentSourceMock({}) {}
+
+    StageConstraints constraints(Pipeline::SplitState pipeState) const final {
+        return StageConstraints{StreamType::kStreaming,
+                                PositionRequirement::kNone,
+                                HostTypeRequirement::kNone,
+                                DiskUseRequirement::kNoDiskUse,
+                                FacetRequirement::kAllowed,
+                                TransactionRequirement::kNotAllowed};
+    }
+
+    static boost::intrusive_ptr<DocumentSourceDisallowedWithSnapshotReads> create() {
+        return new DocumentSourceDisallowedWithSnapshotReads();
+    }
+};
+
+TEST_F(PipelineValidateTest, TopLevelPipelineValidatedForStagesIllegalWithSnapshotReads) {
+    BSONObj readConcernSnapshot = BSON("readConcern" << BSON("level"
+                                                             << "snapshot"));
+    auto ctx = getExpCtx();
+    auto&& readConcernArgs = repl::ReadConcernArgs::get(ctx->opCtx);
+    ASSERT_OK(readConcernArgs.initialize(readConcernSnapshot["readConcern"]));
+    ASSERT(readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
+    ctx->opCtx->setWriteUnitOfWork(stdx::make_unique<WriteUnitOfWork>(ctx->opCtx));
+
+    // Make a pipeline with a legal $match, and then an illegal mock stage, and verify that pipeline
+    // creation fails with the expected error code.
+    auto matchStage = DocumentSourceMatch::create(BSON("_id" << 3), ctx);
+    auto illegalStage = DocumentSourceDisallowedWithSnapshotReads::create();
+    auto pipeline = Pipeline::create({matchStage, illegalStage}, ctx);
+    ASSERT_NOT_OK(pipeline.getStatus());
+    ASSERT_EQ(pipeline.getStatus(), ErrorCodes::duplicateCodeForTest(50742));
+}
+
+TEST_F(PipelineValidateTest, FacetPipelineValidatedForStagesIllegalWithSnapshotReads) {
+    BSONObj readConcernSnapshot = BSON("readConcern" << BSON("level"
+                                                             << "snapshot"));
+    auto ctx = getExpCtx();
+    auto&& readConcernArgs = repl::ReadConcernArgs::get(ctx->opCtx);
+    ASSERT_OK(readConcernArgs.initialize(readConcernSnapshot["readConcern"]));
+    ASSERT(readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern);
+    ctx->opCtx->setWriteUnitOfWork(stdx::make_unique<WriteUnitOfWork>(ctx->opCtx));
+
+    // Make a pipeline with a legal $match, and then an illegal mock stage, and verify that pipeline
+    // creation fails with the expected error code.
+    auto matchStage = DocumentSourceMatch::create(BSON("_id" << 3), ctx);
+    auto illegalStage = DocumentSourceDisallowedWithSnapshotReads::create();
+    auto pipeline = Pipeline::createFacetPipeline({matchStage, illegalStage}, ctx);
+    ASSERT_NOT_OK(pipeline.getStatus());
+    ASSERT_EQ(pipeline.getStatus(), ErrorCodes::duplicateCodeForTest(50742));
+}
+
+}  // namespace pipeline_validate
 
 namespace Dependencies {
 
@@ -2468,7 +2525,8 @@ public:
                 PositionRequirement::kNone,
                 HostTypeRequirement::kNone,
                 DiskUseRequirement::kNoDiskUse,
-                FacetRequirement::kAllowed};
+                FacetRequirement::kAllowed,
+                TransactionRequirement::kAllowed};
     }
 };
 

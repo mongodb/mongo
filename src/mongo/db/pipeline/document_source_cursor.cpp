@@ -210,8 +210,9 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
 
     {
         auto opCtx = pExpCtx->opCtx;
-        AutoGetDb dbLock(opCtx, _exec->nss().db(), MODE_IS);
-        Lock::CollectionLock collLock(opCtx->lockState(), _exec->nss().ns(), MODE_IS);
+        auto lockMode = getLockModeForQuery(opCtx);
+        AutoGetDb dbLock(opCtx, _exec->nss().db(), lockMode);
+        Lock::CollectionLock collLock(opCtx->lockState(), _exec->nss().ns(), lockMode);
         auto collection =
             dbLock.getDb() ? dbLock.getDb()->getCollection(opCtx, _exec->nss()) : nullptr;
 
@@ -266,8 +267,9 @@ void DocumentSourceCursor::cleanupExecutor() {
     // already have been marked as killed when the collection was dropped, and we won't need to
     // access the CursorManager to properly dispose of it.
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    AutoGetDb dbLock(opCtx, _exec->nss().db(), MODE_IS);
-    Lock::CollectionLock collLock(opCtx->lockState(), _exec->nss().ns(), MODE_IS);
+    auto lockMode = getLockModeForQuery(opCtx);
+    AutoGetDb dbLock(opCtx, _exec->nss().db(), lockMode);
+    Lock::CollectionLock collLock(opCtx->lockState(), _exec->nss().ns(), lockMode);
     auto collection = dbLock.getDb() ? dbLock.getDb()->getCollection(opCtx, _exec->nss()) : nullptr;
     auto cursorManager = collection ? collection->getCursorManager() : nullptr;
     _exec->dispose(opCtx, cursorManager);

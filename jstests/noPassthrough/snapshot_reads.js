@@ -20,7 +20,7 @@
     }
     const secondaryDB = rst.getSecondary().getDB(dbName);
 
-    function runTest({useCausalConsistency, readFromSecondary}) {
+    function runTest({useCausalConsistency, readFromSecondary, establishCursorCmd}) {
         primaryDB.coll.drop();
 
         let readDB = primaryDB;
@@ -43,14 +43,14 @@
 
         let txnNumber = 0;
 
+        // Augment the cursor-establishing command with the proper readConcern and transaction
+        // number.
+        let cursorCmd = Object.extend({}, establishCursorCmd);
+        cursorCmd.readConcern = {level: "snapshot"};
+        cursorCmd.txnNumber = NumberLong(txnNumber);
+
         // Establish a snapshot cursor, fetching the first 5 documents.
-        let res = assert.commandWorked(sessionDb.runCommand({
-            find: collName,
-            sort: {_id: 1},
-            batchSize: 5,
-            readConcern: {level: "snapshot"},
-            txnNumber: NumberLong(txnNumber)
-        }));
+        let res = assert.commandWorked(sessionDb.runCommand(cursorCmd));
 
         assert(res.hasOwnProperty("cursor"));
         assert(res.cursor.hasOwnProperty("firstBatch"));
@@ -132,10 +132,19 @@
         session.endSession();
     }
 
-    runTest({useCausalConsistency: false, readFromSecondary: false});
-    runTest({useCausalConsistency: true, readFromSecondary: false});
-    runTest({useCausalConsistency: false, readFromSecondary: true});
-    runTest({useCausalConsistency: true, readFromSecondary: true});
+    // Test snapshot reads using find.
+    let findCmd = {find: collName, sort: {_id: 1}, batchSize: 5};
+    runTest({useCausalConsistency: false, readFromSecondary: false, establishCursorCmd: findCmd});
+    runTest({useCausalConsistency: true, readFromSecondary: false, establishCursorCmd: findCmd});
+    runTest({useCausalConsistency: false, readFromSecondary: true, establishCursorCmd: findCmd});
+    runTest({useCausalConsistency: true, readFromSecondary: true, establishCursorCmd: findCmd});
+
+    // Test snapshot reads using aggregate.
+    let aggCmd = {aggregate: collName, pipeline: [{$sort: {_id: 1}}], cursor: {batchSize: 5}};
+    runTest({useCausalConsistency: false, readFromSecondary: false, establishCursorCmd: aggCmd});
+    runTest({useCausalConsistency: true, readFromSecondary: false, establishCursorCmd: aggCmd});
+    runTest({useCausalConsistency: false, readFromSecondary: true, establishCursorCmd: aggCmd});
+    runTest({useCausalConsistency: true, readFromSecondary: true, establishCursorCmd: aggCmd});
 
     rst.stopSet();
 })();

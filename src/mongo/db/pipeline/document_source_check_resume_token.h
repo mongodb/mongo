@@ -66,6 +66,7 @@ public:
                 HostTypeRequirement::kAnyShard,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
+                TransactionRequirement::kNotAllowed,
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 
@@ -104,6 +105,7 @@ public:
                                                              : HostTypeRequirement::kMongoS),
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kNotAllowed,
+                TransactionRequirement::kNotAllowed,
                 ChangeStreamRequirement::kChangeStreamStage};
     }
 

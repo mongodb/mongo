@@ -114,6 +114,9 @@ public:
                  ? FacetRequirement::kNotAllowed
                  : FacetRequirement::kAllowed),
             (getType() == TransformerInterface::TransformerType::kChangeStreamTransformation
+                 ? TransactionRequirement::kNotAllowed
+                 : TransactionRequirement::kAllowed),
+            (getType() == TransformerInterface::TransformerType::kChangeStreamTransformation
                  ? ChangeStreamRequirement::kChangeStreamStage
                  : ChangeStreamRequirement::kWhitelist));
 

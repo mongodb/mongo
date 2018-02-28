@@ -69,6 +69,7 @@ public:
             HostTypeRequirement::kNone,
             _mergingPresorted ? DiskUseRequirement::kNoDiskUse : DiskUseRequirement::kWritesTmpData,
             _mergingPresorted ? FacetRequirement::kNotAllowed : FacetRequirement::kAllowed,
+            TransactionRequirement::kAllowed,
             _mergingPresorted ? ChangeStreamRequirement::kWhitelist
                               : ChangeStreamRequirement::kBlacklist);
 

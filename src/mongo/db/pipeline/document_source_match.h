@@ -56,6 +56,7 @@ public:
                 HostTypeRequirement::kNone,
                 DiskUseRequirement::kNoDiskUse,
                 FacetRequirement::kAllowed,
+                TransactionRequirement::kAllowed,
                 ChangeStreamRequirement::kWhitelist};
     }
 

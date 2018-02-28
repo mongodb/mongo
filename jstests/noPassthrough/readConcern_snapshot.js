@@ -117,16 +117,14 @@
     assert.commandWorked(sessionDb.runCommand(
         {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)}));
 
-    // readConcern 'snapshot' is not supported by aggregate.
-    // TODO SERVER-33354: Add snapshot support for aggregate.
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    // readConcern 'snapshot' is supported by aggregate.
+    assert.commandWorked(sessionDb.runCommand({
         aggregate: collName,
         pipeline: [],
         cursor: {},
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
+    }));
 
     // readConcern 'snapshot' is supported by count.
     assert.commandWorked(sessionDb.runCommand(

@@ -55,7 +55,8 @@ public:
                                                          : PositionRequirement::kNone,
                                      HostTypeRequirement::kNone,
                                      DiskUseRequirement::kNoDiskUse,
-                                     FacetRequirement::kNotAllowed);
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kAllowed);
 
         constraints.requiresInputDocSource = (_cache->isBuilding());
         return constraints;

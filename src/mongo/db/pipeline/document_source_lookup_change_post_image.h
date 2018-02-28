@@ -70,6 +70,7 @@ public:
                                          : HostTypeRequirement::kMongoS,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kNotAllowed,
                                      ChangeStreamRequirement::kChangeStreamStage);
 
         constraints.canSwapWithMatch = true;

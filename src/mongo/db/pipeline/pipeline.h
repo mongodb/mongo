@@ -338,21 +338,29 @@ private:
      * is present then it must come last in the pipeline, while initial stages such as $indexStats
      * must be at the start.
      */
-    void validatePipeline() const;
+    void validate(bool isFacetPipeline) const;
 
     /**
-     * Throws if the $facet pipeline fails any of a set of semantic checks. For example, the
-     * pipeline cannot be empty and may not contain any initial stages.
+     * Performs validation checking specific to top-level pipelines. Throws if the pipeline is
+     * invalid.
+     */
+    void validateTopLevelPipeline() const;
+
+    /**
+     * Performs validation checking specific to nested $facet pipelines. Throws if the pipeline is
+     * invalid.
      */
     void validateFacetPipeline() const;
 
     /**
-     * Helper method which validates that each stage in pipeline is in a legal position. For
-     * example, $out must be at the end, while a $match stage with a text query must be at the
-     * start. Note that this method accepts an initial source as the first stage, which is illegal
-     * for $facet pipelines.
+     * Performs common validation for top-level or facet pipelines. Throws if the pipeline is
+     * invalid.
+     *
+     * Includes checking for illegal stage positioning. For example, $out must be at the end, while
+     * a $match stage with a text query must be at the start. Note that this method accepts an
+     * initial source as the first stage, which is illegal for $facet pipelines.
      */
-    void ensureAllStagesAreInLegalPositions() const;
+    void validateCommon() const;
 
     /**
      * Returns Status::OK if the pipeline can run on mongoS, or an error with a message explaining
