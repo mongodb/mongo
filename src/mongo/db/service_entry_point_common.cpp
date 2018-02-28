@@ -403,21 +403,13 @@ bool runCommandImpl(OperationContext* opCtx,
         bytesToReserve = 0;
 #endif
 
-    // run expects non-const bsonobj
-    BSONObj cmd = request.body;
-
-    // run expects const db std::string (can't bind to temporary)
-    const std::string db = request.getDatabase().toString();
-
     CommandReplyBuilder crb(replyBuilder->getInPlaceReplyBuilder(bytesToReserve));
 
-    behaviors.waitForReadConcern(opCtx, invocation, db, request, cmd);
-
     if (!invocation->supportsWriteConcern()) {
-        behaviors.uassertCommandDoesNotSpecifyWriteConcern(cmd);
+        behaviors.uassertCommandDoesNotSpecifyWriteConcern(request.body);
         invocation->run(opCtx, &crb);
     } else {
-        auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, cmd, db));
+        auto wcResult = uassertStatusOK(extractWriteConcern(opCtx, request.body));
 
         auto lastOpBeforeRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
@@ -647,12 +639,6 @@ void execCommandDatabase(OperationContext* opCtx,
                     "readConcernLevel snapshot requires a txnNumber",
                     opCtx->getTxnNumber());
 
-            // TODO SERVER-33355: Remove once readConcern level snapshot is supported on
-            // secondaries.
-            uassert(ErrorCodes::InvalidOptions,
-                    "readConcern level snapshot only supported on primaries",
-                    iAmPrimary);
-
             opCtx->lockState()->setSharedLocksShouldTwoPhaseLock(true);
         }
 
@@ -692,6 +678,8 @@ void execCommandDatabase(OperationContext* opCtx,
                 << rpc::TrackingMetadata::get(opCtx).toString();
             rpc::TrackingMetadata::get(opCtx).setIsLogged(true);
         }
+
+        behaviors.waitForReadConcern(opCtx, invocation.get(), request);
 
         sessionTxnState.unstashTransactionResources();
         retval = runCommandImpl(

@@ -52,16 +52,12 @@ bool commandSpecifiesWriteConcern(const BSONObj& cmdObj);
  * Verifies that the writeConcern is of type Object (BSON type) and
  * that the resulting writeConcern is valid for this particular host.
  */
-StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
-                                                    const BSONObj& cmdObj,
-                                                    const std::string& dbName);
+StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx, const BSONObj& cmdObj);
 
 /**
- * Verifies that a WriteConcern is valid for this particular host and database.
+ * Verifies that a WriteConcern is valid for this particular host.
  */
-Status validateWriteConcern(OperationContext* opCtx,
-                            const WriteConcernOptions& writeConcern,
-                            StringData dbName);
+Status validateWriteConcern(OperationContext* opCtx, const WriteConcernOptions& writeConcern);
 
 struct WriteConcernResult {
     WriteConcernResult() {

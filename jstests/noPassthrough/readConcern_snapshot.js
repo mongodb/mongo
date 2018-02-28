@@ -72,7 +72,7 @@
         {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)}));
 
     // readConcern 'snapshot' is allowed with 'afterClusterTime'.
-    const pingRes = assert.commandWorked(rst.getPrimary().adminCommand({ping: 1}));
+    let pingRes = assert.commandWorked(rst.getPrimary().adminCommand({ping: 1}));
     assert(pingRes.hasOwnProperty("$clusterTime"), tojson(pingRes));
     assert(pingRes.$clusterTime.hasOwnProperty("clusterTime"), tojson(pingRes));
     assert.commandWorked(sessionDb.runCommand({
@@ -89,13 +89,21 @@
     }),
                                  ErrorCodes.InvalidOptions);
 
-    // readConcern 'snapshot' is not allowed on a replica set secondary.
+    // readConcern 'snapshot' is allowed on a replica set secondary.
     session = rst.getSecondary().getDB(dbName).getMongo().startSession({causalConsistency: false});
     sessionDb = session.getDatabase(dbName);
-    assert.commandFailedWithCode(
-        sessionDb.runCommand(
-            {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)}),
-        ErrorCodes.InvalidOptions);
+    assert.commandWorked(sessionDb.runCommand(
+        {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(txnNumber++)}));
+
+    pingRes = assert.commandWorked(rst.getSecondary().adminCommand({ping: 1}));
+    assert(pingRes.hasOwnProperty("$clusterTime"), tojson(pingRes));
+    assert(pingRes.$clusterTime.hasOwnProperty("clusterTime"), tojson(pingRes));
+
+    assert.commandWorked(sessionDb.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot", afterClusterTime: pingRes.$clusterTime.clusterTime},
+        txnNumber: NumberLong(txnNumber++)
+    }));
 
     rst.stopSet();
 

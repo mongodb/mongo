@@ -151,7 +151,7 @@ void execCommandClient(OperationContext* opCtx,
         appendRequiredFieldsToResponse(opCtx, &body);
     });
 
-    const auto dbname = request.getDatabase().toString();
+    const auto dbname = request.getDatabase();
     uassert(ErrorCodes::IllegalOperation,
             "Can't use 'local' database through mongos",
             dbname != NamespaceString::kLocalDb);
@@ -191,7 +191,7 @@ void execCommandClient(OperationContext* opCtx,
     }
 
     StatusWith<WriteConcernOptions> wcResult =
-        WriteConcernOptions::extractWCFromCommand(request.body, dbname);
+        WriteConcernOptions::extractWCFromCommand(request.body);
     if (!wcResult.isOK()) {
         auto body = result->getBodyBuilder();
         CommandHelpers::appendCommandStatus(body, wcResult.getStatus());

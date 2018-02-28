@@ -62,9 +62,7 @@ struct ServiceEntryPointCommon {
         virtual bool lockedForWriting() const = 0;
         virtual void waitForReadConcern(OperationContext* opCtx,
                                         const CommandInvocation* invocation,
-                                        const std::string& db,
-                                        const OpMsgRequest& request,
-                                        const BSONObj& cmdObj) const = 0;
+                                        const OpMsgRequest& request) const = 0;
         virtual void waitForWriteConcern(OperationContext* opCtx,
                                          const std::string& commandName,
                                          const repl::OpTime& lastOpBeforeRun,

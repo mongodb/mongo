@@ -151,7 +151,7 @@ Status WriteConcernOptions::parse(const BSONObj& obj) {
 }
 
 StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(
-    const BSONObj& cmdObj, const std::string& dbName, const WriteConcernOptions& defaultWC) {
+    const BSONObj& cmdObj, const WriteConcernOptions& defaultWC) {
     WriteConcernOptions writeConcern = defaultWC;
     writeConcern.usedDefault = true;
     if (writeConcern.wNumNodes == 0 && writeConcern.wMode.empty()) {

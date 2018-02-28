@@ -8,19 +8,27 @@
 
     const rst = new ReplSetTest({nodes: 2});
     rst.startSet();
-    rst.initiate();
+    let conf = rst.getReplSetConfig();
+    conf.members[1].votes = 0;
+    conf.members[1].priority = 0;
+    rst.initiate(conf);
 
     const primaryDB = rst.getPrimary().getDB(dbName);
     if (!primaryDB.serverStatus().storageEngine.supportsSnapshotReadConcern) {
         rst.stopSet();
         return;
     }
+    const secondaryDB = rst.getSecondary().getDB(dbName);
 
-    function runTest({useCausalConsistency}) {
+    function runTest({useCausalConsistency, readFromSecondary}) {
         primaryDB.coll.drop();
 
-        const session =
-            primaryDB.getMongo().startSession({causalConsistency: useCausalConsistency});
+        let readDB = primaryDB;
+        if (readFromSecondary) {
+            readDB = secondaryDB;
+        }
+
+        const session = readDB.getMongo().startSession({causalConsistency: useCausalConsistency});
         const sessionDb = session.getDatabase(dbName);
 
         const bulk = primaryDB.coll.initializeUnorderedBulkOp();
@@ -28,6 +36,10 @@
             bulk.insert({_id: x});
         }
         assert.commandWorked(bulk.execute({w: "majority"}));
+
+        if (readFromSecondary) {
+            rst.awaitLastOpCommitted();
+        }
 
         let txnNumber = 0;
 
@@ -41,8 +53,12 @@
         }));
 
         assert(res.hasOwnProperty("cursor"));
+        assert(res.cursor.hasOwnProperty("firstBatch"));
+        assert.eq(5, res.cursor.firstBatch.length);
+
         assert(res.cursor.hasOwnProperty("id"));
         const cursorId = res.cursor.id;
+        assert.neq(cursorId, 0);
 
         // Insert an 11th document which should not be visible to the snapshot cursor. This write is
         // performed outside of the session.
@@ -78,6 +94,10 @@
         assert(res.cursor.hasOwnProperty("nextBatch"));
         assert.eq(4, res.cursor.nextBatch.length);
 
+        if (readFromSecondary) {
+            rst.awaitLastOpCommitted();
+        }
+
         // Perform a second snapshot read under a new transaction.
         res = assert.commandWorked(sessionDb.runCommand({
             find: collName,
@@ -101,7 +121,7 @@
             {find: collName, sort: {_id: 1}, batchSize: 20, readConcern: {level: "snapshot"}}));
 
         // Reject snapshot reads without session.
-        assert.commandFailed(primaryDB.runCommand({
+        assert.commandFailed(readDB.runCommand({
             find: collName,
             sort: {_id: 1},
             batchSize: 20,
@@ -112,8 +132,10 @@
         session.endSession();
     }
 
-    runTest({useCausalConsistency: false});
-    runTest({useCausalConsistency: true});
+    runTest({useCausalConsistency: false, readFromSecondary: false});
+    runTest({useCausalConsistency: true, readFromSecondary: false});
+    runTest({useCausalConsistency: false, readFromSecondary: true});
+    runTest({useCausalConsistency: true, readFromSecondary: true});
 
     rst.stopSet();
 })();

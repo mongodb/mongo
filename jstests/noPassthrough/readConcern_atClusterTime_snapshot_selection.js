@@ -36,11 +36,9 @@
     // Create the collection and insert one document. Get the op time of the write.
     let res = assert.commandWorked(primaryDB.runCommand(
         {insert: collName, documents: [{_id: "before"}], writeConcern: {w: "majority"}}));
-    assert(res.hasOwnProperty("opTime"), tojson(res));
-    assert(res.opTime.hasOwnProperty("ts"), tojson(res));
-    let clusterTimeBefore = res.opTime.ts;
+    let clusterTimePrimaryBefore;
 
-    // Wait for the majority commit point to reach 'clusterTimeBefore' on the secondary.
+    // Wait for the majority commit point on 'secondaryDB0' to include the {_id: "before"} write.
     assert.soonNoExcept(function() {
         // Without a consistent stream of writes, secondary majority reads are not guaranteed
         // to complete, since the commit point being stale is not sufficient to establish a sync
@@ -50,7 +48,7 @@
             {insert: "otherColl", documents: [{a: 1}], writeConcern: {w: "majority"}}));
         assert(res.hasOwnProperty("opTime"), tojson(res));
         assert(res.opTime.hasOwnProperty("ts"), tojson(res));
-        clusterTimeBefore = res.opTime.ts;
+        clusterTimePrimaryBefore = res.opTime.ts;
 
         return assert
                    .commandWorked(secondaryDB0.runCommand(
@@ -72,7 +70,7 @@
     // A read on the primary at the old cluster time should not include the write.
     res = assert.commandWorked(primaryDB.runCommand({
         find: collName,
-        readConcern: {level: "snapshot", atClusterTime: clusterTimeBefore},
+        readConcern: {level: "snapshot", atClusterTime: clusterTimePrimaryBefore},
         txnNumber: NumberLong(primaryTxnNumber++)
     }));
     assert.eq(res.cursor.firstBatch.length, 1, printjson(res));
@@ -99,12 +97,14 @@
     }));
     assert.eq(res.cursor.firstBatch.length, 2, printjson(res));
 
-    // TODO SERVER-33355: Uncomment the following once secondary reads are supported for readConcern
-    // level snapshot.
-    /*
-    // A read on the lagged secondary at the old cluster time should not include the write.
-    res = assert.commandWorked(secondaryDB0.runCommand(
-        {find: collName, readConcern: {level: "snapshot", atClusterTime: clusterTimeBefore}}));
+    // A read on the lagged secondary at its view of the majority cluster time should not include
+    // the write.
+    const clusterTimeSecondaryBefore = rst.getReadConcernMajorityOpTimeOrThrow(secondaryConn0).ts;
+    res = assert.commandWorked(secondaryDB0.runCommand({
+        find: collName,
+        readConcern: {level: "snapshot", atClusterTime: clusterTimeSecondaryBefore},
+        txnNumber: NumberLong(secondaryTxnNumber++)
+    }));
     assert.eq(res.cursor.firstBatch.length, 1, printjson(res));
     assert.eq(res.cursor.firstBatch[0]._id, "before", printjson(res));
 
@@ -117,14 +117,10 @@
         txnNumber: NumberLong(secondaryTxnNumber++)
     }),
                                  ErrorCodes.ExceededTimeLimit);
-    */
 
     // Restart replication on the lagged secondary.
     restartServerReplication(secondaryConn0);
 
-    // TODO SERVER-33355: Uncomment the following once secondary reads are supported for readConcern
-    // level snapshot.
-    /*
     // A read on the secondary at the new cluster time now succeeds.
     res = assert.commandWorked(secondaryDB0.runCommand({
         find: collName,
@@ -132,7 +128,6 @@
         txnNumber: NumberLong(secondaryTxnNumber++)
     }));
     assert.eq(res.cursor.firstBatch.length, 2, printjson(res));
-    */
 
     // A read at a time that is too old fails.
     assert.commandFailedWithCode(primaryDB.runCommand({

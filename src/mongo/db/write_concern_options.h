@@ -69,9 +69,7 @@ public:
      * Verifies that the writeConcern is of type Object (BSON type).
      */
     static StatusWith<WriteConcernOptions> extractWCFromCommand(
-        const BSONObj& cmdObj,
-        const std::string& dbName,
-        const WriteConcernOptions& defaultWC = WriteConcernOptions());
+        const BSONObj& cmdObj, const WriteConcernOptions& defaultWC = WriteConcernOptions());
 
     /**
      * Return true if the server needs to wait for other secondary nodes to satisfy this
