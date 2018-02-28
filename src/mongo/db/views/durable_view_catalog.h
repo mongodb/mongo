@@ -65,6 +65,7 @@ public:
                         const BSONObj& view) = 0;
     virtual void remove(OperationContext* opCtx, const NamespaceString& name) = 0;
     virtual const std::string& getName() const = 0;
+    virtual ~DurableViewCatalog() = default;
 };
 
 /**
