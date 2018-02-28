@@ -1,0 +1,10 @@
+test_kind: sleep_test
+
+selector:
+  roots: []
+
+executor:
+  fixture:
+    class: YesFixture
+    num_instances: 1
+    message_length: 100

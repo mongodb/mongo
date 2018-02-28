@@ -547,6 +547,18 @@ class _JsonSchemaTestSelectorConfig(_SelectorConfig):
                                  include_files=include_files, exclude_files=exclude_files)
 
 
+class _SleepTestCaseSelectorConfig(_SelectorConfig):
+    """_SelectorConfig subclass for sleep_test tests."""
+    def __init__(self, roots):
+        _SelectorConfig.__init__(self, roots=roots)
+
+
+class _SleepTestCaseSelector(_Selector):
+    """_Selector subclass for sleep_test tests."""
+    def __init__(self, test_file_explorer):
+        _Selector.__init__(self, test_file_explorer, tests_are_files=False)
+
+
 ##########################################
 # Module entry point for filtering tests #
 ##########################################
@@ -561,6 +573,7 @@ _SELECTOR_REGISTRY = {
     "db_test": (_DbTestSelectorConfig, _DbTestSelector),
     "json_schema_test": (_JsonSchemaTestSelectorConfig, _Selector),
     "js_test": (_JSTestSelectorConfig, _JSTestSelector),
+    "sleep_test": (_SleepTestCaseSelectorConfig, _SleepTestCaseSelector),
 }
 
 
