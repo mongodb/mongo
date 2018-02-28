@@ -160,5 +160,4 @@ structs:
       projection: SessionsCollectionFetchRequestProjection
       batchSize: int
       singleBatch: bool
-      allowPartialResults: bool
       limit: int
