@@ -1,0 +1,34 @@
+From 9db968c3544432d17191a1b3c8873873dcd672fe Mon Sep 17 00:00:00 2001
+From: Robert Guo <robert.guo@10gen.com>
+Date: Wed, 28 Feb 2018 17:06:34 -0500
+Subject: [PATCH] SERVER-33560 Remove deprecated Fixture function declarations
+ from Google Benchmark
+
+---
+ .../benchmark-1.3.0/benchmark/include/benchmark/benchmark.h    | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/src/third_party/benchmark-1.3.0/benchmark/include/benchmark/benchmark.h b/src/third_party/benchmark-1.3.0/benchmark/include/benchmark/benchmark.h
+index 15ed02e538..2183c8a1d2 100644
+--- a/src/third_party/benchmark-1.3.0/benchmark/include/benchmark/benchmark.h
++++ b/src/third_party/benchmark-1.3.0/benchmark/include/benchmark/benchmark.h
+@@ -943,12 +943,10 @@ class Fixture : public internal::Benchmark {
+     this->TearDown(st);
+   }
+ 
+-  // These will be deprecated ...
+-  virtual void SetUp(const State&) {}
+-  virtual void TearDown(const State&) {}
+-  // ... In favor of these.
+-  virtual void SetUp(State& st) { SetUp(const_cast<const State&>(st)); }
+-  virtual void TearDown(State& st) { TearDown(const_cast<const State&>(st)); }
++  // MONGODB MODIFICATION: Remove the deprecated version of SetUp() and TearDown() that
++  // require `const State&` as an argument.
++  virtual void SetUp(State&) {}
++  virtual void TearDown(State&) {}
+ 
+  protected:
+   virtual void BenchmarkCase(State&) = 0;
+-- 
+2.14.3 (Apple Git-98)
+
