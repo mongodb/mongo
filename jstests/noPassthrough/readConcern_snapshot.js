@@ -19,9 +19,9 @@
     let sessionDb = session.getDatabase(dbName);
     if (!sessionDb.serverStatus().storageEngine.supportsSnapshotReadConcern) {
         assert.commandFailedWithCode(
-            rst.getPrimary().getDB(dbName).runCommand(
+            sessionDb.runCommand(
                 {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(0)}),
-            ErrorCodes.InvalidOptions);
+            ErrorCodes.IllegalOperation);
         rst.stopSet();
         return;
     }
