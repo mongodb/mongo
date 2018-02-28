@@ -25,22 +25,26 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         """
         Initializes the BenchmarkTestCase with the executable to run.
         """
-
         interface.ProcessTestCase.__init__(self, logger, "Benchmark test", program_executable)
-
         parser.validate_benchmark_options()
+
+        self.bm_executable = program_executable
+        self.suite_bm_options = program_options
+
+    def configure(self, fixture, *args, **kwargs):
+        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         # 1. Set the default benchmark options, including the out file path, which is based on the
         #    executable path. Keep the existing extension (if any) to simplify parsing.
         bm_options = {
-            "benchmark_out": program_executable + ".json",
+            "benchmark_out": self.report_name(),
             "benchmark_min_time": _config.DEFAULT_BENCHMARK_MIN_TIME.total_seconds(),
             "benchmark_repetitions": _config.DEFAULT_BENCHMARK_REPETITIONS
         }
 
         # 2. Override Benchmark options with options set through `program_options` in the suite
         #    configuration.
-        suite_bm_options = utils.default_if_none(program_options, {})
+        suite_bm_options = utils.default_if_none(self.suite_bm_options, {})
         bm_options.update(suite_bm_options)
 
         # 3. Override Benchmark options with options set through resmoke's command line.
@@ -59,10 +63,12 @@ class BenchmarkTestCase(interface.ProcessTestCase):
                     value = value.total_seconds()
                 bm_options[key] = value
 
-        self.program_options = bm_options
-        self.program_executable = program_executable
+        self.bm_options = bm_options
+
+    def report_name(self):
+        return self.bm_executable + ".json"
 
     def _make_process(self):
         return core.programs.generic_program(self.logger,
-                                             [self.program_executable],
-                                             **self.program_options)
+                                             [self.bm_executable],
+                                             **self.bm_options)

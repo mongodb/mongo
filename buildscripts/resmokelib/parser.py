@@ -128,7 +128,10 @@ def parse_command_line():
                       help="Disables preallocation of journal files for all mongod processes.")
 
     parser.add_option("--numClientsPerFixture", type="int", dest="num_clients_per_fixture",
-                      help="Number of clients running tests per fixture")
+                      help="Number of clients running tests per fixture.")
+
+    parser.add_option("--perfReportFile", dest="perf_report_file", metavar="PERF_REPORT",
+                      help="Writes a JSON file with performance test results.")
 
     parser.add_option("--preallocJournal", type="choice", action="store", dest="prealloc_journal",
                       choices=("on", "off"), metavar="ON|OFF",
@@ -375,6 +378,7 @@ def update_config_vars(values):
     _config.NO_JOURNAL = config.pop("no_journal")
     _config.NO_PREALLOC_JOURNAL = config.pop("prealloc_journal") == "off"
     _config.NUM_CLIENTS_PER_FIXTURE = config.pop("num_clients_per_fixture")
+    _config.PERF_REPORT_FILE = config.pop("perf_report_file")
     _config.RANDOM_SEED = config.pop("seed")
     _config.REPEAT = config.pop("repeat")
     _config.REPORT_FAILURE_STATUS = config.pop("report_failure_status")

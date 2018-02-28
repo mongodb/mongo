@@ -2,18 +2,17 @@
 
 """ Unit tests for archival. """
 
+from __future__ import absolute_import
+
 import logging
 import os
 import random
 import shutil
-import sys
 import tempfile
 import unittest
 
-
-if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.getcwd())
 from buildscripts.resmokelib.utils import archival
+
 
 _BUCKET = "mongodatafiles"
 

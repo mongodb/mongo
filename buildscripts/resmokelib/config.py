@@ -60,6 +60,7 @@ DEFAULTS = {
     "mongos_set_parameters": None,
     "no_journal": False,
     "num_clients_per_fixture": 1,
+    "perf_report_file": None,
     "prealloc_journal": None,  # Default is set on the commandline.
     "repeat": 1,
     "report_failure_status": "fail",
@@ -276,6 +277,9 @@ NO_PREALLOC_JOURNAL = None
 
 # If set, then each fixture runs tests with the specified number of clients.
 NUM_CLIENTS_PER_FIXTURE = None
+
+# Report file for the Evergreen performance plugin.
+PERF_REPORT_FILE = None
 
 # If set, then the RNG is seeded with the specified value. Otherwise uses a seed based on the time
 # this module was loaded.

@@ -1,4 +1,5 @@
 """Unit tests for the fetch_test_lifecycle.py script."""
+from __future__ import absolute_import
 
 import unittest
 
