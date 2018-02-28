@@ -430,10 +430,6 @@ Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const Names
         if (!status.isOK()) {
             return status;
         }
-        if (nss.isDropPendingNamespace() && !opCtx->writesAreReplicated()) {
-            Timestamp ts = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
-            fassertStatusOK(50661, opCtx->recoveryUnit()->setTimestamp(ts));
-        }
         wunit.commit();
         return Status::OK();
     });

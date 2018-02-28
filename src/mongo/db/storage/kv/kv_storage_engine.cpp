@@ -410,8 +410,9 @@ Status KVStorageEngine::dropDatabase(OperationContext* opCtx, StringData db) {
 
     // Now drop any leftover timestamped collections (i.e: not already dropped by the reaper).  On
     // secondaries there is already a `commit timestamp` set and these drops inherit the timestamp
-    // of the `dropDatabase` oplog entry. On primaries, we look at the logical clock and set the
-    // commit timestamp state.
+    // of the `dropDatabase` oplog entry. On primaries, these writes are allowed to be processed
+    // without a timestamp as these are, logically, behind the majority commit point. This method
+    // will enforce that all remaining collections were moved to a drop-pending namespace.
     //
     // Additionally, before returning, this method will remove the `KVDatabaseCatalogEntry` from
     // the `_dbs` map. This action creates a new constraint that this "timestamped drop" method
@@ -488,35 +489,15 @@ Status KVStorageEngine::_dropCollectionsWithTimestamp(OperationContext* opCtx,
                                                       std::list<std::string>& toDrop,
                                                       CollIter begin,
                                                       CollIter end) {
-    // On primaries, these collection drops are performed in a separate WUOW than the insertion of
-    // the `dropDatabase` oplog entry. In this case, we expect the `existingCommitTs` to be null
-    // and the code looks at the logical clock to assign a timestamp to the writes.
+    // This method does not enforce any timestamping rules for the writes that remove collections
+    // from the catalog.
     //
-    // Secondaries reach this from within a `TimestampBlock` where there should be a non-null
-    // `existingCommitTs`.
-    const Timestamp existingCommitTs = opCtx->recoveryUnit()->getCommitTimestamp();
-
-    // `LogicalClock`s on standalones and master/slave do not necessarily return real
-    // optimes. Assume it's safe to not timestamp the write.
-    const Timestamp chosenCommitTs = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
-    const bool setCommitTs = existingCommitTs.isNull() && !chosenCommitTs.isNull();
-    if (setCommitTs) {
-        opCtx->recoveryUnit()->setCommitTimestamp(chosenCommitTs);
-    }
-
-    // Ensure the method exits with the same "commit timestamp" state that it was called with.
-    auto removeCommitTimestamp = MakeGuard([&opCtx, setCommitTs] {
-        if (setCommitTs) {
-            opCtx->recoveryUnit()->clearCommitTimestamp();
-        }
-    });
-
     // This is called outside of a WUOW since MMAPv1 has unfortunate behavior around dropping
     // databases. We need to create one here since we want db dropping to all-or-nothing
     // wherever possible. Eventually we want to move this up so that it can include the logOp
     // inside of the WUOW, but that would require making DB dropping happen inside the Dur
     // system for MMAPv1.
-    WriteUnitOfWork timestampedDropWuow(opCtx);
+    WriteUnitOfWork wuow(opCtx);
 
     Status firstError = Status::OK();
     for (auto toDropStr = begin; toDropStr != toDrop.end(); ++toDropStr) {
@@ -539,7 +520,7 @@ Status KVStorageEngine::_dropCollectionsWithTimestamp(OperationContext* opCtx,
         _dbs.erase(dbce->name());
     }
 
-    timestampedDropWuow.commit();
+    wuow.commit();
     return firstError;
 }
 

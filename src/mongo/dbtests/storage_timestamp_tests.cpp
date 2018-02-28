@@ -1657,92 +1657,11 @@ public:
     }
 };
 
-class ReaperDropIsTimestamped : public StorageTimestampTest {
-public:
-    void run() {
-        // Only run on 'wiredTiger'. No other storage engines to-date support timestamp writes.
-        if (mongo::storageGlobalParams.engine != "wiredTiger") {
-            return;
-        }
-
-        auto storageInterface = repl::StorageInterface::get(_opCtx);
-        repl::DropPendingCollectionReaper::set(
-            _opCtx->getServiceContext(),
-            stdx::make_unique<repl::DropPendingCollectionReaper>(storageInterface));
-        auto reaper = repl::DropPendingCollectionReaper::get(_opCtx);
-
-        auto kvStorageEngine =
-            dynamic_cast<KVStorageEngine*>(_opCtx->getServiceContext()->getGlobalStorageEngine());
-        KVCatalog* kvCatalog = kvStorageEngine->getCatalog();
-
-        // Save the pre-state idents so we can capture the specific idents related to collection
-        // creation.
-        std::vector<std::string> origIdents = kvCatalog->getAllIdents(_opCtx);
-
-        NamespaceString nss("unittests.reaperDropIsTimestamped");
-        reset(nss);
-
-        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_X);
-
-        const LogicalTime insertTimestamp = _clock->reserveTicks(1);
-        {
-            WriteUnitOfWork wuow(_opCtx);
-            insertDocument(autoColl.getCollection(),
-                           InsertStatement(BSON("_id" << 0), insertTimestamp.asTimestamp(), 0LL));
-            wuow.commit();
-            ASSERT_EQ(1, itCount(autoColl.getCollection()));
-        }
-
-        // The KVCatalog only adheres to timestamp requests on `getAllIdents`. To know the right
-        // collection/index that gets removed on a drop, we must capture the randomized "ident"
-        // string for the target collection and index.
-        std::string collIdent;
-        std::string indexIdent;
-        std::tie(collIdent, indexIdent) = getNewCollectionIndexIdent(kvCatalog, origIdents);
-
-        // The first phase of a drop in a replica set is to perform a rename. This does not change
-        // the ident values.
-        {
-            WriteUnitOfWork wuow(_opCtx);
-            Database* db = autoColl.getDb();
-            ASSERT_OK(db->dropCollection(_opCtx, nss.ns()));
-            wuow.commit();
-        }
-
-        // Bump the clock two. The drop will get the second tick. The first tick will identify a
-        // snapshot of the data with the collection renamed.
-        const LogicalTime postRenameTimestamp = _clock->reserveTicks(2);
-
-        // Actually drop the collection, propagating to the KVCatalog. This drop will be
-        // timestamped at the logical clock value.
-        reaper->dropCollectionsOlderThan(
-            _opCtx, repl::OpTime(_clock->getClusterTime().asTimestamp(), presentTerm));
-        const LogicalTime postDropTime = _clock->reserveTicks(1);
-
-        // Querying the catalog at insert time shows the collection and index existing.
-        assertIdentsExistAtTimestamp(
-            kvCatalog, collIdent, indexIdent, insertTimestamp.asTimestamp());
-
-        // Querying the catalog at rename time continues to show the collection and index exist.
-        assertIdentsExistAtTimestamp(
-            kvCatalog, collIdent, indexIdent, postRenameTimestamp.asTimestamp());
-
-        // Querying the catalog after the drop shows the collection and index being deleted.
-        assertIdentsMissingAtTimestamp(
-            kvCatalog, collIdent, indexIdent, postDropTime.asTimestamp());
-    }
-};
-
 /**
- * The first step of `mongo::dropDatabase` is to rename all replicated collections, generating a
- * "drop collection" oplog entry. Then when those entries become majority commited, calls
- * `StorageEngine::dropDatabase`. At this point, two separate code paths can perform the final
- * removal of the collections from the storage engine: the reaper, or
- * `[KV]StorageEngine::dropDatabase` when it is called from `mongo::dropDatabase`. This race
- * exists on both primaries and secondaries. This test asserts `[KV]StorageEngine::dropDatabase`
- * correctly timestamps the final drop.
+ * This KVDropDatabase test only exists in this file for historical reasons, the final phase of
+ * timestamping `dropDatabase` side-effects no longer applies. The purpose of this test is to
+ * exercise the `KVStorageEngine::dropDatabase` method.
  */
-template <bool IsPrimary>
 class KVDropDatabase : public StorageTimestampTest {
 public:
     void run() {
@@ -1765,10 +1684,9 @@ public:
         invariant(!syncTime.isNull());
         kvStorageEngine->setInitialDataTimestamp(syncTime);
 
-        // This test is dropping collections individually before following up with a
-        // `dropDatabase` call. This is illegal in typical replication operation as `dropDatabase`
-        // may find collections that haven't been renamed to a "drop-pending"
-        // namespace. Workaround this by operating on a separate DB from the other tests.
+        // This test drops collections piece-wise instead of having the "drop database" algorithm
+        // perform this walk. Defensively operate on a separate DB from the other tests to ensure
+        // no leftover collections carry-over.
         const NamespaceString nss("unittestsDropDB.kvDropDatabase");
         const NamespaceString sysProfile("unittestsDropDB.system.profile");
 
@@ -1803,18 +1721,6 @@ public:
             std::tie(collIdent, indexIdent) = getNewCollectionIndexIdent(kvCatalog, origIdents);
         }
 
-        const Timestamp postCreateTime = _clock->reserveTicks(1).asTimestamp();
-
-        // Assert that `kvDropDatabase` came into creation between `syncTime` and `postCreateTime`.
-        assertIdentsMissingAtTimestamp(kvCatalog, collIdent, indexIdent, syncTime);
-        assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postCreateTime);
-
-        // `system.profile` is never timestamped. This means the creation appears to have taken
-        // place at the beginning of time.
-        assertIdentsExistAtTimestamp(kvCatalog, sysProfileIdent, sysProfileIndexIdent, syncTime);
-        assertIdentsExistAtTimestamp(
-            kvCatalog, sysProfileIdent, sysProfileIndexIdent, postCreateTime);
-
         AutoGetCollection coll(_opCtx, nss, LockMode::MODE_X);
         {
             // Drop/rename `kvDropDatabase`. `system.profile` does not get dropped/renamed.
@@ -1824,42 +1730,19 @@ public:
             wuow.commit();
         }
 
-        // Reserve two ticks. The first represents after the rename in which the `kvDropDatabase`
-        // idents still exist. The second will be used by the `dropDatabase`, as that only looks
-        // at the clock; it does not advance it.
-        const Timestamp postRenameTime = _clock->reserveTicks(2).asTimestamp();
+        // Reserve a tick, this represents a time after the rename in which the `kvDropDatabase`
+        // ident for `kvDropDatabase` still exists.
+        const Timestamp postRenameTime = _clock->reserveTicks(1).asTimestamp();
+
         // The namespace has changed, but the ident still exists as-is after the rename.
         assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postRenameTime);
 
-        // Primaries and secondaries call `dropDatabase` (and thus, `StorageEngine->dropDatabase`)
-        // in different contexts. Both contexts must end up with correct results.
-        if (IsPrimary) {
-            // Primaries call `StorageEngine->dropDatabase` outside of the WUOW that logs the
-            // `dropDatabase` oplog entry. It is not called in the context of a `TimestampBlock`.
+        ASSERT_OK(dropDatabase(_opCtx, nss.db().toString()));
 
-            ASSERT_OK(dropDatabase(_opCtx, nss.db().toString()));
-        } else {
-            // Secondaries processing a `dropDatabase` oplog entry wrap the call in an
-            // UnreplicatedWritesBlock and a TimestampBlock with the oplog entry's optime.
-
-            repl::UnreplicatedWritesBlock norep(_opCtx);
-            const Timestamp preDropTime = _clock->getClusterTime().asTimestamp();
-            TimestampBlock dropTime(_opCtx, preDropTime);
-            ASSERT_OK(dropDatabase(_opCtx, nss.db().toString()));
-        }
-
-        const Timestamp postDropTime = _clock->reserveTicks(1).asTimestamp();
-
-        // First, assert that `system.profile` never seems to have existed.
-        for (const auto& ts : {syncTime, postCreateTime, postDropTime}) {
-            assertIdentsMissingAtTimestamp(kvCatalog, sysProfileIdent, sysProfileIndexIdent, ts);
-        }
-
-        // Now assert that `kvDropDatabase` still existed at `postCreateTime`, but was deleted at
-        // `postDropTime`.
-        assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postCreateTime);
-        assertIdentsExistAtTimestamp(kvCatalog, collIdent, indexIdent, postRenameTime);
-        assertIdentsMissingAtTimestamp(kvCatalog, collIdent, indexIdent, postDropTime);
+        // Assert that the idents do not exist.
+        assertIdentsMissingAtTimestamp(
+            kvCatalog, sysProfileIdent, sysProfileIndexIdent, Timestamp::max());
+        assertIdentsMissingAtTimestamp(kvCatalog, collIdent, indexIdent, Timestamp::max());
     }
 };
 
@@ -1992,10 +1875,7 @@ public:
         add<SetMinValidToAtLeast>();
         add<SetMinValidAppliedThrough>();
         add<WriteCheckpointTimestamp>();
-        add<ReaperDropIsTimestamped>();
-        // KVDropDatabase<IsPrimary>
-        add<KVDropDatabase<false>>();
-        add<KVDropDatabase<true>>();
+        add<KVDropDatabase>();
         // Timestamp<SimulateBackground>
         add<TimestampIndexBuilds<false>>();
         add<TimestampIndexBuilds<true>>();
