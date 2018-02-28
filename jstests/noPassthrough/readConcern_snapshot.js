@@ -173,15 +173,31 @@
     }),
                                  ErrorCodes.InvalidOptions);
 
-    // readConcern 'snapshot' is not supported by insert.
-    // TODO SERVER-33354: Add snapshot support for insert.
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    // TODO SERVER-33592 Move all write related commands out of this test file when writes
+    // with snapshot read concern are only allowed in transactions.
+    // readConcern 'snapshot' is supported by insert.
+    assert.commandWorked(sessionDb.runCommand({
         insert: collName,
-        documents: [{}],
+        documents: [{_id: "single-insert"}],
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
+    }));
+    assert.eq({_id: "single-insert"}, sessionDb.coll.findOne({_id: "single-insert"}));
+
+    // Wait for the last write to be committed since they will update the same session entry.
+    // TODO SERVER-33592 remove the following write when writes with snapshot read concern
+    // are only allowed in transactions.
+    assert.commandWorked(
+        sessionDb.coll.insert({_id: "dummy-insert"}, {writeConcern: {w: "majority"}}));
+    // readConcern 'snapshot' is supported by batch insert.
+    assert.commandWorked(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "batch-insert-1"}, {_id: "batch-insert-2"}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber++)
+    }));
+    assert.eq({_id: "batch-insert-1"}, sessionDb.coll.findOne({_id: "batch-insert-1"}));
+    assert.eq({_id: "batch-insert-2"}, sessionDb.coll.findOne({_id: "batch-insert-2"}));
 
     // readConcern 'snapshot' is supported by update.
     assert.commandWorked(sessionDb.coll.insert({_id: 0}, {writeConcern: {w: "majority"}}));
@@ -193,7 +209,7 @@
     })));
     assert.eq({_id: 0, a: 1}, sessionDb.coll.findOne({_id: 0}));
 
-    // readConcern 'snapshot' is supported by multi-statement updates.
+    // readConcern 'snapshot' is supported by batch updates.
     assert.commandWorked(sessionDb.coll.insert({_id: 1}, {writeConcern: {w: "majority"}}));
     assert.commandWorked(sessionDb.runCommand({
         update: collName,

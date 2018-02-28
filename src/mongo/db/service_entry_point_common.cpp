@@ -126,8 +126,12 @@ const StringMap<int> sessionCheckoutWhitelist = {{"aggregate", 1},
 
 // The command names for which readConcern level snapshot is allowed. The getMore command is
 // implicitly allowed to operate on a cursor which was opened under readConcern level snapshot.
-const StringMap<int> readConcernSnapshotWhitelist = {
-    {"find", 1}, {"count", 1}, {"geoSearch", 1}, {"parallelCollectionScan", 1}, {"update", 1}};
+const StringMap<int> readConcernSnapshotWhitelist = {{"find", 1},
+                                                     {"count", 1},
+                                                     {"geoSearch", 1},
+                                                     {"insert", 1},
+                                                     {"parallelCollectionScan", 1},
+                                                     {"update", 1}};
 
 void generateLegacyQueryErrorResponse(const AssertionException* exception,
                                       const QueryMessage& queryMessage,
