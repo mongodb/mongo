@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/catalog/type_chunk_base_gen.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_id.h"
 
@@ -104,6 +105,22 @@ private:
     BSONObj _maxKey;
 };
 
+class ChunkHistory : public ChunkHistoryBase {
+public:
+    ChunkHistory() : ChunkHistoryBase() {}
+    ChunkHistory(mongo::Timestamp ts, mongo::ShardId shard) : ChunkHistoryBase() {
+        setValidAfter(std::move(ts));
+        setShard(std::move(shard));
+    }
+    ChunkHistory(const ChunkHistoryBase& b) : ChunkHistoryBase(b) {}
+
+    static StatusWith<std::vector<ChunkHistory>> fromBSON(const BSONArray& source);
+
+    bool operator==(const ChunkHistory& other) const {
+        return getValidAfter() == other.getValidAfter() && getShard() == other.getShard();
+    }
+};
+
 /**
  * This class represents the layouts and contents of documents contained in the config server's
  * config.chunks and shard server's config.chunks.uuid collections. All manipulation of documents
@@ -162,6 +179,7 @@ public:
     static const BSONField<bool> jumbo;
     static const BSONField<Date_t> lastmod;
     static const BSONField<OID> epoch;
+    static const BSONField<BSONObj> history;
 
     ChunkType();
     ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId);
@@ -236,6 +254,15 @@ public:
     }
     void setJumbo(bool jumbo);
 
+    void setHistory(std::vector<ChunkHistory>&& history) {
+        _history = std::move(history);
+    }
+    const std::vector<ChunkHistory>& getHistory() const {
+        return _history;
+    }
+
+    void addHistoryToBSON(BSONObjBuilder& builder) const;
+
     /**
      * Generates chunk id based on the namespace name and the lower bound of the chunk.
      */
@@ -267,6 +294,8 @@ private:
     boost::optional<ShardId> _shard;
     // (O)(C)     too big to move?
     boost::optional<bool> _jumbo;
+    // history of the chunk
+    std::vector<ChunkHistory> _history;
 };
 
 }  // namespace mongo

@@ -65,13 +65,16 @@ TEST(CommitChunkMigrationRequest, WithControlChunk) {
     controlChunk.setMax(kKey3);
     boost::optional<ChunkType> controlChunkOpt = controlChunk;
 
+    Timestamp validAfter{1};
+
     CommitChunkMigrationRequest::appendAsCommand(&builder,
                                                  kNamespaceString,
                                                  kShardId0,
                                                  kShardId1,
                                                  migratedChunk,
                                                  controlChunkOpt,
-                                                 fromShardCollectionVersion);
+                                                 fromShardCollectionVersion,
+                                                 validAfter);
 
     BSONObj cmdObj = builder.obj();
 
@@ -98,13 +101,16 @@ TEST(CommitChunkMigrationRequest, WithoutControlChunk) {
 
     ChunkVersion fromShardCollectionVersion(1, 2, OID::gen());
 
+    Timestamp validAfter{1};
+
     CommitChunkMigrationRequest::appendAsCommand(&builder,
                                                  kNamespaceString,
                                                  kShardId0,
                                                  kShardId1,
                                                  migratedChunk,
                                                  boost::none,
-                                                 fromShardCollectionVersion);
+                                                 fromShardCollectionVersion,
+                                                 validAfter);
 
     BSONObj cmdObj = builder.obj();
 

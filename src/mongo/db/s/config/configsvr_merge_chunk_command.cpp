@@ -114,7 +114,8 @@ public:
                                                                  parsedRequest.getNamespace(),
                                                                  parsedRequest.getEpoch(),
                                                                  parsedRequest.getChunkBoundaries(),
-                                                                 parsedRequest.getShardName());
+                                                                 parsedRequest.getShardName(),
+                                                                 parsedRequest.getValidAfter());
 
         if (!mergeChunkResult.isOK()) {
             return CommandHelpers::appendCommandStatus(result, mergeChunkResult);

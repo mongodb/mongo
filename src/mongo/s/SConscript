@@ -130,6 +130,7 @@ env.Library(
         'request_types/update_zone_key_range_request_type.cpp',
         'shard_id.cpp',
         'versioning.cpp',
+        env.Idlc('catalog/type_chunk_base.idl')[0],
         env.Idlc('request_types/create_collection.idl')[0],
         env.Idlc('request_types/create_database.idl')[0],
         env.Idlc('request_types/flush_routing_table_cache_updates.idl')[0],

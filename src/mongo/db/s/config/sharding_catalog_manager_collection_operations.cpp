@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -274,6 +275,8 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
     log() << "going to create " << splitPoints.size() + 1 << " chunk(s) for: " << nss
           << " using new epoch " << version.epoch();
 
+    const auto validAfter = LogicalClock::get(opCtx)->getClusterTime().asTimestamp();
+
     for (unsigned i = 0; i <= splitPoints.size(); i++) {
         const BSONObj min = (i == 0) ? keyPattern.globalMin() : splitPoints[i - 1];
         const BSONObj max = (i < splitPoints.size()) ? splitPoints[i] : keyPattern.globalMax();
@@ -290,6 +293,10 @@ ChunkVersion ShardingCatalogManager::_createFirstChunks(OperationContext* opCtx,
         chunk.setMax(max);
         chunk.setShard(shardIds[i % shardIds.size()]);
         chunk.setVersion(version);
+        // TODO SERVER-33781 write history only when FCV4.0 config.
+        std::vector<ChunkHistory> initialHistory;
+        initialHistory.emplace_back(ChunkHistory(validAfter, shardIds[i % shardIds.size()]));
+        chunk.setHistory(std::move(initialHistory));
 
         uassertStatusOK(Grid::get(opCtx)->catalogClient()->insertConfigDocument(
             opCtx,

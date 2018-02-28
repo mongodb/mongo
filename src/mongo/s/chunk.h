@@ -98,6 +98,8 @@ private:
 
     const ChunkVersion _lastmod;
 
+    const std::vector<ChunkHistory> _history;
+
     // Indicates whether this chunk should be treated as jumbo and not attempted to be moved or
     // split
     mutable bool _jumbo;
