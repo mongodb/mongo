@@ -36,7 +36,10 @@ env.Library(
 
 serveronlyLibDepsDependents = []
 if mobile_se:
-    serveronlyLibDepsDependents = ['$BUILD_DIR/mongo/mongodmain']
+    serveronlyLibDepsDependents = [
+        '$BUILD_DIR/mongo/mongodmain',
+        '$BUILD_DIR/mongo/dbtests/testframework',
+        ]
 
 env.Library(
     target='storage_mobile',
