@@ -1008,12 +1008,10 @@ class Fixture : public internal::Benchmark {
     this->TearDown(st);
   }
 
-  // These will be deprecated ...
-  virtual void SetUp(const State&) {}
-  virtual void TearDown(const State&) {}
-  // ... In favor of these.
-  virtual void SetUp(State& st) { SetUp(const_cast<const State&>(st)); }
-  virtual void TearDown(State& st) { TearDown(const_cast<const State&>(st)); }
+  // MONGODB MODIFICATION: Remove the deprecated version of SetUp() and TearDown() that
+  // require `const State&` as an argument.
+  virtual void SetUp(State&) {}
+  virtual void TearDown(State&) {}
 
  protected:
   virtual void BenchmarkCase(State&) = 0;
