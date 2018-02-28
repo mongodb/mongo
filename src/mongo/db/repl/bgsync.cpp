@@ -78,6 +78,11 @@ const auto defaultBatchSize = (16 * 1024 * 1024) / 12 * 10;
 // The batchSize to use for the find/getMore queries called by the OplogFetcher
 MONGO_EXPORT_STARTUP_SERVER_PARAMETER(bgSyncOplogFetcherBatchSize, int, defaultBatchSize);
 
+// If 'forceRollbackViaRefetch' is true, always perform rollbacks via the refetch algorithm, even if
+// the storage engine supports rollback via recover to timestamp.
+constexpr bool forceRollbackViaRefetchByDefault = false;
+MONGO_EXPORT_SERVER_PARAMETER(forceRollbackViaRefetch, bool, forceRollbackViaRefetchByDefault);
+
 /**
  * Extends DataReplicatorExternalStateImpl to be member state aware.
  */
@@ -646,7 +651,7 @@ void BackgroundSync::_runRollback(OperationContext* opCtx,
     };
 
     auto storageEngine = opCtx->getServiceContext()->getGlobalStorageEngine();
-    if (storageEngine->supportsRecoverToStableTimestamp()) {
+    if (!forceRollbackViaRefetch.load() && storageEngine->supportsRecoverToStableTimestamp()) {
         _runRollbackViaRecoverToCheckpoint(
             opCtx, source, &localOplog, storageInterface, getConnection);
     } else {

@@ -38,9 +38,10 @@
 #include "mongo/util/uuid.h"
 
 /**
- * This rollback algorithm requires featureCompatibilityVersion 3.6.
+ * This rollback algorithm is used when the storage engine does not support recovering to a stable
+ * timestamp, or if the forceRollbackViaRefetch parameter is set to true.
  *
- * Rollback Overview:
+ * Rollback via Refetch Overview:
  *
  * Rollback occurs when a node's oplog diverges from its sync source's oplog and needs to regain
  * consistency with the sync source's oplog.
@@ -74,7 +75,7 @@
  *     R : a b c d e f g                -> a b c d q r s t u v w x z
  *     S : a b c d q r s t u v w x z
  *
- * Rollback Algorithm:
+ * Rollback via Refetch Algorithm:
  *
  * We will continue to use the notation of R as the node whose oplog is inconsistent with
  * its sync source and S as the sync source of R. We will also represent the common point

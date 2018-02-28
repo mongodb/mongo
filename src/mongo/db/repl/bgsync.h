@@ -190,7 +190,7 @@ private:
      * Executes a rollback via refetch in rs_rollback.cpp.
      *
      * We fall back on the rollback via refetch algorithm when the storage engine does not support
-     * "rollback to a checkpoint."
+     * "rollback to a checkpoint," or when the forceRollbackViaRefetch parameter is set to true.
      *
      * Must be called from _runRollback() which ensures that all the conditions for entering
      * rollback have been met.
