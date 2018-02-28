@@ -220,14 +220,15 @@ Status validateWireVersion(const WireVersionInfo client, const WireVersionInfo s
                           str::stream()
                               << errmsg
                               << "You (client) are attempting to connect to a node (server) that "
-                                 "no longer accepts connections with your(client’s) binary "
-                                 "version.Please upgrade the client’s binary version.");
+                                 "no longer accepts connections with your (client’s) binary "
+                                 "version. Please upgrade the client’s binary version.");
         }
         return Status(ErrorCodes::IncompatibleServerVersion,
-                      str::stream() << errmsg << "You (client) are attempting to connect to a node "
-                                                 "(server) with a binary version with which "
-                                                 "you(client) no longer accept connections.Please "
-                                                 "upgrade the server’s binary version.");
+                      str::stream() << errmsg
+                                    << "You (client) are attempting to connect to a node "
+                                       "(server) with a binary version with which "
+                                       "you (client) no longer accept connections. Please "
+                                       "upgrade the server’s binary version.");
     }
 
     return Status::OK();
