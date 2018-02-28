@@ -304,7 +304,6 @@ StatusWith<LogicalSessionIdSet> SessionsCollection::doFetch(const NamespaceStrin
         request.getProjection().set_id(1);
         request.setBatchSize(batch.size());
         request.setLimit(batch.size());
-        request.setAllowPartialResults(true);
         request.setSingleBatch(true);
 
         return wrappedSend(request.toBSON());
