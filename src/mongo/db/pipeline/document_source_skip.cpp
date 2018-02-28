@@ -84,7 +84,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
     invariant(*itr == this);
 
     auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
-
+    //THE ERROR IS HERE
     if (nextSkip) {
         _nToSkip += nextSkip->getSkip();
         container->erase(std::next(itr));
