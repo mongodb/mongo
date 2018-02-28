@@ -7,6 +7,9 @@
  * cursor manager. Threads perform find, getMore and explain commands while the database,
  * collection, or an index is dropped.
  */
+
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
+
 var $config = (function() {
 
     let data = {
@@ -118,6 +121,13 @@ var $config = (function() {
          * 'this.involvedCollections' by repopulating them with data and indexes.
          */
         dropDatabase: function dropDatabase(db, collName) {
+            if (isMongos(db)) {
+                // SERVER-17397: Drops in a sharded cluster may not fully succeed. It is not safe
+                // to drop and then recreate a collection with the same name, so we skip dropping
+                // and recreating the database.
+                return;
+            }
+
             let myDB = db.getSiblingDB(this.uniqueDBName);
             myDB.dropDatabase();
 
@@ -132,6 +142,12 @@ var $config = (function() {
          * collection is then re-created with data and indexes.
          */
         dropCollection: function dropCollection(db, collName) {
+            if (isMongos(db)) {
+                // SERVER-17397: Drops in a sharded cluster may not fully succeed. It is not safe
+                // to drop and then recreate a collection with the same name, so we skip it.
+                return;
+            }
+
             let myDB = db.getSiblingDB(this.uniqueDBName);
             let targetColl = this.chooseRandomlyFrom(this.involvedCollections);
 
