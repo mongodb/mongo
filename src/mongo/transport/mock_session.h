@@ -83,8 +83,8 @@ public:
         return Message();  // Subclasses can do something different.
     }
 
-    void asyncSourceMessage(std::function<void(StatusWith<Message>)> cb) override {
-        cb(sourceMessage());
+    Future<Message> asyncSourceMessage() override {
+        return Future<Message>::makeReady(sourceMessage());
     }
 
     Status sinkMessage(Message message) override {
@@ -99,8 +99,8 @@ public:
         return Status::OK();
     }
 
-    void asyncSinkMessage(Message message, std::function<void(Status)> cb) override {
-        cb(sinkMessage(message));
+    Future<void> asyncSinkMessage(Message message) override {
+        return Future<void>::makeReady(sinkMessage(message));
     }
 
     void setTimeout(boost::optional<Milliseconds>) override {}

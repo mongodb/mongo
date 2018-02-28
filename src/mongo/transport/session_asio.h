@@ -114,9 +114,9 @@ public:
         return sourceMessageImpl().getNoThrow();
     }
 
-    void asyncSourceMessage(std::function<void(StatusWith<Message>)> cb) override {
+    Future<Message> asyncSourceMessage() override {
         ensureAsync();
-        return sourceMessageImpl().getAsync(cb);
+        return sourceMessageImpl();
     }
 
     Status sinkMessage(Message message) override {
@@ -130,14 +130,13 @@ public:
             .getNoThrow();
     }
 
-    void asyncSinkMessage(Message message, std::function<void(Status)> cb) override {
+    Future<void> asyncSinkMessage(Message message) override {
         ensureAsync();
         return write(asio::buffer(message.buf(), message.size()))
             .then([message /*keep the buffer alive*/](size_t size) {
                 invariant(size == size_t(message.size()));
                 networkCounter.hitPhysicalOut(message.size());
-            })
-            .getAsync(cb);
+            });
     }
 
     void setTimeout(boost::optional<Milliseconds> timeout) override {

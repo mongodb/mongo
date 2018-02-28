@@ -241,26 +241,23 @@ void ServiceStateMachine::_sourceMessage(ThreadGuard guard) {
     _state.store(State::SourceWait);
     guard.release();
 
-    if (_transportMode == transport::Mode::kSynchronous) {
-        auto msg = [&] {
+    auto sourceMsgImpl = [&] {
+        if (_transportMode == transport::Mode::kSynchronous) {
             MONGO_IDLE_THREAD_BLOCK;
-            return _session()->sourceMessage();
-        }();
+            return Future<Message>::makeReady(_session()->sourceMessage());
+        } else {
+            invariant(_transportMode == transport::Mode::kAsynchronous);
+            return _session()->asyncSourceMessage();
+        }
+    };
 
+    sourceMsgImpl().getAsync([this](StatusWith<Message> msg) {
         if (msg.isOK()) {
             _inMessage = std::move(msg.getValue());
             invariant(!_inMessage.empty());
         }
         _sourceCallback(msg.getStatus());
-    } else if (_transportMode == transport::Mode::kAsynchronous) {
-        _session()->asyncSourceMessage([this](StatusWith<Message> msg) {
-            if (msg.isOK()) {
-                _inMessage = std::move(msg.getValue());
-                invariant(!_inMessage.empty());
-            }
-            _sourceCallback(msg.getStatus());
-        });
-    }
+    });
 }
 
 void ServiceStateMachine::_sinkMessage(ThreadGuard guard, Message toSink) {
@@ -269,12 +266,19 @@ void ServiceStateMachine::_sinkMessage(ThreadGuard guard, Message toSink) {
     _state.store(State::SinkWait);
     guard.release();
 
-    if (_transportMode == transport::Mode::kSynchronous) {
-        _sinkCallback(_session()->sinkMessage(std::move(toSink)));
-    } else if (_transportMode == transport::Mode::kAsynchronous) {
-        _session()->asyncSinkMessage(std::move(toSink),
-                                     [this](Status status) { _sinkCallback(std::move(status)); });
-    }
+    auto sinkMsgImpl = [&] {
+        if (_transportMode == transport::Mode::kSynchronous) {
+            // We don't consider ourselves idle while sending the reply since we are still doing
+            // work on behalf of the client. Contrast that with sourceMessage() where we are waiting
+            // for the client to send us more work to do.
+            return Future<void>::makeReady(_session()->sinkMessage(std::move(toSink)));
+        } else {
+            invariant(_transportMode == transport::Mode::kAsynchronous);
+            return _session()->asyncSinkMessage(std::move(toSink));
+        }
+    };
+
+    sinkMsgImpl().getAsync([this](Status status) { _sinkCallback(std::move(status)); });
 }
 
 void ServiceStateMachine::_sourceCallback(Status status) {
