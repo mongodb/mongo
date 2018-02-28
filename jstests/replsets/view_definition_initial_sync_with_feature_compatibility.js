@@ -121,6 +121,14 @@ load("jstests/replsets/rslib.js");
     testView([{$project: {conversionWithOnNull: {$convert: {input: "$a", to: "int", onNull: 0}}}}]);
     testView(
         [{$project: {conversionWithOnError: {$convert: {input: "$a", to: "int", onError: 0}}}}]);
+    testView([{$project: {toInt: {$toInt: "$a"}}}]);
+    testView([{$project: {toLong: {$toLong: "$a"}}}]);
+    testView([{$project: {toDouble: {$toDouble: "$a"}}}]);
+    testView([{$project: {toDecimal: {$toDecimal: "$a"}}}]);
+    testView([{$project: {toDate: {$toDate: "$a"}}}]);
+    testView([{$project: {toObjectId: {$toObjectId: "$a"}}}]);
+    testView([{$project: {toBool: {$toBool: "$a"}}}]);
+    testView([{$project: {toString: {$toString: "$a"}}}]);
 
     // Test using one of the prohibited expressions inside of an $expr within a MatchExpression
     // embedded in the pipeline.

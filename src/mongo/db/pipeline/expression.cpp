@@ -5230,6 +5230,22 @@ private:
     }
 };
 
+Expression::Parser makeConversionAlias(const StringData shortcutName, BSONType toType) {
+    return [=](const intrusive_ptr<ExpressionContext>& expCtx,
+               BSONElement elem,
+               const VariablesParseState& vps) -> intrusive_ptr<Expression> {
+
+        // Use parseArguments to allow for a singleton array, or the unwrapped version.
+        auto operands = ExpressionNary::parseArguments(expCtx, elem, vps);
+
+        uassert(50723,
+                str::stream() << shortcutName << " requires a single argument, got "
+                              << operands.size(),
+                operands.size() == 1);
+        return ExpressionConvert::create(expCtx, operands[0], toType);
+    };
+}
+
 }  // namespace
 
 const double ExpressionConvert::kLongLongMaxPlusOneAsDouble =
@@ -5239,6 +5255,55 @@ REGISTER_EXPRESSION_WITH_MIN_VERSION(
     convert,
     ExpressionConvert::parse,
     ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+
+// Also register shortcut expressions like $toInt, $toString, etc. which can be used as a shortcut
+// for $convert without an 'onNull' or 'onError'.
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    toString,
+    makeConversionAlias("$toString"_sd, BSONType::String),
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    toObjectId,
+    makeConversionAlias("$toObjectId"_sd, BSONType::jstOID),
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    toDate,
+    makeConversionAlias("$toDate"_sd, BSONType::Date),
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    toDouble,
+    makeConversionAlias("$toDouble"_sd, BSONType::NumberDouble),
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    toInt,
+    makeConversionAlias("$toInt"_sd, BSONType::NumberInt),
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    toLong,
+    makeConversionAlias("$toLong"_sd, BSONType::NumberLong),
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    toDecimal,
+    makeConversionAlias("$toDecimal"_sd, BSONType::NumberDecimal),
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(
+    toBool,
+    makeConversionAlias("$toBool"_sd, BSONType::Bool),
+    ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40);
+
+boost::intrusive_ptr<Expression> ExpressionConvert::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::intrusive_ptr<Expression>& input,
+    BSONType toType) {
+    return new ExpressionConvert(expCtx, input, toType);
+}
+
+ExpressionConvert::ExpressionConvert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     const boost::intrusive_ptr<Expression>& input,
+                                     BSONType toType)
+    : Expression(expCtx),
+      _input(input),
+      _to(ExpressionConstant::create(expCtx, Value(StringData(typeName(toType))))) {}
 
 intrusive_ptr<Expression> ExpressionConvert::parse(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

@@ -107,7 +107,22 @@
         {
           validator: {$expr: {$eq: [{$convert: {input: "$a", to: "int", onError: 0}}, 2018]}},
           nonMatchingDocument: {a: "hello"}
-        }
+        },
+        {validator: {$expr: {$eq: [{$toInt: "$a"}, 2018]}}, nonMatchingDocument: {a: "0"}},
+        {validator: {$expr: {$eq: [{$toLong: "$a"}, 2018]}}, nonMatchingDocument: {a: 0}},
+        {validator: {$expr: {$eq: [{$toDouble: "$a"}, 2018]}}, nonMatchingDocument: {a: 0}},
+        {validator: {$expr: {$eq: [{$toDecimal: "$a"}, 2018]}}, nonMatchingDocument: {a: 0}},
+        {
+          validator: {$expr: {$eq: [{$toDate: "$a"}, new ISODate("2018-02-27")]}},
+          nonMatchingDocument: {a: 0}
+        },
+        {
+          validator:
+              {$expr: {$eq: [{$toObjectId: "$a"}, new ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")]}},
+          nonMatchingDocument: {a: "bbbbbbbbbbbbbbbbbbbbbbbb"}
+        },
+        {validator: {$expr: {$eq: [{$toBool: "$a"}, false]}}, nonMatchingDocument: {a: 1}},
+        {validator: {$expr: {$eq: [{$toString: "$a"}, "false"]}}, nonMatchingDocument: {a: 1}},
     ];
 
     let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: "latest"});

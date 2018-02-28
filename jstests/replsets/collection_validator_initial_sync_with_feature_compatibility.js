@@ -144,4 +144,13 @@ load("jstests/replsets/rslib.js");
                   {a: null});
     testValidator({$expr: {$eq: [{$convert: {input: "$a", to: "int", onError: 0}}, 2018]}},
                   {a: "hello"});
+    testValidator({$expr: {$eq: [{$toInt: "$a"}, 2018]}}, {a: "0"});
+    testValidator({$expr: {$eq: [{$toLong: "$a"}, 2018]}}, {a: 0});
+    testValidator({$expr: {$eq: [{$toDouble: "$a"}, 2018]}}, {a: 0});
+    testValidator({$expr: {$eq: [{$toDecimal: "$a"}, 2018]}}, {a: 0});
+    testValidator({$expr: {$eq: [{$toDate: "$a"}, new ISODate("2018-02-27")]}}, {a: 0});
+    testValidator({$expr: {$eq: [{$toObjectId: "$a"}, new ObjectId("aaaaaaaaaaaaaaaaaaaaaaaa")]}},
+                  {a: "bbbbbbbbbbbbbbbbbbbbbbbb"});
+    testValidator({$expr: {$eq: [{$toBool: "$a"}, false]}}, {a: 1});
+    testValidator({$expr: {$eq: [{$toString: "$a"}, "false"]}}, {a: 1});
 }());

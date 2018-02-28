@@ -36,6 +36,13 @@
 
 namespace mongo {
 
+#define ASSERT_VALUE_CONTENTS_AND_TYPE(v, contents, type)  \
+    do {                                                   \
+        Value evaluatedResult = v;                         \
+        ASSERT_VALUE_EQ(evaluatedResult, Value(contents)); \
+        ASSERT_EQ(evaluatedResult.getType(), type);        \
+    } while (false);
+
 namespace ExpressionConvertTest {
 
 static const long long kIntMax = std::numeric_limits<int>::max();
@@ -385,13 +392,6 @@ TEST_F(ExpressionConvertTest, NullishToReturnsNull) {
     ASSERT_VALUE_EQ(convertExp->evaluate(undefinedInput), Value(BSONNULL));
     ASSERT_VALUE_EQ(convertExp->evaluate(missingInput), Value(BSONNULL));
 }
-
-#define ASSERT_VALUE_CONTENTS_AND_TYPE(v, contents, type)  \
-    do {                                                   \
-        Value evaluatedResult = v;                         \
-        ASSERT_VALUE_EQ(evaluatedResult, Value(contents)); \
-        ASSERT_EQ(evaluatedResult.getType(), type);        \
-    } while (false);
 
 TEST_F(ExpressionConvertTest, NullInputOverridesNullTo) {
     auto expCtx = getExpCtx();
@@ -2811,4 +2811,170 @@ TEST_F(ExpressionConvertTest, FormatDecimal) {
 
 }  // namespace ExpressionConvertTest
 
+namespace ExpressionConvertShortcutsTest {
+
+using ExpressionConvertShortcutsTest = AggregationContextFixture;
+
+TEST_F(ExpressionConvertShortcutsTest, RejectsMoreThanOneInput) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toInt" << BSON_ARRAY(1 << 3));
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+                       AssertionException,
+                       50723);
+    spec = BSON("$toLong" << BSON_ARRAY(1 << 3));
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+                       AssertionException,
+                       50723);
+    spec = BSON("$toDouble" << BSON_ARRAY(1 << 3));
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+                       AssertionException,
+                       50723);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, RejectsZeroInputs) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toInt" << BSONArray());
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+                       AssertionException,
+                       50723);
+    spec = BSON("$toLong" << BSONArray());
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+                       AssertionException,
+                       50723);
+    spec = BSON("$toDouble" << BSONArray());
+    ASSERT_THROWS_CODE(Expression::parseExpression(expCtx, spec, expCtx->variablesParseState),
+                       AssertionException,
+                       50723);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, AcceptsSingleArgumentInArrayOrByItself) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toInt"
+                        << "1");
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+
+    spec = BSON("$toInt" << BSON_ARRAY("1"));
+    convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+
+    spec = BSON("$toInt" << BSON_ARRAY(BSON_ARRAY("1")));
+    convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_THROWS_CODE(convert->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsToInts) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toInt"
+                        << "1");
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convert->evaluate({}), Value(1), BSONType::NumberInt);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsToLongs) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toLong"
+                        << "1");
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convert->evaluate({}), Value(1), BSONType::NumberLong);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsToDoubles) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toDouble"
+                        << "1");
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convert->evaluate({}), Value(1), BSONType::NumberDouble);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsToDecimals) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toDecimal"
+                        << "1");
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convert->evaluate({}), Value(1), BSONType::NumberDecimal);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsToDates) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toDate" << 0LL);
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convert->evaluate({}), Value(Date_t::fromMillisSinceEpoch(0)), BSONType::Date);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsToObjectIds) {
+    auto expCtx = getExpCtx();
+
+    const auto hexString = "deadbeefdeadbeefdeadbeef"_sd;
+    BSONObj spec = BSON("$toObjectId" << hexString);
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_VALUE_CONTENTS_AND_TYPE(
+        convert->evaluate({}), Value(OID::createFromString(hexString)), BSONType::jstOID);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsToString) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toString" << 1);
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convert->evaluate({}), Value("1"_sd), BSONType::String);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ConvertsToBool) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toBool" << 1);
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convert->evaluate({}), Value(true), BSONType::Bool);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ReturnsNullOnNullishInput) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toBool" << BSONNULL);
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convert->evaluate({}), Value(BSONNULL), BSONType::jstNULL);
+
+    spec = BSON("$toInt"
+                << "$missing");
+    convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_VALUE_CONTENTS_AND_TYPE(convert->evaluate({}), Value(BSONNULL), BSONType::jstNULL);
+}
+
+TEST_F(ExpressionConvertShortcutsTest, ThrowsOnConversionFailure) {
+    auto expCtx = getExpCtx();
+
+    BSONObj spec = BSON("$toInt"
+                        << "not an int");
+    auto convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_THROWS_CODE(convert->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
+
+    spec = BSON("$toObjectId"
+                << "not all hex values");
+    convert = Expression::parseExpression(expCtx, spec, expCtx->variablesParseState);
+    ASSERT_TRUE(dynamic_cast<ExpressionConvert*>(convert.get()));
+    ASSERT_THROWS_CODE(convert->evaluate({}), AssertionException, ErrorCodes::ConversionFailure);
+}
+
+}  // namespace ExpressionConvertShortcutsTest
 }  // namespace mongo

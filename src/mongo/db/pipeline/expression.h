@@ -1978,6 +1978,14 @@ public:
      */
     static const double kLongLongMaxPlusOneAsDouble;
 
+    /**
+     * Creates a $convert expression converting from 'input' to the type given by 'toType'. Leaves
+     * 'onNull' and 'onError' unspecified.
+     */
+    static boost::intrusive_ptr<Expression> create(const boost::intrusive_ptr<ExpressionContext>&,
+                                                   const boost::intrusive_ptr<Expression>& input,
+                                                   BSONType toType);
+
     static boost::intrusive_ptr<Expression> parse(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         BSONElement expr,
@@ -1993,6 +2001,10 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
+    ExpressionConvert(const boost::intrusive_ptr<ExpressionContext>&,
+                      const boost::intrusive_ptr<Expression>& input,
+                      BSONType toType);
+
     BSONType computeTargetType(Value typeName) const;
     Value performConversion(BSONType targetType, Value inputValue) const;
 
