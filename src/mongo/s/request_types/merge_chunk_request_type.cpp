@@ -40,17 +40,19 @@ const char kConfigsvrMergeChunk[] = "_configsvrCommitChunkMerge";
 const char kCollEpoch[] = "collEpoch";
 const char kChunkBoundaries[] = "chunkBoundaries";
 const char kShardName[] = "shard";
-
+const char kValidAfter[] = "validAfter";
 }  // namespace
 
 MergeChunkRequest::MergeChunkRequest(NamespaceString nss,
                                      std::string shardName,
                                      OID epoch,
-                                     std::vector<BSONObj> chunkBoundaries)
+                                     std::vector<BSONObj> chunkBoundaries,
+                                     boost::optional<Timestamp> validAfter)
     : _nss(std::move(nss)),
       _epoch(std::move(epoch)),
       _chunkBoundaries(std::move(chunkBoundaries)),
-      _shardName(std::move(shardName)) {}
+      _shardName(std::move(shardName)),
+      _validAfter(validAfter) {}
 
 StatusWith<MergeChunkRequest> MergeChunkRequest::parseFromConfigCommand(const BSONObj& cmdObj) {
     std::string ns;
@@ -103,8 +105,24 @@ StatusWith<MergeChunkRequest> MergeChunkRequest::parseFromConfigCommand(const BS
         }
     }
 
-    return MergeChunkRequest(
-        std::move(nss), std::move(shardName), std::move(epoch), std::move(chunkBoundaries));
+    boost::optional<Timestamp> validAfter = boost::none;
+    {
+        Timestamp ts{0};
+        auto status = bsonExtractTimestampField(cmdObj, kValidAfter, &ts);
+        if (!status.isOK() && status != ErrorCodes::NoSuchKey) {
+            return status;
+        }
+
+        if (status.isOK()) {
+            validAfter = ts;
+        }
+    }
+
+    return MergeChunkRequest(std::move(nss),
+                             std::move(shardName),
+                             std::move(epoch),
+                             std::move(chunkBoundaries),
+                             validAfter);
 }
 
 BSONObj MergeChunkRequest::toConfigCommandBSON(const BSONObj& writeConcern) {
@@ -127,6 +145,8 @@ void MergeChunkRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
         }
     }
     cmdBuilder->append(kShardName, _shardName);
+    invariant(_validAfter.is_initialized());
+    cmdBuilder->append(kValidAfter, _validAfter.get());
 }
 
 }  // namespace mongo

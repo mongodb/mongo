@@ -41,6 +41,7 @@ const char kToShard[] = "toShard";
 const char kMigratedChunk[] = "migratedChunk";
 const char kControlChunk[] = "controlChunk";
 const char kFromShardCollectionVersion[] = "fromShardCollectionVersion";
+const char kValidAfter[] = "validAfter";
 
 /**
  * Attempts to parse a (range-only!) ChunkType from "field" in "source".
@@ -132,6 +133,20 @@ StatusWith<CommitChunkMigrationRequest> CommitChunkMigrationRequest::createFromC
         request._collectionEpoch = statusWithChunkVersion.getValue().epoch();
     }
 
+    {
+        Timestamp validAfter;
+        auto status = bsonExtractTimestampField(obj, kValidAfter, &validAfter);
+        if (!status.isOK() && status != ErrorCodes::NoSuchKey) {
+            return status;
+        }
+
+        if (status.isOK()) {
+            request._validAfter = validAfter;
+        } else {
+            request._validAfter = boost::none;
+        }
+    }
+
     return request;
 }
 
@@ -141,7 +156,8 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
                                                   const ShardId& toShard,
                                                   const ChunkType& migratedChunk,
                                                   const boost::optional<ChunkType>& controlChunk,
-                                                  const ChunkVersion& fromShardCollectionVersion) {
+                                                  const ChunkVersion& fromShardCollectionVersion,
+                                                  const Timestamp& validAfter) {
     invariant(builder->asTempObj().isEmpty());
     invariant(nss.isValid());
 
@@ -154,6 +170,7 @@ void CommitChunkMigrationRequest::appendAsCommand(BSONObjBuilder* builder,
     if (controlChunk) {
         builder->append(kControlChunk, controlChunk->toConfigBSON());
     }
+    builder->append(kValidAfter, validAfter);
 }
 
 }  // namespace mongo

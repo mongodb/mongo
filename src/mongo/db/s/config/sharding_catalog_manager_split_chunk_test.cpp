@@ -53,6 +53,8 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     auto chunkMax = BSON("a" << 10);
     chunk.setMin(chunkMin);
     chunk.setMax(chunkMax);
+    chunk.setHistory({ChunkHistory(Timestamp(100, 0), ShardId("shardX")),
+                      ChunkHistory(Timestamp(90, 0), ShardId("shardY"))});
 
     auto chunkSplitPoint = BSON("a" << 5);
     std::vector<BSONObj> splitPoints{chunkSplitPoint};
@@ -78,6 +80,9 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     ASSERT_EQ(origVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
     ASSERT_EQ(origVersion.minorVersion() + 1, chunkDoc.getVersion().minorVersion());
 
+    // Make sure the history is there
+    ASSERT_EQ(2UL, chunkDoc.getHistory().size());
+
     // Second chunkDoc should have range [chunkSplitPoint, chunkMax]
     auto otherChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
     ASSERT_OK(otherChunkDocStatus.getStatus());
@@ -88,6 +93,12 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
     // Check for increment on second chunkDoc's minor version
     ASSERT_EQ(origVersion.majorVersion(), otherChunkDoc.getVersion().majorVersion());
     ASSERT_EQ(origVersion.minorVersion() + 2, otherChunkDoc.getVersion().minorVersion());
+
+    // Make sure the history is there
+    ASSERT_EQ(2UL, otherChunkDoc.getHistory().size());
+
+    // Both chunks should have the same history
+    ASSERT(chunkDoc.getHistory() == otherChunkDoc.getHistory());
 }
 
 TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
@@ -102,6 +113,8 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     auto chunkMax = BSON("a" << 10);
     chunk.setMin(chunkMin);
     chunk.setMax(chunkMax);
+    chunk.setHistory({ChunkHistory(Timestamp(100, 0), ShardId("shardX")),
+                      ChunkHistory(Timestamp(90, 0), ShardId("shardY"))});
 
     auto chunkSplitPoint = BSON("a" << 5);
     auto chunkSplitPoint2 = BSON("a" << 7);
@@ -128,6 +141,9 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ASSERT_EQ(origVersion.majorVersion(), chunkDoc.getVersion().majorVersion());
     ASSERT_EQ(origVersion.minorVersion() + 1, chunkDoc.getVersion().minorVersion());
 
+    // Make sure the history is there
+    ASSERT_EQ(2UL, chunkDoc.getHistory().size());
+
     // Second chunkDoc should have range [chunkSplitPoint, chunkSplitPoint2]
     auto midChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint);
     ASSERT_OK(midChunkDocStatus.getStatus());
@@ -139,6 +155,9 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     ASSERT_EQ(origVersion.majorVersion(), midChunkDoc.getVersion().majorVersion());
     ASSERT_EQ(origVersion.minorVersion() + 2, midChunkDoc.getVersion().minorVersion());
 
+    // Make sure the history is there
+    ASSERT_EQ(2UL, midChunkDoc.getHistory().size());
+
     // Third chunkDoc should have range [chunkSplitPoint2, chunkMax]
     auto lastChunkDocStatus = getChunkDoc(operationContext(), chunkSplitPoint2);
     ASSERT_OK(lastChunkDocStatus.getStatus());
@@ -149,6 +168,13 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
     // Check for increment on third chunkDoc's minor version
     ASSERT_EQ(origVersion.majorVersion(), lastChunkDoc.getVersion().majorVersion());
     ASSERT_EQ(origVersion.minorVersion() + 3, lastChunkDoc.getVersion().minorVersion());
+
+    // Make sure the history is there
+    ASSERT_EQ(2UL, lastChunkDoc.getHistory().size());
+
+    // Both chunks should have the same history
+    ASSERT(chunkDoc.getHistory() == midChunkDoc.getHistory());
+    ASSERT(midChunkDoc.getHistory() == lastChunkDoc.getHistory());
 }
 
 TEST_F(SplitChunkTest, NewSplitShouldClaimHighestVersion) {

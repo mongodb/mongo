@@ -60,7 +60,8 @@ struct CommitChunkMigrationRequest {
                                 const ShardId& toShard,
                                 const ChunkType& migratedChunkType,
                                 const boost::optional<ChunkType>& controlChunkType,
-                                const ChunkVersion& fromShardChunkVersion);
+                                const ChunkVersion& fromShardChunkVersion,
+                                const Timestamp& validAfter);
 
     const NamespaceString& getNss() const {
         return _nss;
@@ -80,6 +81,9 @@ struct CommitChunkMigrationRequest {
     const OID& getCollectionEpoch() {
         return _collectionEpoch;
     }
+    const boost::optional<Timestamp>& getValidAfter() {
+        return _validAfter;
+    }
 
     // The collection for which this request applies.
     NamespaceString _nss;
@@ -97,6 +101,9 @@ struct CommitChunkMigrationRequest {
     boost::optional<ChunkType> _controlChunk;
 
     OID _collectionEpoch;
+
+    // The time of the move
+    boost::optional<Timestamp> _validAfter;
 };
 
 }  // namespace mongo
