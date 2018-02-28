@@ -35,7 +35,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
-#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -236,24 +235,6 @@ public:
     void setGlobalInitMethodForTest(GlobalInitFunc func);
 
     /**
-     * Schedules for the range to clean of the given namespace to be deleted.
-     * Behavior can be modified through setScheduleCleanupFunctionForTest.
-     */
-    void scheduleCleanup(const NamespaceString& nss);
-
-    /**
-     * Returns a pointer to the collection range deleter task executor.
-     */
-    executor::ThreadPoolTaskExecutor* getRangeDeleterTaskExecutor();
-
-    /**
-     * Sets the function used by scheduleWorkOnRangeDeleterTaskExecutor to
-     * schedule work. Used for mocking the executor for testing. See the ShardingState
-     * for the default implementation of _scheduleWorkFn.
-     */
-    void setScheduleCleanupFunctionForTest(RangeDeleterCleanupNotificationFunc fn);
-
-    /**
      * If started with --shardsvr, initializes sharding awareness from the shardIdentity document
      * on disk, if there is one.
      * If started with --shardsvr in queryableBackupMode, initializes sharding awareness from the
@@ -348,9 +329,6 @@ private:
      */
     ChunkVersion _refreshMetadata(OperationContext* opCtx, const NamespaceString& nss);
 
-    // Initializes a TaskExecutor for cleaning up orphaned ranges
-    void _initializeRangeDeleterTaskExecutor();
-
     // Manages the state of the migration recipient shard
     MigrationDestinationManager _migrationDestManager;
 
@@ -386,13 +364,6 @@ private:
 
     // Function for initializing the external sharding state components not owned here.
     GlobalInitFunc _globalInit;
-
-    // Function for scheduling work on the _rangeDeleterTaskExecutor.
-    // Used in call to scheduleCleanup(NamespaceString).
-    RangeDeleterCleanupNotificationFunc _scheduleWorkFn;
-
-    // Task executor for the collection range deleter.
-    std::unique_ptr<executor::ThreadPoolTaskExecutor> _rangeDeleterTaskExecutor;
 };
 
 }  // namespace mongo

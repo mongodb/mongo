@@ -50,12 +50,6 @@ using unittest::assertGet;
 
 class MetadataManagerTest : public ServiceContextMongoDTest {
 protected:
-    void setUp() override {
-        ServiceContextMongoDTest::setUp();
-        ShardingState::get(getServiceContext())
-            ->setScheduleCleanupFunctionForTest([](const NamespaceString& nss) {});
-    }
-
     static std::unique_ptr<CollectionMetadata> makeEmptyMetadata() {
         const OID epoch = OID::gen();
 
@@ -106,8 +100,7 @@ TEST_F(MetadataManagerTest, SetAndGetActiveMetadata) {
     ScopedCollectionMetadata scopedMetadata = manager.getActiveMetadata(manager_ptr);
 
     ASSERT_EQ(cmPtr, scopedMetadata.getMetadata());
-};
-
+}
 
 TEST_F(MetadataManagerTest, ResetActiveMetadata) {
     manager.refreshActiveMetadata(makeEmptyMetadata());
@@ -124,166 +117,7 @@ TEST_F(MetadataManagerTest, ResetActiveMetadata) {
     ScopedCollectionMetadata scopedMetadata2 = manager.getActiveMetadata(manager_ptr);
 
     ASSERT_EQ(cm2Ptr, scopedMetadata2.getMetadata());
-};
-
-TEST_F(MetadataManagerTest, AddAndRemoveRangesToClean) {
-    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
-    ChunkRange cr2 = ChunkRange(BSON("key" << 10), BSON("key" << 20));
-
-    manager.addRangeToClean(cr1);
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
-    manager.removeRangeToClean(cr1);
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
-
-    manager.addRangeToClean(cr1);
-    manager.addRangeToClean(cr2);
-    manager.removeRangeToClean(cr1);
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
-    auto ranges = manager.getCopyOfRangesToClean();
-    auto it = ranges.find(cr2.getMin());
-    ChunkRange remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
-    ASSERT_EQ(remainingChunk.toString(), cr2.toString());
-    manager.removeRangeToClean(cr2);
 }
-
-// Tests that a removal in the middle of an existing ChunkRange results in
-// two correct chunk ranges.
-TEST_F(MetadataManagerTest, RemoveRangeInMiddleOfRange) {
-    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
-
-    manager.addRangeToClean(cr1);
-    manager.removeRangeToClean(ChunkRange(BSON("key" << 4), BSON("key" << 6)));
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 2UL);
-
-    auto ranges = manager.getCopyOfRangesToClean();
-    auto it = ranges.find(BSON("key" << 0));
-    ChunkRange expectedChunk = ChunkRange(BSON("key" << 0), BSON("key" << 4));
-    ChunkRange remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
-    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
-
-    it++;
-    expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 10));
-    remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
-    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
-
-    manager.removeRangeToClean(cr1);
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
-}
-
-// Tests removals that overlap with just one ChunkRange.
-TEST_F(MetadataManagerTest, RemoveRangeWithSingleRangeOverlap) {
-    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
-
-    manager.addRangeToClean(cr1);
-    manager.removeRangeToClean(ChunkRange(BSON("key" << 0), BSON("key" << 5)));
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
-    auto ranges = manager.getCopyOfRangesToClean();
-    auto it = ranges.find(BSON("key" << 5));
-    ChunkRange remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
-    ChunkRange expectedChunk = ChunkRange(BSON("key" << 5), BSON("key" << 10));
-    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
-
-    manager.removeRangeToClean(ChunkRange(BSON("key" << 4), BSON("key" << 6)));
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
-    ranges = manager.getCopyOfRangesToClean();
-    it = ranges.find(BSON("key" << 6));
-    remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
-    expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 10));
-    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
-
-    manager.removeRangeToClean(ChunkRange(BSON("key" << 9), BSON("key" << 13)));
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
-    ranges = manager.getCopyOfRangesToClean();
-    it = ranges.find(BSON("key" << 6));
-    remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
-    expectedChunk = ChunkRange(BSON("key" << 6), BSON("key" << 9));
-    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
-
-    manager.removeRangeToClean(ChunkRange(BSON("key" << 0), BSON("key" << 10)));
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
-}
-
-// Tests removals that overlap with more than one ChunkRange.
-TEST_F(MetadataManagerTest, RemoveRangeWithMultipleRangeOverlaps) {
-    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
-    ChunkRange cr2 = ChunkRange(BSON("key" << 10), BSON("key" << 20));
-    ChunkRange cr3 = ChunkRange(BSON("key" << 20), BSON("key" << 30));
-
-    manager.addRangeToClean(cr1);
-    manager.addRangeToClean(cr2);
-    manager.addRangeToClean(cr3);
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 3UL);
-
-    manager.removeRangeToClean(ChunkRange(BSON("key" << 8), BSON("key" << 22)));
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 2UL);
-    auto ranges = manager.getCopyOfRangesToClean();
-    auto it = ranges.find(BSON("key" << 0));
-    ChunkRange remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
-    ChunkRange expectedChunk = ChunkRange(BSON("key" << 0), BSON("key" << 8));
-    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
-    it++;
-    remainingChunk = ChunkRange(it->first, it->second.getMaxKey());
-    expectedChunk = ChunkRange(BSON("key" << 22), BSON("key" << 30));
-    ASSERT_EQ(remainingChunk.toString(), expectedChunk.toString());
-
-    manager.removeRangeToClean(ChunkRange(BSON("key" << 0), BSON("key" << 30)));
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
-}
-
-TEST_F(MetadataManagerTest, AddAndRemoveRangeNotificationsBlockAndYield) {
-    manager.refreshActiveMetadata(makeEmptyMetadata());
-
-    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
-    auto notification = manager.addRangeToClean(cr1);
-    manager.removeRangeToClean(cr1, Status::OK());
-    ASSERT_OK(notification->get());
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
-}
-
-TEST_F(MetadataManagerTest, RemoveRangeToCleanCorrectlySetsBadStatus) {
-    manager.refreshActiveMetadata(makeEmptyMetadata());
-
-    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
-    auto notification = manager.addRangeToClean(cr1);
-    manager.removeRangeToClean(cr1, Status(ErrorCodes::InternalError, "test error"));
-    ASSERT_NOT_OK(notification->get());
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
-}
-
-TEST_F(MetadataManagerTest, RemovingSubrangeStillSetsNotificationStatus) {
-    manager.refreshActiveMetadata(makeEmptyMetadata());
-
-    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
-    auto notification = manager.addRangeToClean(cr1);
-    manager.removeRangeToClean(ChunkRange(BSON("key" << 3), BSON("key" << 7)));
-    ASSERT_OK(notification->get());
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 2UL);
-    manager.removeRangeToClean(cr1);
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
-
-    notification = manager.addRangeToClean(cr1);
-    manager.removeRangeToClean(ChunkRange(BSON("key" << 7), BSON("key" << 15)));
-    ASSERT_OK(notification->get());
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 1UL);
-    manager.removeRangeToClean(cr1);
-    ASSERT_EQ(manager.getCopyOfRangesToClean().size(), 0UL);
-}
-
-TEST_F(MetadataManagerTest, NotificationBlocksUntilDeletion) {
-    manager.refreshActiveMetadata(makeEmptyMetadata());
-
-    ChunkRange cr1(BSON("key" << 0), BSON("key" << 10));
-    auto notification = manager.addRangeToClean(cr1);
-    auto txn = cc().makeOperationContext().get();
-    // Once the new range deleter is set up, this might fail if the range deleter
-    // deleted cr1 before we got here...
-    ASSERT_FALSE(notification->waitFor(txn, Milliseconds(0)));
-
-    manager.removeRangeToClean(cr1);
-    ASSERT_TRUE(notification->waitFor(txn, Milliseconds(0)));
-    ASSERT_OK(notification->get());
-}
-
 
 TEST_F(MetadataManagerTest, RefreshAfterSuccessfulMigrationSinglePending) {
     manager.refreshActiveMetadata(makeEmptyMetadata());
@@ -415,30 +249,6 @@ TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
     ASSERT_BSONOBJ_EQ(BSON("key" << 20), chunkEntry->first);
     ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second.getMaxKey());
     ASSERT_EQ(newVersion, chunkEntry->second.getVersion());
-}
-
-// Tests membership functions for _rangesToClean
-TEST_F(MetadataManagerTest, RangesToCleanMembership) {
-    manager.refreshActiveMetadata(makeEmptyMetadata());
-
-    ASSERT(!manager.hasRangesToClean());
-
-    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
-    manager.addRangeToClean(cr1);
-
-    ASSERT(manager.hasRangesToClean());
-    ASSERT(manager.isInRangesToClean(cr1));
-}
-
-// Tests that getNextRangeToClean successfully pulls a stored ChunkRange
-TEST_F(MetadataManagerTest, GetNextRangeToClean) {
-    manager.refreshActiveMetadata(makeEmptyMetadata());
-
-    ChunkRange cr1 = ChunkRange(BSON("key" << 0), BSON("key" << 10));
-    manager.addRangeToClean(cr1);
-
-    ChunkRange cr2 = manager.getNextRangeToClean();
-    ASSERT_EQ(cr1.toString(), cr2.toString());
 }
 
 }  // namespace

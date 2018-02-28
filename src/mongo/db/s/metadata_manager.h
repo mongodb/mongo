@@ -85,51 +85,9 @@ public:
     RangeMap getCopyOfReceivingChunks();
 
     /**
-    * Adds a new range to be cleaned up.
-    * The newly introduced range must not overlap with the existing ranges.
-    */
-    std::shared_ptr<Notification<Status>> addRangeToClean(const ChunkRange& range);
-
-    /**
-     * Calls removeRangeToClean with Status::OK.
-     */
-    void removeRangeToClean(const ChunkRange& range) {
-        removeRangeToClean(range, Status::OK());
-    }
-
-    /**
-     * Removes the specified range from the ranges to be cleaned up.
-     * The specified deletionStatus will be returned to callers waiting
-     * on whether the deletion succeeded or failed.
-     */
-    void removeRangeToClean(const ChunkRange& range, Status deletionStatus);
-
-    /**
-     * Gets copy of the set of chunk ranges which are scheduled for cleanup.
-     * Converts RangeToCleanMap to RangeMap.
-     */
-    RangeMap getCopyOfRangesToClean();
-
-    /**
      * Appends information on all the chunk ranges in rangesToClean to builder.
      */
     void append(BSONObjBuilder* builder);
-
-    /**
-     * Returns true if _rangesToClean is not empty.
-     */
-    bool hasRangesToClean();
-
-    /**
-     * Returns true if the exact range is in _rangesToClean.
-     */
-    bool isInRangesToClean(const ChunkRange& range);
-
-    /**
-     * Gets and returns, but does not remove, a single ChunkRange from _rangesToClean.
-     * Should not be called if _rangesToClean is empty: it will hit an invariant.
-     */
-    ChunkRange getNextRangeToClean();
 
 private:
     friend class ScopedCollectionMetadata;
@@ -193,12 +151,6 @@ private:
      */
     void _removeMetadata_inlock(CollectionMetadataTracker* metadataTracker);
 
-    std::shared_ptr<Notification<Status>> _addRangeToClean_inlock(const ChunkRange& range);
-
-    void _removeRangeToClean_inlock(const ChunkRange& range, Status deletionStatus);
-
-    RangeMap _getCopyOfRangesToClean_inlock();
-
     void _setActiveMetadata_inlock(std::unique_ptr<CollectionMetadata> newMetadata);
 
     const NamespaceString _nss;
@@ -219,10 +171,6 @@ private:
     // Chunk ranges which are currently assumed to be transferred to the shard. Indexed by the min
     // key of the range.
     RangeMap _receivingChunks;
-
-    // Set of ranges to be deleted. Indexed by the min key of the range.
-    typedef BSONObjIndexedMap<RangeToCleanDescriptor> RangeToCleanMap;
-    RangeToCleanMap _rangesToClean;
 };
 
 class ScopedCollectionMetadata {

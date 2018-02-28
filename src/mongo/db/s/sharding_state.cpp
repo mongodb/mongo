@@ -117,8 +117,7 @@ const std::set<std::string> ShardingState::_commandsThatInitializeShardingAwaren
 ShardingState::ShardingState()
     : _initializationState(static_cast<uint32_t>(InitializationState::kNew)),
       _initializationStatus(Status(ErrorCodes::InternalError, "Uninitialized value")),
-      _globalInit(&initializeGlobalShardingStateForMongod),
-      _scheduleWorkFn([](NamespaceString nss) {}) {}
+      _globalInit(&initializeGlobalShardingStateForMongod) {}
 
 ShardingState::~ShardingState() = default;
 
@@ -220,14 +219,6 @@ void ShardingState::markCollectionsNotShardedAtStepdown() {
 
 void ShardingState::setGlobalInitMethodForTest(GlobalInitFunc func) {
     _globalInit = func;
-}
-
-void ShardingState::setScheduleCleanupFunctionForTest(RangeDeleterCleanupNotificationFunc fn) {
-    _scheduleWorkFn = fn;
-}
-
-void ShardingState::scheduleCleanup(const NamespaceString& nss) {
-    _scheduleWorkFn(nss);
 }
 
 Status ShardingState::onStaleShardVersion(OperationContext* txn,
@@ -416,8 +407,6 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* txn,
             _shardName = shardIdentity.getShardName();
             _clusterId = shardIdentity.getClusterId();
 
-            _initializeRangeDeleterTaskExecutor();
-
             return status;
         } catch (const DBException& ex) {
             auto errorStatus = ex.toStatus();
@@ -445,8 +434,6 @@ void ShardingState::_initializeImpl(ConnectionString configSvr, string shardName
             ReplicaSetMonitor::setSynchronousConfigChangeHook(
                 &ShardRegistry::replicaSetChangeShardRegistryUpdateHook);
             ReplicaSetMonitor::setAsynchronousConfigChangeHook(&updateShardIdentityConfigStringCB);
-
-            _initializeRangeDeleterTaskExecutor();
 
             _shardName = shardName;
         }
@@ -783,19 +770,6 @@ Status ShardingState::updateShardIdentityConfigString(OperationContext* txn,
     }
 
     return Status::OK();
-}
-
-void ShardingState::_initializeRangeDeleterTaskExecutor() {
-    invariant(!_rangeDeleterTaskExecutor);
-    auto net =
-        executor::makeNetworkInterface("NetworkInterfaceCollectionRangeDeleter-TaskExecutor");
-    auto netPtr = net.get();
-    _rangeDeleterTaskExecutor = stdx::make_unique<executor::ThreadPoolTaskExecutor>(
-        stdx::make_unique<executor::NetworkInterfaceThreadPool>(netPtr), std::move(net));
-}
-
-executor::ThreadPoolTaskExecutor* ShardingState::getRangeDeleterTaskExecutor() {
-    return _rangeDeleterTaskExecutor.get();
 }
 
 /**

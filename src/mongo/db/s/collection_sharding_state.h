@@ -168,8 +168,6 @@ public:
     void onDropCollection(OperationContext* txn, const NamespaceString& collectionName);
 
 private:
-    friend class CollectionRangeDeleter;
-
     /**
      * Checks whether the shard version of the operation matches that of the collection.
      *

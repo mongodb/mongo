@@ -34,7 +34,6 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/range_arithmetic.h"
-#include "mongo/db/s/collection_range_deleter.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/log.h"
@@ -47,9 +46,8 @@ MetadataManager::MetadataManager(ServiceContext* sc, NamespaceString nss)
     : _nss(std::move(nss)),
       _serviceContext(sc),
       _activeMetadataTracker(stdx::make_unique<CollectionMetadataTracker>(nullptr)),
-      _receivingChunks(SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()),
-      _rangesToClean(
-          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<RangeToCleanDescriptor>()) {}
+      _receivingChunks(
+          SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>()) {}
 
 MetadataManager::~MetadataManager() {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
@@ -74,7 +72,6 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
     // collection sharding information regardless of whether the node is sharded or not.
     if (!remoteMetadata && !_activeMetadataTracker->metadata) {
         invariant(_receivingChunks.empty());
-        invariant(_rangesToClean.empty());
         return;
     }
 
@@ -84,8 +81,6 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
               << _activeMetadataTracker->metadata->toStringBasic() << " as no longer sharded";
 
         _receivingChunks.clear();
-        _rangesToClean.clear();
-
         _setActiveMetadata_inlock(nullptr);
         return;
     }
@@ -100,8 +95,6 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
               << remoteMetadata->toStringBasic();
 
         invariant(_receivingChunks.empty());
-        invariant(_rangesToClean.empty());
-
         _setActiveMetadata_inlock(std::move(remoteMetadata));
         return;
     }
@@ -115,8 +108,6 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
               << remoteMetadata->toStringBasic() << " due to epoch change";
 
         _receivingChunks.clear();
-        _rangesToClean.clear();
-
         _setActiveMetadata_inlock(std::move(remoteMetadata));
         return;
     }
@@ -168,9 +159,6 @@ void MetadataManager::refreshActiveMetadata(std::unique_ptr<CollectionMetadata> 
             const ChunkRange receivingRange(itRecv->first, itRecv->second.getMaxKey());
 
             _receivingChunks.erase(itRecv);
-
-            // Make sure any potentially partially copied chunks are scheduled to be cleaned up
-            _addRangeToClean_inlock(receivingRange);
         }
 
         // Need to reset the iterator
@@ -207,14 +195,10 @@ void MetadataManager::beginReceive(const ChunkRange& range) {
         const ChunkRange receivingRange(itRecv->first, itRecv->second.getMaxKey());
 
         _receivingChunks.erase(itRecv);
-
-        // Make sure any potentially partially copied chunks are scheduled to be cleaned up
-        _addRangeToClean_inlock(receivingRange);
     }
 
     // Need to ensure that the background range deleter task won't delete the range we are about to
     // receive
-    _removeRangeToClean_inlock(range, Status::OK());
     _receivingChunks.insert(
         std::make_pair(range.getMin().getOwned(),
                        CachedChunkInfo(range.getMax().getOwned(), ChunkVersion::IGNORED())));
@@ -240,9 +224,6 @@ void MetadataManager::forgetReceive(const ChunkRange& range) {
 
         _receivingChunks.erase(it);
     }
-
-    // This is potentially a partially received data, which needs to be cleaned up
-    _addRangeToClean_inlock(range);
 
     // For compatibility with the current range deleter, update the pending chunks on the collection
     // metadata to exclude the chunk being received, which was added in beginReceive
@@ -343,90 +324,8 @@ ScopedCollectionMetadata::operator bool() const {
     return _tracker && _tracker->metadata.get();
 }
 
-RangeMap MetadataManager::getCopyOfRangesToClean() {
-    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    return _getCopyOfRangesToClean_inlock();
-}
-
-RangeMap MetadataManager::_getCopyOfRangesToClean_inlock() {
-    RangeMap ranges = SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<CachedChunkInfo>();
-    for (auto it = _rangesToClean.begin(); it != _rangesToClean.end(); ++it) {
-        ranges.insert(std::make_pair(
-            it->first, CachedChunkInfo(it->second.getMax(), ChunkVersion::IGNORED())));
-    }
-    return ranges;
-}
-
-std::shared_ptr<Notification<Status>> MetadataManager::addRangeToClean(const ChunkRange& range) {
-    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    return _addRangeToClean_inlock(range);
-}
-
-std::shared_ptr<Notification<Status>> MetadataManager::_addRangeToClean_inlock(
-    const ChunkRange& range) {
-    // This first invariant currently makes an unnecessary copy, to reuse the
-    // rangeMapOverlaps helper function.
-    invariant(!rangeMapOverlaps(_getCopyOfRangesToClean_inlock(), range.getMin(), range.getMax()));
-    invariant(!rangeMapOverlaps(_receivingChunks, range.getMin(), range.getMax()));
-
-    RangeToCleanDescriptor descriptor(range.getMax().getOwned());
-    _rangesToClean.insert(std::make_pair(range.getMin().getOwned(), descriptor));
-
-    // If _rangesToClean was previously empty, we need to start the collection range deleter
-    if (_rangesToClean.size() == 1UL) {
-        ShardingState::get(_serviceContext)->scheduleCleanup(_nss);
-    }
-
-    return descriptor.getNotification();
-}
-
-void MetadataManager::removeRangeToClean(const ChunkRange& range, Status deletionStatus) {
-    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    _removeRangeToClean_inlock(range, deletionStatus);
-}
-
-void MetadataManager::_removeRangeToClean_inlock(const ChunkRange& range, Status deletionStatus) {
-    auto it = _rangesToClean.upper_bound(range.getMin());
-    // We want our iterator to point at the greatest value
-    // that is still less than or equal to range.
-    if (it != _rangesToClean.begin()) {
-        --it;
-    }
-
-    for (; it != _rangesToClean.end() &&
-         SimpleBSONObjComparator::kInstance.evaluate(it->first < range.getMax());) {
-        if (SimpleBSONObjComparator::kInstance.evaluate(it->second.getMax() <= range.getMin())) {
-            ++it;
-            continue;
-        }
-
-        // There's overlap between *it and range so we remove *it
-        // and then replace with new ranges.
-        BSONObj oldMin = it->first;
-        BSONObj oldMax = it->second.getMax();
-        it->second.complete(deletionStatus);
-        _rangesToClean.erase(it++);
-        if (SimpleBSONObjComparator::kInstance.evaluate(oldMin < range.getMin())) {
-            _addRangeToClean_inlock(ChunkRange(oldMin, range.getMin()));
-        }
-
-        if (SimpleBSONObjComparator::kInstance.evaluate(oldMax > range.getMax())) {
-            _addRangeToClean_inlock(ChunkRange(range.getMax(), oldMax));
-        }
-    }
-}
-
 void MetadataManager::append(BSONObjBuilder* builder) {
     stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-
-    BSONArrayBuilder rtcArr(builder->subarrayStart("rangesToClean"));
-    for (const auto& entry : _rangesToClean) {
-        BSONObjBuilder obj;
-        ChunkRange r = ChunkRange(entry.first, entry.second.getMax());
-        r.append(&obj);
-        rtcArr.append(obj.done());
-    }
-    rtcArr.done();
 
     BSONArrayBuilder pcArr(builder->subarrayStart("pendingChunks"));
     for (const auto& entry : _receivingChunks) {
@@ -445,25 +344,6 @@ void MetadataManager::append(BSONObjBuilder* builder) {
         amrArr.append(obj.done());
     }
     amrArr.done();
-}
-
-bool MetadataManager::hasRangesToClean() {
-    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    return !_rangesToClean.empty();
-}
-
-bool MetadataManager::isInRangesToClean(const ChunkRange& range) {
-    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    // For convenience, this line makes an unnecessary copy, to reuse the
-    // rangeMapContains helper function.
-    return rangeMapContains(_getCopyOfRangesToClean_inlock(), range.getMin(), range.getMax());
-}
-
-ChunkRange MetadataManager::getNextRangeToClean() {
-    stdx::lock_guard<stdx::mutex> scopedLock(_managerLock);
-    invariant(!_rangesToClean.empty());
-    auto it = _rangesToClean.begin();
-    return ChunkRange(it->first, it->second.getMax());
 }
 
 }  // namespace mongo
