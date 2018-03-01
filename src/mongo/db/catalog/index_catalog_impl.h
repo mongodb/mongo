@@ -306,6 +306,10 @@ public:
             return _entry;
         }
 
+        const std::string& getIndexName() {
+            return _indexName;
+        }
+
     private:
         Collection* const _collection;
         IndexCatalog* const _catalog;

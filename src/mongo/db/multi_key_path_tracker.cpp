@@ -35,13 +35,44 @@ namespace mongo {
 const OperationContext::Decoration<MultikeyPathTracker> MultikeyPathTracker::get =
     OperationContext::declareDecoration<MultikeyPathTracker>();
 
+void MultikeyPathTracker::mergeMultikeyPaths(MultikeyPaths* toMergeInto,
+                                             const MultikeyPaths& newPaths) {
+    invariant(toMergeInto->size() == newPaths.size());
+    for (auto idx = std::size_t(0); idx < toMergeInto->size(); ++idx) {
+        toMergeInto->at(idx).insert(newPaths[idx].begin(), newPaths[idx].end());
+    }
+}
+
 void MultikeyPathTracker::addMultikeyPathInfo(MultikeyPathInfo info) {
     invariant(_trackMultikeyPathInfo);
+    // Merge the `MultikeyPathInfo` input into the accumulated value being tracked for the
+    // (collection, index) key.
+    for (auto& existingChanges : _multikeyPathInfo) {
+        if (existingChanges.nss != info.nss || existingChanges.indexName != info.indexName) {
+            continue;
+        }
+
+        mergeMultikeyPaths(&existingChanges.multikeyPaths, info.multikeyPaths);
+        return;
+    }
+
+    // If an existing entry wasn't found for the (collection, index) input, create a new entry.
     _multikeyPathInfo.emplace_back(info);
 }
 
 const WorkerMultikeyPathInfo& MultikeyPathTracker::getMultikeyPathInfo() const {
     return _multikeyPathInfo;
+}
+
+const boost::optional<MultikeyPaths> MultikeyPathTracker::getMultikeyPathInfo(
+    const NamespaceString& nss, const std::string& indexName) {
+    for (const auto& multikeyPathInfo : _multikeyPathInfo) {
+        if (multikeyPathInfo.nss == nss && multikeyPathInfo.indexName == indexName) {
+            return multikeyPathInfo.multikeyPaths;
+        }
+    }
+
+    return boost::none;
 }
 
 void MultikeyPathTracker::startTrackingMultikeyPathInfo() {

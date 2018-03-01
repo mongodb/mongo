@@ -1730,3 +1730,13 @@ env.CppUnitTest(
         'write_ops',
     ],
 )
+
+env.CppUnitTest(
+    target='multi_key_path_tracker_test',
+    source=[
+        'multi_key_path_tracker_test.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        'service_context',
+    ],
+)
