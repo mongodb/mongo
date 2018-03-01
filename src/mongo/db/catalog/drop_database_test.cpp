@@ -98,7 +98,8 @@ repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,
     uassert(
         ErrorCodes::OperationFailed, "onDropCollection() failed", !onDropCollectionThrowsException);
 
-    return opTime;
+    OpObserver::Times::get(opCtx).reservedOpTimes.push_back(opTime);
+    return {};
 }
 
 class DropDatabaseTest : public ServiceContextMongoDTest {

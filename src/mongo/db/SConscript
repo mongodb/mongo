@@ -120,6 +120,8 @@ env.CppUnitTest(
     source= 'op_observer_registry_test.cpp',
     LIBDEPS=[
         'common',
+        'op_observer',
+        'service_context',
     ],
 )
 
@@ -645,12 +647,24 @@ env.Library(
 )
 
 env.Library(
+    target="op_observer",
+    source=[
+        "op_observer.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/decorable',
+    ],
+)
+
+env.Library(
     target="op_observer_d",
     source=[
         "op_observer_impl.cpp",
     ],
     LIBDEPS=[
         'catalog/collection_options',
+        'op_observer',
         'repl/oplog',
         'views/views_mongod',
         '$BUILD_DIR/mongo/base',

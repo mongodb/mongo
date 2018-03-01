@@ -195,7 +195,8 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     {
         AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        dropOpTime = opObserver.onDropCollection(opCtx.get(), nss, uuid);
+        opObserver.onDropCollection(opCtx.get(), nss, uuid);
+        dropOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
 
@@ -229,8 +230,9 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     {
         AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        renameOpTime = opObserver.onRenameCollection(
+        opObserver.onRenameCollection(
             opCtx.get(), sourceNss, targetNss, {}, dropTarget, {}, stayTemp);
+        renameOpTime = OpObserver::Times::get(opCtx.get()).reservedOpTimes.front();
         wunit.commit();
     }
 
