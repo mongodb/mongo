@@ -419,6 +419,20 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: snapshot_reads_WT
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "snapshot_reads"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: agg_query_comparison_bestbuy_WT
   priority: 5
   depends_on:
@@ -682,6 +696,7 @@ buildvariants:
     - name: agg_query_comparison_bestbuy_WT
     - name: agg_query_comparison_bestbuy_MMAPv1
     - name: change_streams
+    - name: snapshot_reads_WT
 
 - name: linux-standalone
   display_name: Linux Standalone
@@ -765,6 +780,7 @@ buildvariants:
     - name: agg_query_comparison_bestbuy_WT
     - name: agg_query_comparison_bestbuy_MMAPv1
     - name: change_streams
+    - name: snapshot_reads_WT
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
