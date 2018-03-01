@@ -23,7 +23,6 @@ import zipfile
 import requests
 import requests.exceptions
 
-
 def dump_stacks(_signal_num, _frame):
     """Dump stacks when SIGUSR1 is received."""
     print("======================================")
@@ -103,7 +102,8 @@ def download_file(url, file_name, download_retries=5):
                 download_retries -= 1
                 if download_retries == 0:
                     raise Exception("Downloaded file size ({} bytes) doesn't match content length"
-                        "({} bytes) for URL {}".format(file_size, url_content_length, url))
+                                    "({} bytes) for URL {}".format(
+                                        file_size, url_content_length, url))
                 continue
 
         return True
@@ -118,13 +118,16 @@ class MultiVersionDownloader(object):
                  install_dir,
                  link_dir,
                  edition,
-                 platform_arch,
+                 platform,
+                 architecture,
                  use_latest=False):
         self.install_dir = install_dir
         self.link_dir = link_dir
         self.edition = edition.lower()
-        self.platform_arch = platform_arch.lower().replace("/", "_")
-        self.generic_arch = "linux_x86_64"
+        self.platform = platform.lower()
+        self.architecture = architecture.lower()
+        self.generic_platform = "linux"
+        self.generic_architecture = "x86_64"
         self.use_latest = use_latest
         self._links = None
         self._generic_links = None
@@ -162,22 +165,35 @@ class MultiVersionDownloader(object):
 
         links = {}
         generic_links = {}
+        # The generic target contains a platform and architecture.
+        generic_target = "{}_{}".format(self.generic_platform, self.generic_architecture)
         for json_version in full_json["versions"]:
-            if "version" in json_version and 'downloads' in json_version:
-                version = json_version["version"]
-                for download in json_version["downloads"]:
-                    if "target" in download and "edition" in download:
-                        if download["target"].lower() == self.platform_arch and \
-                                download["edition"].lower() == self.edition:
-                            links[version] = download["archive"]["url"]
-                        elif download["target"].lower() == self.generic_arch and \
-                                download["edition"].lower() == "base":
-                            generic_links[version] = download["archive"]["url"]
+            if "version" not in json_version or 'downloads' not in json_version:
+                continue
+            version = json_version["version"]
+            for download in json_version["downloads"]:
+                if "target" not in download or "edition" not in download:
+                    continue
+                if (download["target"].lower() == self.platform and
+                    download["arch"].lower() == self.architecture and
+                    download["edition"].lower() == self.edition):
+                    links[version] = download["archive"]["url"]
+                elif (download["target"].lower() == generic_target and
+                      download["edition"].lower() == "base"):
+                    generic_links[version] = download["archive"]["url"]
 
         return links, generic_links
 
+    def download_install(self, version):
+        """Downloads and installs the version specified."""
+        download_file = self.download_version(version)
+        if download_file:
+            installed_dir = self.uncompress_download(download_file)
+            self.symlink_version(version, installed_dir)
+
     def download_version(self, version):
-        """Downloads the version specified."""
+        """Downloads the version specified and returns file location.
+           If no download occurs, file location is None."""
 
         try:
             os.makedirs(self.install_dir)
@@ -233,8 +249,8 @@ class MultiVersionDownloader(object):
         if already_downloaded:
             print("Skipping download for version {} ({}) since the dest already exists '{}'"
                   .format(version, full_version, extract_dir))
+            return None
         else:
-            temp_dir = tempfile.mkdtemp()
             temp_file = tempfile.mktemp(suffix=file_suffix)
 
             latest_downloaded = False
@@ -258,48 +274,54 @@ class MultiVersionDownloader(object):
                 print("Downloading data for version {} ({})...".format(version, full_version))
                 print("Download url is {}".format(url))
                 download_file(url, temp_file)
+        return temp_file
 
-            print("Uncompressing data for version {} ({})...".format(version, full_version))
-            first_file = ""
-            if file_suffix == ".zip":
-                # Support .zip downloads, used for Windows binaries.
-                with zipfile.ZipFile(temp_file) as zip_handle:
-                    # Use the name of the root directory in the archive as the name of the directory
-                    # to extract the binaries into inside 'self.install_dir'. The name of the root
-                    # directory nearly always matches the parsed URL text, with the exception of
-                    # versions such as "v3.2-latest" that instead contain the githash.
-                    first_file = zip_handle.namelist()[0]
-                    zip_handle.extractall(temp_dir)
-            elif file_suffix == ".tgz":
-                # Support .tgz downloads, used for Linux binaries.
-                with contextlib.closing(tarfile.open(temp_file, "r:gz")) as tar_handle:
-                    # Use the name of the root directory in the archive as the name of the directory
-                    # to extract the binaries into inside 'self.install_dir'. The name of the root
-                    # directory nearly always matches the parsed URL text, with the exception of
-                    # versions such as "v3.2-latest" that instead contain the githash.
-                    first_file = tar_handle.getnames()[0]
-                    tar_handle.extractall(path=temp_dir)
-            else:
-                raise Exception("Unsupported file extension {}".format(file_suffix))
+    def uncompress_download(self, download_file):
+        """Downloads the version specified and returns root of ."""
 
-            # Sometimes the zip will contain the root directory as the first file and
-            # os.path.dirname() will return ''.
-            extract_dir = os.path.dirname(first_file)
-            if not extract_dir:
-                extract_dir = first_file
-            temp_install_dir = os.path.join(temp_dir, extract_dir)
+        print("Uncompressing data to {}...".format(self.install_dir))
+        first_file = ""
+        temp_dir = tempfile.mkdtemp()
+        _, file_suffix = os.path.splitext(download_file)
+        if file_suffix == ".zip":
+            # Support .zip downloads, used for Windows binaries.
+            with zipfile.ZipFile(download_file) as zip_handle:
+                # Use the name of the root directory in the archive as the name of the directory
+                # to extract the binaries into inside 'self.install_dir'. The name of the root
+                # directory nearly always matches the parsed URL text, with the exception of
+                # versions such as "v3.2-latest" that instead contain the githash.
+                first_file = zip_handle.namelist()[0]
+                zip_handle.extractall(temp_dir)
+        elif file_suffix == ".tgz":
+            # Support .tgz downloads, used for Linux binaries.
+            with contextlib.closing(tarfile.open(download_file, "r:gz")) as tar_handle:
+                # Use the name of the root directory in the archive as the name of the directory
+                # to extract the binaries into inside 'self.install_dir'. The name of the root
+                # directory nearly always matches the parsed URL text, with the exception of
+                # versions such as "v3.2-latest" that instead contain the githash.
+                first_file = tar_handle.getnames()[0]
+                tar_handle.extractall(path=temp_dir)
+        else:
+            raise Exception("Unsupported file extension {}".format(file_suffix))
 
-            # We may not have been able to determine whether we already downloaded the requested
-            # version due to the ambiguity in the parsed URL text, so we check for it again using
-            # the adjusted 'extract_dir' value.
-            already_downloaded = os.path.isdir(os.path.join(self.install_dir, extract_dir))
-            if not already_downloaded:
-                shutil.move(temp_install_dir, self.install_dir)
+        # Sometimes the zip will contain the root directory as the first file and
+        # os.path.dirname() will return ''.
+        extract_dir = os.path.dirname(first_file)
+        if not extract_dir:
+            extract_dir = first_file
+        temp_install_dir = os.path.join(temp_dir, extract_dir)
 
-            shutil.rmtree(temp_dir)
-            os.remove(temp_file)
+        # We may not have been able to determine whether we already downloaded the requested
+        # version due to the ambiguity in the parsed URL text, so we check for it again using
+        # the adjusted 'extract_dir' value.
+        already_downloaded = os.path.isdir(os.path.join(self.install_dir, extract_dir))
+        if not already_downloaded:
+            shutil.move(temp_install_dir, self.install_dir)
 
-        self.symlink_version(version, os.path.abspath(os.path.join(self.install_dir, extract_dir)))
+        shutil.rmtree(temp_dir)
+        os.remove(download_file)
+
+        return os.path.abspath(os.path.join(self.install_dir, extract_dir))
 
     def symlink_version(self, version, installed_dir):
         """Symlinks the binaries in the 'installed_dir' to the 'link_dir.'"""
@@ -359,12 +381,13 @@ Usage: setup_multiversion_mongodb.py [options] ver1 [vers2 ...]
 Ex: setup_multiversion_mongodb.py --installDir ./install
                                   --linkDir ./link
                                   --edition base
-                                  --platformArchitecture Linux/x86_64 2.0.6 2.0.3-rc0
+                                  --platform Linux 2.0.6 2.0.3-rc0
+                                  --architecture x86_64
                                   2.0 2.2 2.3
 Ex: setup_multiversion_mongodb.py --installDir ./install
                                   --linkDir ./link
                                   --edition enterprise
-                                  --platformArchitecture osx
+                                  --platform osx
                                   2.4 2.2
 
 After running the script you will have a directory structure like this:
@@ -393,12 +416,16 @@ we'll pull the highest non-rc version compatible with the version specified.
                       help="Edition of the build to download, choose from {}, [default:"
                            " '%default'].".format(editions),
                       default="base")
-    parser.add_option("-p", "--platformArchitecture",
-                      dest="platform_arch",
-                      help="Platform/architecture to download. The architecture is not required."
-                           "  [REQUIRED]. Examples include: 'linux/x86_64', 'osx', 'rhel62',"
-                           " 'windows/x86_64-2008plus-ssl'.",
+    parser.add_option("-p", "--platform",
+                      dest="platform",
+                      help="Platform to download [REQUIRED]. Examples include: 'linux',"
+                           " 'osx', 'rhel62', 'windows'.",
                       default=None)
+    parser.add_option("-a", "--architecture",
+                      dest="architecture",
+                      help="Architecture to download, [default: '%default']. Examples include:"
+                           " 'arm64', 'ppc64le', 's390x' and 'x86_64'.",
+                      default="x86_64")
     parser.add_option("-u", "--useLatest",
                       dest="use_latest",
                       action="store_true",
@@ -415,7 +442,7 @@ we'll pull the highest non-rc version compatible with the version specified.
     if (not versions or
         not options.install_dir or
         not options.link_dir or
-        not options.platform_arch):
+        not options.platform):
         parser.print_help()
         parser.exit(1)
 
@@ -423,11 +450,12 @@ we'll pull the highest non-rc version compatible with the version specified.
         options.install_dir,
         options.link_dir,
         options.edition,
-        options.platform_arch,
+        options.platform,
+        options.architecture,
         options.use_latest)
 
     for version in versions:
-        downloader.download_version(version)
+        downloader.download_install(version)
 
 
 if __name__ == "__main__":

@@ -1148,11 +1148,12 @@ functions:
         pip install 'pyOpenSSL ; sys_platform == "win32" or sys_platform == "cygwin"'
 
         rm -rf /data/install /data/multiversion
-        $python buildscripts/setup_multiversion_mongodb.py                  \
-          --installDir /data/install                                        \
-          --linkDir /data/multiversion                                      \
-          --edition ${multiversion_edition|base}                            \
-          --platformArchitecture ${multiversion_platform_arch|linux/x86_64} \
+        $python buildscripts/setup_multiversion_mongodb.py   \
+          --installDir /data/install                         \
+          --linkDir /data/multiversion                       \
+          --edition ${multiversion_edition|base}             \
+          --platform ${multiversion_platform|linux}          \
+          --architecture ${multiversion_architecture|x86_64} \
           --useLatest 3.0 3.2 3.4 3.6
 
   "do snmp setup" :
@@ -4993,8 +4994,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1204
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1204 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    multiversion_platform_arch: "ubuntu1204"
-    multiversion_edition: "targeted"
+    multiversion_platform: ubuntu1204
+    multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -5075,8 +5076,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-ubuntu1404
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1404 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    multiversion_platform_arch: "ubuntu1404"
-    multiversion_edition: "targeted"
+    multiversion_platform: ubuntu1404
+    multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -5185,11 +5186,8 @@ buildvariants:
     push_arch: x86_64-ubuntu1604
     lang_environment: LANG=C
     compile_flags: --ssl MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    # TODO SERVER-32600: Re-enable targeted downloads after setup_multiversion_mongodb.py is
-    # guaranteed to download x86_64 binaries for this platform.
-    #
-    # multiversion_platform_arch: "ubuntu1604"
-    # multiversion_edition: "targeted"
+    multiversion_platform: ubuntu1604
+    multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -5651,8 +5649,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-amazon
     compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    multiversion_platform_arch: "amzn64"
-    multiversion_edition: "enterprise"
+    multiversion_platform: amzn64
+    multiversion_edition: enterprise
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -6067,7 +6065,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: win32
     push_arch: x86_64-2008plus-ssl
-    multiversion_platform_arch: windows/x86_64-2008plus-ssl
+    multiversion_platform: windows_x86_64-2008plus-ssl
     msi_target: msi
     content_type: application/zip
     compile_flags: --release --ssl MONGO_DISTMOD=2008plus-ssl CPPPATH="c:/openssl/include" LIBPATH="c:/openssl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --dynamic-windows --win-version-min=ws08r2
@@ -6213,7 +6211,7 @@ buildvariants:
     gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
-    multiversion_platform_arch: "osx-ssl"
+    multiversion_platform: osx-ssl
     num_jobs_available: 1
     build_mongoreplay: true
   tasks:
@@ -6469,8 +6467,8 @@ buildvariants:
     push_arch: x86_64-enterprise-rhel62
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
-    multiversion_platform_arch: "rhel62"
-    multiversion_edition: "targeted"
+    multiversion_platform: rhel62
+    multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager-enterprise.py
@@ -6664,8 +6662,8 @@ buildvariants:
     gorootvars: GOROOT=/opt/go PATH="/opt/go/bin:$PATH"
     tooltags: "-tags 'ssl sasl'"
     compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    multiversion_platform_arch: "rhel62"
-    multiversion_edition: "targeted"
+    multiversion_platform: rhel62
+    multiversion_edition: targeted
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 2)) # Avoid starting too many mongod's
     # The gcov instrumentation saves the path the .gcno files were created in as the default path
     # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
@@ -6861,8 +6859,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel62
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    multiversion_platform_arch: "rhel62"
-    multiversion_edition: "targeted"
+    multiversion_platform: rhel62
+    multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -6944,8 +6942,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-rhel70
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    multiversion_platform_arch: "rhel70"
-    multiversion_edition: "targeted"
+    multiversion_platform: rhel70
+    multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -7724,8 +7722,8 @@ buildvariants:
     push_arch: x86_64-suse12
     compile_flags: --ssl MONGO_DISTMOD=suse12 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
-    multiversion_platform_arch: "suse12"
-    multiversion_edition: "targeted"
+    multiversion_platform: suse12
+    multiversion_edition: targeted
     has_packages: true
     packager_script: packager.py
     packager_arch: x86_64
@@ -7919,8 +7917,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian71
     compile_flags: --ssl MONGO_DISTMOD=debian71 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    multiversion_platform_arch: "debian71"
-    multiversion_edition: "targeted"
+    multiversion_platform: debian71
+    multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -8005,8 +8003,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian81
     compile_flags: --ssl MONGO_DISTMOD=debian81 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    multiversion_platform_arch: "debian81"
-    multiversion_edition: "targeted"
+    multiversion_platform: debian81
+    multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -8144,8 +8142,8 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-debian92
     compile_flags: --ssl MONGO_DISTMOD=debian92 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
-    multiversion_platform_arch: "debian92"
-    multiversion_edition: "targeted"
+    multiversion_platform: debian92
+    multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
     packager_script: packager.py
@@ -8232,8 +8230,8 @@ buildvariants:
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,requires_mmapv1
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include" --use-basis-tech-rosette-linguistics-platform=on
-    multiversion_platform_arch: "rhel62"
-    multiversion_edition: "enterprise"
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
     build_mongoreplay: true
@@ -8731,11 +8729,8 @@ buildvariants:
     lang_environment: LANG=C
     san_options: LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1" ASAN_OPTIONS=detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    # TODO SERVER-32600: Re-enable targeted downloads after setup_multiversion_mongodb.py is
-    # guaranteed to download x86_64 binaries for this platform.
-    #
-    # multiversion_platform_arch: "ubuntu1604"
-    # multiversion_edition: "targeted"
+    multiversion_platform: ubuntu1604
+    multiversion_edition: targeted
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under ASAN build.
     build_mongoreplay: true
     hang_analyzer_dump_core: false
@@ -8889,11 +8884,8 @@ buildvariants:
     lang_environment: LANG=C
     san_options: UBSAN_OPTIONS="print_stacktrace=1:handle_abort=0:handle_segv=0:handle_sigbus=0:handle_sigill=0:handle_sigfpe=0"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined --ssl -j$(grep -c ^processor /proc/cpuinfo) --nostrip
-    # TODO SERVER-32600: Re-enable targeted downloads after setup_multiversion_mongodb.py is
-    # guaranteed to download x86_64 binaries for this platform.
-    #
-    # multiversion_platform_arch: "ubuntu1604"
-    # multiversion_edition: "targeted"
+    multiversion_platform: ubuntu1604
+    multiversion_edition: targeted
     num_jobs_available: $(($(grep -c ^processor /proc/cpuinfo) / 3)) # Avoid starting too many mongod's under UBSAN build.
     build_mongoreplay: true
   tasks:
@@ -9170,7 +9162,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_gcc.vars
       CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include"
       --use-basis-tech-rosette-linguistics-platform=on
-    multiversion_platform_arch: rhel62
+    multiversion_platform: rhel62
     multiversion_edition: targeted
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     has_packages: true
@@ -9280,8 +9272,8 @@ buildvariants:
     gorootvars: >-
       PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
       CGO_CFLAGS="-D_WIN32_WINNT=0x0601 -DNTDDI_VERSION=0x06010000"
-    multiversion_platform_arch: windows
-    multiversion_edition: "enterprise"
+    multiversion_platform: windows
+    multiversion_edition: enterprise
     msi_target: msi
     content_type: application/zip
     compile_flags: >-
@@ -9405,8 +9397,8 @@ buildvariants:
     compile_flags: >-
       --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10"
       LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
-    multiversion_platform_arch: "osx"
-    multiversion_edition: "enterprise"
+    multiversion_platform: osx
+    multiversion_edition: enterprise
     num_jobs_available: 1
     build_mongoreplay: true
   tasks:
