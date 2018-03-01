@@ -32,8 +32,14 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/config.h"
 
 namespace mongo {
+
+#if (MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_WINDOWS) || \
+    (MONGO_CONFIG_SSL_PROVIDER == SSL_PROVIDER_APPLE)
+#define MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS 1
+#endif
 
 namespace optionenvironment {
 class OptionSection;
@@ -48,10 +54,21 @@ struct SSLParams {
     std::string sslPEMKeyFile;      // --sslPEMKeyFile
     std::string sslPEMKeyPassword;  // --sslPEMKeyPassword
     std::string sslClusterFile;     // --sslInternalKeyFile
-    std::string sslClusterPassword;               // --sslInternalKeyPassword
-    std::string sslCAFile;                        // --sslCAFile
-    std::string sslCRLFile;                       // --sslCRLFile
-    std::string sslCipherConfig;                  // --sslCipherConfig
+    std::string sslClusterPassword;  // --sslInternalKeyPassword
+    std::string sslCAFile;           // --sslCAFile
+    std::string sslCRLFile;          // --sslCRLFile
+    std::string sslCipherConfig;     // --sslCipherConfig
+
+    struct CertificateSelector {
+        std::string subject;
+        std::vector<uint8_t> thumbprint;
+        std::vector<uint8_t> serial;
+    };
+#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+    CertificateSelector sslCertificateSelector;         // --sslCertificateSelector
+    CertificateSelector sslClusterCertificateSelector;  // --sslClusterCertificateSelector
+#endif
+
     std::vector<Protocols> sslDisabledProtocols;  // --sslDisabledProtocols
     bool sslWeakCertificateValidation = false;    // --sslWeakCertificateValidation
     bool sslFIPSMode = false;                     // --sslFIPSMode
@@ -95,6 +112,9 @@ Status addSSLClientOptions(mongo::optionenvironment::OptionSection* options);
 
 Status storeSSLServerOptions(const mongo::optionenvironment::Environment& params);
 
+Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
+                                StringData name,
+                                StringData value);
 /**
  * Canonicalize SSL options for the given environment that have different representations with
  * the same logical meaning.

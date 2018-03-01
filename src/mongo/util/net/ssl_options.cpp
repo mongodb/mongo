@@ -34,7 +34,9 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/config.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/text.h"
@@ -42,9 +44,71 @@
 namespace mongo {
 
 namespace moe = mongo::optionenvironment;
-
-
 using std::string;
+
+namespace {
+StatusWith<std::vector<uint8_t>> hexToVector(StringData hex) {
+    if (std::any_of(hex.begin(), hex.end(), [](char c) { return !isxdigit(c); })) {
+        return {ErrorCodes::BadValue, "Not a valid hex string"};
+    }
+    if (hex.size() % 2) {
+        return {ErrorCodes::BadValue, "Not an even number of hexits"};
+    }
+
+    std::vector<uint8_t> ret;
+    ret.resize(hex.size() >> 1);
+    int idx = -2;
+    std::generate(ret.begin(), ret.end(), [&hex, &idx] {
+        idx += 2;
+        return (fromHex(hex[idx]) << 4) | fromHex(hex[idx + 1]);
+    });
+    return ret;
+}
+}  // nameapace
+
+Status parseCertificateSelector(SSLParams::CertificateSelector* selector,
+                                StringData name,
+                                StringData value) {
+    selector->subject.clear();
+    selector->thumbprint.clear();
+    selector->serial.clear();
+
+    const auto delim = value.find('=');
+    if (delim == std::string::npos) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Certificate selector for '" << name
+                              << "' must be a key=value pair"};
+    }
+
+    auto key = value.substr(0, delim);
+    if (key == "subject") {
+        selector->subject = value.substr(delim + 1).toString();
+        return Status::OK();
+    }
+
+    if ((key != "thumbprint") && (key != "serial")) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Unknown certificate selector property for '" << name << "': '"
+                              << key
+                              << "'"};
+    }
+
+    auto swHex = hexToVector(value.substr(delim + 1));
+    if (!swHex.isOK()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Invalid certificate selector value for '" << name << "': "
+                              << swHex.getStatus().reason()};
+    }
+
+    if (key == "thumbprint") {
+        selector->thumbprint = std::move(swHex.getValue());
+    } else {
+        invariant(key == "serial");
+        selector->serial = std::move(swHex.getValue());
+    }
+
+    return Status::OK();
+}
 
 Status addSSLServerOptions(moe::OptionSection* options) {
     options
@@ -125,6 +189,23 @@ Status addSSLServerOptions(moe::OptionSection* options) {
     options->addOptionChaining(
         "net.ssl.FIPSMode", "sslFIPSMode", moe::Switch, "activate FIPS 140-2 mode at startup");
 
+#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+    options
+        ->addOptionChaining("net.ssl.certificateSelector",
+                            "sslCertificateSelector",
+                            moe::String,
+                            "SSL Certificate in system store")
+        .incompatibleWith("net.ssl.PEMKeyFile")
+        .incompatibleWith("net.ssl.PEMKeyPassword");
+    options
+        ->addOptionChaining("net.ssl.clusterCertificateSelector",
+                            "sslClusterCertificateSelector",
+                            moe::String,
+                            "SSL Certificate in system store for internal SSL authentication")
+        .incompatibleWith("net.ssl.clusterFile")
+        .incompatibleWith("net.ssl.clusterFilePassword");
+#endif
+
     return Status::OK();
 }
 
@@ -170,6 +251,16 @@ Status addSSLClientOptions(moe::OptionSection* options) {
 
     options->addOptionChaining(
         "ssl.FIPSMode", "sslFIPSMode", moe::Switch, "activate FIPS 140-2 mode at startup");
+
+#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+    options
+        ->addOptionChaining("ssl.certificateSelector",
+                            "sslCertificateSelector",
+                            moe::String,
+                            "SSL Certificate in system store")
+        .incompatibleWith("ssl.PEMKeyFile")
+        .incompatibleWith("ssl.PEMKeyPassword");
+#endif
 
     return Status::OK();
 }
@@ -327,6 +418,27 @@ Status storeSSLServerOptions(const moe::Environment& params) {
         sslGlobalParams.sslFIPSMode = params["net.ssl.FIPSMode"].as<bool>();
     }
 
+#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+    if (params.count("net.ssl.certificateSelector")) {
+        const auto status =
+            parseCertificateSelector(&sslGlobalParams.sslCertificateSelector,
+                                     "net.ssl.certificateSelector",
+                                     params["net.ssl.certificateSelector"].as<std::string>());
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+    if (params.count("net.ssl.ClusterCertificateSelector")) {
+        const auto status = parseCertificateSelector(
+            &sslGlobalParams.sslClusterCertificateSelector,
+            "net.ssl.clusterCertificateSelector",
+            params["net.ssl.clusterCertificateSelector"].as<std::string>());
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+#endif
+
     int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
     if (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled) {
         if (sslGlobalParams.sslPEMKeyFile.size() == 0) {
@@ -399,6 +511,17 @@ Status storeSSLClientOptions(const moe::Environment& params) {
     if (params.count("ssl.FIPSMode")) {
         sslGlobalParams.sslFIPSMode = true;
     }
+#ifdef MONGO_CONFIG_SSL_CERTIFICATE_SELECTORS
+    if (params.count("ssl.certificateSelector")) {
+        const auto status =
+            parseCertificateSelector(&sslGlobalParams.sslCertificateSelector,
+                                     "ssl.certificateSelector",
+                                     params["ssl.certificateSelector"].as<std::string>());
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+#endif
     return Status::OK();
 }
 
