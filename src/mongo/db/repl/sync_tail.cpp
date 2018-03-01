@@ -515,37 +515,6 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     }
 }
 
-using SessionRecordMap =
-    stdx::unordered_map<LogicalSessionId, SessionTxnRecord, LogicalSessionIdHash>;
-
-void scheduleTxnTableUpdates(OperationContext* opCtx,
-                             ThreadPool* threadPool,
-                             const SessionRecordMap& latestRecords) {
-    for (const auto& it : latestRecords) {
-        auto& record = it.second;
-
-        invariantOK(threadPool->schedule([&record]() {
-            auto opCtx = cc().makeOperationContext();
-            ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
-                opCtx->lockState());
-            Session::updateSessionRecordOnSecondary(opCtx.get(), record);
-        }));
-    }
-}
-
-/**
- * A session txn record is greater (i.e. later) than another if its transaction number is greater,
- * or if its transaction number is the same, and its last write optime is greater.
- *
- * Records can only be compared meaningfully if they are for the same session id.
- */
-bool isSessionTxnRecordLaterThan(const SessionTxnRecord& lhs, const SessionTxnRecord& rhs) {
-    invariant(lhs.getSessionId() == rhs.getSessionId());
-
-    return (lhs.getTxnNum() > rhs.getTxnNum()) ||
-        (lhs.getTxnNum() == rhs.getTxnNum() && lhs.getLastWriteOpTime() > rhs.getLastWriteOpTime());
-}
-
 /**
  * Caches per-collection properties which are relevant for oplog application, so that they don't
  * have to be retrieved repeatedly for each op.
@@ -660,42 +629,6 @@ void fillWriterVectors(OperationContext* opCtx,
         }
         writer.push_back(&op);
     }
-}
-
-/**
- * Returns a map of the "latest" transaction table records for each logical session id present in
- * the given operations. Each record represents the final state of the transaction table entry for
- * that session id after the operations are applied.
- */
-SessionRecordMap getLatestSessionRecords(const MultiApplier::Operations& ops) {
-    SessionRecordMap latestSessionRecords;
-
-    for (auto&& op : ops) {
-        const auto& sessionInfo = op.getOperationSessionInfo();
-        // Do not write session table entries for applyOps, as multi-document transactions
-        // and retryable writes do not work together.
-        // TODO(SERVER-33501): Make multi-docunment transactions work with retryable writes.
-        if (sessionInfo.getTxnNumber() &&
-            (!op.isCommand() || op.getCommandType() != OplogEntry::CommandType::kApplyOps)) {
-            const auto& lsid = *sessionInfo.getSessionId();
-
-            SessionTxnRecord record;
-            record.setSessionId(lsid);
-            record.setTxnNum(*sessionInfo.getTxnNumber());
-            record.setLastWriteOpTime(op.getOpTime());
-            invariant(op.getWallClockTime());
-            record.setLastWriteDate(*op.getWallClockTime());
-
-            auto it = latestSessionRecords.find(lsid);
-            if (it == latestSessionRecords.end()) {
-                latestSessionRecords.emplace(lsid, std::move(record));
-            } else if (isSessionTxnRecordLaterThan(record, it->second)) {
-                latestSessionRecords[lsid] = std::move(record);
-            }
-        }
-    }
-
-    return latestSessionRecords;
 }
 
 }  // namespace
@@ -1412,8 +1345,15 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         // 'applyOpsOperations' have been applied.
         std::vector<MultiApplier::Operations> applyOpsOperations;
 
+        // Normal writes to config.transactions in the primary don't create an oplog entry.
+        // Reconstruct these ops so config.transactions will be replicated correctly.
+        // Need to create a new copy of ops vector because the workerPool is also concurrently
+        // reading it and we don't want the new oplog entries to get written to the actual
+        // oplog.rs collection.
+        auto opsWithTxnUpdates = Session::addOpsForReplicatingTxnTable(ops);
+
         std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getStats().numThreads);
-        fillWriterVectors(opCtx, &ops, &writerVectors, &applyOpsOperations);
+        fillWriterVectors(opCtx, &opsWithTxnUpdates, &writerVectors, &applyOpsOperations);
 
         // Wait for writes to finish before applying ops.
         workerPool->waitForIdle();
@@ -1441,11 +1381,6 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
                 }
             }
         }
-
-        // Update the transaction table to point to the latest oplog entries for each session id.
-        const auto latestSessionRecords = getLatestSessionRecords(ops);
-        scheduleTxnTableUpdates(opCtx, workerPool, latestSessionRecords);
-        workerPool->waitForIdle();
 
         // Notify the storage engine that a replication batch has completed.
         // This means that all the writes associated with the oplog entries in the batch are

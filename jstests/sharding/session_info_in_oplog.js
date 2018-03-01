@@ -13,6 +13,8 @@
         return;
     }
 
+    const kNodes = 2;
+
     var checkOplog = function(oplog, lsid, uid, txnNum, stmtId, prevTs, prevTerm) {
         assert(oplog != null);
         assert(oplog.lsid != null);
@@ -40,7 +42,7 @@
         assert.eq(expectedTerm, sessionDoc.lastWriteOpTime.t);
     };
 
-    var runTests = function(mainConn, priConn) {
+    var runTests = function(mainConn, priConn, secConn) {
         var lsid = UUID();
         var uid = function() {
             var user = mainConn.getDB("admin")
@@ -68,6 +70,7 @@
             ordered: false,
             lsid: {id: lsid},
             txnNumber: txnNumber,
+            writeConcern: {w: kNodes},
         };
 
         assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
@@ -81,6 +84,7 @@
         checkOplog(secondDoc, lsid, uid, txnNumber, 1, firstDoc.ts, firstDoc.t);
 
         checkSessionCatalog(priConn, lsid, uid, txnNumber, secondDoc.ts, secondDoc.t);
+        checkSessionCatalog(secConn, lsid, uid, txnNumber, secondDoc.ts, secondDoc.t);
 
         ////////////////////////////////////////////////////////////////////////
         // Test update command
@@ -96,6 +100,7 @@
             ordered: false,
             lsid: {id: lsid},
             txnNumber: txnNumber,
+            writeConcern: {w: kNodes},
         };
 
         assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
@@ -110,6 +115,7 @@
         checkOplog(thirdDoc, lsid, uid, txnNumber, 2, secondDoc.ts, secondDoc.t);
 
         checkSessionCatalog(priConn, lsid, uid, txnNumber, thirdDoc.ts, thirdDoc.t);
+        checkSessionCatalog(secConn, lsid, uid, txnNumber, thirdDoc.ts, thirdDoc.t);
 
         ////////////////////////////////////////////////////////////////////////
         // Test delete command
@@ -121,6 +127,7 @@
             ordered: false,
             lsid: {id: lsid},
             txnNumber: txnNumber,
+            writeConcern: {w: kNodes},
         };
 
         assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
@@ -132,6 +139,7 @@
         checkOplog(secondDoc, lsid, uid, txnNumber, 1, firstDoc.ts, firstDoc.t);
 
         checkSessionCatalog(priConn, lsid, uid, txnNumber, secondDoc.ts, secondDoc.t);
+        checkSessionCatalog(secConn, lsid, uid, txnNumber, secondDoc.ts, secondDoc.t);
 
         ////////////////////////////////////////////////////////////////////////
         // Test findAndModify command (upsert)
@@ -145,6 +153,7 @@
             upsert: true,
             lsid: {id: lsid},
             txnNumber: txnNumber,
+            writeConcern: {w: kNodes},
         };
 
         assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
@@ -156,6 +165,7 @@
         assert.eq(null, firstDoc.postImageTs);
 
         checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
+        checkSessionCatalog(secConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
         var lastTs = firstDoc.ts;
 
         ////////////////////////////////////////////////////////////////////////
@@ -170,6 +180,7 @@
             upsert: false,
             lsid: {id: lsid},
             txnNumber: txnNumber,
+            writeConcern: {w: kNodes},
         };
 
         var beforeDoc = mainConn.getDB('test').user.findOne({_id: 40});
@@ -189,6 +200,7 @@
         assert.eq(beforeDoc, savedDoc.o);
 
         checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
+        checkSessionCatalog(secConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
         lastTs = firstDoc.ts;
 
         ////////////////////////////////////////////////////////////////////////
@@ -203,6 +215,7 @@
             upsert: false,
             lsid: {id: lsid},
             txnNumber: txnNumber,
+            writeConcern: {w: kNodes},
         };
 
         res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
@@ -222,6 +235,7 @@
         assert.eq(afterDoc, savedDoc.o);
 
         checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
+        checkSessionCatalog(secConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
         lastTs = firstDoc.ts;
 
         ////////////////////////////////////////////////////////////////////////
@@ -236,6 +250,7 @@
             upsert: false,
             lsid: {id: lsid},
             txnNumber: txnNumber,
+            writeConcern: {w: kNodes},
         };
 
         beforeDoc = mainConn.getDB('test').user.findOne({_id: 40});
@@ -255,6 +270,7 @@
         assert.eq(beforeDoc, savedDoc.o);
 
         checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
+        checkSessionCatalog(secConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
         lastTs = firstDoc.ts;
 
         ////////////////////////////////////////////////////////////////////////
@@ -269,6 +285,7 @@
             upsert: false,
             lsid: {id: lsid},
             txnNumber: txnNumber,
+            writeConcern: {w: kNodes},
         };
 
         res = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
@@ -288,6 +305,7 @@
         assert.eq(afterDoc, savedDoc.o);
 
         checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
+        checkSessionCatalog(secConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
         lastTs = firstDoc.ts;
 
         ////////////////////////////////////////////////////////////////////////
@@ -301,6 +319,7 @@
             new: false,
             lsid: {id: lsid},
             txnNumber: txnNumber,
+            writeConcern: {w: kNodes},
         };
 
         beforeDoc = mainConn.getDB('test').user.findOne({_id: 40});
@@ -320,22 +339,27 @@
         assert.eq(beforeDoc, savedDoc.o);
 
         checkSessionCatalog(priConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
+        checkSessionCatalog(secConn, lsid, uid, txnNumber, firstDoc.ts, firstDoc.t);
         lastTs = firstDoc.ts;
     };
 
-    var replTest = new ReplSetTest({nodes: 1});
+    var replTest = new ReplSetTest({nodes: kNodes});
     replTest.startSet();
     replTest.initiate();
 
     var priConn = replTest.getPrimary();
+    var secConn = replTest.getSecondary();
+    secConn.setSlaveOk(true);
 
-    runTests(priConn, priConn);
+    runTests(priConn, priConn, secConn);
 
     replTest.stopSet();
 
-    var st = new ShardingTest({shards: {rs0: {nodes: 1}}});
+    var st = new ShardingTest({shards: {rs0: {nodes: kNodes}}});
 
-    runTests(st.s, st.rs0.getPrimary());
+    secConn = st.rs0.getSecondary();
+    secConn.setSlaveOk(true);
+    runTests(st.s, st.rs0.getPrimary(), secConn);
 
     st.stop();
 

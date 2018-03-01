@@ -90,6 +90,7 @@ repl::OplogEntry makeOplogEntry(NamespaceString nss) {
                             BSONObj(),                        // o
                             boost::none,                      // o2
                             {},                               // sessionInfo
+                            boost::none,                      // upsert
                             boost::none,                      // wall clock time
                             boost::none,                      // statement id
                             boost::none,   // optime of previous write within same transaction
@@ -194,7 +195,6 @@ auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
 
     return OpTime(tsArray.Array()[elem].timestamp(), termArray.Array()[elem].Long());
 };
-
 
 TEST_F(SyncTailTest, SyncApplyNoNamespaceBadOp) {
     const BSONObj op = BSON("op"
@@ -665,119 +665,6 @@ TEST_F(SyncTailTest, MultiApplyAssignsOperationsToWriterThreadsBasedOnNamespaceH
     ASSERT_EQUALS(NamespaceString::kRsOplogNamespace, nssForInsert);
     ASSERT_EQUALS(op1, unittest::assertGet(OplogEntry::parse(operationsWrittenToOplog[0].doc)));
     ASSERT_EQUALS(op2, unittest::assertGet(OplogEntry::parse(operationsWrittenToOplog[1].doc)));
-}
-
-TEST_F(SyncTailTest, MultiApplyUpdatesTheTransactionTable) {
-    // Set up the transactions collection, which can only be done by the primary.
-    ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
-    SessionCatalog::create(_opCtx->getServiceContext());
-    SessionCatalog::get(_opCtx->getServiceContext())->onStepUp(_opCtx.get());
-    ON_BLOCK_EXIT([&] { SessionCatalog::reset_forTest(_opCtx->getServiceContext()); });
-    ASSERT_OK(
-        ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_SECONDARY));
-
-    // Entries with a session id and a txnNumber update the transaction table.
-    auto lsidSingle = makeLogicalSessionIdForTest();
-    auto opSingle =
-        makeInsertDocumentOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(1), 0), 1LL},
-                                                             NamespaceString("test.0"),
-                                                             BSON("x" << 1),
-                                                             lsidSingle,
-                                                             5LL,
-                                                             0);
-
-    // For entries with the same session, the entry with a larger txnNumber is saved.
-    auto lsidDiffTxn = makeLogicalSessionIdForTest();
-    auto opDiffTxnSmaller =
-        makeInsertDocumentOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(2), 0), 1LL},
-                                                             NamespaceString("test.1"),
-                                                             BSON("x" << 0),
-                                                             lsidDiffTxn,
-                                                             10LL,
-                                                             1);
-    auto opDiffTxnLarger =
-        makeInsertDocumentOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(3), 0), 1LL},
-                                                             NamespaceString("test.1"),
-                                                             BSON("x" << 1),
-                                                             lsidDiffTxn,
-                                                             20LL,
-                                                             1);
-
-    // For entries with the same session and txnNumber, the later optime is saved.
-    auto lsidSameTxn = makeLogicalSessionIdForTest();
-    auto opSameTxnLater =
-        makeInsertDocumentOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(6), 0), 1LL},
-                                                             NamespaceString("test.2"),
-                                                             BSON("x" << 0),
-                                                             lsidSameTxn,
-                                                             30LL,
-                                                             0);
-    auto opSameTxnSooner =
-        makeInsertDocumentOplogEntryWithSessionInfoAndStmtId({Timestamp(Seconds(5), 0), 1LL},
-                                                             NamespaceString("test.2"),
-                                                             BSON("x" << 1),
-                                                             lsidSameTxn,
-                                                             30LL,
-                                                             1);
-
-    // Entries with a session id but no txnNumber do not lead to updates.
-    auto lsidNoTxn = makeLogicalSessionIdForTest();
-    OperationSessionInfo info;
-    info.setSessionId(lsidNoTxn);
-    auto opNoTxn = makeInsertDocumentOplogEntryWithSessionInfo(
-        {Timestamp(Seconds(7), 0), 1LL}, NamespaceString("test.3"), BSON("x" << 0), info);
-
-    // Apply the batch and verify the transaction collection was properly updated for each scenario.
-    auto writerPool = SyncTail::makeWriterPool();
-    ASSERT_OK(multiApply(
-        _opCtx.get(),
-        writerPool.get(),
-        {opSingle, opDiffTxnSmaller, opDiffTxnLarger, opSameTxnLater, opSameTxnSooner, opNoTxn},
-        noopApplyOperationFn));
-
-    DBDirectClient client(_opCtx.get());
-
-    // The txnNum and optime of the only write were saved.
-    auto resultSingleDoc =
-        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidSingle.toBSON()));
-    ASSERT_TRUE(!resultSingleDoc.isEmpty());
-
-    auto resultSingle =
-        SessionTxnRecord::parse(IDLParserErrorContext("resultSingleDoc test"), resultSingleDoc);
-
-    ASSERT_EQ(resultSingle.getTxnNum(), 5LL);
-    ASSERT_EQ(resultSingle.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(1), 0), 1));
-
-    // The txnNum and optime of the write with the larger txnNum were saved.
-    auto resultDiffTxnDoc =
-        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidDiffTxn.toBSON()));
-    ASSERT_TRUE(!resultDiffTxnDoc.isEmpty());
-
-    auto resultDiffTxn =
-        SessionTxnRecord::parse(IDLParserErrorContext("resultDiffTxnDoc test"), resultDiffTxnDoc);
-
-    ASSERT_EQ(resultDiffTxn.getTxnNum(), 20LL);
-    ASSERT_EQ(resultDiffTxn.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(3), 0), 1));
-
-    // The txnNum and optime of the write with the later optime were saved.
-    auto resultSameTxnDoc =
-        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidSameTxn.toBSON()));
-    ASSERT_TRUE(!resultSameTxnDoc.isEmpty());
-
-    auto resultSameTxn =
-        SessionTxnRecord::parse(IDLParserErrorContext("resultSameTxnDoc test"), resultSameTxnDoc);
-
-    ASSERT_EQ(resultSameTxn.getTxnNum(), 30LL);
-    ASSERT_EQ(resultSameTxn.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(6), 0), 1));
-
-    // There is no entry for the write with no txnNumber.
-    auto resultNoTxn =
-        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
-                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidNoTxn.toBSON()));
-    ASSERT_TRUE(resultNoTxn.isEmpty());
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyUsesSyncApplyToApplyOperation) {
@@ -1812,6 +1699,265 @@ TEST_F(SyncTailTest, DropDatabaseSucceedsInRecovering) {
 
     auto op = makeCommandOplogEntry(nextOpTime(), ns, BSON("dropDatabase" << 1));
     ASSERT_OK(runOpSteadyState(op));
+}
+
+class SyncTailTxnTableTest : public SyncTailTest {
+public:
+    void setUp() override {
+        SyncTailTest::setUp();
+
+        SessionCatalog::create(_opCtx->getServiceContext());
+        SessionCatalog::get(_opCtx->getServiceContext())->onStepUp(_opCtx.get());
+
+        DBDirectClient client(_opCtx.get());
+        BSONObj result;
+        ASSERT(client.runCommand(kNs.db().toString(), BSON("create" << kNs.coll()), result));
+    }
+    void tearDown() override {
+        SessionCatalog::reset_forTest(_opCtx->getServiceContext());
+        SyncTailTest::tearDown();
+    }
+
+    /**
+     * Creates an OplogEntry with given parameters and preset defaults for this test suite.
+     */
+    repl::OplogEntry makeOplogEntry(const NamespaceString& ns,
+                                    repl::OpTime opTime,
+                                    repl::OpTypeEnum opType,
+                                    BSONObj object,
+                                    boost::optional<BSONObj> object2,
+                                    const OperationSessionInfo& sessionInfo,
+                                    Date_t wallClockTime) {
+        return repl::OplogEntry(opTime,         // optime
+                                0,              // hash
+                                opType,         // opType
+                                ns,             // namespace
+                                boost::none,    // uuid
+                                boost::none,    // fromMigrate
+                                0,              // version
+                                object,         // o
+                                object2,        // o2
+                                sessionInfo,    // sessionInfo
+                                boost::none,    // false
+                                wallClockTime,  // wall clock time
+                                boost::none,    // statement id
+                                boost::none,    // optime of previous write within same transaction
+                                boost::none,    // pre-image optime
+                                boost::none);   // post-image optime
+    }
+
+    void checkTxnTable(const OperationSessionInfo& sessionInfo,
+                       const repl::OpTime& expectedOpTime,
+                       Date_t expectedWallClock) {
+        invariant(sessionInfo.getSessionId());
+        invariant(sessionInfo.getTxnNumber());
+
+        DBDirectClient client(_opCtx.get());
+        auto result = client.findOne(
+            NamespaceString::kSessionTransactionsTableNamespace.ns(),
+            {BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON())});
+        ASSERT_FALSE(result.isEmpty());
+
+        auto txnRecord =
+            SessionTxnRecord::parse(IDLParserErrorContext("parse txn record for test"), result);
+
+        ASSERT_EQ(*sessionInfo.getTxnNumber(), txnRecord.getTxnNum());
+        ASSERT_EQ(expectedOpTime, txnRecord.getLastWriteOpTime());
+        ASSERT_EQ(expectedWallClock, txnRecord.getLastWriteDate());
+    }
+
+    static const NamespaceString& nss() {
+        return kNs;
+    }
+
+private:
+    static const NamespaceString kNs;
+};
+
+const NamespaceString SyncTailTxnTableTest::kNs("test.foo");
+
+TEST_F(SyncTailTxnTableTest, SimpleWriteWithTxn) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+    const auto date = Date_t::now();
+
+    auto insertOp = makeOplogEntry(nss(),
+                                   {Timestamp(1, 0), 1},
+                                   repl::OpTypeEnum::kInsert,
+                                   BSON("_id" << 1),
+                                   boost::none,
+                                   sessionInfo,
+                                   date);
+
+    auto writerPool = SyncTail::makeWriterPool();
+    SyncTail syncTail(nullptr, multiSyncApply, writerPool.get());
+    ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp}));
+
+    checkTxnTable(sessionInfo, {Timestamp(1, 0), 1}, date);
+}
+
+TEST_F(SyncTailTxnTableTest, WriteWithTxnMixedWithDirectWriteToTxnTable) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+    const auto date = Date_t::now();
+
+    auto insertOp = makeOplogEntry(nss(),
+                                   {Timestamp(1, 0), 1},
+                                   repl::OpTypeEnum::kInsert,
+                                   BSON("_id" << 1),
+                                   boost::none,
+                                   sessionInfo,
+                                   date);
+
+    auto deleteOp = makeOplogEntry(NamespaceString::kSessionTransactionsTableNamespace,
+                                   {Timestamp(2, 0), 1},
+                                   repl::OpTypeEnum::kDelete,
+                                   BSON("_id" << sessionInfo.getSessionId()->toBSON()),
+                                   boost::none,
+                                   {},
+                                   Date_t::now());
+
+    auto writerPool = SyncTail::makeWriterPool();
+    SyncTail syncTail(nullptr, multiSyncApply, writerPool.get());
+    ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp, deleteOp}));
+
+    DBDirectClient client(_opCtx.get());
+    auto result = client.findOne(
+        NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        {BSON(SessionTxnRecord::kSessionIdFieldName << sessionInfo.getSessionId()->toBSON())});
+    ASSERT_TRUE(result.isEmpty());
+}
+
+TEST_F(SyncTailTxnTableTest, InterleavedWriteWithTxnMixedWithDirectWriteToTxnTable) {
+    const auto sessionId = makeLogicalSessionIdForTest();
+    OperationSessionInfo sessionInfo;
+    sessionInfo.setSessionId(sessionId);
+    sessionInfo.setTxnNumber(3);
+    auto date = Date_t::now();
+
+    auto insertOp = makeOplogEntry(nss(),
+                                   {Timestamp(1, 0), 1},
+                                   repl::OpTypeEnum::kInsert,
+                                   BSON("_id" << 1),
+                                   boost::none,
+                                   sessionInfo,
+                                   date);
+
+    auto deleteOp = makeOplogEntry(NamespaceString::kSessionTransactionsTableNamespace,
+                                   {Timestamp(2, 0), 1},
+                                   repl::OpTypeEnum::kDelete,
+                                   BSON("_id" << sessionInfo.getSessionId()->toBSON()),
+                                   boost::none,
+                                   {},
+                                   Date_t::now());
+
+    date = Date_t::now();
+    sessionInfo.setTxnNumber(7);
+    auto insertOp2 = makeOplogEntry(nss(),
+                                    {Timestamp(3, 0), 2},
+                                    repl::OpTypeEnum::kInsert,
+                                    BSON("_id" << 6),
+                                    boost::none,
+                                    sessionInfo,
+                                    date);
+
+    auto writerPool = SyncTail::makeWriterPool();
+    SyncTail syncTail(nullptr, multiSyncApply, writerPool.get());
+    ASSERT_OK(syncTail.multiApply(_opCtx.get(), {insertOp, deleteOp, insertOp2}));
+
+    checkTxnTable(sessionInfo, {Timestamp(3, 0), 2}, date);
+}
+
+TEST_F(SyncTailTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
+    NamespaceString ns0("test.0");
+    NamespaceString ns1("test.1");
+    NamespaceString ns2("test.2");
+    NamespaceString ns3("test.3");
+
+    DBDirectClient client(_opCtx.get());
+    BSONObj result;
+    ASSERT(client.runCommand(ns0.db().toString(), BSON("create" << ns0.coll()), result));
+    ASSERT(client.runCommand(ns1.db().toString(), BSON("create" << ns1.coll()), result));
+    ASSERT(client.runCommand(ns2.db().toString(), BSON("create" << ns2.coll()), result));
+    ASSERT(client.runCommand(ns3.db().toString(), BSON("create" << ns3.coll()), result));
+
+    // Entries with a session id and a txnNumber update the transaction table.
+    auto lsidSingle = makeLogicalSessionIdForTest();
+    auto opSingle = makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(
+        {Timestamp(Seconds(1), 0), 1LL}, ns0, BSON("_id" << 0), lsidSingle, 5LL, 0);
+
+    // For entries with the same session, the entry with a larger txnNumber is saved.
+    auto lsidDiffTxn = makeLogicalSessionIdForTest();
+    auto opDiffTxnSmaller = makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(
+        {Timestamp(Seconds(2), 0), 1LL}, ns1, BSON("_id" << 0), lsidDiffTxn, 10LL, 1);
+    auto opDiffTxnLarger = makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(
+        {Timestamp(Seconds(3), 0), 1LL}, ns1, BSON("_id" << 1), lsidDiffTxn, 20LL, 1);
+
+    // For entries with the same session and txnNumber, the later optime is saved.
+    auto lsidSameTxn = makeLogicalSessionIdForTest();
+    auto opSameTxnLater = makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(
+        {Timestamp(Seconds(6), 0), 1LL}, ns2, BSON("_id" << 0), lsidSameTxn, 30LL, 0);
+    auto opSameTxnSooner = makeInsertDocumentOplogEntryWithSessionInfoAndStmtId(
+        {Timestamp(Seconds(5), 0), 1LL}, ns2, BSON("_id" << 1), lsidSameTxn, 30LL, 1);
+
+    // Entries with a session id but no txnNumber do not lead to updates.
+    auto lsidNoTxn = makeLogicalSessionIdForTest();
+    OperationSessionInfo info;
+    info.setSessionId(lsidNoTxn);
+    auto opNoTxn = makeInsertDocumentOplogEntryWithSessionInfo(
+        {Timestamp(Seconds(7), 0), 1LL}, ns3, BSON("_id" << 0), info);
+
+    auto writerPool = SyncTail::makeWriterPool();
+    SyncTail syncTail(nullptr, multiSyncApply, writerPool.get());
+    ASSERT_OK(syncTail.multiApply(
+        _opCtx.get(),
+        {opSingle, opDiffTxnSmaller, opDiffTxnLarger, opSameTxnSooner, opSameTxnLater, opNoTxn}));
+
+    // The txnNum and optime of the only write were saved.
+    auto resultSingleDoc =
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidSingle.toBSON()));
+    ASSERT_TRUE(!resultSingleDoc.isEmpty());
+
+    auto resultSingle =
+        SessionTxnRecord::parse(IDLParserErrorContext("resultSingleDoc test"), resultSingleDoc);
+
+    ASSERT_EQ(resultSingle.getTxnNum(), 5LL);
+    ASSERT_EQ(resultSingle.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(1), 0), 1));
+
+    // The txnNum and optime of the write with the larger txnNum were saved.
+    auto resultDiffTxnDoc =
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidDiffTxn.toBSON()));
+    ASSERT_TRUE(!resultDiffTxnDoc.isEmpty());
+
+    auto resultDiffTxn =
+        SessionTxnRecord::parse(IDLParserErrorContext("resultDiffTxnDoc test"), resultDiffTxnDoc);
+
+    ASSERT_EQ(resultDiffTxn.getTxnNum(), 20LL);
+    ASSERT_EQ(resultDiffTxn.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(3), 0), 1));
+
+    // The txnNum and optime of the write with the later optime were saved.
+    auto resultSameTxnDoc =
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidSameTxn.toBSON()));
+    ASSERT_TRUE(!resultSameTxnDoc.isEmpty());
+
+    auto resultSameTxn =
+        SessionTxnRecord::parse(IDLParserErrorContext("resultSameTxnDoc test"), resultSameTxnDoc);
+
+    ASSERT_EQ(resultSameTxn.getTxnNum(), 30LL);
+    ASSERT_EQ(resultSameTxn.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(6), 0), 1));
+
+    // There is no entry for the write with no txnNumber.
+    auto resultNoTxn =
+        client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                       BSON(SessionTxnRecord::kSessionIdFieldName << lsidNoTxn.toBSON()));
+    ASSERT_TRUE(resultNoTxn.isEmpty());
 }
 
 }  // namespace

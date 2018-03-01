@@ -169,16 +169,6 @@ public:
                                      Date_t lastStmtIdWriteDate);
 
     /**
-     * Called after a replication batch has been applied on a secondary node. Keeps the session
-     * transaction entry in sync with the oplog chain which has been written.
-     *
-     * In order to avoid the possibility of deadlock, this method must not be called while holding a
-     * lock.
-     */
-    static void updateSessionRecordOnSecondary(OperationContext* opCtx,
-                                               const SessionTxnRecord& sessionTxnRecord);
-
-    /**
      * Marks the session as requiring refresh. Used when the session state has been modified
      * externally, such as through a direct write to the transactions table.
      */
@@ -257,6 +247,13 @@ public:
     const std::vector<repl::ReplOperation>& transactionOperationsForTest() {
         return _transactionOperations;
     }
+
+    /**
+     * Scan through the list of operations and add new oplog entries for updating
+     * config.transactions if needed.
+     */
+    static std::vector<repl::OplogEntry> addOpsForReplicatingTxnTable(
+        const std::vector<repl::OplogEntry>& ops);
 
 private:
     void _beginOrContinueTxn(WithLock, TxnNumber txnNumber, boost::optional<bool> autocommit);

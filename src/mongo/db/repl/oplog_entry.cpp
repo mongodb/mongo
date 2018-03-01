@@ -87,6 +87,7 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
                           const BSONObj& oField,
                           const boost::optional<BSONObj>& o2Field,
                           const OperationSessionInfo& sessionInfo,
+                          const boost::optional<bool>& isUpsert,
                           const boost::optional<mongo::Date_t>& wallClockTime,
                           const boost::optional<StmtId>& statementId,
                           const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
@@ -109,6 +110,10 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     builder.append(OplogEntryBase::kObjectFieldName, oField);
     if (o2Field) {
         builder.append(OplogEntryBase::kObject2FieldName, o2Field.get());
+    }
+    if (isUpsert) {
+        invariant(o2Field);
+        builder.append(OplogEntryBase::kUpsertFieldName, isUpsert.get());
     }
     if (wallClockTime) {
         builder.append(OplogEntryBase::kWallClockTimeFieldName, wallClockTime.get());
@@ -202,6 +207,7 @@ OplogEntry::OplogEntry(OpTime opTime,
                        const BSONObj& oField,
                        const boost::optional<BSONObj>& o2Field,
                        const OperationSessionInfo& sessionInfo,
+                       const boost::optional<bool>& isUpsert,
                        const boost::optional<mongo::Date_t>& wallClockTime,
                        const boost::optional<StmtId>& statementId,
                        const boost::optional<OpTime>& prevWriteOpTimeInTransaction,
@@ -217,6 +223,7 @@ OplogEntry::OplogEntry(OpTime opTime,
                                    oField,
                                    o2Field,
                                    sessionInfo,
+                                   isUpsert,
                                    wallClockTime,
                                    statementId,
                                    prevWriteOpTimeInTransaction,

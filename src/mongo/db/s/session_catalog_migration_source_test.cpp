@@ -72,6 +72,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
         object,                           // o
         object2,                          // o2
         {},                               // sessionInfo
+        boost::none,                      // upsert
         wallClockTime,                    // wall clock time
         stmtId,                           // statement id
         prevWriteOpTimeInTransaction,     // optime of previous write within same transaction
