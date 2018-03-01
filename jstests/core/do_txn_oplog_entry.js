@@ -1,13 +1,13 @@
 // @tags: [requires_non_retryable_commands]
 
-// Tests that doTxn is atomic for CRUD operations
+// Tests that doTxn produces correct oplog entries.
 (function() {
     'use strict';
-
     // For isMMAPv1.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");
     // For isReplSet
     load("jstests/libs/fixture_helpers.js");
+    load('jstests/libs/uuid_util.js');
 
     if (isMMAPv1(db)) {
         jsTestLog("Skipping test as the storage engine does not support doTxn.");
@@ -18,86 +18,63 @@
         return;
     }
 
+    var oplog = db.getSiblingDB('local').oplog.rs;
     var session = db.getMongo().startSession();
     var sessionDb = session.getDatabase("test");
-    var txnNumber = 0;
-
     var t = db.doTxn;
     t.drop();
-    assert.writeOK(t.insert({_id: 1}));
+    db.createCollection(t.getName());
+    const tUuid = getUUIDFromListCollections(db, t.getName());
 
-    // Operations including commands are not allowed and should be rejected completely.
-    assert.commandFailedWithCode(sessionDb.adminCommand({
-        doTxn: [
-            {op: 'i', ns: t.getFullName(), o: {_id: ObjectId(), x: 1}},
-            {op: 'c', ns: "invalid", o: {create: "t"}},
-        ],
-        txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
-    assert.eq(t.count({x: 1}), 0);
+    //
+    // Test insert ops.  Insert ops are unmodified except the UUID field is added.
+    //
+    const insertOps = [
+        {op: 'i', ns: t.getFullName(), o: {_id: 100, x: 1, y: 1}},
+        {op: 'i', ns: t.getFullName(), o: {_id: 101, x: 2, y: 1}},
+    ];
+    assert.commandWorked(sessionDb.runCommand({doTxn: insertOps, txnNumber: NumberLong("1")}));
+    let topOfOplog = oplog.find().sort({$natural: -1}).limit(1).next();
+    assert.eq(topOfOplog.txnNumber, NumberLong("1"));
+    assert.docEq(topOfOplog.o.applyOps, insertOps.map(x => Object.assign(x, {ui: tUuid})));
 
-    // Operations only including CRUD commands should be atomic, so the next insert will fail.
-    var tooLong = Array(2000).join("hello");
-    assert.commandFailedWithCode(sessionDb.adminCommand({
-        doTxn: [
-            {op: 'i', ns: t.getFullName(), o: {_id: ObjectId(), x: 1}},
-            {op: 'i', ns: t.getFullName(), o: {_id: tooLong, x: 1}},
-        ],
-        txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.KeyTooLong);
-    assert.eq(t.count({x: 1}), 0);
+    //
+    // Test update ops.  For updates, the "$v" UpdateSemantics field is added and non-idempotent
+    // operations are made idempotent.
+    //
+    const updateOps = [
+        {op: 'u', ns: t.getFullName(), o: {$inc: {x: 10}}, o2: {_id: 100}},
+        {op: 'u', ns: t.getFullName(), o: {$inc: {x: 10}}, o2: {_id: 101}}
+    ];
+    const expectedUpdateOps = [
+        {op: 'u', ns: t.getFullName(), o: {$v: 1, $set: {x: 11}}, o2: {_id: 100}, ui: tUuid},
+        {op: 'u', ns: t.getFullName(), o: {$v: 1, $set: {x: 12}}, o2: {_id: 101}, ui: tUuid}
+    ];
+    assert.commandWorked(sessionDb.runCommand({doTxn: updateOps, txnNumber: NumberLong("2")}));
+    topOfOplog = oplog.find().sort({$natural: -1}).limit(1).next();
+    assert.eq(topOfOplog.txnNumber, NumberLong("2"));
+    assert.docEq(topOfOplog.o.applyOps, expectedUpdateOps);
 
-    // Operations on non-existent databases cannot be atomic.
-    var newDBName = "do_txn_atomicity";
-    var newDB = sessionDb.getSiblingDB(newDBName);
-    assert.commandWorked(newDB.dropDatabase());
-    // Updates on a non-existent database no longer implicitly create collections and will fail with
-    // a NamespaceNotFound error.
-    assert.commandFailedWithCode(newDB.runCommand({
-        doTxn: [{op: "u", ns: newDBName + ".foo", o: {_id: 5, x: 17}, o2: {_id: 5, x: 16}}],
-        txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.NamespaceNotFound);
+    //
+    // Test delete ops.  Delete ops are unmodified except the UUID field is added.
+    //
+    const deleteOps = [
+        {op: 'd', ns: t.getFullName(), o: {_id: 100}},
+        {op: 'd', ns: t.getFullName(), o: {_id: 101}}
+    ];
+    assert.commandWorked(sessionDb.runCommand({doTxn: deleteOps, txnNumber: NumberLong("3")}));
+    topOfOplog = oplog.find().sort({$natural: -1}).limit(1).next();
+    assert.eq(topOfOplog.txnNumber, NumberLong("3"));
+    assert.docEq(topOfOplog.o.applyOps, deleteOps.map(x => Object.assign(x, {ui: tUuid})));
 
-    var sawTooManyLocksError = false;
+    //
+    // Make sure the transaction table is not affected by one-shot transactions.
+    //
+    assert.eq(0,
+              db.getSiblingDB('config')
+                  .transactions.find({"_id.id": session.getSessionId().id})
+                  .toArray(),
+              "No transactions should be written to the transaction table.");
 
-    function applyWithManyLocks(n) {
-        let cappedOps = [];
-        let multiOps = [];
-
-        for (let i = 0; i < n; i++) {
-            // Write to a capped collection, as that may require a lock for serialization.
-            let cappedName = "capped" + n + "-" + i;
-            assert.commandWorked(newDB.createCollection(cappedName, {capped: true, size: 100}));
-            cappedOps.push({op: 'i', ns: newDBName + "." + cappedName, o: {_id: 0}});
-
-            // Make an index multi-key, as that may require a lock for updating the catalog.
-            let multiName = "multi" + n + "-" + i;
-            assert.commandWorked(newDB[multiName].createIndex({x: 1}));
-            multiOps.push({op: 'i', ns: newDBName + "." + multiName, o: {_id: 0, x: [0, 1]}});
-        }
-
-        let res = [cappedOps, multiOps].map(
-            (doTxn) => newDB.runCommand({doTxn: doTxn, txnNumber: NumberLong(txnNumber++)}));
-        sawTooManyLocksError |= res.some((res) => res.code === ErrorCodes.TooManyLocks);
-        // Transactions involving just two collections should succeed.
-        if (n <= 2)
-            res.every((res) => res.ok);
-        // All transactions should either completely succeed or completely fail.
-        assert(res.every((res) => res.results.every((result) => result == res.ok)));
-        assert(res.every((res) => !res.ok || res.applied == n));
-    }
-
-    //  Try requiring different numbers of collection accesses in a single operation to cover
-    //  all edge cases, so we run out of available locks in different code paths such as during
-    //  oplog application.
-    applyWithManyLocks(1);
-    applyWithManyLocks(2);
-
-    for (let i = 9; i < 16; i++) {
-        applyWithManyLocks(i);
-    }
-    assert(sawTooManyLocksError, "test no longer exhausts the max number of locks held at once");
+    session.endSession();
 })();
