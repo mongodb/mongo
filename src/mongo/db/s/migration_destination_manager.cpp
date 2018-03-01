@@ -1103,7 +1103,7 @@ void MigrationDestinationManager::_forgetPending(OperationContext* opCtx,
         return;  // no documents can have been moved in, so there is nothing to clean up.
     }
 
-    UninterruptableLockGuard noInterrupt(opCtx->lockState());
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, nss, MODE_IX, MODE_X);
     auto css = CollectionShardingState::get(opCtx, nss);
     auto metadata = css->getMetadata();

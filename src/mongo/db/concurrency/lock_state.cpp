@@ -786,10 +786,10 @@ LockResult LockerImpl<IsForMMAPV1>::lockComplete(
     while (true) {
         // It is OK if this call wakes up spuriously, because we re-evaluate the remaining
         // wait time anyways.
-        // If we have an operation context, we want to use its interruptable wait so that
+        // If we have an operation context, we want to use its interruptible wait so that
         // pending lock acquisitions can be cancelled, so long as no callers have requested an
-        // uninterruptable lock.
-        if (opCtx && _uninterruptableLocksRequested == 0) {
+        // uninterruptible lock.
+        if (opCtx && _uninterruptibleLocksRequested == 0) {
             result = _notify.wait(opCtx, waitTime);
         } else {
             result = _notify.wait(waitTime);

@@ -83,7 +83,7 @@ void QueryYield::yieldAllLocks(OperationContext* opCtx,
         whileYieldingFn();
     }
 
-    UninterruptableLockGuard noInterrupt(locker);
+    UninterruptibleLockGuard noInterrupt(locker);
     locker->restoreLockState(opCtx, snapshot);
 }
 

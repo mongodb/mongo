@@ -364,8 +364,8 @@ Config::Config(const string& _dbname, const BSONObj& cmdObj) {
  * Clean up the temporary and incremental collections
  */
 void State::dropTempCollections() {
-    // The cleanup handler should not be interruptable.
-    UninterruptableLockGuard noInterrupt(_opCtx->lockState());
+    // The cleanup handler should not be interruptible.
+    UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
 
     if (!_config.tempNamespace.isEmpty()) {
         writeConflictRetry(_opCtx, "M/R dropTempCollections", _config.tempNamespace.ns(), [this] {
@@ -1014,7 +1014,7 @@ void State::bailFromJS() {
 Collection* State::getCollectionOrUassert(OperationContext* opCtx,
                                           Database* db,
                                           const NamespaceString& nss) {
-    UninterruptableLockGuard noInterrupt(opCtx->lockState());
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     Collection* out = db ? db->getCollection(opCtx, nss) : NULL;
     uassert(18697, "Collection unexpectedly disappeared: " + nss.ns(), out);
     return out;
@@ -1402,7 +1402,7 @@ public:
                    BSONObjBuilder& result) {
         Timer t;
         // Don't let a lock acquisition in map-reduce get interrupted.
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmd))
@@ -1736,7 +1736,7 @@ public:
         }
 
         // Don't let any lock acquisitions get interrupted.
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
         boost::optional<DisableDocumentValidation> maybeDisableValidation;
         if (shouldBypassDocumentValidationForCommand(cmdObj))

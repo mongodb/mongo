@@ -134,7 +134,7 @@ private:
 
         // Get all TTL indexes from every collection.
         for (const std::string& collectionNS : ttlCollections) {
-            UninterruptableLockGuard noInterrupt(opCtx.lockState());
+            UninterruptibleLockGuard noInterrupt(opCtx.lockState());
             NamespaceString collectionNSS(collectionNS);
             AutoGetCollection autoGetCollection(&opCtx, collectionNSS, MODE_IS);
             Collection* coll = autoGetCollection.getCollection();

@@ -208,7 +208,7 @@ public:
      * Waits for the completion of a lock, previously requested through lockBegin or
      * lockGlobalBegin. Must only be called, if lockBegin returned LOCK_WAITING.
      *
-     * @param opCtx Operation context that, if not null, will be used to allow interruptable lock
+     * @param opCtx Operation context that, if not null, will be used to allow interruptible lock
      * acquisition.
      * @param resId Resource id which was passed to an earlier lockBegin call. Must match.
      * @param mode Mode which was passed to an earlier lockBegin call. Must match.

@@ -47,7 +47,7 @@ namespace mongo {
 class Locker {
     MONGO_DISALLOW_COPYING(Locker);
 
-    friend class UninterruptableLockGuard;
+    friend class UninterruptibleLockGuard;
 
 public:
     virtual ~Locker() {}
@@ -388,11 +388,11 @@ protected:
 
     /**
      * The number of callers that are guarding from lock interruptions.
-     * When 0, all lock acquisitions are interruptable. When positive, no lock acquisitions
-     * are interruptable. This is only true for database and global locks. Collection locks are
-     * never interruptable.
+     * When 0, all lock acquisitions are interruptible. When positive, no lock acquisitions
+     * are interruptible. This is only true for database and global locks. Collection locks are
+     * never interruptible.
      */
-    int _uninterruptableLocksRequested = 0;
+    int _uninterruptibleLocksRequested = 0;
 
 private:
     bool _shouldConflictWithSecondaryBatchApplication = true;
@@ -407,25 +407,25 @@ private:
  * Lock acquisitions can still return LOCK_TIMEOUT, just not if the parent operation
  * context is killed first.
  *
- * It is possible that multiple callers are requesting uninterruptable behavior, so the guard
+ * It is possible that multiple callers are requesting uninterruptible behavior, so the guard
  * increments a counter on the Locker class to indicate how may guards are active.
  */
-class UninterruptableLockGuard {
+class UninterruptibleLockGuard {
 public:
     /*
-     * Accepts a Locker, and increments the _uninterruptableLocksRequested. Decrements the
+     * Accepts a Locker, and increments the _uninterruptibleLocksRequested. Decrements the
      * counter when destoyed.
      */
-    explicit UninterruptableLockGuard(Locker* locker) : _locker(locker) {
+    explicit UninterruptibleLockGuard(Locker* locker) : _locker(locker) {
         invariant(_locker);
-        invariant(_locker->_uninterruptableLocksRequested >= 0);
-        invariant(_locker->_uninterruptableLocksRequested < std::numeric_limits<int>::max());
-        _locker->_uninterruptableLocksRequested += 1;
+        invariant(_locker->_uninterruptibleLocksRequested >= 0);
+        invariant(_locker->_uninterruptibleLocksRequested < std::numeric_limits<int>::max());
+        _locker->_uninterruptibleLocksRequested += 1;
     }
 
-    ~UninterruptableLockGuard() {
-        invariant(_locker->_uninterruptableLocksRequested > 0);
-        _locker->_uninterruptableLocksRequested -= 1;
+    ~UninterruptibleLockGuard() {
+        invariant(_locker->_uninterruptibleLocksRequested > 0);
+        _locker->_uninterruptibleLocksRequested -= 1;
     }
 
 private:

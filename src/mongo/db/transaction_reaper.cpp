@@ -155,7 +155,7 @@ int handleBatchHelper(SessionsCollection* sessionsCollection,
     invariant(locker->saveLockStateAndUnlock(&snapshot));
 
     const auto guard = MakeGuard([&] {
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         locker->restoreLockState(opCtx, snapshot);
     });
 

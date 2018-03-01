@@ -656,7 +656,7 @@ TEST_F(DConcurrencyTestFixture, TempReleaseRecursive) {
     ASSERT(lockState->isW());
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptable) {
+TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptible) {
     auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
     auto opCtx1 = clients[0].second.get();
     auto opCtx2 = clients[1].second.get();
@@ -673,7 +673,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptable) {
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptableMMAP) {
+TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptibleMMAP) {
     auto clients = makeKClientsWithLockers<MMAPV1LockerImpl>(2);
 
     auto opCtx1 = clients[0].second.get();
@@ -693,7 +693,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptableMMAP) {
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
 }
 
-TEST_F(DConcurrencyTestFixture, DBLockWaitIsInterruptable) {
+TEST_F(DConcurrencyTestFixture, DBLockWaitIsInterruptible) {
     auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
     auto opCtx1 = clients[0].second.get();
     auto opCtx2 = clients[1].second.get();
@@ -710,7 +710,7 @@ TEST_F(DConcurrencyTestFixture, DBLockWaitIsInterruptable) {
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
 }
 
-TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsNotInterruptableWithLockGuard) {
+TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsNotInterruptibleWithLockGuard) {
     auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
 
     auto opCtx1 = clients[0].second.get();
@@ -722,7 +722,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsNotInterruptableWithLockGuard) {
     // Killing the lock wait should not interrupt it.
     auto result = runTaskAndKill(opCtx2,
                                  [&]() {
-                                     UninterruptableLockGuard noInterrupt(opCtx2->lockState());
+                                     UninterruptibleLockGuard noInterrupt(opCtx2->lockState());
                                      Lock::GlobalLock g(opCtx2, MODE_S, Date_t::max());
                                  },
                                  [&]() { globalLock.reset(); });
@@ -730,7 +730,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsNotInterruptableWithLockGuard) {
     result.get();
 }
 
-TEST_F(DConcurrencyTestFixture, DBLockWaitIsNotInterruptableWithLockGuard) {
+TEST_F(DConcurrencyTestFixture, DBLockWaitIsNotInterruptibleWithLockGuard) {
     auto clients = makeKClientsWithLockers<DefaultLockerImpl>(2);
     auto opCtx1 = clients[0].second.get();
     auto opCtx2 = clients[1].second.get();
@@ -742,7 +742,7 @@ TEST_F(DConcurrencyTestFixture, DBLockWaitIsNotInterruptableWithLockGuard) {
     // Killing the lock wait should not interrupt it.
     auto result = runTaskAndKill(opCtx2,
                                  [&]() {
-                                     UninterruptableLockGuard noInterrupt(opCtx2->lockState());
+                                     UninterruptibleLockGuard noInterrupt(opCtx2->lockState());
                                      Lock::DBLock d(opCtx2, "db", MODE_S);
                                  },
                                  [&] { dbLock.reset(); });

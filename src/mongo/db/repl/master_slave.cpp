@@ -883,7 +883,7 @@ int ReplSource::_sync_pullOpLog(OperationContext* opCtx, int& nApplied) {
     oplogReader.tailCheck();
 
     // Due to the lack of exception handlers, don't allow lock interrupts.
-    UninterruptableLockGuard noInterrupt(opCtx->lockState());
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
 
     bool initial = syncedTo.isNull();
 
@@ -1304,7 +1304,7 @@ static void replMasterThread() {
         OperationContext& opCtx = *opCtxPtr;
         AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization();
 
-        UninterruptableLockGuard noInterrupt(opCtx.lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx.lockState());
         Lock::GlobalWrite globalWrite(&opCtx, Date_t::now() + Milliseconds(1));
         if (globalWrite.isLocked()) {
             toSleep = 10;

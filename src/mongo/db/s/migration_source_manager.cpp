@@ -151,7 +151,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
     // Snapshot the committed metadata from the time the migration starts
     const auto collectionMetadataAndUUID = [&] {
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
         uassert(ErrorCodes::InvalidOptions,
                 "cannot move chunks for a collection that doesn't exist",
@@ -233,7 +233,7 @@ Status MigrationSourceManager::startClone(OperationContext* opCtx) {
 
     {
         // Register for notifications from the replication subsystem
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
         auto css = CollectionShardingState::get(opCtx, getNss());
 
@@ -290,7 +290,7 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
 
     {
         const auto metadata = [&] {
-            UninterruptableLockGuard noInterrupt(opCtx->lockState());
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
             AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
             return CollectionShardingState::get(opCtx, _args.getNss())->getMetadata();
         }();
@@ -316,7 +316,7 @@ Status MigrationSourceManager::enterCriticalSection(OperationContext* opCtx) {
         // The critical section must be entered with collection X lock in order to ensure there are
         // no writes which could have entered and passed the version check just before we entered
         // the crticial section, but managed to complete after we left it.
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
         // IMPORTANT: After this line, the critical section is in place and needs to be signaled
@@ -386,7 +386,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
 
     {
         const auto metadata = [&] {
-            UninterruptableLockGuard noInterrupt(opCtx->lockState());
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
             AutoGetCollection autoColl(opCtx, _args.getNss(), MODE_IS);
             return CollectionShardingState::get(opCtx, _args.getNss())->getMetadata();
         }();
@@ -423,7 +423,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     // Read operations must begin to wait on the critical section just before we send the commit
     // operation to the config server
     {
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
         _readsShouldWaitOnCritSec = true;
     }
@@ -484,7 +484,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
         // metadata for this collection, forcing subsequent callers to do a full refresh. Check if
         // this node can accept writes for this collection as a proxy for it being primary.
         if (!status.isOK()) {
-            UninterruptableLockGuard noInterrupt(opCtx->lockState());
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
             AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, getNss())) {
                 CollectionShardingState::get(opCtx, getNss())->refreshMetadata(opCtx, nullptr);
@@ -521,7 +521,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     }();
 
     if (!refreshStatus.isOK()) {
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
 
         CollectionShardingState::get(opCtx, getNss())->refreshMetadata(opCtx, nullptr);
@@ -542,7 +542,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     }
 
     auto refreshedMetadata = [&] {
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
         return CollectionShardingState::get(opCtx, getNss())->getMetadata();
     }();
@@ -592,7 +592,7 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
     auto notification = [&] {
         auto const whenToClean = _args.getWaitForDelete() ? CollectionShardingState::kNow
                                                           : CollectionShardingState::kDelayed;
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IS);
         return CollectionShardingState::get(opCtx, getNss())->cleanUpRange(range, whenToClean);
     }();
@@ -670,7 +670,7 @@ void MigrationSourceManager::_notifyChangeStreamsOnRecipientFirstChunk(
 
     auto const serviceContext = opCtx->getClient()->getServiceContext();
 
-    UninterruptableLockGuard noInterrupt(opCtx->lockState());
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
     writeConflictRetry(
         opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
@@ -686,7 +686,7 @@ void MigrationSourceManager::_cleanup(OperationContext* opCtx) {
 
     auto cloneDriver = [&]() {
         // Unregister from the collection's sharding state
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, getNss(), MODE_IX, MODE_X);
         auto css = CollectionShardingState::get(opCtx, getNss());
 

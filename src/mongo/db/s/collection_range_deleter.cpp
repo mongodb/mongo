@@ -102,7 +102,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
     auto notification = DeleteNotification();
 
     {
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
 
         auto* const collection = autoColl.getCollection();
@@ -242,7 +242,7 @@ boost::optional<Date_t> CollectionRangeDeleter::cleanUpNextRange(
                << redact(range->toString()) << " : " << redact(status.reason());
 
         // Don't allow lock interrupts while cleaning up.
-        UninterruptableLockGuard noInterrupt(opCtx->lockState());
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         auto* const css = CollectionShardingState::get(opCtx, nss);
 
