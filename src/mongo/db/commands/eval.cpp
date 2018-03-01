@@ -179,12 +179,23 @@ public:
                    const BSONObj& cmdObj,
                    string& errmsg,
                    BSONObjBuilder& result) {
-        // Eval is not allowed to touch sharded collections.
+        // Note: 'eval' is not allowed to touch sharded namespaces, but we can't check the
+        // shardVersions of the namespaces accessed in the script until the script is evaluated.
+        // Instead, we enforce that the script does not access sharded namespaces by ensuring the
+        // shardVersion is set to UNSHARDED on the OperationContext before sending the script to be
+        // evaluated.
         auto& oss = OperationShardingState::get(opCtx);
         uassert(ErrorCodes::IllegalOperation,
                 "can't send a shardVersion with the 'eval' command, since you can't use sharded "
                 "collections from 'eval'",
-                !oss.hasClientShardVersionForAnyNamespace());
+                !oss.hasShardVersion());
+
+        // Set the shardVersion to UNSHARDED. The "namespace" used does not matter, because if a
+        // shardVersion is set on the OperationContext, a check for a different namespace will
+        // default to UNSHARDED.
+        oss.setShardVersion(NamespaceString(dbname), ChunkVersion::UNSHARDED());
+        const auto shardVersionGuard =
+            MakeGuard([&]() { oss.unsetShardVersion(NamespaceString(dbname)); });
 
         try {
             if (cmdObj["nolock"].trueValue()) {
