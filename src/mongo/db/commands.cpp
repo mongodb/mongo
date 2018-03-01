@@ -317,7 +317,8 @@ void CommandHelpers::filterCommandReplyForPassthrough(const BSONObj& cmdObj,
             name == "$clusterTime" ||        //
             name == "$oplogQueryData" ||     //
             name == "$replData" ||           //
-            name == "operationTime") {
+            name == "operationTime" ||
+            name == "lastCommittedOpTime") {
             continue;
         }
         output->append(elem);

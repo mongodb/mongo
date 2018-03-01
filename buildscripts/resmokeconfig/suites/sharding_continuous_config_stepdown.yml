@@ -157,6 +157,8 @@ selector:
   # Test expects a specific chunk distribution after shardCollection and it can be broken when
   # a step down occurs.
   - jstests/sharding/regex_targeting.js
+  # Sets a failpoint on a config server secondary.
+  - jstests/sharding/shards_and_config_return_last_committed_optime.js
 
 executor:
   config:

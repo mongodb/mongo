@@ -129,6 +129,8 @@ selector:
   - jstests/sharding/nonreplicated_uuids_on_shardservers.js
   # Requires the ability to interrupt a pinned cursor, introduced in v4.0.
   - jstests/sharding/kill_pinned_cursor.js
+  # New feature in v4.0 mongos and mongod.
+  - jstests/sharding/shards_and_config_return_last_committed_optime.js
 
 executor:
   config:
