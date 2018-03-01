@@ -23,7 +23,7 @@
             max: maxKey,
             keyPattern: {x: 1},
             splitKeys: splitPoints,
-            shardVersion: shardVersion,
+            epoch: res.versionEpoch,
         });
     };
 
