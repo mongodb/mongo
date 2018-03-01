@@ -7,6 +7,13 @@
         var db = conn.getDB("admin");
         var externalDB = conn.getDB("$external");
 
+        // Check that unknown or users produce the correct errors.
+        assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: "test.bogus"}),
+                                     ErrorCodes.UserNotFound);
+
+        assert.commandFailedWithCode(db.runCommand({isMaster: 1, saslSupportedMechs: "bogus"}),
+                                     ErrorCodes.BadValue);
+
         // Enable SCRAM-SHA-256.
         assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: "4.0"}));
 
