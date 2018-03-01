@@ -655,8 +655,7 @@ void fillWriterVectors(OperationContext* opCtx,
 
         // Extract applyOps operations and fill writers with extracted operations using this
         // function.
-        if (supportsDocLocking && op.isCommand() &&
-            op.getCommandType() == OplogEntry::CommandType::kApplyOps) {
+        if (op.isCommand() && op.getCommandType() == OplogEntry::CommandType::kApplyOps) {
             try {
                 applyOpsOperations->emplace_back(ApplyOps::extractOperations(op));
                 fillWriterVectors(
