@@ -17,8 +17,6 @@
     // Try to do a split with invalid parameters through mongod
     var callSplit = function(db, minKey, maxKey, splitPoints) {
         var res = assert.commandWorked(st.s.adminCommand({getShardVersion: 'TestSplitDB.Coll'}));
-        var shardVersion = [res.version, res.versionEpoch];
-
         return db.runCommand({
             splitChunk: 'TestSplitDB.Coll',
             from: st.shard0.shardName,
@@ -26,7 +24,7 @@
             max: maxKey,
             keyPattern: {x: 1},
             splitKeys: splitPoints,
-            shardVersion: shardVersion,
+            epoch: res.versionEpoch,
         });
     };
 
