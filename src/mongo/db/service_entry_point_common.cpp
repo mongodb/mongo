@@ -103,6 +103,7 @@ using logger::LogComponent;
 // which is not allowed.
 const StringMap<int> sessionCheckoutWhitelist = {{"aggregate", 1},
                                                  {"applyOps", 1},
+                                                 {"commitTransaction", 1},
                                                  {"count", 1},
                                                  {"delete", 1},
                                                  {"distinct", 1},
@@ -688,12 +689,19 @@ void execCommandDatabase(OperationContext* opCtx,
 
         if (retval) {
             if (opCtx->getWriteUnitOfWork()) {
-                if (!opCtx->hasStashedCursor()) {
+                // Snapshot readConcern is enabled and it must be used within a session.
+                auto session = sessionTxnState.get(opCtx);
+                invariant(session != nullptr,
+                          str::stream()
+                              << "Snapshot transaction must be run within a session. Command: "
+                              << ServiceEntryPointCommon::getRedactedCopyForLogging(command,
+                                                                                    request.body));
+                if (opCtx->hasStashedCursor() || session->inMultiDocumentTransaction()) {
+                    sessionTxnState.stashTransactionResources();
+                } else {
                     // If we are in an autocommit=true transaction and have no stashed cursor,
                     // commit the transaction.
                     opCtx->getWriteUnitOfWork()->commit();
-                } else {
-                    sessionTxnState.stashTransactionResources();
                 }
             }
         } else {

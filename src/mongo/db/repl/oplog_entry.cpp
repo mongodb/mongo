@@ -143,7 +143,7 @@ ReplOperation OplogEntry::makeInsertOperation(const NamespaceString& nss,
     op.setOpType(OpTypeEnum::kInsert);
     op.setNamespace(nss);
     op.setUuid(uuid);
-    op.setObject(docToInsert);
+    op.setObject(docToInsert.getOwned());
     return op;
 }
 
@@ -155,8 +155,8 @@ ReplOperation OplogEntry::makeUpdateOperation(const NamespaceString nss,
     op.setOpType(OpTypeEnum::kUpdate);
     op.setNamespace(nss);
     op.setUuid(uuid);
-    op.setObject(update);
-    op.setObject2(criteria);
+    op.setObject(update.getOwned());
+    op.setObject2(criteria.getOwned());
     return op;
 }
 
@@ -167,7 +167,7 @@ ReplOperation OplogEntry::makeDeleteOperation(const NamespaceString& nss,
     op.setOpType(OpTypeEnum::kDelete);
     op.setNamespace(nss);
     op.setUuid(uuid);
-    op.setObject(docToDelete);
+    op.setObject(docToDelete.getOwned());
     return op;
 }
 

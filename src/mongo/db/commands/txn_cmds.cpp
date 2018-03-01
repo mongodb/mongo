@@ -33,8 +33,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session_catalog.h"
 
 namespace mongo {
 namespace {
@@ -65,6 +67,21 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        auto session = OperationContextSession::get(opCtx);
+        uassert(
+            ErrorCodes::CommandFailed, "commitTransaction must be run within a session", session);
+
+        // TODO SERVER-33501 Change this when commitTransaction is retryable.
+        uassert(ErrorCodes::CommandFailed,
+                "Transaction isn't in progress",
+                opCtx->getWriteUnitOfWork() && session->inMultiDocumentTransaction());
+
+        auto opObserver = opCtx->getServiceContext()->getOpObserver();
+        invariant(opObserver);
+        opObserver->onTransactionCommit(opCtx);
+        opCtx->getWriteUnitOfWork()->commit();
+        opCtx->setWriteUnitOfWork(nullptr);
+
         return true;
     }
 
