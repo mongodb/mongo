@@ -68,9 +68,14 @@ protected:
         if (!globalTempDir) {
             globalTempDir = mongo::stdx::make_unique<mongo::unittest::TempDir>("embedded_mongo");
         }
-        const char* argv[] = {
-            "mongo_embedded_capi_test", "--port", "0", "--dbpath", globalTempDir->path().c_str()};
-        db = libmongodbcapi_db_new(5, argv, nullptr);
+        const char* argv[] = {"mongo_embedded_capi_test",
+                              "--port",
+                              "0",
+                              "--storageEngine",
+                              "mobile",
+                              "--dbpath",
+                              globalTempDir->path().c_str()};
+        db = libmongodbcapi_db_new(7, argv, nullptr);
         ASSERT(db != nullptr);
     }
 

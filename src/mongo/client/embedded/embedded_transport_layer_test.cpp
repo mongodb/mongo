@@ -55,9 +55,12 @@ protected:
         if (!globalTempDir) {
             globalTempDir = mongo::stdx::make_unique<mongo::unittest::TempDir>("embedded_mongo");
         }
-        int argc = 3;
-        const char* argv[] = {
-            "mongo_embedded_transport_layer_test", "--dbpath", globalTempDir->path().c_str()};
+        int argc = 5;
+        const char* argv[] = {"mongo_embedded_transport_layer_test",
+                              "--storageEngine",
+                              "mobile",
+                              "--dbpath",
+                              globalTempDir->path().c_str()};
         db_handle = libmongodbcapi_db_new(argc, argv, nullptr);
 
         mongoc_init();

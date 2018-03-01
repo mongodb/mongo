@@ -52,6 +52,9 @@ Status addOptions(optionenvironment::OptionSection* options) {
 
     moe::OptionSection storage_options("Storage options");
 
+    storage_options.addOptionChaining(
+        "storage.engine", "storageEngine", moe::String, "what storage engine to use");
+
 #ifdef _WIN32
     boost::filesystem::path currentPath = boost::filesystem::current_path();
 
@@ -94,6 +97,11 @@ Status canonicalizeOptions(optionenvironment::Environment* params) {
 }
 
 Status storeOptions(const moe::Environment& params) {
+    if (params.count("storage.engine")) {
+        storageGlobalParams.engine = params["storage.engine"].as<std::string>();
+        storageGlobalParams.engineSetByUser = true;
+    }
+
     if (params.count("storage.dbPath")) {
         storageGlobalParams.dbpath = params["storage.dbPath"].as<string>();
         if (params.count("processManagement.fork") && storageGlobalParams.dbpath[0] != '/') {
