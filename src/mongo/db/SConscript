@@ -133,6 +133,7 @@ env.CppUnitTest(
         'auth/authmocks',
         'common',
         'op_observer_d',
+        'repl/oplog_interface_local',
         'repl/replmocks',
         'service_context_d_test_fixture',
     ],
@@ -1063,7 +1064,9 @@ env.Library(
         # See the additional comments in instance.cpp for details.
         'instance.cpp'
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
+        # DO NOT ADD ADDITIONAL FILES TO THIS LIST.
+        # This list should be gradually becoming empty.
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/logical_time_metadata_hook",
         "$BUILD_DIR/mongo/db/ttl_collection_cache",

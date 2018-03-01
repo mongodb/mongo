@@ -89,6 +89,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/s/grid',
         'shard_local',
     ],
 )

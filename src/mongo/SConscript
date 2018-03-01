@@ -316,6 +316,7 @@ env.Library(
         'db/query_exec',
         'db/repair_database',
         'db/repair_database_and_check_version',
+        'db/repl/repl_coordinator_impl',
         'db/repl/repl_set_commands',
         'db/repl/storage_interface_impl',
         'db/repl/topology_coordinator',

@@ -95,9 +95,11 @@ env.CppUnitTest(
     LIBDEPS=[
         'oplog',
         'oplog_entry',
+        'oplog_interface_local',
         'replmocks',
         'storage_interface_impl',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/op_observer_d',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/rpc/command_status',
     ],
@@ -568,6 +570,7 @@ env.Library(
         'oplog_interface_mock',
         'optime',
         'replication_process',
+        'replication_recovery',
         'replmocks',
         'rs_rollback',
         'storage_interface_impl',
@@ -617,6 +620,7 @@ env.CppUnitTest(
         'rollback_impl_test.cpp',
     ],
     LIBDEPS=[
+        'oplog_interface_local',
         'oplog_interface_mock',
         'rollback_impl',
         'rollback_test_fixture',
@@ -704,6 +708,7 @@ env.Library(
         'sync_tail_test_fixture.cpp',
     ],
     LIBDEPS=[
+        'drop_pending_collection_reaper',
         'oplog_application',
         'replmocks',
         'storage_interface_impl',
@@ -1620,7 +1625,10 @@ env.Library(
     ],
     LIBDEPS=[
         'oplog',
+        'oplog_entry',
         'replmocks',
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
     ]
 )
