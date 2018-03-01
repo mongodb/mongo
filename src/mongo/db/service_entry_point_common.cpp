@@ -521,7 +521,6 @@ void execCommandDatabase(OperationContext* opCtx,
         BSONElement cmdOptionMaxTimeMSField;
         BSONElement allowImplicitCollectionCreationField;
         BSONElement helpField;
-        BSONElement shardVersionFieldIdx;
         BSONElement queryOptionMaxTimeMSField;
 
         StringMap<int> topLevelFields;
@@ -533,8 +532,6 @@ void execCommandDatabase(OperationContext* opCtx,
                 allowImplicitCollectionCreationField = element;
             } else if (fieldName == CommandHelpers::kHelpFieldName) {
                 helpField = element;
-            } else if (fieldName == ChunkVersion::kShardVersionField) {
-                shardVersionFieldIdx = element;
             } else if (fieldName == QueryRequest::queryOptionMaxTimeMS) {
                 queryOptionMaxTimeMSField = element;
             }
@@ -659,11 +656,11 @@ void execCommandDatabase(OperationContext* opCtx,
             readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
             (iAmPrimary ||
              (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
-            oss.initializeShardVersion(NamespaceString(command->parseNs(dbname, request.body)),
-                                       shardVersionFieldIdx);
+            oss.setClientRoutingVersions(NamespaceString(command->parseNs(dbname, request.body)),
+                                         request.body);
 
             auto const shardingState = ShardingState::get(opCtx);
-            if (oss.hasShardVersion()) {
+            if (oss.hasClientShardVersionForAnyNamespace() || oss.hasClientDbVersionForAnyDb()) {
                 uassertStatusOK(shardingState->canAcceptShardedCommands());
             }
 

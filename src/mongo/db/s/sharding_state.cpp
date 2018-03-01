@@ -440,7 +440,7 @@ bool ShardingState::needCollectionMetadata(OperationContext* opCtx, const string
     // Shard version information received from mongos may either by attached to the Client or
     // directly to the OperationContext.
     return ShardedConnectionInfo::get(client, false) ||
-        OperationShardingState::get(opCtx).hasShardVersion();
+        OperationShardingState::get(opCtx).hasClientShardVersion(NamespaceString(ns));
 }
 
 Status ShardingState::updateShardIdentityConfigString(OperationContext* opCtx,

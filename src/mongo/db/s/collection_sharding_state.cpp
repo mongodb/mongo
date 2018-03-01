@@ -601,8 +601,8 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
 
     // If there is a version attached to the OperationContext, use it as the received version.
     // Otherwise, get the received version from the ShardedConnectionInfo.
-    if (oss.hasShardVersion()) {
-        *expectedShardVersion = oss.getShardVersion(_nss);
+    if (oss.hasClientShardVersion(_nss)) {
+        *expectedShardVersion = oss.getClientShardVersion(_nss);
     } else {
         ShardedConnectionInfo* info = ShardedConnectionInfo::get(client, false);
         if (!info) {
