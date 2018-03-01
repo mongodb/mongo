@@ -64,7 +64,7 @@ boost::optional<Timestamp> WiredTigerSnapshotManager::getMinSnapshotForNextCommi
     return _committedSnapshot;
 }
 
-Status WiredTigerSnapshotManager::beginTransactionAtTimestamp(Timestamp pointInTime,
+Status WiredTigerSnapshotManager::setTransactionReadTimestamp(Timestamp pointInTime,
                                                               WT_SESSION* session) const {
     char readTSConfigString[15 /* read_timestamp= */ + (8 * 2) /* 8 hexadecimal characters */ +
                             1 /* trailing null */];
@@ -77,49 +77,34 @@ Status WiredTigerSnapshotManager::beginTransactionAtTimestamp(Timestamp pointInT
     }
     invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
 
-    return wtRCToStatus(session->begin_transaction(session, readTSConfigString));
+    return wtRCToStatus(session->timestamp_transaction(session, readTSConfigString));
 }
 
 Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     WT_SESSION* session) const {
+    invariantWTOK(session->begin_transaction(session, nullptr));
+
     stdx::lock_guard<stdx::mutex> lock(_mutex);
 
-    uassert(ErrorCodes::ReadConcernMajorityNotAvailableYet,
-            "Committed view disappeared while running operation",
-            _committedSnapshot);
+    if (!_committedSnapshot) {
+        int wtRet = session->rollback_transaction(session, nullptr);
+        invariant(!wtRet);
+        uasserted(ErrorCodes::ReadConcernMajorityNotAvailableYet,
+                  "Committed view disappeared while running operation");
+    }
 
-    auto status = beginTransactionAtTimestamp(_committedSnapshot.get(), session);
+    auto status = setTransactionReadTimestamp(_committedSnapshot.get(), session);
     fassertStatusOK(30635, status);
     return *_committedSnapshot;
 }
 
 void WiredTigerSnapshotManager::beginTransactionOnOplog(WiredTigerOplogManager* oplogManager,
                                                         WT_SESSION* session) const {
+    invariantWTOK(session->begin_transaction(session, nullptr));
+
     stdx::lock_guard<stdx::mutex> lock(_mutex);
     auto allCommittedTimestamp = oplogManager->getOplogReadTimestamp();
-    char readTSConfigString[15 /* read_timestamp= */ + (8 * 2) /* 16 hexadecimal digits */ +
-                            1 /* trailing null */];
-    auto size = std::snprintf(readTSConfigString,
-                              sizeof(readTSConfigString),
-                              "read_timestamp=%llx",
-                              static_cast<unsigned long long>(allCommittedTimestamp));
-    if (size < 0) {
-        int e = errno;
-        error() << "error snprintf " << errnoWithDescription(e);
-        fassertFailedNoTrace(40663);
-    }
-    invariant(static_cast<std::size_t>(size) < sizeof(readTSConfigString));
-
-    int status = session->begin_transaction(session, readTSConfigString);
-
-    // If begin_transaction returns EINVAL, we will assume it is due to the oldest_timestamp
-    // racing ahead of the read_timestamp.  Rather than synchronizing for this rare case, throw a
-    // WriteConflictException which will presumably be retried.
-    if (status == EINVAL) {
-        throw WriteConflictException();
-    }
-
-    invariantWTOK(status);
+    uassertStatusOK(setTransactionReadTimestamp(Timestamp(allCommittedTimestamp), session));
 }
 
 }  // namespace mongo
