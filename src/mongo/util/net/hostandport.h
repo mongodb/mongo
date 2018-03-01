@@ -54,10 +54,17 @@ class StatusWith;
  */
 struct HostAndPort {
     /**
-     * Parses "text" to produce a HostAndPort.  Returns either that or an error
-     * status describing the parse failure.
+     * Parses "text" to produce a HostAndPort.  Returns either that or an error status describing
+     * the parse failure.
      */
     static StatusWith<HostAndPort> parse(StringData text);
+
+    /**
+     * A version of 'parse' that throws a UserException if a parsing error is encountered.
+     */
+    static HostAndPort parseThrowing(StringData text) {
+        return uassertStatusOK(parse(text));
+    }
 
     /**
      * Construct an empty/invalid HostAndPort.

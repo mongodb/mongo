@@ -394,7 +394,7 @@ void parseResumeOptions(const intrusive_ptr<ExpressionContext>& expCtx,
 list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     // A change stream is a tailable + awaitData cursor.
-    expCtx->tailableMode = TailableMode::kTailableAndAwaitData;
+    expCtx->tailableMode = TailableModeEnum::kTailableAndAwaitData;
 
     // Change stream on an entire database is a new 4.0 feature.
     uassert(ErrorCodes::QueryFeatureNotAllowed,

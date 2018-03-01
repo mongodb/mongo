@@ -36,7 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/query/cluster_client_cursor_params.h"
+#include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
@@ -61,12 +61,11 @@ class CursorResponse;
  *                             on reachable hosts are returned.
  *
  */
-std::vector<ClusterClientCursorParams::RemoteCursor> establishCursors(
-    OperationContext* opCtx,
-    executor::TaskExecutor* executor,
-    const NamespaceString& nss,
-    const ReadPreferenceSetting readPref,
-    const std::vector<std::pair<ShardId, BSONObj>>& remotes,
-    bool allowPartialResults);
+std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
+                                           executor::TaskExecutor* executor,
+                                           const NamespaceString& nss,
+                                           const ReadPreferenceSetting readPref,
+                                           const std::vector<std::pair<ShardId, BSONObj>>& remotes,
+                                           bool allowPartialResults);
 
 }  // namespace mongo

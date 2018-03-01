@@ -161,7 +161,7 @@ public:
      * query.
      */
     bool isTailableAwaitData() const {
-        return tailableMode == TailableMode::kTailableAndAwaitData;
+        return tailableMode == TailableModeEnum::kTailableAndAwaitData;
     }
 
     // The explain verbosity requested by the user, or boost::none if no explain was requested.
@@ -198,7 +198,7 @@ public:
     Variables variables;
     VariablesParseState variablesParseState;
 
-    TailableMode tailableMode = TailableMode::kNormal;
+    TailableModeEnum tailableMode = TailableModeEnum::kNormal;
 
     // Tracks the depth of nested aggregation sub-pipelines. Used to enforce depth limits.
     size_t subPipelineDepth = 0;

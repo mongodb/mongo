@@ -301,8 +301,6 @@ private:
     const int _maxNumClonerCursors;
     // (M) Component responsible for fetching the documents from the collection cloner cursor(s).
     std::unique_ptr<AsyncResultsMerger> _arm;
-    // (R) The cursor parameters used by the 'AsyncResultsMerger'.
-    std::unique_ptr<ClusterClientCursorParams> _clusterClientCursorParams;
 
     // (M) The event handle for the 'kill' event of the 'AsyncResultsMerger'.
     executor::TaskExecutor::EventHandle _killArmHandle;

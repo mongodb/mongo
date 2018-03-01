@@ -69,7 +69,7 @@ public:
 
     BSONObj getOriginatingCommand() const final;
 
-    const std::vector<ClusterClientCursorParams::RemoteCursor>& getRemotes() const final;
+    const std::size_t getNumRemotes() const final;
 
     long long getNumReturnedSoFar() const final;
 

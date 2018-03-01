@@ -369,7 +369,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
         opCtx(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
-    queryRequest->setTailableMode(TailableMode::kTailableAndAwaitData);
+    queryRequest->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
     auto planExecutor =
@@ -381,7 +381,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
                                            PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT));
 
     // Make a DocumentSourceCursor.
-    ctx()->tailableMode = TailableMode::kTailableAndAwaitData;
+    ctx()->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
     auto cursor =
@@ -419,7 +419,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
                                            PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT));
 
     // Make a DocumentSourceCursor.
-    ctx()->tailableMode = TailableMode::kNormal;
+    ctx()->tailableMode = TailableModeEnum::kNormal;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
     auto cursor =
@@ -449,7 +449,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
         opCtx(), collScanParams, workingSet.get(), matchExpression.get());
     auto queryRequest = stdx::make_unique<QueryRequest>(nss);
     queryRequest->setFilter(filter);
-    queryRequest->setTailableMode(TailableMode::kTailableAndAwaitData);
+    queryRequest->setTailableMode(TailableModeEnum::kTailableAndAwaitData);
     auto canonicalQuery = unittest::assertGet(
         CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest), nullptr));
     auto planExecutor =
@@ -461,7 +461,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
                                            PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED));
 
     // Make a DocumentSourceCursor.
-    ctx()->tailableMode = TailableMode::kTailableAndAwaitData;
+    ctx()->tailableMode = TailableModeEnum::kTailableAndAwaitData;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
     auto cursor =
@@ -498,7 +498,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
                                            PlanExecutor::YieldPolicy::ALWAYS_MARK_KILLED));
 
     // Make a DocumentSourceCursor.
-    ctx()->tailableMode = TailableMode::kNormal;
+    ctx()->tailableMode = TailableModeEnum::kNormal;
     // DocumentSourceCursor expects a PlanExecutor that has had its state saved.
     planExecutor->saveState();
     auto cursor =

@@ -89,6 +89,14 @@ public:
     }
 
     /**
+     * Returns the number of remote hosts involved in this execution plan.
+     */
+    virtual std::size_t getNumRemotes() const {
+        invariant(_child);  // The default implementation forwards to the child stage.
+        return _child->getNumRemotes();
+    }
+
+    /**
      * Returns whether or not all the remote cursors are exhausted.
      */
     virtual bool remotesExhausted() {

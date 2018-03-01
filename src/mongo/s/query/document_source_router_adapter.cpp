@@ -67,6 +67,10 @@ Value DocumentSourceRouterAdapter::serialize(
     return Value();      // Return the empty value to hide this stage from explain output.
 }
 
+std::size_t DocumentSourceRouterAdapter::getNumRemotes() const {
+    return _child->getNumRemotes();
+}
+
 bool DocumentSourceRouterAdapter::remotesExhausted() {
     return _child->remotesExhausted();
 }

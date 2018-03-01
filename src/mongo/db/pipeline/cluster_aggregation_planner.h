@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2017 MongoDB Inc.
+ * Copyright (C) 2018 MongoDB Inc.
  *
  * This program is free software: you can redistribute it and/or  modify
  * it under the terms of the GNU Affero General Public License, version 3,
@@ -28,16 +28,31 @@
 
 #pragma once
 
-#include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
-#include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo {
+namespace cluster_aggregation_planner {
 
 /**
- * Returns a TailableMode from two booleans, returning ErrorCodes::FailedToParse if awaitData is
- * set without tailable.
+ * Performs optimizations with the aim of reducing computing time and network traffic when a
+ * pipeline has been split into two pieces. Modifies 'shardPipeline' and 'mergingPipeline' such that
+ * they may contain different stages, but still compute the same results when executed.
  */
-StatusWith<TailableModeEnum> tailableModeFromBools(bool isTailable, bool isAwaitData);
+void performSplitPipelineOptimizations(Pipeline* shardPipeline, Pipeline* mergingPipeline);
 
+/**
+ * Rips off an initial $sort stage that can be handled by cursor merging machinery. Returns the
+ * sort key pattern of such a $sort stage if there was one, and boost::none otherwise.
+ */
+boost::optional<BSONObj> popLeadingMergeSort(Pipeline* mergePipeline);
+
+/**
+ * Creates a new DocumentSourceMergeCursors from the provided 'remoteCursors' and adds it to the
+ * front of 'mergePipeline'.
+ */
+void addMergeCursorsSource(Pipeline* mergePipeline,
+                           std::vector<RemoteCursor> remoteCursors,
+                           executor::TaskExecutor*);
+
+}  // namespace cluster_aggregation_planner
 }  // namespace mongo

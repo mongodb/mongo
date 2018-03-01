@@ -57,10 +57,12 @@ public:
 
     bool remotesExhausted() final;
 
+    std::size_t getNumRemotes() const final;
+
     /**
      * Adds the cursors in 'newShards' to those being merged by the ARM.
      */
-    void addNewShardCursors(std::vector<ClusterClientCursorParams::RemoteCursor>&& newShards);
+    void addNewShardCursors(std::vector<RemoteCursor>&& newShards);
 
 protected:
     Status doSetAwaitDataTimeout(Milliseconds awaitDataTimeout) final;

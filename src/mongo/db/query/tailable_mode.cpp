@@ -32,17 +32,17 @@
 
 namespace mongo {
 
-StatusWith<TailableMode> tailableModeFromBools(bool isTailable, bool isAwaitData) {
+StatusWith<TailableModeEnum> tailableModeFromBools(bool isTailable, bool isAwaitData) {
     if (isTailable) {
         if (isAwaitData) {
-            return TailableMode::kTailableAndAwaitData;
+            return TailableModeEnum::kTailableAndAwaitData;
         }
-        return TailableMode::kTailable;
+        return TailableModeEnum::kTailable;
     } else if (isAwaitData) {
         return {ErrorCodes::FailedToParse,
                 "Cannot set 'awaitData' without also setting 'tailable'"};
     }
-    return TailableMode::kNormal;
+    return TailableModeEnum::kNormal;
 }
 
 }  // namespace mongo

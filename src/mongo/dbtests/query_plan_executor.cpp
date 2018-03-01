@@ -99,7 +99,7 @@ public:
         Collection* coll,
         BSONObj& filterObj,
         PlanExecutor::YieldPolicy yieldPolicy = PlanExecutor::YieldPolicy::YIELD_MANUAL,
-        TailableMode tailableMode = TailableMode::kNormal) {
+        TailableModeEnum tailableMode = TailableModeEnum::kNormal) {
         CollectionScanParams csparams;
         csparams.collection = coll;
         csparams.direction = CollectionScanParams::FORWARD;
@@ -307,7 +307,7 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYieldButIsTailableAndAwa
     auto exec = makeCollScanExec(coll,
                                  filterObj,
                                  PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT,
-                                 TailableMode::kTailableAndAwaitData);
+                                 TailableModeEnum::kTailableAndAwaitData);
 
     BSONObj resultObj;
     ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));
@@ -323,7 +323,7 @@ TEST_F(PlanExecutorTest, ShouldNotSwallowExceedsTimeLimitDuringYieldButIsTailabl
 
     Collection* coll = ctx.getCollection();
     auto exec = makeCollScanExec(
-        coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, TailableMode::kTailable);
+        coll, filterObj, PlanExecutor::YieldPolicy::ALWAYS_TIME_OUT, TailableModeEnum::kTailable);
 
     BSONObj resultObj;
     ASSERT_EQ(PlanExecutor::DEAD, exec->getNext(&resultObj, nullptr));

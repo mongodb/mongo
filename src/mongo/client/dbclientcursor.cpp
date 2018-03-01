@@ -137,7 +137,7 @@ Message DBClientCursor::_assembleInit() {
 Message DBClientCursor::_assembleGetMore() {
     invariant(cursorId);
     if (_useFindCommand) {
-        long long batchSize = nextBatchSize();
+        std::int64_t batchSize = nextBatchSize();
         auto gmr = GetMoreRequest(ns,
                                   cursorId,
                                   boost::make_optional(batchSize != 0, batchSize),
