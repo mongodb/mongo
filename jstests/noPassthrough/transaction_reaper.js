@@ -84,7 +84,7 @@
         for (var i = 0; i < nSessions; i++) {
             // make a session and get it to the collection
             var session = this.sessions[i];
-            session.getDatabase("test").test.save({a: 1});
+            assert.writeOK(session.getDatabase("test").test.save({a: 1}));
         }
 
         // Ensure a write flushes a transaction
