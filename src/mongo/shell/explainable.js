@@ -110,12 +110,12 @@ var Explainable = (function() {
                 return this._collection.aggregate(pipeline, extraOptsCopy);
             } else {
                 // The aggregate command requires a cursor field.
-                if (!extraOpts.hasOwnProperty("cursor")) {
-                    extraOpts = Object.extend(extraOpts, {cursor: {}});
+                if (!extraOptsCopy.hasOwnProperty("cursor")) {
+                    extraOptsCopy = Object.extend(extraOptsCopy, {cursor: {}});
                 }
 
                 let aggCmd = Object.extend(
-                    {"aggregate": this._collection.getName(), "pipeline": pipeline}, extraOpts);
+                    {"aggregate": this._collection.getName(), "pipeline": pipeline}, extraOptsCopy);
                 let explainCmd = {"explain": aggCmd, "verbosity": this._verbosity};
                 let explainResult = this._collection.runReadCommand(explainCmd);
                 return throwOrReturn(explainResult);
