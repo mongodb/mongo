@@ -312,7 +312,7 @@ private:
         kCommitting,
         kCommitted,
         kAborted
-    } _txnState;
+    } _txnState = MultiDocumentTransactionState::kNone;
 
     // Holds oplog data for operations which have been applied in the current multi-document
     // transaction.  Not used for retryable writes.
