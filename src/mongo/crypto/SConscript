@@ -23,7 +23,7 @@ env.Library('sha256_block',
     ])
 
 if "tom" in env["MONGO_CRYPTO"]:
-    tomEnv = env.Clone();
+    tomEnv = env.Clone()
     tomEnv.InjectThirdPartyIncludePaths(libraries=['tomcrypt'])
     tomEnv.Append(
         CPPDEFINES=[
@@ -46,20 +46,10 @@ if "tom" in env["MONGO_CRYPTO"]:
         ]
     )
 
-env.Library('sha_block_openssl',
-    source=[
-        'sha_block_openssl.cpp'
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'sha1_block',
-        'sha256_block',
-    ])
-
-if env.TargetOSIs('darwin', 'macOS'):
-    env.Library('sha_block_apple',
+else:
+    env.Library('sha_block_${MONGO_CRYPTO}',
         source=[
-            'sha_block_apple.cpp',
+            'sha_block_${MONGO_CRYPTO}.cpp'
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base',
