@@ -171,9 +171,15 @@ if (typeof _threadInject != "undefined") {
             "evalf.js",
             "run_program1.js",
             "notablescan.js",
-            "dropdb_race.js",
             "bench_test1.js",
             "padding.js",
+
+            // These tests use the getLastError command, which is unsafe to use in this environment,
+            // since a previous test's cursors could be garbage collected in the middle of the next
+            // test, which would reset the last error associated with the shell's client.
+            "dropdb_race.js",
+            "bulk_legacy_enforce_gle.js",
+
             "queryoptimizera.js",
             "loglong.js",  // log might overflow before
             // this has a chance to see the message
