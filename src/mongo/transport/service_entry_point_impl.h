@@ -57,7 +57,7 @@ class ServiceEntryPointImpl : public ServiceEntryPoint {
 public:
     explicit ServiceEntryPointImpl(ServiceContext* svcCtx);
 
-    void startSession(transport::SessionHandle session) final;
+    void startSession(transport::SessionHandle session) override;
 
     void endAllSessions(transport::Session::TagMask tags) final;
 
