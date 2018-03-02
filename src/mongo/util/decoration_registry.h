@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <algorithm>
+#include <functional>
+#include <iterator>
 #include <type_traits>
 #include <vector>
 
@@ -35,6 +38,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/decoration_container.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -46,6 +50,7 @@ namespace mongo {
  * the decorations declared on r1, and a DecorationContainer constructed from r2 has instances
  * of the decorations declared on r2.
  */
+template <typename DecoratedType>
 class DecorationRegistry {
     MONGO_DISALLOW_COPYING(DecorationRegistry);
 
@@ -59,24 +64,14 @@ public:
      * NOTE: T's destructor must not throw exceptions.
      */
     template <typename T>
-    DecorationContainer::DecorationDescriptorWithType<T> declareDecoration() {
+    auto declareDecoration() {
         MONGO_STATIC_ASSERT_MSG(std::is_nothrow_destructible<T>::value,
                                 "Decorations must be nothrow destructible");
-        return DecorationContainer::DecorationDescriptorWithType<T>(std::move(declareDecoration(
-            sizeof(T), std::alignment_of<T>::value, &constructAt<T>, &destructAt<T>)));
+        return
+            typename DecorationContainer<DecoratedType>::template DecorationDescriptorWithType<T>(
+                std::move(declareDecoration(
+                    sizeof(T), std::alignment_of<T>::value, &constructAt<T>, &destroyAt<T>)));
     }
-
-    template <typename T, typename Owner>
-    DecorationContainer::DecorationDescriptorWithType<T> declareDecorationWithOwner() {
-        MONGO_STATIC_ASSERT_MSG(std::is_nothrow_destructible<T>::value,
-                                "Decorations must be nothrow destructible");
-        return DecorationContainer::DecorationDescriptorWithType<T>(
-            std::move(declareDecoration(sizeof(T),
-                                        std::alignment_of<T>::value,
-                                        &constructAtWithOwner<T, Owner>,
-                                        &destructAt<T>)));
-    }
-
 
     size_t getDecorationBufferSizeBytes() const {
         return _totalSizeBytes;
@@ -88,33 +83,67 @@ public:
      *
      * Called by the DecorationContainer constructor. Do not call directly.
      */
-    void construct(DecorationContainer* decorable, void* owner) const;
+    void construct(DecorationContainer<DecoratedType>* const container) const {
+        using std::cbegin;
+
+        auto iter = cbegin(_decorationInfo);
+
+        auto cleanupFunction = [&iter, container, this ]() noexcept->void {
+            using std::crend;
+            std::for_each(std::make_reverse_iterator(iter),
+                          crend(this->_decorationInfo),
+                          [&](auto&& decoration) {
+                              decoration.destructor(
+                                  container->getDecoration(decoration.descriptor));
+                          });
+        };
+
+        auto cleanup = MakeGuard(std::move(cleanupFunction));
+
+        using std::cend;
+
+        for (; iter != cend(_decorationInfo); ++iter) {
+            iter->constructor(container->getDecoration(iter->descriptor));
+        }
+
+        cleanup.Dismiss();
+    }
 
     /**
      * Destroys the decorations declared in this registry on the given instance of "decorable".
      *
      * Called by the DecorationContainer destructor.  Do not call directly.
      */
-    void destruct(DecorationContainer* decorable) const;
+    void destroy(DecorationContainer<DecoratedType>* const container) const noexcept try {
+        for (auto& decoration : _decorationInfo) {
+            decoration.destructor(container->getDecoration(decoration.descriptor));
+        }
+    } catch (...) {
+        std::terminate();
+    }
 
 private:
     /**
      * Function that constructs (initializes) a single instance of a decoration.
      */
-    using DecorationConstructorFn = stdx::function<void(void*, void*)>;
+    using DecorationConstructorFn = void (*)(void*);
 
     /**
-     * Function that destructs (deinitializes) a single instance of a decoration.
+     * Function that destroys (deinitializes) a single instance of a decoration.
      */
-    using DecorationDestructorFn = stdx::function<void(void*)>;
+    using DecorationDestructorFn = void (*)(void*);
 
     struct DecorationInfo {
         DecorationInfo() {}
-        DecorationInfo(DecorationContainer::DecorationDescriptor descriptor,
-                       DecorationConstructorFn constructor,
-                       DecorationDestructorFn destructor);
+        DecorationInfo(
+            typename DecorationContainer<DecoratedType>::DecorationDescriptor inDescriptor,
+            DecorationConstructorFn inConstructor,
+            DecorationDestructorFn inDestructor)
+            : descriptor(std::move(inDescriptor)),
+              constructor(std::move(inConstructor)),
+              destructor(std::move(inDestructor)) {}
 
-        DecorationContainer::DecorationDescriptor descriptor;
+        typename DecorationContainer<DecoratedType>::DecorationDescriptor descriptor;
         DecorationConstructorFn constructor;
         DecorationDestructorFn destructor;
     };
@@ -122,17 +151,12 @@ private:
     using DecorationInfoVector = std::vector<DecorationInfo>;
 
     template <typename T>
-    static void constructAt(void* location, void* owner) {
+    static void constructAt(void* location) {
         new (location) T();
     }
 
-    template <typename T, typename Owner>
-    static void constructAtWithOwner(void* location, void* owner) {
-        new (location) T(static_cast<Owner*>(owner));
-    }
-
     template <typename T>
-    static void destructAt(void* location) {
+    static void destroyAt(void* location) {
         static_cast<T*>(location)->~T();
     }
 
@@ -142,13 +166,23 @@ private:
      *
      * NOTE: "destructor" must not throw exceptions.
      */
-    DecorationContainer::DecorationDescriptor declareDecoration(size_t sizeBytes,
-                                                                size_t alignBytes,
-                                                                DecorationConstructorFn constructor,
-                                                                DecorationDestructorFn destructor);
+    typename DecorationContainer<DecoratedType>::DecorationDescriptor declareDecoration(
+        const size_t sizeBytes,
+        const size_t alignBytes,
+        const DecorationConstructorFn constructor,
+        const DecorationDestructorFn destructor) {
+        const size_t misalignment = _totalSizeBytes % alignBytes;
+        if (misalignment) {
+            _totalSizeBytes += alignBytes - misalignment;
+        }
+        typename DecorationContainer<DecoratedType>::DecorationDescriptor result(_totalSizeBytes);
+        _decorationInfo.push_back(DecorationInfo(result, constructor, destructor));
+        _totalSizeBytes += sizeBytes;
+        return result;
+    }
 
     DecorationInfoVector _decorationInfo;
-    size_t _totalSizeBytes{0};
+    size_t _totalSizeBytes{sizeof(void*)};
 };
 
 }  // namespace mongo

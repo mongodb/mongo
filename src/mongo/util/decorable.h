@@ -59,7 +59,6 @@
 
 #pragma once
 
-#include "mongo/base/disallow_copying.h"
 #include "mongo/util/decoration_container.h"
 #include "mongo/util/decoration_registry.h"
 
@@ -67,7 +66,8 @@ namespace mongo {
 
 template <typename D>
 class Decorable {
-    MONGO_DISALLOW_COPYING(Decorable);
+    Decorable(const Decorable&) = delete;
+    Decorable& operator=(const Decorable&) = delete;
 
 public:
     template <typename T>
@@ -76,51 +76,72 @@ public:
         Decoration() = delete;
 
         T& operator()(D& d) const {
-            return static_cast<Decorable&>(d)._decorations.getDecoration(_raw);
+            return static_cast<Decorable&>(d)._decorations.getDecoration(this->_raw);
         }
 
-        T& operator()(D* d) const {
+        T& operator()(D* const d) const {
             return (*this)(*d);
         }
 
         const T& operator()(const D& d) const {
-            return static_cast<const Decorable&>(d)._decorations.getDecoration(_raw);
+            return static_cast<const Decorable&>(d)._decorations.getDecoration(this->_raw);
         }
 
-        const T& operator()(const D* d) const {
+        const T& operator()(const D* const d) const {
             return (*this)(*d);
         }
 
+        const D* owner(const T* const t) const {
+            return static_cast<const D*>(getOwnerImpl(t));
+        }
+
+        D* owner(T* const t) const {
+            return static_cast<D*>(getOwnerImpl(t));
+        }
+
+        const D& owner(const T& t) const {
+            return *owner(&t);
+        }
+
+        D& owner(T& t) const {
+            return *owner(&t);
+        }
+
     private:
+        const Decorable* getOwnerImpl(const T* const t) const {
+            return *reinterpret_cast<const Decorable* const*>(
+                reinterpret_cast<const unsigned char* const>(t) - _raw._raw._index);
+        }
+
+        Decorable* getOwnerImpl(T* const t) const {
+            return const_cast<Decorable*>(getOwnerImpl(const_cast<const T*>(t)));
+        }
+
         friend class Decorable;
 
-        explicit Decoration(DecorationContainer::DecorationDescriptorWithType<T> raw)
+        explicit Decoration(
+            typename DecorationContainer<D>::template DecorationDescriptorWithType<T> raw)
             : _raw(std::move(raw)) {}
 
-        DecorationContainer::DecorationDescriptorWithType<T> _raw;
+        typename DecorationContainer<D>::template DecorationDescriptorWithType<T> _raw;
     };
 
     template <typename T>
     static Decoration<T> declareDecoration() {
-        return Decoration<T>(getRegistry()->declareDecoration<T>());
-    }
-
-    template <typename T>
-    static Decoration<T> declareDecorationWithOwner() {
-        return Decoration<T>(getRegistry()->declareDecorationWithOwner<T, D>());
+        return Decoration<T>(getRegistry()->template declareDecoration<T>());
     }
 
 protected:
-    Decorable() : _decorations(getRegistry(), this) {}
+    Decorable() : _decorations(this, getRegistry()) {}
     ~Decorable() = default;
 
 private:
-    static DecorationRegistry* getRegistry() {
-        static DecorationRegistry* theRegistry = new DecorationRegistry();
+    static DecorationRegistry<D>* getRegistry() {
+        static DecorationRegistry<D>* theRegistry = new DecorationRegistry<D>();
         return theRegistry;
     }
 
-    DecorationContainer _decorations;
+    DecorationContainer<D> _decorations;
 };
 
 }  // namespace mongo

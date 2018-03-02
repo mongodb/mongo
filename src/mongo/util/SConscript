@@ -59,22 +59,12 @@ debuggerEnv.Library(
     ]
 )
 
-env.Library(
-    target='decorable',
-    source=[
-        'decoration_container.cpp',
-        'decoration_registry.cpp',
-    ],
-    LIBDEPS=[]
-    )
-
 env.CppUnitTest(
     target='decorable_test',
     source=[
         'decorable_test.cpp'
         ],
     LIBDEPS=[
-        'decorable',
         ]
     )
 

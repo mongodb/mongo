@@ -31,17 +31,21 @@
 #include <cstdint>
 #include <memory>
 
-#include "mongo/base/disallow_copying.h"
-
 namespace mongo {
 
+template <typename DecoratedType>
 class DecorationRegistry;
+
+template <typename DecoratedType>
+class Decorable;
 
 /**
  * An container for decorations.
  */
+template <typename DecoratedType>
 class DecorationContainer {
-    MONGO_DISALLOW_COPYING(DecorationContainer);
+    DecorationContainer(const DecorationContainer&) = delete;
+    DecorationContainer& operator=(const DecorationContainer&) = delete;
 
 public:
     /**
@@ -53,8 +57,9 @@ public:
         DecorationDescriptor() = default;
 
     private:
-        friend class DecorationContainer;
-        friend class DecorationRegistry;
+        friend DecorationContainer;
+        friend DecorationRegistry<DecoratedType>;
+        friend Decorable<DecoratedType>;
 
         explicit DecorationDescriptor(size_t index) : _index(index) {}
 
@@ -72,8 +77,9 @@ public:
         DecorationDescriptorWithType() = default;
 
     private:
-        friend class DecorationContainer;
-        friend class DecorationRegistry;
+        friend DecorationContainer;
+        friend DecorationRegistry<DecoratedType>;
+        friend Decorable<DecoratedType>;
 
         explicit DecorationDescriptorWithType(DecorationDescriptor raw) : _raw(std::move(raw)) {}
 
@@ -87,8 +93,24 @@ public:
      * have any declareDecoration() calls made on it while a DecorationContainer dependent on it
      * is in scope.
      */
-    explicit DecorationContainer(const DecorationRegistry* registry, void* owner);
-    ~DecorationContainer();
+    explicit DecorationContainer(Decorable<DecoratedType>* const decorated,
+                                 const DecorationRegistry<DecoratedType>* const registry)
+        : _registry(registry),
+          _decorationData(new unsigned char[registry->getDecorationBufferSizeBytes()]) {
+        // Because the decorations live in the externally allocated storage buffer at
+        // `_decorationData`, there needs to be a way to get back from a known location within this
+        // buffer to the type which owns those decorations.  We place a pointer to ourselves, a
+        // "back link" in the front of this storage buffer, as this is the easiest "well known
+        // location" to compute.
+        Decorable<DecoratedType>** const backLink =
+            reinterpret_cast<Decorable<DecoratedType>**>(_decorationData.get());
+        *backLink = decorated;
+        _registry->construct(this);
+    }
+
+    ~DecorationContainer() {
+        _registry->destroy(this);
+    }
 
     /**
      * Gets the decorated value for the given descriptor.
@@ -123,7 +145,7 @@ public:
     }
 
 private:
-    const DecorationRegistry* const _registry;
+    const DecorationRegistry<DecoratedType>* const _registry;
     const std::unique_ptr<unsigned char[]> _decorationData;
 };
 

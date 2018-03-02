@@ -45,7 +45,7 @@ class DatabaseShardingState {
 public:
     static const Database::Decoration<DatabaseShardingState> get;
 
-    DatabaseShardingState(Database* db);
+    DatabaseShardingState();
     ~DatabaseShardingState() = default;
 
     /**
@@ -84,9 +84,6 @@ public:
     void checkDbVersion(OperationContext* opCtx) const;
 
 private:
-    // The database to which this sharding state corresponds.
-    const Database* _db;
-
     // Modifying the state below requires holding the DBLock in X mode; holding the DBLock in any
     // mode is acceptable for reading it. (Note: accessing this class at all requires holding the
     // DBLock in some mode, since it requires having a pointer to the Database).

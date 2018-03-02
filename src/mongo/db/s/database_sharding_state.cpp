@@ -34,12 +34,12 @@
 
 namespace mongo {
 const Database::Decoration<DatabaseShardingState> DatabaseShardingState::get =
-    Database::declareDecorationWithOwner<DatabaseShardingState>();
+    Database::declareDecoration<DatabaseShardingState>();
 
-DatabaseShardingState::DatabaseShardingState(Database* db) : _db(db) {}
+DatabaseShardingState::DatabaseShardingState() = default;
 
 void DatabaseShardingState::enterCriticalSection(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
     invariant(!_critSecSignal);
     _critSecSignal = std::make_shared<Notification<void>>();
     // TODO (SERVER-33313): call CursorManager::invalidateAll() on all collections in this database
@@ -49,7 +49,7 @@ void DatabaseShardingState::enterCriticalSection(OperationContext* opCtx) {
 
 void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx,
                                                 boost::optional<DatabaseVersion> newDbVersion) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
     invariant(_critSecSignal);
     _critSecSignal->set();
     _critSecSignal.reset();
@@ -62,7 +62,7 @@ std::shared_ptr<Notification<void>> DatabaseShardingState::getCriticalSectionSig
 
 void DatabaseShardingState::setDbVersion(OperationContext* opCtx,
                                          boost::optional<DatabaseVersion> newDbVersion) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(get.owner(this)->name(), MODE_X));
     _dbVersion = newDbVersion;
 }
 
