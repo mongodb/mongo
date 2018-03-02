@@ -480,10 +480,10 @@ void scheduleWritesToOplog(OperationContext* opCtx,
         // guarantees that 'ops' will stay in scope until the spawned threads complete.
         return [&ops, begin, end] {
             initializeWriterThread();
-            const auto opCtxHolder = cc().makeOperationContext();
-            const auto opCtx = opCtxHolder.get();
-            opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
-            UnreplicatedWritesBlock uwb(opCtx);
+            auto opCtx = cc().makeOperationContext();
+            UnreplicatedWritesBlock uwb(opCtx.get());
+            ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+                opCtx->lockState());
 
             std::vector<InsertStatement> docs;
             docs.reserve(end - begin);
@@ -494,9 +494,10 @@ void scheduleWritesToOplog(OperationContext* opCtx,
                     ops[i].raw, ops[i].getOpTime().getTimestamp(), ops[i].getOpTime().getTerm()});
             }
 
-            fassertStatusOK(40141,
-                            StorageInterface::get(opCtx)->insertDocuments(
-                                opCtx, NamespaceString::kRsOplogNamespace, docs));
+            fassertStatusOK(
+                40141,
+                StorageInterface::get(opCtx.get())
+                    ->insertDocuments(opCtx.get(), NamespaceString::kRsOplogNamespace, docs));
         };
     };
 
@@ -539,11 +540,10 @@ void scheduleTxnTableUpdates(OperationContext* opCtx,
 
         threadPool->schedule([&record]() {
             initializeWriterThread();
-            const auto opCtxHolder = cc().makeOperationContext();
-            const auto opCtx = opCtxHolder.get();
-            opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
-
-            Session::updateSessionRecordOnSecondary(opCtx, record);
+            auto opCtx = cc().makeOperationContext();
+            ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
+                opCtx->lockState());
+            Session::updateSessionRecordOnSecondary(opCtx.get(), record);
         });
     }
 }
@@ -1278,9 +1278,7 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
                               SyncApplyFn syncApply) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
-
-    // Allow us to get through the magic barrier.
-    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
 
     // Sort the oplog entries by namespace, so that entries from the same namespace will be next to
     // each other in the list.
@@ -1466,12 +1464,11 @@ Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
                                      WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
+    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
+
     {  // Ensure that the MultikeyPathTracker stops tracking paths.
         ON_BLOCK_EXIT([opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });
         MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo();
-
-        // allow us to get through the magic barrier
-        opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
         for (auto it = ops->begin(); it != ops->end(); ++it) {
             auto& entry = **it;

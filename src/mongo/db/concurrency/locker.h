@@ -432,4 +432,26 @@ private:
     Locker* const _locker;
 };
 
+/**
+ * RAII-style class to opt out of replication's use of ParallelBatchWriterMode.
+ */
+class ShouldNotConflictWithSecondaryBatchApplicationBlock {
+    MONGO_DISALLOW_COPYING(ShouldNotConflictWithSecondaryBatchApplicationBlock);
+
+public:
+    explicit ShouldNotConflictWithSecondaryBatchApplicationBlock(Locker* lockState)
+        : _lockState(lockState),
+          _originalShouldConflict(_lockState->shouldConflictWithSecondaryBatchApplication()) {
+        _lockState->setShouldConflictWithSecondaryBatchApplication(false);
+    }
+
+    ~ShouldNotConflictWithSecondaryBatchApplicationBlock() {
+        _lockState->setShouldConflictWithSecondaryBatchApplication(_originalShouldConflict);
+    }
+
+private:
+    Locker* const _lockState;
+    const bool _originalShouldConflict;
+};
+
 }  // namespace mongo

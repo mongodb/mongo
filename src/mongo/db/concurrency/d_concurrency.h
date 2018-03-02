@@ -388,12 +388,10 @@ public:
 
     public:
         explicit ParallelBatchWriterMode(Locker* lockState);
-        ~ParallelBatchWriterMode();
 
     private:
         ResourceLock _pbwm;
-        Locker* const _lockState;
-        const bool _orginalShouldConflict;
+        ShouldNotConflictWithSecondaryBatchApplicationBlock _shouldNotConflictBlock;
     };
 };
 

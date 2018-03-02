@@ -82,24 +82,23 @@ void IndexBuilder::run() {
     Client::initThread(name().c_str());
     LOG(2) << "IndexBuilder building index " << _index;
 
-    const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-    OperationContext& opCtx = *opCtxPtr;
-    opCtx.lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+    auto opCtx = cc().makeOperationContext();
+    ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
 
-    AuthorizationSession::get(opCtx.getClient())->grantInternalAuthorization();
+    AuthorizationSession::get(opCtx->getClient())->grantInternalAuthorization();
 
     {
-        stdx::lock_guard<Client> lk(*opCtx.getClient());
-        CurOp::get(opCtx)->setNetworkOp_inlock(dbInsert);
+        stdx::lock_guard<Client> lk(*(opCtx->getClient()));
+        CurOp::get(opCtx.get())->setNetworkOp_inlock(dbInsert);
     }
     NamespaceString ns(_index["ns"].String());
 
-    Lock::DBLock dlk(&opCtx, ns.db(), MODE_X);
-    OldClientContext ctx(&opCtx, ns.getSystemIndexesCollection());
+    Lock::DBLock dlk(opCtx.get(), ns.db(), MODE_X);
+    OldClientContext ctx(opCtx.get(), ns.getSystemIndexesCollection());
 
-    Database* db = dbHolder().get(&opCtx, ns.db().toString());
+    Database* db = dbHolder().get(opCtx.get(), ns.db().toString());
 
-    Status status = _build(&opCtx, db, true, &dlk);
+    Status status = _build(opCtx.get(), db, true, &dlk);
     if (!status.isOK()) {
         error() << "IndexBuilder could not build index: " << redact(status);
         fassert(28555, ErrorCodes::isInterruption(status.code()));
