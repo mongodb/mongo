@@ -33,7 +33,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_command.h"
 #include "mongo/db/repl/repl_set_request_votes_args.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"

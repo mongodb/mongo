@@ -39,7 +39,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/repl/bson_extract_optime.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
 

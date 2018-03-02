@@ -31,7 +31,6 @@
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

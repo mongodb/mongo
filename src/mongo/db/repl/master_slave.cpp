@@ -64,7 +64,7 @@
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator_global.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/service_context.h"
@@ -854,7 +854,8 @@ public:
             return Status(ErrorCodes::BadValue, "replApplyBatchSize has to be >= 1 and <= 1024");
         }
 
-        const ReplSettings& replSettings = getGlobalReplicationCoordinator()->getSettings();
+        const ReplSettings& replSettings =
+            ReplicationCoordinator::get(getGlobalServiceContext())->getSettings();
         if (replSettings.getSlaveDelaySecs() != Seconds(0) && potentialNewValue > 1) {
             return Status(ErrorCodes::BadValue, "can't use a batch size > 1 with slavedelay");
         }

@@ -98,7 +98,6 @@ env.Library(
         'oplog_interface_remote',
         'oplogreader',
         'repl_coordinator_interface',
-        'repl_coordinator_global',
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/background',
         '$BUILD_DIR/mongo/db/catalog/database',
@@ -143,7 +142,6 @@ env.Library(
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
     ],
 )
@@ -289,7 +287,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'optime',
-        'repl_coordinator_global',
+        'repl_coordinator_interface',
         'replication_consistency_markers_idl',
     ],
 )
@@ -633,7 +631,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
         'initial_syncer',
         'oplog_entry',
-        'repl_coordinator_global',
+        'repl_coordinator_interface',
         'storage_interface',
         'bgsync',
     ],
@@ -796,7 +794,6 @@ env.Library(
         'collection_cloner',
         'initial_syncer',
         'data_replicator_external_state_initial_sync',
-        'repl_coordinator_global',
         'repl_coordinator_interface',
         'repl_settings',
         'replica_set_messages',
@@ -958,10 +955,6 @@ env.Library(
     ],
 )
 
-env.Library('repl_coordinator_global',
-            'replication_coordinator_global.cpp',
-            LIBDEPS=['repl_coordinator_interface'])
-
 env.Library(
     target='replmocks',
     source=[
@@ -1068,7 +1061,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/lasterror',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         'drop_pending_collection_reaper',
         'repl_settings',
@@ -1577,7 +1570,7 @@ env.Library(
         'oplog_buffer_collection',
         'oplog_interface_remote',
         'optime',
-        'repl_coordinator_global',
+        'repl_coordinator_interface',
         'repl_settings',
         'replication_consistency_markers_impl',
         'replication_info',
