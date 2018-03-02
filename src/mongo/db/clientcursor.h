@@ -129,6 +129,10 @@ public:
         return _lsid;
     }
 
+    boost::optional<TxnNumber> getTxnNumber() const {
+        return _txnNumber;
+    }
+
     bool isReadCommitted() const {
         return _isReadCommitted;
     }
@@ -299,6 +303,9 @@ private:
 
     // A logical session id for this cursor, if it is running inside of a session.
     const boost::optional<LogicalSessionId> _lsid;
+
+    // A transaction number for this cursor, if it was provided in the originating command.
+    const boost::optional<TxnNumber> _txnNumber;
 
     const bool _isReadCommitted = false;
 

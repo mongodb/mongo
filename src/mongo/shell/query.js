@@ -697,7 +697,7 @@ DBQuery.Option = {
     partial: 0x80
 };
 
-function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS) {
+function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS, txnNumber) {
     if (cmdResult._mongo) {
         const newSession = new _DelegatingDriverSession(cmdResult._mongo, db.getSession());
         db = newSession.getDatabase(db.getName());
@@ -714,6 +714,7 @@ function DBCommandCursor(db, cmdResult, batchSize, maxAwaitTimeMS) {
         this._cursorid = cmdResult.cursor.id;
         this._batchSize = batchSize;
         this._maxAwaitTimeMS = maxAwaitTimeMS;
+        this._txnNumber = txnNumber;
 
         this._ns = cmdResult.cursor.ns;
         this._db = db;
@@ -785,6 +786,10 @@ DBCommandCursor.prototype._runGetMoreCommand = function() {
     // maxAwaitTimeMS is only supported when using read commands.
     if (this._maxAwaitTimeMS) {
         getMoreCmd.maxTimeMS = this._maxAwaitTimeMS;
+    }
+
+    if (this._txnNumber) {
+        getMoreCmd.txnNumber = NumberLong(this._txnNumber);
     }
 
     // Deliver the getMore command, and check for errors in the response.

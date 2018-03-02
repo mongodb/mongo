@@ -99,6 +99,64 @@ void waitWhileFailPointEnabled(FailPoint* failPoint,
 }
 
 /**
+ * Validates that the lsid of 'opCtx' matches that of 'cursor'. This must be called after
+ * authenticating, so that it is safe to report the lsid of 'cursor'.
+ */
+void validateLSID(OperationContext* opCtx, const GetMoreRequest& request, ClientCursor* cursor) {
+    uassert(50736,
+            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                          << ", which was not created in a session, in session "
+                          << *opCtx->getLogicalSessionId(),
+            !opCtx->getLogicalSessionId() || cursor->getSessionId());
+
+    uassert(50737,
+            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                          << ", which was created in session "
+                          << *cursor->getSessionId()
+                          << ", without an lsid",
+            opCtx->getLogicalSessionId() || !cursor->getSessionId());
+
+    uassert(50738,
+            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                          << ", which was created in session "
+                          << *cursor->getSessionId()
+                          << ", in session "
+                          << *opCtx->getLogicalSessionId(),
+            !opCtx->getLogicalSessionId() || !cursor->getSessionId() ||
+                (*opCtx->getLogicalSessionId() == *cursor->getSessionId()));
+}
+
+/**
+ * Validates that the txnNumber of 'opCtx' matches that of 'cursor'. This must be called after
+ * authenticating, so that it is safe to report the txnNumber of 'cursor'.
+ */
+void validateTxnNumber(OperationContext* opCtx,
+                       const GetMoreRequest& request,
+                       ClientCursor* cursor) {
+    uassert(50739,
+            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                          << ", which was not created in a transaction, in transaction "
+                          << *opCtx->getTxnNumber(),
+            !opCtx->getTxnNumber() || cursor->getTxnNumber());
+
+    uassert(50740,
+            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                          << ", which was created in transaction "
+                          << *cursor->getTxnNumber()
+                          << ", without a txnNumber",
+            opCtx->getTxnNumber() || !cursor->getTxnNumber());
+
+    uassert(50741,
+            str::stream() << "Cannot run getMore on cursor " << request.cursorid
+                          << ", which was created in transaction "
+                          << *cursor->getTxnNumber()
+                          << ", in transaction "
+                          << *opCtx->getTxnNumber(),
+            !opCtx->getTxnNumber() || !cursor->getTxnNumber() ||
+                (*opCtx->getTxnNumber() == *cursor->getTxnNumber()));
+}
+
+/**
  * A command for running getMore() against an existing cursor registered with a CursorManager.
  * Used to generate the next batch of results for a ClientCursor.
  *
@@ -187,6 +245,9 @@ public:
                    const GetMoreRequest& request,
                    const BSONObj& cmdObj,
                    BSONObjBuilder& result) {
+        // If we return early without freeing the cursor, indicate we have a stashed cursor, so that
+        // transaction state is stashed.
+        ScopeGuard stashedCursorIndicator = MakeGuard(&OperationContext::setStashedCursor, opCtx);
 
         auto curOp = CurOp::get(opCtx);
         curOp->debug().cursorid = request.cursorid;
@@ -291,6 +352,10 @@ public:
                                      << cursor->nss().ns()));
         }
 
+        // Ensure the lsid and txnNumber of the getMore match that of the originating command.
+        validateLSID(opCtx, request, cursor);
+        validateTxnNumber(opCtx, request, cursor);
+
         if (request.nss.isOplog() && MONGO_FAIL_POINT(rsStopGetMoreCmd)) {
             return CommandHelpers::appendCommandStatus(
                 result,
@@ -310,8 +375,10 @@ public:
             return CommandHelpers::appendCommandStatus(result, status);
         }
 
-        // On early return, get rid of the cursor.
+        // On early return, get rid of the cursor. We should no longer indicate we have a stashed
+        // cursor on early return.
         ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, &ccPin.getValue());
+        stashedCursorIndicator.Dismiss();
 
         if (cursor->isReadCommitted())
             uassertStatusOK(opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
