@@ -143,7 +143,6 @@ env.Library(
         '$BUILD_DIR/third_party/shim_boost',
         '$BUILD_DIR/third_party/shim_intel_decimal128',
         '$BUILD_DIR/third_party/shim_pcrecpp',
-        '$BUILD_DIR/third_party/shim_tz',
         'util/quick_exit',
     ],
     LIBDEPS_PRIVATE=[

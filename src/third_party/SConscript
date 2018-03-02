@@ -21,7 +21,6 @@ sqliteSuffix = '-amalgamation-3190300'
 
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
-    ('tz', '#/src/third_party/tz'),
     ('timelib', '#/src/third_party/timelib' + timelibSuffix),
 ]
 
@@ -335,23 +334,6 @@ yamlEnv.Library(
     source=[
         'shim_yaml.cpp',
     ])
-
-
-tzEnv = env.Clone()
-if env.TargetOSIs('solaris'):
-    tzEnv.InjectThirdPartyIncludePaths(libraries=['tz'])
-    tzEnv.SConscript('tz/SConscript', exports={ 'env' : tzEnv })
-    tzEnv = tzEnv.Clone(
-        LIBDEPS_INTERFACE=[
-            'tz/tz',
-        ])
-
-tzEnv.Library(
-    target='shim_tz',
-    source=[
-        'shim_tz.cpp',
-    ])
-
 
 timelibEnv = env.Clone();
 timelibEnv.InjectThirdPartyIncludePaths(libraries=['timelib'])
