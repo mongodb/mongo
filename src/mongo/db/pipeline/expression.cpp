@@ -1898,8 +1898,16 @@ intrusive_ptr<ExpressionObject> ExpressionObject::parse(
 }
 
 intrusive_ptr<Expression> ExpressionObject::optimize() {
+    bool allValuesConstant = true;
     for (auto&& pair : _expressions) {
         pair.second = pair.second->optimize();
+        if (!dynamic_cast<ExpressionConstant*>(pair.second.get())) {
+            allValuesConstant = false;
+        }
+    }
+    // If all values in ExpressionObject are constant evaluate to ExpressionConstant.
+    if (allValuesConstant) {
+        return ExpressionConstant::create(getExpressionContext(), evaluate(Document()));
     }
     return this;
 }
