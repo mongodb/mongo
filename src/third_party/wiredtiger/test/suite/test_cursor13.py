@@ -41,9 +41,6 @@ class test_cursor13_base(wttest.WiredTigerTestCase):
     stat_cursor_cache = 0
     stat_cursor_reopen = 0
 
-    def setUpSessionOpen(self, conn):
-        return conn.open_session('cache_cursors=true')
-
     def caching_stats(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         cache = stat_cursor[stat.conn.cursor_cache][2]
@@ -120,14 +117,32 @@ class test_cursor13_ckpt2(test_checkpoint02.test_checkpoint02,
     pass
 
 class test_cursor13_reopens(test_cursor13_base):
-    scenarios = make_scenarios([
+    # The SimpleDataSet uses simple tables, that have no column groups or
+    # indices. Thus, these tables will be cached. The more complex data sets
+    # are not simple, so are not cached and not included in this test.
+    types = [
         ('file', dict(uri='file:cursor13_reopen1', dstype=None)),
         ('table', dict(uri='table:cursor13_reopen2', dstype=None)),
         ('sfile', dict(uri='file:cursor13_reopen3', dstype=SimpleDataSet)),
         ('stable', dict(uri='table:cursor13_reopen4', dstype=SimpleDataSet)),
-        ('ctable', dict(uri='table:cursor13_reopen5', dstype=ComplexDataSet)),
-        ('clsm', dict(uri='table:cursor13_reopen6', dstype=ComplexLSMDataSet))
-    ])
+    ]
+    connoptions = [
+        ('none', dict(connoption='', conn_caching=None)),
+        ('enable', dict(connoption='cache_cursors=true', conn_caching=True)),
+        ('disable', dict(connoption='cache_cursors=false', conn_caching=False)),
+    ]
+    sessoptions = [
+        ('none', dict(sessoption='', sess_caching=None)),
+        ('enable', dict(sessoption='cache_cursors=true', sess_caching=True)),
+        ('disable', dict(sessoption='cache_cursors=false', sess_caching=False)),
+    ]
+    scenarios = make_scenarios(types, connoptions, sessoptions)
+
+    def conn_config(self):
+        return self.connoption + ',statistics=(fast)'
+
+    def session_config(self):
+        return self.sessoption
 
     def basic_populate(self, uri, caching_enabled):
         cursor = self.session.open_cursor(uri)
@@ -188,23 +203,61 @@ class test_cursor13_reopens(test_cursor13_base):
         ds.check()
         self.assert_cursor_reopened(caching_enabled)
 
+    # Return if caching was configured at the start of the session
+    def is_caching_configured(self):
+        if self.sess_caching != None:
+            return self.sess_caching
+        if self.conn_caching != None:
+            return self.conn_caching
+        return True   # default
+
     def test_reopen(self):
+        caching = self.is_caching_configured()
         self.cursor_stats_init()
         if self.dstype == None:
-            self.basic_reopen(100, True, True)
+            self.basic_reopen(100, True, caching)
         else:
-            self.dataset_reopen(True)
+            self.dataset_reopen(caching)
 
     def test_reconfig(self):
-        if self.dstype == None:
-            self.cursor_stats_init()
-            self.basic_reopen(10, True, True)
-            self.session.reconfigure('cache_cursors=false')
-            self.cursor_stats_init()
-            self.basic_reopen(10, False, False)
+        caching = self.is_caching_configured()
+        self.cursor_stats_init()
+        self.basic_reopen(10, True, caching)
+        self.session.reconfigure('cache_cursors=false')
+        self.cursor_stats_init()
+        self.basic_reopen(10, False, False)
+        self.session.reconfigure('cache_cursors=true')
+        self.cursor_stats_init()
+        self.basic_reopen(10, False, True)
+
+    # Test we can reopen across a verify.
+    def test_verify(self):
+        if self.dstype != None:
             self.session.reconfigure('cache_cursors=true')
-            self.cursor_stats_init()
-            self.basic_reopen(10, False, True)
+            ds = self.dstype(self, self.uri, 100)
+            ds.populate()
+            for loop in range(10):
+                # We need an extra cursor open to test all code paths in
+                # this loop.  After the verify (the second or more time through
+                # the loop), the data handle referred to by both cached
+                # cursors will no longer be open.
+                #
+                # The first cursor open will attempt to reopen the
+                # first cached cursor, will see the data handle closed,
+                # thus will close that cursor and open normally.
+                #
+                # The second cursor open (in ds.check()) will attempt the
+                # reopen the second cached cursor, see the data handle now
+                # open and will succeed the reopen.
+                #
+                # This test checks that reopens of cursor using a an
+                # already reopened data handle will work.
+                c = self.session.open_cursor(self.uri)
+                ds.check()
+                c.close()
+                s2 = self.conn.open_session()
+                s2.verify(self.uri)
+                s2.close()
 
 class test_cursor13_drops(test_cursor13_base):
     def open_and_drop(self, uri, cursor_session, drop_session, nopens, ntrials):
@@ -304,25 +357,21 @@ class test_cursor13_drops(test_cursor13_base):
             cursor.close()
             session.drop(uri)
 
-class test_cursor13_sweep(test_cursor13_base):
-    aggressive_sweep = False
-    scenarios = make_scenarios([
-        ('file', dict(uri='file:cursor13_sweep_a')),
-        ('table', dict(uri='table:cursor13_sweep_b'))
-    ])
-
+# Shared base class for some bigger tests.
+class test_cursor13_big_base(test_cursor13_base):
     deep = 3
     nuris = 100
-    nopens = 500000
+    opencount = 0
+    closecount = 0
+    uri = None   # set by child classes
+
     def uriname(self, i):
         return self.uri + '.' + str(i)
 
-    def test_cursor_sweep(self):
-        rand = suite_random()
-
-        # Create a large number (self.nuris) of uris, and for each one,
-        # create some number (self.deep) of cached cursors.
-        urimap = {}
+    # Create a large number (self.nuris) of uris, and for each one,
+    # create some number (self.deep) of cached cursors.
+    def create_uri_map(self, baseuri):
+        uri_map = {}
         for i in xrange(0, self.nuris):
             uri = self.uriname(i)
             cursors = []
@@ -331,46 +380,126 @@ class test_cursor13_sweep(test_cursor13_base):
                 cursors.append(self.session.open_cursor(uri, None))
             for c in cursors:
                 c.close()
-
             # Each map entry has a list of the open cursors.
-            # We start with none
-            urimap[uri] = []
+            # Since we just closed them, we start with none
+            uri_map[uri] = []
+
+        return uri_map
+
+    def close_uris(self, uri_map, range_arg):
+        for i in range_arg:
+            cursors = uri_map[self.uriname(i)]
+            while len(cursors) > 0:
+                cursors.pop().close()
+                self.closecount += 1
+
+    def open_or_close(self, uri_map, rand, low, high):
+        uri = self.uriname(rand.rand_range(low, high))
+        cursors = uri_map[uri]
+        ncursors = len(cursors)
+
+        # Keep the range of open cursors between 0 and [deep],
+        # with some random fluctuation
+        if ncursors == 0:
+            do_open = True
+        elif ncursors == self.deep:
+            do_open = False
+        else:
+            do_open = (rand.rand_range(0, 2) == 0)
+
+        if do_open:
+            cursors.append(self.session.open_cursor(uri, None))
+            self.opencount += 1
+        else:
+            i = rand.rand_range(0, ncursors)
+            cursors.pop(i).close()
+            self.closecount += 1
+
+class test_cursor13_big(test_cursor13_big_base):
+    scenarios = make_scenarios([
+        ('file', dict(uri='file:cursor13_sweep_a')),
+        ('table', dict(uri='table:cursor13_sweep_b'))
+    ])
+
+    nopens = 500000
+
+    def test_cursor_big(self):
+        rand = suite_random()
+        uri_map = self.create_uri_map(self.uri)
+        self.cursor_stats_init()
+        begin_stats = self.caching_stats()
+        #self.tty('stats before = ' + str(begin_stats))
 
         # At this point, we'll randomly open/close lots of cursors, keeping
         # track of how many of each. As long as we don't have more than [deep]
         # cursors open for each uri, we should always be taking then from
         # the set of cached cursors.
-        self.cursor_stats_init()
-        begin_stats = self.caching_stats()
-        #self.tty('stats before = ' + str(begin_stats))
-
-        opencount = 0
-        closecount = 0
-
-        while opencount < self.nopens:
-            uri = self.uriname(rand.rand_range(0, self.nuris))
-            cursors = urimap[uri]
-            ncursors = len(cursors)
-
-            # Keep the range of open cursors between 0 and [deep],
-            # with some random fluctuation
-            if ncursors == 0:
-                do_open = True
-            elif ncursors == self.deep:
-                do_open = False
-            else:
-                do_open = (rand.rand_range(0, 2) == 0)
-            if do_open:
-                cursors.append(self.session.open_cursor(uri, None))
-                opencount += 1
-            else:
-                i = rand.rand_range(0, ncursors)
-                cursors.pop(i).close()
-                closecount += 1
+        while self.opencount < self.nopens:
+            self.open_or_close(uri_map, rand, 0, self.nuris)
 
         end_stats = self.caching_stats()
 
-        #self.tty('opens = ' + str(opencount) + ', closes = ' + str(closecount))
+        #self.tty('opens = ' + str(self.opencount) + \
+        #         ', closes = ' + str(self.closecount))
         #self.tty('stats after = ' + str(end_stats))
-        self.assertEquals(end_stats[0] - begin_stats[0], closecount)
-        self.assertEquals(end_stats[1] - begin_stats[1], opencount)
+        self.assertEquals(end_stats[0] - begin_stats[0], self.closecount)
+        self.assertEquals(end_stats[1] - begin_stats[1], self.opencount)
+
+class test_cursor13_sweep(test_cursor13_big_base):
+    # Set dhandle sweep configuration so that dhandles should be closed within
+    # two seconds of all the cursors for the dhandle being closed (cached).
+    conn_config = 'statistics=(fast),' + \
+                  'file_manager=(close_scan_interval=1,close_idle_time=1,' + \
+                  'close_handle_minimum=0)'
+    uri = 'table:cursor13_sweep_b'
+    opens_per_round = 100000
+    rounds = 5
+
+    @wttest.longtest('cursor sweep tests require wait times')
+    def test_cursor_sweep(self):
+        rand = suite_random()
+
+        uri_map = self.create_uri_map(self.uri)
+        self.cursor_stats_init()
+        begin_stats = self.caching_stats()
+        begin_sweep_stats = self.sweep_stats()
+        #self.tty('stats before = ' + str(begin_stats))
+        #self.tty('sweep stats before = ' + str(begin_sweep_stats))
+
+        for round_cnt in range(0, self.rounds):
+            if round_cnt % 2 == 1:
+                # Close cursors in half of the range, and don't
+                # use them during this round, so they will be
+                # closed by sweep.
+                half = self.nuris / 2
+                self.close_uris(uri_map, xrange(0, half))
+                bottom_range = half
+                # Let the dhandle sweep run and find the closed cursors.
+                time.sleep(3.0)
+            else:
+                bottom_range = 0
+
+            i = 0
+            while self.opencount < (1 + round_cnt) * self.opens_per_round:
+                i += 1
+                if i % 100 == 0:
+                    time.sleep(0.0)   # Let other threads run
+                self.open_or_close(uri_map, rand, bottom_range, self.nuris)
+
+        end_stats = self.caching_stats()
+        end_sweep_stats = self.sweep_stats()
+
+        #self.tty('opens = ' + str(self.opencount) + \
+        #         ', closes = ' + str(self.closecount))
+        #self.tty('stats after = ' + str(end_stats))
+        #self.tty('sweep stats after = ' + str(end_sweep_stats))
+        self.assertEquals(end_stats[0] - begin_stats[0], self.closecount)
+        swept = end_sweep_stats[3] - begin_sweep_stats[3]
+        min_swept = self.deep * self.nuris
+        self.assertGreaterEqual(swept, min_swept)
+
+        # No strict equality test for the reopen stats. When we've swept
+        # some closed cursors, we'll have fewer reopens. It's different
+        # by approximately the number of swept cursors, but it's less
+        # predictable.
+        self.assertGreater(end_stats[1] - begin_stats[1], 0)

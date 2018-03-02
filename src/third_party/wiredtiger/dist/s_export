@@ -13,7 +13,7 @@ Darwin)
 	# We require GNU nm, which may not be installed.
 	type nm > /dev/null 2>&1 &&
 	    (nm --version | grep 'GNU nm') > /dev/null 2>&1 || exit 0
-	NM='nm --extern-only --defined-only --print-file-name $f'
+	NM='nm --extern-only --defined-only --print-file-name $f | egrep -v "__bss_start|_edata|_end|_fini|_init"'
 	;;
 esac
 
@@ -44,13 +44,12 @@ check()
 # top-level or build_posix directories, check the previously built library,
 # if it exists. And, allow this script to be run from the top-level directory
 # as well as locally.
-for d in .libs build_posix/.libs; do
-	f="$d/libwiredtiger.a"
-	test -f $f && check $f
-
-	f="../$d/libwiredtiger.a"
-	test -f $f && check $f
+for d in .. ../build_posix; do
+	for ext in a so dylib; do
+		f="$d/.libs/libwiredtiger.$ext"
+		test -f $f && check $f
+	done
 done
 
-echo "skipped: libwiredtiger.a not found"
+echo "skipped: libwiredtiger.[a|so|dylib] not found"
 exit 0
