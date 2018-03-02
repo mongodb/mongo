@@ -674,7 +674,7 @@ var ShardingTest = function(params) {
         }
 
         if (!_isSharded(dbName)) {
-            this.s.adminCommand({enableSharding: dbName});
+            assert.commandWorked(this.s.adminCommand({enableSharding: dbName}));
         }
 
         var result = assert.commandWorked(this.s.adminCommand({shardcollection: c, key: key}));
