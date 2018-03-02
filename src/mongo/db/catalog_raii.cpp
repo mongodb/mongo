@@ -130,6 +130,12 @@ NamespaceString AutoGetCollection::resolveNamespaceStringOrUUID(OperationContext
             str::stream() << "Unable to resolve " << nsOrUUID.toString(),
             resolvedNss.isValid());
 
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "UUID " << nsOrUUID.toString() << " specified in " << nsOrUUID.dbname()
+                          << " resolved to a collection in a different database: "
+                          << resolvedNss.toString(),
+            resolvedNss.db() == nsOrUUID.dbname());
+
     return resolvedNss;
 }
 

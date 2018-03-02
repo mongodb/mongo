@@ -124,7 +124,7 @@ NamespaceString CommandHelpers::parseNsCollectionRequired(StringData dbname,
 NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(StringData dbname, const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
-        return uassertStatusOK(UUID::parse(first));
+        return {dbname.toString(), uassertStatusOK(UUID::parse(first))};
     } else {
         // Ensure collection identifier is not a Command
         const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));

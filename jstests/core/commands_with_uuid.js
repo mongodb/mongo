@@ -5,8 +5,9 @@
 
 (function() {
     'use strict';
-    let mainCollName = 'main_coll';
-    let subCollName = 'sub_coll';
+    const mainCollName = 'main_coll';
+    const subCollName = 'sub_coll';
+    const kOtherDbName = 'commands_with_uuid_db';
     db.runCommand({drop: mainCollName});
     db.runCommand({drop: subCollName});
     assert.commandWorked(db.runCommand({create: mainCollName}));
@@ -82,4 +83,26 @@
     cmd = {parallelCollectionScan: uuid, numCursors: 1};
     res = assert.commandWorked(db.runCommand(cmd), 'could not run ' + tojson(cmd));
     assert.eq(res.cursors[0].cursor.ns, 'test.' + mainCollName);
+
+    // Test that UUID resolution fails when the UUID belongs to a different database. First, we
+    // create a collection in another database.
+    const dbWithUUID = db.getSiblingDB(kOtherDbName);
+    dbWithUUID.getCollection(mainCollName).drop();
+    assert.commandWorked(dbWithUUID.runCommand({create: mainCollName}));
+    collectionInfos = dbWithUUID.getCollectionInfos({name: mainCollName});
+    uuid = collectionInfos[0].info.uuid;
+    assert.neq(null, uuid);
+    assert.commandWorked(dbWithUUID.runCommand({find: uuid}));
+
+    // Run read commands supporting UUIDs against the original database, passing the UUID from a
+    // different database, and verify that the UUID resolution fails with the correct error code. We
+    // also test that the same command succeeds when there is no database mismatch.
+    for (cmd of[{count: uuid}, {distinct: uuid, key: "a"}, {find: uuid}, {listIndexes: uuid}, {
+             parallelCollectionScan: uuid,
+             numCursors: 1
+         }]) {
+        assert.commandWorked(dbWithUUID.runCommand(cmd));
+        assert.commandFailedWithCode(
+            db.runCommand(cmd), ErrorCodes.NamespaceNotFound, "command: " + tojson(cmd));
+    }
 }());

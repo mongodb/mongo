@@ -284,7 +284,7 @@ NamespaceString parseUUIDOrNs(OperationContext* opCtx, const OplogEntry& oplogEn
 
 NamespaceStringOrUUID getNsOrUUID(const NamespaceString& nss, const BSONObj& op) {
     if (auto ui = op["ui"]) {
-        return uassertStatusOK(UUID::parse(ui));
+        return {nss.db().toString(), uassertStatusOK(UUID::parse(ui))};
     }
     return nss;
 }
