@@ -197,7 +197,7 @@ env.Library('authmongod',
                 '$BUILD_DIR/mongo/db/db_raii',
                 '$BUILD_DIR/mongo/db/dbdirectclient',
                 '$BUILD_DIR/mongo/db/dbhelpers',
-                '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+                '$BUILD_DIR/mongo/db/repl/repl_coordinator_global',
                 '$BUILD_DIR/mongo/db/server_parameters',
             ],
 )

@@ -45,7 +45,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rollback_source_impl.h"

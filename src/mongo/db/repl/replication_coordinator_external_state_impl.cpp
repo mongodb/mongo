@@ -65,7 +65,7 @@
 #include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/oplog_buffer_proxy.h"
 #include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/storage_interface.h"

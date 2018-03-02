@@ -47,7 +47,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/log.h"

@@ -41,7 +41,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/util/log.h"
@@ -56,9 +56,7 @@ ShardLocal::ShardLocal(const ShardId& id) : Shard(id), _rsLocalClient() {
 }
 
 const ConnectionString ShardLocal::getConnString() const {
-    return repl::ReplicationCoordinator::get(getGlobalServiceContext())
-        ->getConfig()
-        .getConnectionString();
+    return repl::getGlobalReplicationCoordinator()->getConfig().getConnectionString();
 }
 
 std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {

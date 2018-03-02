@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2015 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,47 +28,21 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/optime.h"
-#include "mongo/db/repl/repl_set_command.h"
-#include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/replication_coordinator_global.h"
-#include "mongo/executor/network_interface.h"
-#include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 namespace repl {
 
-class CmdReplSetRequestVotes : public ReplSetCommand {
-public:
-    CmdReplSetRequestVotes() : ReplSetCommand("replSetRequestVotes") {}
+ReplicationCoordinator* getGlobalReplicationCoordinator() {
+    ReplicationCoordinator* globalReplCoordinator =
+        ReplicationCoordinator::get(getGlobalServiceContext());
+    return globalReplCoordinator;
+}
 
-private:
-    bool run(OperationContext* opCtx,
-             const std::string&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) final {
-        Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
-
-        ReplSetRequestVotesArgs parsedArgs;
-        status = parsedArgs.initialize(cmdObj);
-        if (!status.isOK()) {
-            return CommandHelpers::appendCommandStatus(result, status);
-        }
-
-        ReplSetRequestVotesResponse response;
-        status = ReplicationCoordinator::get(opCtx)->processReplSetRequestVotes(
-            opCtx, parsedArgs, &response);
-        response.addToBSON(&result);
-        return CommandHelpers::appendCommandStatus(result, status);
-    }
-} cmdReplSetRequestVotes;
-
+void setGlobalReplicationCoordinator(ReplicationCoordinator* coord) {
+    repl::ReplicationCoordinator::set(getGlobalServiceContext(),
+                                      std::unique_ptr<ReplicationCoordinator>(coord));
+}
 }  // namespace repl
 }  // namespace mongo

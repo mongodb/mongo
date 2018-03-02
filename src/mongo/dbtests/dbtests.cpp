@@ -44,7 +44,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context.h"
@@ -152,11 +152,9 @@ int dbtestsMain(int argc, char** argv, char** envp) {
     preciseClock->advance(Seconds(1));
     service->setPreciseClockSource(std::move(preciseClock));
 
-    repl::ReplicationCoordinator::set(
-        service,
-        std::unique_ptr<repl::ReplicationCoordinator>(
-            new repl::ReplicationCoordinatorMock(service, replSettings)));
-    repl::ReplicationCoordinator::get(getGlobalServiceContext())
+    repl::setGlobalReplicationCoordinator(
+        new repl::ReplicationCoordinatorMock(service, replSettings));
+    repl::getGlobalReplicationCoordinator()
         ->setFollowerMode(repl::MemberState::RS_PRIMARY)
         .ignore();
 

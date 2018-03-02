@@ -52,7 +52,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/util/background.h"

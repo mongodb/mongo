@@ -40,7 +40,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/query/find.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {

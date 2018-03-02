@@ -48,7 +48,7 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/sync_tail.h"
 #include "mongo/dbtests/dbtests.h"
@@ -102,9 +102,7 @@ protected:
 
 public:
     Base()
-        : _client(&_opCtx),
-          _defaultReplSettings(
-              ReplicationCoordinator::get(getGlobalServiceContext())->getSettings()) {
+        : _client(&_opCtx), _defaultReplSettings(getGlobalReplicationCoordinator()->getSettings()) {
         // Replication is not supported by mobile SE.
         if (mongo::storageGlobalParams.engine == "mobile") {
             return;
@@ -112,10 +110,8 @@ public:
         ReplSettings replSettings;
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);
         replSettings.setMaster(true);
-        ReplicationCoordinator::set(
-            getGlobalServiceContext(),
-            std::unique_ptr<repl::ReplicationCoordinator>(
-                new repl::ReplicationCoordinatorMock(_opCtx.getServiceContext(), replSettings)));
+        setGlobalReplicationCoordinator(
+            new repl::ReplicationCoordinatorMock(_opCtx.getServiceContext(), replSettings));
 
         // Since the Client object persists across tests, even though the global
         // ReplicationCoordinator does not, we need to clear the last op associated with the client
@@ -146,11 +142,9 @@ public:
         try {
             deleteAll(ns());
             deleteAll(cllNS());
-            repl::ReplicationCoordinator::set(
-                getGlobalServiceContext(),
-                std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
-                    _opCtx.getServiceContext(), _defaultReplSettings)));
-            repl::ReplicationCoordinator::get(getGlobalServiceContext())
+            setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(
+                _opCtx.getServiceContext(), _defaultReplSettings));
+            repl::getGlobalReplicationCoordinator()
                 ->setFollowerMode(repl::MemberState::RS_PRIMARY)
                 .ignore();
 

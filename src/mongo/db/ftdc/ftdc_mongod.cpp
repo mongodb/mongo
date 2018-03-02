@@ -36,6 +36,7 @@
 #include "mongo/db/ftdc/controller.h"
 #include "mongo/db/ftdc/ftdc_server.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
@@ -43,7 +44,7 @@ namespace mongo {
 namespace {
 void registerMongoDCollectors(FTDCController* controller) {
     // These metrics are only collected if replication is enabled
-    if (repl::ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
+    if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
         repl::ReplicationCoordinator::modeNone) {
         // CmdReplSetGetStatus
         controller->addPeriodicCollector(stdx::make_unique<FTDCSimpleInternalCommandCollector>(

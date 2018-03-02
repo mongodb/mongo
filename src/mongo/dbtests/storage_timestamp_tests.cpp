@@ -57,7 +57,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
@@ -103,9 +103,7 @@ public:
             new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings);
         _coordinatorMock = coordinatorMock;
         coordinatorMock->alwaysAllowWrites(true);
-        repl::ReplicationCoordinator::set(
-            _opCtx->getServiceContext(),
-            std::unique_ptr<repl::ReplicationCoordinator>(coordinatorMock));
+        setGlobalReplicationCoordinator(coordinatorMock);
         repl::StorageInterface::set(_opCtx->getServiceContext(),
                                     stdx::make_unique<repl::StorageInterfaceImpl>());
 
@@ -302,8 +300,7 @@ public:
     }
 
     void setReplCoordAppliedOpTime(const repl::OpTime& opTime) {
-        repl::ReplicationCoordinator::get(getGlobalServiceContext())
-            ->setMyLastAppliedOpTime(opTime);
+        repl::getGlobalReplicationCoordinator()->setMyLastAppliedOpTime(opTime);
     }
 
     /**

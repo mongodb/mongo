@@ -35,7 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_and_modify_request.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
@@ -85,18 +85,16 @@ void ShardLocalTest::setUp() {
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
     _shardLocal = stdx::make_unique<ShardLocal>(ShardRegistry::kConfigServerShardId);
     const repl::ReplSettings replSettings = {};
-    repl::ReplicationCoordinator::set(
-        getGlobalServiceContext(),
-        std::unique_ptr<repl::ReplicationCoordinator>(
-            new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings)));
-    ASSERT_OK(repl::ReplicationCoordinator::get(getGlobalServiceContext())
-                  ->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    repl::setGlobalReplicationCoordinator(
+        new repl::ReplicationCoordinatorMock(_opCtx->getServiceContext(), replSettings));
+    ASSERT_OK(
+        repl::getGlobalReplicationCoordinator()->setFollowerMode(repl::MemberState::RS_PRIMARY));
 }
 
 void ShardLocalTest::tearDown() {
     _opCtx.reset();
     ServiceContextMongoDTest::tearDown();
-    repl::ReplicationCoordinator::set(getGlobalServiceContext(), nullptr);
+    repl::setGlobalReplicationCoordinator(nullptr);
 }
 
 StatusWith<Shard::CommandResponse> ShardLocalTest::runFindAndModifyRunCommand(NamespaceString nss,

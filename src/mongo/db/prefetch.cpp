@@ -43,6 +43,7 @@
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/mmap_v1/mmap.h"
@@ -215,12 +216,12 @@ public:
     virtual ~ReplIndexPrefetch() {}
 
     const char* _value() {
-        if (ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
+        if (getGlobalReplicationCoordinator()->getReplicationMode() !=
             ReplicationCoordinator::modeReplSet) {
             return "uninitialized";
         }
         ReplSettings::IndexPrefetchConfig ip =
-            ReplicationCoordinator::get(getGlobalServiceContext())->getIndexPrefetchConfig();
+            getGlobalReplicationCoordinator()->getIndexPrefetchConfig();
         switch (ip) {
             case ReplSettings::IndexPrefetchConfig::PREFETCH_NONE:
                 return "none";
@@ -238,7 +239,7 @@ public:
     }
 
     virtual Status set(const BSONElement& newValueElement) {
-        if (ReplicationCoordinator::get(getGlobalServiceContext())->getReplicationMode() !=
+        if (getGlobalReplicationCoordinator()->getReplicationMode() !=
             ReplicationCoordinator::modeReplSet) {
             return Status(ErrorCodes::BadValue, "replication is not enabled");
         }
@@ -263,8 +264,7 @@ public:
                           str::stream() << "unrecognized indexPrefetch setting: " << prefetch);
         }
 
-        ReplicationCoordinator::get(getGlobalServiceContext())
-            ->setIndexPrefetchConfig(prefetchConfig);
+        getGlobalReplicationCoordinator()->setIndexPrefetchConfig(prefetchConfig);
         return Status::OK();
     }
 
