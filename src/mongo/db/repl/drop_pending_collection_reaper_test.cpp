@@ -66,7 +66,6 @@ protected:
      * Generates a default CollectionOptions object with a UUID. These options should be used
      * when creating a collection in this test because otherwise, collections will not be created
      * with UUIDs. All collections are expected to have UUIDs.
-     * TODO(SERVER-31540) Remove once UUID is no longer a boost::optional in CollectionOptions.
      */
     CollectionOptions generateOptionsWithUuid();
 
