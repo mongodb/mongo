@@ -503,13 +503,11 @@ Value ExpressionArrayElemAt::evaluate(const Document& root) const {
             array.isArray());
     uassert(28690,
             str::stream() << getOpName() << "'s second argument must be a numeric value,"
-                          << " but is "
-                          << typeName(indexArg.getType()),
+                          << " but is " << typeName(indexArg.getType()),
             indexArg.numeric());
     uassert(28691,
             str::stream() << getOpName() << "'s second argument must be representable as"
-                          << " a 32-bit integer: "
-                          << indexArg.coerceToDouble(),
+                          << " a 32-bit integer: " << indexArg.coerceToDouble(),
             indexArg.integral());
 
     long long i = indexArg.coerceToLong();
@@ -1898,8 +1896,16 @@ intrusive_ptr<ExpressionObject> ExpressionObject::parse(
 }
 
 intrusive_ptr<Expression> ExpressionObject::optimize() {
+    bool allValuesConstant = true;
     for (auto&& pair : _expressions) {
         pair.second = pair.second->optimize();
+        if (!dynamic_cast<ExpressionConstant*>(pair.second.get())) {
+            allValuesConstant = false;
+        }
+    }
+    // If all values in ExpressionObject are constant evaluate to ExpressionConstant.
+    if (allValuesConstant) {
+        return ExpressionConstant::create(getExpressionContext(), evaluate(Document()));
     }
     return this;
 }
