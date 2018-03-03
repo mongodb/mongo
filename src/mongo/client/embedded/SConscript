@@ -1,6 +1,7 @@
 # -*- mode: python; -*-
 
 Import("env")
+Import("get_option")
 
 env = env.Clone()
 
@@ -105,10 +106,18 @@ capi = env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         'embedded',
-    ]
+    ],
+    INSTALL_ALIAS='mobile-dev',
 )
 
 env.Alias('embedded_capi', capi)
+
+if get_option('install-mode') == 'hygienic':
+    env.Install(
+        'include',
+        source=['libmongodbcapi.h'],
+        INSTALL_ALIAS='mobile-dev'
+    )
 
 capiTest = env.Program(
     target='mongo_embedded_capi_test',
@@ -147,7 +156,8 @@ embeddedTransport = env.Library(
     SYSLIBDEPS=[
         'mongoc-1.0',
         'bson-1.0',
-    ]
+    ],
+    INSTALL_ALIAS='mobile-dev'
 )
 
 env.Alias('embedded_capi', embeddedTransport)
