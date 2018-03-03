@@ -546,7 +546,6 @@ functions:
 
         ${activate_virtualenv}
         prune_scons_cache="$python buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}"
-        $prune_scons_cache
         if [ "${scons_cache_scope}" = "shared" ]; then
             if [ "${shared_scons_pruning}" = "true" ] && [ "${is_patch}" != "true" ]; then
               echo "shared_scons_pruning is set to true, checking last prune time"
