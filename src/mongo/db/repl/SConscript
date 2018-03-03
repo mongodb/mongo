@@ -611,6 +611,7 @@ env.Library(
 env.Library(
     target='sync_tail',
     source=[
+        'applier_helpers.cpp',
         'sync_tail.cpp',
     ],
     LIBDEPS=[
