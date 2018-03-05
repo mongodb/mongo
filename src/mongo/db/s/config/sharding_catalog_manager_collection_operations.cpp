@@ -678,7 +678,14 @@ void ShardingCatalogManager::createCollection(OperationContext* opCtx,
     }
 
     checkCollectionOptions(opCtx, primaryShard.get(), ns, collOptions);
+
     // TODO: SERVER-33094 use UUID returned to write config.collections entries.
+
+    // Make sure to advance the opTime if writes didn't occur during the execution of this
+    // command. This is to ensure that this request will wait for the opTime that at least
+    // reflects the current state (that this command observed) while waiting for replication
+    // to satisfy the write concern.
+    repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 }
 
 }  // namespace mongo
