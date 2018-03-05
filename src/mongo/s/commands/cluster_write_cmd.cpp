@@ -160,14 +160,9 @@ public:
     }
 
     Status explain(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& cmdObj,
+                   const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const final {
-        OpMsgRequest request;
-        request.body = cmdObj;
-        invariant(request.getDatabase() == dbname);  // Ensured by explain command's run() method.
-
         const auto batchedRequest(parseRequest(_writeType, request));
 
         // We can only explain write batches of size 1.
@@ -175,7 +170,7 @@ public:
             return Status(ErrorCodes::InvalidLength, "explained write batches must be of size 1");
         }
 
-        const auto explainCmd = ClusterExplain::wrapAsExplain(cmdObj, verbosity);
+        const auto explainCmd = ClusterExplain::wrapAsExplain(request.body, verbosity);
 
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
@@ -183,8 +178,8 @@ public:
         // Target the command to the shards based on the singleton batch item.
         BatchItemRef targetingBatchItem(&batchedRequest, 0);
         std::vector<Strategy::CommandResult> shardResults;
-        Status status =
-            _commandOpWrite(opCtx, dbname, explainCmd, targetingBatchItem, &shardResults);
+        Status status = _commandOpWrite(
+            opCtx, request.getDatabase().toString(), explainCmd, targetingBatchItem, &shardResults);
         if (!status.isOK()) {
             return status;
         }
