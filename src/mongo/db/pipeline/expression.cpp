@@ -4883,9 +4883,7 @@ public:
         table[BSONType::String][BSONType::NumberDouble] = &parseStringToNumber<double, 0>;
         table[BSONType::String][BSONType::String] = &performIdentityConversion;
         table[BSONType::String][BSONType::jstOID] = &parseStringToOID;
-        table[BSONType::String]
-             [BSONType::Bool] = [](const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                   Value inputValue) { return Value(true); };
+        table[BSONType::String][BSONType::Bool] = &performConvertToTrue;
         table[BSONType::String][BSONType::Date] = [](
             const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
             return Value(expCtx->timeZoneDatabase->fromString(inputValue.getStringData(),
@@ -4903,6 +4901,7 @@ public:
                 return Value(inputValue.getOid().toString());
             };
         table[BSONType::jstOID][BSONType::jstOID] = &performIdentityConversion;
+        table[BSONType::jstOID][BSONType::Bool] = &performConvertToTrue;
         table[BSONType::jstOID][BSONType::Date] =
             [](const boost::intrusive_ptr<ExpressionContext>& expCtx, Value inputValue) {
                 return Value(inputValue.getOid().asDateT());
@@ -5027,13 +5026,40 @@ public:
                 return performCastDecimalToInt(BSONType::NumberLong, inputValue);
             };
         table[BSONType::NumberDecimal][BSONType::NumberDecimal] = &performIdentityConversion;
+
+        //
+        // Miscellaneous conversions to Bool
+        //
+        table[BSONType::Object][BSONType::Bool] = &performConvertToTrue;
+        table[BSONType::Array][BSONType::Bool] = &performConvertToTrue;
+        table[BSONType::BinData][BSONType::Bool] = &performConvertToTrue;
+        table[BSONType::RegEx][BSONType::Bool] = &performConvertToTrue;
+        table[BSONType::DBRef][BSONType::Bool] = &performConvertToTrue;
+        table[BSONType::Code][BSONType::Bool] = &performConvertToTrue;
+        table[BSONType::Symbol][BSONType::Bool] = &performConvertToTrue;
+        table[BSONType::CodeWScope][BSONType::Bool] = &performConvertToTrue;
+        table[BSONType::bsonTimestamp][BSONType::Bool] = &performConvertToTrue;
     }
 
     ConversionFunc findConversionFunc(BSONType inputType, BSONType targetType) const {
-        invariant(inputType >= 0 && inputType <= JSTypeMax);
-        invariant(targetType >= 0 && targetType <= JSTypeMax);
+        ConversionFunc foundFunction;
 
-        auto foundFunction = table[inputType][targetType];
+        // Note: We can't use BSONType::MinKey (-1) or BSONType::MaxKey (127) as table indexes,
+        // so we have to treat them as special cases.
+        if (inputType != BSONType::MinKey && inputType != BSONType::MaxKey &&
+            targetType != BSONType::MinKey && targetType != BSONType::MaxKey) {
+            invariant(inputType >= 0 && inputType <= JSTypeMax);
+            invariant(targetType >= 0 && targetType <= JSTypeMax);
+            foundFunction = table[inputType][targetType];
+        } else if (targetType == BSONType::Bool) {
+            // This is a conversion from MinKey or MaxKey to Bool, which is allowed (and always
+            // returns true).
+            foundFunction = &performConvertToTrue;
+        } else {
+            // Any other conversions involving MinKey or MaxKey (either as the target or input) are
+            // illegal.
+        }
+
         uassert(ErrorCodes::ConversionFailure,
                 str::stream() << "Unsupported conversion from " << typeName(inputType) << " to "
                               << typeName(targetType)
@@ -5230,6 +5256,11 @@ private:
                                     << "' in $convert with no onError value: "
                                     << ex.reason());
         }
+    }
+
+    static Value performConvertToTrue(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                      Value inputValue) {
+        return Value(true);
     }
 
     static Value performIdentityConversion(const boost::intrusive_ptr<ExpressionContext>& expCtx,
