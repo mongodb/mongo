@@ -109,11 +109,6 @@ void OperationShardingState::setShardVersion(NamespaceString nss, ChunkVersion n
     _hasVersion = true;
 }
 
-void OperationShardingState::unsetShardVersion(NamespaceString nss) {
-    invariant(!_hasVersion || _ns == nss);
-    _clear();
-}
-
 bool OperationShardingState::waitForMigrationCriticalSectionSignal(OperationContext* opCtx) {
     // Must not block while holding a lock
     invariant(!opCtx->lockState()->isLocked());
@@ -135,12 +130,6 @@ void OperationShardingState::setMigrationCriticalSectionSignal(
     std::shared_ptr<Notification<void>> critSecSignal) {
     invariant(critSecSignal);
     _migrationCriticalSectionSignal = std::move(critSecSignal);
-}
-
-void OperationShardingState::_clear() {
-    _hasVersion = false;
-    _shardVersion = ChunkVersion();
-    _ns = NamespaceString();
 }
 
 }  // namespace mongo

@@ -1119,39 +1119,46 @@ class TestRoundTrip {
 public:
     virtual ~TestRoundTrip() {}
     void run() {
-        // Insert in Javascript -> Find using DBDirectClient
+        {
+            // Insert in Javascript -> Find using DBDirectClient
 
-        // Drop the collection
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
-        DBDirectClient client(&opCtx);
+            // Drop the collection
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+            OperationContext& opCtx = *opCtxPtr;
+            DBDirectClient client(&opCtx);
 
-        client.dropCollection("unittest.testroundtrip");
+            client.dropCollection("unittest.testroundtrip");
 
-        // Insert in Javascript
-        stringstream jsInsert;
-        jsInsert << "db.testroundtrip.insert(" << jsonIn() << ")";
-        ASSERT_TRUE(client.eval("unittest", jsInsert.str()));
+            // Insert in Javascript
+            stringstream jsInsert;
+            jsInsert << "db.testroundtrip.insert(" << jsonIn() << ")";
+            ASSERT_TRUE(client.eval("unittest", jsInsert.str()));
 
-        // Find using DBDirectClient
-        BSONObj excludeIdProjection = BSON("_id" << 0);
-        BSONObj directFind = client.findOne("unittest.testroundtrip", "", &excludeIdProjection);
-        bsonEquals(bson(), directFind);
+            // Find using DBDirectClient
+            BSONObj excludeIdProjection = BSON("_id" << 0);
+            BSONObj directFind = client.findOne("unittest.testroundtrip", "", &excludeIdProjection);
+            bsonEquals(bson(), directFind);
+        }
 
+        {
+            // Insert using DBDirectClient -> Find in Javascript
 
-        // Insert using DBDirectClient -> Find in Javascript
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+            OperationContext& opCtx = *opCtxPtr;
+            DBDirectClient client(&opCtx);
 
-        // Drop the collection
-        client.dropCollection("unittest.testroundtrip");
+            // Drop the collection
+            client.dropCollection("unittest.testroundtrip");
 
-        // Insert using DBDirectClient
-        client.insert("unittest.testroundtrip", bson());
+            // Insert using DBDirectClient
+            client.insert("unittest.testroundtrip", bson());
 
-        // Find in Javascript
-        stringstream jsFind;
-        jsFind << "dbref = db.testroundtrip.findOne( { } , { _id : 0 } )\n"
-               << "assert.eq(dbref, " << jsonOut() << ")";
-        ASSERT_TRUE(client.eval("unittest", jsFind.str()));
+            // Find in Javascript
+            stringstream jsFind;
+            jsFind << "dbref = db.testroundtrip.findOne( { } , { _id : 0 } )\n"
+                   << "assert.eq(dbref, " << jsonOut() << ")";
+            ASSERT_TRUE(client.eval("unittest", jsFind.str()));
+        }
     }
 
 protected:
@@ -2230,18 +2237,29 @@ public:
         update.append("_id", "invalidstoredjs1");
         update.appendCode("value",
                           "function () { db.test.find().forEach(function(obj) { continue; }); }");
-
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
-        DBDirectClient client(&opCtx);
-        client.update("test.system.js", query.obj(), update.obj(), true /* upsert */);
+        {
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+            OperationContext& opCtx = *opCtxPtr;
+            DBDirectClient client(&opCtx);
+            client.update("test.system.js", query.obj(), update.obj(), true /* upsert */);
+        }
 
         unique_ptr<Scope> s(getGlobalScriptEngine()->newScope());
-        client.eval("test", "invalidstoredjs1()");
+        {
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+            OperationContext& opCtx = *opCtxPtr;
+            DBDirectClient client(&opCtx);
+            client.eval("test", "invalidstoredjs1()");
+        }
 
         BSONObj info;
         BSONElement ret;
-        ASSERT(client.eval("test", "return 5 + 12", info, ret));
+        {
+            const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
+            OperationContext& opCtx = *opCtxPtr;
+            DBDirectClient client(&opCtx);
+            ASSERT(client.eval("test", "return 5 + 12", info, ret));
+        }
         ASSERT_EQUALS(17, ret.number());
     }
 };

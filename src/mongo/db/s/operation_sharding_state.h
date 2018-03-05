@@ -104,11 +104,6 @@ public:
     void setShardVersion(NamespaceString nss, ChunkVersion newVersion);
 
     /**
-     * Undoes setting the shard version for the given namespace. Needed for views.
-     */
-    void unsetShardVersion(NamespaceString nss);
-
-    /**
      * This call is a no op if there isn't a currently active migration critical section. Otherwise
      * it will wait for the critical section to complete up to the remaining operation time.
      *
@@ -125,12 +120,6 @@ public:
     void setMigrationCriticalSectionSignal(std::shared_ptr<Notification<void>> critSecSignal);
 
 private:
-    /**
-     * Resets this object back as if it was default constructed (ie _hasVersion is false,
-     * _shardVersion is UNSHARDED, _ns is empty).
-     */
-    void _clear();
-
     // Specifies whether the request is allowed to create database/collection implicitly
     bool _allowImplicitCollectionCreation{true};
 
