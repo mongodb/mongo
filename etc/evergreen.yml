@@ -552,6 +552,10 @@ functions:
               if $python buildscripts/prune_check.py; then
                 echo "Pruning shared cache"
                 $prune_scons_cache
+                if [ $? -eq 0 ]; then
+                  echo "Prune successful.  Resetting last_prune timestamp"
+                  $python buildscripts/prune_check.py -w
+                fi
               else
                 echo "We are less than the 'shared_scons_pruning' num seconds threshold, pruning will be skipped"
               fi

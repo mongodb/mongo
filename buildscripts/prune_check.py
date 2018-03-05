@@ -4,15 +4,24 @@
     determine the last prune time and run the prune script on a schedule.
     It is meant to be invoked from the shell:
 
-    if python prune.py; then
+    if python prune_check.py; then
       echo 'Pruning'
     else
       echo 'Less than 24 hours, waiting ...'
     fi
 
+    The script can be invoked with optional arguments for mount point and 'seconds
+    since last prune' (default is 86400 - 24 hours). Use -h to see options and defaults.
+
+    python prune_check.py -m '/mount_point' -p 86400
+
+    To write the latest timestamp to a directory
+
+    python prune_check.py -w
+
     If it is time to prune (ie. more than 24 hours since the last timestamp),
     the script exits with a 0 return code.
-    Otherwise the script returns exit code 1 and pruning is skipped.
+    Otherwise the script returns exit code 1.
 """
 
 import argparse
@@ -63,18 +72,15 @@ def check_last_prune_time(args):
 
     diff = now - last_prune_time
 
-    # if it's been longer than 'seconds_since_last_prune',
-    # update/overwrite the prune file and return 0 to the shell.
-    # A 0 return code signals our Evergreen task that we should run the prune script
+    # if it's been longer than 'seconds_since_last_prune', return 0 to the shell.
+    # A 0 return code signals our Evergreen task that we should run the prune script.
     # Otherwise, return 1 and skip pruning.
     if diff.total_seconds() > seconds_since_last_prune:
-        print("It has been {0:.2f} seconds ({1:.2f} hours) since last prune.  Pruning directory"
+        print("It has been {0:.2f} seconds ({1:.2f} hours) since last prune."
               .format(diff.total_seconds(), diff.total_seconds()/60/60))
-        last_prune_time = datetime.utcnow()
-        write_last_prune_time(last_prune_time, prune_file_path)
         sys.exit(0)
     else:
-        print("It has been {0:.2f} seconds ({1:.2f} hours) since last prune.  Skipping directory prune."
+        print("It has been {0:.2f} seconds ({1:.2f} hours) since last prune."
               .format(diff.total_seconds(), diff.total_seconds()/60/60))
         sys.exit(1)
 
@@ -83,11 +89,13 @@ def get_command_line_args():
     """ Get the command line arguments """
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--mount_point', type=str, required=False,
-                        help="The base mount where efs is mounted",
+                        help="The base mount where efs is mounted. Default is '/efs'",
                         default='/efs')
     parser.add_argument('-p', '--prune_seconds', type=int, required=False,
                         help="Seconds to wait since last prune - default is 86400 (one day)",
                         default=86400)
+    parser.add_argument('-w', '--write_prune_time', action='store_true', required=False,
+                        help="Write the latest prune time")
     args = parser.parse_args()
     return args
 
@@ -96,7 +104,10 @@ def main():
     args = get_command_line_args()
     mount_point = args.mount_point
 
-    check_last_prune_time(args)
+    if args.write_prune_time:
+        write_last_prune_time(datetime.utcnow(), get_prune_file_path(mount_point))
+    else:
+        check_last_prune_time(args)
 
 
 if __name__ == '__main__':
