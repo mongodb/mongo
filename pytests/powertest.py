@@ -623,6 +623,11 @@ def call_remote_operation(local_ops, remote_python, script_name, client_args, op
     return ret, output
 
 
+def is_instance_running(ret, aws_status):
+    """ Return true if instance is in a running state. """
+    return ret == 0 and aws_status.state["Name"] == "running"
+
+
 class Processes(object):
     """Class to create and kill spawned processes."""
 
@@ -2051,8 +2056,8 @@ Examples:
         save_options = {}
         for opt_group in parser.option_groups:
             for opt in opt_group.option_list:
-                if getattr(options, opt.dest) != opt.default:
-                    save_options[opt.dest] = getattr(options, opt.dest)
+                if getattr(options, opt.dest, None) != opt.default:
+                    save_options[opt.dest] = getattr(options, opt.dest, None)
         LOGGER.info("Config options being saved %s", save_options)
         with open(save_config_options, "w") as ystream:
             yaml.safe_dump(save_options, ystream, default_flow_style=False)
@@ -2127,10 +2132,6 @@ Examples:
     # Required option for non-remote commands.
     if options.ssh_user_host is None and not options.remote_operation:
         parser.error("Missing required argument --sshUserHost")
-
-    # Establish EC2 connection if an instance_id is specified.
-    if options.instance_id:
-        ec2 = aws_ec2.AwsEc2()
 
     secret_port = options.usable_ports[1]
     standard_port = options.usable_ports[0]
@@ -2232,6 +2233,20 @@ Examples:
     # Note - the ssh option RequestTTY was added in OpenSSH 5.9, so we use '-tt'.
     ssh_options = "-tt" if options.remote_sudo else None
 
+    # Establish EC2 connection if an instance_id is specified.
+    if options.instance_id:
+        ec2 = aws_ec2.AwsEc2()
+        # Determine address_type if not using 'aws_ec2' crash_method.
+        if options.crash_method != "aws_ec2":
+            address_type = "public_ip_address"
+            ret, aws_status = ec2.control_instance(mode="status", image_id=options.instance_id)
+            if not is_instance_running(ret, aws_status):
+                LOGGER.error("AWS instance is not running:  %d %s", ret, aws_status)
+                sys.exit(1)
+            if (ssh_host == aws_status.private_ip_address or
+                    ssh_host == aws_status.private_dns_name):
+                address_type = "private_ip_address"
+
     # Instantiate the local handler object.
     local_ops = LocalToRemoteOperations(
         user_host=options.ssh_user_host,
@@ -2249,7 +2264,7 @@ Examples:
     client_args = ""
     for option in parser._get_all_options():
         if option.dest:
-            option_value = getattr(options, option.dest)
+            option_value = getattr(options, option.dest, None)
             if option_value != option.default:
                 # The boolean options do not require the option_value.
                 if isinstance(option_value, bool):
@@ -2498,7 +2513,7 @@ Examples:
         if options.instance_id:
             ret, aws_status = ec2.control_instance(mode="status", image_id=options.instance_id)
             LOGGER.info("AWS EC2 instance status: %d %s****", ret, aws_status)
-            instance_running = ret == 0 and getattr(aws_status, "state")["Name"] == "running"
+            instance_running = is_instance_running(ret, aws_status)
 
         # The EC2 instance address changes if the instance is restarted.
         if options.crash_method == "aws_ec2" or not instance_running:
@@ -2510,7 +2525,7 @@ Examples:
             if not hasattr(aws_status, address_type):
                 raise Exception("Cannot determine address_type {} from AWS EC2 status {}".format(
                     address_type, aws_status))
-            ssh_host = getattr(aws_status, address_type)
+            ssh_host = aws_status.address_type
             if ssh_user is None:
                 ssh_user_host = ssh_host
             else:
