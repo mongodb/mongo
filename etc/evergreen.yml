@@ -664,6 +664,12 @@ functions:
         set -o verbose
         set -o errexit
 
+        ### TODO - Remove this temporary disabling of bypass compile when SERVER-33657
+        ### is fully implemented.
+        if [ ${build_variant} = "linux-64" ] || [ ${build_variant} = "windows-64-2k8-ssl" ]; then
+          exit 0
+        fi
+        ###
         # For patch builds determine if we can bypass compile.
         if [ "${is_patch}" = "true" ]; then
           ${activate_virtualenv}
