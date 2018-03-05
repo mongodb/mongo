@@ -2767,6 +2767,7 @@ tasks:
   name: aggregation_fuzzer
   commands:
   - func: "do setup"
+  - func: "do multiversion setup"
   - func: "run jstestfuzz"
     vars:
       jstestfuzz_vars: --numGeneratedFiles 50
@@ -2774,6 +2775,7 @@ tasks:
   - <<: *run_jstestfuzz_tests
     vars:
       <<: *jstestfuzz_config_vars
+      task_path_suffix: /data/multiversion
       resmoke_args: --suites=generational_fuzzer
 
 ## jstestfuzz standalone update generational fuzzer ##
@@ -5328,6 +5330,9 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: ubuntu1604
+    multiversion_architecture: arm64
+    multiversion_edition: targeted
   tasks:
   - name: compile
     distros:
@@ -5416,6 +5421,9 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: org
     build_mongoreplay: true
+    multiversion_platform: ubuntu1604
+    multiversion_architecture: arm64
+    multiversion_edition: targeted
   tasks:
   - name: compile
     distros:
@@ -5453,6 +5461,9 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: ubuntu1604
+    multiversion_architecture: ppc64le
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -5532,6 +5543,9 @@ buildvariants:
     packager_distro: ubuntu1604
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: ubuntu1604
+    multiversion_architecture: s390x
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -5925,6 +5939,8 @@ buildvariants:
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
+    multiversion_platform: windows
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     requires:
@@ -6059,6 +6075,8 @@ buildvariants:
     test_flags: --storageEngine=inMemory --excludeWithAnyTags=requires_persistence,requires_journaling,requires_mmapv1
     ext: zip
     use_scons_cache: true
+    multiversion_platform: windows
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -6388,6 +6406,8 @@ buildvariants:
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
     num_jobs_available: 1
     build_mongoreplay: true
+    multiversion_platform: osx
+    multiversion_edition: enterprise
   tasks:
   - name: compile
   - name: compile_all
@@ -7095,6 +7115,9 @@ buildvariants:
     push_arch: ppc64le-enterprise-rhel71
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: rhel71
+    multiversion_architecture: ppc64le
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -7199,6 +7222,9 @@ buildvariants:
     push_arch: s390x-enterprise-rhel72
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: rhel72
+    multiversion_architecture: s390x
+    multiversion_edition: enterprise
   tasks:
   - name: compile
     distros:
@@ -7677,6 +7703,9 @@ buildvariants:
     packager_distro: suse12
     repo_edition: enterprise
     build_mongoreplay: true
+    multiversion_platform: suse12
+    multiversion_architecture: s390x
+    multiversion_edition: targeted
   tasks:
   - name: compile
     distros:
@@ -8428,7 +8457,6 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsonSchema
-  - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: noPassthrough
   - name: noPassthroughWithMongod
@@ -8482,7 +8510,6 @@ buildvariants:
   - name: jsCore_minimum_batch_size
   - name: jsCore_op_query
   - name: jsonSchema
-  - name: aggregation_fuzzer
   - name: jstestfuzz
   - name: noPassthrough
   - name: noPassthroughWithMongod
