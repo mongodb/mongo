@@ -36,7 +36,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/active_move_primaries_registry.h"
-#include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
@@ -127,20 +126,6 @@ public:
      * ConfigServerMetadata decoration attached to the OperationContext.
      */
     Status updateConfigServerOpTimeFromMetadata(OperationContext* opCtx);
-
-    ChunkSplitter* getChunkSplitter();
-
-    /**
-     * Should be invoked when the shard server primary enters the 'PRIMARY' state.
-     * Sets up the ChunkSplitter to begin accepting split requests.
-     */
-    void initiateChunkSplitter();
-
-    /**
-     * Should be invoked when this node which is currently serving as a 'PRIMARY' steps down.
-     * Sets the state of the ChunkSplitter so that it will no longer accept split requests.
-     */
-    void interruptChunkSplitter();
 
     void appendInfo(OperationContext* opCtx, BSONObjBuilder& b);
 
@@ -268,9 +253,6 @@ private:
 
     // Tracks the active move primary operations running on this shard
     ActiveMovePrimariesRegistry _activeMovePrimariesRegistry;
-
-    // Handles asynchronous auto-splitting of chunks
-    std::unique_ptr<ChunkSplitter> _chunkSplitter;
 
     // Protects state below
     stdx::mutex _mutex;

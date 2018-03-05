@@ -33,6 +33,8 @@
 namespace mongo {
 
 class NamespaceString;
+class OperationContext;
+class ServiceContext;
 
 /**
  * Handles asynchronous auto-splitting of chunks.
@@ -45,6 +47,12 @@ public:
     ~ChunkSplitter();
 
     /**
+     * Obtains the service-wide chunk splitter instance.
+     */
+    static ChunkSplitter& get(OperationContext* opCtx);
+    static ChunkSplitter& get(ServiceContext* serviceContext);
+
+    /**
      * Sets the mode of the ChunkSplitter to either primary or secondary.
      * The ChunkSplitter is only active when primary.
      */
@@ -54,7 +62,7 @@ public:
      * Invoked when the shard server primary enters the 'PRIMARY' state to set up the ChunkSplitter
      * to begin accepting split requests.
      */
-    void initiateChunkSplitter();
+    void onStepUp();
 
     /**
      * Invoked when this node which is currently serving as a 'PRIMARY' steps down.
@@ -62,7 +70,7 @@ public:
      * This method might be called multiple times in succession, which is what happens as a result
      * of incomplete transition to primary so it is resilient to that.
      */
-    void interruptChunkSplitter();
+    void onStepDown();
 
     /**
      * Schedules an autosplit task. This function throws on scheduling failure.
@@ -90,7 +98,7 @@ private:
     stdx::mutex _mutex;
 
     // The ChunkSplitter is only active on a primary node.
-    bool _isPrimary;
+    bool _isPrimary{false};
 
     // Thread pool for parallelizing splits.
     ThreadPool _threadPool;

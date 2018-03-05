@@ -361,9 +361,14 @@ void MigrationChunkClonerSourceLegacy::cancelClone(OperationContext* opCtx) {
     switch (_state) {
         case kDone:
             break;
-        case kCloning:
-            _callRecipient(createRequestWithSessionId(kRecvChunkAbort, _args.getNss(), _sessionId))
-                .status_with_transitional_ignore();
+        case kCloning: {
+            const auto status = _callRecipient(createRequestWithSessionId(
+                                                   kRecvChunkAbort, _args.getNss(), _sessionId))
+                                    .getStatus();
+            if (!status.isOK()) {
+                LOG(0) << "Failed to cancel migration " << causedBy(redact(status));
+            }
+        }
         // Intentional fall through
         case kNew:
             _cleanup(opCtx);

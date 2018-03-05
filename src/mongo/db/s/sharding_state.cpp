@@ -45,6 +45,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharded_connection_info.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
@@ -64,11 +65,6 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-
-using std::shared_ptr;
-using std::string;
-using std::vector;
-
 namespace {
 
 const auto getShardingState = ServiceContext::declareDecoration<ShardingState>();
@@ -81,7 +77,8 @@ const auto getShardingState = ServiceContext::declareDecoration<ShardingState>()
  * One example use case is for the ReplicaSetMonitor asynchronous callback when it detects changes
  * to replica set membership.
  */
-void updateShardIdentityConfigStringCB(const string& setName, const string& newConnectionString) {
+void updateShardIdentityConfigStringCB(const std::string& setName,
+                                       const std::string& newConnectionString) {
     auto configsvrConnStr = grid.shardRegistry()->getConfigServerConnectionString();
     if (configsvrConnStr.getSetName() != setName) {
         // Ignore all change notification for other sets that are not the config server.
@@ -102,8 +99,7 @@ void updateShardIdentityConfigStringCB(const string& setName, const string& newC
 }  // namespace
 
 ShardingState::ShardingState()
-    : _chunkSplitter(stdx::make_unique<ChunkSplitter>()),
-      _initializationState(static_cast<uint32_t>(InitializationState::kNew)),
+    : _initializationState(static_cast<uint32_t>(InitializationState::kNew)),
       _initializationStatus(Status(ErrorCodes::InternalError, "Uninitialized value")),
       _globalInit(&initializeGlobalShardingStateForMongod) {}
 
@@ -139,7 +135,7 @@ Status ShardingState::canAcceptShardedCommands() const {
     }
 }
 
-string ShardingState::getShardName() {
+std::string ShardingState::getShardName() {
     invariant(enabled());
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     return _shardName;
@@ -171,18 +167,6 @@ Status ShardingState::updateConfigServerOpTimeFromMetadata(OperationContext* opC
     }
 
     return Status::OK();
-}
-
-ChunkSplitter* ShardingState::getChunkSplitter() {
-    return _chunkSplitter.get();
-}
-
-void ShardingState::initiateChunkSplitter() {
-    _chunkSplitter->initiateChunkSplitter();
-}
-
-void ShardingState::interruptChunkSplitter() {
-    _chunkSplitter->interruptChunkSplitter();
 }
 
 void ShardingState::setGlobalInitMethodForTest(GlobalInitFunc func) {
@@ -249,8 +233,7 @@ Status ShardingState::initializeFromShardIdentity(OperationContext* opCtx,
                                repl::MemberState::RS_PRIMARY);
 
             CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
-
-            _chunkSplitter->setReplicaSetMode(isStandaloneOrPrimary);
+            ChunkSplitter::get(opCtx).setReplicaSetMode(isStandaloneOrPrimary);
 
             log() << "initialized sharding components for "
                   << (isStandaloneOrPrimary ? "primary" : "secondary") << " node.";
@@ -431,7 +414,7 @@ void ShardingState::appendInfo(OperationContext* opCtx, BSONObjBuilder& builder)
     builder.append("clusterId", _clusterId);
 }
 
-bool ShardingState::needCollectionMetadata(OperationContext* opCtx, const string& ns) {
+bool ShardingState::needCollectionMetadata(OperationContext* opCtx, const std::string& ns) {
     if (!enabled())
         return false;
 

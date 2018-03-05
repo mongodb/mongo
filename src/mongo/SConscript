@@ -312,7 +312,7 @@ env.Library(
         'db/repl/storage_interface_impl',
         'db/repl/topology_coordinator',
         'db/s/balancer',
-        'db/s/sharding_catalog_manager',
+        'db/s/sharding_runtime_d',
         'db/serveronly',
         'db/service_context_d',
         'db/startup_warnings_mongod',

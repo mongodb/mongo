@@ -24,6 +24,7 @@ env.Library(
 env.Library(
     target='sharding_runtime_d',
     source=[
+        'chunk_splitter.cpp',
         'implicit_create_collection.cpp',
         'migration_destination_manager.cpp',
         'session_catalog_migration_destination.cpp',
@@ -36,6 +37,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/rw_concern_d',
         'sharding',
+        'sharding_catalog_manager',
     ],
 )
 
@@ -71,7 +73,6 @@ env.Library(
         'active_migrations_registry.cpp',
         'active_move_primaries_registry.cpp',
         'chunk_move_write_concern_options.cpp',
-        'chunk_splitter.cpp',
         'collection_range_deleter.cpp',
         'collection_sharding_state.cpp',
         'metadata_manager.cpp',
@@ -232,7 +233,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         'balancer',
-        'sharding_catalog_manager',
         'sharding_runtime_d',
     ],
 )

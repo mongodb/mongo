@@ -147,7 +147,8 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
         autoGetOrCreateDb.emplace(
             opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_X);
 
-        BSONObj updateObj = RecoveryDocument::createChangeObj(grid.configOpTime(), change);
+        BSONObj updateObj =
+            RecoveryDocument::createChangeObj(Grid::get(opCtx)->configOpTime(), change);
 
         LOG(1) << "Changing sharding recovery document " << redact(updateObj);
 
@@ -225,12 +226,13 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
 
     log() << "Sharding state recovery process found document " << redact(recoveryDoc.toBSON());
 
+    Grid* const grid = Grid::get(opCtx);
     ShardingState* const shardingState = ShardingState::get(opCtx);
     invariant(shardingState->enabled());
 
     if (!recoveryDoc.getMinOpTimeUpdaters()) {
         // Treat the minOpTime as up-to-date
-        grid.advanceConfigOpTime(recoveryDoc.getMinOpTime());
+        grid->advanceConfigOpTime(recoveryDoc.getMinOpTime());
         return Status::OK();
     }
 
@@ -240,16 +242,16 @@ Status ShardingStateRecovery::recover(OperationContext* opCtx) {
              "to retrieve the most recent opTime.";
 
     // Need to fetch the latest uptime from the config server, so do a logging write
-    Status status = Grid::get(opCtx)->catalogClient()->logChange(
-        opCtx,
-        "Sharding minOpTime recovery",
-        NamespaceString::kServerConfigurationNamespace.ns(),
-        recoveryDocBSON,
-        ShardingCatalogClient::kMajorityWriteConcern);
+    Status status =
+        grid->catalogClient()->logChange(opCtx,
+                                         "Sharding minOpTime recovery",
+                                         NamespaceString::kServerConfigurationNamespace.ns(),
+                                         recoveryDocBSON,
+                                         ShardingCatalogClient::kMajorityWriteConcern);
     if (!status.isOK())
         return status;
 
-    log() << "Sharding state recovered. New config server opTime is " << grid.configOpTime();
+    log() << "Sharding state recovered. New config server opTime is " << grid->configOpTime();
 
     // Finally, clear the recovery document so next time we don't need to recover
     status = modifyRecoveryDocument(opCtx, RecoveryDocument::Clear, kLocalWriteConcern);
