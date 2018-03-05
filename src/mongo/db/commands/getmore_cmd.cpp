@@ -94,10 +94,6 @@ void waitWhileFailPointEnabled(FailPoint* failPoint,
             readLock->reset();
             readLock->emplace(opCtx, nss);
         }
-
-        // Check for interrupt so that an operation can be killed while waiting for the failpoint to
-        // be disabled.
-        opCtx->checkForInterrupt();
     }
     updateCurOpMsg(opCtx, origCurOpMsg);
 }
