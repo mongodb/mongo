@@ -923,7 +923,8 @@ TEST_F(SyncTailTest, MultiSyncApplyDisablesDocumentValidationWhileApplyingOperat
     auto op = makeUpdateDocumentOplogEntry(
         {Timestamp(Seconds(1), 0), 1LL}, nss, BSON("_id" << 0), BSON("_id" << 0 << "x" << 2));
     MultiApplier::OperationPtrs ops = {&op};
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+    WorkerMultikeyPathInfo pathInfo;
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyErrorAfterFailingToApplyOperation) {
@@ -933,8 +934,9 @@ TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyErrorAfterFailingToAppl
         return {ErrorCodes::OperationFailed, ""};
     };
     MultiApplier::OperationPtrs ops = {&op};
+    WorkerMultikeyPathInfo pathInfo;
     ASSERT_EQUALS(ErrorCodes::OperationFailed,
-                  multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+                  multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
 }
 
 TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyException) {
@@ -945,8 +947,9 @@ TEST_F(SyncTailTest, MultiSyncApplyPassesThroughSyncApplyException) {
         MONGO_UNREACHABLE;
     };
     MultiApplier::OperationPtrs ops = {&op};
+    WorkerMultikeyPathInfo pathInfo;
     ASSERT_EQUALS(ErrorCodes::OperationFailed,
-                  multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+                  multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
 }
 
 TEST_F(SyncTailTest, MultiSyncApplySortsOperationsStablyByNamespaceBeforeApplying) {
@@ -961,7 +964,8 @@ TEST_F(SyncTailTest, MultiSyncApplySortsOperationsStablyByNamespaceBeforeApplyin
             return Status::OK();
         };
     MultiApplier::OperationPtrs ops = {&op4, &op1, &op3, &op2};
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+    WorkerMultikeyPathInfo pathInfo;
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
     ASSERT_EQUALS(4U, operationsApplied.size());
     ASSERT_EQUALS(op1, operationsApplied[0]);
     ASSERT_EQUALS(op2, operationsApplied[1]);
@@ -992,7 +996,8 @@ TEST_F(SyncTailTest, MultiSyncApplyGroupsInsertOperationByNamespaceBeforeApplyin
 
     MultiApplier::OperationPtrs ops = {
         &createOp1, &createOp2, &insertOp1a, &insertOp2a, &insertOp1b, &insertOp2b};
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+    WorkerMultikeyPathInfo pathInfo;
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
 
     ASSERT_EQUALS(4U, operationsApplied.size());
     ASSERT_EQUALS(createOp1, unittest::assertGet(OplogEntry::parse(operationsApplied[0])));
@@ -1047,7 +1052,8 @@ TEST_F(SyncTailTest, MultiSyncApplyLimitsBatchCountWhenGroupingInsertOperation) 
     for (auto&& op : operationsToApply) {
         ops.push_back(&op);
     }
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+    WorkerMultikeyPathInfo pathInfo;
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
 
     // multiSyncApply should combine operations as follows:
     // {create}, {grouped_insert}, {insert_(limit+1)}
@@ -1112,7 +1118,8 @@ TEST_F(SyncTailTest, MultiSyncApplyLimitsBatchSizeWhenGroupingInsertOperations) 
         };
 
     // Apply the ops.
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+    WorkerMultikeyPathInfo pathInfo;
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
 
     // Applied ops should be as follows:
     // [ {create}, INSERT_GROUP{insert 1, insert 2, insert 3}, {insert 4} ]
@@ -1155,7 +1162,8 @@ TEST_F(SyncTailTest, MultiSyncApplyAppliesOpIndividuallyWhenOpIndividuallyExceed
         };
 
     // Apply the ops.
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+    WorkerMultikeyPathInfo pathInfo;
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
 
     // Applied ops should be as follows:
     // [ {create}, {large insert} {small insert} ]
@@ -1194,7 +1202,8 @@ TEST_F(SyncTailTest, MultiSyncApplyAppliesInsertOpsIndividuallyWhenUnableToCreat
     }
 
     // Apply the ops.
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+    WorkerMultikeyPathInfo pathInfo;
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
 
     // Applied ops should be as follows i.e. no insert grouping:
     // [{insert 1}, {insert 2}, {insert 3}]
@@ -1242,7 +1251,8 @@ TEST_F(SyncTailTest, MultiSyncApplyFallsBackOnApplyingInsertsIndividuallyWhenGro
     for (auto&& op : operationsToApply) {
         ops.push_back(&op);
     }
-    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, syncApply));
+    WorkerMultikeyPathInfo pathInfo;
+    ASSERT_OK(multiSyncApply_noAbort(_opCtx.get(), &ops, &pathInfo, syncApply));
 
     // On failing to apply the grouped insert operation, multiSyncApply should apply the operations
     // as given in "operationsToApply":

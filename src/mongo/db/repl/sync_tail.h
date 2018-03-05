@@ -291,6 +291,7 @@ using SyncApplyFn = stdx::function<Status(
     OperationContext* opCtx, const BSONObj& o, OplogApplication::Mode oplogApplicationMode)>;
 Status multiSyncApply_noAbort(OperationContext* opCtx,
                               MultiApplier::OperationPtrs* ops,
+                              WorkerMultikeyPathInfo* workerMultikeyPathInfo,
                               SyncApplyFn syncApply);
 
 /**

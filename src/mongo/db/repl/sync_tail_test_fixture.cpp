@@ -168,7 +168,8 @@ Status SyncTailTest::runOpSteadyState(const OplogEntry& op) {
         OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
         return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
     };
-    return multiSyncApply_noAbort(_opCtx.get(), &opsPtrs, syncApply);
+    WorkerMultikeyPathInfo pathInfo;
+    return multiSyncApply_noAbort(_opCtx.get(), &opsPtrs, &pathInfo, syncApply);
 }
 
 Status SyncTailTest::runOpInitialSync(const OplogEntry& op) {

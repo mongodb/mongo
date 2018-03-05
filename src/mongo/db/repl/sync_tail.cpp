@@ -1259,23 +1259,13 @@ void multiSyncApply(MultiApplier::OperationPtrs* ops,
         OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
         return SyncTail::syncApply(opCtx, op, oplogApplicationMode);
     };
-    {
-        ON_BLOCK_EXIT(
-            [&opCtx] { MultikeyPathTracker::get(opCtx.get()).stopTrackingMultikeyPathInfo(); });
-        MultikeyPathTracker::get(opCtx.get()).startTrackingMultikeyPathInfo();
-        fassertNoTrace(16359, multiSyncApply_noAbort(opCtx.get(), ops, syncApply));
-    }
-
-    invariant(!MultikeyPathTracker::get(opCtx.get()).isTrackingMultikeyPathInfo());
-    invariant(workerMultikeyPathInfo->empty());
-    auto newPaths = MultikeyPathTracker::get(opCtx.get()).getMultikeyPathInfo();
-    if (!newPaths.empty()) {
-        workerMultikeyPathInfo->swap(newPaths);
-    }
+    fassertNoTrace(16359,
+                   multiSyncApply_noAbort(opCtx.get(), ops, workerMultikeyPathInfo, syncApply));
 }
 
 Status multiSyncApply_noAbort(OperationContext* opCtx,
                               MultiApplier::OperationPtrs* ops,
+                              WorkerMultikeyPathInfo* workerMultikeyPathInfo,
                               SyncApplyFn syncApply) {
     UnreplicatedWritesBlock uwb(opCtx);
     DisableDocumentValidation validationDisabler(opCtx);
@@ -1290,31 +1280,43 @@ Status multiSyncApply_noAbort(OperationContext* opCtx,
 
     ApplierHelpers::InsertGroup insertGroup(ops, syncApply, opCtx, oplogApplicationMode);
 
-    for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
-        const auto& entry = **it;
+    {  // Ensure that the MultikeyPathTracker stops tracking paths.
+        ON_BLOCK_EXIT([opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });
+        MultikeyPathTracker::get(opCtx).startTrackingMultikeyPathInfo();
 
-        // If we are successful in grouping and applying inserts, advance the current iterator past
-        // the end of the inserted group of entries.
-        auto groupResult = insertGroup.groupAndApplyInserts(it);
-        if (groupResult.isOK()) {
-            it = groupResult.getValue();
-            continue;
-        }
+        for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
+            const auto& entry = **it;
 
-        // If we didn't create a group, try to apply the op individually.
-        try {
-            const Status status = syncApply(opCtx, entry.raw, oplogApplicationMode);
-
-            if (!status.isOK()) {
-                severe() << "Error applying operation (" << redact(entry.toBSON())
-                         << "): " << causedBy(redact(status));
-                return status;
+            // If we are successful in grouping and applying inserts, advance the current iterator
+            // past the end of the inserted group of entries.
+            auto groupResult = insertGroup.groupAndApplyInserts(it);
+            if (groupResult.isOK()) {
+                it = groupResult.getValue();
+                continue;
             }
-        } catch (const DBException& e) {
-            severe() << "writer worker caught exception: " << redact(e)
-                     << " on: " << redact(entry.toBSON());
-            return e.toStatus();
+
+            // If we didn't create a group, try to apply the op individually.
+            try {
+                const Status status = syncApply(opCtx, entry.raw, oplogApplicationMode);
+
+                if (!status.isOK()) {
+                    severe() << "Error applying operation (" << redact(entry.toBSON())
+                             << "): " << causedBy(redact(status));
+                    return status;
+                }
+            } catch (const DBException& e) {
+                severe() << "writer worker caught exception: " << redact(e)
+                         << " on: " << redact(entry.toBSON());
+                return e.toStatus();
+            }
         }
+    }
+
+    invariant(!MultikeyPathTracker::get(opCtx).isTrackingMultikeyPathInfo());
+    invariant(workerMultikeyPathInfo->empty());
+    auto newPaths = MultikeyPathTracker::get(opCtx).getMultikeyPathInfo();
+    if (!newPaths.empty()) {
+        workerMultikeyPathInfo->swap(newPaths);
     }
 
     return Status::OK();
