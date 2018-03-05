@@ -61,17 +61,18 @@ struct ServiceEntryPointCommon {
         virtual ~Hooks();
         virtual bool lockedForWriting() const = 0;
         virtual void waitForReadConcern(OperationContext* opCtx,
-                                        const CommandInvocation* invocation,
+                                        const Command* command,
                                         const OpMsgRequest& request) const = 0;
         virtual void waitForWriteConcern(OperationContext* opCtx,
                                          const std::string& commandName,
                                          const repl::OpTime& lastOpBeforeRun,
-                                         BSONObjBuilder commandResponseBuilder) const = 0;
+                                         BSONObjBuilder* commandResponseBuilder) const = 0;
 
         virtual void waitForLinearizableReadConcern(OperationContext* opCtx) const = 0;
         virtual void uassertCommandDoesNotSpecifyWriteConcern(const BSONObj& cmdObj) const = 0;
 
-        virtual void attachCurOpErrInfo(OperationContext* opCtx, const BSONObj& replyObj) const = 0;
+        virtual void attachCurOpErrInfo(OperationContext* opCtx,
+                                        BSONObjBuilder& replyObj) const = 0;
     };
 
     static DbResponse handleRequest(OperationContext* opCtx, const Message& m, const Hooks& hooks);

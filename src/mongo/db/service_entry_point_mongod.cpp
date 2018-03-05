@@ -51,10 +51,11 @@ public:
     }
 
     void waitForReadConcern(OperationContext* opCtx,
-                            const CommandInvocation* invocation,
+                            const Command* command,
                             const OpMsgRequest& request) const override {
-        Status rcStatus = mongo::waitForReadConcern(
-            opCtx, repl::ReadConcernArgs::get(opCtx), invocation->allowsAfterClusterTime());
+        Status rcStatus = mongo::waitForReadConcern(opCtx,
+                                                    repl::ReadConcernArgs::get(opCtx),
+                                                    command->allowsAfterClusterTime(request.body));
 
         if (!rcStatus.isOK()) {
             if (rcStatus == ErrorCodes::ExceededTimeLimit) {
@@ -63,7 +64,7 @@ public:
                 LOG(debugLevel) << "Command on database " << request.getDatabase()
                                 << " timed out waiting for read concern to be satisfied. Command: "
                                 << redact(ServiceEntryPointCommon::getRedactedCopyForLogging(
-                                       invocation->definition(), request.body));
+                                       command, request.body));
             }
 
             uassertStatusOK(rcStatus);
@@ -73,7 +74,7 @@ public:
     void waitForWriteConcern(OperationContext* opCtx,
                              const std::string& commandName,
                              const repl::OpTime& lastOpBeforeRun,
-                             BSONObjBuilder commandResponseBuilder) const override {
+                             BSONObjBuilder* commandResponseBuilder) const override {
         auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
         // Ensures that if we tried to do a write, we wait for write concern, even if that write was
         // a noop.
@@ -87,15 +88,15 @@ public:
         auto waitForWCStatus =
             mongo::waitForWriteConcern(opCtx, lastOpAfterRun, opCtx->getWriteConcern(), &res);
 
-        CommandHelpers::appendCommandWCStatus(commandResponseBuilder, waitForWCStatus, res);
+        CommandHelpers::appendCommandWCStatus(*commandResponseBuilder, waitForWCStatus, res);
 
         // SERVER-22421: This code is to ensure error response backwards compatibility with the
         // user management commands. This can be removed in 3.6.
         if (!waitForWCStatus.isOK() && CommandHelpers::isUserManagementCommand(commandName)) {
-            BSONObj temp = commandResponseBuilder.asTempObj().copy();
-            commandResponseBuilder.resetToEmpty();
-            CommandHelpers::appendCommandStatus(commandResponseBuilder, waitForWCStatus);
-            commandResponseBuilder.appendElementsUnique(temp);
+            BSONObj temp = commandResponseBuilder->asTempObj().copy();
+            commandResponseBuilder->resetToEmpty();
+            CommandHelpers::appendCommandStatus(*commandResponseBuilder, waitForWCStatus);
+            commandResponseBuilder->appendElementsUnique(temp);
         }
     }
 
@@ -114,8 +115,8 @@ public:
         }
     }
 
-    void attachCurOpErrInfo(OperationContext* opCtx, const BSONObj& replyObj) const override {
-        CurOp::get(opCtx)->debug().errInfo = getStatusFromCommandResult(replyObj);
+    void attachCurOpErrInfo(OperationContext* opCtx, BSONObjBuilder& replyObj) const override {
+        CurOp::get(opCtx)->debug().errInfo = getStatusFromCommandResult(replyObj.asTempObj());
     }
 };
 

@@ -117,12 +117,11 @@ private:
         return nss.ns();
     }
 
-    Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& request,
-                   ExplainOptions::Verbosity verbosity,
-                   BSONObjBuilder* out) const override {
-        std::string dbname = request.getDatabase().toString();
-        const BSONObj& cmdObj = request.body;
+    virtual Status explain(OperationContext* opCtx,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           ExplainOptions::Verbosity verbosity,
+                           BSONObjBuilder* out) const {
         GroupRequest groupRequest;
         Status parseRequestStatus = _parseRequest(dbname, cmdObj, &groupRequest);
         if (!parseRequestStatus.isOK()) {

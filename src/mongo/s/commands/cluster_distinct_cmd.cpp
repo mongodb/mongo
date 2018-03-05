@@ -78,11 +78,10 @@ public:
     }
 
     Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& opMsgRequest,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        std::string dbname = opMsgRequest.getDatabase().toString();
-        const BSONObj& cmdObj = opMsgRequest.body;
         const NamespaceString nss(parseNs(dbname, cmdObj));
 
         auto targetingQuery = extractQuery(cmdObj);

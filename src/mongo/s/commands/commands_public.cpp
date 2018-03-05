@@ -626,11 +626,10 @@ public:
     }
 
     Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& request,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        std::string dbname = request.getDatabase().toString();
-        const BSONObj& cmdObj = request.body;
         // We will time how long it takes to run the commands on the shards.
         Timer timer;
         BSONObj command = ClusterExplain::wrapAsExplain(cmdObj, verbosity);

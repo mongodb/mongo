@@ -126,11 +126,10 @@ public:
     }
 
     Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& request,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        std::string dbname = request.getDatabase().toString();
-        const BSONObj& cmdObj = request.body;
         // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
         // of a view, the locks need to be released.
         boost::optional<AutoGetCollectionForReadCommand> ctx;

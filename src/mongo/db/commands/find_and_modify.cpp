@@ -246,11 +246,10 @@ public:
     }
 
     Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& request,
+                   const std::string& dbName,
+                   const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        std::string dbName = request.getDatabase().toString();
-        const BSONObj& cmdObj = request.body;
         const auto args(uassertStatusOK(FindAndModifyRequest::parseFromBSON(
             CommandHelpers::parseNsCollectionRequired(dbName, cmdObj), cmdObj)));
         const NamespaceString& nsString = args.getNamespaceString();

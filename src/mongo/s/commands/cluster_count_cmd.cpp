@@ -218,11 +218,10 @@ public:
     }
 
     Status explain(OperationContext* opCtx,
-                   const OpMsgRequest& request,
+                   const std::string& dbname,
+                   const BSONObj& cmdObj,
                    ExplainOptions::Verbosity verbosity,
                    BSONObjBuilder* out) const override {
-        std::string dbname = request.getDatabase().toString();
-        const BSONObj& cmdObj = request.body;
         const NamespaceString nss(parseNs(dbname, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.ns() << "'",

@@ -71,23 +71,6 @@ const WriteConcernOptions kMajorityWriteConcern(
     WriteConcernOptions::SyncMode::UNSET,
     Seconds(60));
 
-// A facade presenting CommandDefinition as an audit::CommandInterface.
-class CommandAuditHook : public audit::CommandInterface {
-public:
-    explicit CommandAuditHook(Command* command) : _command(command) {}
-
-    void redactForLogging(mutablebson::Document* cmdObj) const final {
-        _command->redactForLogging(cmdObj);
-    }
-
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const final {
-        return _command->parseNs(dbname, cmdObj);
-    }
-
-private:
-    Command* _command;
-};
-
 }  // namespace
 
 
@@ -97,22 +80,18 @@ private:
 BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request) {
     auto command = globalCommandRegistry()->findCommand(request.getCommandName());
     invariant(command);
-    BufBuilder bb;
-    CommandReplyBuilder crb(BSONObjBuilder{bb});
+    BSONObjBuilder out;
     try {
-        auto invocation = command->parse(opCtx, request);
-        invocation->run(opCtx, &crb);
-        auto body = crb.getBodyBuilder();
-        CommandHelpers::extractOrAppendOk(body);
+        bool ok = command->publicRun(opCtx, request, out);
+        appendCommandStatus(out, ok);
     } catch (const StaleConfigException&) {
         // These exceptions are intended to be handled at a higher level.
         throw;
     } catch (const DBException& ex) {
-        auto body = crb.getBodyBuilder();
-        body.resetToEmpty();
-        appendCommandStatus(body, ex.toStatus());
+        out.resetToEmpty();
+        appendCommandStatus(out, ex.toStatus());
     }
-    return BSONObj(bb.release());
+    return out.obj();
 }
 
 std::string CommandHelpers::parseNsFullyQualified(StringData dbname, const BSONObj& cmdObj) {
@@ -186,16 +165,6 @@ void CommandHelpers::appendCommandStatus(BSONObjBuilder& result,
     if (need_errmsg) {
         result.append("errmsg", errmsg);
     }
-}
-
-bool CommandHelpers::extractOrAppendOk(BSONObjBuilder& reply) {
-    if (auto okField = reply.asTempObj()["ok"]) {
-        // If ok is present, use its truthiness.
-        return okField.trueValue();
-    }
-    // Missing "ok" field is an implied success.
-    CommandHelpers::appendCommandStatus(reply, true);
-    return true;
 }
 
 void CommandHelpers::appendCommandWCStatus(BSONObjBuilder& result,
@@ -337,98 +306,9 @@ bool CommandHelpers::isHelpRequest(const BSONElement& helpElem) {
 constexpr StringData CommandHelpers::kHelpFieldName;
 
 //////////////////////////////////////////////////////////////
-// CommandReplyBuilder
-
-CommandReplyBuilder::CommandReplyBuilder(BSONObjBuilder bodyObj)
-    : _bodyBuf(&bodyObj.bb()), _bodyOffset(bodyObj.offset()) {
-    // CommandReplyBuilder requires that bodyObj build into an externally-owned buffer.
-    invariant(!bodyObj.owned());
-    bodyObj.doneFast();
-}
-
-BSONObjBuilder CommandReplyBuilder::getBodyBuilder() const {
-    return BSONObjBuilder(BSONObjBuilder::ResumeBuildingTag{}, *_bodyBuf, _bodyOffset);
-}
-
-void CommandReplyBuilder::reset() {
-    getBodyBuilder().resetToEmpty();
-}
-
-//////////////////////////////////////////////////////////////
-// CommandInvocation
-
-CommandInvocation::~CommandInvocation() = default;
-
-//////////////////////////////////////////////////////////////
 // Command
 
-class Command::InvocationShim final : public CommandInvocation {
-public:
-    InvocationShim(OperationContext*, const OpMsgRequest& request, Command* command)
-        : CommandInvocation(command),
-          _command(command),
-          _request(&request),
-          _dbName(_request->getDatabase().toString()) {}
-
-private:
-    void run(OperationContext* opCtx, CommandReplyBuilder* result) override {
-        try {
-            BSONObjBuilder bob = result->getBodyBuilder();
-            bool ok = _command->enhancedRun(opCtx, *_request, bob);
-            CommandHelpers::appendCommandStatus(bob, ok);
-        } catch (const ExceptionFor<ErrorCodes::Unauthorized>&) {
-            CommandAuditHook hook(_command);
-            audit::logCommandAuthzCheck(
-                opCtx->getClient(), *_request, &hook, ErrorCodes::Unauthorized);
-            throw;
-        }
-    }
-
-    void explain(OperationContext* opCtx,
-                 ExplainOptions::Verbosity verbosity,
-                 BSONObjBuilder* result) override {
-        uassertStatusOK(_command->explain(opCtx, *_request, verbosity, result));
-    }
-
-    NamespaceString ns() const override {
-        return NamespaceString(_command->parseNs(_dbName, cmdObj()));
-    }
-
-    bool supportsWriteConcern() const override {
-        return _command->supportsWriteConcern(cmdObj());
-    }
-
-    Command::AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
-        return _command->secondaryAllowed(context);
-    }
-
-    bool supportsReadConcern(repl::ReadConcernLevel level) const override {
-        return _command->supportsReadConcern(_dbName, cmdObj(), level);
-    }
-
-    bool allowsAfterClusterTime() const override {
-        return _command->allowsAfterClusterTime(cmdObj());
-    }
-
-    void doCheckAuthorization(OperationContext* opCtx) const override {
-        uassertStatusOK(_command->checkAuthForRequest(opCtx, *_request));
-    }
-
-    const BSONObj& cmdObj() const {
-        return _request->body;
-    }
-
-    Command* const _command;
-    const OpMsgRequest* const _request;
-    const std::string _dbName;
-};
-
 Command::~Command() = default;
-
-std::unique_ptr<CommandInvocation> Command::parse(OperationContext* opCtx,
-                                                  const OpMsgRequest& request) {
-    return stdx::make_unique<InvocationShim>(opCtx, request, this);
-}
 
 std::string Command::parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
     BSONElement first = cmdObj.firstElement();
@@ -455,7 +335,8 @@ Command::Command(StringData name, StringData oldName)
 }
 
 Status Command::explain(OperationContext* opCtx,
-                        const OpMsgRequest& request,
+                        const std::string& dbname,
+                        const BSONObj& cmdObj,
                         ExplainOptions::Verbosity verbosity,
                         BSONObjBuilder* out) const {
     return {ErrorCodes::IllegalOperation, str::stream() << "Cannot explain cmd: " << getName()};
@@ -515,6 +396,25 @@ static Status _checkAuthorizationImpl(Command* c,
     return Status::OK();
 }
 
+namespace {
+// A facade presenting CommandDefinition as an audit::CommandInterface.
+class CommandAuditHook : public audit::CommandInterface {
+public:
+    explicit CommandAuditHook(Command* command) : _command(command) {}
+
+    void redactForLogging(mutablebson::Document* cmdObj) const final {
+        _command->redactForLogging(cmdObj);
+    }
+
+    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const final {
+        return _command->parseNs(dbname, cmdObj);
+    }
+
+private:
+    Command* _command;
+};
+}  // namespace
+
 Status Command::checkAuthorization(Command* c,
                                    OperationContext* opCtx,
                                    const OpMsgRequest& request) {
@@ -525,6 +425,21 @@ Status Command::checkAuthorization(Command* c,
     CommandAuditHook hook(c);
     audit::logCommandAuthzCheck(opCtx->getClient(), request, &hook, status.code());
     return status;
+}
+
+bool Command::publicRun(OperationContext* opCtx,
+                        const OpMsgRequest& request,
+                        BSONObjBuilder& result) {
+    try {
+        return enhancedRun(opCtx, request, result);
+    } catch (const DBException& e) {
+        if (e.code() == ErrorCodes::Unauthorized) {
+            CommandAuditHook hook(this);
+            audit::logCommandAuthzCheck(
+                opCtx->getClient(), request, &hook, ErrorCodes::Unauthorized);
+        }
+        throw;
+    }
 }
 
 void Command::generateHelpResponse(OperationContext* opCtx,

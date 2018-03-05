@@ -145,11 +145,8 @@ void appendRequiredFieldsToResponse(OperationContext* opCtx, BSONObjBuilder* res
 void execCommandClient(OperationContext* opCtx,
                        Command* c,
                        const OpMsgRequest& request,
-                       CommandReplyBuilder* result) {
-    ON_BLOCK_EXIT([opCtx, &result] {
-        auto body = result->getBodyBuilder();
-        appendRequiredFieldsToResponse(opCtx, &body);
-    });
+                       BSONObjBuilder& result) {
+    ON_BLOCK_EXIT([opCtx, &result] { appendRequiredFieldsToResponse(opCtx, &result); });
 
     const auto dbname = request.getDatabase();
     uassert(ErrorCodes::IllegalOperation,
@@ -164,10 +161,10 @@ void execCommandClient(OperationContext* opCtx,
         StringData fieldName = element.fieldNameStringData();
         if (fieldName == "help" && element.type() == Bool && element.Bool()) {
             std::stringstream help;
-            help << "help for: " << c->getName() << " " << c->help();
-            auto body = result->getBodyBuilder();
-            body.append("help", help.str());
-            CommandHelpers::appendCommandStatus(body, true, "");
+            help << "help for: " << c->getName() << " ";
+            help << c->help();
+            result.append("help", help.str());
+            CommandHelpers::appendCommandStatus(result, true, "");
             return;
         }
 
@@ -179,8 +176,7 @@ void execCommandClient(OperationContext* opCtx,
 
     Status status = Command::checkAuthorization(c, opCtx, request);
     if (!status.isOK()) {
-        auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(body, status);
+        CommandHelpers::appendCommandStatus(result, status);
         return;
     }
 
@@ -193,35 +189,29 @@ void execCommandClient(OperationContext* opCtx,
     StatusWith<WriteConcernOptions> wcResult =
         WriteConcernOptions::extractWCFromCommand(request.body);
     if (!wcResult.isOK()) {
-        auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(body, wcResult.getStatus());
+        CommandHelpers::appendCommandStatus(result, wcResult.getStatus());
         return;
     }
 
-    auto invocation = c->parse(opCtx, request);
-
-    bool supportsWriteConcern = invocation->supportsWriteConcern();
+    bool supportsWriteConcern = c->supportsWriteConcern(request.body);
     if (!supportsWriteConcern && !wcResult.getValue().usedDefault) {
         // This command doesn't do writes so it should not be passed a writeConcern.
         // If we did not use the default writeConcern, one was provided when it shouldn't have
         // been by the user.
-        auto body = result->getBodyBuilder();
         CommandHelpers::appendCommandStatus(
-            body, Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern"));
+            result, Status(ErrorCodes::InvalidOptions, "Command does not support writeConcern"));
         return;
     }
 
     repl::ReadConcernArgs readConcernArgs;
     auto readConcernParseStatus = readConcernArgs.initialize(request.body);
     if (!readConcernParseStatus.isOK()) {
-        auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(body, readConcernParseStatus);
+        CommandHelpers::appendCommandStatus(result, readConcernParseStatus);
         return;
     }
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        auto body = result->getBodyBuilder();
         CommandHelpers::appendCommandStatus(
-            body,
+            result,
             Status(ErrorCodes::InvalidOptions, "read concern snapshot is not supported on mongos"));
         return;
     }
@@ -233,26 +223,25 @@ void execCommandClient(OperationContext* opCtx,
 
     auto metadataStatus = processCommandMetadata(opCtx, request.body);
     if (!metadataStatus.isOK()) {
-        auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(body, metadataStatus);
+        CommandHelpers::appendCommandStatus(result, metadataStatus);
         return;
     }
 
+    bool ok = false;
     if (!supportsWriteConcern) {
-        invocation->run(opCtx, result);
+        ok = c->publicRun(opCtx, request, result);
     } else {
         // Change the write concern while running the command.
         const auto oldWC = opCtx->getWriteConcern();
         ON_BLOCK_EXIT([&] { opCtx->setWriteConcern(oldWC); });
         opCtx->setWriteConcern(wcResult.getValue());
 
-        invocation->run(opCtx, result);
+        ok = c->publicRun(opCtx, request, result);
     }
-    auto body = result->getBodyBuilder();
-    bool ok = CommandHelpers::extractOrAppendOk(body);
     if (!ok) {
         c->incrementCommandsFailed();
     }
+    CommandHelpers::appendCommandStatus(result, ok);
 }
 
 void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBuilder&& builder) {
@@ -281,13 +270,12 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
 
     initializeOperationSessionInfo(opCtx, request.body, command->requiresAuth(), true, true);
 
-    CommandReplyBuilder crb(std::move(builder));
-
     int loops = 5;
+
     while (true) {
-        crb.reset();
+        builder.resetToEmpty();
         try {
-            execCommandClient(opCtx, command, request, &crb);
+            execCommandClient(opCtx, command, request, builder);
             return;
         } catch (const StaleConfigException& e) {
             if (e->getns().empty()) {
@@ -313,11 +301,10 @@ void runCommand(OperationContext* opCtx, const OpMsgRequest& request, BSONObjBui
 
             continue;
         } catch (const DBException& e) {
-            crb.reset();
-            BSONObjBuilder bob = crb.getBodyBuilder();
-            ON_BLOCK_EXIT([&] { appendRequiredFieldsToResponse(opCtx, &bob); });
+            ON_BLOCK_EXIT([opCtx, &builder] { appendRequiredFieldsToResponse(opCtx, &builder); });
+            builder.resetToEmpty();
             command->incrementCommandsFailed();
-            CommandHelpers::appendCommandStatus(bob, e.toStatus());
+            CommandHelpers::appendCommandStatus(builder, e.toStatus());
             LastError::get(opCtx->getClient()).setLastError(e.code(), e.reason());
             return;
         }
@@ -590,7 +577,6 @@ void Strategy::killCursors(OperationContext* opCtx, DbMessage* dbm) {
 }
 
 void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
-    BufBuilder bb;
     runCommand(opCtx,
                [&]() {
                    const auto& msg = dbm->msg();
@@ -609,7 +595,7 @@ void Strategy::writeOp(OperationContext* opCtx, DbMessage* dbm) {
                            MONGO_UNREACHABLE;
                    }
                }(),
-               BSONObjBuilder{bb});  // built object is ignored
+               BSONObjBuilder());
 }
 
 void Strategy::explainFind(OperationContext* opCtx,
