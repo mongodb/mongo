@@ -36,6 +36,7 @@
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -52,9 +53,6 @@
 namespace mongo {
 
 using repl::UnreplicatedWritesBlock;
-
-constexpr StringData FeatureCompatibilityVersion::kCollection;
-constexpr StringData FeatureCompatibilityVersion::kDatabase;
 
 Lock::ResourceMutex FeatureCompatibilityVersion::fcvLock("featureCompatibilityVersionLock");
 
@@ -101,7 +99,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
     const bool storeUpgradeVersion = serverGlobalParams.clusterRole != ClusterRole::ShardServer;
 
     UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
-    NamespaceString nss(FeatureCompatibilityVersion::kCollection);
+    NamespaceString nss(NamespaceString::kServerConfigurationNamespace);
 
     {
         CollectionOptions options;
@@ -109,7 +107,7 @@ void FeatureCompatibilityVersion::setIfCleanStartup(OperationContext* opCtx,
         uassertStatusOK(storageInterface->createCollection(opCtx, nss, options));
     }
 
-    // We then insert the featureCompatibilityVersion document into the "admin.system.version"
+    // We then insert the featureCompatibilityVersion document into the server configuration
     // collection. The server parameter will be updated on commit by the op observer.
     uassertStatusOK(storageInterface->insertDocument(
         opCtx,
@@ -210,7 +208,7 @@ void FeatureCompatibilityVersion::_validateVersion(StringData version) {
 void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
                                                     UpdateBuilder builder) {
     DBDirectClient client(opCtx);
-    NamespaceString nss(FeatureCompatibilityVersion::kCollection);
+    NamespaceString nss(NamespaceString::kServerConfigurationNamespace);
 
     BSONObjBuilder updateCmd;
     updateCmd.append("update", nss.coll());
@@ -231,7 +229,7 @@ void FeatureCompatibilityVersion::_runUpdateCommand(OperationContext* opCtx,
     }
     updateCmd.append(WriteConcernOptions::kWriteConcernField, WriteConcernOptions::Majority);
 
-    // Update the featureCompatibilityVersion document stored in the "admin.system.version"
+    // Update the featureCompatibilityVersion document stored in the server configuration
     // collection.
     BSONObj updateResult;
     client.runCommand(nss.db().toString(), updateCmd.obj(), updateResult);

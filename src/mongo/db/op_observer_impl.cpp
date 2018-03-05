@@ -395,7 +395,9 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         Scope::storedFuncMod(opCtx);
     } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, nss);
-    } else if (nss.ns() == FeatureCompatibilityVersion::kCollection) {
+    } else if (nss == NamespaceString::kServerConfigurationNamespace) {
+        // We must check server configuration collection writes for featureCompatibilityVersion
+        // document changes.
         for (auto it = first; it != last; it++) {
             FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, it->doc);
         }
@@ -457,7 +459,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         Scope::storedFuncMod(opCtx);
     } else if (args.nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, args.nss);
-    } else if (args.nss.ns() == FeatureCompatibilityVersion::kCollection) {
+    } else if (args.nss == NamespaceString::kServerConfigurationNamespace) {
+        // We must check server configuration collection writes for featureCompatibilityVersion
+        // document changes.
         FeatureCompatibilityVersion::onInsertOrUpdate(opCtx, args.updatedDoc);
     } else if (args.nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
@@ -511,7 +515,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         Scope::storedFuncMod(opCtx);
     } else if (nss.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, nss);
-    } else if (nss.isAdminDotSystemDotVersion()) {
+    } else if (nss.isServerConfigurationCollection()) {
         auto _id = deleteState.documentKey["_id"];
         if (_id.type() == BSONType::String &&
             _id.String() == FeatureCompatibilityVersionParser::kParameterName)
@@ -666,9 +670,8 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& 
                  kUninitializedStmtId,
                  {});
 
-    uassert(50714,
-            "dropping the admin database is not allowed.",
-            dbName != FeatureCompatibilityVersion::kDatabase);
+    uassert(
+        50714, "dropping the admin database is not allowed.", dbName != NamespaceString::kAdminDb);
 
     if (dbName == NamespaceString::kSessionTransactionsTableNamespace.db()) {
         SessionCatalog::get(opCtx)->invalidateSessions(opCtx, boost::none);
@@ -702,8 +705,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     }
 
     uassert(50715,
-            "dropping the admin.system.version collection is not allowed.",
-            collectionName.ns() != FeatureCompatibilityVersion::kCollection);
+            "dropping the server configuration collection (admin.system.version) is not allowed.",
+            collectionName != NamespaceString::kServerConfigurationNamespace);
 
     if (collectionName.coll() == DurableViewCatalog::viewsCollectionName()) {
         DurableViewCatalog::onExternalChange(opCtx, collectionName);

@@ -35,8 +35,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
-#include "mongo/db/query/query_request.h"
-#include "mongo/util/version.h"
 
 namespace mongo {
 

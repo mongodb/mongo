@@ -70,9 +70,10 @@ const std::string mustDowngradeErrorMsg = str::stream()
 
 Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx,
                                                          const std::vector<std::string>& dbNames) {
-    NamespaceString fcvNss(FeatureCompatibilityVersion::kCollection);
+    NamespaceString fcvNss(NamespaceString::kServerConfigurationNamespace);
 
-    // If the admin database does not exist, create it.
+    // If the admin database, which contains the server configuration collection with the
+    // featureCompatibilityVersion document, does not exist, create it.
     Database* db = dbHolder().get(opCtx, fcvNss.db());
     if (!db) {
         log() << "Re-creating admin database that was dropped.";
@@ -80,14 +81,16 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
     db = dbHolder().openDb(opCtx, fcvNss.db());
     invariant(db);
 
-    // If admin.system.version does not exist, create it.
-    if (!db->getCollection(opCtx, FeatureCompatibilityVersion::kCollection)) {
-        log() << "Re-creating admin.system.version collection that was dropped.";
+    // If the server configuration collection, which contains the FCV document, does not exist, then
+    // create it.
+    if (!db->getCollection(opCtx, NamespaceString::kServerConfigurationNamespace)) {
+        log() << "Re-creating the server configuration collection (admin.system.version) that was "
+                 "dropped.";
         uassertStatusOK(
             createCollection(opCtx, fcvNss.db().toString(), BSON("create" << fcvNss.coll())));
     }
 
-    Collection* fcvColl = db->getCollection(opCtx, FeatureCompatibilityVersion::kCollection);
+    Collection* fcvColl = db->getCollection(opCtx, NamespaceString::kServerConfigurationNamespace);
     invariant(fcvColl);
 
     // Restore the featureCompatibilityVersion document if it is missing.
@@ -284,12 +287,12 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
         repairVerifiedAllCollectionsHaveUUIDs = true;
 
         // Attempt to restore the featureCompatibilityVersion document if it is missing.
-        NamespaceString nss(FeatureCompatibilityVersion::kCollection);
+        NamespaceString fcvNSS(NamespaceString::kServerConfigurationNamespace);
 
-        Database* db = dbHolder().get(opCtx, nss.db());
+        Database* db = dbHolder().get(opCtx, fcvNSS.db());
         Collection* versionColl;
         BSONObj featureCompatibilityVersion;
-        if (!db || !(versionColl = db->getCollection(opCtx, nss)) ||
+        if (!db || !(versionColl = db->getCollection(opCtx, fcvNSS)) ||
             !Helpers::findOne(opCtx,
                               versionColl,
                               BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
@@ -407,11 +410,12 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
             MONGO_UNREACHABLE;
         }
 
-        // Check if admin.system.version contains an invalid featureCompatibilityVersion.
-        // If a valid featureCompatibilityVersion is present, cache it as a server parameter.
+
+        // If the server configuration collection already contains a valid
+        // featureCompatibilityVersion document, cache it in-memory as a server parameter.
         if (dbName == "admin") {
             if (Collection* versionColl =
-                    db->getCollection(opCtx, FeatureCompatibilityVersion::kCollection)) {
+                    db->getCollection(opCtx, NamespaceString::kServerConfigurationNamespace)) {
                 BSONObj featureCompatibilityVersion;
                 if (Helpers::findOne(
                         opCtx,

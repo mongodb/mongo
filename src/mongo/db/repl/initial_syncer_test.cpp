@@ -34,9 +34,9 @@
 
 #include "mongo/client/fetcher.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/json.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/repl/base_cloner_test_fixture.h"
 #include "mongo/db/repl/data_replicator_external_state_mock.h"
@@ -571,9 +571,9 @@ void InitialSyncerTest::processSuccessfulLastOplogEntryFetcherResponse(std::vect
 }
 
 void assertFCVRequest(RemoteCommandRequest request) {
-    ASSERT_EQUALS(nsToDatabaseSubstring(FeatureCompatibilityVersion::kCollection), request.dbname)
+    ASSERT_EQUALS(NamespaceString::kServerConfigurationNamespace.db(), request.dbname)
         << request.toString();
-    ASSERT_EQUALS(nsToCollectionSubstring(FeatureCompatibilityVersion::kCollection),
+    ASSERT_EQUALS(NamespaceString::kServerConfigurationNamespace.coll(),
                   request.cmdObj.getStringField("find"));
     ASSERT_BSONOBJ_EQ(BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
                       request.cmdObj.getObjectField("filter"));
@@ -589,8 +589,8 @@ void InitialSyncerTest::processSuccessfulFCVFetcherResponse(std::vector<BSONObj>
     auto net = getNet();
     auto request = assertRemoteCommandNameEquals(
         "find",
-        net->scheduleSuccessfulResponse(makeCursorResponse(
-            0LL, NamespaceString(FeatureCompatibilityVersion::kCollection), docs)));
+        net->scheduleSuccessfulResponse(
+            makeCursorResponse(0LL, NamespaceString::kServerConfigurationNamespace, docs)));
     assertFCVRequest(request);
     net->runReadyNetworkOperations();
 }
@@ -1350,7 +1350,7 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherScheduleError) {
         [&request](const executor::RemoteCommandRequest& requestToSend) {
             request = requestToSend;
             return "find" == requestToSend.cmdObj.firstElement().fieldNameStringData() &&
-                nsToCollectionSubstring(FeatureCompatibilityVersion::kCollection) ==
+                NamespaceString::kServerConfigurationNamespace.coll() ==
                 requestToSend.cmdObj.firstElement().str();
         };
 

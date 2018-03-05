@@ -146,8 +146,9 @@ struct ServerGlobalParams {
 
     struct FeatureCompatibility {
         /**
-         * The combination of the fields in the admin.system.version document in the format
-         * (version, targetVersion) are represented by this enum and determine this node's behavior.
+         * The combination of the fields (version, targetVersion) in the featureCompatiiblityVersion
+         * document in the server configuration collection (admin.system.version) are represented by
+         * this enum and determine this node's behavior.
          *
          * Features can be gated for specific versions, or ranges of versions above or below some
          * minimum or maximum version, respectively.

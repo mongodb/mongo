@@ -47,9 +47,6 @@ extern bool internalValidateFeaturesAsMaster;
 
 class FeatureCompatibilityVersion {
 public:
-    static constexpr StringData kCollection = "admin.system.version"_sd;
-    static constexpr StringData kDatabase = "admin"_sd;
-
     /**
      * Should be taken in shared mode by any operations that should not run while
      * setFeatureCompatibilityVersion is running.
@@ -96,9 +93,9 @@ public:
     static bool isCleanStartUp();
 
     /**
-     * Examines a document inserted or updated in admin.system.version. If it is the
-     * featureCompatibilityVersion document, validates the document and on commit, updates
-     * the server parameter.
+     * Examines a document inserted or updated in the server configuration collection
+     * (admin.system.version). If it is the featureCompatibilityVersion document, validates the
+     * document and on commit, updates the server parameter.
      */
     static void onInsertOrUpdate(OperationContext* opCtx, const BSONObj& doc);
 

@@ -41,7 +41,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -1653,15 +1652,14 @@ TEST_F(SyncTailTest, FailOnDropFCVCollection) {
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
-    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    auto fcvNS(NamespaceString::kServerConfigurationNamespace);
     auto cmd = BSON("drop" << fcvNS.coll());
-    auto op = makeCommandOplogEntry(
-        nextOpTime(), NamespaceString(FeatureCompatibilityVersion::kCollection), cmd);
+    auto op = makeCommandOplogEntry(nextOpTime(), fcvNS, cmd);
     ASSERT_EQUALS(runOpInitialSync(op), ErrorCodes::OplogOperationUnsupported);
 }
 
 TEST_F(SyncTailTest, FailOnInsertFCVDocument) {
-    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    auto fcvNS(NamespaceString::kServerConfigurationNamespace);
     ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
@@ -1672,7 +1670,7 @@ TEST_F(SyncTailTest, FailOnInsertFCVDocument) {
 }
 
 TEST_F(IdempotencyTest, InsertToFCVCollectionBesidesFCVDocumentSucceeds) {
-    auto fcvNS = NamespaceString(FeatureCompatibilityVersion::kCollection);
+    auto fcvNS(NamespaceString::kServerConfigurationNamespace);
     ::mongo::repl::createCollection(_opCtx.get(), fcvNS, CollectionOptions());
     ASSERT_OK(
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));

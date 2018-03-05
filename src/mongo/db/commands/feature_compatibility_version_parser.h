@@ -50,8 +50,9 @@ public:
     static constexpr StringData kTargetVersionField = "targetVersion"_sd;
 
     /**
-     * Parses the featureCompatibilityVersion document from admin.system.version, and returns the
-     * state represented by the combination of the targetVersion and version.
+     * Parses the featureCompatibilityVersion document from the server configuration collection
+     * (admin.system.version), and returns the state represented by the combination of the
+     * targetVersion and version.
      */
     static StatusWith<ServerGlobalParams::FeatureCompatibility::Version> parse(
         const BSONObj& featureCompatibilityVersionDoc);

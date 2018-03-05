@@ -41,7 +41,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -439,7 +438,7 @@ void InitialSyncer::_startInitialSyncAttemptCallback(
 
     LOG(2) << "Resetting feature compatibility version to last-stable. If the sync source is in "
               "latest feature compatibility version, we will find out when we clone the "
-              "admin.system.version collection.";
+              "server configuration collection (admin.system.version).";
     serverGlobalParams.featureCompatibility.reset();
 
     // Clear the oplog buffer.
@@ -611,7 +610,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
     const auto& lastOpTimeWithHash = opTimeWithHashResult.getValue();
 
     BSONObjBuilder queryBob;
-    queryBob.append("find", nsToCollectionSubstring(FeatureCompatibilityVersion::kCollection));
+    queryBob.append("find", NamespaceString::kServerConfigurationNamespace.coll());
     auto filterBob = BSONObjBuilder(queryBob.subobjStart("filter"));
     filterBob.append("_id", FeatureCompatibilityVersionParser::kParameterName);
     filterBob.done();
@@ -619,7 +618,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginTimestamp(
     _fCVFetcher = stdx::make_unique<Fetcher>(
         _exec,
         _syncSource,
-        nsToDatabaseSubstring(FeatureCompatibilityVersion::kCollection).toString(),
+        NamespaceString::kServerConfigurationNamespace.db().toString(),
         queryBob.obj(),
         [=](const StatusWith<mongo::Fetcher::QueryResponse>& response,
             mongo::Fetcher::NextAction*,

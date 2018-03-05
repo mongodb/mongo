@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -61,42 +62,37 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
             if (elem.type() != BSONType::String) {
                 return Status(
                     ErrorCodes::TypeMismatch,
-                    str::stream()
-                        << fieldName
-                        << " must be of type String, but was of type "
-                        << typeName(elem.type())
-                        << ". Contents of "
-                        << kParameterName
-                        << " document in "
-                        << "admin.system.version"  // TODO: NamespaceString constant (SERVER-33562)
-                        << ": "
-                        << featureCompatibilityVersionDoc
-                        << ". See "
-                        << feature_compatibility_version_documentation::kCompatibilityLink
-                        << ".");
+                    str::stream() << fieldName << " must be of type String, but was of type "
+                                  << typeName(elem.type())
+                                  << ". Contents of "
+                                  << kParameterName
+                                  << " document in "
+                                  << NamespaceString::kServerConfigurationNamespace.toString()
+                                  << ": "
+                                  << featureCompatibilityVersionDoc
+                                  << ". See "
+                                  << feature_compatibility_version_documentation::kCompatibilityLink
+                                  << ".");
             }
 
             if (elem.String() != kVersion40 && elem.String() != kVersion36) {
                 return Status(
                     ErrorCodes::BadValue,
-                    str::stream()
-                        << "Invalid value for "
-                        << fieldName
-                        << ", found "
-                        << elem.String()
-                        << ", expected '"
-                        << kVersion40
-                        << "' or '"
-                        << kVersion36
-                        << "'. Contents of "
-                        << kParameterName
-                        << " document in "
-                        << "admin.system.version"  // TODO: NamespaceString constant (SERVER-33562)
-                        << ": "
-                        << featureCompatibilityVersionDoc
-                        << ". See "
-                        << feature_compatibility_version_documentation::kCompatibilityLink
-                        << ".");
+                    str::stream() << "Invalid value for " << fieldName << ", found "
+                                  << elem.String()
+                                  << ", expected '"
+                                  << kVersion40
+                                  << "' or '"
+                                  << kVersion36
+                                  << "'. Contents of "
+                                  << kParameterName
+                                  << " document in "
+                                  << NamespaceString::kServerConfigurationNamespace.toString()
+                                  << ": "
+                                  << featureCompatibilityVersionDoc
+                                  << ". See "
+                                  << feature_compatibility_version_documentation::kCompatibilityLink
+                                  << ".");
             }
 
             if (fieldName == kVersionField) {
@@ -107,18 +103,15 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
         } else {
             return Status(
                 ErrorCodes::BadValue,
-                str::stream()
-                    << "Unrecognized field '"
-                    << fieldName
-                    << "'. Contents of "
-                    << kParameterName
-                    << " document in "
-                    << "admin.system.version"  // TODO: NamespaceString constant (SERVER-33562)
-                    << ": "
-                    << featureCompatibilityVersionDoc
-                    << ". See "
-                    << feature_compatibility_version_documentation::kCompatibilityLink
-                    << ".");
+                str::stream() << "Unrecognized field '" << fieldName << "'. Contents of "
+                              << kParameterName
+                              << " document in "
+                              << NamespaceString::kServerConfigurationNamespace.toString()
+                              << ": "
+                              << featureCompatibilityVersionDoc
+                              << ". See "
+                              << feature_compatibility_version_documentation::kCompatibilityLink
+                              << ".");
         }
     }
 
@@ -134,34 +127,28 @@ FeatureCompatibilityVersionParser::parse(const BSONObj& featureCompatibilityVers
         if (targetVersionString == kVersion40 || targetVersionString == kVersion36) {
             return Status(
                 ErrorCodes::BadValue,
-                str::stream()
-                    << "Invalid state for "
-                    << kParameterName
-                    << " document in "
-                    << "admin.system.version"  // TODO: NamespaceString constant (SERVER-33562)
-                    << ": "
-                    << featureCompatibilityVersionDoc
-                    << ". See "
-                    << feature_compatibility_version_documentation::kCompatibilityLink
-                    << ".");
+                str::stream() << "Invalid state for " << kParameterName << " document in "
+                              << NamespaceString::kServerConfigurationNamespace.toString()
+                              << ": "
+                              << featureCompatibilityVersionDoc
+                              << ". See "
+                              << feature_compatibility_version_documentation::kCompatibilityLink
+                              << ".");
         } else {
             version = ServerGlobalParams::FeatureCompatibility::Version::kFullyUpgradedTo40;
         }
     } else {
         return Status(
             ErrorCodes::BadValue,
-            str::stream()
-                << "Missing required field '"
-                << kVersionField
-                << "''. Contents of "
-                << kParameterName
-                << " document in "
-                << "admin.system.version"  // TODO: NamespaceString constant (SERVER-33562)
-                << ": "
-                << featureCompatibilityVersionDoc
-                << ". See "
-                << feature_compatibility_version_documentation::kCompatibilityLink
-                << ".");
+            str::stream() << "Missing required field '" << kVersionField << "''. Contents of "
+                          << kParameterName
+                          << " document in "
+                          << NamespaceString::kServerConfigurationNamespace.toString()
+                          << ": "
+                          << featureCompatibilityVersionDoc
+                          << ". See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << ".");
     }
 
     return version;

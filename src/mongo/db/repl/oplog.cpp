@@ -56,7 +56,6 @@
 #include "mongo/db/catalog/uuid_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
@@ -1052,10 +1051,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
         collection = db->getCollection(opCtx, requestNss);
     }
 
-    // During upgrade from 3.4 to 3.6, the feature compatibility version cannot change during
-    // initial sync because we cannot do some operations with UUIDs and others without.
+    // The feature compatibility version in the server configuration collection must not change
+    // during initial sync.
     if ((mode == OplogApplication::Mode::kInitialSync) &&
-        requestNss.ns() == FeatureCompatibilityVersion::kCollection) {
+        requestNss == NamespaceString::kServerConfigurationNamespace) {
         std::string oID;
         auto status = bsonExtractStringField(o, "_id", &oID);
         if (status.isOK() && oID == FeatureCompatibilityVersionParser::kParameterName) {
@@ -1480,7 +1479,8 @@ Status applyCommand_inlock(OperationContext* opCtx,
         }
     }
 
-    // The feature compatibility version cannot change during initial sync.
+    // The feature compatibility version in the server configuration collection cannot change during
+    // initial sync.
     // We do not attempt to parse the whitelisted ops because they do not have a collection
     // namespace. If we drop the 'admin' database we will also log a 'drop' oplog entry for each
     // collection dropped. 'applyOps' will try to apply each individual operation, and those
@@ -1489,7 +1489,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
     if ((mode == OplogApplication::Mode::kInitialSync) &&
         (std::find(whitelistedOps.begin(), whitelistedOps.end(), o.firstElementFieldName()) ==
          whitelistedOps.end()) &&
-        parseNs(nss.ns(), o).ns() == FeatureCompatibilityVersion::kCollection) {
+        parseNs(nss.ns(), o) == NamespaceString::kServerConfigurationNamespace) {
         return Status(ErrorCodes::OplogOperationUnsupported,
                       str::stream() << "Applying command to feature compatibility version "
                                        "collection not supported in initial sync: "

@@ -144,11 +144,12 @@ public:
             return false;
         }
 
-        if (source.isAdminDotSystemDotVersion()) {
-            CommandHelpers::appendCommandStatus(
-                result,
-                Status(ErrorCodes::IllegalOperation,
-                       "renaming admin.system.version is not allowed"));
+        if (source.isServerConfigurationCollection()) {
+            CommandHelpers::appendCommandStatus(result,
+                                                Status(ErrorCodes::IllegalOperation,
+                                                       "renaming the server configuration "
+                                                       "collection (admin.system.version) is not "
+                                                       "allowed"));
             return false;
         }
 
