@@ -491,7 +491,7 @@ void execCommandDatabase(OperationContext* opCtx,
         // servers may result in a deadlock when a server tries to check out a session it is already
         // using to service an earlier operation in the command's chain. To avoid this, only check
         // out sessions for commands that require them.
-        const bool shouldCheckoutSession =
+        const bool shouldCheckoutSession = static_cast<bool>(opCtx->getTxnNumber()) &&
             sessionCheckoutWhitelist.find(command->getName()) != sessionCheckoutWhitelist.cend();
 
         boost::optional<bool> autocommitVal = boost::none;

@@ -647,6 +647,12 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const AggregationRequest& request,
                                       BSONObj cmdObj,
                                       BSONObjBuilder* result) {
+    // TODO SERVER-33683 allowing an aggregation within a transaction can lead to a deadlock in the
+    // SessionCatalog when a pipeline with a $mergeCursors sends a getMore to itself.
+    uassert(50732,
+            "Cannot specify a transaction number in combination with an aggregation on mongos",
+            !opCtx->getTxnNumber());
+
     const auto catalogCache = Grid::get(opCtx)->catalogCache();
 
     auto executionNsRoutingInfoStatus =
