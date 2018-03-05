@@ -23,7 +23,7 @@
 (function() {
     "use strict";
 
-    // For isMMAPv1.
+    // For isWiredTiger.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");
     // For isReplSet
     load("jstests/libs/fixture_helpers.js");
@@ -321,7 +321,7 @@
         coll.drop();
         assert.writeOK(coll.insert({_id: 1, a: true}));
 
-        if (FixtureHelpers.isReplSet(db) && !isMongos && !isMMAPv1(db)) {
+        if (FixtureHelpers.isReplSet(db) && !isMongos && isWiredTiger(db)) {
             // Test $jsonSchema in the precondition checking for doTxn.
             const session = db.getMongo().startSession();
             const sessionDb = session.getDatabase(testDB.getName());

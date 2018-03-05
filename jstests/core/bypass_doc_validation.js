@@ -15,7 +15,7 @@
 (function() {
     'use strict';
 
-    // For isMMAPv1.
+    // For isWiredTiger.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");
     // For isReplSet
     load("jstests/libs/fixture_helpers.js");
@@ -55,8 +55,9 @@
             assert.eq(1, coll.count({_id: 9}));
         }
 
-        // Test doTxn with a simple insert if a replica set, not on mongos and not on MMAPv1.
-        if (FixtureHelpers.isReplSet(db) && !isMongos && !isMMAPv1(db)) {
+        // Test doTxn with a simple insert if a replica set, not on mongos and the storage engine
+        // is WiredTiger.
+        if (FixtureHelpers.isReplSet(db) && !isMongos && isWiredTiger(db)) {
             const session = db.getMongo().startSession();
             const sessionDb = session.getDatabase(myDb.getName());
             const op = [{op: 'i', ns: coll.getFullName(), o: {_id: 10}}];

@@ -4,24 +4,19 @@
     "use strict";
 
     load("jstests/libs/get_index_helpers.js");
-    // For isMMAPv1.
+    // For isWiredTiger.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");
     // For isReplSet
     load("jstests/libs/fixture_helpers.js");
 
     const t = db.do_txn1;
 
-    if (isMMAPv1(db)) {
-        assert.commandFailedWithCode(
-            db.adminCommand({doTxn: [{op: "i", ns: t.getFullName(), o: {_id: 1}}]}),
-            ErrorCodes.CommandNotSupported,
-            "doTxn should fail if document level locking isn't supported.");
-
-        jsTestLog("Skipping test as the storage engine does not support doTxn.");
-        return;
-    }
     if (!FixtureHelpers.isReplSet(db)) {
         jsTestLog("Skipping test as doTxn requires a replSet and replication is not enabled.");
+        return;
+    }
+    if (!isWiredTiger(db)) {
+        jsTestLog("Skipping test as the storage engine does not support doTxn.");
         return;
     }
 

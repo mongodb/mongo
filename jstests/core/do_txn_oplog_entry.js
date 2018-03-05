@@ -3,13 +3,13 @@
 // Tests that doTxn produces correct oplog entries.
 (function() {
     'use strict';
-    // For isMMAPv1.
+    // For isWiredTiger.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");
     // For isReplSet
     load("jstests/libs/fixture_helpers.js");
     load('jstests/libs/uuid_util.js');
 
-    if (isMMAPv1(db)) {
+    if (!isWiredTiger(db)) {
         jsTestLog("Skipping test as the storage engine does not support doTxn.");
         return;
     }

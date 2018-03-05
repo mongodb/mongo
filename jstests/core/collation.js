@@ -9,7 +9,7 @@
 
     load("jstests/libs/analyze_plan.js");
     load("jstests/libs/get_index_helpers.js");
-    // For isMMAPv1.
+    // For isWiredTiger.
     load("jstests/concurrency/fsm_workload_helpers/server_types.js");
     // For isReplSet
     load("jstests/libs/fixture_helpers.js");
@@ -1975,7 +1975,7 @@
     }
 
     // doTxn
-    if (FixtureHelpers.isReplSet(db) && !isMongos && !isMMAPv1(db)) {
+    if (FixtureHelpers.isReplSet(db) && !isMongos && isWiredTiger(db)) {
         const session = db.getMongo().startSession();
         const sessionDb = session.getDatabase(db.getName());
         coll.drop();
