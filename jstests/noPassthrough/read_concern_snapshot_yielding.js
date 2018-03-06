@@ -238,19 +238,36 @@
     }, {"originatingCommand.filter": {x: 1}}, {op: "getmore"});
 
     // Test update.
-    // We cannot profide a 'profilerFilter' because profiling is turned off for write commands in
+    // We cannot provide a 'profilerFilter' because profiling is turned off for write commands in
     // transactions.
     testCommand(function() {
         const res = assert.commandWorked(db.runCommand({
             update: "coll",
-            updates: [{q: {new: 1}, u: {$set: {updated: true}}}],
+            updates:
+                [{q: {}, u: {$set: {updated: true}}}, {q: {new: 1}, u: {$set: {updated: true}}}],
             readConcern: {level: "snapshot"},
             lsid: TestData.sessionId,
             txnNumber: NumberLong(TestData.txnNumber)
         }));
-        assert.eq(res.n, 0, tojson(res));
-        assert.eq(res.nModified, 0, tojson(res));
+        // Only update one existing doc committed before the transaction.
+        assert.eq(res.n, 1, tojson(res));
+        assert.eq(res.nModified, 1, tojson(res));
     }, {op: "update"}, null, true);
+
+    // Test delete.
+    // We cannot provide a 'profilerFilter' because profiling is turned off for write commands in
+    // transactions.
+    testCommand(function() {
+        const res = assert.commandWorked(db.runCommand({
+            delete: "coll",
+            deletes: [{q: {}, limit: 1}, {q: {new: 1}, limit: 1}],
+            readConcern: {level: "snapshot"},
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber)
+        }));
+        // Only remove one existing doc committed before the transaction.
+        assert.eq(res.n, 1, tojson(res));
+    }, {op: "remove"}, null, true);
 
     rst.stopSet();
 }());

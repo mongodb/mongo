@@ -451,8 +451,8 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 }  // namespace
 
 WriteResult performInserts(OperationContext* opCtx, const write_ops::Insert& wholeOp) {
-    // Insert performs its own retries and should only be performed within a WriteUnitOfWork when
-    // run under snapshot read concern.
+    // Insert performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
+    // transaction.
     invariant(!opCtx->lockState()->inAWriteUnitOfWork() || opCtx->getWriteUnitOfWork());
     auto& curOp = *CurOp::get(opCtx);
     ON_BLOCK_EXIT([&] {
@@ -732,7 +732,11 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     request.setQuery(op.getQ());
     request.setCollation(write_ops::collationOf(op));
     request.setMulti(op.getMulti());
-    request.setYieldPolicy(PlanExecutor::YIELD_AUTO);  // ParsedDelete overrides this for $isolated.
+    auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    request.setYieldPolicy(
+        readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern
+            ? PlanExecutor::INTERRUPT_ONLY
+            : PlanExecutor::YIELD_AUTO);  // ParsedDelete overrides this for $isolated.
     request.setStmtId(stmtId);
 
     ParsedDelete parsedDelete(opCtx, &request);
@@ -787,7 +791,9 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 }
 
 WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& wholeOp) {
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());  // Does own retries.
+    // Delete performs its own retries, so we should not be in a WriteUnitOfWork unless we are in a
+    // transaction.
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork() || opCtx->getWriteUnitOfWork());
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
     DisableDocumentValidationIfTrue docValidationDisabler(

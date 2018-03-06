@@ -29,6 +29,7 @@
 
     jsTest.log("Insert two documents in a transaction");
 
+    coll.remove({}, {writeConcern: {w: "majority"}});
     // Insert a doc within the transaction.
     assert.commandWorked(sessionDb.runCommand({
         insert: collName,
@@ -79,6 +80,7 @@
 
     jsTest.log("Update documents in a transaction");
 
+    coll.remove({}, {writeConcern: {w: "majority"}});
     // Insert the docs to be updated.
     assert.commandWorked(sessionDb.coll.insert([{_id: "update-1", a: 0}, {_id: "update-2", a: 0}],
                                                {writeConcern: {w: "majority"}}));
@@ -123,6 +125,7 @@
 
     jsTest.log("Insert, update and read documents in a transaction");
 
+    coll.remove({}, {writeConcern: {w: "majority"}});
     txnNumber++;
     assert.commandWorked(sessionDb.runCommand({
         insert: collName,
@@ -176,5 +179,66 @@
     assert.eq(topOfOplog.txnNumber, NumberLong(txnNumber));
     assert.docEq(topOfOplog.o.applyOps, insertUpdateOps.map(x => Object.assign(x, {ui: uuid})));
 
+    jsTest.log("Insert and delete documents in a transaction");
+
+    coll.remove({}, {writeConcern: {w: "majority"}});
+    coll.insert([{_id: "doc-1"}, {_id: "doc-2"}], {writeConcern: {w: "majority"}});
+    txnNumber++;
+    assert.commandWorked(sessionDb.runCommand({
+        insert: collName,
+        documents: [{_id: "doc-3"}],
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber),
+        // Only the first write in a transaction has autocommit flag.
+        autocommit: false
+    }));
+
+    // Remove three docs in transaction.
+    assert.commandWorked(sessionDb.runCommand({
+        delete: collName,
+        deletes: [{q: {_id: "doc-1"}, limit: 1}],
+        txnNumber: NumberLong(txnNumber),
+    }));
+    // Batch delete.
+    assert.commandWorked(sessionDb.runCommand({
+        delete: collName,
+        deletes: [{q: {_id: "doc-2"}, limit: 1}, {q: {_id: "doc-3"}, limit: 1}],
+        txnNumber: NumberLong(txnNumber),
+    }));
+    // Cannot read the new doc and still see the to-be removed docs with default read concern.
+    assert.eq({_id: "doc-1"}, testDB.coll.findOne({_id: "doc-1"}));
+    assert.eq({_id: "doc-2"}, testDB.coll.findOne({_id: "doc-2"}));
+    assert.eq(null, testDB.coll.findOne({_id: "doc-3"}));
+
+    // But read in the same transaction sees the docs get deleted.
+    res = sessionDb.runCommand({
+        find: collName,
+        filter: {$or: [{_id: "doc-1"}, {_id: "doc-2"}, {_id: "doc-3"}]},
+        txnNumber: NumberLong(txnNumber)
+    });
+    assert.commandWorked(res);
+    assert.docEq([], res.cursor.firstBatch);
+
+    assert.commandWorked(sessionDb.runCommand({
+        commitTransaction: 1,
+        txnNumber: NumberLong(txnNumber),
+    }));
+    // Read with default read concern sees the commmitted transaction.
+    assert.eq(null, testDB.coll.findOne({_id: "doc-1"}));
+    assert.eq(null, testDB.coll.findOne({_id: "doc-2"}));
+    assert.eq(null, testDB.coll.findOne({_id: "doc-3"}));
+
+    // Oplog has the "applyOps" entry that includes ops.
+    const deleteOps = [
+        {op: 'i', ns: coll.getFullName(), o: {_id: "doc-3"}},
+        {op: 'd', ns: coll.getFullName(), o: {_id: "doc-1"}},
+        {op: 'd', ns: coll.getFullName(), o: {_id: "doc-2"}},
+        {op: 'd', ns: coll.getFullName(), o: {_id: "doc-3"}},
+    ];
+    topOfOplog = oplog.find().sort({$natural: -1}).limit(1).next();
+    assert.eq(topOfOplog.txnNumber, NumberLong(txnNumber));
+    assert.docEq(topOfOplog.o.applyOps, deleteOps.map(x => Object.assign(x, {ui: uuid})));
+
+    session.endSession();
     rst.stopSet();
 }());

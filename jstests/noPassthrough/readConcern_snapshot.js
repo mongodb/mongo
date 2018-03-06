@@ -218,15 +218,14 @@
     assert.eq({_id: 0, a: 2}, sessionDb.coll.findOne({_id: 0}));
     assert.eq({_id: 1, a: 1}, sessionDb.coll.findOne({_id: 1}));
 
-    // readConcern 'snapshot' is not supported by delete.
-    // TODO SERVER-33354: Add snapshot support for delete.
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    // readConcern 'snapshot' is supported by delete.
+    assert.commandWorked(sessionDb.coll.insert({_id: 2}, {writeConcern: {w: "majority"}}));
+    assert.commandWorked(sessionDb.runCommand({
         delete: collName,
         deletes: [{q: {}, limit: 1}],
         readConcern: {level: "snapshot"},
         txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
+    }));
 
     // readConcern 'snapshot' is not supported by findAndModify.
     // TODO SERVER-33354: Add snapshot support for findAndModify.
