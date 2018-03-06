@@ -46,13 +46,17 @@ namespace mongo {
 template <typename T>
 class StatusWith;
 
+// Using extern constexpr to prevent the compiler from allocating storage as a poor man's c++17
+// inline constexpr variable.
+// TODO delete extern in c++17 because inline is the default for constexper variables.
 template <typename T>
-constexpr bool isStatusWith = false;
+extern constexpr bool isStatusWith = false;
 template <typename T>
-constexpr bool isStatusWith<StatusWith<T>> = true;
+extern constexpr bool isStatusWith<StatusWith<T>> = true;
 
 template <typename T>
-constexpr bool isStatusOrStatusWith = std::is_same<T, mongo::Status>::value || isStatusWith<T>;
+extern constexpr bool isStatusOrStatusWith =
+    std::is_same<T, mongo::Status>::value || isStatusWith<T>;
 
 template <typename T>
 using StatusOrStatusWith = std::conditional_t<std::is_void<T>::value, Status, StatusWith<T>>;

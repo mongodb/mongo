@@ -55,10 +55,13 @@ class Future;
 template <>
 class Future<void>;
 
+// Using extern constexpr to prevent the compiler from allocating storage as a poor man's c++17
+// inline constexpr variable.
+// TODO delete extern in c++17 because inline is the default for constexper variables.
 template <typename T>
-constexpr bool isFuture = false;
+extern constexpr bool isFuture = false;
 template <typename T>
-constexpr bool isFuture<Future<T>> = true;
+extern constexpr bool isFuture<Future<T>> = true;
 
 // This is used to "normalize" void since it can't be used as an argument and it becomes Status
 // rather than StatusWith<void>.
