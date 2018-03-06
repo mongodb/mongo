@@ -9,7 +9,6 @@ import os
 import os.path
 import unittest
 
-from ... import config
 from ... import logging
 from ...utils import registry
 
@@ -23,7 +22,7 @@ def make_test_case(test_kind, *args, **kwargs):
     """
 
     if test_kind not in _TEST_CASES:
-        raise ValueError("Unknown test kind '%s'" % (test_kind))
+        raise ValueError("Unknown test kind '%s'" % test_kind)
     return _TEST_CASES[test_kind](*args, **kwargs)
 
 
@@ -88,7 +87,7 @@ class TestCase(unittest.TestCase):
     def shortDescription(self):
         return "%s %s" % (self.test_kind, self.test_name)
 
-    def configure(self, fixture, *args, **kwargs):
+    def configure(self, fixture, *args, **kwargs):  # pylint: disable=unused-argument
         """
         Stores 'fixture' as an attribute for later use during execution.
         """
@@ -103,6 +102,27 @@ class TestCase(unittest.TestCase):
         Runs the specified test.
         """
         raise NotImplementedError("run_test must be implemented by TestCase subclasses")
+
+    def as_command(self):
+        """
+        Returns the command invocation used to run the test.
+        """
+        raise NotImplementedError("as_command must be implemented by TestCase subclasses")
+
+
+class ProcessTestCase(TestCase):  # pylint: disable=abstract-method
+    """Base class for TestCases that executes an external process."""
+
+    def run_test(self):
+        try:
+            shell = self._make_process()
+            self._execute(shell)
+        except self.failureException:
+            raise
+        except:
+            self.logger.exception("Encountered an error running %s %s",
+                                  self.test_kind, self.basename())
+            raise
 
     def as_command(self):
         """

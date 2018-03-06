@@ -9,7 +9,7 @@ from ... import core
 from ... import utils
 
 
-class CPPUnitTestCase(interface.TestCase):
+class CPPUnitTestCase(interface.ProcessTestCase):
     """
     A C++ unit test to execute.
     """
@@ -24,20 +24,10 @@ class CPPUnitTestCase(interface.TestCase):
         Initializes the CPPUnitTestCase with the executable to run.
         """
 
-        interface.TestCase.__init__(self, logger, "Program", program_executable)
+        interface.ProcessTestCase.__init__(self, logger, "C++ unit test", program_executable)
 
         self.program_executable = program_executable
         self.program_options = utils.default_if_none(program_options, {}).copy()
-
-    def run_test(self):
-        try:
-            program = self._make_process()
-            self._execute(program)
-        except self.failureException:
-            raise
-        except:
-            self.logger.exception("Encountered an error running C++ unit test %s.", self.basename())
-            raise
 
     def _make_process(self):
         return core.process.Process(self.logger,

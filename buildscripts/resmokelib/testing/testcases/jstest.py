@@ -17,7 +17,7 @@ from ... import utils
 from ...utils import registry
 
 
-class _SingleJSTestCase(interface.TestCase):
+class _SingleJSTestCase(interface.ProcessTestCase):
     """
     A jstest to execute.
     """
@@ -33,7 +33,7 @@ class _SingleJSTestCase(interface.TestCase):
         Initializes the _SingleJSTestCase with the JS file to run.
         """
 
-        interface.TestCase.__init__(self, logger, "JSTest", js_filename)
+        interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
 
         # Command line options override the YAML configuration.
         self.shell_executable = utils.default_if_none(config.MONGO_EXECUTABLE, shell_executable)
@@ -115,18 +115,8 @@ class _SingleJSTestCase(interface.TestCase):
                                                 global_vars.get("MongoRunner.dataDir"))
         data_dir_prefix = utils.default_if_none(data_dir_prefix, config.DEFAULT_DBPATH_PREFIX)
         return os.path.join(data_dir_prefix,
-                            "job%d" % (self.fixture.job_num),
+                            "job%d" % self.fixture.job_num,
                             config.MONGO_RUNNER_SUBDIR)
-
-    def run_test(self):
-        try:
-            shell = self._make_process()
-            self._execute(shell)
-        except self.failureException:
-            raise
-        except:
-            self.logger.exception("Encountered an error running jstest %s.", self.basename())
-            raise
 
     def _make_process(self):
         return core.programs.mongo_shell_program(
@@ -137,7 +127,7 @@ class _SingleJSTestCase(interface.TestCase):
             **self.shell_options)
 
 
-class JSTestCase(interface.TestCase):
+class JSTestCase(interface.ProcessTestCase):
     """
     A wrapper for several copies of a SingleJSTest to execute.
     """
@@ -165,13 +155,12 @@ class JSTestCase(interface.TestCase):
                  logger,
                  js_filename,
                  shell_executable=None,
-                 shell_options=None,
-                 test_kind="JSTest"):
+                 shell_options=None):
         """
         Initializes the JSTestCase with the JS file to run.
         """
 
-        interface.TestCase.__init__(self, logger, test_kind, js_filename)
+        interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
         self.num_clients = JSTestCase.DEFAULT_CLIENT_NUM
         self.test_case_template = _SingleJSTestCase(logger, js_filename, shell_executable,
                                                     shell_options)

@@ -10,7 +10,7 @@ from ... import core
 from ... import utils
 
 
-class JSONSchemaTestCase(interface.TestCase):
+class JSONSchemaTestCase(interface.ProcessTestCase):
     """
     A JSON Schema test to execute.
     """
@@ -25,7 +25,7 @@ class JSONSchemaTestCase(interface.TestCase):
                  shell_options=None):
         """Initializes the JSONSchemaTestCase with the JSON test file."""
 
-        interface.TestCase.__init__(self, logger, "JSON Schema Test", json_filename)
+        interface.ProcessTestCase.__init__(self, logger, "JSON Schema test", json_filename)
 
         # Command line options override the YAML configuration.
         self.shell_executable = utils.default_if_none(config.MONGO_EXECUTABLE, shell_executable)
@@ -43,17 +43,6 @@ class JSONSchemaTestCase(interface.TestCase):
 
         global_vars["TestData"] = test_data
         self.shell_options["global_vars"] = global_vars
-
-    def run_test(self):
-        try:
-            shell = self._make_process()
-            self._execute(shell)
-        except self.failureException:
-            raise
-        except:
-            self.logger.exception("Encountered an error running JSON Schema test %s.",
-                                  self.basename())
-            raise
 
     def _make_process(self):
         return core.programs.mongo_shell_program(

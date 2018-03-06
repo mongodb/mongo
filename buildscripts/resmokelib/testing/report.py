@@ -104,10 +104,7 @@ class TestReport(unittest.TestResult):
         test_info.start_time = time.time()
 
         basename = test.basename()
-        if dynamic:
-            command = "(dynamic test case)"
-        else:
-            command = test.as_command()
+        command = test.as_command()
         self.job_logger.info("Running %s...\n%s", basename, command)
 
         with self._lock:

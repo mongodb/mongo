@@ -9,7 +9,7 @@ from ... import core
 from ... import utils
 
 
-class CPPIntegrationTestCase(interface.TestCase):
+class CPPIntegrationTestCase(interface.ProcessTestCase):
     """
     A C++ integration test to execute.
     """
@@ -24,7 +24,7 @@ class CPPIntegrationTestCase(interface.TestCase):
         Initializes the CPPIntegrationTestCase with the executable to run.
         """
 
-        interface.TestCase.__init__(self, logger, "Program", program_executable)
+        interface.ProcessTestCase.__init__(self, logger, "C++ integration test", program_executable)
 
         self.program_executable = program_executable
         self.program_options = utils.default_if_none(program_options, {}).copy()
@@ -33,17 +33,6 @@ class CPPIntegrationTestCase(interface.TestCase):
         interface.TestCase.configure(self, fixture, *args, **kwargs)
 
         self.program_options["connectionString"] = self.fixture.get_internal_connection_string()
-
-    def run_test(self):
-        try:
-            program = self._make_process()
-            self._execute(program)
-        except self.failureException:
-            raise
-        except:
-            self.logger.exception("Encountered an error running C++ integration test %s.",
-                                  self.basename())
-            raise
 
     def _make_process(self):
         return core.programs.generic_program(self.logger,
