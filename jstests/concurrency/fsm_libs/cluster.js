@@ -403,7 +403,7 @@ var Cluster = function(options) {
     };
 
     this.isSharded = function isSharded() {
-        return options.sharded.enabled;
+        return Cluster.isSharded(options);
     };
 
     this.isReplication = function isReplication() {
@@ -703,4 +703,11 @@ Cluster.isStandalone = function isStandalone(clusterOptions) {
  */
 Cluster.isReplication = function isReplication(clusterOptions) {
     return clusterOptions.replication.enabled;
+};
+
+/**
+ * Returns true if 'clusterOptions' represents a sharded configuration, and returns false otherwise.
+ */
+Cluster.isSharded = function isSharded(clusterOptions) {
+    return clusterOptions.sharded.enabled;
 };

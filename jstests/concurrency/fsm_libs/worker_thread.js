@@ -24,6 +24,7 @@ var workerThread = (function() {
     function main(workloads, args, run) {
         var myDB;
         var configs = {};
+        var connectionString = 'mongodb://' + args.host + '/?appname=tid:' + args.tid;
 
         globalAssertLevel = args.globalAssertLevel;
 
@@ -33,59 +34,75 @@ var workerThread = (function() {
         TestData = (args.testData !== undefined) ? args.testData : {};
 
         try {
-            if (Cluster.isStandalone(args.clusterOptions)) {
-                myDB = db.getSiblingDB(args.dbName);
+            if (typeof db !== 'undefined') {
+                // The implicit database connection created within the thread's scope
+                // is unneeded, so forcibly clean it up.
+                db = null;
+                gc();
+            }
+
+            if (typeof args.sessionOptions !== 'undefined') {
+                let initialClusterTime;
+                let initialOperationTime;
+
+                // JavaScript objects backed by C++ objects (e.g. BSON values from a command
+                // response) do not serialize correctly when passed through the ScopedThread
+                // constructor. To work around this behavior, we instead pass a stringified form
+                // of the JavaScript object through the ScopedThread constructor and use eval()
+                // to rehydrate it.
+                if (typeof args.sessionOptions.initialClusterTime === 'string') {
+                    initialClusterTime = eval('(' + args.sessionOptions.initialClusterTime + ')');
+
+                    // The initialClusterTime property was removed from SessionOptions in a
+                    // later revision of the Driver's specification, so we remove the property
+                    // and call advanceClusterTime() ourselves.
+                    delete args.sessionOptions.initialClusterTime;
+                }
+
+                if (typeof args.sessionOptions.initialOperationTime === 'string') {
+                    initialOperationTime =
+                        eval('(' + args.sessionOptions.initialOperationTime + ')');
+
+                    // The initialOperationTime property was removed from SessionOptions in a
+                    // later revision of the Driver's specification, so we remove the property
+                    // and call advanceOperationTime() ourselves.
+                    delete args.sessionOptions.initialOperationTime;
+                }
+
+                const session = new Mongo(connectionString).startSession(args.sessionOptions);
+
+                if (typeof initialClusterTime !== 'undefined') {
+                    session.advanceClusterTime(initialClusterTime);
+                }
+
+                if (typeof initialOperationTime !== 'undefined') {
+                    session.advanceOperationTime(initialOperationTime);
+                }
+
+                myDB = session.getDatabase(args.dbName);
             } else {
-                if (typeof db !== 'undefined') {
-                    // The implicit database connection created within the thread's scope
-                    // is unneeded, so forcibly clean it up.
-                    db = null;
-                    gc();
+                myDB = new Mongo(connectionString).getDB(args.dbName);
+            }
+
+            {
+                let connectionDesc = '';
+                // In sharded environments, mongos is acting as a proxy for the mongo shell and
+                // therefore has a different outbound port than the 'whatsmyuri' command returns.
+                if (!Cluster.isSharded(args.clusterOptions)) {
+                    let res = assert.commandWorked(myDB.runCommand({whatsmyuri: 1}));
+                    const myUri = res.you;
+
+                    res = assert.commandWorked(myDB.adminCommand({currentOp: 1, client: myUri}));
+                    connectionDesc = ', conn:' + res.inprog[0].desc;
                 }
 
-                if (typeof args.sessionOptions !== 'undefined') {
-                    let initialClusterTime;
-                    let initialOperationTime;
-
-                    // JavaScript objects backed by C++ objects (e.g. BSON values from a command
-                    // response) do not serialize correctly when passed through the ScopedThread
-                    // constructor. To work around this behavior, we instead pass a stringified form
-                    // of the JavaScript object through the ScopedThread constructor and use eval()
-                    // to rehydrate it.
-                    if (typeof args.sessionOptions.initialClusterTime === 'string') {
-                        initialClusterTime =
-                            eval('(' + args.sessionOptions.initialClusterTime + ')');
-
-                        // The initialClusterTime property was removed from SessionOptions in a
-                        // later revision of the Driver's specification, so we remove the property
-                        // and call advanceClusterTime() ourselves.
-                        delete args.sessionOptions.initialClusterTime;
-                    }
-
-                    if (typeof args.sessionOptions.initialOperationTime === 'string') {
-                        initialOperationTime =
-                            eval('(' + args.sessionOptions.initialOperationTime + ')');
-
-                        // The initialOperationTime property was removed from SessionOptions in a
-                        // later revision of the Driver's specification, so we remove the property
-                        // and call advanceOperationTime() ourselves.
-                        delete args.sessionOptions.initialOperationTime;
-                    }
-
-                    const session = new Mongo(args.host).startSession(args.sessionOptions);
-
-                    if (typeof initialClusterTime !== 'undefined') {
-                        session.advanceClusterTime(initialClusterTime);
-                    }
-
-                    if (typeof initialOperationTime !== 'undefined') {
-                        session.advanceOperationTime(initialOperationTime);
-                    }
-
-                    myDB = session.getDatabase(args.dbName);
-                } else {
-                    myDB = new Mongo(args.host).getDB(args.dbName);
-                }
+                const printOriginal = print;
+                print = function() {
+                    const printArgs = Array.from(arguments);
+                    const prefix = '[tid:' + args.tid + connectionDesc + ']';
+                    printArgs.unshift(prefix);
+                    return printOriginal.apply(this, printArgs);
+                };
             }
 
             if (Cluster.isReplication(args.clusterOptions)) {
