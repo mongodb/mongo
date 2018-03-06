@@ -212,6 +212,7 @@ StatusWith<CursorId> ClusterCursorManager::registerCursor(
     }
 
     invariant(cursor);
+    cursor->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
 
     // Find the CursorEntryContainer for this namespace.  If none exists, create one.
     auto nsToContainerIt = _namespaceToContainerMap.find(nss);
