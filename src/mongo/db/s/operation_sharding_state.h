@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version_gen.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
@@ -72,16 +73,20 @@ public:
     bool allowImplicitCollectionCreation() const;
 
     /**
-     * Parses shard version from the command parameters 'cmdObj' and stores the results in this
-     * object along with the give namespace that is associated with the version. Does nothing
-     * if no shard version is attached to the command.
+     * Parses shardVersion and databaseVersion from 'cmdObj' and stores the results in this object
+     * along with the given namespace that is associated with the versions. Does nothing if no
+     * shardVersion or databaseVersion is attached to the command.
      *
-     * Expects the format { ..., shardVersion: [<version>, <epoch>] }.
+     * Expects 'cmdObj' to have format
+     * { ...,
+     *   shardVersion: [<version>, <epoch>],
+     *   databaseVersion: { uuid: <UUID>, version: <int> },
+     * ...}
      *
      * This initialization may only be performed once for the lifetime of the object, which
-     * coincides with the lifetime of the request.
+     * coincides with the lifetime of the client's request.
      */
-    void initializeShardVersion(NamespaceString nss, const BSONElement& shardVersionElement);
+    void initializeClientRoutingVersions(NamespaceString nss, const BSONObj& cmdObj);
 
     /**
      * Returns whether or not there is a shard version associated with this operation.
@@ -97,6 +102,17 @@ public:
      * for the requested namespace.
      */
     ChunkVersion getShardVersion(const NamespaceString& nss) const;
+
+    /**
+     * Returns true if the client sent a databaseVersion for any namespace.
+     */
+    bool hasDbVersion() const;
+
+    /**
+     * If 'db' matches the 'db' in the namespace the client sent versions for, returns the database
+     * version sent by the client (if any), else returns boost::none.
+     */
+    boost::optional<DatabaseVersion> getDbVersion(const StringData db) const;
 
     /**
      * Stores the given chunk version of a namespace into this object.
@@ -123,9 +139,10 @@ private:
     // Specifies whether the request is allowed to create database/collection implicitly
     bool _allowImplicitCollectionCreation{true};
 
-    bool _hasVersion = false;
+    bool _hasShardVersion = false;
     ChunkVersion _shardVersion{ChunkVersion::UNSHARDED()};
-    NamespaceString _ns;
+    boost::optional<DatabaseVersion> _dbVersion;
+    NamespaceString _nss;
 
     // This value will only be non-null if version check during the operation execution failed due
     // to stale version and there was a migration for that namespace, which was in critical section.

@@ -42,6 +42,8 @@ const OperationContext::Decoration<OperationShardingState> shardingMetadataDecor
 // Max time to wait for the migration critical section to complete
 const Milliseconds kMaxWaitForMigrationCriticalSection = Minutes(5);
 
+// The name of the field in which the client attaches its database version.
+constexpr auto kDbVersionField = "databaseVersion"_sd;
 }  // namespace
 
 OperationShardingState::OperationShardingState() = default;
@@ -63,50 +65,77 @@ bool OperationShardingState::allowImplicitCollectionCreation() const {
     return _allowImplicitCollectionCreation;
 }
 
-void OperationShardingState::initializeShardVersion(NamespaceString nss,
-                                                    const BSONElement& shardVersionElt) {
+void OperationShardingState::initializeClientRoutingVersions(NamespaceString nss,
+                                                             const BSONObj& cmdObj) {
     invariant(!hasShardVersion());
+    invariant(!_dbVersion);
 
-    if (shardVersionElt.eoo() || shardVersionElt.type() != BSONType::Array) {
-        return;
+    _nss = std::move(nss);
+
+    const auto shardVersionElem = cmdObj.getField(ChunkVersion::kShardVersionField);
+    if (!shardVersionElem.eoo()) {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "expected shardVersion element to be an array, got "
+                              << shardVersionElem,
+                shardVersionElem.type() == BSONType::Array);
+        const BSONArray versionArr(shardVersionElem.Obj());
+
+        bool canParse;
+        ChunkVersion shardVersion = ChunkVersion::fromBSON(versionArr, &canParse);
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "could not parse shardVersion from field " << versionArr,
+                canParse);
+
+        _hasShardVersion = true;
+        if (nss.isSystemDotIndexes()) {
+            _shardVersion = ChunkVersion::IGNORED();
+        } else {
+            _shardVersion = std::move(shardVersion);
+        }
     }
 
-    const BSONArray versionArr(shardVersionElt.Obj());
-    bool hasVersion = false;
-    ChunkVersion newVersion = ChunkVersion::fromBSON(versionArr, &hasVersion);
-
-    if (!hasVersion) {
-        return;
+    const auto dbVersionElem = cmdObj.getField(kDbVersionField);
+    if (!dbVersionElem.eoo()) {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "expected databaseVersion element to be an object, got "
+                              << dbVersionElem,
+                dbVersionElem.type() == BSONType::Object);
+        _dbVersion = DatabaseVersion::parse(IDLParserErrorContext("setClientRoutingVersions"),
+                                            dbVersionElem.Obj());
     }
-
-    if (nss.isSystemDotIndexes()) {
-        setShardVersion(std::move(nss), ChunkVersion::IGNORED());
-        return;
-    }
-
-    setShardVersion(std::move(nss), std::move(newVersion));
 }
 
 bool OperationShardingState::hasShardVersion() const {
-    return _hasVersion;
+    return _hasShardVersion;
 }
 
 ChunkVersion OperationShardingState::getShardVersion(const NamespaceString& nss) const {
-    if (_ns != nss) {
+    if (_nss != nss) {
         return ChunkVersion::UNSHARDED();
     }
 
     return _shardVersion;
 }
 
+bool OperationShardingState::hasDbVersion() const {
+    return !!_dbVersion;
+}
+
+boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(const StringData db) const {
+    if (_nss.db() != db) {
+        return boost::none;
+    }
+    return _dbVersion;
+}
+
 void OperationShardingState::setShardVersion(NamespaceString nss, ChunkVersion newVersion) {
     // This currently supports only setting the shard version for one namespace.
-    invariant(!_hasVersion || _ns == nss);
+    invariant(!_hasShardVersion || _nss == nss);
     invariant(!nss.isSystemDotIndexes() || ChunkVersion::isIgnoredVersion(newVersion));
 
-    _ns = std::move(nss);
+    _nss = std::move(nss);
     _shardVersion = std::move(newVersion);
-    _hasVersion = true;
+    _hasShardVersion = true;
 }
 
 bool OperationShardingState::waitForMigrationCriticalSectionSignal(OperationContext* opCtx) {
