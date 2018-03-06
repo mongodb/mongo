@@ -269,6 +269,14 @@ inline void fassertWithLocation(int msgid, bool testOK, const char* file, unsign
     }
 }
 
+template <typename T>
+inline T fassertWithLocation(int msgid, StatusWith<T> sw, const char* file, unsigned line) {
+    if (MONGO_unlikely(!sw.isOK())) {
+        fassertFailedWithStatusWithLocation(msgid, sw.getStatus(), file, line);
+    }
+    return std::move(sw.getValue());
+}
+
 inline void fassertWithLocation(int msgid, const Status& status, const char* file, unsigned line) {
     if (MONGO_unlikely(!status.isOK())) {
         fassertFailedWithStatusWithLocation(msgid, status, file, line);
@@ -282,6 +290,14 @@ inline void fassertNoTraceWithLocation(int msgid, bool testOK, const char* file,
     if (MONGO_unlikely(!testOK)) {
         fassertFailedNoTraceWithLocation(msgid, file, line);
     }
+}
+
+template <typename T>
+inline T fassertNoTraceWithLocation(int msgid, StatusWith<T> sw, const char* file, unsigned line) {
+    if (MONGO_unlikely(!sw.isOK())) {
+        fassertFailedWithStatusNoTraceWithLocation(msgid, sw.getStatus(), file, line);
+    }
+    return std::move(sw.getValue());
 }
 
 inline void fassertNoTraceWithLocation(int msgid,

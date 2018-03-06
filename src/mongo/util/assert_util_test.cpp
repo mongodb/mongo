@@ -233,6 +233,12 @@ DEATH_TEST(FassertionTerminationTest, fassertOverload, "Terminating with fassert
     fassert(40207, {ErrorCodes::InternalError, "Terminating with fassert"});
 }
 
+DEATH_TEST(FassertionTerminationTest, fassertStatusWithOverload, "Terminating with fassert") {
+    fassert(50733,
+            StatusWith<std::string>{ErrorCodes::InternalError,
+                                    "Terminating with fassertStatusWithOverload"});
+}
+
 DEATH_TEST(FassertionTerminationTest, fassertStatusOK, "Terminating with fassertStatusOK") {
     fassertStatusOK(40208, Status(ErrorCodes::InternalError, "Terminating with fassertStatusOK"));
 }
@@ -241,6 +247,16 @@ DEATH_TEST(FassertionTerminationTest, fassertStatusOKOverload, "Terminating with
     fassertStatusOK(
         40209,
         StatusWith<std::string>(ErrorCodes::InternalError, "Terminating with fassertStatusOK"));
+}
+
+DEATH_TEST(FassertionTerminationTest, fassertNoTrace, "Terminating with fassertNoTrace") {
+    fassertNoTrace(50734, Status(ErrorCodes::InternalError, "Terminating with fassertNoTrace"));
+}
+
+DEATH_TEST(FassertionTerminationTest, fassertNoTraceOverload, "Terminating with fassertNoTrace") {
+    fassertNoTrace(50735,
+                   StatusWith<std::string>(ErrorCodes::InternalError,
+                                           "Terminating with fassertNoTraceOverload"));
 }
 
 DEATH_TEST(FassertionTerminationTest, fassertFailed, "40210") {
