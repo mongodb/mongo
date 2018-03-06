@@ -155,6 +155,7 @@ BENCHMARK_REGISTER_F(CacheLatencyTest, BM_CacheLatency)
     // Loop over arrays of different sizes to test the L2, L3, and RAM latency.
     ->Range(256 * 1024, 4096 * 1024)
     ->ThreadRange(1, [] {
+        ProcessInfo::initializeSystemInfo();
         ProcessInfo pi;
         return static_cast<int>(pi.getNumAvailableCores().value_or(pi.getNumCores()));
     }());
