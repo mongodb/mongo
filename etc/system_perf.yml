@@ -390,6 +390,20 @@ tasks:
     - func: "run test"
     - func: "analyze"
 
+- name: smoke_test
+  priority: 5
+  depends_on:
+    - name: compile
+      variant: linux-standalone
+  commands:
+    - func: "prepare environment"
+      vars:
+        storageEngine: "wiredTiger"
+        test: "short"
+    - func: "deploy cluster"
+    - func: "run test"
+    - func: "analyze"
+
 - name: core_workloads_MMAPv1
   priority: 5
   depends_on:
@@ -688,6 +702,7 @@ buildvariants:
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
+    - name: smoke_test
     - name: retryable_writes_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
@@ -719,6 +734,7 @@ buildvariants:
       - rhel70
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
+    - name: smoke_test
     - name: industry_benchmarks_MMAPv1
     - name: core_workloads_MMAPv1
     - name: non_sharded_workloads_WT
@@ -740,6 +756,7 @@ buildvariants:
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
+    - name: smoke_test
     - name: retryable_writes_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: industry_benchmarks_wmajority_WT
@@ -768,6 +785,7 @@ buildvariants:
   tasks:
     - name: industry_benchmarks_WT
     - name: core_workloads_WT
+    - name: smoke_test
     - name: retryable_writes_workloads_WT
     - name: industry_benchmarks_MMAPv1
     - name: industry_benchmarks_wmajority_WT
