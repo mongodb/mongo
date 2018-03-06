@@ -115,9 +115,8 @@ protected:
     void makeCursorFromExistingCursors(
         std::vector<ClusterClientCursorParams::RemoteCursor> remoteCursors,
         boost::optional<BSONObj> findCmd = boost::none,
-        boost::optional<long long> getMoreBatchSize = boost::none,
-        ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly)) {
-        _params = stdx::make_unique<ClusterClientCursorParams>(_nss, readPref);
+        boost::optional<long long> getMoreBatchSize = boost::none) {
+        _params = stdx::make_unique<ClusterClientCursorParams>(_nss);
         _params->remotes = std::move(remoteCursors);
 
         if (findCmd) {
@@ -1269,36 +1268,6 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
 
     ASSERT_TRUE(arm->ready());
     ASSERT_BSONOBJ_EQ(fromjson("{_id: 3}"), *unittest::assertGet(arm->nextReady()).getResult());
-    ASSERT_TRUE(arm->ready());
-    ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
-}
-
-TEST_F(AsyncResultsMergerTest, SendsSecondaryOkAsMetadata) {
-    std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
-    cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(_nss, 1, {}));
-    makeCursorFromExistingCursors(std::move(cursors),
-                                  boost::none,
-                                  boost::none,
-                                  ReadPreferenceSetting(ReadPreference::Nearest));
-
-    ASSERT_FALSE(arm->ready());
-    auto readyEvent = unittest::assertGet(arm->nextEvent());
-    ASSERT_FALSE(arm->ready());
-
-    BSONObj cmdRequestMetadata = getNthPendingRequest(0).metadata;
-    ASSERT(uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(cmdRequestMetadata))
-               .canRunOnSecondary())
-        << "full metadata: " << cmdRequestMetadata;
-
-    std::vector<CursorResponse> responses;
-    std::vector<BSONObj> batch1 = {fromjson("{_id: 1}")};
-    responses.emplace_back(_nss, CursorId(0), batch1);
-    scheduleNetworkResponses(std::move(responses),
-                             CursorResponse::ResponseType::SubsequentResponse);
-    executor()->waitForEvent(readyEvent);
-
-    ASSERT_TRUE(arm->ready());
-    ASSERT_BSONOBJ_EQ(fromjson("{_id: 1}"), *unittest::assertGet(arm->nextReady()).getResult());
     ASSERT_TRUE(arm->ready());
     ASSERT_TRUE(unittest::assertGet(arm->nextReady()).isEOF());
 }

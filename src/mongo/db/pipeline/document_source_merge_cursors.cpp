@@ -174,7 +174,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
 
     auto params = stdx::make_unique<ClusterClientCursorParams>(*nss);
     params->remotes = std::move(remotes);
-    params->readPreference = ReadPreferenceSetting::get(expCtx->opCtx);
     return new DocumentSourceMergeCursors(
         Grid::get(expCtx->opCtx)->getExecutorPool()->getArbitraryExecutor(),
         std::move(params),
@@ -187,7 +186,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto params = stdx::make_unique<ClusterClientCursorParams>(expCtx->ns);
     params->remotes = std::move(remoteCursors);
-    params->readPreference = ReadPreferenceSetting::get(expCtx->opCtx);
     return new DocumentSourceMergeCursors(executor, std::move(params), expCtx);
 }
 

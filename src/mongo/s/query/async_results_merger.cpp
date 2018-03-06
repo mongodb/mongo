@@ -98,13 +98,6 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
         _addBatchToBuffer(WithLock::withoutLock(), remoteIndex, remote.cursorResponse);
         ++remoteIndex;
     }
-
-    // Initialize command metadata to handle the read preference. We do this in case the readPref
-    // is primaryOnly, in which case if the remote host for one of the cursors changes roles, the
-    // remote will return an error.
-    if (_params->readPreference) {
-        _metadataObj = _params->readPreference->toContainingBSON();
-    }
 }
 
 AsyncResultsMerger::~AsyncResultsMerger() {
@@ -355,7 +348,7 @@ Status AsyncResultsMerger::_askForNextBatch(WithLock, size_t remoteIndex) {
                          .toBSON();
 
     executor::RemoteCommandRequest request(
-        remote.getTargetHost(), _params->nsString.db().toString(), cmdObj, _metadataObj, _opCtx);
+        remote.getTargetHost(), _params->nsString.db().toString(), cmdObj, _opCtx);
 
     auto callbackStatus =
         _executor->scheduleRemoteCommand(request, [this, remoteIndex](auto const& cbData) {
