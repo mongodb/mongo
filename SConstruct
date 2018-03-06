@@ -2692,9 +2692,11 @@ def doConfigure(myenv):
     if has_option( "ssl" ):
         sslLibName = "ssl"
         cryptoLibName = "crypto"
+        sslLinkDependencies = ["crypto", "dl"]
         if conf.env.TargetOSIs('windows'):
             sslLibName = "ssleay32"
             cryptoLibName = "libeay32"
+            sslLinkDependencies = ["libeay32"]
 
             # Add the SSL binaries to the zip file distribution
             files = ['ssleay32.dll', 'libeay32.dll']
@@ -2740,15 +2742,6 @@ def doConfigure(myenv):
                         pass
 
         if not conf.CheckLibWithHeader(
-                sslLibName,
-                ["openssl/ssl.h"],
-                "C",
-                "SSL_version(NULL);",
-                autoadd=True):
-            maybeIssueDarwinSSLAdvice(conf.env)
-            conf.env.ConfError("Couldn't find OpenSSL ssl.h header and library")
-
-        if not conf.CheckLibWithHeader(
                 cryptoLibName,
                 ["openssl/crypto.h"],
                 "C",
@@ -2756,6 +2749,23 @@ def doConfigure(myenv):
                 autoadd=True):
             maybeIssueDarwinSSLAdvice(conf.env)
             conf.env.ConfError("Couldn't find OpenSSL crypto.h header and library")
+
+        def CheckLibSSL(context):
+            res = SCons.Conftest.CheckLib(context,
+                     libs=[sslLibName],
+                     extra_libs=sslLinkDependencies,
+                     header='#include "openssl/ssl.h"',
+                     language="C",
+                     call="SSL_version(NULL);",
+                     autoadd=True)
+            context.did_show_result = 1
+            return not res
+
+        conf.AddTest("CheckLibSSL", CheckLibSSL)
+
+        if not conf.CheckLibSSL():
+           maybeIssueDarwinSSLAdvice(conf.env)
+           conf.env.ConfError("Couldn't find OpenSSL ssl.h header and library")
 
         def CheckLinkSSL(context):
             test_body = """
