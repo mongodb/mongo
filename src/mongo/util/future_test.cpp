@@ -142,12 +142,13 @@ TEST(Future, Success_getNothrowRvalue) {
 
 TEST(Future, Success_getAsync) {
     FUTURE_SUCCESS_TEST(int, 1, [](Future<int>&& fut) {
-        Promise<int> outside;
-        std::move(fut).getAsync([&outside](StatusWith<int> sw) {
+        auto outside = std::make_shared<Promise<int>>();
+        auto outsideFut = outside->getFuture();
+        std::move(fut).getAsync([outside = std::move(outside)](StatusWith<int> sw) mutable {
             ASSERT_OK(sw);
-            outside.emplaceValue(sw.getValue());
+            outside->emplaceValue(sw.getValue());
         });
-        ASSERT_EQ(outside.getFuture().get(), 1);
+        ASSERT_EQ(std::move(outsideFut).get(), 1);
     });
 }
 
@@ -179,12 +180,13 @@ TEST(Future, Fail_getNothrowRvalue) {
 
 TEST(Future, Fail_getAsync) {
     FUTURE_FAIL_TEST(int, [](Future<int>&& fut) {
-        Promise<int> outside;
-        std::move(fut).getAsync([&outside](StatusWith<int> sw) {
+        auto outside = std::make_shared<Promise<int>>();
+        auto outsideFut = outside->getFuture();
+        std::move(fut).getAsync([outside = std::move(outside)](StatusWith<int> sw) mutable {
             ASSERT(!sw.isOK());
-            outside.setError(sw.getStatus());
+            outside->setError(sw.getStatus());
         });
-        ASSERT_EQ(outside.getFuture().getNoThrow(), failStatus);
+        ASSERT_EQ(std::move(outsideFut).getNoThrow(), failStatus);
     });
 }
 
@@ -557,12 +559,13 @@ TEST(Future_Void, Success_getNothrowRvalue) {
 
 TEST(Future_Void, Success_getAsync) {
     FUTURE_SUCCESS_TEST(void, , [](Future<void>&& fut) {
-        Promise<void> outside;
-        std::move(fut).getAsync([&outside](Status status) {
+        auto outside = std::make_shared<Promise<void>>();
+        auto outsideFut = outside->getFuture();
+        std::move(fut).getAsync([outside = std::move(outside)](Status status) mutable {
             ASSERT_OK(status);
-            outside.emplaceValue();
+            outside->emplaceValue();
         });
-        ASSERT_EQ(outside.getFuture().getNoThrow(), Status::OK());
+        ASSERT_EQ(std::move(outsideFut).getNoThrow(), Status::OK());
     });
 }
 
@@ -595,12 +598,13 @@ TEST(Future_Void, Fail_getNothrowRvalue) {
 
 TEST(Future_Void, Fail_getAsync) {
     FUTURE_FAIL_TEST(void, [](Future<void>&& fut) {
-        Promise<void> outside;
-        std::move(fut).getAsync([&outside](Status status) {
+        auto outside = std::make_shared<Promise<void>>();
+        auto outsideFut = outside->getFuture();
+        std::move(fut).getAsync([outside = std::move(outside)](Status status) mutable {
             ASSERT(!status.isOK());
-            outside.setError(status);
+            outside->setError(status);
         });
-        ASSERT_EQ(outside.getFuture().getNoThrow(), failStatus);
+        ASSERT_EQ(std::move(outsideFut).getNoThrow(), failStatus);
     });
 }
 
@@ -971,12 +975,13 @@ TEST(Future_MoveOnly, Success_getNothrowRvalue) {
 
 TEST(Future_MoveOnly, Success_getAsync) {
     FUTURE_SUCCESS_TEST(Widget, Widget(1), [](Future<Widget>&& fut) {
-        Promise<Widget> outside;
-        std::move(fut).getAsync([&outside](StatusWith<Widget> sw) {
+        auto outside = std::make_shared<Promise<Widget>>();
+        auto outsideFut = outside->getFuture();
+        std::move(fut).getAsync([outside = std::move(outside)](StatusWith<Widget> sw) mutable {
             ASSERT_OK(sw);
-            outside.emplaceValue(std::move(sw.getValue()));
+            outside->emplaceValue(std::move(sw.getValue()));
         });
-        ASSERT_EQ(outside.getFuture().get(), 1);
+        ASSERT_EQ(std::move(outsideFut).get(), 1);
     });
 }
 
@@ -1013,12 +1018,13 @@ TEST(Future_MoveOnly, Fail_getNothrowRvalue) {
 
 TEST(Future_MoveOnly, Fail_getAsync) {
     FUTURE_FAIL_TEST(Widget, [](Future<Widget>&& fut) {
-        Promise<Widget> outside;
-        std::move(fut).getAsync([&outside](StatusWith<Widget> sw) {
+        auto outside = std::make_shared<Promise<Widget>>();
+        auto outsideFut = outside->getFuture();
+        std::move(fut).getAsync([outside = std::move(outside)](StatusWith<Widget> sw) mutable {
             ASSERT(!sw.isOK());
-            outside.setError(sw.getStatus());
+            outside->setError(sw.getStatus());
         });
-        ASSERT_EQ(outside.getFuture().getNoThrow(), failStatus);
+        ASSERT_EQ(std::move(outsideFut).getNoThrow(), failStatus);
     });
 }
 
