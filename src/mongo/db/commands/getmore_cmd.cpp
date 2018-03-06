@@ -88,13 +88,24 @@ void waitWhileFailPointEnabled(FailPoint* failPoint,
     invariant(failPoint);
     auto origCurOpMsg = updateCurOpMsg(opCtx, curOpMsg);
 
-    while (MONGO_FAIL_POINT((*failPoint))) {
-        sleepFor(Milliseconds(10));
-        if (readLock && *readLock) {
-            readLock->reset();
-            readLock->emplace(opCtx, nss);
+    MONGO_FAIL_POINT_BLOCK((*failPoint), options) {
+        const BSONObj& data = options.getData();
+        const bool shouldCheckForInterrupt = data["shouldCheckForInterrupt"].booleanSafe();
+        while (MONGO_FAIL_POINT((*failPoint))) {
+            sleepFor(Milliseconds(10));
+            if (readLock && *readLock) {
+                readLock->reset();
+                readLock->emplace(opCtx, nss);
+            }
+
+            // Check for interrupt so that an operation can be killed while waiting for the
+            // failpoint to be disabled, if the failpoint is configured to be interruptible.
+            if (shouldCheckForInterrupt) {
+                opCtx->checkForInterrupt();
+            }
         }
     }
+
     updateCurOpMsg(opCtx, origCurOpMsg);
 }
 
