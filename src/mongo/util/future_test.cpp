@@ -37,6 +37,25 @@
 namespace mongo {
 namespace {
 
+MONGO_STATIC_ASSERT(std::is_same<FutureContinuationResult<std::function<void()>>, void>::value);
+MONGO_STATIC_ASSERT(std::is_same<FutureContinuationResult<std::function<Status()>>, void>::value);
+MONGO_STATIC_ASSERT(
+    std::is_same<FutureContinuationResult<std::function<Future<void>()>>, void>::value);
+MONGO_STATIC_ASSERT(std::is_same<FutureContinuationResult<std::function<int()>>, int>::value);
+MONGO_STATIC_ASSERT(
+    std::is_same<FutureContinuationResult<std::function<StatusWith<int>()>>, int>::value);
+MONGO_STATIC_ASSERT(
+    std::is_same<FutureContinuationResult<std::function<Future<int>()>>, int>::value);
+MONGO_STATIC_ASSERT(
+    std::is_same<FutureContinuationResult<std::function<int(bool)>, bool>, int>::value);
+
+template <typename T>
+auto overloadCheck(T) -> FutureContinuationResult<std::function<std::true_type(bool)>, T>;
+auto overloadCheck(...) -> std::false_type;
+
+MONGO_STATIC_ASSERT(decltype(overloadCheck(bool()))::value);          // match.
+MONGO_STATIC_ASSERT(!decltype(overloadCheck(std::string()))::value);  // SFINAE-failure.
+
 template <typename T, typename Func>
 void completePromise(Promise<T>* promise, Func&& func) {
     promise->emplaceValue(func());
@@ -1520,6 +1539,125 @@ TEST(Future_EdgeCases, looping_onError_with_then) {
 DEATH_TEST(Future_EdgeCases, Success_getAsync_throw, "terminate() called") {
     Future<void>::makeReady().getAsync(
         [](Status) { uasserted(ErrorCodes::BadValue, "die die die!!!"); });
+}
+
+TEST(Promise, Success_setFrom) {
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](Future<int>&& fut) {
+                            Promise<int> p;
+                            p.setFrom(std::move(fut));
+                            ASSERT_EQ(p.getFuture().get(), 1);
+                        });
+}
+
+TEST(Promise, Fail_setFrom) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        Promise<int> p;
+        p.setFrom(std::move(fut));
+        ASSERT_THROWS_failStatus(p.getFuture().get());
+    });
+}
+
+TEST(Promise, Success_setWith_value) {
+    Promise<int> p;
+    p.setWith([&] { return 1; });
+    ASSERT_EQ(p.getFuture().get(), 1);
+}
+
+TEST(Promise, Fail_setWith_throw) {
+    Promise<int> p;
+    p.setWith([&] {
+        uassertStatusOK(failStatus);
+        return 1;
+    });
+    ASSERT_THROWS_failStatus(p.getFuture().get());
+}
+
+TEST(Promise, Success_setWith_StatusWith) {
+    Promise<int> p;
+    p.setWith([&] { return StatusWith<int>(1); });
+    ASSERT_EQ(p.getFuture().get(), 1);
+}
+
+TEST(Promise, Fail_setWith_StatusWith) {
+    Promise<int> p;
+    p.setWith([&] { return StatusWith<int>(failStatus); });
+    ASSERT_THROWS_failStatus(p.getFuture().get());
+}
+
+TEST(Promise, Success_setWith_Future) {
+    FUTURE_SUCCESS_TEST([] { return 1; },
+                        [](Future<int>&& fut) {
+                            Promise<int> p;
+                            p.setWith([&] { return std::move(fut); });
+                            ASSERT_EQ(p.getFuture().get(), 1);
+                        });
+}
+
+TEST(Promise, Fail_setWith_Future) {
+    FUTURE_FAIL_TEST<int>([](Future<int>&& fut) {
+        Promise<int> p;
+        p.setWith([&] { return std::move(fut); });
+        ASSERT_THROWS_failStatus(p.getFuture().get());
+    });
+}
+
+TEST(Promise_void, Success_setFrom) {
+    FUTURE_SUCCESS_TEST([] {},
+                        [](Future<void>&& fut) {
+                            Promise<void> p;
+                            p.setFrom(std::move(fut));
+                            ASSERT_OK(p.getFuture().getNoThrow());
+                        });
+}
+
+TEST(Promise_void, Fail_setFrom) {
+    FUTURE_FAIL_TEST<void>([](Future<void>&& fut) {
+        Promise<void> p;
+        p.setFrom(std::move(fut));
+        ASSERT_THROWS_failStatus(p.getFuture().get());
+    });
+}
+
+TEST(Promise_void, Success_setWith_value) {
+    Promise<void> p;
+    p.setWith([&] {});
+    ASSERT_OK(p.getFuture().getNoThrow());
+}
+
+TEST(Promise_void, Fail_setWith_throw) {
+    Promise<void> p;
+    p.setWith([&] { uassertStatusOK(failStatus); });
+    ASSERT_THROWS_failStatus(p.getFuture().get());
+}
+
+TEST(Promise_void, Success_setWith_Status) {
+    Promise<void> p;
+    p.setWith([&] { return Status::OK(); });
+    ASSERT_OK(p.getFuture().getNoThrow());
+}
+
+TEST(Promise_void, Fail_setWith_Status) {
+    Promise<void> p;
+    p.setWith([&] { return failStatus; });
+    ASSERT_THROWS_failStatus(p.getFuture().get());
+}
+
+TEST(Promise_void, Success_setWith_Future) {
+    FUTURE_SUCCESS_TEST([] {},
+                        [](Future<void>&& fut) {
+                            Promise<void> p;
+                            p.setWith([&] { return std::move(fut); });
+                            ASSERT_OK(p.getFuture().getNoThrow());
+                        });
+}
+
+TEST(Promise_void, Fail_setWith_Future) {
+    FUTURE_FAIL_TEST<void>([](Future<void>&& fut) {
+        Promise<void> p;
+        p.setWith([&] { return std::move(fut); });
+        ASSERT_THROWS_failStatus(p.getFuture().get());
+    });
 }
 
 }  // namespace

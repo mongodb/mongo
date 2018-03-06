@@ -223,6 +223,23 @@ using NormalizedCallResult =
                        void,
                        RawNormalizedCallResult<Func, Args...>>;
 
+template <typename T>
+struct FutureContinuationResultImpl {
+    using type = T;
+};
+template <typename T>
+struct FutureContinuationResultImpl<Future<T>> {
+    using type = T;
+};
+template <typename T>
+struct FutureContinuationResultImpl<StatusWith<T>> {
+    using type = T;
+};
+template <>
+struct FutureContinuationResultImpl<Status> {
+    using type = void;
+};
+
 /**
  * A base class that handles the ref-count for boost::intrusive_ptr compatibility.
  *
@@ -448,7 +465,7 @@ using future_details::Future;
  * Future before allowing other threads to see the Promise.
  *
  * If the result is ready when producing the Future, it is more efficient to use
- * Future<T>::makeReady() than to use a Promise<T>.
+ * makeReadyFutureWith() or Future<T>::makeReady() than to use a Promise<T>.
  */
 template <typename T>
 class future_details::Promise {
@@ -475,28 +492,54 @@ public:
     // The default move construction is fine.
     Promise(Promise&&) = default;
 
+    /**
+     * Sets a value or error into this Promise by calling func, which must take no arguments and
+     * return one of T, StatusWith<T> (or Status when T is void), or Future<T>. All errors, whether
+     * returned or thrown, will be correctly propagated.
+     *
+     * If the function returns a Future<T>, this Promise's Future will complete when the returned
+     * Future<T> completes, as-if it was passed to Promise::setFrom().
+     *
+     * If any work is needed to produce the result, prefer doing something like:
+     *     promise.setWith([&]{ return makeResult(); });
+     * over code like:
+     *     promise.emplaceValue(makeResult());
+     * because this method will correctly propagate errors thrown from makeResult(), rather than
+     * ErrorCodes::BrokenPromise.
+     */
+    template <typename Func>
+    void setWith(Func&& func) noexcept;
+
+    /**
+     * Sets the value into this Promise when the passed-in Future completes, which may have already
+     * happened. If it hasn't, it is still safe to destroy this Promise since it is no longer
+     * involved.
+     */
+    void setFrom(Future<T>&& future) noexcept;
+
     template <typename... Args>
     void emplaceValue(Args&&... args) noexcept {
-        invariant(!haveSetValue);
-        haveSetValue = true;
-        sharedState->emplaceValue(std::forward<Args>(args)...);
-        if (haveExtractedFuture)
-            sharedState.reset();
+        setImpl([&] { sharedState->emplaceValue(std::forward<Args>(args)...); });
     }
 
     void setError(Status status) noexcept {
         invariant(!status.isOK());
-        invariant(!haveSetValue);
-        haveSetValue = true;
-        sharedState->setError(std::move(status));
-        if (haveExtractedFuture)
-            sharedState.reset();
+        setImpl([&] { sharedState->setError(std::move(status)); });
     }
 
     Future<T> getFuture() noexcept;
 
 private:
     friend class Future<void>;
+
+    template <typename Func>
+    void setImpl(Func&& doSet) noexcept {
+        invariant(!haveSetValue);
+        haveSetValue = true;
+        doSet();
+        if (haveExtractedFuture)
+            sharedState.reset();
+    }
 
     bool haveSetValue = false;
     bool haveExtractedFuture = false;
@@ -875,7 +918,7 @@ public:
 private:
     template <typename T2>
     friend class Future;
-    friend Future<T> Promise<T>::getFuture() noexcept;
+    friend class Promise<T>;
 
     T& getImpl() {
         if (immediate) {
@@ -1065,7 +1108,7 @@ public:
 private:
     template <typename T>
     friend class Future;
-    friend Future<void> Promise<void>::getFuture() noexcept;
+    friend class Promise<void>;
 
     explicit Future(boost::intrusive_ptr<SharedState<FakeVoid>> ptr) : inner(std::move(ptr)) {}
     /*implicit*/ Future(Future<FakeVoid>&& inner) : inner(std::move(inner)) {}
@@ -1084,6 +1127,46 @@ private:
     Future<FakeVoid> inner;
 };
 
+/**
+ * Makes a ready Future with the return value of a nullary function. This has the same semantics as
+ * Promise::setWith, and has the same reasons to prefer it over Future<T>::makeReady(). Also, it
+ * deduces the T, so it is easier to use.
+ */
+template <typename Func>
+auto makeReadyFutureWith(Func&& func) {
+    return Future<void>::makeReady().then(std::forward<Func>(func));
+}
+
+/**
+ * This metafunction allows APIs that take callbacks and return Future to avoid doing their own type
+ * calculus. This results in the base value_type that would result from passing Func to a
+ * Future<T>::then(), with the same normalizing of T/StatusWith<T>/Future<T> returns. This is
+ * primarily useful for implementations of executors rather than their users.
+ *
+ * This returns the unwrapped T rather than Future<T> so it will be easy to create a Promise<T>.
+ *
+ * Examples:
+ *
+ * FutureContinuationResult<std::function<void()>> == void
+ * FutureContinuationResult<std::function<Status()>> == void
+ * FutureContinuationResult<std::function<Future<void>()>> == void
+ *
+ * FutureContinuationResult<std::function<int()>> == int
+ * FutureContinuationResult<std::function<StatusWith<int>()>> == int
+ * FutureContinuationResult<std::function<Future<int>()>> == int
+ *
+ * FutureContinuationResult<std::function<int(bool)>, bool> == int
+ *
+ * FutureContinuationResult<std::function<int(bool)>, NotBool> SFINAE-safe substitution failure.
+ */
+template <typename Func, typename... Args>
+using FutureContinuationResult =
+    typename future_details::FutureContinuationResultImpl<std::result_of_t<Func(Args&&...)>>::type;
+
+//
+// Implementations of methods that couldn't be defined in the class due to ordering requirements.
+//
+
 template <typename T>
 inline Future<T> Promise<T>::getFuture() noexcept {
     invariant(!haveExtractedFuture);
@@ -1097,6 +1180,17 @@ inline Future<T> Promise<T>::getFuture() noexcept {
 
     // Let the Future steal our ref-count since we don't need it anymore.
     return Future<T>(std::move(sharedState));
+}
+
+template <typename T>
+inline void Promise<T>::setFrom(Future<T>&& future) noexcept {
+    setImpl([&] { future.propagateResultTo(sharedState.get()); });
+}
+
+template <typename T>
+template <typename Func>
+inline void Promise<T>::setWith(Func&& func) noexcept {
+    setFrom(Future<void>::makeReady().then(std::forward<Func>(func)));
 }
 
 }  // namespace mongo
