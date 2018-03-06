@@ -1,6 +1,7 @@
 // Test that the read concern level 'snapshot' exhibits the correct yielding behavior. That is,
 // operations performed at read concern level snapshot check for interrupt but do not yield locks or
 // storage engine resources.
+// @tags: [requires_replication]
 (function() {
     "use strict";
 
