@@ -472,6 +472,17 @@ functions:
         make USE_RTTI=1 CC=/opt/mongodbtoolchain/v2/bin/gcc CXX=/opt/mongodbtoolchain/v2/bin/g++ static_lib
         fi
 
+  "fetch and build OpenSSL" :
+    command: shell.exec
+    params:
+        working_dir:  src
+        script: |
+            set -o errexit
+            set -o verbose
+            if [ "${build_openssl|}" = "true" ]; then
+                bash buildscripts/fetch_and_build_openssl.sh "${python|python}" "${openssl_make_flags|}" "${openssl_config_flags|}"
+            fi
+
   "use WiredTiger develop" :
     command: shell.exec
     params:
@@ -2548,6 +2559,19 @@ functions:
   - *archive_system_resource_information
 
   ### Attach report & artifacts ###
+  "attach scons config log":
+    command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/build/scons/config.log
+      remote_file: ${project}/${build_variant}/${revision}/artifacts/config-${build_id}.log
+      bucket: mciuploads
+      permissions: public-read
+      content_type: text/plain
+      display_name: config.log
+
   "attach report":
     command: attach.results
     params:
@@ -2573,6 +2597,7 @@ pre: &pre
 
 # Post task steps
 post: &post
+  - func: "attach scons config log"
   - func: "attach report"
   - func: "attach artifacts"
   - func: "save ec2 task artifacts"
@@ -2637,6 +2662,7 @@ tasks:
     - func: "update bypass expansions"
     - func: "get buildnumber"
     - func: "set up credentials"
+    - func: "fetch and build OpenSSL"
     - func: "build new tools"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
@@ -2804,6 +2830,7 @@ tasks:
     - func: "git get project"
     - func: "get buildnumber"
     - func: "set up credentials"
+    - func: "fetch and build OpenSSL"
     - func: "build new tools"
     - func: "build rocksdb" # noop if ${build_rocksdb} is not "true"
     - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
@@ -6810,7 +6837,7 @@ buildvariants:
     push_name: osx-ssl
     push_arch: x86_64
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
     multiversion_platform: osx-ssl
     num_jobs_available: 1
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
@@ -6943,7 +6970,7 @@ buildvariants:
     push_name: osx
     push_arch: x86_64-enterprise
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10"
     num_jobs_available: 1
     gorootvars: 'PATH="/usr/local/go1.8/go/bin:/opt/mongodbtoolchain/v2/bin/:$PATH" GOROOT=/usr/local/go1.8/go CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10'
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
@@ -6987,11 +7014,14 @@ buildvariants:
     tooltags: "-tags 'ssl sasl openssl_pre_1.0'"
     gorootvars: CGO_CPPFLAGS=-I/opt/mongodbtoolchain/v2/include CGO_CFLAGS=-mmacosx-version-min=10.10 CGO_LDFLAGS=-mmacosx-version-min=10.10
     compile_env: DEVELOPER_DIR=/Applications/Xcode8.3.app
-    compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" CPPPATH=/opt/mongodbtoolchain/v2/include
+    compile_flags: --ssl --ssl-provider=openssl -j$(sysctl -n hw.logicalcpu) --release --libc++ CCFLAGS="-mmacosx-version-min=10.10" LINKFLAGS="-mmacosx-version-min=10.10" LIBPATH="$PWD/openssl_install_dir/lib" CPPPATH="$PWD/openssl_install_dir/include"
     num_jobs_available: 1
     build_mongoreplay: true
     multiversion_platform: osx
     multiversion_edition: enterprise
+    build_openssl: true
+    openssl_config_flags: "-mmacosx-version-min=10.10"
+    openssl_make_flags: "-j$(sysctl -n hw.logicalcpu)"
 
 
 ###########################################
