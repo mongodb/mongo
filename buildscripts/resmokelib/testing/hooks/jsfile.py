@@ -5,14 +5,9 @@ JavaScript file.
 
 from __future__ import absolute_import
 
-import sys
-
-import pymongo
-import pymongo.errors
 
 from . import interface
 from ..testcases import jstest
-from ... import errors
 from ...utils import registry
 
 
@@ -21,47 +16,37 @@ class JSHook(interface.Hook):
 
     def __init__(self, hook_logger, fixture, js_filename, description, shell_options=None):
         interface.Hook.__init__(self, hook_logger, fixture, description)
-        self.hook_test_case = self.make_dynamic_test(jstest.JSTestCase,
-                                                     js_filename,
-                                                     shell_options=shell_options,
-                                                     test_kind="Hook")
-        self.test_case_is_configured = False
+        self._js_filename = js_filename
+        self._shell_options = shell_options
 
-    def before_suite(self, test_report):
-        if not self.test_case_is_configured:
-            # Configure the test case after the fixture has been set up.
-            self.hook_test_case.configure(self.fixture)
-            self.test_case_is_configured = True
-
-    def _should_run_after_test_impl(self):
+    def _should_run_after_test(self):  # pylint: disable=no-self-use
+        """
+        Callback that can be overrided by subclasses to indicate if the JavaScript file should be
+         executed after the current test.
+        """
         return True
 
-    def _after_test_impl(self, test, test_report, description):
-        self.hook_test_case.run_test()
-
     def after_test(self, test, test_report):
-        if not self._should_run_after_test_impl():
+        if not self._should_run_after_test():
             return
 
-        # Change test_name and description to be more descriptive.
-        description = "{0} after running '{1}'".format(self.description, test.short_name())
-        test_name = "{}:{}".format(test.short_name(), self.__class__.__name__)
-        self.hook_test_case.test_name = test_name
+        hook_test_case = DynamicJSTestCase.create_after_test(
+            self.logger.test_case_logger, test, self, self._js_filename, self._shell_options)
+        hook_test_case.configure(self.fixture)
+        hook_test_case.run_dynamic_test(test_report)
 
-        interface.Hook.start_dynamic_test(self.hook_test_case, test_report)
-        try:
-            self._after_test_impl(test, test_report, description)
-        except pymongo.errors.OperationFailure as err:
-            self.hook_test_case.logger.exception("{0} failed".format(description))
-            self.hook_test_case.return_code = 1
-            test_report.addFailure(self.hook_test_case, sys.exc_info())
-            raise errors.StopExecution(err.args[0])
-        except self.hook_test_case.failureException as err:
-            self.hook_test_case.logger.exception("{0} failed".format(description))
-            test_report.addFailure(self.hook_test_case, sys.exc_info())
-            raise errors.StopExecution(err.args[0])
-        else:
-            self.hook_test_case.return_code = 0
-            test_report.addSuccess(self.hook_test_case)
-        finally:
-            test_report.stopTest(self.hook_test_case)
+
+class DynamicJSTestCase(interface.DynamicTestCase):
+    """A dynamic TestCase that runs a JavaScript file."""
+    def __init__(self, logger, test_name, description, base_test_name, hook,
+                 js_filename, shell_options=None):
+        interface.DynamicTestCase.__init__(self, logger, test_name, description,
+                                           base_test_name, hook)
+        self._js_test = jstest.JSTestCase(logger, js_filename, shell_options=shell_options)
+
+    def configure(self, fixture, *args, **kwargs):  # pylint: disable=unused-argument
+        interface.DynamicTestCase.configure(self, fixture, *args, **kwargs)
+        self._js_test.configure(fixture, *args, **kwargs)
+
+    def run_test(self):
+        self._js_test.run_test()

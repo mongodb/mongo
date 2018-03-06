@@ -4,14 +4,16 @@ Testing hook for verifying that the primary has not stepped down or changed.
 
 from __future__ import absolute_import
 
+import pymongo.errors
+
 from . import interface
 from ..fixtures import replicaset
 from ... import errors
 
-import pymongo.errors
-
 
 class CheckPrimary(interface.Hook):
+    """Hook that checks that the primary is still primary after the test."""
+
     def __init__(self, hook_logger, rs_fixture):
         description = "Verify that the primary has not stepped down or changed"
         interface.Hook.__init__(self, hook_logger, rs_fixture, description)

@@ -5,12 +5,10 @@ from __future__ import absolute_import
 
 import collections
 import random
-import sys
 import time
 import threading
 
 import bson
-import pymongo
 import pymongo.errors
 
 from buildscripts.resmokelib import errors
@@ -67,25 +65,21 @@ class ContinuousStepdown(interface.Hook):
         self._stepdown_thread.stop()
 
     def before_test(self, test, test_report):
-        self._check_thread(test, test_report)
+        self._check_thread()
         self.logger.info("Resuming the stepdown thread.")
         self._stepdown_thread.resume()
 
     def after_test(self, test, test_report):
-        self._check_thread(test, test_report)
+        self._check_thread()
         self.logger.info("Pausing the stepdown thread.")
         self._stepdown_thread.pause()
         self.logger.info("Paused the stepdown thread.")
 
-    def _check_thread(self, test, test_report):
+    def _check_thread(self):
         if not self._stepdown_thread.is_alive():
             msg = "The stepdown thread is not running."
             self.logger.error(msg)
-            try:
-                raise errors.StopExecution(msg)
-            except errors.StopExecution:
-                test_report.addError(test, sys.exc_info())
-                raise
+            raise errors.ServerFailure(msg)
 
     def _add_fixture(self, fixture):
         if isinstance(fixture, replicaset.ReplicaSetFixture):

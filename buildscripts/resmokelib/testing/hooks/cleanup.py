@@ -5,10 +5,8 @@ Testing hook for cleaning up data files created by the fixture.
 from __future__ import absolute_import
 
 import os
-import sys
 
 from . import interface
-from ..testcases import interface as testcase
 
 
 class CleanEveryN(interface.Hook):
@@ -37,29 +35,24 @@ class CleanEveryN(interface.Hook):
         if self.tests_run < self.n:
             return
 
-        test_name = "{}:{}".format(test.short_name(), self.__class__.__name__)
-        self.hook_test_case = self.make_dynamic_test(testcase.TestCase, "Hook", test_name)
+        hook_test_case = CleanEveryNTestCase.create_after_test(
+            self.logger.test_case_logger, test, self)
+        hook_test_case.configure(self.fixture)
+        hook_test_case.run_dynamic_test(test_report)
 
-        interface.Hook.start_dynamic_test(self.hook_test_case, test_report)
+
+class CleanEveryNTestCase(interface.DynamicTestCase):
+    def run_test(self):
         try:
-            self.hook_test_case.logger.info(
-                "%d tests have been run against the fixture, stopping it...",
-                self.tests_run)
-            self.tests_run = 0
+            self.logger.info("%d tests have been run against the fixture, stopping it...",
+                             self._hook.tests_run)
+            self._hook.tests_run = 0
 
             self.fixture.teardown()
 
-            self.hook_test_case.logger.info("Starting the fixture back up again...")
+            self.logger.info("Starting the fixture back up again...")
             self.fixture.setup()
             self.fixture.await_ready()
         except:
-            self.hook_test_case.logger.exception(
-                "Encountered an error while restarting the fixture.")
-            self.hook_test_case.return_code = 2
-            test_report.addFailure(self.hook_test_case, sys.exc_info())
+            self.logger.exception("Encountered an error while restarting the fixture.")
             raise
-        else:
-            self.hook_test_case.return_code = 0
-            test_report.addSuccess(self.hook_test_case)
-        finally:
-            test_report.stopTest(self.hook_test_case)
