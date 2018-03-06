@@ -1895,7 +1895,8 @@ post:
         cmds="$cmds; do base_name=\$(echo \$core_file | sed 's/.*\///')"
         cmds="$cmds;   if [ ! -f \$base_name ]; then mv \$core_file .; fi"
         cmds="$cmds; done"
-        $python buildscripts/remote_operations.py \
+        ${activate_virtualenv}
+        $python buildscripts/remote_operations.py          \
           --verbose                                        \
           --userHost $USER@${ip_address}                   \
           --sshConnectionOptions "$ssh_connection_options" \
@@ -1911,7 +1912,8 @@ post:
         fi
         ssh_connection_options="${ssh_identity} ${ssh_connection_options}"
         remote_dir=${remote_dir|.}
-        $python buildscripts/remote_operations.py \
+        ${activate_virtualenv}
+        $python buildscripts/remote_operations.py          \
           --verbose                                        \
           --userHost $USER@${ip_address}                   \
           --operation "copy_from"                          \
