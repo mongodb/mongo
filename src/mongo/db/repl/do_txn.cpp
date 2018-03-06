@@ -321,6 +321,11 @@ Status doTxn(OperationContext* opCtx,
             wunit.commit();
             result->appendElements(intermediateResult.obj());
         });
+
+        // Commit the global WUOW if the command succeeds.
+        if (opCtx->getWriteUnitOfWork()) {
+            opCtx->getWriteUnitOfWork()->commit();
+        }
     } catch (const DBException& ex) {
         BSONArrayBuilder ab;
         ++numApplied;

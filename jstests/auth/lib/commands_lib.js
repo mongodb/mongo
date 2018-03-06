@@ -2085,6 +2085,7 @@ var authCommandsLib = {
           testname: "commitTxn",
           command: {commitTransaction: 1},
           skipSharded: true,
+          skipUnlessReplicaSet: true,
           testcases: [
               {
                 runOnDb: firstDbName,
