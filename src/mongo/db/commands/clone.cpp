@@ -103,28 +103,21 @@ public:
         opts.fromDB = dbname;
         opts.slaveOk = cmdObj["slaveOk"].trueValue();
 
-        // See if there's any collections we should ignore
+        // collsToIgnore is only used by movePrimary and contains a list of the
+        // sharded collections.
         if (cmdObj["collsToIgnore"].type() == Array) {
             BSONObjIterator it(cmdObj["collsToIgnore"].Obj());
 
             while (it.more()) {
                 BSONElement e = it.next();
                 if (e.type() == String) {
-                    opts.collsToIgnore.insert(e.String());
+                    opts.shardedColls.insert(e.String());
                 }
             }
         }
 
-        // If metadataOnly is set, we will copy collection options, indexes, and views,
-        // but not collection data.
-        if (cmdObj["metadataOnly"].booleanSafe()) {
-            opts.syncData = false;
-            opts.metadataOnly = true;
-        }
-
         // Clone the non-ignored collections.
         set<string> clonedColls;
-
         Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
 
         Cloner cloner;

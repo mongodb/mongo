@@ -67,6 +67,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -82,6 +83,7 @@ using std::vector;
 using IndexVersion = IndexDescriptor::IndexVersion;
 
 MONGO_EXPORT_SERVER_PARAMETER(skipCorruptDocumentsWhenCloning, bool, false);
+MONGO_FP_DECLARE(movePrimaryFailPoint);
 
 BSONElement getErrField(const BSONObj& o);
 
@@ -520,9 +522,6 @@ bool Cloner::copyCollection(OperationContext* opCtx,
     return true;
 }
 
-// TODO SERVER-32847: This function should take in CloneOptions from copyDb,
-// indicating that we are in metadataOnly mode and we want to copy over UUID
-// info.
 StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
     const CloneOptions& opts, const std::list<BSONObj>& initialCollections) {
     std::vector<BSONObj> finalCollections;
@@ -556,12 +555,6 @@ StatusWith<std::vector<BSONObj>> Cloner::filterCollectionsForClone(
             LOG(2) << "\t\t not cloning because has $ ";
             continue;
         }
-        if (opts.collsToIgnore.find(ns.ns()) != opts.collsToIgnore.end()) {
-            LOG(2) << "\t\t ignoring collection " << ns;
-            continue;
-        } else {
-            LOG(2) << "\t\t not ignoring collection " << ns;
-        }
 
         finalCollections.push_back(collection.getOwned());
     }
@@ -574,56 +567,91 @@ Status Cloner::createCollectionsForDb(
     const std::string& dbName,
     const CloneOptions& opts) {
     Database* db = dbHolder().openDb(opCtx, dbName);
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
+
+    auto collCount = 0;
     for (auto&& params : createCollectionParams) {
-        auto options = params.collectionInfo["options"].Obj();
+        if (MONGO_FAIL_POINT(movePrimaryFailPoint) && collCount > 0) {
+            return Status(ErrorCodes::CommandFailed, "movePrimary failed due to failpoint");
+        }
+        collCount++;
+
+        BSONObjBuilder optionsBuilder;
+        optionsBuilder.appendElements(params.collectionInfo["options"].Obj());
+
         const NamespaceString nss(dbName, params.collectionName);
 
         uassertStatusOK(userAllowedCreateNS(dbName, params.collectionName));
-        Status status = writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
-            opCtx->checkForInterrupt();
-            WriteUnitOfWork wunit(opCtx);
+        Status status =
+            writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
+                opCtx->checkForInterrupt();
+                WriteUnitOfWork wunit(opCtx);
 
-            // When in metadataOnly mode, we don't want to error when a collection
-            // we're trying to create already exists. Instead, we check if the existing
-            // collection's options match those of the one we're tying to create. If they
-            // do, we treat the create as a success; if they don't match, we return an error.
-            if (opts.metadataOnly) {
                 Collection* collection = db->getCollection(opCtx, nss.ns());
                 if (collection) {
+                    if (!params.shardedColl) {
+                        // If the collection is unsharded then we want to fail when a collection
+                        // we're trying to create already exists.
+                        return Status(ErrorCodes::NamespaceExists,
+                                      str::stream() << "unsharded collection with same namespace "
+                                                    << nss.ns()
+                                                    << " already exists.");
+                    }
+
+                    // If the collection is sharded and a collection with the same name already
+                    // exists on the target, we check if the existing collection's options and
+                    // UUID match those of the one we're trying to create. If they do, we treat
+                    // the create as a no-op; if they don't match, we return an error.
                     auto existingOpts =
                         collection->getCatalogEntry()->getCollectionOptions(opCtx).toBSON();
                     UnorderedFieldsBSONObjComparator bsonCmp;
 
-                    // TODO SERVER-32847: don't remove this field anymore.
-                    existingOpts = existingOpts.removeField("uuid");
+                    optionsBuilder.append(params.collectionInfo["info"]["uuid"]);
+                    auto options = optionsBuilder.obj();
 
                     if (bsonCmp.evaluate(existingOpts == options)) {
                         return Status::OK();
                     }
-                    return Status(ErrorCodes::InvalidOptions,
-                                  str::stream() << "collection with same namespace " << nss.ns()
-                                                << " already exists, but options don't match");
+
+                    return Status(
+                        ErrorCodes::InvalidOptions,
+                        str::stream()
+                            << "sharded collection with same namespace "
+                            << nss.ns()
+                            << " already exists, but options don't match. Existing options are "
+                            << existingOpts
+                            << " and new options are "
+                            << options);
                 }
-            }
 
-            const bool createDefaultIndexes = true;
-            // TODO SERVER-32847: if in metadataOnly mode, we should use the UUID the
-            // collection had on the old primary here.
-            Status createStatus =
-                userCreateNS(opCtx,
-                             db,
-                             nss.ns(),
-                             options,
-                             CollectionOptions::parseForCommand,
-                             createDefaultIndexes,
-                             fixIndexSpec(nss.db().toString(), params.idIndexSpec));
-            if (!createStatus.isOK()) {
-                return createStatus;
-            }
+                // If the collection does not already exist and is sharded, we create a new
+                // collection on the target shard with the UUID of the original collection and
+                // copy the options and secondary indexes. If the collection does not already
+                // exist and is unsharded, we create a new collection with its own UUID and
+                // copy the options and secondary indexes of the original collection.
 
-            wunit.commit();
-            return Status::OK();
-        });
+                if (params.shardedColl) {
+                    optionsBuilder.append(params.collectionInfo["info"]["uuid"]);
+                }
+
+                const bool createDefaultIndexes = true;
+                auto options = optionsBuilder.obj();
+
+                Status createStatus =
+                    userCreateNS(opCtx,
+                                 db,
+                                 nss.ns(),
+                                 options,
+                                 CollectionOptions::parseForStorage,
+                                 createDefaultIndexes,
+                                 fixIndexSpec(nss.db().toString(), params.idIndexSpec));
+                if (!createStatus.isOK()) {
+                    return createStatus;
+                }
+
+                wunit.commit();
+                return Status::OK();
+            });
 
         // Break early if one of the creations fails.
         if (!status.isOK()) {
@@ -705,8 +733,6 @@ Status Cloner::copyDb(OperationContext* opCtx,
         std::list<BSONObj> initialCollections = _conn->getCollectionInfos(
             opts.fromDB, ListCollectionsFilter::makeTypeCollectionFilter());
 
-        // TODO SERVER-32847: pass in options here to indicate we should keep the UUIDs
-        // with the collection info.
         auto status = filterCollectionsForClone(opts, initialCollections);
         if (!status.isOK()) {
             return status.getStatus();
@@ -723,6 +749,11 @@ Status Cloner::copyDb(OperationContext* opCtx,
         params.collectionInfo = collection;
         if (auto idIndex = collection["idIndex"]) {
             params.idIndexSpec = idIndex.Obj();
+        }
+
+        const NamespaceString ns(opts.fromDB, params.collectionName);
+        if (opts.shardedColls.find(ns.ns()) != opts.shardedColls.end()) {
+            params.shardedColl = true;
         }
         createCollectionParams.push_back(params);
     }
@@ -751,10 +782,8 @@ Status Cloner::copyDb(OperationContext* opCtx,
         !opCtx->writesAreReplicated() ||
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx, toDBName));
 
-    if (opts.syncData || opts.metadataOnly) {
+    if (opts.syncData) {
         if (opts.createCollections) {
-            // TODO SERVER-32847: make sure createCollectionsForDb can copy UUIDs when
-            // metadataOnly=true.
             Status status = createCollectionsForDb(opCtx, createCollectionParams, toDBName, opts);
             if (!status.isOK()) {
                 return status;
@@ -762,9 +791,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
         }
 
         for (auto&& params : createCollectionParams) {
-
-            // If we are only here because metadataOnly = true, skip all non system.views colls.
-            if (!opts.syncData && params.collectionName != "system.views") {
+            if (params.shardedColl) {
                 continue;
             }
 
