@@ -293,11 +293,10 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldNotKillCursorsIfNeverIterated) {
     ASSERT_FALSE(network()->hasReadyRequests());
 }
 
-TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorsIfPartiallyIterated) {
+TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorIfPartiallyIterated) {
     auto expCtx = getExpCtx();
     std::vector<ClusterClientCursorParams::RemoteCursor> cursors;
     cursors.emplace_back(kTestShardIds[0], kTestShardHosts[0], CursorResponse(expCtx->ns, 1, {}));
-    cursors.emplace_back(kTestShardIds[1], kTestShardHosts[1], CursorResponse(expCtx->ns, 2, {}));
     auto pipeline = uassertStatusOK(Pipeline::create({}, expCtx));
     pipeline->addInitialSource(
         DocumentSourceMergeCursors::create(std::move(cursors), executor(), expCtx));
@@ -309,18 +308,13 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorsIfPartiallyIterated) {
         pipeline.reset();  // Stop iterating and delete the pipeline.
     });
 
-    // Note we do not use 'kExhaustedCursorID' here, so the cursors are still open.
+    // Note we do not use 'kExhaustedCursorID' here, so the cursor is still open.
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["getMore"]);
         return cursorResponseObj(expCtx->ns, 1, {BSON("x" << 1), BSON("x" << 1)});
     });
-    onCommand([&](const auto& request) {
-        ASSERT(request.cmdObj["getMore"]);
-        return cursorResponseObj(expCtx->ns, 2, {BSON("x" << 1), BSON("x" << 1)});
-    });
 
-    // Here we're looking for the killCursors requests to be scheduled.
-    std::set<CursorId> killedCursors;
+    // Here we're looking for the killCursors request to be scheduled.
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["killCursors"]);
         auto cursors = request.cmdObj["cursors"];
@@ -328,28 +322,12 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldKillCursorsIfPartiallyIterated) {
         auto cursorsArray = cursors.Array();
         ASSERT_FALSE(cursorsArray.empty());
         auto cursorId = cursorsArray[0].Long();
-        ASSERT(cursorId == 1 || cursorId == 2);
-        killedCursors.insert(cursorId);
+        ASSERT(cursorId == 1);
         // The ARM doesn't actually inspect the response of the killCursors, so we don't have to put
         // anything except {ok: 1}.
         return BSON("ok" << 1);
     });
-    onCommand([&](const auto& request) {
-        ASSERT(request.cmdObj["killCursors"]);
-        auto cursors = request.cmdObj["cursors"];
-        ASSERT_EQ(cursors.type(), BSONType::Array);
-        auto cursorsArray = cursors.Array();
-        ASSERT_FALSE(cursorsArray.empty());
-        auto cursorId = cursorsArray[0].Long();
-        ASSERT(cursorId == 1 || cursorId == 2);
-        killedCursors.insert(cursorId);
-        // The ARM doesn't actually inspect the response of the killCursors, so we don't have to put
-        // anything except {ok: 1}.
-        return BSON("ok" << 1);
-    });
-
     future.timed_get(kFutureTimeout);
-    ASSERT_EQ(killedCursors.size(), 2UL);
 }
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldOptimizeWithASortToEnsureCorrectOrder) {
