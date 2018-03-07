@@ -37,7 +37,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
-#include "mongo/platform/basic.h"
+#include "mongo/s/catalog/dist_lock_manager_mock.h"
 #include "mongo/s/config_server_test_fixture.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/unittest/unittest.h"
@@ -73,6 +73,15 @@ protected:
     void tearDown() override {
         _validator->shutDown();
         ConfigServerTestFixture::tearDown();
+    }
+
+    /**
+     * Intentionally create a DistLockManagerMock, even though this is a config serfver test in
+     * order to avoid the lock pinger thread from executing and accessing uninitialized state.
+     */
+    std::unique_ptr<DistLockManager> makeDistLockManager(
+        std::unique_ptr<DistLockCatalog> distLockCatalog) override {
+        return stdx::make_unique<DistLockManagerMock>(std::move(distLockCatalog));
     }
 
     /**

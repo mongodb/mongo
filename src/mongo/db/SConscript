@@ -1609,8 +1609,9 @@ env.CppUnitTest(
         'keys_collection_manager_sharding_test.cpp',
     ],
     LIBDEPS=[
-        'keys_collection_manager',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
+        'keys_collection_manager',
     ],
 )
 
