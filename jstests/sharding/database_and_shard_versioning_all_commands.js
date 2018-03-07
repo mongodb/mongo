@@ -189,11 +189,9 @@
         explain: {skip: "TODO SERVER-31226"},
         features: {skip: "executes locally on mongos (not sent to any remote node)"},
         filemd5: {
-            sendsDbVersion: false,
-            // It's a known bug that filemd5 uses ShardConnection without connection versioning
-            // (SERVER-33434).
-            sendsShardVersion: false,
-            command: {filemd5: collName}
+            sendsDbVersion: true,
+            sendsShardVersion: true,
+            command: {filemd5: ObjectId(), root: collName}
         },
         find: {
             sendsDbVersion: false,
@@ -208,9 +206,8 @@
         flushRouterConfig: {skip: "executes locally on mongos (not sent to any remote node)"},
         fsync: {skip: "broadcast to all shards"},
         geoNear: {
-            sendsDbVersion: false,
-            // It's known a bug that geoNear does not attach shardVersion (SERVER-13364).
-            sendsShardVersion: false,
+            sendsDbVersion: true,
+            sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist with a geo index, and does not implicitly create
                 // the collection or index.
@@ -358,12 +355,12 @@
         },
         profile: {skip: "not supported in mongos"},
         reIndex: {
+            sendsDbVersion: true,
+            sendsShardVersion: true,
             setUp: function(mongosConn) {
                 // Expects the collection to exist, and doesn't implicitly create it.
                 assert.commandWorked(mongosConn.getDB(dbName).runCommand({create: collName}));
             },
-            sendsDbVersion: true,
-            sendsShardVersion: true,
             command: {reIndex: collName},
             cleanUp: function(mongosConn) {
                 assert(mongosConn.getDB(dbName).getCollection(collName).drop());

@@ -6,9 +6,6 @@
  *   filters results.
  * - When no read concern is specified, the secondary defaults to 'available' read concern.
  *
- * Since some commands are unversioned even against primaries or cannot be run on sharded
- * collections, this file declaratively defines the expected behavior for each command.
- *
  * If versioned secondary reads do not apply to a command, it should specify "skip" with the reason.
  *
  * The following fields are required for each command that is not skipped:
@@ -21,8 +18,8 @@
  *                 *when the range has not been deleted from the donor.*
  * - checkAvailableReadConcernResults: Same as checkResults above, except asserts the expected
  *                                     results for the command run with read concern 'available'.
- * - behavior: Must be one of "unshardedOnly", "targetsPrimaryUsesConnectionVersioning",
- *             "unversioned", or "versioned". Determines what system profiler checks are performed.
+ * - behavior: Must be one of "unshardedOnly", "targetsPrimaryUsesConnectionVersioning" or
+ * "versioned". Determines what system profiler checks are performed.
  */
 (function() {
     "use strict";
@@ -40,7 +37,7 @@
         assert(test.checkResults && typeof(test.checkResults) === "function");
         assert(test.checkAvailableReadConcernResults &&
                typeof(test.checkAvailableReadConcernResults) === "function");
-        assert(test.behavior === "unshardedOnly" || test.behavior === "unversioned" ||
+        assert(test.behavior === "unshardedOnly" ||
                test.behavior === "targetsPrimaryUsesConnectionVersioning" ||
                test.behavior === "versioned");
     };
@@ -208,16 +205,20 @@
             },
             command: {geoNear: coll, near: [1, 1]},
             checkResults: function(res) {
+                // The command should work and return orphaned results, because it doesn't do
+                // filtering and also because the collection is sharded, it will get broadcast to
+                // both shards.
                 assert.commandWorked(res);
-                // Expect the command to return correct results, since it will read orphaned data.
-                assert.eq(1, res.results.length, tojson(res));
+                assert.eq(2, res.results.length, tojson(res));
             },
             checkAvailableReadConcernResults: function(res) {
+                // The command should work and return orphaned results, because it doesn't do
+                // filtering. The expected result is 1, because the stale mongos assumes the
+                // collection is still on only 1 shard and will not broadcast it to both.
                 assert.commandWorked(res);
-                // Command is unversioned, so 'available' has no additional effect.
                 assert.eq(1, res.results.length, tojson(res));
             },
-            behavior: "unversioned"
+            behavior: "versioned"
         },
         geoSearch: {skip: "not supported in mongos"},
         getCmdLineOpts: {skip: "does not return user data"},
@@ -472,33 +473,6 @@
             // Check that neither the donor nor recipient shard secondaries received either request.
             profilerHasZeroMatchingEntriesOrThrow(
                 {profileDB: donorShardSecondary.getDB(db), filter: commandProfile});
-            profilerHasZeroMatchingEntriesOrThrow(
-                {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
-        } else if (test.behavior === "unversioned") {
-            // Check that the donor shard secondary received both requests *without* an attached
-            // shardVersion and returned success for both.
-            profilerHasSingleMatchingEntryOrThrow({
-                profileDB: donorShardSecondary.getDB(db),
-                filter: Object.extend({
-                    "command.shardVersion": {"$exists": false},
-                    "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"level": 'available'},
-                    "errCode": {"$ne": ErrorCodes.StaleConfig},
-                },
-                                      commandProfile)
-            });
-            profilerHasSingleMatchingEntryOrThrow({
-                profileDB: donorShardSecondary.getDB(db),
-                filter: Object.extend({
-                    "command.shardVersion": {"$exists": false},
-                    "command.$readPreference": {"mode": "secondary"},
-                    "command.readConcern": {"level": "local"},
-                    "errCode": {"$ne": ErrorCodes.StaleConfig},
-                },
-                                      commandProfile)
-            });
-
-            // Check that the recipient shard secondary did not receive either request.
             profilerHasZeroMatchingEntriesOrThrow(
                 {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
         } else if (test.behavior === "targetsPrimaryUsesConnectionVersioning") {

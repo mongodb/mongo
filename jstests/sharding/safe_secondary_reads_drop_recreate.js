@@ -3,9 +3,6 @@
  * - When non-'available' read concern is specified (local in this case), the secondary participates
  *   in the shard versioning protocol and filters returned documents using its routing table cache.
  *
- * Since some commands are unversioned even against primaries or cannot be run on sharded
- * collections, this file declaratively defines the expected behavior for each command.
- *
  * If versioned secondary reads do not apply to a command, it should specify "skip" with the reason.
  *
  * The following fields are required for each command that is not skipped:
@@ -16,8 +13,8 @@
  * - checkResults: A function that asserts whether the command should succeed or fail. If the
  *                 command is expected to succeed, the function should assert the expected results
  *                 *when the the collection has been dropped and recreated as empty.*
- * - behavior: Must be one of "unshardedOnly", "targetsPrimaryUsesConnectionVersioning",
- *             "unversioned", or "versioned". Determines what system profiler checks are performed.
+ * - behavior: Must be one of "unshardedOnly", "targetsPrimaryUsesConnectionVersioning" or
+ * "versioned". Determines what system profiler checks are performed.
  */
 (function() {
     "use strict";
@@ -33,7 +30,7 @@
         assert(test.setUp && typeof(test.setUp) === "function");
         assert(test.command && typeof(test.command) === "object");
         assert(test.checkResults && typeof(test.checkResults) === "function");
-        assert(test.behavior === "unshardedOnly" || test.behavior === "unversioned" ||
+        assert(test.behavior === "unshardedOnly" ||
                test.behavior === "targetsPrimaryUsesConnectionVersioning" ||
                test.behavior === "versioned");
     };
@@ -181,7 +178,7 @@
                 // The command should fail on the new collection, because the geo index was dropped.
                 assert.commandFailed(res);
             },
-            behavior: "unversioned"
+            behavior: "versioned"
         },
         geoSearch: {skip: "not supported in mongos"},
         getCmdLineOpts: {skip: "does not return user data"},
@@ -359,19 +356,6 @@
             if (test.behavior === "unshardedOnly") {
                 profilerHasZeroMatchingEntriesOrThrow(
                     {profileDB: primaryShardSecondary.getDB(db), filter: commandProfile});
-            } else if (test.behavior === "unversioned") {
-                // Check that the primary shard secondary received the request *without* an
-                // attached shardVersion and returned success.
-                profilerHasSingleMatchingEntryOrThrow({
-                    profileDB: primaryShardSecondary.getDB(db),
-                    filter: Object.extend({
-                        "command.shardVersion": {"$exists": false},
-                        "command.$readPreference": {"mode": "secondary"},
-                        "command.readConcern": {"level": "local"},
-                        "errCode": {"$ne": ErrorCodes.StaleConfig},
-                    },
-                                          commandProfile)
-                });
             } else if (test.behavior === "targetsPrimaryUsesConnectionVersioning") {
                 // Check that the primary shard primary received the request without a shardVersion
                 // field and returned success.
@@ -437,19 +421,6 @@
             if (test.behavior === "unshardedOnly") {
                 profilerHasZeroMatchingEntriesOrThrow(
                     {profileDB: primaryShardSecondary.getDB(db), filter: commandProfile});
-            } else if (test.behavior === "unversioned") {
-                // Check that the primary shard secondary received the request *without* an
-                // attached shardVersion and returned success.
-                profilerHasSingleMatchingEntryOrThrow({
-                    profileDB: primaryShardSecondary.getDB(db),
-                    filter: Object.extend({
-                        "command.shardVersion": {"$exists": false},
-                        "command.$readPreference": {"mode": "secondary"},
-                        "command.readConcern": {"level": "local"},
-                        "errCode": {"$ne": ErrorCodes.StaleConfig},
-                    },
-                                          commandProfile)
-                });
             } else if (test.behavior === "targetsPrimaryUsesConnectionVersioning") {
                 // Check that the primary shard primary received the request without a shardVersion
                 // field and returned success.
@@ -528,19 +499,6 @@
                     {profileDB: donorShardSecondary.getDB(db), filter: commandProfile});
                 profilerHasZeroMatchingEntriesOrThrow(
                     {profileDB: recipientShardSecondary.getDB(db), filter: commandProfile});
-            } else if (test.behavior === "unversioned") {
-                // Check that the donor shard secondary received the request *without* an attached
-                // shardVersion and returned success.
-                profilerHasSingleMatchingEntryOrThrow({
-                    profileDB: donorShardSecondary.getDB(db),
-                    filter: Object.extend({
-                        "command.shardVersion": {"$exists": false},
-                        "command.$readPreference": {"mode": "secondary"},
-                        "command.readConcern": {"level": "local"},
-                        "errCode": {"$ne": ErrorCodes.StaleConfig},
-                    },
-                                          commandProfile)
-                });
             } else if (test.behavior === "targetsPrimaryUsesConnectionVersioning") {
                 // Check that the recipient shard primary received the request without a
                 // shardVersion field and returned success.
