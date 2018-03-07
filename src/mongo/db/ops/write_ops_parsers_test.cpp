@@ -131,6 +131,35 @@ TEST(CommandWriteOpsParsers, ErrorOnDuplicateCommonFieldBetweenBodyAndSequence) 
     ASSERT_THROWS(InsertOp::parse(request), AssertionException);
 }
 
+TEST(CommandWriteOpsParsers, ErrorOnWrongSizeStmtIdsArray) {
+    auto cmd = BSON("insert"
+                    << "bar"
+                    << "documents"
+                    << BSON_ARRAY(BSONObj() << BSONObj())
+                    << "stmtIds"
+                    << BSON_ARRAY(12));
+    for (bool seq : {false, true}) {
+        auto request = toOpMsg("foo", cmd, seq);
+        ASSERT_THROWS_CODE(InsertOp::parse(request), AssertionException, ErrorCodes::InvalidLength);
+    }
+}
+
+TEST(CommandWriteOpsParsers, ErrorOnStmtIdSpecifiedTwoWays) {
+    auto cmd = BSON("insert"
+                    << "bar"
+                    << "documents"
+                    << BSON_ARRAY(BSONObj())
+                    << "stmtIds"
+                    << BSON_ARRAY(12)
+                    << "stmtId"
+                    << 13);
+    for (bool seq : {false, true}) {
+        auto request = toOpMsg("foo", cmd, seq);
+        ASSERT_THROWS_CODE(
+            InsertOp::parse(request), AssertionException, ErrorCodes::InvalidOptions);
+    }
+}
+
 TEST(CommandWriteOpsParsers, GarbageFieldsInUpdateDoc) {
     auto cmd = BSON("update"
                     << "bar"
@@ -237,6 +266,48 @@ TEST(CommandWriteOpsParsers, RealMultiInsert) {
         ASSERT_EQ(op.getDocuments().size(), 2u);
         ASSERT_BSONOBJ_EQ(op.getDocuments()[0], obj0);
         ASSERT_BSONOBJ_EQ(op.getDocuments()[1], obj1);
+        ASSERT_EQ(0, write_ops::getStmtIdForWriteAt(op, 0));
+        ASSERT_EQ(1, write_ops::getStmtIdForWriteAt(op, 1));
+    }
+}
+
+TEST(CommandWriteOpsParsers, MultiInsertWithStmtId) {
+    const auto ns = NamespaceString("test", "foo");
+    const BSONObj obj0 = BSON("x" << 0);
+    const BSONObj obj1 = BSON("x" << 1);
+    auto cmd =
+        BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj0 << obj1) << "stmtId" << 10);
+    for (bool seq : {false, true}) {
+        auto request = toOpMsg(ns.db(), cmd, seq);
+        const auto op = InsertOp::parse(request);
+        ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+        ASSERT(!op.getWriteCommandBase().getBypassDocumentValidation());
+        ASSERT(op.getWriteCommandBase().getOrdered());
+        ASSERT_EQ(op.getDocuments().size(), 2u);
+        ASSERT_BSONOBJ_EQ(op.getDocuments()[0], obj0);
+        ASSERT_BSONOBJ_EQ(op.getDocuments()[1], obj1);
+        ASSERT_EQ(10, write_ops::getStmtIdForWriteAt(op, 0));
+        ASSERT_EQ(11, write_ops::getStmtIdForWriteAt(op, 1));
+    }
+}
+
+TEST(CommandWriteOpsParsers, MultiInsertWithStmtIdsArray) {
+    const auto ns = NamespaceString("test", "foo");
+    const BSONObj obj0 = BSON("x" << 0);
+    const BSONObj obj1 = BSON("x" << 1);
+    auto cmd = BSON("insert" << ns.coll() << "documents" << BSON_ARRAY(obj0 << obj1) << "stmtIds"
+                             << BSON_ARRAY(15 << 17));
+    for (bool seq : {false, true}) {
+        auto request = toOpMsg(ns.db(), cmd, seq);
+        const auto op = InsertOp::parse(request);
+        ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+        ASSERT(!op.getWriteCommandBase().getBypassDocumentValidation());
+        ASSERT(op.getWriteCommandBase().getOrdered());
+        ASSERT_EQ(op.getDocuments().size(), 2u);
+        ASSERT_BSONOBJ_EQ(op.getDocuments()[0], obj0);
+        ASSERT_BSONOBJ_EQ(op.getDocuments()[1], obj1);
+        ASSERT_EQ(15, write_ops::getStmtIdForWriteAt(op, 0));
+        ASSERT_EQ(17, write_ops::getStmtIdForWriteAt(op, 1));
     }
 }
 

@@ -60,6 +60,9 @@ void checkOpCountForCommand(const T& op, size_t numOps) {
     uassert(ErrorCodes::InvalidLength,
             "Number of statement ids must match the number of batch entries",
             !stmtIds || stmtIds->size() == numOps);
+    uassert(ErrorCodes::InvalidOptions,
+            "May not specify both stmtId and stmtIds in write command",
+            !stmtIds || !op.getWriteCommandBase().getStmtId());
 }
 
 void validateInsertOp(const write_ops::Insert& insertOp) {
@@ -112,7 +115,8 @@ int32_t getStmtIdForWriteAt(const WriteCommandBase& writeCommandBase, size_t wri
         return stmtIds->at(writePos);
     }
 
-    const int32_t kFirstStmtId = 0;
+    const auto& stmtId = writeCommandBase.getStmtId();
+    const int32_t kFirstStmtId = stmtId ? *stmtId : 0;
     return kFirstStmtId + writePos;
 }
 

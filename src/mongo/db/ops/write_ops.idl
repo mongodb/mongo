@@ -49,12 +49,22 @@ structs:
                               continue with the remaining statements, if any."
                 type: bool
                 default: true
+            stmtId:
+                description: "A statement number relative to the transaction. If this field
+                              is set, the statement ids of the contained operation will be
+                              implicitly generated based on their offset, starting from the value
+                              given. This field is mutually exclusive with 'stmtIds'."
+                type: int
+                optional: true
+
             stmtIds:
                 description: "An array of statement numbers relative to the transaction. If this
                               field is set, its size must be exactly the same as the number of
                               entries in the corresponding insert/update/delete request. If it is
                               not set, the statement ids of the contained operation will be
-                              implicitly generated based on their offset, starting from 0."
+                              implicitly generated based on their offset, starting from 'stmtId' or
+                              0 if 'stmtId' is not specified. This field is mutually exclusive
+                              with 'stmtId'."
                 type: array<int>
                 optional: true
 
