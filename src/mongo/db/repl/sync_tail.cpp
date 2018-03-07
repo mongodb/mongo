@@ -1423,7 +1423,6 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
                 "attempting to replicate ops while primary"};
     }
 
-    std::vector<Status> statusVector(workerPool->getStats().numThreads, Status::OK());
     std::vector<WorkerMultikeyPathInfo> multikeyVector(workerPool->getStats().numThreads);
     {
         // Each node records cumulative batch application stats for itself using this timer.
@@ -1451,8 +1450,25 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
         consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
 
-        applyOps(writerVectors, workerPool, applyOperation, &statusVector, &multikeyVector);
-        workerPool->waitForIdle();
+        {
+            std::vector<Status> statusVector(workerPool->getStats().numThreads, Status::OK());
+            applyOps(writerVectors, workerPool, applyOperation, &statusVector, &multikeyVector);
+            workerPool->waitForIdle();
+
+            // If any of the statuses is not ok, return error.
+            for (auto it = statusVector.cbegin(); it != statusVector.cend(); ++it) {
+                const auto& status = *it;
+                if (!status.isOK()) {
+                    severe()
+                        << "Failed to apply batch of operations. Number of operations in batch: "
+                        << ops.size() << ". First operation: " << redact(ops.front().toBSON())
+                        << ". Last operation: " << redact(ops.back().toBSON())
+                        << ". Oplog application failed in writer thread "
+                        << std::distance(statusVector.cbegin(), it) << ": " << redact(status);
+                    return status;
+                }
+            }
+        }
 
         // Update the transaction table to point to the latest oplog entries for each session id.
         const auto latestSessionRecords = getLatestSessionRecords(ops);
@@ -1480,13 +1496,6 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
                 50686,
                 StorageInterface::get(opCtx)->setIndexIsMultikey(
                     opCtx, info.nss, info.indexName, info.multikeyPaths, firstTimeInBatch));
-        }
-    }
-
-    // If any of the statuses is not ok, return error.
-    for (auto& status : statusVector) {
-        if (!status.isOK()) {
-            return status;
         }
     }
 
