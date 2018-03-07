@@ -39,7 +39,7 @@ class DBTestCase(interface.ProcessTestCase):
         self.dbtest_options = utils.default_if_none(dbtest_options, {}).copy()
 
     def configure(self, fixture, *args, **kwargs):
-        interface.TestCase.configure(self, fixture, *args, **kwargs)
+        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         # If a dbpath was specified, then use it as a container for all other dbpaths.
         dbpath_prefix = self.dbtest_options.pop("dbpath", DBTestCase._get_dbpath_prefix())

@@ -42,7 +42,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
         self.shell_options = utils.default_if_none(shell_options, {}).copy()
 
     def configure(self, fixture, *args, **kwargs):
-        interface.TestCase.configure(self, fixture, *args, **kwargs)
+        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
     def configure_shell(self):
         """
@@ -166,7 +166,7 @@ class JSTestCase(interface.ProcessTestCase):
                                                     shell_options)
 
     def configure(self, fixture, num_clients=DEFAULT_CLIENT_NUM, *args, **kwargs):
-        interface.TestCase.configure(self, fixture, *args, **kwargs)
+        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
         self.num_clients = num_clients
         self.test_case_template.configure(fixture, *args, **kwargs)
         self.test_case_template.configure_shell()

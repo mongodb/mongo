@@ -35,7 +35,7 @@ class MongosTestCase(interface.ProcessTestCase):
         Ensures the --test option is present in the mongos options.
         """
 
-        interface.TestCase.configure(self, fixture, *args, **kwargs)
+        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
         # Always specify test option to ensure the mongos will terminate.
         if "test" not in self.options:
             self.options["test"] = ""

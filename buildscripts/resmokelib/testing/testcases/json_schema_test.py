@@ -34,7 +34,7 @@ class JSONSchemaTestCase(interface.ProcessTestCase):
         self.shell_options = utils.default_if_none(shell_options, {}).copy()
 
     def configure(self, fixture, *args, **kwargs):
-        interface.TestCase.configure(self, fixture, *args, **kwargs)
+        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         global_vars = self.shell_options.get("global_vars", {}).copy()
 

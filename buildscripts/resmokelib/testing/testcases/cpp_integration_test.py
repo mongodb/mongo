@@ -30,7 +30,7 @@ class CPPIntegrationTestCase(interface.ProcessTestCase):
         self.program_options = utils.default_if_none(program_options, {}).copy()
 
     def configure(self, fixture, *args, **kwargs):
-        interface.TestCase.configure(self, fixture, *args, **kwargs)
+        interface.ProcessTestCase.configure(self, fixture, *args, **kwargs)
 
         self.program_options["connectionString"] = self.fixture.get_internal_connection_string()
 
