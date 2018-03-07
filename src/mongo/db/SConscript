@@ -1560,6 +1560,7 @@ env.CppUnitTest(
         'logical_time_validator_test.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/config_server_test_fixture',
         'keys_collection_manager',
         'logical_time_validator',
