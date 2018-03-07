@@ -45,12 +45,24 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {
+namespace {
+// Control whether or not the server will write out data files containing deleted documents during
+// rollback. This server parameter affects both rollback via refetch and rollback via recovery to
+// stable timestamp.
+constexpr bool createRollbackFilesDefault = true;
+MONGO_EXPORT_SERVER_PARAMETER(createRollbackDataFiles, bool, createRollbackFilesDefault);
+}  // namespace
+
+bool RollbackImpl::shouldCreateDataFiles() {
+    return createRollbackDataFiles.load();
+}
 
 RollbackImpl::RollbackImpl(OplogInterface* localOplog,
                            OplogInterface* remoteOplog,

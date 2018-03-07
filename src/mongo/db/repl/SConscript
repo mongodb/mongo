@@ -499,6 +499,7 @@ env.Library(
         'oplog',
         'replication_process',
         'roll_back_local_operations',
+        'rollback_impl',
         'rslog',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/database_holder',

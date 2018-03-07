@@ -743,45 +743,47 @@ void dropCollection(OperationContext* opCtx,
                     NamespaceString nss,
                     Collection* collection,
                     Database* db) {
-    Helpers::RemoveSaver removeSaver("rollback", "", nss.ns());
+    if (RollbackImpl::shouldCreateDataFiles()) {
+        Helpers::RemoveSaver removeSaver("rollback", "", nss.ns());
 
-    // Performs a collection scan and writes all documents in the collection to disk
-    // in order to keep an archive of items that were rolled back.
-    auto exec = InternalPlanner::collectionScan(
-        opCtx, nss.toString(), collection, PlanExecutor::YIELD_AUTO);
-    BSONObj curObj;
-    PlanExecutor::ExecState execState;
-    while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {
-        auto status = removeSaver.goingToDelete(curObj);
-        if (!status.isOK()) {
-            severe() << "Rolling back createCollection on " << nss
-                     << " failed to write document to remove saver file: " << redact(status);
-            throw RSFatalException(
-                "Rolling back createCollection. Failed to write document to remove saver "
-                "file.");
+        // Performs a collection scan and writes all documents in the collection to disk
+        // in order to keep an archive of items that were rolled back.
+        auto exec = InternalPlanner::collectionScan(
+            opCtx, nss.toString(), collection, PlanExecutor::YIELD_AUTO);
+        BSONObj curObj;
+        PlanExecutor::ExecState execState;
+        while (PlanExecutor::ADVANCED == (execState = exec->getNext(&curObj, NULL))) {
+            auto status = removeSaver.goingToDelete(curObj);
+            if (!status.isOK()) {
+                severe() << "Rolling back createCollection on " << nss
+                         << " failed to write document to remove saver file: " << redact(status);
+                throw RSFatalException(
+                    "Rolling back createCollection. Failed to write document to remove saver "
+                    "file.");
+            }
         }
-    }
 
-    // If we exited the above for loop with any other execState than IS_EOF, this means that
-    // a FAILURE or DEAD state was returned. If a DEAD state occurred, the collection or
-    // database that we are attempting to save may no longer be valid. If a FAILURE state
-    // was returned, either an unrecoverable error was thrown by exec, or we attempted to
-    // retrieve data that could not be provided by the PlanExecutor. In both of these cases
-    // it is necessary for a full resync of the server.
+        // If we exited the above for loop with any other execState than IS_EOF, this means that
+        // a FAILURE or DEAD state was returned. If a DEAD state occurred, the collection or
+        // database that we are attempting to save may no longer be valid. If a FAILURE state
+        // was returned, either an unrecoverable error was thrown by exec, or we attempted to
+        // retrieve data that could not be provided by the PlanExecutor. In both of these cases
+        // it is necessary for a full resync of the server.
 
-    if (execState != PlanExecutor::IS_EOF) {
-        if (execState == PlanExecutor::FAILURE &&
-            WorkingSetCommon::isValidStatusMemberObject(curObj)) {
-            Status errorStatus = WorkingSetCommon::getMemberObjectStatus(curObj);
-            severe() << "Rolling back createCollection on " << nss << " failed with "
-                     << redact(errorStatus) << ". A full resync is necessary.";
-            throw RSFatalException(
-                "Rolling back createCollection failed. A full resync is necessary.");
-        } else {
-            severe() << "Rolling back createCollection on " << nss
-                     << " failed. A full resync is necessary.";
-            throw RSFatalException(
-                "Rolling back createCollection failed. A full resync is necessary.");
+        if (execState != PlanExecutor::IS_EOF) {
+            if (execState == PlanExecutor::FAILURE &&
+                WorkingSetCommon::isValidStatusMemberObject(curObj)) {
+                Status errorStatus = WorkingSetCommon::getMemberObjectStatus(curObj);
+                severe() << "Rolling back createCollection on " << nss << " failed with "
+                         << redact(errorStatus) << ". A full resync is necessary.";
+                throw RSFatalException(
+                    "Rolling back createCollection failed. A full resync is necessary.");
+            } else {
+                severe() << "Rolling back createCollection on " << nss
+                         << " failed. A full resync is necessary.";
+                throw RSFatalException(
+                    "Rolling back createCollection failed. A full resync is necessary.");
+            }
         }
     }
 
@@ -1254,7 +1256,9 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
         NamespaceString nss = catalog.lookupNSSByUUID(uuid);
 
-        removeSaver.reset(new Helpers::RemoveSaver("rollback", "", nss.ns()));
+        if (RollbackImpl::shouldCreateDataFiles()) {
+            removeSaver = std::make_unique<Helpers::RemoveSaver>("rollback", "", nss.ns());
+        }
 
         const auto& goodVersionsByDocID = nsAndGoodVersionsByDocID.second;
         for (const auto& idAndDoc : goodVersionsByDocID) {

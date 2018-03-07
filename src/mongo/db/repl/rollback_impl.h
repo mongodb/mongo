@@ -173,6 +173,12 @@ public:
         return _namespacesForOp(oplogEntry);
     }
 
+    /**
+     * Returns true if the rollback system should write out data files containing documents that
+     * will be deleted by rollback.
+     */
+    static bool shouldCreateDataFiles();
+
 private:
     /**
      * Returns if shutdown was called on this rollback process.
