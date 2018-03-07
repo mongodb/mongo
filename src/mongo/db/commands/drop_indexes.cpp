@@ -121,17 +121,15 @@ public:
                    BSONObjBuilder& result) {
         DBDirectClient db(opCtx);
 
-        const NamespaceString toReIndexNs =
+        const NamespaceString toReIndexNss =
             CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
 
-        LOG(0) << "CMD: reIndex " << toReIndexNs;
+        LOG(0) << "CMD: reIndex " << toReIndexNss;
 
-        Lock::DBLock dbXLock(opCtx, dbname, MODE_X);
-        OldClientContext ctx(opCtx, toReIndexNs.ns());
-
-        Collection* collection = ctx.db()->getCollection(opCtx, toReIndexNs);
+        AutoGetOrCreateDb autoDb(opCtx, dbname, MODE_X);
+        Collection* collection = autoDb.getDb()->getCollection(opCtx, toReIndexNss);
         if (!collection) {
-            if (ctx.db()->getViewCatalog()->lookup(opCtx, toReIndexNs.ns()))
+            if (autoDb.getDb()->getViewCatalog()->lookup(opCtx, toReIndexNss.ns()))
                 return CommandHelpers::appendCommandStatus(
                     result, {ErrorCodes::CommandNotSupportedOnView, "can't re-index a view"});
             else
@@ -139,7 +137,10 @@ public:
                     result, {ErrorCodes::NamespaceNotFound, "collection does not exist"});
         }
 
-        BackgroundOperation::assertNoBgOpInProgForNs(toReIndexNs.ns());
+        BackgroundOperation::assertNoBgOpInProgForNs(toReIndexNss.ns());
+
+        // This is necessary to set up CurOp and update the Top stats.
+        OldClientContext ctx(opCtx, toReIndexNss.ns());
 
         const auto featureCompatibilityVersion =
             serverGlobalParams.featureCompatibility.getVersion();
