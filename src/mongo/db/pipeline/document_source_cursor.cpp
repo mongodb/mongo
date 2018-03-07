@@ -134,17 +134,11 @@ void DocumentSourceCursor::loadBatch() {
         case PlanExecutor::ADVANCED:
         case PlanExecutor::IS_EOF:
             return;  // We've reached our limit or exhausted the cursor.
-        case PlanExecutor::DEAD: {
-            cleanupExecutor();
-            uasserted(ErrorCodes::QueryPlanKilled,
-                      str::stream() << "collection or index disappeared when cursor yielded: "
-                                    << WorkingSetCommon::toStatusString(resultObj));
-        }
+        case PlanExecutor::DEAD:
         case PlanExecutor::FAILURE: {
             cleanupExecutor();
-            uasserted(17285,
-                      str::stream() << "cursor encountered an error: "
-                                    << WorkingSetCommon::toStatusString(resultObj));
+            uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(resultObj).withContext(
+                "Error in $cursor stage"));
         }
         default:
             MONGO_UNREACHABLE;

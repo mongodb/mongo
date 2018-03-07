@@ -282,7 +282,7 @@
     assert.eq(maxNumDocs, sourceCollection.count());
     assert.commandFailedWithCode(
         testDB.runCommand({getMore: res.cursor.id, collection: getMoreCollName}),
-        ErrorCodes.QueryPlanKilled,
+        ErrorCodes.CappedPositionLost,
         'expected getMore to fail because the capped collection was truncated');
 
     // Test that killing an aggregation's cursor via the killCursors command will cause a subsequent

@@ -185,14 +185,9 @@ private:
         if (PlanExecutor::ADVANCED != state) {
             invariant(PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state);
 
-            if (WorkingSetCommon::isValidStatusMemberObject(retval)) {
-                return appendCommandStatus(result, WorkingSetCommon::getMemberObjectStatus(retval));
-            }
             return appendCommandStatus(result,
-                                       Status(ErrorCodes::BadValue,
-                                              str::stream() << "error encountered during group "
-                                                            << "operation, executor returned "
-                                                            << PlanExecutor::statestr(state)));
+                                       WorkingSetCommon::getMemberObjectStatus(retval).withContext(
+                                           "Plan executor error during group command"));
         }
 
         invariant(planExecutor->isEOF());

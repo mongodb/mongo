@@ -303,10 +303,8 @@ public:
                   << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
             return appendCommandStatus(result,
-                                       Status(ErrorCodes::OperationFailed,
-                                              str::stream()
-                                                  << "Executor error during geoNear command: "
-                                                  << WorkingSetCommon::toStatusString(currObj)));
+                                       WorkingSetCommon::getMemberObjectStatus(currObj).withContext(
+                                           "Executor error during geoNear command"));
         }
 
         PlanSummaryStats summary;

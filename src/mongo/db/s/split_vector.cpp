@@ -215,9 +215,8 @@ StatusWith<std::vector<BSONObj>> splitVector(OperationContext* opCtx,
             }
 
             if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
-                return {ErrorCodes::OperationFailed,
-                        "Executor error during splitVector command: " +
-                            WorkingSetCommon::toStatusString(currKey)};
+                return WorkingSetCommon::getMemberObjectStatus(currKey).withContext(
+                    "Executor error during splitVector command");
             }
 
             if (!force)

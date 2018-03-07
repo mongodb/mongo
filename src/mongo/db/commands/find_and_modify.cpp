@@ -120,16 +120,9 @@ StatusWith<boost::optional<BSONObj>> advanceExecutor(OperationContext* opCtx,
         error() << "Plan executor error during findAndModify: " << PlanExecutor::statestr(state)
                 << ", stats: " << redact(Explain::getWinningPlanStats(exec));
 
-        if (WorkingSetCommon::isValidStatusMemberObject(value)) {
-            const Status errorStatus = WorkingSetCommon::getMemberObjectStatus(value);
-            invariant(!errorStatus.isOK());
-            return {errorStatus.code(), errorStatus.reason()};
-        }
-        const std::string opstr = isRemove ? "delete" : "update";
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "executor returned " << PlanExecutor::statestr(state)
-                              << " while executing "
-                              << opstr};
+        uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(value).withContext(
+            "Plan executor error during findAndModify"));
+        MONGO_UNREACHABLE;
     }
 
     invariant(state == PlanExecutor::IS_EOF);

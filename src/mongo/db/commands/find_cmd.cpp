@@ -357,10 +357,8 @@ public:
                     << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
 
             return appendCommandStatus(result,
-                                       Status(ErrorCodes::OperationFailed,
-                                              str::stream()
-                                                  << "Executor error during find command: "
-                                                  << WorkingSetCommon::toStatusString(obj)));
+                                       WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                                           "Executor error during find command"));
         }
 
         // Before saving the cursor, ensure that whatever plan we established happened with the

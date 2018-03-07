@@ -200,11 +200,9 @@ public:
         }
 
         if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::OperationFailed,
-                       str::stream() << "Executor error while checking sharding index: "
-                                     << WorkingSetCommon::toStatusString(currKey)));
+            return appendCommandStatus(result,
+                                       WorkingSetCommon::getMemberObjectStatus(currKey).withContext(
+                                           "Executor error while checking sharding index"));
         }
 
         return true;

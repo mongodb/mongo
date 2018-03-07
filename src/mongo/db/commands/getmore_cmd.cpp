@@ -448,28 +448,27 @@ public:
             return Status::OK();
         }
 
-        if (PlanExecutor::FAILURE == *state) {
-            nextBatch->abandon();
-
-            error() << "GetMore command executor error: " << PlanExecutor::statestr(*state)
-                    << ", stats: " << redact(Explain::getWinningPlanStats(exec));
-
-            return Status(ErrorCodes::OperationFailed,
-                          str::stream() << "GetMore command executor error: "
-                                        << WorkingSetCommon::toStatusString(obj));
-        } else if (PlanExecutor::DEAD == *state) {
-            nextBatch->abandon();
-
-            return Status(ErrorCodes::QueryPlanKilled,
-                          str::stream() << "PlanExecutor killed: "
-                                        << WorkingSetCommon::toStatusString(obj));
-        } else if (PlanExecutor::IS_EOF == *state) {
-            // This causes the reported latest oplog timestamp to advance even when there are
-            // no results for this particular query.
-            nextBatch->setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
+        switch (*state) {
+            case PlanExecutor::FAILURE:
+                // Log an error message and then perform the same cleanup as DEAD.
+                error() << "GetMore command executor error: " << PlanExecutor::statestr(*state)
+                        << ", stats: " << redact(Explain::getWinningPlanStats(exec));
+            case PlanExecutor::DEAD: {
+                nextBatch->abandon();
+                // We should always have a valid status member object at this point.
+                auto status = WorkingSetCommon::getMemberObjectStatus(obj);
+                invariant(!status.isOK());
+                return status;
+            }
+            case PlanExecutor::IS_EOF:
+                // This causes the reported latest oplog timestamp to advance even when there are
+                // no results for this particular query.
+                nextBatch->setLatestOplogTimestamp(exec->getLatestOplogTimestamp());
+            default:
+                return Status::OK();
         }
 
-        return Status::OK();
+        MONGO_UNREACHABLE;
     }
 
 } getMoreCmd;

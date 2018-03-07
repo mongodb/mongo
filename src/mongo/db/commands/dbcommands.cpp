@@ -708,10 +708,8 @@ public:
 
             if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
                 return appendCommandStatus(result,
-                                           Status(ErrorCodes::OperationFailed,
-                                                  str::stream()
-                                                      << "Executor error during filemd5 command: "
-                                                      << WorkingSetCommon::toStatusString(obj)));
+                                           WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                                               "Executor error during filemd5 command"));
             }
 
             if (partialOk)
@@ -876,11 +874,9 @@ public:
 
         if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
             warning() << "Internal error while reading " << ns;
-            return appendCommandStatus(
-                result,
-                Status(ErrorCodes::OperationFailed,
-                       str::stream() << "Executor error while reading during dataSize command: "
-                                     << WorkingSetCommon::toStatusString(obj)));
+            return appendCommandStatus(result,
+                                       WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                                           "Executor error while reading during dataSize command"));
         }
 
         ostringstream os;

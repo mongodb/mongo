@@ -250,10 +250,8 @@ public:
                   << ", stats: " << redact(Explain::getWinningPlanStats(executor.getValue().get()));
 
             return appendCommandStatus(result,
-                                       Status(ErrorCodes::OperationFailed,
-                                              str::stream()
-                                                  << "Executor error during distinct command: "
-                                                  << WorkingSetCommon::toStatusString(obj)));
+                                       WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+                                           "Executor error during distinct command"));
         }
 
 

@@ -201,15 +201,22 @@ void generateBatch(int ntoreturn,
         }
     }
 
-    // Propagate any errors to the caller.
-    if (PlanExecutor::FAILURE == *state) {
-        error() << "getMore executor error, stats: " << redact(Explain::getWinningPlanStats(exec));
-        uasserted(17406, "getMore executor error: " + WorkingSetCommon::toStatusString(obj));
-    } else if (PlanExecutor::DEAD == *state) {
-        uasserted(ErrorCodes::QueryPlanKilled,
-                  str::stream() << "PlanExecutor killed: "
-                                << WorkingSetCommon::toStatusString(obj));
+    switch (*state) {
+        // Log an error message and then perform the same cleanup as DEAD.
+        case PlanExecutor::FAILURE:
+            error() << "getMore executor error, stats: "
+                    << redact(Explain::getWinningPlanStats(exec));
+        case PlanExecutor::DEAD: {
+            // We should always have a valid status object by this point.
+            auto status = WorkingSetCommon::getMemberObjectStatus(obj);
+            invariant(!status.isOK());
+            uassertStatusOK(status);
+        }
+        default:
+            return;
     }
+
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace
@@ -669,7 +676,9 @@ std::string runQuery(OperationContext* opCtx,
     if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
         error() << "Plan executor error during find: " << PlanExecutor::statestr(state)
                 << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
-        uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
+        uassertStatusOK(WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+            "Executor error during OP_QUERY find"));
+        MONGO_UNREACHABLE;
     }
 
     // Before saving the cursor, ensure that whatever plan we established happened with the expected
