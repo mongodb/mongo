@@ -160,7 +160,7 @@ private:
         std::shared_ptr<Notification<Status>> refreshCompletionNotification;
 
         // Contains the cached routing information (only available if needsRefresh is false)
-        std::shared_ptr<ChunkManager> routingInfo;
+        std::shared_ptr<RoutingTableHistory> routingInfo;
     };
 
     /**
@@ -191,9 +191,14 @@ private:
      */
     void _scheduleCollectionRefresh(WithLock,
                                     std::shared_ptr<DatabaseInfoEntry> dbEntry,
-                                    std::shared_ptr<ChunkManager> existingRoutingInfo,
+                                    std::shared_ptr<RoutingTableHistory> existingRoutingInfo,
                                     NamespaceString const& nss,
                                     int refreshAttempt);
+
+    StatusWith<CachedCollectionRoutingInfo> _getCollectionRoutingInfoAt(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        boost::optional<Timestamp> atClusterTime);
 
     // Interface from which chunks will be retrieved
     CatalogCacheLoader& _cacheLoader;

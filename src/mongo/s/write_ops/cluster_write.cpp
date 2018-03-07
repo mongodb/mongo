@@ -259,12 +259,12 @@ void updateChunkWriteStatsAndSplitIfNeeded(OperationContext* opCtx,
 
     const NamespaceString& nss = manager->getns();
 
-    if (!manager->_autoSplitThrottle._splitTickets.tryAcquire()) {
+    if (!manager->autoSplitThrottle()._splitTickets.tryAcquire()) {
         LOG(1) << "won't auto split because not enough tickets: " << nss;
         return;
     }
 
-    TicketHolderReleaser releaser(&(manager->_autoSplitThrottle._splitTickets));
+    TicketHolderReleaser releaser(&(manager->autoSplitThrottle()._splitTickets));
 
     const ChunkRange chunkRange(chunk->getMin(), chunk->getMax());
 

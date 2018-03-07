@@ -71,7 +71,7 @@ protected:
     static std::unique_ptr<CollectionMetadata> makeEmptyMetadata() {
         const OID epoch = OID::gen();
 
-        auto cm = ChunkManager::makeNew(
+        auto rt = RoutingTableHistory::makeNew(
             kNss,
             UUID::gen(),
             kShardKeyPattern,
@@ -82,6 +82,9 @@ protected:
                        ChunkRange{BSON(kPattern << MINKEY), BSON(kPattern << MAXKEY)},
                        ChunkVersion(1, 0, epoch),
                        kOtherShard}});
+
+        std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, Timestamp(100, 0));
+
         return stdx::make_unique<CollectionMetadata>(cm, kThisShard);
     }
 
@@ -110,10 +113,12 @@ protected:
         v2.incMajor();
         auto v3 = v2;
         v3.incMajor();
-        cm = cm->makeUpdated(
+        auto rt = cm->getRoutingHistory().makeUpdated(
             {ChunkType{kNss, ChunkRange{chunkToSplit->getMin(), minKey}, v1, kOtherShard},
              ChunkType{kNss, ChunkRange{minKey, maxKey}, v2, kThisShard},
              ChunkType{kNss, ChunkRange{maxKey, chunkToSplit->getMax()}, v3, kOtherShard}});
+        cm = std::make_shared<ChunkManager>(rt, Timestamp(100, 0));
+
         return stdx::make_unique<CollectionMetadata>(cm, kThisShard);
     }
 

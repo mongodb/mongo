@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/logical_clock.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -67,10 +68,10 @@ const int kMaxInconsistentRoutingInfoRefreshAttempts = 3;
  * dropped or recreated concurrently, the caller must retry the reload up to some configurable
  * number of attempts.
  */
-std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
+std::shared_ptr<RoutingTableHistory> refreshCollectionRoutingInfo(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    std::shared_ptr<ChunkManager> existingRoutingInfo,
+    std::shared_ptr<RoutingTableHistory> existingRoutingInfo,
     StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollectionAndChangedChunks) {
     if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound) {
         return nullptr;
@@ -94,13 +95,13 @@ std::shared_ptr<ChunkManager> refreshCollectionRoutingInfo(
             }
             return nullptr;
         }();
-        return ChunkManager::makeNew(nss,
-                                     collectionAndChunks.uuid,
-                                     KeyPattern(collectionAndChunks.shardKeyPattern),
-                                     std::move(defaultCollator),
-                                     collectionAndChunks.shardKeyIsUnique,
-                                     collectionAndChunks.epoch,
-                                     collectionAndChunks.changedChunks);
+        return RoutingTableHistory::makeNew(nss,
+                                            collectionAndChunks.uuid,
+                                            KeyPattern(collectionAndChunks.shardKeyPattern),
+                                            std::move(defaultCollator),
+                                            collectionAndChunks.shardKeyIsUnique,
+                                            collectionAndChunks.epoch,
+                                            collectionAndChunks.changedChunks);
     }();
 
     std::set<ShardId> shardIds;
@@ -129,14 +130,18 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
     }
 }
 
-StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt(
-    OperationContext* opCtx, const NamespaceString& nss, Timestamp atClusterTime) {
-    // TODO (GPiTR): Implement retrieving collection routing info at time
-    return getCollectionRoutingInfo(opCtx, nss);
-}
-
 StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss) {
+    return _getCollectionRoutingInfoAt(opCtx, nss, boost::none);
+}
+
+StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt(
+    OperationContext* opCtx, const NamespaceString& nss, Timestamp atClusterTime) {
+    return _getCollectionRoutingInfoAt(opCtx, nss, atClusterTime);
+}
+
+StatusWith<CachedCollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoAt(
+    OperationContext* opCtx, const NamespaceString& nss, boost::optional<Timestamp> atClusterTime) {
     while (true) {
         std::shared_ptr<DatabaseInfoEntry> dbEntry;
         try {
@@ -197,12 +202,14 @@ StatusWith<CachedCollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(
             continue;
         }
 
+        auto cm = std::make_shared<ChunkManager>(collEntry.routingInfo, atClusterTime);
+
         return {CachedCollectionRoutingInfo(
             nss,
             {dbEntry,
              uassertStatusOK(
                  Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbEntry->primaryShardId))},
-            collEntry.routingInfo)};
+            std::move(cm))};
     }
 }
 
@@ -347,11 +354,12 @@ std::shared_ptr<CatalogCache::DatabaseInfoEntry> CatalogCache::_getDatabase(Oper
                                                                      dbDesc.getVersion()});
 }
 
-void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
-                                              std::shared_ptr<DatabaseInfoEntry> dbEntry,
-                                              std::shared_ptr<ChunkManager> existingRoutingInfo,
-                                              NamespaceString const& nss,
-                                              int refreshAttempt) {
+void CatalogCache::_scheduleCollectionRefresh(
+    WithLock lk,
+    std::shared_ptr<DatabaseInfoEntry> dbEntry,
+    std::shared_ptr<RoutingTableHistory> existingRoutingInfo,
+    NamespaceString const& nss,
+    int refreshAttempt) {
     // If we have an existing chunk manager, the refresh is considered "incremental", regardless of
     // how many chunks are in the differential
     const bool isIncremental(existingRoutingInfo);
@@ -366,7 +374,7 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
 
     // Invoked when one iteration of getChunksSince has completed, whether with success or error
     const auto onRefreshCompleted = [ this, t = Timer(), nss, isIncremental ](
-        const Status& status, ChunkManager* routingInfoAfterRefresh) {
+        const Status& status, RoutingTableHistory* routingInfoAfterRefresh) {
         if (isIncremental) {
             _stats.numActiveIncrementalRefreshes.subtractAndFetch(1);
         } else {
@@ -414,7 +422,7 @@ void CatalogCache::_scheduleCollectionRefresh(WithLock lk,
         [ this, dbEntry, nss, existingRoutingInfo, onRefreshFailed, onRefreshCompleted ](
             OperationContext * opCtx,
             StatusWith<CatalogCacheLoader::CollectionAndChangedChunks> swCollAndChunks) noexcept {
-        std::shared_ptr<ChunkManager> newRoutingInfo;
+        std::shared_ptr<RoutingTableHistory> newRoutingInfo;
         try {
             newRoutingInfo = refreshCollectionRoutingInfo(
                 opCtx, nss, std::move(existingRoutingInfo), std::move(swCollAndChunks));

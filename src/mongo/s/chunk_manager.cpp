@@ -45,7 +45,7 @@
 namespace mongo {
 namespace {
 
-// Used to generate sequence numbers to assign to each newly created ChunkManager
+// Used to generate sequence numbers to assign to each newly created RoutingTableHistory
 AtomicUInt32 nextCMSequenceNumber(0);
 
 void checkAllElementsAreOfType(BSONType type, const BSONObj& o) {
@@ -68,13 +68,13 @@ std::string extractKeyStringInternal(const BSONObj& shardKeyValue, Ordering orde
 
 }  // namespace
 
-ChunkManager::ChunkManager(NamespaceString nss,
-                           boost::optional<UUID> uuid,
-                           KeyPattern shardKeyPattern,
-                           std::unique_ptr<CollatorInterface> defaultCollator,
-                           bool unique,
-                           ChunkMap chunkMap,
-                           ChunkVersion collectionVersion)
+RoutingTableHistory::RoutingTableHistory(NamespaceString nss,
+                                         boost::optional<UUID> uuid,
+                                         KeyPattern shardKeyPattern,
+                                         std::unique_ptr<CollatorInterface> defaultCollator,
+                                         bool unique,
+                                         ChunkMap chunkMap,
+                                         ChunkVersion collectionVersion)
     : _sequenceNumber(nextCMSequenceNumber.addAndFetch(1)),
       _nss(std::move(nss)),
       _uuid(uuid),
@@ -89,7 +89,7 @@ ChunkManager::ChunkManager(NamespaceString nss,
 
 std::shared_ptr<Chunk> ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
                                                            const BSONObj& collation) const {
-    const bool hasSimpleCollation = (collation.isEmpty() && !_defaultCollator) ||
+    const bool hasSimpleCollation = (collation.isEmpty() && !_rt->getDefaultCollator()) ||
         SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
     if (!hasSimpleCollation) {
         for (BSONElement elt : shardKey) {
@@ -100,43 +100,38 @@ std::shared_ptr<Chunk> ChunkManager::findIntersectingChunk(const BSONObj& shardK
         }
     }
 
-    const auto it = _chunkMap.upper_bound(_extractKeyString(shardKey));
+    const auto it = _rt->getChunkMap().upper_bound(_rt->_extractKeyString(shardKey));
     uassert(ErrorCodes::ShardKeyNotFound,
             str::stream() << "Cannot target single shard using key " << shardKey,
-            it != _chunkMap.end() && it->second->containsKey(shardKey));
+            it != _rt->getChunkMap().end() && it->second->containsKey(shardKey));
 
     return it->second;
-}
-
-std::shared_ptr<Chunk> ChunkManager::findIntersectingChunkWithSimpleCollation(
-    const BSONObj& shardKey) const {
-    return findIntersectingChunk(shardKey, CollationSpec::kSimpleSpec);
 }
 
 bool ChunkManager::keyBelongsToShard(const BSONObj& shardKey, const ShardId& shardId) const {
     if (shardKey.isEmpty())
         return false;
 
-    const auto it = _chunkMap.upper_bound(_extractKeyString(shardKey));
-    if (it == _chunkMap.end())
+    const auto it = _rt->getChunkMap().upper_bound(_rt->_extractKeyString(shardKey));
+    if (it == _rt->getChunkMap().end())
         return false;
 
     invariant(it->second->containsKey(shardKey));
 
-    return it->second->getShardId() == shardId;
+    return it->second->getShardIdAt(_clusterTime) == shardId;
 }
 
 void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        std::set<ShardId>* shardIds) const {
-    auto qr = stdx::make_unique<QueryRequest>(_nss);
+    auto qr = stdx::make_unique<QueryRequest>(_rt->getns());
     qr->setFilter(query);
 
     if (!collation.isEmpty()) {
         qr->setCollation(collation);
-    } else if (_defaultCollator) {
-        qr->setCollation(_defaultCollator->getSpec().toBSON());
+    } else if (_rt->getDefaultCollator()) {
+        qr->setCollation(_rt->getDefaultCollator()->getSpec().toBSON());
     }
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
@@ -148,11 +143,11 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
                                      MatchExpressionParser::kAllowAllSpecialFeatures));
 
     // Fast path for targeting equalities on the shard key.
-    auto shardKeyToFind = _shardKeyPattern.extractShardKeyFromQuery(*cq);
+    auto shardKeyToFind = _rt->getShardKeyPattern().extractShardKeyFromQuery(*cq);
     if (!shardKeyToFind.isEmpty()) {
         try {
             auto chunk = findIntersectingChunk(shardKeyToFind, collation);
-            shardIds->insert(chunk->getShardId());
+            shardIds->insert(chunk->getShardIdAt(_clusterTime));
             return;
         } catch (const DBException&) {
             // The query uses multiple shards
@@ -165,20 +160,20 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
     //   Query { a : { $gte : 1, $lt : 2 },
     //            b : { $gte : 3, $lt : 4 } }
     //   => Bounds { a : [1, 2), b : [3, 4) }
-    IndexBounds bounds = getIndexBoundsForQuery(_shardKeyPattern.toBSON(), *cq);
+    IndexBounds bounds = getIndexBoundsForQuery(_rt->getShardKeyPattern().toBSON(), *cq);
 
     // Transforms bounds for each shard key field into full shard key ranges
     // for example :
     //   Key { a : 1, b : 1 }
     //   Bounds { a : [1, 2), b : [3, 4) }
     //   => Ranges { a : 1, b : 3 } => { a : 2, b : 4 }
-    BoundList ranges = _shardKeyPattern.flattenBounds(bounds);
+    BoundList ranges = _rt->getShardKeyPattern().flattenBounds(bounds);
 
     for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
         getShardIdsForRange(it->first /*min*/, it->second /*max*/, shardIds);
 
         // once we know we need to visit all shards no need to keep looping
-        if (shardIds->size() == _shardVersions.size()) {
+        if (shardIds->size() == _rt->_shardVersions.size()) {
             break;
         }
     }
@@ -187,47 +182,41 @@ void ChunkManager::getShardIdsForQuery(OperationContext* opCtx,
     // For now, we satisfy that assumption by adding a shard with no matches rather than returning
     // an empty set of shards.
     if (shardIds->empty()) {
-        shardIds->insert(_chunkMap.begin()->second->getShardId());
+        shardIds->insert(_rt->getChunkMap().begin()->second->getShardIdAt(_clusterTime));
     }
 }
 
 void ChunkManager::getShardIdsForRange(const BSONObj& min,
                                        const BSONObj& max,
                                        std::set<ShardId>* shardIds) const {
-    const auto itMin = _chunkMap.upper_bound(_extractKeyString(min));
-    const auto itMax = [this, &max]() {
-        auto it = _chunkMap.upper_bound(_extractKeyString(max));
-        return it == _chunkMap.end() ? it : ++it;
-    }();
-
-    for (auto it = itMin; it != itMax; ++it) {
-        shardIds->insert(it->second->getShardId());
+    const auto bounds = _rt->overlappingRanges(min, max, true);
+    for (auto it = bounds.first; it != bounds.second; ++it) {
+        shardIds->insert(it->second->getShardIdAt(_clusterTime));
 
         // No need to iterate through the rest of the ranges, because we already know we need to use
         // all shards.
-        if (shardIds->size() == _shardVersions.size()) {
+        if (shardIds->size() == _rt->_shardVersions.size()) {
             break;
         }
     }
 }
 
 bool ChunkManager::rangeOverlapsShard(const ChunkRange& range, const ShardId& shardId) const {
-    const auto itMin = _chunkMap.upper_bound(_extractKeyString(range.getMin()));
-    const auto itMax = [this, &range]() {
-        auto it = _chunkMap.lower_bound(_extractKeyString(range.getMax()));
-        return it == _chunkMap.end() ? it : ++it;
-    }();
-    const auto it = std::find_if(
-        itMin, itMax, [&shardId](const auto& scr) { return scr.second->getShardId() == shardId; });
-    return it != itMax;
+    const auto bounds = _rt->overlappingRanges(range.getMin(), range.getMax(), false);
+    const auto it = std::find_if(bounds.first, bounds.second, [this, &shardId](const auto& scr) {
+        return scr.second->getShardIdAt(_clusterTime) == shardId;
+    });
+
+    return it != bounds.second;
 }
 
 ChunkManager::ConstRangeOfChunks ChunkManager::getNextChunkOnShard(const BSONObj& shardKey,
                                                                    const ShardId& shardId) const {
-    for (auto it = _chunkMap.upper_bound(_extractKeyString(shardKey)); it != _chunkMap.end();
+    for (auto it = _rt->getChunkMap().upper_bound(_rt->_extractKeyString(shardKey));
+         it != _rt->getChunkMap().end();
          ++it) {
         const auto& chunk = it->second;
-        if (chunk->getShardId() == shardId) {
+        if (chunk->getShardIdAt(_clusterTime) == shardId) {
             const auto begin = it;
             const auto end = ++it;
             return {ConstChunkIterator(begin), ConstChunkIterator(end)};
@@ -237,11 +226,26 @@ ChunkManager::ConstRangeOfChunks ChunkManager::getNextChunkOnShard(const BSONObj
     return {ConstChunkIterator(), ConstChunkIterator()};
 }
 
-void ChunkManager::getAllShardIds(std::set<ShardId>* all) const {
+void RoutingTableHistory::getAllShardIds(std::set<ShardId>* all) const {
     std::transform(_shardVersions.begin(),
                    _shardVersions.end(),
                    std::inserter(*all, all->begin()),
                    [](const ShardVersionMap::value_type& pair) { return pair.first; });
+}
+
+std::pair<ChunkMap::const_iterator, ChunkMap::const_iterator>
+RoutingTableHistory::overlappingRanges(const BSONObj& min,
+                                       const BSONObj& max,
+                                       bool isMaxInclusive) const {
+
+    const auto itMin = _chunkMap.upper_bound(_extractKeyString(min));
+    const auto itMax = [this, &max, isMaxInclusive]() {
+        auto it = isMaxInclusive ? _chunkMap.upper_bound(_extractKeyString(max))
+                                 : _chunkMap.lower_bound(_extractKeyString(max));
+        return it == _chunkMap.end() ? it : ++it;
+    }();
+
+    return {itMin, itMax};
 }
 
 IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
@@ -359,13 +363,14 @@ IndexBounds ChunkManager::collapseQuerySolution(const QuerySolutionNode* node) {
     return bounds;
 }
 
-bool ChunkManager::compatibleWith(const ChunkManager& other, const ShardId& shardName) const {
+bool RoutingTableHistory::compatibleWith(const RoutingTableHistory& other,
+                                         const ShardId& shardName) const {
     // Return true if the shard version is the same in the two chunk managers
     // TODO: This doesn't need to be so strong, just major vs
     return other.getVersion(shardName).equals(getVersion(shardName));
 }
 
-ChunkVersion ChunkManager::getVersion(const ShardId& shardName) const {
+ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
     auto it = _shardVersions.find(shardName);
     if (it == _shardVersions.end()) {
         // Shards without explicitly tracked shard versions (meaning they have no chunks) always
@@ -376,13 +381,13 @@ ChunkVersion ChunkManager::getVersion(const ShardId& shardName) const {
     return it->second;
 }
 
-std::string ChunkManager::toString() const {
+std::string RoutingTableHistory::toString() const {
     StringBuilder sb;
-    sb << "ChunkManager: " << _nss.ns() << " key: " << _shardKeyPattern.toString() << '\n';
+    sb << "RoutingTableHistory: " << _nss.ns() << " key: " << _shardKeyPattern.toString() << '\n';
 
     sb << "Chunks:\n";
-    for (const auto& chunk : chunks()) {
-        sb << "\t" << chunk->toString() << '\n';
+    for (const auto& chunk : _chunkMap) {
+        sb << "\t" << chunk.second->toString() << '\n';
     }
 
     sb << "Shard versions:\n";
@@ -393,9 +398,9 @@ std::string ChunkManager::toString() const {
     return sb.str();
 }
 
-ShardVersionMap ChunkManager::_constructShardVersionMap(const OID& epoch,
-                                                        const ChunkMap& chunkMap,
-                                                        Ordering shardKeyOrdering) {
+ShardVersionMap RoutingTableHistory::_constructShardVersionMap(const OID& epoch,
+                                                               const ChunkMap& chunkMap,
+                                                               Ordering shardKeyOrdering) {
     ShardVersionMap shardVersions;
     ChunkMap::const_iterator current = chunkMap.cbegin();
 
@@ -475,11 +480,11 @@ ShardVersionMap ChunkManager::_constructShardVersionMap(const OID& epoch,
     return shardVersions;
 }
 
-std::string ChunkManager::_extractKeyString(const BSONObj& shardKeyValue) const {
+std::string RoutingTableHistory::_extractKeyString(const BSONObj& shardKeyValue) const {
     return extractKeyStringInternal(shardKeyValue, _shardKeyOrdering);
 }
 
-std::shared_ptr<ChunkManager> ChunkManager::makeNew(
+std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeNew(
     NamespaceString nss,
     boost::optional<UUID> uuid,
     KeyPattern shardKeyPattern,
@@ -487,17 +492,17 @@ std::shared_ptr<ChunkManager> ChunkManager::makeNew(
     bool unique,
     OID epoch,
     const std::vector<ChunkType>& chunks) {
-    return ChunkManager(std::move(nss),
-                        std::move(uuid),
-                        std::move(shardKeyPattern),
-                        std::move(defaultCollator),
-                        std::move(unique),
-                        {},
-                        {0, 0, epoch})
+    return RoutingTableHistory(std::move(nss),
+                               std::move(uuid),
+                               std::move(shardKeyPattern),
+                               std::move(defaultCollator),
+                               std::move(unique),
+                               {},
+                               {0, 0, epoch})
         .makeUpdated(chunks);
 }
 
-std::shared_ptr<ChunkManager> ChunkManager::makeUpdated(
+std::shared_ptr<RoutingTableHistory> RoutingTableHistory::makeUpdated(
     const std::vector<ChunkType>& changedChunks) {
 
     const auto startingCollectionVersion = getVersion();
@@ -546,14 +551,14 @@ std::shared_ptr<ChunkManager> ChunkManager::makeUpdated(
         return shared_from_this();
     }
 
-    return std::shared_ptr<ChunkManager>(
-        new ChunkManager(_nss,
-                         _uuid,
-                         KeyPattern(getShardKeyPattern().getKeyPattern()),
-                         CollatorInterface::cloneCollator(getDefaultCollator()),
-                         isUnique(),
-                         std::move(chunkMap),
-                         collectionVersion));
+    return std::shared_ptr<RoutingTableHistory>(
+        new RoutingTableHistory(_nss,
+                                _uuid,
+                                KeyPattern(getShardKeyPattern().getKeyPattern()),
+                                CollatorInterface::cloneCollator(getDefaultCollator()),
+                                isUnique(),
+                                std::move(chunkMap),
+                                collectionVersion));
 }
 
 }  // namespace mongo

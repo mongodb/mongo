@@ -51,6 +51,7 @@
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
+#include "mongo/s/write_ops/cluster_write.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"

@@ -64,7 +64,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandWithCtl) {
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
-    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), ShardId("shardX"))});
+    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -143,7 +143,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtl) {
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
-    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), ShardId("shardX"))});
+    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -204,7 +204,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
-    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), ShardId("shardX"))});
+    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -266,7 +266,7 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
     chunk0.setNS(kNamespace);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
-    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), ShardId("shardX"))});
+    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
 
     // apportion
     auto chunkMin = BSON("a" << 1);

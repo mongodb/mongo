@@ -247,6 +247,7 @@ error_code("SnapshotUnavailable", 246)
 error_code("ProducerConsumerQueueBatchTooLarge", 247)
 error_code("ProducerConsumerQueueEndClosed", 248)
 error_code("StaleDbVersion", 249, extra="StaleDbRoutingVersion");
+error_code("StaleChunkHistory", 250);
 
 # Error codes 4000-8999 are reserved.
 
@@ -304,4 +305,4 @@ error_class("ConnectionFatalMessageParseError", ["IllegalOpMsgFlag",
 
 error_class("ExceededTimeLimitError", ["ExceededTimeLimit", "NetworkInterfaceExceededTimeLimit"])
 
-error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable"])
+error_class("SnapshotError", ["SnapshotTooOld", "SnapshotUnavailable", "StaleChunkHistory"])

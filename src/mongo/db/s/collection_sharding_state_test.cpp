@@ -132,8 +132,10 @@ std::unique_ptr<CollectionMetadata> makeAMetadata(BSONObj const& keyPattern) {
     const OID epoch = OID::gen();
     auto range = ChunkRange(BSON("key" << MINKEY), BSON("key" << MAXKEY));
     auto chunk = ChunkType(kTestNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
-    auto cm = ChunkManager::makeNew(
+    auto rt = RoutingTableHistory::makeNew(
         kTestNss, UUID::gen(), KeyPattern(keyPattern), nullptr, false, epoch, {std::move(chunk)});
+    std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, Timestamp(100, 0));
+
     return stdx::make_unique<CollectionMetadata>(std::move(cm), ShardId("this"));
 }
 

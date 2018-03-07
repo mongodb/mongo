@@ -55,11 +55,18 @@ public:
     }
 
     const ShardId& getShardId() const {
-        return _shardId;
+        // TODO: SERVER-34100 - consolidate a usage of getShardAt and getShardIdAt
+        return getShardIdAt(boost::none);
     }
+
+    const ShardId& getShardIdAt(const boost::optional<Timestamp>& ts) const;
 
     ChunkVersion getLastmod() const {
         return _lastmod;
+    }
+
+    const auto& getHistory() const {
+        return _history;
     }
 
     bool isJumbo() const {

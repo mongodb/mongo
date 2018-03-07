@@ -65,6 +65,34 @@ Chunk::Chunk(const ChunkType& from)
       _jumbo(from.getJumbo()),
       _dataWritten(mkDataWritten()) {
     invariantOK(from.validate());
+    if (!_history.empty()) {
+        invariant(_shardId == _history.front().getShard());
+    }
+}
+
+const ShardId& Chunk::getShardIdAt(const boost::optional<Timestamp>& ts) const {
+    // This chunk was refreshed from FCV 3.6 config server so it doesn't have history
+    // TODO: SERVER-34100 consider removing getShardIdAt completely
+    // TODO: SERVER-33781 add uassert once we do upgrade/downgrade work
+    if (_history.empty()) {
+        return _shardId;
+    }
+
+    // If the tiemstamp is not provided than we return the latest shardid
+    if (!ts) {
+        invariant(_shardId == _history.front().getShard());
+        return _history.front().getShard();
+    }
+
+    for (const auto& h : _history) {
+        if (h.getValidAfter() <= ts) {
+            return h.getShard();
+        }
+    }
+
+    uasserted(ErrorCodes::StaleChunkHistory,
+              str::stream() << "Cant find shardId the chunk belonged to at cluster time "
+                            << ts.get().toString());
 }
 
 bool Chunk::containsKey(const BSONObj& shardKey) const {

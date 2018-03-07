@@ -43,12 +43,16 @@ using unittest::assertGet;
 
 std::unique_ptr<CollectionMetadata> makeCollectionMetadataImpl(
     const KeyPattern& shardKeyPattern,
-    const std::vector<std::pair<BSONObj, BSONObj>>& thisShardsChunks) {
+    const std::vector<std::pair<BSONObj, BSONObj>>& thisShardsChunks,
+    bool staleChunkManager) {
 
     const OID epoch = OID::gen();
     const NamespaceString kNss("test.foo");
     const ShardId kThisShard("thisShard");
     const ShardId kOtherShard("otherShard");
+
+    const Timestamp kRouting(100, 0);
+    const Timestamp kChunkManager(staleChunkManager ? 99 : 100, 0);
 
     std::vector<ChunkType> allChunks;
     auto nextMinKey = shardKeyPattern.globalMin();
@@ -58,20 +62,25 @@ std::unique_ptr<CollectionMetadata> makeCollectionMetadataImpl(
             // Need to add a chunk to the other shard from nextMinKey to myNextChunk.first.
             allChunks.emplace_back(
                 kNss, ChunkRange{nextMinKey, myNextChunk.first}, version, kOtherShard);
+            allChunks.back().setHistory({ChunkHistory(kRouting, kOtherShard)});
             version.incMajor();
         }
         allChunks.emplace_back(
             kNss, ChunkRange{myNextChunk.first, myNextChunk.second}, version, kThisShard);
+        allChunks.back().setHistory({ChunkHistory(kRouting, kThisShard)});
         version.incMajor();
         nextMinKey = myNextChunk.second;
     }
     if (SimpleBSONObjComparator::kInstance.evaluate(nextMinKey < shardKeyPattern.globalMax())) {
         allChunks.emplace_back(
             kNss, ChunkRange{nextMinKey, shardKeyPattern.globalMax()}, version, kOtherShard);
+        allChunks.back().setHistory({ChunkHistory(kRouting, kOtherShard)});
     }
 
     UUID uuid(UUID::gen());
-    auto cm = ChunkManager::makeNew(kNss, uuid, shardKeyPattern, nullptr, false, epoch, allChunks);
+    auto rt =
+        RoutingTableHistory::makeNew(kNss, uuid, shardKeyPattern, nullptr, false, epoch, allChunks);
+    std::shared_ptr<ChunkManager> cm = std::make_shared<ChunkManager>(rt, kChunkManager);
     return stdx::make_unique<CollectionMetadata>(cm, kThisShard);
 }
 
@@ -83,7 +92,7 @@ struct ConstructedRangeMap : public RangeMap {
 class NoChunkFixture : public unittest::Test {
 protected:
     std::unique_ptr<CollectionMetadata> makeCollectionMetadata() const {
-        return makeCollectionMetadataImpl(KeyPattern(BSON("a" << 1)), {});
+        return makeCollectionMetadataImpl(KeyPattern(BSON("a" << 1)), {}, false);
     }
 };
 
@@ -168,8 +177,8 @@ TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
 class SingleChunkFixture : public unittest::Test {
 protected:
     std::unique_ptr<CollectionMetadata> makeCollectionMetadata() const {
-        return makeCollectionMetadataImpl(KeyPattern(BSON("a" << 1)),
-                                          {std::make_pair(BSON("a" << 10), BSON("a" << 20))});
+        return makeCollectionMetadataImpl(
+            KeyPattern(BSON("a" << 1)), {std::make_pair(BSON("a" << 10), BSON("a" << 20))}, false);
     }
 };
 
@@ -247,7 +256,8 @@ protected:
         const KeyPattern shardKeyPattern(BSON("a" << 1 << "b" << 1));
         return makeCollectionMetadataImpl(
             shardKeyPattern,
-            {std::make_pair(shardKeyPattern.globalMin(), shardKeyPattern.globalMax())});
+            {std::make_pair(shardKeyPattern.globalMin(), shardKeyPattern.globalMax())},
+            false);
     }
 };
 
@@ -271,7 +281,8 @@ protected:
         return makeCollectionMetadataImpl(
             KeyPattern(BSON("a" << 1 << "b" << 1)),
             {std::make_pair(BSON("a" << 10 << "b" << 0), BSON("a" << 20 << "b" << 0)),
-             std::make_pair(BSON("a" << 30 << "b" << 0), BSON("a" << 40 << "b" << 0))});
+             std::make_pair(BSON("a" << 30 << "b" << 0), BSON("a" << 40 << "b" << 0))},
+            false);
     }
 };
 
@@ -308,7 +319,8 @@ protected:
         return makeCollectionMetadataImpl(KeyPattern(BSON("a" << 1)),
                                           {std::make_pair(BSON("a" << MINKEY), BSON("a" << 10)),
                                            std::make_pair(BSON("a" << 10), BSON("a" << 20)),
-                                           std::make_pair(BSON("a" << 30), BSON("a" << MAXKEY))});
+                                           std::make_pair(BSON("a" << 30), BSON("a" << MAXKEY))},
+                                          false);
     }
 };
 
@@ -388,6 +400,28 @@ TEST_F(ThreeChunkWithRangeGapFixture, GetDifferentChunkFromLast) {
     ASSERT(makeCollectionMetadata()->getDifferentChunk(BSON("a" << 30), &differentChunk));
     ASSERT_EQUALS(0, differentChunk.getMin().woCompare(BSON("a" << MINKEY)));
     ASSERT_EQUALS(0, differentChunk.getMax().woCompare(BSON("a" << 10)));
+}
+
+/**
+ * Fixture with single chunk containing:
+ * [10->20)
+ */
+class StaleChunkFixture : public unittest::Test {
+protected:
+    std::unique_ptr<CollectionMetadata> makeCollectionMetadata() const {
+        return makeCollectionMetadataImpl(
+            KeyPattern(BSON("a" << 1)), {std::make_pair(BSON("a" << 10), BSON("a" << 20))}, true);
+    }
+};
+
+TEST_F(StaleChunkFixture, KeyBelongsToMe) {
+    ASSERT_THROWS_CODE(makeCollectionMetadata()->keyBelongsToMe(BSON("a" << 10)),
+                       AssertionException,
+                       ErrorCodes::StaleChunkHistory);
+
+    ASSERT_THROWS_CODE(makeCollectionMetadata()->keyBelongsToMe(BSON("a" << 0)),
+                       AssertionException,
+                       ErrorCodes::StaleChunkHistory);
 }
 
 }  // namespace

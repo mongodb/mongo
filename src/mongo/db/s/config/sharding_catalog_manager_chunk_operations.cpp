@@ -691,6 +691,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     // Generate the new versions of migratedChunk and controlChunk. Migrating chunk's minor version
     // will be 0.
     ChunkType newMigratedChunk = migratedChunk;
+    newMigratedChunk.setShard(toShard);
     newMigratedChunk.setVersion(ChunkVersion(
         currentCollectionVersion.majorVersion() + 1, 0, currentCollectionVersion.epoch()));
 
@@ -718,6 +719,9 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
                                   << validAfter.get().toString()};
         }
         newHistory.emplace(newHistory.begin(), ChunkHistory(validAfter.get(), toShard));
+    } else {
+        // TODO: SERVER-33781 FCV 3.6 should not have any history
+        newHistory.clear();
     }
     newMigratedChunk.setHistory(std::move(newHistory));
 
