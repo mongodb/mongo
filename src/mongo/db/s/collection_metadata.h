@@ -121,12 +121,10 @@ public:
     }
 
     ChunkVersion getShardVersion() const {
-        return _shardVersion;
+        return _cm->getVersion(_thisShardId);
     }
 
-    const RangeMap& getChunks() const {
-        return _chunksMap;
-    }
+    RangeMap getChunks() const;
 
     const BSONObj& getKeyPattern() const {
         return _cm->getShardKeyPattern().toBSON();
@@ -142,10 +140,6 @@ public:
 
     BSONObj getMaxKey() const {
         return _cm->getShardKeyPattern().getKeyPattern().globalMax();
-    }
-
-    std::size_t getNumChunks() const {
-        return _chunksMap.size();
     }
 
     /**
@@ -177,12 +171,6 @@ private:
 
     // The identity of this shard, for the purpose of answering "key belongs to me" queries.
     ShardId _thisShardId;
-
-    // highest ChunkVersion for which this metadata's information is accurate
-    ChunkVersion _shardVersion;
-
-    // Map of chunks tracked by this shard
-    RangeMap _chunksMap;
 };
 
 }  // namespace mongo

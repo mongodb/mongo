@@ -286,7 +286,8 @@ TEST_F(MetadataManagerTest, RefreshMetadataAfterDropAndRecreate) {
         cloneMetadataPlusChunk(*recreateMetadata, BSON("key" << 20), BSON("key" << 30)));
     ASSERT_EQ(_manager->getActiveMetadata(_manager)->getChunks().size(), 1UL);
 
-    const auto chunkEntry = _manager->getActiveMetadata(_manager)->getChunks().begin();
+    const auto chunks = _manager->getActiveMetadata(_manager)->getChunks();
+    const auto chunkEntry = chunks.begin();
     ASSERT_BSONOBJ_EQ(BSON("key" << 20), chunkEntry->first);
     ASSERT_BSONOBJ_EQ(BSON("key" << 30), chunkEntry->second);
 }
