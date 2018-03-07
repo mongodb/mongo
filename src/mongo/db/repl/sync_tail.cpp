@@ -147,16 +147,6 @@ ServerStatusMetricField<Counter64> displayAttemptsToBecomeSecondary(
 TimerStats applyBatchStats;
 ServerStatusMetricField<TimerStats> displayOpBatchesApplied("repl.apply.batches", &applyBatchStats);
 
-bool isCrudOpType(const char* field) {
-    switch (field[0]) {
-        case 'd':
-        case 'i':
-        case 'u':
-            return field[1] == 0;
-    }
-    return false;
-}
-
 class ApplyBatchFinalizer {
 public:
     ApplyBatchFinalizer(ReplicationCoordinator* replCoord) : _replCoord(replCoord) {}
@@ -331,8 +321,6 @@ Status SyncTail::syncApply(OperationContext* opCtx,
 
     const NamespaceString nss(op.getStringField("ns"));
 
-    const char* opType = op["op"].valuestrsafe();
-
     auto applyOp = [&](Database* db) {
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.
@@ -356,16 +344,20 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         return status;
     };
 
-    bool isNoOp = opType[0] == 'n';
-    if (isNoOp || (opType[0] == 'i' && nss.isSystemDotIndexes())) {
-        if (isNoOp && nss.db() == "")
+    auto opType = OpType_parse(IDLParserErrorContext("syncApply"), op["op"].valuestrsafe());
+
+    if (opType == OpTypeEnum::kNoop) {
+        if (nss.db() == "") {
             return Status::OK();
+        }
         Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
         OldClientContext ctx(opCtx, nss.ns());
         return applyOp(ctx.db());
-    }
-
-    if (isCrudOpType(opType)) {
+    } else if (opType == OpTypeEnum::kInsert && nss.isSystemDotIndexes()) {
+        Lock::DBLock dbLock(opCtx, nss.db(), MODE_X);
+        OldClientContext ctx(opCtx, nss.ns());
+        return applyOp(ctx.db());
+    } else if (OplogEntry::isCrudOpType(opType)) {
         return writeConflictRetry(opCtx, "syncApply_CRUD", nss.ns(), [&] {
             // Need to throw instead of returning a status for it to be properly ignored.
             try {
@@ -379,16 +371,14 @@ Status SyncTail::syncApply(OperationContext* opCtx,
             } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
                 // Delete operations on non-existent namespaces can be treated as successful for
                 // idempotency reasons.
-                if (opType[0] == 'd') {
+                if (opType == OpTypeEnum::kDelete) {
                     return Status::OK();
                 }
                 ex.addContext(str::stream() << "Failed to apply operation: " << redact(op));
                 throw;
             }
         });
-    }
-
-    if (opType[0] == 'c') {
+    } else if (opType == OpTypeEnum::kCommand) {
         return writeConflictRetry(opCtx, "syncApply_command", nss.ns(), [&] {
             // a command may need a global write lock. so we will conservatively go
             // ahead and grab one here. suboptimal. :-(
@@ -401,11 +391,7 @@ Status SyncTail::syncApply(OperationContext* opCtx,
         });
     }
 
-    // unknown opType
-    str::stream ss;
-    ss << "bad opType '" << opType << "' in oplog entry: " << redact(op);
-    error() << std::string(ss);
-    return Status(ErrorCodes::BadValue, ss);
+    MONGO_UNREACHABLE;
 }
 
 Status SyncTail::syncApply(OperationContext* opCtx,

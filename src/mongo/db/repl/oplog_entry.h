@@ -107,6 +107,7 @@ public:
     /**
      * Returns if the oplog entry is for a CRUD operation.
      */
+    static bool isCrudOpType(OpTypeEnum opType);
     bool isCrudOpType() const;
 
     /**

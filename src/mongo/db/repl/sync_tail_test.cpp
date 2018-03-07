@@ -199,10 +199,11 @@ auto parseFromOplogEntryArray(const BSONObj& obj, int elem) {
 TEST_F(SyncTailTest, SyncApplyNoNamespaceBadOp) {
     const BSONObj op = BSON("op"
                             << "x");
-    ASSERT_EQUALS(
-        ErrorCodes::BadValue,
+    ASSERT_THROWS(
         SyncTail::syncApply(
-            _opCtx.get(), op, OplogApplication::Mode::kInitialSync, _applyOp, _applyCmd, _incOps));
+            _opCtx.get(), op, OplogApplication::Mode::kInitialSync, _applyOp, _applyCmd, _incOps)
+            .ignore(),
+        ExceptionFor<ErrorCodes::BadValue>);
     ASSERT_EQUALS(0U, _opsApplied);
 }
 
@@ -219,11 +220,11 @@ TEST_F(SyncTailTest, SyncApplyBadOp) {
                             << "x"
                             << "ns"
                             << "test.t");
-    ASSERT_EQUALS(
-        ErrorCodes::BadValue,
+    ASSERT_THROWS(
         SyncTail::syncApply(
             _opCtx.get(), op, OplogApplication::Mode::kInitialSync, _applyOp, _applyCmd, _incOps)
-            .code());
+            .ignore(),
+        ExceptionFor<ErrorCodes::BadValue>);
     ASSERT_EQUALS(0U, _opsApplied);
 }
 

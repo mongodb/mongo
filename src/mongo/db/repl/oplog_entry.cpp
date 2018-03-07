@@ -227,8 +227,9 @@ bool OplogEntry::isCommand() const {
     return getOpType() == OpTypeEnum::kCommand;
 }
 
-bool OplogEntry::isCrudOpType() const {
-    switch (getOpType()) {
+// static
+bool OplogEntry::isCrudOpType(OpTypeEnum opType) {
+    switch (opType) {
         case OpTypeEnum::kInsert:
         case OpTypeEnum::kDelete:
         case OpTypeEnum::kUpdate:
@@ -238,6 +239,10 @@ bool OplogEntry::isCrudOpType() const {
             return false;
     }
     MONGO_UNREACHABLE;
+}
+
+bool OplogEntry::isCrudOpType() const {
+    return isCrudOpType(getOpType());
 }
 
 BSONElement OplogEntry::getIdElement() const {
