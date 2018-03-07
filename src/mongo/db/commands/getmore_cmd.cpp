@@ -391,8 +391,18 @@ public:
         ScopeGuard cursorFreer = MakeGuard(&ClientCursorPin::deleteUnderlying, &ccPin.getValue());
         stashedCursorIndicator.Dismiss();
 
-        if (cursor->isReadCommitted())
-            uassertStatusOK(opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
+        const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
+        opCtx->recoveryUnit()->setReadConcernLevelAndReplicationMode(cursor->getReadConcernLevel(),
+                                                                     replicationMode);
+
+        // TODO SERVER-33698: Remove kSnapshotReadConcern clause once we can guarantee that a
+        // readConcern level snapshot getMore will have an established point-in-time WiredTiger
+        // snapshot.
+        if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
+            (cursor->getReadConcernLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
+             cursor->getReadConcernLevel() == repl::ReadConcernLevel::kSnapshotReadConcern)) {
+            uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
+        }
 
         const bool disableAwaitDataFailpointActive =
             MONGO_FAIL_POINT(disableAwaitDataForGetMoreCmd);

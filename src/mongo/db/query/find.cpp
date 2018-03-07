@@ -358,8 +358,18 @@ Message getMore(OperationContext* opCtx,
 
         *isCursorAuthorized = true;
 
-        if (cc->isReadCommitted())
-            uassertStatusOK(opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
+        const auto replicationMode = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode();
+        opCtx->recoveryUnit()->setReadConcernLevelAndReplicationMode(cc->getReadConcernLevel(),
+                                                                     replicationMode);
+
+        // TODO SERVER-33698: Remove kSnapshotReadConcern clause once we can guarantee that a
+        // readConcern level snapshot getMore will have an established point-in-time WiredTiger
+        // snapshot.
+        if (replicationMode == repl::ReplicationCoordinator::modeReplSet &&
+            (cc->getReadConcernLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
+             cc->getReadConcernLevel() == repl::ReadConcernLevel::kSnapshotReadConcern)) {
+            uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
+        }
 
         uassert(40548,
                 "OP_GET_MORE operations are not supported on tailable aggregations. Only clients "
@@ -690,7 +700,7 @@ std::string runQuery(OperationContext* opCtx,
             {std::move(exec),
              nss,
              AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-             opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+             opCtx->recoveryUnit()->getReadConcernLevel(),
              upconvertQueryEntry(q.query, qr.nss(), q.ntoreturn, q.ntoskip)});
         ccId = pinnedCursor.getCursor()->cursorid();
 

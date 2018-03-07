@@ -207,6 +207,9 @@ Status waitForReadConcern(OperationContext* opCtx,
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     invariant(replCoord);
 
+    opCtx->recoveryUnit()->setReadConcernLevelAndReplicationMode(readConcernArgs.getLevel(),
+                                                                 replCoord->getReplicationMode());
+
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern) {
         if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) {
             // For master/slave and standalone nodes, Linearizable Read is not supported.
@@ -299,13 +302,13 @@ Status waitForReadConcern(OperationContext* opCtx,
         LOG(debugLevel) << "Waiting for 'committed' snapshot to be available for reading: "
                         << readConcernArgs;
 
-        Status status = opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+        Status status = opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot();
 
         // Wait until a snapshot is available.
         while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
             LOG(debugLevel) << "Snapshot not available yet.";
             replCoord->waitUntilSnapshotCommitted(opCtx, Timestamp());
-            status = opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot();
+            status = opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot();
         }
 
         if (!status.isOK()) {

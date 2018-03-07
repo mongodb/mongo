@@ -33,6 +33,8 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context_noop.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
@@ -142,13 +144,19 @@ public:
 
     int itCountCommitted() {
         auto op = makeOperation();
-        ASSERT_OK(op->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
+        op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            repl::ReplicationCoordinator::modeReplSet);
+        ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
         return itCountOn(op);
     }
 
     boost::optional<Record> readRecordCommitted(RecordId id) {
         auto op = makeOperation();
-        ASSERT_OK(op->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
+        op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            repl::ReplicationCoordinator::modeReplSet);
+        ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
         auto cursor = rs->getCursor(op);
         auto record = cursor->seekExact(id);
         if (record)
@@ -204,23 +212,25 @@ TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {
 
     auto op = makeOperation();
     auto ru = op->recoveryUnit();
+    ru->setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel::kMajorityReadConcern,
+                                              repl::ReplicationCoordinator::modeReplSet);
 
     // Before first snapshot is created.
-    ASSERT_EQ(ru->setReadFromMajorityCommittedSnapshot(),
+    ASSERT_EQ(ru->obtainMajorityCommittedSnapshot(),
               ErrorCodes::ReadConcernMajorityNotAvailableYet);
 
     // There is a snapshot but it isn't committed.
     auto snap = fetchAndIncrementTimestamp();
-    ASSERT_EQ(ru->setReadFromMajorityCommittedSnapshot(),
+    ASSERT_EQ(ru->obtainMajorityCommittedSnapshot(),
               ErrorCodes::ReadConcernMajorityNotAvailableYet);
 
     // Now there is a committed snapshot.
     snapshotManager->setCommittedSnapshot(snap);
-    ASSERT_OK(ru->setReadFromMajorityCommittedSnapshot());
+    ASSERT_OK(ru->obtainMajorityCommittedSnapshot());
 
     // Not anymore!
     snapshotManager->dropAllSnapshots();
-    ASSERT_EQ(ru->setReadFromMajorityCommittedSnapshot(),
+    ASSERT_EQ(ru->obtainMajorityCommittedSnapshot(),
               ErrorCodes::ReadConcernMajorityNotAvailableYet);
 }
 
@@ -229,11 +239,13 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
         return;  // This test is only for engines that DO support SnapshotMangers.
 
     auto op = makeOperation();
+    op->recoveryUnit()->setReadConcernLevelAndReplicationMode(
+        repl::ReadConcernLevel::kMajorityReadConcern, repl::ReplicationCoordinator::modeReplSet);
 
     // Start an operation using a committed snapshot.
     auto snap = fetchAndIncrementTimestamp();
     snapshotManager->setCommittedSnapshot(snap);
-    ASSERT_OK(op->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
+    ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
     ASSERT_EQ(itCountOn(op), 0);  // acquires a snapshot.
 
     // Everything still works until we abandon our snapshot.
@@ -284,7 +296,9 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
 
     // This op should keep its original snapshot until abandoned.
     auto longOp = makeOperation();
-    ASSERT_OK(longOp->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
+    longOp->recoveryUnit()->setReadConcernLevelAndReplicationMode(
+        repl::ReadConcernLevel::kMajorityReadConcern, repl::ReplicationCoordinator::modeReplSet);
+    ASSERT_OK(longOp->recoveryUnit()->obtainMajorityCommittedSnapshot());
     ASSERT_EQ(itCountOn(longOp), 3);
 
     // If this fails, the snapshot contains writes that were rolled back.

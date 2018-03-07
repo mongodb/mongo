@@ -67,7 +67,7 @@ void EphemeralForTestRecoveryUnit::abortUnitOfWork() {
     }
 }
 
-Status EphemeralForTestRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
+Status EphemeralForTestRecoveryUnit::obtainMajorityCommittedSnapshot() {
     return Status::OK();
 }
 }

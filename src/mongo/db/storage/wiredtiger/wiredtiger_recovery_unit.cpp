@@ -227,20 +227,19 @@ SnapshotId WiredTigerRecoveryUnit::getSnapshotId() const {
     return SnapshotId(_mySnapshotId);
 }
 
-Status WiredTigerRecoveryUnit::setReadFromMajorityCommittedSnapshot() {
+Status WiredTigerRecoveryUnit::obtainMajorityCommittedSnapshot() {
+    invariant(isReadingFromMajorityCommittedSnapshot());
     auto snapshotName = _sessionCache->snapshotManager().getMinSnapshotForNextCommittedRead();
     if (!snapshotName) {
         return {ErrorCodes::ReadConcernMajorityNotAvailableYet,
                 "Read concern majority reads are currently not possible."};
     }
-
     _majorityCommittedSnapshot = *snapshotName;
-    _readFromMajorityCommittedSnapshot = true;
     return Status::OK();
 }
 
 boost::optional<Timestamp> WiredTigerRecoveryUnit::getMajorityCommittedSnapshot() const {
-    if (!_readFromMajorityCommittedSnapshot)
+    if (!isReadingFromMajorityCommittedSnapshot())
         return {};
     return _majorityCommittedSnapshot;
 }
@@ -268,7 +267,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                     << " is older than the oldest available timestamp.");
         }
         uassertStatusOK(status);
-    } else if (_readFromMajorityCommittedSnapshot) {
+    } else if (isReadingFromMajorityCommittedSnapshot()) {
         // We reset _majorityCommittedSnapshot to the actual read timestamp used when the
         // transaction was started.
         _majorityCommittedSnapshot =

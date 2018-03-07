@@ -36,6 +36,7 @@
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -43,14 +44,6 @@ namespace mongo {
 class BSONObj;
 
 namespace repl {
-
-enum class ReadConcernLevel {
-    kLocalReadConcern,
-    kMajorityReadConcern,
-    kLinearizableReadConcern,
-    kAvailableReadConcern,
-    kSnapshotReadConcern
-};
 
 class ReadConcernArgs {
 public:

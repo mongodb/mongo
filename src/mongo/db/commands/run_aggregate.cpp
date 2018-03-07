@@ -521,7 +521,7 @@ Status runAggregate(OperationContext* opCtx,
         std::move(exec),
         origNss,
         AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserNames(),
-        opCtx->recoveryUnit()->isReadingFromMajorityCommittedSnapshot(),
+        opCtx->recoveryUnit()->getReadConcernLevel(),
         cmdObj);
     if (expCtx->tailableMode == TailableMode::kTailableAndAwaitData) {
         cursorParams.setTailable(true);

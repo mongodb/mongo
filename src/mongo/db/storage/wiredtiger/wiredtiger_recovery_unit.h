@@ -39,6 +39,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/util/timer.h"
@@ -72,9 +73,12 @@ public:
     void abandonSnapshot() override;
     void preallocateSnapshot() override;
 
-    Status setReadFromMajorityCommittedSnapshot() override;
+    Status obtainMajorityCommittedSnapshot() override;
+
     bool isReadingFromMajorityCommittedSnapshot() const override {
-        return _readFromMajorityCommittedSnapshot;
+        return _replicationMode == repl::ReplicationCoordinator::modeReplSet &&
+            (_readConcernLevel == repl::ReadConcernLevel::kMajorityReadConcern ||
+             _readConcernLevel == repl::ReadConcernLevel::kSnapshotReadConcern);
     }
 
     boost::optional<Timestamp> getMajorityCommittedSnapshot() const override;
@@ -146,7 +150,6 @@ private:
     bool _isTimestamped = false;
     Timestamp _commitTimestamp;
     uint64_t _mySnapshotId;
-    bool _readFromMajorityCommittedSnapshot = false;
     Timestamp _majorityCommittedSnapshot;
     Timestamp _readAtTimestamp;
     std::unique_ptr<Timer> _timer;

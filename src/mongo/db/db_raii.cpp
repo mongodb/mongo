@@ -104,7 +104,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
 
         repl::ReplicationCoordinator::get(opCtx)->waitUntilSnapshotCommitted(opCtx, *minSnapshot);
 
-        uassertStatusOK(opCtx->recoveryUnit()->setReadFromMajorityCommittedSnapshot());
+        uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());

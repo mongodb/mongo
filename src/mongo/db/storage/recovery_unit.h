@@ -35,6 +35,8 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/snapshot.h"
 
 namespace mongo {
@@ -93,9 +95,8 @@ public:
     virtual void preallocateSnapshot() {}
 
     /**
-     * Informs this RecoveryUnit that all future reads through it should be from a snapshot
-     * marked as Majority Committed. Snapshots should still be separately acquired and newer
-     * committed snapshots should be used if available whenever implementations would normally
+     * Obtains a majority committed snapshot. Snapshots should still be separately acquired and
+     * newer committed snapshots should be used if available whenever implementations would normally
      * change snapshots.
      *
      * If no snapshot has yet been marked as Majority Committed, returns a status with error code
@@ -107,16 +108,32 @@ public:
      * StorageEngines that don't support a SnapshotManager should use the default
      * implementation.
      */
-    virtual Status setReadFromMajorityCommittedSnapshot() {
+    virtual Status obtainMajorityCommittedSnapshot() {
         return {ErrorCodes::CommandNotSupported,
                 "Current storage engine does not support majority readConcerns"};
     }
 
     /**
-     * Returns true if setReadFromMajorityCommittedSnapshot() has been called.
+     * Returns true if we are reading from a majority committed snapshot.
      */
     virtual bool isReadingFromMajorityCommittedSnapshot() const {
         return false;
+    }
+
+    /**
+     * Set this operation's readConcern level and replication mode on the recovery unit.
+     */
+    void setReadConcernLevelAndReplicationMode(repl::ReadConcernLevel readConcernLevel,
+                                               repl::ReplicationCoordinator::Mode replicationMode) {
+        _readConcernLevel = readConcernLevel;
+        _replicationMode = replicationMode;
+    }
+
+    /**
+     * Returns the readConcern level of this recovery unit.
+     */
+    repl::ReadConcernLevel getReadConcernLevel() const {
+        return _readConcernLevel;
     }
 
     /**
@@ -296,6 +313,8 @@ public:
 
 protected:
     RecoveryUnit() {}
+    repl::ReplicationCoordinator::Mode _replicationMode = repl::ReplicationCoordinator::modeNone;
+    repl::ReadConcernLevel _readConcernLevel = repl::ReadConcernLevel::kLocalReadConcern;
 };
 
 }  // namespace mongo

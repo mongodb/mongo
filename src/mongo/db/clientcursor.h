@@ -37,6 +37,7 @@
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/net/message.h"
 
@@ -57,11 +58,11 @@ struct ClientCursorParams {
     ClientCursorParams(std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> planExecutor,
                        NamespaceString nss,
                        UserNameIterator authenticatedUsersIter,
-                       bool isReadCommitted,
+                       repl::ReadConcernLevel readConcernLevel,
                        BSONObj originatingCommandObj)
         : exec(std::move(planExecutor)),
           nss(std::move(nss)),
-          isReadCommitted(isReadCommitted),
+          readConcernLevel(readConcernLevel),
           queryOptions(exec->getCanonicalQuery()
                            ? exec->getCanonicalQuery()->getQueryRequest().getOptions()
                            : 0),
@@ -88,7 +89,7 @@ struct ClientCursorParams {
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
     const NamespaceString nss;
     std::vector<UserName> authenticatedUsers;
-    bool isReadCommitted = false;
+    const repl::ReadConcernLevel readConcernLevel;
     int queryOptions = 0;
     BSONObj originatingCommandObj;
 };
@@ -133,8 +134,8 @@ public:
         return _txnNumber;
     }
 
-    bool isReadCommitted() const {
-        return _isReadCommitted;
+    repl::ReadConcernLevel getReadConcernLevel() const {
+        return _readConcernLevel;
     }
 
     /**
@@ -307,7 +308,7 @@ private:
     // A transaction number for this cursor, if it was provided in the originating command.
     const boost::optional<TxnNumber> _txnNumber;
 
-    const bool _isReadCommitted = false;
+    const repl::ReadConcernLevel _readConcernLevel;
 
     CursorManager* _cursorManager;
 
