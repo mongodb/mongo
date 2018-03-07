@@ -283,6 +283,19 @@ def main():
                     print("Extracting the following files from {0}...\n{1}".format(
                         filename, "\n".join(tarinfo.name for tarinfo in subdir)))
                     tar.extractall(members=subdir)
+            elif filename.startswith("mongo-src"):
+                print("Retrieving mongo source {}".format(filename))
+                # This is the distsrc.[tgz|zip] as referenced in evergreen.yml.
+                try:
+                    urllib.urlretrieve(artifact["url"], filename)
+                except urllib.ContentTooShortError:
+                    print("The artifact {} could not be completely downloaded. Default"
+                          " compile bypass to false.".format(filename))
+                    return
+                extension = os.path.splitext(filename)[1]
+                distsrc_filename = "distsrc{}".format(extension)
+                print("Renaming {} to {}".format(filename, distsrc_filename))
+                os.rename(filename, distsrc_filename)
             else:
                 print("Linking base artifact {} to this patch build".format(filename))
                 # For other artifacts we just add their URLs to the JSON file to upload.
