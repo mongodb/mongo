@@ -26,17 +26,34 @@
  *    then also delete it in the license file.
  */
 
-var ErrorCodes = {
-    //#for $ec in $codes
-    '$ec.name': $ec.code,
-    //#end for
-};
+var {ErrorCodes, ErrorCodeStrings} = (function() {
+    const handler = {
+        get: function(obj, prop) {
+            if (!obj.hasOwnProperty(prop)) {
+                throw new Error('Unknown Error Code: ' + prop);
+            }
 
-var ErrorCodeStrings = {
-    //#for $ec in $codes
-    $ec.code: '$ec.name',
-    //#end for
-};
+            return obj[prop];
+        }
+    };
+
+    const ErrorCodesObject = {
+        //#for $ec in $codes
+        '$ec.name': $ec.code,
+        //#end for
+    };
+
+    const ErrorCodeStringsObject = {
+        //#for $ec in $codes
+        $ec.code: '$ec.name',
+        //#end for
+    };
+
+    return {
+        ErrorCodes: new Proxy(ErrorCodesObject, handler),
+        ErrorCodeStrings: new Proxy(ErrorCodeStringsObject, handler),
+    };
+})();
 
 //#for $cat in $categories
 ErrorCodes.is${cat.name} = function(err) {
@@ -46,7 +63,11 @@ ErrorCodes.is${cat.name} = function(err) {
     if (typeof err === 'string') {
         error = err;
     } else if (typeof err === 'number') {
-        error = ErrorCodeStrings[err];
+        if (Object.prototype.hasOwnProperty.call(ErrorCodeStrings, err)) {
+            error = ErrorCodeStrings[err];
+        } else {
+            return false;
+        }
     }
     switch (error) {
         //#for $code in $cat.codes
