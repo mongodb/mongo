@@ -84,10 +84,12 @@ Pipeline::SourceContainer::iterator DocumentSourceSkip::doOptimizeAt(
     invariant(*itr == this);
 
     auto nextSkip = dynamic_cast<DocumentSourceSkip*>((*std::next(itr)).get());
-    //THE ERROR IS HERE
     if (nextSkip) {
-        _nToSkip += nextSkip->getSkip();
-        container->erase(std::next(itr));
+        unsigned long long overFlowCheck = 0 - 1;
+        if (overFlowCheck - _nToSkip - nextSkip->getSkip() < overFlowCheck / 2) {
+            _nToSkip += nextSkip->getSkip();
+            container->erase(std::next(itr));
+        }
         return itr;
     }
     return std::next(itr);
