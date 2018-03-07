@@ -670,9 +670,8 @@ Status MigrationChunkClonerSourceLegacy::_storeCurrentLocs(OperationContext* opC
     }
 
     if (PlanExecutor::DEAD == state || PlanExecutor::FAILURE == state) {
-        return {ErrorCodes::InternalError,
-                str::stream() << "Executor error while scanning for documents belonging to chunk: "
-                              << WorkingSetCommon::toStatusString(obj)};
+        return WorkingSetCommon::getMemberObjectStatus(obj).withContext(
+            "Executor error while scanning for documents belonging to chunk");
     }
 
     const uint64_t collectionAverageObjectSize = collection->averageObjectSize(opCtx);

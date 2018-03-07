@@ -388,7 +388,8 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
         DocumentSourceCursor::create(readLock.getCollection(), std::move(planExecutor), ctx());
 
     ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
-    ASSERT_THROWS_CODE(cursor->getNext().isEOF(), AssertionException, ErrorCodes::QueryPlanKilled);
+    ASSERT_THROWS_CODE(
+        cursor->getNext().isEOF(), AssertionException, ErrorCodes::ExceededTimeLimit);
 }
 
 TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
@@ -425,7 +426,8 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
         DocumentSourceCursor::create(readLock.getCollection(), std::move(planExecutor), ctx());
 
     ON_BLOCK_EXIT([cursor]() { cursor->dispose(); });
-    ASSERT_THROWS_CODE(cursor->getNext().isEOF(), AssertionException, ErrorCodes::QueryPlanKilled);
+    ASSERT_THROWS_CODE(
+        cursor->getNext().isEOF(), AssertionException, ErrorCodes::ExceededTimeLimit);
 }
 
 TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKilled) {

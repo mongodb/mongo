@@ -677,7 +677,9 @@ std::string runQuery(OperationContext* opCtx,
     if (PlanExecutor::FAILURE == state || PlanExecutor::DEAD == state) {
         error() << "Plan executor error during find: " << PlanExecutor::statestr(state)
                 << ", stats: " << redact(Explain::getWinningPlanStats(exec.get()));
-        uasserted(17144, "Executor error: " + WorkingSetCommon::toStatusString(obj));
+        uassertStatusOKWithContext(WorkingSetCommon::getMemberObjectStatus(obj),
+                                   "Executor error during OP_QUERY find");
+        MONGO_UNREACHABLE;
     }
 
     // Before saving the cursor, ensure that whatever plan we established happened with the expected

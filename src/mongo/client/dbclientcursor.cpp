@@ -305,7 +305,7 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
         invariant(qr.getCursorId() == 0);
 
         if (!(opts & QueryOption_CursorTailable)) {
-            uasserted(13127,
+            uasserted(ErrorCodes::CursorNotFound,
                       str::stream() << "cursor id " << cursorId << " didn't exist on server.");
         }
 
