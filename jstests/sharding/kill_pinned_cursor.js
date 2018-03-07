@@ -28,6 +28,39 @@
     st.shardColl(coll, {_id: 1}, {_id: 5}, {_id: 6}, kDBName, false);
     st.ensurePrimaryShard(kDBName, st.shard0.name);
 
+    // The startParallelShell function will take the string it's given and serialize it into a
+    // string. This means that we can't pass it functions which capture variables. Instead we use
+    // the trick below, by putting the values for the variables we'd like to capture inside the
+    // string. Kudos to Dave Storch for coming up with this idea.
+    function makeParallelShellFunctionString(cursorId, getMoreErrCode, useSession) {
+        let code = `const cursorId = ${cursorId.toString()};`;
+        code += `const kDBName = "${kDBName}";`;
+        code += `let collName = "${coll.getName()}";`;
+        code += `let getMoreErrCode = ${getMoreErrCode};`;
+        code += `const useSession = ${useSession};`;
+
+        const runGetMore = function() {
+            let dbToUse = db;
+            let session = null;
+            if (useSession) {
+                session = db.getMongo().startSession();
+                dbToUse = session.getDatabase(kDBName);
+            }
+            let response =
+                dbToUse.runCommand({getMore: cursorId, collection: collName, batchSize: 4});
+
+            // We expect that the operation will get interrupted and fail.
+            assert.commandFailedWithCode(response, getMoreErrCode);
+
+            if (session) {
+                session.endSession();
+            }
+        };
+
+        code += `(${runGetMore.toString()})();`;
+        return code;
+    }
+
     // Tests that the various cursors involved in a sharded query can be killed, even when pinned.
     //
     // Sets up a sharded cursor, opens a mongos cursor, and uses failpoints to cause the mongos
@@ -37,7 +70,8 @@
     // 'getMoreErrCode' is the error code with which we expect the getMore to fail (e.g. a
     // killCursors command should cause getMore to fail with "CursorKilled", but killOp should cause
     // a getMore to fail with "Interrupted").
-    function testShardedKillPinned({killFunc: killFunc, getMoreErrCode: getMoreErrCode}) {
+    function testShardedKillPinned(
+        {killFunc: killFunc, getMoreErrCode: getMoreErrCode, useSession: useSession}) {
         let getMoreJoiner = null;
         let cursorId;
 
@@ -56,20 +90,9 @@
             cursorId = cmdRes.cursor.id;
             assert.neq(cursorId, NumberLong(0));
 
-            // Now run a getMore in a parallel shell. This will require issuing getMores to the
-            // shards, which hang due to the fail point. In turn, mongos hangs waiting for the
-            // shards.
-            const runGetMore = function() {
-                let response =
-                    db.runCommand({getMore: cursorId, collection: collName, batchSize: 4});
-                // We expect that the operation will get interrupted and fail.
-                assert.commandFailedWithCode(response, getMoreErrCode);
-            };
-            let code = `let cursorId = ${cursorId.toString()};`;
-            code += `let collName = "${coll.getName()}";`;
-            code += `let getMoreErrCode = ${getMoreErrCode};`;
-            code += `(${runGetMore.toString()})();`;
-            getMoreJoiner = startParallelShell(code, st.s.port);
+            const parallelShellFn =
+                makeParallelShellFunctionString(cursorId, getMoreErrCode, useSession);
+            getMoreJoiner = startParallelShell(parallelShellFn, st.s.port);
 
             // Sleep until we know the mongod cursors are pinned.
             assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.pinned > 0);
@@ -109,63 +132,92 @@
         }
     }
 
-    // Test that running 'killCursors' against a pinned mongos cursor (with pinned mongod cursors)
-    // correctly cleans up all of the involved cursors.
-    testShardedKillPinned({
-        killFunc: function(mongosCursorId) {
-            // Run killCursors against the mongos cursor. Verify that the cursor is reported as
-            // killed successfully, and does not hang or return a "CursorInUse" error.
-            let cmdRes =
-                mongosDB.runCommand({killCursors: coll.getName(), cursors: [mongosCursorId]});
-            assert.commandWorked(cmdRes);
-            assert.eq(cmdRes.cursorsKilled, [mongosCursorId]);
-            assert.eq(cmdRes.cursorsAlive, []);
-            assert.eq(cmdRes.cursorsNotFound, []);
-            assert.eq(cmdRes.cursorsUnknown, []);
-        },
-        getMoreErrCode: ErrorCodes.CursorKilled
-    });
+    for (let useSession of[true, false]) {
+        // Test that running 'killCursors' against a pinned mongos cursor (with pinned mongod
+        // cursors) correctly cleans up all of the involved cursors.
+        testShardedKillPinned({
+            killFunc: function(mongosCursorId) {
+                // Run killCursors against the mongos cursor. Verify that the cursor is reported as
+                // killed successfully, and does not hang or return a "CursorInUse" error.
+                let cmdRes =
+                    mongosDB.runCommand({killCursors: coll.getName(), cursors: [mongosCursorId]});
+                assert.commandWorked(cmdRes);
+                assert.eq(cmdRes.cursorsKilled, [mongosCursorId]);
+                assert.eq(cmdRes.cursorsAlive, []);
+                assert.eq(cmdRes.cursorsNotFound, []);
+                assert.eq(cmdRes.cursorsUnknown, []);
+            },
+            getMoreErrCode: ErrorCodes.CursorKilled,
+            useSession: useSession
+        });
 
-    // Test that running killOp against one of the cursors pinned on mongod causes all involved
-    // cursors to be killed.
-    testShardedKillPinned({
-        // This function ignores the mongos cursor id, since it instead uses currentOp to obtain an
-        // op id to kill.
-        killFunc: function() {
-            let currentGetMoresArray =
-                shard0DB.getSiblingDB("admin")
-                    .aggregate([{$currentOp: {}}, {$match: {"command.getMore": {$exists: true}}}])
-                    .toArray();
-            assert.eq(1, currentGetMoresArray.length);
-            let currentGetMore = currentGetMoresArray[0];
-            let killOpResult = shard0DB.killOp(currentGetMore.opid);
-            assert.commandWorked(killOpResult);
-        },
-        getMoreErrCode: ErrorCodes.Interrupted
-    });
+        // Test that running killOp against one of the cursors pinned on mongod causes all involved
+        // cursors to be killed.
+        testShardedKillPinned({
+            // This function ignores the mongos cursor id, since it instead uses currentOp to
+            // obtain an op id to kill.
+            killFunc: function() {
+                let currentGetMoresArray =
+                    shard0DB.getSiblingDB("admin")
+                        .aggregate(
+                            [{$currentOp: {}}, {$match: {"command.getMore": {$exists: true}}}])
+                        .toArray();
+                assert.eq(1, currentGetMoresArray.length);
+                let currentGetMore = currentGetMoresArray[0];
+                let killOpResult = shard0DB.killOp(currentGetMore.opid);
+                assert.commandWorked(killOpResult);
+            },
+            getMoreErrCode: ErrorCodes.Interrupted,
+            useSession: useSession
+        });
 
-    // Test that running killCursors against one of the cursors pinned on mongod causes all involved
-    // cursors to be killed.
+        // Test that running killCursors against one of the cursors pinned on mongod causes all
+        // involved cursors to be killed.
+        testShardedKillPinned({
+            // This function ignores the mongos cursor id, since it instead uses currentOp to
+            // obtain the cursor id of one of the shard cursors.
+            killFunc: function() {
+                let currentGetMoresArray =
+                    shard0DB.getSiblingDB("admin")
+                        .aggregate(
+                            [{$currentOp: {}}, {$match: {"command.getMore": {$exists: true}}}])
+                        .toArray();
+                assert.eq(1, currentGetMoresArray.length);
+                let currentGetMore = currentGetMoresArray[0];
+                let shardCursorId = currentGetMore.command.getMore;
+                let cmdRes =
+                    shard0DB.runCommand({killCursors: coll.getName(), cursors: [shardCursorId]});
+                assert.commandWorked(cmdRes);
+                assert.eq(cmdRes.cursorsKilled, [shardCursorId]);
+                assert.eq(cmdRes.cursorsAlive, []);
+                assert.eq(cmdRes.cursorsNotFound, []);
+                assert.eq(cmdRes.cursorsUnknown, []);
+            },
+            getMoreErrCode: ErrorCodes.CursorKilled,
+            useSession: useSession
+        });
+    }
+
+    // Test that running killSessions on the session which is running the getMore causes the
+    // cursor to be killed.
     testShardedKillPinned({
-        // This function ignores the mongos cursor id, since it instead uses currentOp to obtain the
-        // cursor id of one of the shard cursors.
+        // This function ignores the mongos cursor id, since it instead uses listLocalSessions
+        // to obtain the session id of the session running the getMore.
         killFunc: function() {
-            let currentGetMoresArray =
-                shard0DB.getSiblingDB("admin")
-                    .aggregate([{$currentOp: {}}, {$match: {"command.getMore": {$exists: true}}}])
-                    .toArray();
-            assert.eq(1, currentGetMoresArray.length);
-            let currentGetMore = currentGetMoresArray[0];
-            let shardCursorId = currentGetMore.command.getMore;
-            let cmdRes =
-                shard0DB.runCommand({killCursors: coll.getName(), cursors: [shardCursorId]});
-            assert.commandWorked(cmdRes);
-            assert.eq(cmdRes.cursorsKilled, [shardCursorId]);
-            assert.eq(cmdRes.cursorsAlive, []);
-            assert.eq(cmdRes.cursorsNotFound, []);
-            assert.eq(cmdRes.cursorsUnknown, []);
+            // Must sort by 'lastUse' because there may be sessions left over on the server from
+            // the previous runs. We will only call killSessions on the most recently used one.
+            const localSessions = mongosDB
+                                      .aggregate([
+                                          {$listLocalSessions: {allUsers: true}},
+                                          {$sort: {"lastUse": -1}},
+                                      ])
+                                      .toArray();
+
+            const sessionUUID = localSessions[0]._id.id;
+            assert.commandWorked(mongosDB.runCommand({killSessions: [{id: sessionUUID}]}));
         },
-        getMoreErrCode: ErrorCodes.CursorKilled
+        getMoreErrCode: ErrorCodes.Interrupted,
+        useSession: true,
     });
 
     st.stop();
