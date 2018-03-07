@@ -1576,7 +1576,6 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
     const Date_t stepDownUntil = startTime + stepdownTime;
     const Date_t waitUntil = startTime + waitTime;
 
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     if (!getMemberState().primary()) {
         // Note this check is inherently racy - it's always possible for the node to
         // stepdown from some other path before we acquire the global exclusive lock.  This check
@@ -1678,8 +1677,7 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             invariant(!opCtx->lockState()->isLocked());
 
             // Make sure we re-acquire the global lock before returning so that we're always holding
-            // the
-            // global lock when the onExitGuard set up earlier runs.
+            // the global lock when the onExitGuard set up earlier runs.
             ON_BLOCK_EXIT([&] {
                 // Need to release _mutex before re-acquiring the global lock to preserve lock
                 // acquisition order rules.
@@ -1687,13 +1685,12 @@ Status ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
 
                 // Need to re-acquire the global lock before re-attempting stepdown.
                 // We use no timeout here even though that means the lock acquisition could take
-                // longer
-                // than the stepdown window.  If that happens, the call to _tryToStepDown
-                // immediately
-                // after will error.  Since we'll need the global lock no matter what to clean up a
-                // failed stepdown attempt, we might as well spend whatever time we need to acquire
-                // it
-                // now.
+                // longer than the stepdown window.  If that happens, the call to _tryToStepDown
+                // immediately after will error.  Since we'll need the global lock no matter what to
+                // clean up a failed stepdown attempt, we might as well spend whatever time we need
+                // to acquire it now.  For the same reason, we also disable lock acquisition
+                // interruption, to guarantee that we get the lock eventually.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                 globalLock.reset(new Lock::GlobalLock(opCtx, MODE_X, Date_t::max()));
                 invariant(globalLock->isLocked());
                 lk.lock();
