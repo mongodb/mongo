@@ -251,8 +251,9 @@
     }, {"command.pipeline": [{$match: {x: 1}}]}, {"command.pipeline": [{$match: {x: 1}}]});
 
     // Test update.
-    // We cannot provide a 'profilerFilter' because profiling is turned off for write commands in
-    // transactions.
+    // TODO SERVER-33412: Perform writes under autocommit:false transaction.
+    // TODO SERVER-33548: We cannot provide a 'profilerFilter' because profiling is turned off for
+    // batch write commands in transactions.
     testCommand(function() {
         const res = assert.commandWorked(db.runCommand({
             update: "coll",
@@ -281,6 +282,36 @@
         // Only remove one existing doc committed before the transaction.
         assert.eq(res.n, 1, tojson(res));
     }, {op: "remove"}, null, true);
+
+    // Test findAndModify.
+    // TODO SERVER-33412: Perform writes under autocommit:false transaction.
+    testCommand(function() {
+        const res = assert.commandWorked(db.runCommand({
+            findAndModify: "coll",
+            query: {new: 1},
+            update: {$set: {findAndModify: 1}},
+            readConcern: {level: "snapshot"},
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber),
+        }));
+        assert(res.hasOwnProperty("lastErrorObject"));
+        assert.eq(res.lastErrorObject.n, 0, tojson(res));
+        assert.eq(res.lastErrorObject.updatedExisting, false, tojson(res));
+    }, {"command.findAndModify": "coll"}, {"command.findAndModify": "coll"}, true);
+
+    testCommand(function() {
+        const res = assert.commandWorked(db.runCommand({
+            findAndModify: "coll",
+            query: {new: 1},
+            update: {$set: {findAndModify: 1}},
+            readConcern: {level: "snapshot"},
+            lsid: TestData.sessionId,
+            txnNumber: NumberLong(TestData.txnNumber),
+        }));
+        assert(res.hasOwnProperty("lastErrorObject"));
+        assert.eq(res.lastErrorObject.n, 0, tojson(res));
+        assert.eq(res.lastErrorObject.updatedExisting, false, tojson(res));
+    }, {"command.findAndModify": "coll"}, {"command.findAndModify": "coll"}, true);
 
     rst.stopSet();
 }());

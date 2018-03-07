@@ -129,7 +129,8 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
     return boost::none;
 }
 
-void makeUpdateRequest(const FindAndModifyRequest& args,
+void makeUpdateRequest(const OperationContext* opCtx,
+                       const FindAndModifyRequest& args,
                        bool explain,
                        UpdateLifecycleImpl* updateLifecycle,
                        UpdateRequest* requestOut) {
@@ -143,20 +144,33 @@ void makeUpdateRequest(const FindAndModifyRequest& args,
     requestOut->setReturnDocs(args.shouldReturnNew() ? UpdateRequest::RETURN_NEW
                                                      : UpdateRequest::RETURN_OLD);
     requestOut->setMulti(false);
-    requestOut->setYieldPolicy(PlanExecutor::YIELD_AUTO);
     requestOut->setExplain(explain);
     requestOut->setLifecycle(updateLifecycle);
+
+    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    requestOut->setYieldPolicy(readConcernArgs.getLevel() ==
+                                       repl::ReadConcernLevel::kSnapshotReadConcern
+                                   ? PlanExecutor::INTERRUPT_ONLY
+                                   : PlanExecutor::YIELD_AUTO);
 }
 
-void makeDeleteRequest(const FindAndModifyRequest& args, bool explain, DeleteRequest* requestOut) {
+void makeDeleteRequest(const OperationContext* opCtx,
+                       const FindAndModifyRequest& args,
+                       bool explain,
+                       DeleteRequest* requestOut) {
     requestOut->setQuery(args.getQuery());
     requestOut->setProj(args.getFields());
     requestOut->setSort(args.getSort());
     requestOut->setCollation(args.getCollation());
     requestOut->setMulti(false);
-    requestOut->setYieldPolicy(PlanExecutor::YIELD_AUTO);
     requestOut->setReturnDeleted(true);  // Always return the old value.
     requestOut->setExplain(explain);
+
+    const auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+    requestOut->setYieldPolicy(readConcernArgs.getLevel() ==
+                                       repl::ReadConcernLevel::kSnapshotReadConcern
+                                   ? PlanExecutor::INTERRUPT_ONLY
+                                   : PlanExecutor::YIELD_AUTO);
 }
 
 void appendCommandResponse(const PlanExecutor* exec,
@@ -255,7 +269,7 @@ public:
         if (args.isRemove()) {
             DeleteRequest request(nsString);
             const bool isExplain = true;
-            makeDeleteRequest(args, isExplain, &request);
+            makeDeleteRequest(opCtx, args, isExplain, &request);
 
             ParsedDelete parsedDelete(opCtx, &request);
             uassertStatusOK(parsedDelete.parseRequest());
@@ -279,7 +293,7 @@ public:
             UpdateRequest request(nsString);
             UpdateLifecycleImpl updateLifecycle(nsString);
             const bool isExplain = true;
-            makeUpdateRequest(args, isExplain, &updateLifecycle, &request);
+            makeUpdateRequest(opCtx, args, isExplain, &updateLifecycle, &request);
 
             ParsedUpdate parsedUpdate(opCtx, &request);
             uassertStatusOK(parsedUpdate.parseRequest());
@@ -338,7 +352,7 @@ public:
             if (args.isRemove()) {
                 DeleteRequest request(nsString);
                 const bool isExplain = false;
-                makeDeleteRequest(args, isExplain, &request);
+                makeDeleteRequest(opCtx, args, isExplain, &request);
 
                 if (opCtx->getTxnNumber()) {
                     request.setStmtId(stmtId);
@@ -396,7 +410,7 @@ public:
                 UpdateRequest request(nsString);
                 UpdateLifecycleImpl updateLifecycle(nsString);
                 const bool isExplain = false;
-                makeUpdateRequest(args, isExplain, &updateLifecycle, &request);
+                makeUpdateRequest(opCtx, args, isExplain, &updateLifecycle, &request);
 
                 if (opCtx->getTxnNumber()) {
                     request.setStmtId(stmtId);

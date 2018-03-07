@@ -225,16 +225,34 @@
         txnNumber: NumberLong(txnNumber++)
     }));
 
-    // readConcern 'snapshot' is not supported by findAndModify.
-    // TODO SERVER-33354: Add snapshot support for findAndModify.
-    assert.commandFailedWithCode(sessionDb.runCommand({
+    // TODO SERVER-33591: Remove once snapshot writes use majority writeConcern.
+    // Perform majority write to ensure any previous writes are part of the majority commit
+    // snapshot.
+    assert.commandWorked(sessionDb.coll.insert({}, {writeConcern: {w: "majority"}}));
+
+    // readConcern 'snapshot' is supported by findAndModify.
+    assert.commandWorked(sessionDb.runCommand({
         findAndModify: collName,
-        filter: {},
-        update: {$set: {a: 1}},
+        query: {_id: 1},
+        update: {$set: {b: 1}},
         readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++)
-    }),
-                                 ErrorCodes.InvalidOptions);
+        txnNumber: NumberLong(txnNumber++),
+    }));
+    assert.eq({_id: 1, a: 1, b: 1}, sessionDb.coll.findOne({_id: 1}));
+
+    // TODO SERVER-33591: Remove once snapshot writes use majority writeConcern.
+    // Perform majority write to ensure any previous writes are part of the majority commit
+    // snapshot.
+    assert.commandWorked(sessionDb.coll.insert({}, {writeConcern: {w: "majority"}}));
+
+    assert.commandWorked(sessionDb.runCommand({
+        findAndModify: collName,
+        query: {_id: 1},
+        remove: true,
+        readConcern: {level: "snapshot"},
+        txnNumber: NumberLong(txnNumber++),
+    }));
+    assert.eq(0, sessionDb.coll.find({_id: 1}).itcount());
 
     // readConcern 'snapshot' is supported by parallelCollectionScan.
     assert.commandWorked(sessionDb.runCommand({
