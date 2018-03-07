@@ -1648,7 +1648,7 @@ void initTimestampFromOplog(OperationContext* opCtx, const std::string& oplogNS)
 
     if (!lastOp.isEmpty()) {
         LOG(1) << "replSet setting last Timestamp";
-        const OpTime opTime = fassertStatusOK(28696, OpTime::parseFromOplogEntry(lastOp));
+        const OpTime opTime = fassert(28696, OpTime::parseFromOplogEntry(lastOp));
         setNewTimestamp(opCtx->getServiceContext(), opTime.getTimestamp());
     }
 }

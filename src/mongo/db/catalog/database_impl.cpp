@@ -552,7 +552,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
             log() << "dropCollection: " << fullns << " (" << uuidString << ") - index namespace '"
                   << index->indexNamespace()
                   << "' would be too long after drop-pending rename. Dropping index immediately.";
-            fassertStatusOK(40463, collection->getIndexCatalog()->dropIndex(opCtx, index));
+            fassert(40463, collection->getIndexCatalog()->dropIndex(opCtx, index));
             opObserver->onDropIndex(
                 opCtx, fullns, collection->uuid(), index->indexName(), index->infoObj());
         }
@@ -568,7 +568,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
             log() << "dropCollection: " << fullns << " (" << uuidString
                   << ") - no drop optime available for pending-drop. "
                   << "Dropping collection immediately.";
-            fassertStatusOK(40462, _finishDropCollection(opCtx, fullns, collection));
+            fassert(40462, _finishDropCollection(opCtx, fullns, collection));
             return Status::OK();
         }
     } else {
@@ -591,7 +591,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     log() << "dropCollection: " << fullns << " (" << uuidString
           << ") - renaming to drop-pending collection: " << dpns << " with drop optime "
           << dropOpTime;
-    fassertStatusOK(40464, renameCollection(opCtx, fullns.ns(), dpns.ns(), stayTemp));
+    fassert(40464, renameCollection(opCtx, fullns.ns(), dpns.ns(), stayTemp));
 
     // Register this drop-pending namespace with DropPendingCollectionReaper to remove when the
     // committed optime reaches the drop optime.

@@ -282,7 +282,7 @@ OpTime ReplicationCoordinatorExternalStateMock::onTransitionToPrimary(OperationC
                                                                       bool isV1ElectionProtocol) {
     _lastOpTime = _firstOpTimeOfMyTerm;
     _firstOpTimeOfMyTerm = OpTime();
-    return fassertStatusOK(40297, _lastOpTime);
+    return fassert(40297, _lastOpTime);
 }
 
 void ReplicationCoordinatorExternalStateMock::startNoopWriter(OpTime opTime) {}

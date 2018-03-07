@@ -466,7 +466,7 @@ Status MobileRecordStore::updateRecord(OperationContext* opCtx,
     _changeDataSize(opCtx, -dataSizeBefore + len);
 
     if (notifier) {
-        fassertStatusOK(37054, notifier->recordStoreGoingToUpdateInPlace(opCtx, recId));
+        fassert(37054, notifier->recordStoreGoingToUpdateInPlace(opCtx, recId));
     }
 
     std::string updateQuery = "UPDATE \"" + _ident + "\" SET data = ? " + "WHERE rec_id = ?;";

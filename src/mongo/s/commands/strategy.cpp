@@ -492,8 +492,8 @@ void Strategy::commandOp(OperationContext* opCtx,
         CommandResult result;
         result.shardTargetId = shardId;
 
-        result.target = fassertStatusOK(
-            34417, ConnectionString::parse(cursor.getShardCursor(shardId)->originalHost()));
+        result.target =
+            fassert(34417, ConnectionString::parse(cursor.getShardCursor(shardId)->originalHost()));
         result.result = cursor.getShardCursor(shardId)->peekFirst().getOwned();
         results->push_back(result);
     }

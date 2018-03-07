@@ -94,7 +94,7 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     }
 
     auto status = setTransactionReadTimestamp(_committedSnapshot.get(), session);
-    fassertStatusOK(30635, status);
+    fassert(30635, status);
     return *_committedSnapshot;
 }
 

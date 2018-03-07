@@ -57,7 +57,7 @@ public:
         std::string ident("index_" + std::to_string(inc++));
         OperationContextNoop opCtx(newRecoveryUnit().release());
         Status status = MobileIndex::create(&opCtx, ident);
-        fassertStatusOK(37052, status);
+        fassert(37052, status);
 
         if (isUnique) {
             return stdx::make_unique<MobileIndexUnique>(_ordering, ident);

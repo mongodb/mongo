@@ -451,8 +451,7 @@ void ReplicationCoordinatorImpl::appendConnectionStats(executor::ConnectionPoolS
 bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) {
     // Create necessary replication collections to guarantee that if a checkpoint sees data after
     // initial sync has completed, it also sees these collections.
-    fassertStatusOK(50708,
-                    _replicationProcess->getConsistencyMarkers()->createInternalCollections(opCtx));
+    fassert(50708, _replicationProcess->getConsistencyMarkers()->createInternalCollections(opCtx));
 
     _replicationProcess->getConsistencyMarkers()->initializeMinValidDocument(opCtx);
 
@@ -476,7 +475,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
         if (status == ErrorCodes::NamespaceNotFound) {
             log() << "Did not find local Rollback ID document at startup. Creating one.";
             auto initializingStatus = _replicationProcess->initializeRollbackID(opCtx);
-            fassertStatusOK(40424, initializingStatus);
+            fassert(40424, initializingStatus);
         } else {
             severe() << "Error loading local Rollback ID document at startup; " << status;
             fassertFailedNoTrace(40428);
@@ -513,7 +512,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* opCtx) 
     if (handle == ErrorCodes::ShutdownInProgress) {
         handle = CallbackHandle{};
     }
-    fassertStatusOK(40446, handle);
+    fassert(40446, handle);
     stdx::lock_guard<stdx::mutex> lk(_mutex);
     _finishLoadLocalConfigCbh = std::move(handle.getValue());
 
@@ -3489,7 +3488,7 @@ CallbackHandle ReplicationCoordinatorImpl::_scheduleWorkAt(Date_t when, const Ca
     if (cbh == ErrorCodes::ShutdownInProgress) {
         return {};
     }
-    return fassertStatusOK(28800, cbh);
+    return fassert(28800, cbh);
 }
 
 EventHandle ReplicationCoordinatorImpl::_makeEvent() {

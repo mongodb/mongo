@@ -318,7 +318,7 @@ void BackgroundSync::_produce() {
     if (ErrorCodes::CallbackCanceled == status || ErrorCodes::isShutdownError(status.code())) {
         return;
     }
-    fassertStatusOK(40349, status);
+    fassert(40349, status);
     _syncSourceResolver->join();
     {
         stdx::lock_guard<stdx::mutex> lock(_mutex);

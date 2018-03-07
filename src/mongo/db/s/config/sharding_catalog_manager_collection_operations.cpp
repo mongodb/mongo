@@ -431,7 +431,7 @@ Status ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Nam
         SetShardVersionRequest ssv = SetShardVersionRequest::makeForVersioningNoPersist(
             shardRegistry->getConfigServerConnectionString(),
             shardEntry.getName(),
-            fassertStatusOK(28781, ConnectionString::parse(shardEntry.getHost())),
+            fassert(28781, ConnectionString::parse(shardEntry.getHost())),
             nss,
             ChunkVersion::DROPPED(),
             true);

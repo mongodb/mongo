@@ -281,7 +281,7 @@ Status waitForReadConcern(OperationContext* opCtx,
 
 
     if (atClusterTime) {
-        fassertStatusOK(39345, opCtx->recoveryUnit()->selectSnapshot(atClusterTime->asTimestamp()));
+        fassert(39345, opCtx->recoveryUnit()->selectSnapshot(atClusterTime->asTimestamp()));
         return Status::OK();
     }
 

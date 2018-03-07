@@ -178,7 +178,7 @@ Status dropDatabase(OperationContext* opCtx, const std::string& dbName) {
             // A primary processing this will assign a timestamp when the operation is written to
             // the oplog. As stated above, a secondary processing must only observe non-replicated
             // collections, thus this should not be timestamped.
-            fassertStatusOK(40476, db->dropCollectionEvenIfSystem(opCtx, nss));
+            fassert(40476, db->dropCollectionEvenIfSystem(opCtx, nss));
             wunit.commit();
         }
         dropPendingGuard.Dismiss();

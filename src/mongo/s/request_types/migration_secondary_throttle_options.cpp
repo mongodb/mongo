@@ -149,7 +149,7 @@ WriteConcernOptions MigrationSecondaryThrottleOptions::getWriteConcern() const {
     invariant(_writeConcernBSON);
 
     WriteConcernOptions writeConcern;
-    fassertStatusOK(34414, writeConcern.parse(*_writeConcernBSON));
+    fassert(34414, writeConcern.parse(*_writeConcernBSON));
 
     return writeConcern;
 }

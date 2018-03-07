@@ -50,9 +50,9 @@ TimeProofService::Key TimeProofService::generateRandomKey() {
     std::unique_ptr<SecureRandom> rng(SecureRandom::create());
     std::generate(keyBuffer.begin(), keyBuffer.end(), [&] { return rng->nextInt64(); });
 
-    return fassertStatusOK(40384,
-                           SHA1Block::fromBuffer(reinterpret_cast<std::uint8_t*>(keyBuffer.data()),
-                                                 SHA1Block::kHashLength));
+    return fassert(40384,
+                   SHA1Block::fromBuffer(reinterpret_cast<std::uint8_t*>(keyBuffer.data()),
+                                         SHA1Block::kHashLength));
 }
 
 TimeProofService::TimeProof TimeProofService::getProof(LogicalTime time, const Key& key) {

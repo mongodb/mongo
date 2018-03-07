@@ -114,7 +114,7 @@ void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx) try {
     boost::optional<OpTime> topOfOplog = boost::none;
     if (topOfOplogSW.getStatus() != ErrorCodes::CollectionIsEmpty &&
         topOfOplogSW.getStatus() != ErrorCodes::NamespaceNotFound) {
-        fassertStatusOK(40290, topOfOplogSW);
+        fassert(40290, topOfOplogSW);
         topOfOplog = topOfOplogSW.getValue();
     }
 
@@ -199,7 +199,7 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
     }
 
     auto firstTimestampFound =
-        fassertStatusOK(40291, OpTime::parseFromOplogEntry(cursor->nextSafe())).getTimestamp();
+        fassert(40291, OpTime::parseFromOplogEntry(cursor->nextSafe())).getTimestamp();
     if (firstTimestampFound != oplogApplicationStartPoint) {
         severe() << "Oplog entry at " << oplogApplicationStartPoint.toBSON()
                  << " is missing; actual entry found is " << firstTimestampFound.toBSON();
@@ -211,10 +211,9 @@ void ReplicationRecoveryImpl::_applyToEndOfOplog(OperationContext* opCtx,
 
     while (cursor->more()) {
         auto entry = cursor->nextSafe();
-        fassertStatusOK(40294,
-                        SyncTail::syncApply(opCtx, entry, OplogApplication::Mode::kRecovering));
-        _consistencyMarkers->setAppliedThrough(
-            opCtx, fassertStatusOK(40295, OpTime::parseFromOplogEntry(entry)));
+        fassert(40294, SyncTail::syncApply(opCtx, entry, OplogApplication::Mode::kRecovering));
+        _consistencyMarkers->setAppliedThrough(opCtx,
+                                               fassert(40295, OpTime::parseFromOplogEntry(entry)));
     }
 }
 

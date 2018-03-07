@@ -194,7 +194,7 @@ void scheduleWork(executor::TaskExecutor* executor,
     if (cbh == ErrorCodes::ShutdownInProgress) {
         return;
     }
-    fassertStatusOK(40460, cbh);
+    fassert(40460, cbh);
 }
 
 }  // namespace
@@ -459,7 +459,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
             wuow.commit();
         });
     }
-    const auto opTimeToReturn = fassertStatusOK(28665, loadLastOpTime(opCtx));
+    const auto opTimeToReturn = fassert(28665, loadLastOpTime(opCtx));
 
     _shardingOnTransitionToPrimaryHook(opCtx);
     _dropAllTempCollections(opCtx);
@@ -685,7 +685,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         return;
     }
 
-    fassertStatusOK(40107, status);
+    fassert(40107, status);
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         status = ShardingCatalogManager::get(opCtx)->initializeConfigDatabaseIfNeeded(opCtx);
@@ -717,7 +717,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
                 return;
             }
 
-            fassertStatusOK(40217, status);
+            fassert(40217, status);
         }
 
         // Free any leftover locks from previous instantiations.

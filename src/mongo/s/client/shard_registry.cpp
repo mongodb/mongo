@@ -329,7 +329,7 @@ bool ShardRegistry::reload(OperationContext* opCtx) {
 void ShardRegistry::replicaSetChangeShardRegistryUpdateHook(
     const std::string& setName, const std::string& newConnectionString) {
     // Inform the ShardRegsitry of the new connection string for the shard.
-    auto connString = fassertStatusOK(28805, ConnectionString::parse(newConnectionString));
+    auto connString = fassert(28805, ConnectionString::parse(newConnectionString));
     invariant(setName == connString.getSetName());
     grid.shardRegistry()->updateReplSetHosts(connString);
 }

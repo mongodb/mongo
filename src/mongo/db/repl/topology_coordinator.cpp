@@ -1685,7 +1685,7 @@ HeartbeatResponseAction TopologyCoordinator::_updatePrimaryFromHBData(
         LOG(2) << "TopologyCoordinator::_updatePrimaryFromHBData - " << status.reason();
         return HeartbeatResponseAction::makeNoAction();
     }
-    fassertStatusOK(28816, becomeCandidateIfElectable(now, StartElectionReason::kElectionTimeout));
+    fassert(28816, becomeCandidateIfElectable(now, StartElectionReason::kElectionTimeout));
     return HeartbeatResponseAction::makeElectAction();
 }
 

@@ -183,8 +183,8 @@ void updateSessionEntry(OperationContext* opCtx, const UpdateRequest& updateRequ
     invariant(collection->getDefaultCollator() == nullptr);
     boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(opCtx, nullptr));
 
-    auto matcher = fassertStatusOK(
-        40673, MatchExpressionParser::parse(updateRequest.getQuery(), std::move(expCtx)));
+    auto matcher =
+        fassert(40673, MatchExpressionParser::parse(updateRequest.getQuery(), std::move(expCtx)));
     if (!matcher->matchesBSON(originalDoc)) {
         // Document no longer match what we expect so throw WCE to make the caller re-examine.
         throw WriteConflictException();

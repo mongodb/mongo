@@ -497,10 +497,9 @@ void scheduleWritesToOplog(OperationContext* opCtx,
                     ops[i].raw, ops[i].getOpTime().getTimestamp(), ops[i].getOpTime().getTerm()});
             }
 
-            fassertStatusOK(
-                40141,
-                StorageInterface::get(opCtx.get())
-                    ->insertDocuments(opCtx.get(), NamespaceString::kRsOplogNamespace, docs));
+            fassert(40141,
+                    StorageInterface::get(opCtx.get())
+                        ->insertDocuments(opCtx.get(), NamespaceString::kRsOplogNamespace, docs));
         };
     };
 
@@ -737,8 +736,8 @@ OpTime SyncTail::multiApply(OperationContext* opCtx, MultiApplier::Operations op
         return Status::OK();
     };
 
-    return fassertStatusOK(
-        34437, repl::multiApply(opCtx, _writerPool.get(), std::move(ops), applyOperation));
+    return fassert(34437,
+                   repl::multiApply(opCtx, _writerPool.get(), std::move(ops), applyOperation));
 }
 
 namespace {
@@ -826,7 +825,7 @@ private:
         auto storageInterface = StorageInterface::get(opCtx.get());
         auto oplogMaxSizeResult =
             storageInterface->getOplogMaxSize(opCtx.get(), NamespaceString::kRsOplogNamespace);
-        auto oplogMaxSize = fassertStatusOK(40301, oplogMaxSizeResult);
+        auto oplogMaxSize = fassert(40301, oplogMaxSizeResult);
         return std::min(oplogMaxSize / 10, std::size_t(replBatchLimitBytes));
     }
 
@@ -1492,10 +1491,9 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
             // safe to set an index as multikey too early, just not too late. We conservatively pick
             // the first timestamp in the batch since we do not have enough information to find out
             // the timestamp of the first write that set the given multikey path.
-            fassertStatusOK(
-                50686,
-                StorageInterface::get(opCtx)->setIndexIsMultikey(
-                    opCtx, info.nss, info.indexName, info.multikeyPaths, firstTimeInBatch));
+            fassert(50686,
+                    StorageInterface::get(opCtx)->setIndexIsMultikey(
+                        opCtx, info.nss, info.indexName, info.multikeyPaths, firstTimeInBatch));
         }
     }
 

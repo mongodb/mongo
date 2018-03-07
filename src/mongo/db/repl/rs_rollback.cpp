@@ -608,7 +608,7 @@ void checkRbidAndUpdateMinValid(OperationContext* opCtx,
     // online until we get to that point in freshness. In other words, we do not transition from
     // RECOVERING state to SECONDARY state until we have reached the minValid oplog entry.
 
-    OpTime minValid = fassertStatusOK(40492, OpTime::parseFromOplogEntry(newMinValidDoc));
+    OpTime minValid = fassert(40492, OpTime::parseFromOplogEntry(newMinValidDoc));
     log() << "Setting minvalid to " << minValid;
 
     // This method is only used with storage engines that do not support recover to stable
@@ -790,7 +790,7 @@ void dropCollection(OperationContext* opCtx,
     // We permanently drop the collection rather than 2-phase drop the collection
     // here. By not passing in an opTime to dropCollectionEvenIfSystem() the collection
     // is immediately dropped.
-    fassertStatusOK(40504, db->dropCollectionEvenIfSystem(opCtx, nss));
+    fassert(40504, db->dropCollectionEvenIfSystem(opCtx, nss));
     wunit.commit();
 }
 
@@ -945,7 +945,7 @@ Status _syncRollback(OperationContext* opCtx,
     try {
         ON_BLOCK_EXIT([&] {
             auto status = replicationProcess->incrementRollbackID(opCtx);
-            fassertStatusOK(40497, status);
+            fassert(40497, status);
         });
         syncFixUp(opCtx, how, rollbackSource, replCoord, replicationProcess);
     } catch (const RSFatalException& e) {

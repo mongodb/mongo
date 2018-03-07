@@ -51,7 +51,7 @@ using ResponseStatus = TaskExecutor::ResponseStatus;
 NetworkInterfaceMock::NetworkInterfaceMock()
     : _waitingToRunMask(0),
       _currentlyRunning(kNoThread),
-      _now(fassertStatusOK(18653, dateFromISOString("2014-08-01T00:00:00Z"))),
+      _now(fassert(18653, dateFromISOString("2014-08-01T00:00:00Z"))),
       _hasStarted(false),
       _inShutdown(false),
       _executorNextWakeupDate(Date_t::max()) {}

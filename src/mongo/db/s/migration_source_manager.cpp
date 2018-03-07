@@ -498,14 +498,13 @@ Status MigrationSourceManager::commitChunkMetadataOnConfig(OperationContext* opC
             }
         }
 
-        fassertStatusOK(
-            40137,
-            status.withContext(
-                str::stream() << "Failed to commit migration for chunk " << _args.toString()
-                              << " due to "
-                              << redact(migrationCommitStatus)
-                              << ". Updating the optime with a write before refreshing the "
-                              << "metadata also failed"));
+        fassert(40137,
+                status.withContext(
+                    str::stream() << "Failed to commit migration for chunk " << _args.toString()
+                                  << " due to "
+                                  << redact(migrationCommitStatus)
+                                  << ". Updating the optime with a write before refreshing the "
+                                  << "metadata also failed"));
     }
 
     // Do a best effort attempt to incrementally refresh the metadata before leaving the critical

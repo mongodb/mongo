@@ -677,7 +677,7 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill(OperationContext* o
         }
         return executor::TaskExecutor::EventHandle();
     }
-    fassertStatusOK(28716, statusWithEvent);
+    fassert(28716, statusWithEvent);
     _killCompleteEvent = statusWithEvent.getValue();
 
     _scheduleKillCursors(lk, opCtx);

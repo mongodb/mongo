@@ -116,7 +116,7 @@ void ReplicationConsistencyMarkersImpl::initializeMinValidDocument(OperationCont
     // the 'minValid' document, but we still want the initialization write to go into the next
     // checkpoint since a newly initialized 'minValid' document is always valid.
     upsert.timestamp = Timestamp();
-    fassertStatusOK(40467, _storageInterface->putSingleton(opCtx, _minValidNss, upsert));
+    fassert(40467, _storageInterface->putSingleton(opCtx, _minValidNss, upsert));
 }
 
 bool ReplicationConsistencyMarkersImpl::getInitialSyncFlag(OperationContext* opCtx) const {
@@ -320,10 +320,9 @@ ReplicationConsistencyMarkersImpl::_getOplogTruncateAfterPointDocument(
 
 void ReplicationConsistencyMarkersImpl::_upsertOplogTruncateAfterPointDocument(
     OperationContext* opCtx, const BSONObj& updateSpec) {
-    fassertStatusOK(
-        40512,
-        _storageInterface->upsertById(
-            opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"], updateSpec));
+    fassert(40512,
+            _storageInterface->upsertById(
+                opCtx, _oplogTruncateAfterPointNss, kOplogTruncateAfterPointId["_id"], updateSpec));
 }
 
 void ReplicationConsistencyMarkersImpl::setOplogTruncateAfterPoint(OperationContext* opCtx,
@@ -376,13 +375,13 @@ void ReplicationConsistencyMarkersImpl::_upsertCheckpointTimestampDocument(
     if (status == ErrorCodes::NamespaceNotFound) {
         status = _storageInterface->createCollection(
             opCtx, _checkpointTimestampNss, CollectionOptions());
-        fassertStatusOK(40581, status);
+        fassert(40581, status);
 
         status = _storageInterface->upsertById(
             opCtx, _checkpointTimestampNss, kCheckpointTimestampId["_id"], updateSpec);
     }
 
-    fassertStatusOK(40582, status);
+    fassert(40582, status);
 }
 
 void ReplicationConsistencyMarkersImpl::writeCheckpointTimestamp(OperationContext* opCtx,

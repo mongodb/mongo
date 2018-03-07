@@ -187,9 +187,9 @@ MultiIndexBlockImpl::~MultiIndexBlockImpl() {
                 _indexes[i].block->fail();
             }
             if (requiresCommitTimestamp) {
-                fassertStatusOK(50703,
-                                _opCtx->recoveryUnit()->setTimestamp(
-                                    LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
+                fassert(50703,
+                        _opCtx->recoveryUnit()->setTimestamp(
+                            LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
             }
             wunit.commit();
             return;
@@ -318,9 +318,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlockImpl::init(const std::vector<BSO
         _backgroundOperation.reset(new BackgroundOperation(ns));
 
     if (requiresCommitTimestamp) {
-        fassertStatusOK(50702,
-                        _opCtx->recoveryUnit()->setTimestamp(
-                            LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
+        fassert(50702,
+                _opCtx->recoveryUnit()->setTimestamp(
+                    LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
     }
 
     wunit.commit();
@@ -559,9 +559,9 @@ void MultiIndexBlockImpl::commit() {
     }
 
     if (requiresCommitTimestamp) {
-        fassertStatusOK(50701,
-                        _opCtx->recoveryUnit()->setTimestamp(
-                            LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
+        fassert(50701,
+                _opCtx->recoveryUnit()->setTimestamp(
+                    LogicalClock::get(_opCtx)->getClusterTime().asTimestamp()));
     }
 
     _opCtx->recoveryUnit()->registerChange(new SetNeedToCleanupOnRollback(this));

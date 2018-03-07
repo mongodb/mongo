@@ -542,8 +542,8 @@ void CollectionShardingState::_onConfigCollectionsUpdateOp(OperationContext* opC
 
     // Extract which user collection was updated.
     std::string updatedCollection;
-    fassertStatusOK(
-        40477, bsonExtractStringField(query, ShardCollectionType::ns.name(), &updatedCollection));
+    fassert(40477,
+            bsonExtractStringField(query, ShardCollectionType::ns.name(), &updatedCollection));
 
     // Parse the '$set' update.
     BSONElement setElement;
@@ -581,8 +581,8 @@ void CollectionShardingState::_onConfigDeleteInvalidateCachedMetadataAndNotify(
 
     // Extract which collection entry is being deleted from the _id field.
     std::string deletedCollection;
-    fassertStatusOK(
-        40479, bsonExtractStringField(query, ShardCollectionType::ns.name(), &deletedCollection));
+    fassert(40479,
+            bsonExtractStringField(query, ShardCollectionType::ns.name(), &deletedCollection));
     const NamespaceString deletedNss(deletedCollection);
 
     // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit().

@@ -245,7 +245,7 @@ protected:
         asio::error_code ec;
         if (_blockingMode != Sync) {
             getSocket().non_blocking(false, ec);
-            fassertStatusOK(40490, errorCodeToStatus(ec));
+            fassert(40490, errorCodeToStatus(ec));
             _blockingMode = Sync;
         }
 
@@ -273,7 +273,7 @@ protected:
 
         asio::error_code ec;
         getSocket().non_blocking(true, ec);
-        fassertStatusOK(50706, errorCodeToStatus(ec));
+        fassert(50706, errorCodeToStatus(ec));
         _blockingMode = Async;
     }
 

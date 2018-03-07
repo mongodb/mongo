@@ -78,7 +78,7 @@ MONGO_STATIC_ASSERT(kCurrentRecordStoreVersion <= kMaximumRecordStoreVersion);
 
 void checkOplogFormatVersion(OperationContext* opCtx, const std::string& uri) {
     StatusWith<BSONObj> appMetadata = WiredTigerUtil::getApplicationMetadata(opCtx, uri);
-    fassertStatusOK(39999, appMetadata);
+    fassert(39999, appMetadata);
 
     fassertNoTrace(39998, appMetadata.getValue().getIntField("oplogKeyExtractionVersion") == 1);
 }
@@ -1152,7 +1152,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         }
         if (!ts.isNull()) {
             LOG(4) << "inserting record with timestamp " << ts;
-            fassertStatusOK(39001, opCtx->recoveryUnit()->setTimestamp(ts));
+            fassert(39001, opCtx->recoveryUnit()->setTimestamp(ts));
         }
         setKey(c, record.id);
         WiredTigerItem value(record.data.data(), record.data.size());

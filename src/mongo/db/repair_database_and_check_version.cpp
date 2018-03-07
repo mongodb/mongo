@@ -193,7 +193,7 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx, Databas
         const NamespaceString ns(collectionName);
 
         if (ns.isDropPendingNamespace()) {
-            auto dropOpTime = fassertStatusOK(40459, ns.getDropPendingNamespaceOpTime());
+            auto dropOpTime = fassert(40459, ns.getDropPendingNamespaceOpTime());
             log() << "Found drop-pending namespace " << ns << " with drop optime " << dropOpTime;
             repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(dropOpTime, ns);
         }
@@ -315,7 +315,7 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
     if (!storageGlobalParams.readOnly) {
         StatusWith<std::vector<StorageEngine::CollectionIndexNamePair>> swIndexesToRebuild =
             storageEngine->reconcileCatalogAndIdents(opCtx);
-        fassertStatusOK(40593, swIndexesToRebuild);
+        fassert(40593, swIndexesToRebuild);
 
         if (!swIndexesToRebuild.getValue().empty() && serverGlobalParams.indexBuildRetry) {
             log() << "note: restart the server with --noIndexBuildRetry "
@@ -347,8 +347,8 @@ StatusWith<bool> repairDatabasesAndCheckVersion(OperationContext* opCtx) {
 
             invariant(swIndexToRebuild.getValue().first.size() == 1 &&
                       swIndexToRebuild.getValue().second.size() == 1);
-            fassertStatusOK(
-                40592, rebuildIndexesOnCollection(opCtx, dbce, cce, swIndexToRebuild.getValue()));
+            fassert(40592,
+                    rebuildIndexesOnCollection(opCtx, dbce, cce, swIndexToRebuild.getValue()));
         }
 
         // We open the "local" database before calling checkIfReplMissingFromCommandLine() to

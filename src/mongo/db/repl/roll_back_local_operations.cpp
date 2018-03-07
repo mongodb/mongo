@@ -53,7 +53,7 @@ MONGO_FP_DECLARE(rollbackHangThenFailAfterWritingMinValid);
 namespace {
 
 OpTime getOpTime(const OplogInterface::Iterator::Value& oplogValue) {
-    return fassertStatusOK(40298, OpTime::parseFromOplogEntry(oplogValue.first));
+    return fassert(40298, OpTime::parseFromOplogEntry(oplogValue.first));
 }
 
 Timestamp getTimestamp(const BSONObj& operation) {
