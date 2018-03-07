@@ -431,8 +431,7 @@ tasks:
 - name: smoke_test
   priority: 5
   depends_on:
-    - name: compile
-      variant: linux-standalone
+    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
@@ -471,8 +470,7 @@ tasks:
 - name: snapshot_reads_WT
   priority: 5
   depends_on:
-    - name: compile
-      variant: linux-standalone
+    - name: compile_proxy
   commands:
     - func: "prepare environment"
       vars:
