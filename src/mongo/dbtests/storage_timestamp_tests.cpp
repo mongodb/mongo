@@ -1346,15 +1346,13 @@ public:
         std::vector<repl::OplogEntry> ops = {op0, createIndexOp, op1, op2};
 
         AtomicUInt32 fetchCount(0);
-        repl::SyncTail syncTail(nullptr, repl::multiSyncApply);
-        repl::MultiApplier::ApplyOperationFn applyOpFn = [&fetchCount, &syncTail](
-            repl::MultiApplier::OperationPtrs* ops,
-            WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-            return repl::multiInitialSyncApply(ops, &syncTail, &fetchCount, workerMultikeyPathInfo);
+        auto applyOpFn = [&fetchCount](repl::MultiApplier::OperationPtrs* ops,
+                                       repl::SyncTail* st,
+                                       WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
+            return repl::multiInitialSyncApply(ops, st, &fetchCount, workerMultikeyPathInfo);
         };
 
-        auto lastTime =
-            assertGet(repl::multiApply(_opCtx, syncTail.getWriterPool(), ops, applyOpFn));
+        auto lastTime = repl::SyncTail(nullptr, applyOpFn).multiApply_forTest(_opCtx, ops);
         ASSERT_EQ(lastTime.getTimestamp(), insertTime2.asTimestamp());
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X, LockMode::MODE_IX);

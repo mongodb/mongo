@@ -37,7 +37,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/stdx/functional.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
@@ -92,13 +92,14 @@ public:
         OperationContext*, const BSONObj&, OplogApplication::Mode oplogApplicationMode)>;
 
     SyncTail(BackgroundSync* q, MultiSyncApplyFunc func);
-    SyncTail(BackgroundSync* q, MultiSyncApplyFunc func, std::unique_ptr<OldThreadPool> writerPool);
+    SyncTail(BackgroundSync* q, MultiSyncApplyFunc func, std::unique_ptr<ThreadPool> writerPool);
     virtual ~SyncTail();
 
     /**
      * Creates thread pool for writer tasks.
      */
-    static std::unique_ptr<OldThreadPool> makeWriterPool();
+    static std::unique_ptr<ThreadPool> makeWriterPool();
+    static std::unique_ptr<ThreadPool> makeWriterPool(int threadCount);
 
     /**
      * Applies the operation that is in param o.
@@ -219,12 +220,6 @@ public:
 
     void setHostname(const std::string& hostname);
 
-    /**
-     * Returns writer thread pool.
-     * Used by ReplicationCoordinatorExternalStateImpl only.
-     */
-    OldThreadPool* getWriterPool();
-
     static AtomicInt32 replBatchLimitOperations;
 
     /**
@@ -251,7 +246,7 @@ private:
     MultiSyncApplyFunc _applyFunc;
 
     // persistent pool of worker threads for writing ops to the databases
-    std::unique_ptr<OldThreadPool> _writerPool;
+    std::unique_ptr<ThreadPool> _writerPool;
 };
 
 /**
@@ -264,7 +259,7 @@ private:
  * Shared between here and MultiApplier.
  */
 StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                              OldThreadPool* workerPool,
+                              ThreadPool* workerPool,
                               MultiApplier::Operations ops,
                               MultiApplier::ApplyOperationFn applyOperation);
 

@@ -147,13 +147,6 @@ ServerStatusMetricField<Counter64> displayAttemptsToBecomeSecondary(
 TimerStats applyBatchStats;
 ServerStatusMetricField<TimerStats> displayOpBatchesApplied("repl.apply.batches", &applyBatchStats);
 
-void initializePrefetchThread() {
-    if (!Client::getCurrent()) {
-        Client::initThreadIfNotAlready();
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
-    }
-}
-
 bool isCrudOpType(const char* field) {
     switch (field[0]) {
         case 'd':
@@ -296,13 +289,30 @@ SyncTail::SyncTail(BackgroundSync* q, MultiSyncApplyFunc func)
 
 SyncTail::SyncTail(BackgroundSync* q,
                    MultiSyncApplyFunc func,
-                   std::unique_ptr<OldThreadPool> writerPool)
+                   std::unique_ptr<ThreadPool> writerPool)
     : _networkQueue(q), _applyFunc(func), _writerPool(std::move(writerPool)) {}
 
 SyncTail::~SyncTail() {}
 
-std::unique_ptr<OldThreadPool> SyncTail::makeWriterPool() {
-    return stdx::make_unique<OldThreadPool>(replWriterThreadCount, "repl writer worker ");
+std::unique_ptr<ThreadPool> SyncTail::makeWriterPool() {
+    return makeWriterPool(replWriterThreadCount);
+}
+
+std::unique_ptr<ThreadPool> SyncTail::makeWriterPool(int threadCount) {
+    ThreadPool::Options options;
+    options.threadNamePrefix = "repl writer worker ";
+    options.poolName = "repl writer worker Pool";
+    options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
+    options.onCreateThread = [](const std::string&) {
+        // Only do this once per thread
+        if (!Client::getCurrent()) {
+            Client::initThreadIfNotAlready();
+            AuthorizationSession::get(cc())->grantInternalAuthorization();
+        }
+    };
+    auto pool = stdx::make_unique<ThreadPool>(options);
+    pool->startup();
+    return pool;
 }
 
 bool SyncTail::peek(OperationContext* opCtx, BSONObj* op) {
@@ -412,8 +422,6 @@ namespace {
 
 // The pool threads call this to prefetch each op
 void prefetchOp(const OplogEntry& oplogEntry) {
-    initializePrefetchThread();
-
     const auto& nss = oplogEntry.getNamespace();
     if (!nss.isEmpty()) {
         try {
@@ -436,43 +444,38 @@ void prefetchOp(const OplogEntry& oplogEntry) {
 }
 
 // Doles out all the work to the reader pool threads and waits for them to complete
-void prefetchOps(const MultiApplier::Operations& ops, OldThreadPool* prefetcherPool) {
+void prefetchOps(const MultiApplier::Operations& ops, ThreadPool* prefetcherPool) {
     invariant(prefetcherPool);
     for (auto&& op : ops) {
-        prefetcherPool->schedule([&] { prefetchOp(op); });
+        invariantOK(prefetcherPool->schedule([&] { prefetchOp(op); }));
     }
-    prefetcherPool->join();
+    prefetcherPool->waitForIdle();
 }
 
 // Doles out all the work to the writer pool threads.
 // Does not modify writerVectors, but passes non-const pointers to inner vectors into func.
 void applyOps(std::vector<MultiApplier::OperationPtrs>& writerVectors,
-              OldThreadPool* writerPool,
+              ThreadPool* writerPool,
               const MultiApplier::ApplyOperationFn& func,
               std::vector<Status>* statusVector,
               std::vector<WorkerMultikeyPathInfo>* workerMultikeyPathInfo) {
     invariant(writerVectors.size() == statusVector->size());
     for (size_t i = 0; i < writerVectors.size(); i++) {
         if (!writerVectors[i].empty()) {
-            writerPool->schedule([&func, &writerVectors, statusVector, workerMultikeyPathInfo, i] {
-                (*statusVector)[i] = func(&writerVectors[i], &((*workerMultikeyPathInfo)[i]));
-            });
+            invariantOK(writerPool->schedule([
+                &func,
+                &writer = writerVectors.at(i),
+                &status = statusVector->at(i),
+                &workerMultikeyPathInfo = workerMultikeyPathInfo->at(i)
+            ] { status = func(&writer, &workerMultikeyPathInfo); }));
         }
-    }
-}
-
-void initializeWriterThread() {
-    // Only do this once per thread
-    if (!Client::getCurrent()) {
-        Client::initThreadIfNotAlready();
-        AuthorizationSession::get(cc())->grantInternalAuthorization();
     }
 }
 
 // Schedules the writes to the oplog for 'ops' into threadPool. The caller must guarantee that 'ops'
 // stays valid until all scheduled work in the thread pool completes.
 void scheduleWritesToOplog(OperationContext* opCtx,
-                           OldThreadPool* threadPool,
+                           ThreadPool* threadPool,
                            const MultiApplier::Operations& ops) {
 
     auto makeOplogWriterForRange = [&ops](size_t begin, size_t end) {
@@ -480,7 +483,6 @@ void scheduleWritesToOplog(OperationContext* opCtx,
         // captures other than 'ops' must be by value since they will not be available. The caller
         // guarantees that 'ops' will stay in scope until the spawned threads complete.
         return [&ops, begin, end] {
-            initializeWriterThread();
             auto opCtx = cc().makeOperationContext();
             UnreplicatedWritesBlock uwb(opCtx.get());
             ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
@@ -507,7 +509,7 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     // setup/teardown overhead across many writes.
     const size_t kMinOplogEntriesPerThread = 16;
     const bool enoughToMultiThread =
-        ops.size() >= kMinOplogEntriesPerThread * threadPool->getNumThreads();
+        ops.size() >= kMinOplogEntriesPerThread * threadPool->getStats().numThreads;
 
     // Only doc-locking engines support parallel writes to the oplog because they are required to
     // ensure that oplog entries are ordered correctly, even if inserted out-of-order. Additionally,
@@ -516,17 +518,17 @@ void scheduleWritesToOplog(OperationContext* opCtx,
     if (!enoughToMultiThread ||
         !opCtx->getServiceContext()->getGlobalStorageEngine()->supportsDocLocking()) {
 
-        threadPool->schedule(makeOplogWriterForRange(0, ops.size()));
+        invariantOK(threadPool->schedule(makeOplogWriterForRange(0, ops.size())));
         return;
     }
 
 
-    const size_t numOplogThreads = threadPool->getNumThreads();
+    const size_t numOplogThreads = threadPool->getStats().numThreads;
     const size_t numOpsPerThread = ops.size() / numOplogThreads;
     for (size_t thread = 0; thread < numOplogThreads; thread++) {
         size_t begin = thread * numOpsPerThread;
         size_t end = (thread == numOplogThreads - 1) ? ops.size() : begin + numOpsPerThread;
-        threadPool->schedule(makeOplogWriterForRange(begin, end));
+        invariantOK(threadPool->schedule(makeOplogWriterForRange(begin, end)));
     }
 }
 
@@ -534,18 +536,17 @@ using SessionRecordMap =
     stdx::unordered_map<LogicalSessionId, SessionTxnRecord, LogicalSessionIdHash>;
 
 void scheduleTxnTableUpdates(OperationContext* opCtx,
-                             OldThreadPool* threadPool,
+                             ThreadPool* threadPool,
                              const SessionRecordMap& latestRecords) {
     for (const auto& it : latestRecords) {
         auto& record = it.second;
 
-        threadPool->schedule([&record]() {
-            initializeWriterThread();
+        invariantOK(threadPool->schedule([&record]() {
             auto opCtx = cc().makeOperationContext();
             ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
                 opCtx->lockState());
             Session::updateSessionRecordOnSecondary(opCtx.get(), record);
-        });
+        }));
     }
 }
 
@@ -1105,10 +1106,6 @@ void SyncTail::setHostname(const std::string& hostname) {
     _hostname = hostname;
 }
 
-OldThreadPool* SyncTail::getWriterPool() {
-    return _writerPool.get();
-}
-
 BSONObj SyncTail::getMissingDoc(OperationContext* opCtx, const OplogEntry& oplogEntry) {
     OplogReader missingObjReader;  // why are we using OplogReader to run a non-oplog query?
 
@@ -1253,7 +1250,6 @@ bool SyncTail::fetchAndInsertMissingDocument(OperationContext* opCtx,
 void multiSyncApply(MultiApplier::OperationPtrs* ops,
                     SyncTail* st,
                     WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    initializeWriterThread();
     auto opCtx = cc().makeOperationContext();
     auto syncApply = [](
         OperationContext* opCtx, const BSONObj& op, OplogApplication::Mode oplogApplicationMode) {
@@ -1326,7 +1322,6 @@ Status multiInitialSyncApply(MultiApplier::OperationPtrs* ops,
                              SyncTail* st,
                              AtomicUInt32* fetchCount,
                              WorkerMultikeyPathInfo* workerMultikeyPathInfo) {
-    initializeWriterThread();
     auto opCtx = cc().makeOperationContext();
     return multiInitialSyncApply_noAbort(opCtx.get(), ops, st, fetchCount, workerMultikeyPathInfo);
 }
@@ -1389,7 +1384,7 @@ Status multiInitialSyncApply_noAbort(OperationContext* opCtx,
 }
 
 StatusWith<OpTime> multiApply(OperationContext* opCtx,
-                              OldThreadPool* workerPool,
+                              ThreadPool* workerPool,
                               MultiApplier::Operations ops,
                               MultiApplier::ApplyOperationFn applyOperation) {
     if (!opCtx) {
@@ -1428,15 +1423,15 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
                 "attempting to replicate ops while primary"};
     }
 
-    std::vector<Status> statusVector(workerPool->getNumThreads(), Status::OK());
-    std::vector<WorkerMultikeyPathInfo> multikeyVector(workerPool->getNumThreads());
+    std::vector<Status> statusVector(workerPool->getStats().numThreads, Status::OK());
+    std::vector<WorkerMultikeyPathInfo> multikeyVector(workerPool->getStats().numThreads);
     {
         // Each node records cumulative batch application stats for itself using this timer.
         TimerHolder timer(&applyBatchStats);
 
         // We must wait for the all work we've dispatched to complete before leaving this block
         // because the spawned threads refer to objects on the stack
-        ON_BLOCK_EXIT([&] { workerPool->join(); });
+        ON_BLOCK_EXIT([&] { workerPool->waitForIdle(); });
 
         // Write batch of ops into oplog.
         consistencyMarkers->setOplogTruncateAfterPoint(opCtx, ops.front().getTimestamp());
@@ -1446,23 +1441,23 @@ StatusWith<OpTime> multiApply(OperationContext* opCtx,
         // 'applyOpsOperations' have been applied.
         std::vector<MultiApplier::Operations> applyOpsOperations;
 
-        std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getNumThreads());
+        std::vector<MultiApplier::OperationPtrs> writerVectors(workerPool->getStats().numThreads);
         fillWriterVectors(opCtx, &ops, &writerVectors, &applyOpsOperations);
 
         // Wait for writes to finish before applying ops.
-        workerPool->join();
+        workerPool->waitForIdle();
 
         // Reset consistency markers in case the node fails while applying ops.
         consistencyMarkers->setOplogTruncateAfterPoint(opCtx, Timestamp());
         consistencyMarkers->setMinValidToAtLeast(opCtx, ops.back().getOpTime());
 
         applyOps(writerVectors, workerPool, applyOperation, &statusVector, &multikeyVector);
-        workerPool->join();
+        workerPool->waitForIdle();
 
         // Update the transaction table to point to the latest oplog entries for each session id.
         const auto latestSessionRecords = getLatestSessionRecords(ops);
         scheduleTxnTableUpdates(opCtx, workerPool, latestSessionRecords);
-        workerPool->join();
+        workerPool->waitForIdle();
 
         // Notify the storage engine that a replication batch has completed.
         // This means that all the writes associated with the oplog entries in the batch are

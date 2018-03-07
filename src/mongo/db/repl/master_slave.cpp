@@ -71,6 +71,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"

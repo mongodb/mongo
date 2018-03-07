@@ -42,6 +42,7 @@
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/old_thread_pool.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 class ServiceContext;
@@ -198,8 +199,11 @@ private:
     // Task executor used to run replication tasks.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;
 
+    // Used by database and collection cloners to perform storage operations.
+    std::unique_ptr<OldThreadPool> _dbWorkerPool;
+
     // Used by repl::multiApply() to apply the sync source's operations in parallel.
-    std::unique_ptr<OldThreadPool> _writerPool;
+    std::unique_ptr<ThreadPool> _writerPool;
 
     // Writes a noop every 10 seconds.
     std::unique_ptr<NoopWriter> _noopWriter;
