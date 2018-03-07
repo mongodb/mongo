@@ -448,16 +448,31 @@
             testCase.setUp(st.s);
         }
 
-        assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
-
-        let commandProfile = buildCommandProfile(testCase.command, false /* sharded */);
-        commandProfile["command.databaseVersion"] =
-            testCase.sendsDbVersion ? dbVersion : {$exists: false};
+        let commandProfile = buildCommandProfile(testCase.command, false);
         commandProfile["command.shardVersion"] =
             testCase.sendsShardVersion ? SHARD_VERSION_UNSHARDED : {$exists: false};
 
-        profilerHasSingleMatchingEntryOrThrow(
-            {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
+        st.shard0.adminCommand({configureFailPoint: "checkForDbVersionMismatch", mode: "alwaysOn"});
+        if (testCase.sendsDbVersion) {
+            commandProfile["command.databaseVersion"] = dbVersion;
+            assert.commandFailedWithCode(st.s.getDB(dbName).runCommand(testCase.command),
+                                         ErrorCodes.StaleDbVersion);
+
+            // TODO: Currently, commands are profiled if they call CurOp::raiseDbProfilingLevel().
+            // But, some commands do so only after calling AutoGetDb, where dbVersion is checked.
+            // So, commands that send dbVersion will throw inside of AutoGetDb and may not be
+            // profiled. SERVER-33499 will change the server so that CurOp::raiseDbProfilingLevel()
+            // is called as part of generic command processing, before AutoGetDb can be called. Once
+            // that is in, we should check that the dbVersion sent matched what was expected.
+            // profilerHasSingleMatchingEntryOrThrow(
+            //    {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
+        } else {
+            commandProfile["command.databaseVersion"] = {$exists: false};
+            assert.commandWorked(st.s.getDB(dbName).runCommand(testCase.command));
+            profilerHasSingleMatchingEntryOrThrow(
+                {profileDB: st.shard0.getDB(dbName), filter: commandProfile});
+        }
+        st.shard0.adminCommand({configureFailPoint: "checkForDbVersionMismatch", mode: "off"});
 
         if (testCase.cleanUp) {
             testCase.cleanUp(st.s);

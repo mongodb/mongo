@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/uuid_catalog.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
@@ -59,7 +60,11 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, 
           uassertLockTimeout(
               str::stream() << "database " << dbName, mode, deadline, _dbLock.isLocked());
           return dbHolder().get(opCtx, dbName);
-      }()) {}
+      }()) {
+    if (_db) {
+        DatabaseShardingState::get(_db).checkDbVersion(opCtx);
+    }
+}
 
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,
@@ -156,6 +161,8 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
 
         _db = dbHolder().openDb(opCtx, dbName, &_justCreated);
     }
+
+    DatabaseShardingState::get(_db).checkDbVersion(opCtx);
 }
 
 }  // namespace mongo

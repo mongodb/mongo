@@ -572,6 +572,7 @@ env.Library(
     LIBDEPS=[
         'catalog_raii',
         'curop',
+        's/sharding_api_d',
         's/sharding',
         'stats/top',
     ],
@@ -602,6 +603,7 @@ env.Library(
         'logical_session_id',
         'namespace_string',
         'repl/oplog_entry',
+        's/sharding_api_d',
         'views/views',
     ],
 )

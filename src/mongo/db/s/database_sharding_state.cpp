@@ -31,8 +31,15 @@
 #include "mongo/db/s/database_sharding_state.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/util/fail_point_service.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
+
+MONGO_FP_DECLARE(checkForDbVersionMismatch);
+
 const Database::Decoration<DatabaseShardingState> DatabaseShardingState::get =
     Database::declareDecoration<DatabaseShardingState>();
 
@@ -68,18 +75,34 @@ void DatabaseShardingState::setDbVersion(OperationContext* opCtx,
 
 void DatabaseShardingState::checkDbVersion(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isLocked());
+    const auto dbName = get.owner(this)->name();
+
+    const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(dbName);
+    if (!clientDbVersion) {
+        return;
+    }
+
+    if (!MONGO_FAIL_POINT(checkForDbVersionMismatch)) {
+        // While checking the dbVersion and triggering a cache refresh on StaleDbVersion is under
+        // development, only check for dbVersion mismatch if explicitly asked to.
+        return;
+    }
 
     if (_critSecSignal) {
-        // TODO (SERVER-33097): Set movePrimary critical section signal on the
+        // TODO (SERVER-33773): Set movePrimary critical section signal on the
         // OperationShardingState (so that the operation can wait outside the DBLock for the
         // movePrimary critical section to end before returning to the client).
 
-        // TODO (SERVER-33098): throw StaleDbVersion.
+        uasserted(StaleDbRoutingVersion(dbName, *clientDbVersion, boost::none),
+                  "migration critical section active");
     }
 
-    // TODO (SERVER-33098): check the client's dbVersion (from the OperationShardingState) against
-    // _dbVersion, and throw StaleDbVersion if they don't match.
-    return;
+    uassert(StaleDbRoutingVersion(dbName, *clientDbVersion, boost::none),
+            "don't know dbVersion",
+            _dbVersion);
+    uassert(StaleDbRoutingVersion(dbName, *clientDbVersion, *_dbVersion),
+            "dbVersion mismatch",
+            *clientDbVersion == *_dbVersion);
 }
 
 }  // namespace mongo

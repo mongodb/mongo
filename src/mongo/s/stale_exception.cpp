@@ -35,6 +35,7 @@
 namespace mongo {
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleConfigInfo);
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 
 void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("ns", _ns);
@@ -49,6 +50,28 @@ StaleConfigInfo::StaleConfigInfo(const BSONObj& obj)
 
 std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj) {
     return std::make_shared<StaleConfigInfo>(obj);
+}
+
+void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
+    bob->append("db", _db);
+    bob->append("vReceived", _received.toBSON());
+    if (_wanted) {
+        bob->append("vWanted", _wanted->toBSON());
+    }
+}
+
+StaleDbRoutingVersion::StaleDbRoutingVersion(const BSONObj& obj)
+    : StaleDbRoutingVersion(
+          obj["db"].String(),
+          DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vReceived"),
+                                 obj["vReceived"].Obj()),
+          !obj["vWanted"].eoo()
+              ? DatabaseVersion::parse(IDLParserErrorContext("StaleDbRoutingVersion-vWanted"),
+                                       obj["vWanted"].Obj())
+              : boost::optional<DatabaseVersion>{}) {}
+
+std::shared_ptr<const ErrorExtraInfo> StaleDbRoutingVersion::parse(const BSONObj& obj) {
+    return std::make_shared<StaleDbRoutingVersion>(obj);
 }
 
 }  // namespace mongo

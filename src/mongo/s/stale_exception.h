@@ -30,6 +30,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -72,6 +73,40 @@ private:
     std::string _ns;
     ChunkVersion _received;
     ChunkVersion _wanted;
+};
+
+class StaleDbRoutingVersion final : public ErrorExtraInfo {
+public:
+    static constexpr auto code = ErrorCodes::StaleDbVersion;
+
+    StaleDbRoutingVersion(const std::string& db,
+                          DatabaseVersion received,
+                          boost::optional<DatabaseVersion> wanted)
+        : _db(db), _received(received), _wanted(wanted) {}
+
+    StaleDbRoutingVersion(const BSONObj& commandError);
+
+    StaleDbRoutingVersion() = default;
+
+    const std::string& getDb() const {
+        return _db;
+    }
+
+    DatabaseVersion getVersionReceived() const {
+        return _received;
+    }
+
+    boost::optional<DatabaseVersion> getVersionWanted() const {
+        return _wanted;
+    }
+
+    void serialize(BSONObjBuilder* bob) const final;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
+
+private:
+    std::string _db;
+    DatabaseVersion _received;
+    boost::optional<DatabaseVersion> _wanted;
 };
 
 using StaleConfigException = ExceptionFor<ErrorCodes::StaleConfig>;

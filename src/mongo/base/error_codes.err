@@ -246,6 +246,7 @@ error_code("BrokenPromise", 245)
 error_code("SnapshotUnavailable", 246)
 error_code("ProducerConsumerQueueBatchTooLarge", 247)
 error_code("ProducerConsumerQueueEndClosed", 248)
+error_code("StaleDbVersion", 249, extra="StaleDbRoutingVersion");
 
 # Error codes 4000-8999 are reserved.
 
