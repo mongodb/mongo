@@ -212,6 +212,8 @@ public:
 
     virtual void resetLastOpTimesFromOplog(OperationContext* opCtx, DataConsistency consistency);
 
+    bool lastOpTimesWereReset() const;
+
     virtual bool shouldChangeSyncSource(const HostAndPort& currentSource,
                                         const rpc::ReplSetMetadata& replMetadata,
                                         boost::optional<rpc::OplogQueryMetadata> oqMetadata);
@@ -296,6 +298,7 @@ private:
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     };
     bool _alwaysAllowWrites = false;
+    bool _resetLastOpTimesCalled = false;
 };
 
 }  // namespace repl

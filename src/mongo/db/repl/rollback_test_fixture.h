@@ -188,13 +188,6 @@ public:
     ReplicationCoordinatorRollbackMock(ServiceContext* service);
 
     /**
-     * Base class implementation triggers an invariant. This function is overridden to be a no-op
-     * for rollback tests.
-     */
-    void resetLastOpTimesFromOplog(OperationContext* opCtx,
-                                   ReplicationCoordinator::DataConsistency consistency) override;
-
-    /**
      * Returns IllegalOperation (does not forward call to
      * ReplicationCoordinatorMock::setFollowerMode())
      * if new state requested is '_failSetFollowerModeOnThisMemberState'.

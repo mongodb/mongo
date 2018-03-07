@@ -119,9 +119,6 @@ RollbackTest::ReplicationCoordinatorRollbackMock::ReplicationCoordinatorRollback
     ServiceContext* service)
     : ReplicationCoordinatorMock(service, createReplSettings()) {}
 
-void RollbackTest::ReplicationCoordinatorRollbackMock::resetLastOpTimesFromOplog(
-    OperationContext* opCtx, ReplicationCoordinator::DataConsistency consistency) {}
-
 void RollbackTest::ReplicationCoordinatorRollbackMock::failSettingFollowerMode(
     const MemberState& transitionToFail, ErrorCodes::Error codeToFailWith) {
     _failSetFollowerModeOnThisMemberState = transitionToFail;

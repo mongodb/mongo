@@ -261,6 +261,37 @@ TEST_F(RollbackImplTest, RollbackPersistsDocumentAfterCommonPointToOplogTruncate
     ASSERT_EQUALS(_truncatePoint, Timestamp(3, 3));
 }
 
+TEST_F(RollbackImplTest, RollbackImplResetsOptimesFromOplogAfterRollback) {
+    auto commonPoint = makeOpAndRecordId(1);
+    _remoteOplog->setOperations({commonPoint});
+    ASSERT_OK(_insertOplogEntry(commonPoint.first));
+    _storageInterface->setStableTimestamp(nullptr, Timestamp(1, 1));
+
+    auto nextTime = 2;
+    ASSERT_OK(_insertOplogEntry(makeOp(nextTime)));
+
+    // runRollback has not been called yet.
+    ASSERT_FALSE(_recoveredToStableTimestamp);
+    ASSERT_FALSE(_recoveredFromOplog);
+    ASSERT_FALSE(_coordinator->lastOpTimesWereReset());
+
+    _onRecoverToStableTimestampFn = [this](Timestamp stableTimestamp) {
+        _recoveredToStableTimestamp = true;
+        _stableTimestamp = stableTimestamp;
+        ASSERT_FALSE(_coordinator->lastOpTimesWereReset());
+    };
+
+    _onRecoverFromOplogFn = [this]() {
+        _recoveredFromOplog = true;
+        ASSERT_FALSE(_coordinator->lastOpTimesWereReset());
+    };
+
+    ASSERT_OK(_rollback->runRollback(_opCtx.get()));
+
+    // Verify that resetLastOptimesFromOplog is called towards the end of runRollback.
+    ASSERT_TRUE(_coordinator->lastOpTimesWereReset());
+}
+
 TEST_F(RollbackImplTest, RollbackIncrementsRollbackID) {
     auto op = makeOpAndRecordId(1);
     _remoteOplog->setOperations({op});
@@ -424,6 +455,7 @@ TEST_F(RollbackImplTest, RollbackSkipsRecoverFromOplogWhenShutdownDuringRTT) {
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, _rollback->runRollback(_opCtx.get()));
     ASSERT(_recoveredToStableTimestamp);
     ASSERT_FALSE(_recoveredFromOplog);
+    ASSERT_FALSE(_coordinator->lastOpTimesWereReset());
 
     // Make sure we transitioned back to SECONDARY state.
     ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
@@ -533,6 +565,7 @@ TEST_F(RollbackImplTest, RollbackSkipsCommonPointWhenShutDownEarly) {
     ASSERT(_transitionedToRollback);
     ASSERT_EQUALS(Timestamp(0, 0), _commonPointFound);
     ASSERT_EQUALS(_coordinator->getMemberState(), MemberState::RS_SECONDARY);
+    ASSERT_FALSE(_coordinator->lastOpTimesWereReset());
 }
 
 TEST_F(RollbackImplTest, RollbackSkipsTriggerOpObserverWhenShutDownEarly) {

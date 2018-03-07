@@ -167,6 +167,12 @@ Status RollbackImpl::runRollback(OperationContext* opCtx) {
     }
     _listener->onRecoverFromOplog();
 
+    // At this point, the last applied and durable optimes on this node still point to ops on
+    // the divergent branch of history. We therefore update the last optimes to the top of the
+    // oplog, which should now be at the common point.
+    _replicationCoordinator->resetLastOpTimesFromOplog(
+        opCtx, ReplicationCoordinator::DataConsistency::Consistent);
+
     status = _triggerOpObserver(opCtx);
     if (!status.isOK()) {
         return status;

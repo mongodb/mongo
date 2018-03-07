@@ -390,7 +390,11 @@ void ReplicationCoordinatorMock::blacklistSyncSource(const HostAndPort& host, Da
 
 void ReplicationCoordinatorMock::resetLastOpTimesFromOplog(OperationContext* opCtx,
                                                            DataConsistency consistency) {
-    invariant(false);
+    _resetLastOpTimesCalled = true;
+}
+
+bool ReplicationCoordinatorMock::lastOpTimesWereReset() const {
+    return _resetLastOpTimesCalled;
 }
 
 bool ReplicationCoordinatorMock::shouldChangeSyncSource(
