@@ -43,12 +43,10 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-
-class OldThreadPool;
-
 namespace repl {
 
 class StorageInterface;
@@ -109,7 +107,7 @@ public:
      * 'listCollectionsFilter' will be extended to include collections only, filtering out views.
      */
     DatabaseCloner(executor::TaskExecutor* executor,
-                   OldThreadPool* dbWorkThreadPool,
+                   ThreadPool* dbWorkThreadPool,
                    const HostAndPort& source,
                    const std::string& dbname,
                    const BSONObj& listCollectionsFilter,
@@ -213,7 +211,7 @@ private:
     mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;                 // (M)
     executor::TaskExecutor* _executor;                           // (R)
-    OldThreadPool* _dbWorkThreadPool;                            // (R)
+    ThreadPool* _dbWorkThreadPool;                               // (R)
     const HostAndPort _source;                                   // (R)
     const std::string _dbname;                                   // (R)
     const BSONObj _listCollectionsFilter;                        // (R)

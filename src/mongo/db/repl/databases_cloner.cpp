@@ -66,7 +66,7 @@ MONGO_EXPORT_SERVER_PARAMETER(numInitialSyncListDatabasesAttempts, int, 3);
 
 DatabasesCloner::DatabasesCloner(StorageInterface* si,
                                  executor::TaskExecutor* exec,
-                                 OldThreadPool* dbWorkThreadPool,
+                                 ThreadPool* dbWorkThreadPool,
                                  HostAndPort source,
                                  IncludeDbFilterFn includeDbPred,
                                  OnFinishFn finishFn)

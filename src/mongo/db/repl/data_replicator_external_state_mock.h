@@ -45,7 +45,7 @@ public:
 
     executor::TaskExecutor* getTaskExecutor() const override;
 
-    OldThreadPool* getDbWorkThreadPool() const override;
+    ThreadPool* getDbWorkThreadPool() const override;
 
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 
@@ -66,7 +66,7 @@ public:
     executor::TaskExecutor* taskExecutor = nullptr;
 
     // DB worker thread pool. Not owned by us.
-    OldThreadPool* dbWorkThreadPool = nullptr;
+    ThreadPool* dbWorkThreadPool = nullptr;
 
     // Returned by getCurrentTermAndLastCommittedOpTime.
     long long currentTerm = OpTime::kUninitializedTerm;

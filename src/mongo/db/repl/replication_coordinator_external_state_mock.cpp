@@ -92,7 +92,7 @@ executor::TaskExecutor* ReplicationCoordinatorExternalStateMock::getTaskExecutor
     return nullptr;
 }
 
-OldThreadPool* ReplicationCoordinatorExternalStateMock::getDbWorkThreadPool() const {
+ThreadPool* ReplicationCoordinatorExternalStateMock::getDbWorkThreadPool() const {
     return nullptr;
 }
 

@@ -101,7 +101,7 @@ BSONObj createListCollectionsCommandObject(const BSONObj& filter) {
 }  // namespace
 
 DatabaseCloner::DatabaseCloner(executor::TaskExecutor* executor,
-                               OldThreadPool* dbWorkThreadPool,
+                               ThreadPool* dbWorkThreadPool,
                                const HostAndPort& source,
                                const std::string& dbname,
                                const BSONObj& listCollectionsFilter,

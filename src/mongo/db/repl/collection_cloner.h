@@ -50,14 +50,11 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
-
-class OldThreadPool;
-
 namespace repl {
 
 class StorageInterface;
@@ -106,7 +103,7 @@ public:
      * Takes ownership of the passed StorageInterface object.
      */
     CollectionCloner(executor::TaskExecutor* executor,
-                     OldThreadPool* dbWorkThreadPool,
+                     ThreadPool* dbWorkThreadPool,
                      const HostAndPort& source,
                      const NamespaceString& sourceNss,
                      const CollectionOptions& options,
@@ -278,7 +275,7 @@ private:
     mutable stdx::mutex _mutex;
     mutable stdx::condition_variable _condition;        // (M)
     executor::TaskExecutor* _executor;                  // (R) Not owned by us.
-    OldThreadPool* _dbWorkThreadPool;                   // (R) Not owned by us.
+    ThreadPool* _dbWorkThreadPool;                      // (R) Not owned by us.
     HostAndPort _source;                                // (R)
     NamespaceString _sourceNss;                         // (R)
     NamespaceString _destNss;                           // (R)

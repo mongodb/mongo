@@ -37,12 +37,11 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-
-class OldThreadPool;
 
 namespace executor {
 class TaskExecutor;
@@ -79,7 +78,7 @@ public:
     /**
      * Returns shared db worker thread pool for collection cloning.
      */
-    virtual OldThreadPool* getDbWorkThreadPool() const = 0;
+    virtual ThreadPool* getDbWorkThreadPool() const = 0;
 
     /**
      * Returns the current term and last committed optime.

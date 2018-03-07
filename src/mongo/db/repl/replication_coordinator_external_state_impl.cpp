@@ -312,7 +312,6 @@ void ReplicationCoordinatorExternalStateImpl::startThreads(const ReplSettings& s
         executor::makeNetworkInterface("NetworkInterfaceASIO-RS", nullptr, std::move(hookList)));
     _taskExecutor->startup();
 
-    _dbWorkerPool = std::make_unique<OldThreadPool>(16, "db worker");
     _writerPool = SyncTail::makeWriterPool();
 
     _startedThreads = true;
@@ -360,8 +359,8 @@ executor::TaskExecutor* ReplicationCoordinatorExternalStateImpl::getTaskExecutor
     return _taskExecutor.get();
 }
 
-OldThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() const {
-    return _dbWorkerPool.get();
+ThreadPool* ReplicationCoordinatorExternalStateImpl::getDbWorkThreadPool() const {
+    return _writerPool.get();
 }
 
 Status ReplicationCoordinatorExternalStateImpl::runRepairOnLocalDB(OperationContext* opCtx) {

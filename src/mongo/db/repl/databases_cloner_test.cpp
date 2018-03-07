@@ -43,8 +43,8 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/task_executor_proxy.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
 
@@ -79,14 +79,13 @@ struct StorageInterfaceResults {
 
 class DBsClonerTest : public executor::ThreadPoolExecutorTest {
 public:
-    DBsClonerTest()
-        : _storageInterface{}, _dbWorkThreadPool{OldThreadPool::DoNotStartThreadsTag(), 1} {}
+    DBsClonerTest() : _storageInterface{}, _dbWorkThreadPool(ThreadPool::Options()) {}
 
     StorageInterface& getStorage() {
         return _storageInterface;
     }
 
-    OldThreadPool& getDbWorkThreadPool() {
+    ThreadPool& getDbWorkThreadPool() {
         return _dbWorkThreadPool;
     }
 
@@ -186,13 +185,12 @@ protected:
                     std::unique_ptr<CollectionBulkLoader>(collInfo->loader));
             };
 
-        _dbWorkThreadPool.startThreads();
+        _dbWorkThreadPool.startup();
     }
 
     void tearDown() override {
         getExecutor().shutdown();
         getExecutor().join();
-        _dbWorkThreadPool.join();
     }
 
     /**
@@ -330,7 +328,7 @@ protected:
     StorageInterfaceMock _storageInterface;
 
 private:
-    OldThreadPool _dbWorkThreadPool;
+    ThreadPool _dbWorkThreadPool;
     std::map<NamespaceString, CollectionMockStats> _collectionStats;
     std::map<NamespaceString, CollectionCloneInfo> _collections;
     StorageInterfaceResults _storageInterfaceWorkDone;

@@ -41,7 +41,6 @@
 #include "mongo/db/storage/journal_listener.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
@@ -78,7 +77,7 @@ public:
     virtual void startMasterSlave(OperationContext* opCtx);
     virtual void shutdown(OperationContext* opCtx);
     virtual executor::TaskExecutor* getTaskExecutor() const override;
-    virtual OldThreadPool* getDbWorkThreadPool() const override;
+    virtual ThreadPool* getDbWorkThreadPool() const override;
     virtual Status runRepairOnLocalDB(OperationContext* opCtx) override;
     virtual Status initializeReplSetStorage(OperationContext* opCtx, const BSONObj& config);
     virtual void waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx);
@@ -199,10 +198,10 @@ private:
     // Task executor used to run replication tasks.
     std::unique_ptr<executor::TaskExecutor> _taskExecutor;
 
-    // Used by database and collection cloners to perform storage operations.
-    std::unique_ptr<OldThreadPool> _dbWorkerPool;
-
     // Used by repl::multiApply() to apply the sync source's operations in parallel.
+    // Also used by database and collection cloners to perform storage operations.
+    // Cloners and oplog application run in separate phases of initial sync so it is fine to share
+    // this thread pool.
     std::unique_ptr<ThreadPool> _writerPool;
 
     // Writes a noop every 10 seconds.

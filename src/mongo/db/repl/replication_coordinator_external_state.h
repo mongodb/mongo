@@ -38,13 +38,13 @@
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class BSONObj;
 class OID;
-class OldThreadPool;
 class OperationContext;
 class ServiceContext;
 class Status;
@@ -115,7 +115,7 @@ public:
     /**
      * Returns shared db worker thread pool for collection cloning.
      */
-    virtual OldThreadPool* getDbWorkThreadPool() const = 0;
+    virtual ThreadPool* getDbWorkThreadPool() const = 0;
 
     /**
      * Runs the repair database command on the "local" db, if the storage engine is MMapV1.

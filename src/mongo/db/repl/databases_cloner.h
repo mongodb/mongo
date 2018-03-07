@@ -44,12 +44,10 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
-
-class OldThreadPool;
-
 namespace repl {
 
 /**
@@ -70,7 +68,7 @@ public:
     using OnFinishFn = stdx::function<void(const Status&)>;
     DatabasesCloner(StorageInterface* si,
                     executor::TaskExecutor* exec,
-                    OldThreadPool* dbWorkThreadPool,
+                    ThreadPool* dbWorkThreadPool,
                     HostAndPort source,
                     IncludeDbFilterFn includeDbPred,
                     OnFinishFn finishFn);
@@ -169,8 +167,8 @@ private:
     mutable stdx::mutex _mutex;                         // (S)
     Status _status{ErrorCodes::NotYetInitialized, ""};  // (M) If it is not OK, we stop everything.
     executor::TaskExecutor* _exec;                      // (R) executor to schedule things with
-    OldThreadPool* _dbWorkThreadPool;  // (R) db worker thread pool for collection cloning.
-    const HostAndPort _source;         // (R) The source to use.
+    ThreadPool* _dbWorkThreadPool;  // (R) db worker thread pool for collection cloning.
+    const HostAndPort _source;      // (R) The source to use.
     CollectionCloner::ScheduleDbWorkFn _scheduleDbWorkFn;  // (M)
 
     const IncludeDbFilterFn _includeDbFn;  // (R) function which decides which dbs are cloned.

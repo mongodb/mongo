@@ -111,7 +111,13 @@ void BaseClonerTest::setUp() {
     executor::ThreadPoolExecutorTest::setUp();
     clear();
     launchExecutorThread();
-    dbWorkThreadPool = stdx::make_unique<OldThreadPool>(1);
+
+    ThreadPool::Options options;
+    options.minThreads = 1U;
+    options.maxThreads = 1U;
+    dbWorkThreadPool = stdx::make_unique<ThreadPool>(options);
+    dbWorkThreadPool->startup();
+
     storageInterface.reset(new StorageInterfaceMock());
 }
 
@@ -120,7 +126,7 @@ void BaseClonerTest::tearDown() {
     getExecutor().join();
 
     storageInterface.reset();
-    dbWorkThreadPool->join();
+
     dbWorkThreadPool.reset();
 }
 

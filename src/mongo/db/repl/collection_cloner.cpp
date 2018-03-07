@@ -99,7 +99,7 @@ BSONObj makeCommandWithUUIDorCollectionName(StringData command,
 }
 
 CollectionCloner::CollectionCloner(executor::TaskExecutor* executor,
-                                   OldThreadPool* dbWorkThreadPool,
+                                   ThreadPool* dbWorkThreadPool,
                                    const HostAndPort& source,
                                    const NamespaceString& sourceNss,
                                    const CollectionOptions& options,

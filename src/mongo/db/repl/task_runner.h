@@ -35,11 +35,11 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
 class Status;
-class OldThreadPool;
 class OperationContext;
 
 namespace repl {
@@ -79,7 +79,7 @@ public:
      */
     static Task makeCancelTask();
 
-    explicit TaskRunner(OldThreadPool* threadPool);
+    explicit TaskRunner(ThreadPool* threadPool);
 
     virtual ~TaskRunner();
 
@@ -156,7 +156,7 @@ private:
      */
     Task _waitForNextTask();
 
-    OldThreadPool* _threadPool;
+    ThreadPool* _threadPool;
 
     // Protects member data of this TaskRunner.
     mutable stdx::mutex _mutex;

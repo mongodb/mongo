@@ -48,7 +48,7 @@ public:
 
     executor::TaskExecutor* getTaskExecutor() const override;
 
-    OldThreadPool* getDbWorkThreadPool() const override;
+    ThreadPool* getDbWorkThreadPool() const override;
 
     OpTimeWithTerm getCurrentTermAndLastCommittedOpTime() override;
 

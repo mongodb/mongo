@@ -45,7 +45,7 @@ executor::TaskExecutor* DataReplicatorExternalStateMock::getTaskExecutor() const
     return taskExecutor;
 }
 
-OldThreadPool* DataReplicatorExternalStateMock::getDbWorkThreadPool() const {
+ThreadPool* DataReplicatorExternalStateMock::getDbWorkThreadPool() const {
     return dbWorkThreadPool;
 }
 

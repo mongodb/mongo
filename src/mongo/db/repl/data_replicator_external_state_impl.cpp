@@ -49,7 +49,7 @@ executor::TaskExecutor* DataReplicatorExternalStateImpl::getTaskExecutor() const
     return _replicationCoordinatorExternalState->getTaskExecutor();
 }
 
-OldThreadPool* DataReplicatorExternalStateImpl::getDbWorkThreadPool() const {
+ThreadPool* DataReplicatorExternalStateImpl::getDbWorkThreadPool() const {
     return _replicationCoordinatorExternalState->getDbWorkThreadPool();
 }
 

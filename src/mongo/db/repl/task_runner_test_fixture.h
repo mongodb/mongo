@@ -33,11 +33,11 @@
 #include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
 class Client;
-class OldThreadPool;
 class OperationContext;
 
 namespace repl {
@@ -52,7 +52,7 @@ class TaskRunnerTest : public unittest::Test {
 public:
     static Status getDetectableErrorStatus();
 
-    OldThreadPool& getThreadPool() const;
+    ThreadPool& getThreadPool() const;
     TaskRunner& getTaskRunner() const;
 
     void destroyTaskRunner();
@@ -62,7 +62,7 @@ protected:
     void tearDown() override;
 
 private:
-    std::unique_ptr<OldThreadPool> _threadPool;
+    std::unique_ptr<ThreadPool> _threadPool;
     std::unique_ptr<TaskRunner> _taskRunner;
 };
 

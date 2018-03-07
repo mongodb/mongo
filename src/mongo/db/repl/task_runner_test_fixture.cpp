@@ -34,19 +34,12 @@
 #include "mongo/db/repl/task_runner.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/stdx/memory.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 
 namespace mongo {
 namespace repl {
 
 using namespace mongo;
 using namespace mongo::repl;
-
-namespace {
-
-const int kNumThreads = 3;
-
-}  // namespace
 
 Status TaskRunnerTest::getDetectableErrorStatus() {
     return Status(ErrorCodes::InternalError, "Not mutated");
@@ -57,7 +50,7 @@ TaskRunner& TaskRunnerTest::getTaskRunner() const {
     return *_taskRunner;
 }
 
-OldThreadPool& TaskRunnerTest::getThreadPool() const {
+ThreadPool& TaskRunnerTest::getThreadPool() const {
     ASSERT(_threadPool.get());
     return *_threadPool;
 }
@@ -67,7 +60,11 @@ void TaskRunnerTest::destroyTaskRunner() {
 }
 
 void TaskRunnerTest::setUp() {
-    _threadPool = stdx::make_unique<OldThreadPool>(kNumThreads, "TaskRunnerTest-");
+    ThreadPool::Options options;
+    options.poolName = "TaskRunnerTest";
+    _threadPool = stdx::make_unique<ThreadPool>(options);
+    _threadPool->startup();
+
     _taskRunner = stdx::make_unique<TaskRunner>(_threadPool.get());
 }
 

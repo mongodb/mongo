@@ -59,8 +59,8 @@
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/stdx/mutex.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
@@ -227,7 +227,7 @@ public:
         return *_storageInterface;
     }
 
-    OldThreadPool& getDbWorkThreadPool() {
+    ThreadPool& getDbWorkThreadPool() {
         return *_dbWorkThreadPool;
     }
 
@@ -305,7 +305,8 @@ protected:
                     std::unique_ptr<CollectionBulkLoader>(collInfo->loader));
             };
 
-        _dbWorkThreadPool = stdx::make_unique<OldThreadPool>(1);
+        _dbWorkThreadPool = stdx::make_unique<ThreadPool>(ThreadPool::Options());
+        _dbWorkThreadPool->startup();
 
         Client::initThreadIfNotAlready();
         reset();
@@ -403,7 +404,6 @@ protected:
     void tearDown() override {
         tearDownExecutorThread();
         _initialSyncer.reset();
-        _dbWorkThreadPool->join();
         _dbWorkThreadPool.reset();
         _replicationProcess.reset();
         _storageInterface.reset();
@@ -439,7 +439,7 @@ protected:
     std::unique_ptr<SyncSourceSelectorMock> _syncSourceSelector;
     std::unique_ptr<StorageInterfaceMock> _storageInterface;
     std::unique_ptr<ReplicationProcess> _replicationProcess;
-    std::unique_ptr<OldThreadPool> _dbWorkThreadPool;
+    std::unique_ptr<ThreadPool> _dbWorkThreadPool;
     std::map<NamespaceString, CollectionMockStats> _collectionStats;
     std::map<NamespaceString, CollectionCloneInfo> _collections;
 

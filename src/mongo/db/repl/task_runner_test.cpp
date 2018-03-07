@@ -36,7 +36,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace {
 
@@ -68,7 +68,7 @@ TEST_F(TaskRunnerTest, CallbackValues) {
         return TaskRunner::NextAction::kCancel;
     };
     getTaskRunner().schedule(task);
-    getThreadPool().join();
+    getThreadPool().waitForIdle();
     ASSERT_FALSE(getTaskRunner().isActive());
 
     stdx::lock_guard<stdx::mutex> lk(mutex);
@@ -107,7 +107,7 @@ OpIdVector _testRunTaskTwice(TaskRunnerTest& test,
     ASSERT_TRUE(test.getTaskRunner().isActive());
     barrier.countDownAndWait();
 
-    test.getThreadPool().join();
+    test.getThreadPool().waitForIdle();
     ASSERT_FALSE(test.getTaskRunner().isActive());
 
     stdx::lock_guard<stdx::mutex> lk(mutex);
@@ -133,7 +133,7 @@ TEST_F(TaskRunnerTest, RunTaskTwiceDisposeOperationContext) {
 // thread back to pool after disposing of operation context.
 TEST_F(TaskRunnerTest, RunTaskTwiceDisposeOperationContextJoinThreadPoolBeforeScheduling) {
     auto schedule = [this](const Task& task) {
-        getThreadPool().join();
+        getThreadPool().waitForIdle();
         getTaskRunner().schedule(task);
     };
     auto txnId =
@@ -177,7 +177,7 @@ TEST_F(TaskRunnerTest, SkipSecondTask) {
         schedulingDone = true;
         condition.notify_all();
     }
-    getThreadPool().join();
+    getThreadPool().waitForIdle();
     ASSERT_FALSE(getTaskRunner().isActive());
 
     stdx::lock_guard<stdx::mutex> lk(mutex);
@@ -226,7 +226,7 @@ TEST_F(TaskRunnerTest, FirstTaskThrowsException) {
         schedulingDone = true;
         condition.notify_all();
     }
-    getThreadPool().join();
+    getThreadPool().waitForIdle();
     ASSERT_FALSE(getTaskRunner().isActive());
 
     stdx::lock_guard<stdx::mutex> lk(mutex);
@@ -270,7 +270,7 @@ TEST_F(TaskRunnerTest, Cancel) {
     getTaskRunner().cancel();
     getTaskRunner().cancel();
 
-    getThreadPool().join();
+    getThreadPool().waitForIdle();
     ASSERT_FALSE(getTaskRunner().isActive());
 
     // This status will not be OK if canceling the task runner
@@ -345,7 +345,7 @@ TEST_F(TaskRunnerTest, DestroyShouldWaitForTasksToComplete) {
 
     destroyTaskRunner();
 
-    getThreadPool().join();
+    getThreadPool().waitForIdle();
 
     // This status will not be OK if canceling the task runner
     // before scheduling the task results in the task being canceled.

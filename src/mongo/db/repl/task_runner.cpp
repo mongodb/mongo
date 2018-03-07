@@ -40,7 +40,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/old_thread_pool.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/log.h"
@@ -77,7 +76,7 @@ TaskRunner::Task TaskRunner::makeCancelTask() {
     return [](OperationContext* opCtx, const Status& status) { return NextAction::kCancel; };
 }
 
-TaskRunner::TaskRunner(OldThreadPool* threadPool)
+TaskRunner::TaskRunner(ThreadPool* threadPool)
     : _threadPool(threadPool), _active(false), _cancelRequested(false) {
     uassert(ErrorCodes::BadValue, "null thread pool", threadPool);
 }
@@ -113,7 +112,7 @@ void TaskRunner::schedule(const Task& task) {
         return;
     }
 
-    _threadPool->schedule([this] { _runTasks(); });
+    invariantOK(_threadPool->schedule([this] { _runTasks(); }));
 
     _active = true;
     _cancelRequested = false;
