@@ -1,8 +1,11 @@
-test_kind: fsm_workload_test
+test_kind: js_test
 
 selector:
   roots:
-  - jstests/concurrency/fsm_workloads/**/*.js
+  - jstests/concurrency/*.js
+  exclude_files:
+  # Skip the sharding tests because they're run in different suites.
+  - jstests/concurrency/fsm_all_sharded*.js
 
 executor:
   archive:
@@ -18,10 +21,6 @@ executor:
       global_vars:
         TestData:
           skipValidationOnNamespaceNotFound: false
-  # TODO SERVER-30204: Avoid restarting the MongoDB deployment in order to delete all of the data
-  # files from earlier FSM workloads.
-  - class: CleanEveryN
-    n: 20
   fixture:
     class: MongoDFixture
     mongod_options:

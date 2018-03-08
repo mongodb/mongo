@@ -3796,7 +3796,7 @@ tasks:
   - func: "run tests"
     timeout_secs: 21600 # 6 hour timeout
     vars:
-      resmoke_args: --suites=concurrency jstests/concurrency/fsm_all_simultaneous.js --storageEngine=wiredTiger
+      resmoke_args: --suites=concurrency_simultaneous --storageEngine=wiredTiger
 
 - <<: *task_template
   name: rlp
@@ -8541,9 +8541,10 @@ buildvariants:
   - name: auth
   - name: auth_audit
   - name: dbtest
-  - name: concurrency
-    distros:
-    - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
+  # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
+  # - name: concurrency
+  #   distros:
+  #   - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: concurrency_simultaneous
   - name: disk_mobile
   - name: failpoints
@@ -8596,7 +8597,8 @@ buildvariants:
   - name: auth
   - name: auth_audit
   - name: dbtest
-  - name: concurrency
+  # TODO SERVER-32993: Re-enable the concurrency suite on the mobile storage engine builders.
+  # - name: concurrency
   - name: concurrency_simultaneous
   - name: disk_mobile
   - name: failpoints
