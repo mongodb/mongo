@@ -403,29 +403,29 @@
                   numExpectedMatches);
 
         // Test that $currentOp is explainable.
-        // TODO SERVER-33718: enable this test for {localOps:true} on mongoS.
-        if (!isLocalMongosCurOp) {
-            const explainPlan = assert.commandWorked(adminDB.runCommand({
-                aggregate: 1,
-                pipeline: [
-                    {$currentOp: addToSpec({idleConnections: true, allUsers: false})},
-                    {$match: {desc: "test"}}
-                ],
-                explain: true
-            }));
+        const explainPlan = assert.commandWorked(adminDB.runCommand({
+            aggregate: 1,
+            pipeline: [
+                {$currentOp: addToSpec({idleConnections: true, allUsers: false})},
+                {$match: {desc: "test"}}
+            ],
+            explain: true
+        }));
 
-            let expectedStages =
-                [{$currentOp: {idleConnections: true}}, {$match: {desc: {$eq: "test"}}}];
+        let expectedStages =
+            [{$currentOp: {idleConnections: true}}, {$match: {desc: {$eq: "test"}}}];
 
-            if (isRemoteShardCurOp) {
-                assert.docEq(explainPlan.splitPipeline.shardsPart, expectedStages);
-                for (let i = 0; i < stParams.shards; i++) {
-                    let shardName = st["rs" + i].name;
-                    assert.docEq(explainPlan.shards[shardName].stages, expectedStages);
-                }
-            } else {
-                assert.docEq(explainPlan.stages, expectedStages);
+        if (isRemoteShardCurOp) {
+            assert.docEq(explainPlan.splitPipeline.shardsPart, expectedStages);
+            for (let i = 0; i < stParams.shards; i++) {
+                let shardName = st["rs" + i].name;
+                assert.docEq(explainPlan.shards[shardName].stages, expectedStages);
             }
+        } else if (isLocalMongosCurOp) {
+            expectedStages[0].$currentOp.localOps = true;
+            assert.docEq(explainPlan.mongos.stages, expectedStages);
+        } else {
+            assert.docEq(explainPlan.stages, expectedStages);
         }
 
         // Test that a user with the inprog privilege can run getMore on a $currentOp aggregation

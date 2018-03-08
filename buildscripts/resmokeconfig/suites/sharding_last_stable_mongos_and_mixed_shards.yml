@@ -29,6 +29,7 @@ selector:
   - jstests/sharding/commands_that_write_accept_wc_configRS.js
   - jstests/sharding/kill_pinned_cursor.js
   - jstests/sharding/movechunk_commit_changelog_stats.js
+  - jstests/sharding/mongos_local_explain.js
   # Enable when 3.6 becomes last-stable.
   - jstests/sharding/coll_epoch_test1.js
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js

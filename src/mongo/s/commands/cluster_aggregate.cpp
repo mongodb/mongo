@@ -68,6 +68,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
 
@@ -743,6 +744,13 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                               << pipeline->getSources().front()->getSourceName()
                               << " is not capable of producing input",
                 !pipeline->getSources().front()->constraints().requiresInputDocSource);
+
+        if (mergeCtx->explain) {
+            *result << "splitPipeline" << BSONNULL << "mongos"
+                    << Document{{"host", getHostNameCachedAndPort()},
+                                {"stages", pipeline->writeExplainOps(*mergeCtx->explain)}};
+            return Status::OK();
+        }
 
         auto cursorResponse = establishMergingMongosCursor(opCtx,
                                                            request,
