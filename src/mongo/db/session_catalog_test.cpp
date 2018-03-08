@@ -278,5 +278,41 @@ TEST_F(SessionCatalogTest, OnlyCheckOutSessionWithCheckOutSessionTrue) {
     }
 }
 
+TEST_F(SessionCatalogTest, ScanSessions) {
+    std::vector<LogicalSessionId> lsids;
+    auto workerFn = [&](OperationContext* opCtx, Session* session) {
+        lsids.push_back(session->getSessionId());
+    };
+
+    // Scan over zero Sessions.
+    SessionKiller::Matcher matcherAllSessions(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx())});
+    catalog()->scanSessions(opCtx(), matcherAllSessions, workerFn);
+    ASSERT(lsids.empty());
+
+    // Create three sessions in the catalog.
+    auto lsid1 = makeLogicalSessionIdForTest();
+    auto lsid2 = makeLogicalSessionIdForTest();
+    auto lsid3 = makeLogicalSessionIdForTest();
+    {
+        auto scopedSession1 = catalog()->getOrCreateSession(opCtx(), lsid1);
+        auto scopedSession2 = catalog()->getOrCreateSession(opCtx(), lsid2);
+        auto scopedSession3 = catalog()->getOrCreateSession(opCtx(), lsid3);
+    }
+
+    // Scan over all Sessions.
+    lsids.clear();
+    catalog()->scanSessions(opCtx(), matcherAllSessions, workerFn);
+    ASSERT_EQ(lsids.size(), 3U);
+
+    // Scan over all Sessions, visiting a particular Session.
+    SessionKiller::Matcher matcherLSID2(
+        KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx(), lsid2)});
+    lsids.clear();
+    catalog()->scanSessions(opCtx(), matcherLSID2, workerFn);
+    ASSERT_EQ(lsids.size(), 1U);
+    ASSERT_EQ(lsids.front(), lsid2);
+}
+
 }  // namespace
 }  // namespace mongo

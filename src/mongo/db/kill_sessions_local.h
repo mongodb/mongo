@@ -28,17 +28,15 @@
 
 #pragma once
 
-#include "mongo/db/kill_sessions.h"
-
 #include "mongo/db/session_killer.h"
 
 namespace mongo {
 
+/**
+ * Kills all cursors, ops, and transactions on mongod for sessions matching 'matcher'.
+ */
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
                                         const SessionKiller::Matcher& matcher,
                                         SessionKiller::UniformRandomBitGenerator* urbg);
-
-SessionKiller::Result killSessionsLocalKillCursors(OperationContext* opCtx,
-                                                   const SessionKiller::Matcher& matcher);
 
 }  // namespace mongo

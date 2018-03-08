@@ -208,14 +208,12 @@ public:
     bool checkStatementExecutedNoOplogEntryFetch(TxnNumber txnNumber, StmtId stmtId) const;
 
     /**
-     * Transfers management of both locks and WiredTiger transaction from the OperationContext to
-     * the Session.
+     * Transfers management of transaction resources from the OperationContext to the Session.
      */
     void stashTransactionResources(OperationContext* opCtx);
 
     /**
-     * Transfers management of both locks and WiredTiger transaction from the Session to the
-     * OperationContext.
+     * Transfers management of transaction resources from the Session to the OperationContext.
      */
     void unstashTransactionResources(OperationContext* opCtx);
 
@@ -223,7 +221,12 @@ public:
      * If there is transaction in progress with transaction number 'txnNumber' and _autocommit=true,
      * aborts the transaction.
      */
-    void abortIfSnapshotRead(OperationContext* opCtx, TxnNumber txnNumber);
+    void abortIfSnapshotRead(TxnNumber txnNumber);
+
+    /**
+     * Aborts the transaction, releasing stashed transaction resources.
+     */
+    void abortTransaction();
 
     bool getAutocommit() const {
         return _autocommit;
@@ -293,8 +296,7 @@ private:
                                       std::vector<StmtId> stmtIdsWritten,
                                       const repl::OpTime& lastStmtIdWriteTs);
 
-    // Releases stashed locks and WiredTiger transaction. This implicitly aborts the transaction.
-    void _releaseStashedTransactionResources(WithLock, OperationContext* opCtx);
+    void _releaseStashedTransactionResources(WithLock);
 
     const LogicalSessionId _sessionId;
 

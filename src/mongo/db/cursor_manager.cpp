@@ -259,7 +259,7 @@ bool GlobalCursorIdCache::killCursor(OperationContext* opCtx, CursorId id, bool 
     if (txnToAbort) {
         auto session = SessionCatalog::get(opCtx)->getSession(opCtx, txnToAbort->first);
         if (session) {
-            (*session)->abortIfSnapshotRead(opCtx, txnToAbort->second);
+            (*session)->abortIfSnapshotRead(txnToAbort->second);
         }
     }
 
@@ -318,7 +318,7 @@ std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* opCtx, Date_t 
     for (auto&& txnToAbort : txnsToAbort) {
         auto session = SessionCatalog::get(opCtx)->getSession(opCtx, txnToAbort.first);
         if (session) {
-            (*session)->abortIfSnapshotRead(opCtx, txnToAbort.second);
+            (*session)->abortIfSnapshotRead(txnToAbort.second);
         }
     }
 

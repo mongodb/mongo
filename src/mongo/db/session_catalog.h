@@ -31,6 +31,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/session.h"
+#include "mongo/db/session_killer.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
@@ -134,6 +135,15 @@ public:
      * will throw. This prevents invalid entries from making it in the collection.
      */
     void invalidateSessions(OperationContext* opCtx, boost::optional<BSONObj> singleSessionDoc);
+
+    /**
+     * Iterates through the SessionCatalog and applies 'workerFn' to each Session. This locks the
+     * SessionCatalog.
+     * TODO SERVER-33850: Take Matcher out of the SessionKiller namespace.
+     */
+    void scanSessions(OperationContext* opCtx,
+                      const SessionKiller::Matcher& matcher,
+                      stdx::function<void(OperationContext*, Session*)> workerFn);
 
 private:
     struct SessionRuntimeInfo {

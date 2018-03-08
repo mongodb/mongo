@@ -598,7 +598,7 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
         // to a higher _activeTxnNumber during the lifetime of a checkout. If that occurs, we abort
         // the current transaction. Note that it would indicate a user bug to have a newer
         // transaction on one shard while an older transaction is still active on another shard.
-        _releaseStashedTransactionResources(lg, opCtx);
+        _releaseStashedTransactionResources(lg);
         uasserted(ErrorCodes::TransactionAborted,
                   str::stream() << "Transaction aborted. Active txnNumber is now "
                                 << _activeTxnNumber);
@@ -617,19 +617,24 @@ void Session::unstashTransactionResources(OperationContext* opCtx) {
     }
 }
 
-void Session::abortIfSnapshotRead(OperationContext* opCtx, TxnNumber txnNumber) {
+void Session::abortIfSnapshotRead(TxnNumber txnNumber) {
     stdx::lock_guard<stdx::mutex> lg(_mutex);
     if (_activeTxnNumber == txnNumber && _autocommit) {
-        _releaseStashedTransactionResources(lg, opCtx);
+        _releaseStashedTransactionResources(lg);
+        _txnState = MultiDocumentTransactionState::kAborted;
     }
 }
 
-void Session::_releaseStashedTransactionResources(WithLock wl, OperationContext* opCtx) {
-    if (opCtx->getWriteUnitOfWork()) {
-        opCtx->setWriteUnitOfWork(nullptr);
-    }
+void Session::abortTransaction() {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+    _releaseStashedTransactionResources(lg);
+    _txnState = MultiDocumentTransactionState::kAborted;
+}
 
+void Session::_releaseStashedTransactionResources(WithLock wl) {
     _txnResourceStash = boost::none;
+    _transactionOperations.clear();
+    _txnState = MultiDocumentTransactionState::kNone;
 }
 
 void Session::_beginOrContinueTxnOnMigration(WithLock wl, TxnNumber txnNumber) {

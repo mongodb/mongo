@@ -37,28 +37,34 @@
 #include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session.h"
+#include "mongo/db/session_catalog.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-SessionKiller::Result killSessionsLocalKillCursors(OperationContext* opCtx,
-                                                   const SessionKiller::Matcher& matcher) {
+namespace {
+void killSessionsLocalKillCursors(OperationContext* opCtx, const SessionKiller::Matcher& matcher) {
 
     auto res = CursorManager::killCursorsWithMatchingSessions(opCtx, matcher);
-    auto status = res.first;
-
-    if (status.isOK()) {
-        return std::vector<HostAndPort>{};
-    } else {
-        return status;
-    }
+    uassertStatusOK(res.first);
 }
+
+void killSessionsLocalKillTransactions(OperationContext* opCtx,
+                                       const SessionKiller::Matcher& matcher) {
+    SessionCatalog::get(opCtx)->scanSessions(
+        opCtx, matcher, [](OperationContext* opCtx, Session* session) {
+            session->abortTransaction();
+        });
+}
+}  // namespace
 
 SessionKiller::Result killSessionsLocal(OperationContext* opCtx,
                                         const SessionKiller::Matcher& matcher,
                                         SessionKiller::UniformRandomBitGenerator* urbg) {
-    uassertStatusOK(killSessionsLocalKillCursors(opCtx, matcher));
-    return uassertStatusOK(killSessionsLocalKillOps(opCtx, matcher));
+    killSessionsLocalKillCursors(opCtx, matcher);
+    uassertStatusOK(killSessionsLocalKillOps(opCtx, matcher));
+    killSessionsLocalKillTransactions(opCtx, matcher);
+    return {std::vector<HostAndPort>{}};
 }
 
 }  // namespace mongo

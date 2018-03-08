@@ -36,6 +36,7 @@
 
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -233,6 +234,23 @@ void SessionCatalog::invalidateSessions(OperationContext* opCtx,
         auto it = _txnTable.begin();
         while (it != _txnTable.end()) {
             invalidateSessionFn(lg, it++);
+        }
+    }
+}
+
+void SessionCatalog::scanSessions(OperationContext* opCtx,
+                                  const SessionKiller::Matcher& matcher,
+                                  stdx::function<void(OperationContext*, Session*)> workerFn) {
+    stdx::lock_guard<stdx::mutex> lg(_mutex);
+
+    LOG(2) << "Beginning scanSessions. Scanning " << _txnTable.size() << " sessions.";
+
+    for (auto it = _txnTable.begin(); it != _txnTable.end(); ++it) {
+        // TODO SERVER-33850: Rename KillAllSessionsByPattern and
+        // ScopedKillAllSessionsByPatternImpersonator to not refer to session kill.
+        if (const KillAllSessionsByPattern* pattern = matcher.match(it->first)) {
+            ScopedKillAllSessionsByPatternImpersonator impersonator(opCtx, *pattern);
+            workerFn(opCtx, &(it->second->txnState));
         }
     }
 }

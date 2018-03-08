@@ -89,7 +89,7 @@ private:
         if (txnToAbort) {
             auto session = SessionCatalog::get(opCtx)->getSession(opCtx, txnToAbort->first);
             if (session) {
-                (*session)->abortIfSnapshotRead(opCtx, txnToAbort->second);
+                (*session)->abortIfSnapshotRead(txnToAbort->second);
             }
         }
 
