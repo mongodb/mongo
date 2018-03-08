@@ -565,7 +565,7 @@ extern int __wt_schema_index_source(WT_SESSION_IMPL *session, WT_TABLE *table, c
 extern int __wt_schema_create( WT_SESSION_IMPL *session, const char *uri, const char *config) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[]) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_schema_get_table(WT_SESSION_IMPL *session, const char *name, size_t namelen, bool ok_incomplete, WT_TABLE **tablep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern void __wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE *table);
+extern int __wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE *table) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern void __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp);
 extern int __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX **idxp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE **tablep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

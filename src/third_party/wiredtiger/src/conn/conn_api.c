@@ -2220,6 +2220,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "readonly", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_READONLY);
+	WT_ERR(__wt_config_gets(session, cfg, "session_table_cache", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_TABLE_CACHE);
 
 	/* Configure error messages so we get them right early. */
 	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));

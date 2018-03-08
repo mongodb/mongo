@@ -67,6 +67,7 @@ __drop_colgroup(
 	    session, uri, force, &table, &colgroup)) == 0) {
 		table->cg_complete = false;
 		WT_TRET(__wt_schema_drop(session, colgroup->source, cfg));
+		WT_TRET(__wt_schema_release_table(session, table));
 	}
 
 	WT_TRET(__wt_metadata_remove(session, uri));
@@ -90,6 +91,7 @@ __drop_index(
 	    session, uri, force, &table, &idx)) == 0) {
 		table->idx_complete = false;
 		WT_TRET(__wt_schema_drop(session, idx->source, cfg));
+		WT_TRET(__wt_schema_release_table(session, table));
 	}
 
 	WT_TRET(__wt_metadata_remove(session, uri));
@@ -151,7 +153,7 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_ERR(__wt_metadata_remove(session, uri));
 
 err:	if (table != NULL)
-		__wt_schema_release_table(session, table);
+		WT_TRET(__wt_schema_release_table(session, table));
 	return (ret);
 }
 

@@ -246,6 +246,9 @@ __wt_turtle_read(WT_SESSION_IMPL *session, const char *key, char **valuep)
 
 	*valuep = NULL;
 
+	/* Require single-threading. */
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TURTLE));
+
 	/*
 	 * Open the turtle file; there's one case where we won't find the turtle
 	 * file, yet still succeed.  We create the metadata file before creating
@@ -301,6 +304,9 @@ __wt_turtle_update(WT_SESSION_IMPL *session, const char *key, const char *value)
 	const char *version;
 
 	fs = NULL;
+
+	/* Require single-threading. */
+	WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TURTLE));
 
 	/*
 	 * Create the turtle setup file: we currently re-write it from scratch

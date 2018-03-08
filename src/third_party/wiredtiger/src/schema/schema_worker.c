@@ -64,14 +64,17 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		}
 	} else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
 		WT_ERR(__wt_schema_get_colgroup(
-		    session, uri, false, NULL, &colgroup));
+		    session, uri, false, &table, &colgroup));
 		WT_ERR(__wt_schema_worker(session,
 		    colgroup->source, file_func, name_func, cfg, open_flags));
+		WT_ERR(__wt_schema_release_table(session, table));
 	} else if (WT_PREFIX_SKIP(tablename, "index:")) {
 		idx = NULL;
-		WT_ERR(__wt_schema_get_index(session, uri, false, NULL, &idx));
+		WT_ERR(__wt_schema_get_index(
+		    session, uri, false, &table, &idx));
 		WT_ERR(__wt_schema_worker(session, idx->source,
 		    file_func, name_func, cfg, open_flags));
+		WT_ERR(__wt_schema_release_table(session, table));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
 		WT_ERR(__wt_lsm_tree_worker(session,
 		    uri, file_func, name_func, cfg, open_flags));
@@ -128,6 +131,6 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_bad_object_type(session, uri));
 
 err:	if (table != NULL)
-		__wt_schema_release_table(session, table);
+		WT_TRET(__wt_schema_release_table(session, table));
 	return (ret);
 }
