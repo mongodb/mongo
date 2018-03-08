@@ -425,32 +425,6 @@ inline void massertStatusOKWithLocation(const Status& status, const char* file, 
 }
 
 /**
- * fassert is our fatal assert: if it fails, the process dies.
- *
- * Use this rather than invariant for cases that are possible, but we have chosen not to implement
- * recovery logic for.
- */
-#define fassertStatusOK MONGO_fassertStatusOK
-#define MONGO_fassertStatusOK(...) \
-    ::mongo::fassertStatusOKWithLocation(__VA_ARGS__, __FILE__, __LINE__)
-template <typename T>
-inline T fassertStatusOKWithLocation(int msgid, StatusWith<T> sw, const char* file, unsigned line) {
-    if (MONGO_unlikely(!sw.isOK())) {
-        fassertFailedWithStatusWithLocation(msgid, sw.getStatus(), file, line);
-    }
-    return std::move(sw.getValue());
-}
-
-inline void fassertStatusOKWithLocation(int msgid,
-                                        const Status& s,
-                                        const char* file,
-                                        unsigned line) {
-    if (MONGO_unlikely(!s.isOK())) {
-        fassertFailedWithStatusWithLocation(msgid, s, file, line);
-    }
-}
-
-/**
  * verify is deprecated. It is like invariant() in debug builds and massert() in release builds.
  */
 #define verify(expression) MONGO_verify(expression)

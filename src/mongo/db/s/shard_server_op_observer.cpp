@@ -253,9 +253,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         // Extract which user collection was updated
         const auto updatedNss([&] {
             std::string coll;
-            fassertStatusOK(
-                40477,
-                bsonExtractStringField(args.criteria, ShardCollectionType::ns.name(), &coll));
+            fassert(40477,
+                    bsonExtractStringField(args.criteria, ShardCollectionType::ns.name(), &coll));
             return NamespaceString(coll);
         }());
 
