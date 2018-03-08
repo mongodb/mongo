@@ -69,12 +69,6 @@ const Seconds kLockExpiration(10);
  */
 class ReplSetDistLockManagerFixture : public ShardServerTestFixture {
 protected:
-    void setUp() override {
-        ShardServerTestFixture::setUp();
-
-        getServiceContext()->setTickSource(makeTickSource());
-    }
-
     void tearDown() override {
         // Don't care about what shutDown passes to stopPing here.
         getMockCatalog()->expectStopPing([](StringData) {}, Status::OK());
@@ -101,10 +95,6 @@ protected:
         return stdx::make_unique<BalancerConfiguration>();
     }
 
-    virtual std::unique_ptr<TickSource> makeTickSource() {
-        return stdx::make_unique<SystemTickSource>();
-    }
-
     /**
      * Returns the mocked catalog used by the lock manager being tested.
      */
@@ -127,11 +117,8 @@ private:
 
 class RSDistLockMgrWithMockTickSource : public ReplSetDistLockManagerFixture {
 protected:
-    /**
-     * Override the way the fixture gets the tick source to install to use a mock tick source.
-     */
-    std::unique_ptr<TickSource> makeTickSource() override {
-        return stdx::make_unique<TickSourceMock>();
+    RSDistLockMgrWithMockTickSource() {
+        getServiceContext()->setTickSource(stdx::make_unique<TickSourceMock>());
     }
 
     /**

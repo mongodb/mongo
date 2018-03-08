@@ -178,8 +178,8 @@ void ReplSetDistLockManager::doTask() {
             }
         }
 
-        stdx::unique_lock<stdx::mutex> lk(_mutex);
         MONGO_IDLE_THREAD_BLOCK;
+        stdx::unique_lock<stdx::mutex> lk(_mutex);
         _shutDownCV.wait_for(lk, _pingInterval.toSystemDuration(), [this] { return _isShutDown; });
     }
 }

@@ -142,7 +142,6 @@ void ShardingTestFixture::setUp() {
 
     std::unique_ptr<ShardingCatalogClientImpl> catalogClient(
         stdx::make_unique<ShardingCatalogClientImpl>(std::move(uniqueDistLockManager)));
-    _catalogClient = catalogClient.get();
     catalogClient->startup();
 
     ConnectionString configCS = ConnectionString::forReplicaSet(
@@ -212,10 +211,6 @@ void ShardingTestFixture::shutdownExecutor() {
 
 ShardingCatalogClient* ShardingTestFixture::catalogClient() const {
     return Grid::get(operationContext())->catalogClient();
-}
-
-ShardingCatalogClientImpl* ShardingTestFixture::getCatalogClient() const {
-    return _catalogClient;
 }
 
 ShardRegistry* ShardingTestFixture::shardRegistry() const {

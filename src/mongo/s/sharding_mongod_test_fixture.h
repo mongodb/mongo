@@ -74,6 +74,9 @@ public:
     ShardingCatalogClient* catalogClient() const;
     CatalogCache* catalogCache() const;
     ShardRegistry* shardRegistry() const;
+    RemoteCommandTargeterFactoryMock* targeterFactory() const;
+    executor::TaskExecutor* executor() const;
+    DistLockManager* distLock() const;
     ClusterCursorManager* clusterCursorManager() const;
     executor::TaskExecutorPool* executorPool() const;
 
@@ -85,28 +88,12 @@ public:
      */
     void shutdownExecutorPool();
 
-    // Syntactic sugar for getting executor and networking components off the Grid's executor pool,
-    // if they have been initialized.
-
-    executor::TaskExecutor* executor() const;
-
     repl::ReplicationCoordinatorMock* replicationCoordinator() const;
 
     /**
      * Returns the stored raw pointer to the DistLockCatalog, if it has been initialized.
      */
     DistLockCatalog* distLockCatalog() const;
-
-    /**
-     * Returns the stored raw pointer to the DistLockManager, if it has been initialized.
-     */
-    DistLockManager* distLock() const;
-
-    /**
-     * Returns the stored raw pointer to the RemoteCommandTargeterFactoryMock, if it has been
-     * initialized.
-     */
-    RemoteCommandTargeterFactoryMock* targeterFactory() const;
 
     /**
      * Returns the stored raw pointer to the OperationContext.

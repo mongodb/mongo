@@ -165,14 +165,6 @@ public:
 
     DistLockManager* getDistLockManager() override;
 
-    /**
-     * Runs a read command against the config server with majority read concern.
-     */
-    bool runReadCommandForTest(OperationContext* opCtx,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               BSONObjBuilder* result);
-
     StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
         OperationContext* opCtx,
         StringData purpose,
@@ -215,11 +207,6 @@ private:
         const BSONObj& query,
         const BSONObj& sort,
         boost::optional<long long> limit) override;
-
-    /**
-     * Appends a read committed read concern to the request object.
-     */
-    void _appendReadConcern(BSONObjBuilder* builder);
 
     /**
      * Queries the config servers for the database metadata for the given database, using the

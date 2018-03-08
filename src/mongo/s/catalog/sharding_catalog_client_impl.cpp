@@ -662,25 +662,6 @@ bool ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext* 
     return true;
 }
 
-bool ShardingCatalogClientImpl::runReadCommandForTest(OperationContext* opCtx,
-                                                      const std::string& dbname,
-                                                      const BSONObj& cmdObj,
-                                                      BSONObjBuilder* result) {
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.appendElements(cmdObj);
-    _appendReadConcern(&cmdBuilder);
-
-    auto resultStatus =
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            opCtx, kConfigReadSelector, dbname, cmdBuilder.done(), Shard::RetryPolicy::kIdempotent);
-    if (resultStatus.isOK()) {
-        result->appendElements(resultStatus.getValue().response);
-        return resultStatus.getValue().commandStatus.isOK();
-    }
-
-    return CommandHelpers::appendCommandStatus(*result, resultStatus.getStatus());
-}
-
 bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* opCtx,
                                                              const std::string& dbname,
                                                              const BSONObj& cmdObj,
@@ -997,12 +978,6 @@ StatusWith<repl::OpTimeWith<vector<BSONObj>>> ShardingCatalogClientImpl::_exhaus
 
     return repl::OpTimeWith<vector<BSONObj>>(std::move(response.getValue().docs),
                                              response.getValue().opTime);
-}
-
-void ShardingCatalogClientImpl::_appendReadConcern(BSONObjBuilder* builder) {
-    repl::ReadConcernArgs readConcern(grid.configOpTime(),
-                                      repl::ReadConcernLevel::kMajorityReadConcern);
-    readConcern.appendInfo(builder);
 }
 
 StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNewKeys(

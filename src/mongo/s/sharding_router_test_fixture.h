@@ -33,9 +33,7 @@
 namespace mongo {
 
 class BSONObj;
-class CatalogCache;
 class ShardingCatalogClient;
-class ShardingCatalogClientImpl;
 struct ChunkVersion;
 class CollectionType;
 class DistLockManagerMock;
@@ -57,26 +55,16 @@ public:
     ShardingTestFixture();
     ~ShardingTestFixture();
 
-protected:
+    // Syntactic sugar for getting sharding components off the Grid, if they have been initialized.
+
     ShardingCatalogClient* catalogClient() const;
-
-    /**
-     * Prefer catalogClient() method over this as much as possible.
-     */
-    ShardingCatalogClientImpl* getCatalogClient() const;
-
     ShardRegistry* shardRegistry() const;
-
     RemoteCommandTargeterFactoryMock* targeterFactory() const;
-
+    executor::TaskExecutor* executor() const;
+    DistLockManagerMock* distLock() const;
     RemoteCommandTargeterMock* configTargeter() const;
 
-    executor::TaskExecutor* executor() const;
-
-    DistLockManagerMock* distLock() const;
-
     ServiceContext* serviceContext() const;
-
     OperationContext* operationContext() const;
 
     /**
@@ -208,7 +196,6 @@ private:
     std::unique_ptr<executor::NetworkTestEnv> _networkTestEnvForPool;
 
     DistLockManagerMock* _distLockManager = nullptr;
-    ShardingCatalogClientImpl* _catalogClient = nullptr;
 };
 
 }  // namespace mongo
