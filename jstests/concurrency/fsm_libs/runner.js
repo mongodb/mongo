@@ -832,6 +832,19 @@ var runner = (function() {
 
             runWorkloads(
                 workloads, clusterOptions, {composed: true}, executionOptions, cleanupOptions);
+        },
+
+        internals: {
+            validateExecutionOptions,
+            prepareCollections,
+            WorkloadFailure,
+            throwError,
+            shouldSkipWorkload,
+            setupWorkload,
+            teardownWorkload,
+            setIterations,
+            setThreadCount,
+            loadWorkloadContext,
         }
     };
 

@@ -46,7 +46,8 @@ var Cluster = function(options) {
             'sharded.stepdownOptions',
             'sharded.stepdownOptions.configStepdown',
             'sharded.stepdownOptions.shardStepdown',
-            'teardownFunctions'
+            'teardownFunctions',
+            'useExistingConnectionAsSeed',
         ];
 
         getObjectKeys(options).forEach(function(option) {
@@ -165,6 +166,9 @@ var Cluster = function(options) {
                'Expected teardownFunctions.config to be an array');
         assert(options.teardownFunctions.config.every(f => (typeof f === 'function')),
                'Expected teardownFunctions.config to be an array of functions');
+
+        options.useExistingConnectionAsSeed = options.useExistingConnectionAsSeed || false;
+        assert.eq('boolean', typeof options.useExistingConnectionAsSeed);
     }
 
     function makeReplSetTestConfig(numReplSetNodes, firstNodeOnlyVote) {
@@ -203,6 +207,16 @@ var Cluster = function(options) {
         }
 
         if (options.sharded.enabled) {
+            if (options.useExistingConnectionAsSeed) {
+                // Note that depending on how SERVER-21485 is implemented, it may still not be
+                // possible to rehydrate a ShardingTest instance from an existing connection because
+                // it wouldn't be possible to discover other mongos processes running in the sharded
+                // cluster.
+                throw new Error(
+                    "Cluster cannot support 'useExistingConnectionAsSeed' option until" +
+                    ' SERVER-21485 is implemented');
+            }
+
             // TODO: allow 'options' to specify the number of shards and mongos processes
             var shardConfig = {
                 shards: options.sharded.numShards,
@@ -299,18 +313,26 @@ var Cluster = function(options) {
                 settings: {electionTimeoutMillis: 60 * 60 * 24 * 1000}
             };
 
-            var rst = new ReplSetTest(replSetConfig);
-            rst.startSet();
+            var rst;
 
-            rst.initiate();
-            rst.awaitSecondaryNodes();
+            if (!options.useExistingConnectionAsSeed) {
+                rst = new ReplSetTest(replSetConfig);
+                rst.startSet();
+
+                rst.initiate();
+                rst.awaitSecondaryNodes();
+            } else {
+                rst = new ReplSetTest(db.getMongo().host);
+            }
 
             conn = rst.getPrimary();
             replSets = [rst];
 
             this.teardown = function teardown(opts) {
                 options.teardownFunctions.mongod.forEach(this.executeOnMongodNodes);
-                rst.stopSet(undefined, undefined, opts);
+                if (!options.useExistingConnectionAsSeed) {
+                    rst.stopSet(undefined, undefined, opts);
+                }
             };
 
             this._addReplicaSetConns(rst);
