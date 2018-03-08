@@ -1333,7 +1333,15 @@ var ReplSetTest = function(opts) {
      * Constructor, which instantiates the ReplSetTest object from an existing set.
      */
     function _constructFromExistingSeedNode(seedNode) {
-        var conf = _replSetGetConfig(new Mongo(seedNode));
+        const conn = new Mongo(seedNode);
+        var conf;
+        if (jsTest.options().keyFile) {
+            self.keyFile = jsTest.options().keyFile;
+            conf = authutil.asCluster(conn, self.keyFile, () => _replSetGetConfig(conn));
+        } else {
+            conf = _replSetGetConfig(conn);
+        }
+
         print('Recreating replica set from config ' + tojson(conf));
 
         var existingNodes = conf.members.map(member => member.host);
