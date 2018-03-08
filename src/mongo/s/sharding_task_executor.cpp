@@ -122,8 +122,10 @@ StatusWith<TaskExecutor::CallbackHandle> ShardingTaskExecutor::scheduleRemoteCom
 
     if (request.opCtx->getLogicalSessionId() && !request.cmdObj.hasField("lsid")) {
         newRequest.emplace(request);
+
         BSONObjBuilder bob(std::move(newRequest->cmdObj));
         {
+            // TODO SERVER-33702.
             BSONObjBuilder subbob(bob.subobjStart("lsid"));
             request.opCtx->getLogicalSessionId()->serialize(&subbob);
         }

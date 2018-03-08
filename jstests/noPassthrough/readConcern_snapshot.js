@@ -38,16 +38,6 @@
         ErrorCodes.IllegalOperation);
     MongoRunner.stopMongod(conn);
 
-    // readConcern 'snapshot' is not allowed on mongos.
-    const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
-    session = st.getDB(dbName).getMongo().startSession({causalConsistency: false});
-    sessionDb = session.getDatabase(dbName);
-    assert.commandFailedWithCode(
-        sessionDb.runCommand(
-            {find: collName, readConcern: {level: "snapshot"}, txnNumber: NumberLong(0)}),
-        ErrorCodes.InvalidOptions);
-    st.stop();
-
     // readConcern 'snapshot' is not allowed with protocol version 0.
     rst = new ReplSetTest({nodes: 1, protocolVersion: 0});
     rst.startSet();

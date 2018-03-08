@@ -219,12 +219,37 @@ void execCommandClient(OperationContext* opCtx,
         CommandHelpers::appendCommandStatus(body, readConcernParseStatus);
         return;
     }
+
     if (readConcernArgs.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern) {
-        auto body = result->getBodyBuilder();
-        CommandHelpers::appendCommandStatus(
-            body,
-            Status(ErrorCodes::InvalidOptions, "read concern snapshot is not supported on mongos"));
-        return;
+        // TODO SERVER-33708.
+        if (!invocation->supportsReadConcern(readConcernArgs.getLevel())) {
+            auto body = result->getBodyBuilder();
+            CommandHelpers::appendCommandStatus(
+                body,
+                Status(ErrorCodes::InvalidOptions,
+                       str::stream()
+                           << "read concern snapshot is not supported on mongos for the command "
+                           << c->getName()));
+            return;
+        }
+
+        if (!opCtx->getTxnNumber()) {
+            auto body = result->getBodyBuilder();
+            CommandHelpers::appendCommandStatus(
+                body,
+                Status(ErrorCodes::InvalidOptions,
+                       "read concern snapshot is supported only in a transaction"));
+            return;
+        }
+
+        if (readConcernArgs.getArgsAtClusterTime()) {
+            auto body = result->getBodyBuilder();
+            CommandHelpers::appendCommandStatus(
+                body,
+                Status(ErrorCodes::InvalidOptions,
+                       "read concern snapshot is not supported with atClusterTime on mongos"));
+            return;
+        }
     }
 
     // attach tracking
