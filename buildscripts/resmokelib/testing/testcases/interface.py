@@ -55,6 +55,9 @@ class TestCase(unittest.TestCase):
         # logger is an instance of TestQueueLogger. When the TestCase is created by a hook
         # implementation it is an instance of BaseLogger.
         self.logger = logger
+        # Used to store the logger when overridden by a test logger in Report.startTest().
+        self._original_logger = None
+
         self.test_kind = test_kind
         self.test_name = test_name
 
@@ -86,6 +89,22 @@ class TestCase(unittest.TestCase):
 
     def shortDescription(self):
         return "%s %s" % (self.test_kind, self.test_name)
+
+    def override_logger(self, new_logger):
+        """
+        Overrides this instance's logger with a new logger.
+
+        This method is used by the repport to set the test logger.
+        """
+        assert not self._original_logger, "Logger already overridden"
+        self._original_logger = self.logger
+        self.logger = new_logger
+
+    def reset_logger(self):
+        """Resets this instance's logger to its original value."""
+        assert self._original_logger, "Logger was not overridden"
+        self.logger = self._original_logger
+        self._original_logger = None
 
     def configure(self, fixture, *args, **kwargs):  # pylint: disable=unused-argument
         """

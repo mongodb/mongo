@@ -117,10 +117,7 @@ class TestReport(unittest.TestResult):
                                                       command, test.logger)
         test_info.url_endpoint = test_logger.url_endpoint
 
-        # TestReport.combine() doesn't access the '__original_loggers' attribute, so we don't bother
-        # protecting it with the lock.
-        self.__original_loggers[test_info.test_id] = test.logger
-        test.logger = test_logger
+        test.override_logger(test_logger)
 
     def stopTest(self, test):
         """
@@ -144,10 +141,7 @@ class TestReport(unittest.TestResult):
             logging.flush.close_later(handler)
 
         # Restore the original logger for the test.
-        #
-        # TestReport.combine() doesn't access the '__original_loggers' attribute, so we don't bother
-        # protecting it with the lock.
-        test.logger = self.__original_loggers.pop(test.id())
+        test.reset_logger()
 
     def addError(self, test, err):
         """
@@ -367,10 +361,6 @@ class TestReport(unittest.TestResult):
             self.num_failed = 0
             self.num_errored = 0
             self.num_interrupted = 0
-
-        # TestReport.combine() doesn't access the '__original_loggers' attribute, so we don't bother
-        # protecting it with the lock.
-        self.__original_loggers = {}
 
     def _find_test_info(self, test):
         """

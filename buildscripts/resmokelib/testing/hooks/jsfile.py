@@ -44,6 +44,14 @@ class DynamicJSTestCase(interface.DynamicTestCase):
                                            base_test_name, hook)
         self._js_test = jstest.JSTestCase(logger, js_filename, shell_options=shell_options)
 
+    def override_logger(self, new_logger):
+        interface.DynamicTestCase.override_logger(self, new_logger)
+        self._js_test.override_logger(new_logger)
+
+    def reset_logger(self):
+        interface.DynamicTestCase.reset_logger(self)
+        self._js_test.reset_logger()
+
     def configure(self, fixture, *args, **kwargs):  # pylint: disable=unused-argument
         interface.DynamicTestCase.configure(self, fixture, *args, **kwargs)
         self._js_test.configure(fixture, *args, **kwargs)

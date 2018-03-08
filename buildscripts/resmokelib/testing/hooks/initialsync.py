@@ -40,9 +40,6 @@ class BackgroundInitialSync(interface.Hook):
                 fixture.__class__.__name__))
 
         description = "Background Initial Sync"
-        # js_filename = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
-        # jsfile.JSHook.__init__(self, hook_logger, fixture, js_filename,
-        #                        description, shell_options)
         interface.Hook.__init__(self, hook_logger, fixture, description)
 
         self.use_resync = use_resync
