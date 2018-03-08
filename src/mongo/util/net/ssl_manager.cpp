@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
@@ -151,6 +152,314 @@ SSLManagerInterface::~SSLManagerInterface() {}
 
 SSLConnectionInterface::~SSLConnectionInterface() {}
 
+namespace {
+
+/**
+ * Enum of supported Abstract Syntax Notation One (ASN.1) Distinguished Encoding Rules (DER) types.
+ *
+ * This is a subset of all DER types.
+ */
+enum class DERType : char {
+    // Primitive, not supported by the parser
+    // Only exists when BER indefinite form is used which is not valid DER.
+    EndOfContent = 0,
+
+    // Primitive
+    UTF8String = 12,
+
+    // Sequence or Sequence Of, Constructed
+    SEQUENCE = 16,
+
+    // Set or Set Of, Constructed
+    SET = 17,
+};
+
+/**
+ * Distinguished Encoding Rules (DER) are a strict subset of Basic Encoding Rules (BER).
+ *
+ * For more details, see X.690 from ITU-T.
+ *
+ * It is a Tag + Length + Value format. The tag is generally 1 byte, the length is 1 or more
+ * and then followed by the value.
+ */
+class DERToken {
+public:
+    DERToken() {}
+    DERToken(DERType type, size_t length, const char* const data)
+        : _type(type), _length(length), _data(data) {}
+
+    /**
+     * Get the ASN.1 type of the current token.
+     */
+    DERType getType() const {
+        return _type;
+    }
+
+    /**
+     * Get a ConstDataRange for the value of this SET or SET OF.
+     */
+    ConstDataRange getSetRange() {
+        invariant(_type == DERType::SET);
+        return ConstDataRange(_data, _data + _length);
+    }
+
+    /**
+     * Get a ConstDataRange for the value of this SEQUENCE or SEQUENCE OF.
+     */
+    ConstDataRange getSequenceRange() {
+        invariant(_type == DERType::SEQUENCE);
+        return ConstDataRange(_data, _data + _length);
+    }
+
+    /**
+     * Get a std::string for the value of this Utf8String.
+     */
+    std::string readUtf8String() {
+        invariant(_type == DERType::UTF8String);
+        return std::string(_data, _length);
+    }
+
+    /**
+     * Parse a buffer of bytes and return the number of bytes we read for this token.
+     *
+     * Returns a DERToken which consists of the (tag, length, value) tuple.
+     */
+    static StatusWith<DERToken> parse(ConstDataRange cdr, size_t* outLength);
+
+private:
+    DERType _type{DERType::EndOfContent};
+    size_t _length{0};
+    const char* _data{nullptr};
+};
+
+}  // namespace
+
+template <>
+struct DataType::Handler<DERToken> {
+    static Status load(DERToken* t,
+                       const char* ptr,
+                       size_t length,
+                       size_t* advanced,
+                       std::ptrdiff_t debug_offset) {
+        size_t outLength;
+
+        auto swPair = DERToken::parse(ConstDataRange(ptr, length), &outLength);
+
+        if (!swPair.isOK()) {
+            return swPair.getStatus();
+        }
+
+        if (t) {
+            *t = std::move(swPair.getValue());
+        }
+
+        if (advanced) {
+            *advanced = outLength;
+        }
+
+        return Status::OK();
+    }
+
+    static DERToken defaultConstruct() {
+        return DERToken();
+    }
+};
+
+namespace {
+
+StatusWith<std::string> readDERString(ConstDataRangeCursor& cdc) {
+    auto swString = cdc.readAndAdvance<DERToken>();
+    if (!swString.isOK()) {
+        return swString.getStatus();
+    }
+
+    auto derString = swString.getValue();
+
+    if (derString.getType() != DERType::UTF8String) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "Unexpected DER Tag, Got "
+                                    << static_cast<char>(derString.getType())
+                                    << ", Expected UTF8String");
+    }
+
+    return derString.readUtf8String();
+}
+
+
+StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, size_t* outLength) {
+    const size_t kTagLength = 1;
+    const size_t kTagLengthAndInitialLengthByteLength = kTagLength + 1;
+
+    ConstDataRangeCursor cdrc(cdr);
+
+    auto swTagByte = cdrc.readAndAdvance<char>();
+    if (!swTagByte.getStatus().isOK()) {
+        return swTagByte.getStatus();
+    }
+
+    const char tagByte = swTagByte.getValue();
+
+    // Get the tag number from the first 5 bits
+    const char tag = tagByte & 0x1f;
+
+    // Check the 6th bit
+    const bool constructed = tagByte & 0x20;
+    const bool primitive = !constructed;
+
+    // Check bits 7 and 8 for the tag class, we only want Universal (i.e. 0)
+    const char tagClass = tagByte & 0xC0;
+    if (tagClass != 0) {
+        return Status(ErrorCodes::InvalidSSLConfiguration, "Unsupported tag class");
+    }
+
+    // Validate the 6th bit is correct, and it is a known type
+    switch (static_cast<DERType>(tag)) {
+        case DERType::UTF8String:
+            if (!primitive) {
+                return Status(ErrorCodes::InvalidSSLConfiguration, "Unknown DER tag");
+            }
+            break;
+        case DERType::SEQUENCE:
+        case DERType::SET:
+            if (!constructed) {
+                return Status(ErrorCodes::InvalidSSLConfiguration, "Unknown DER tag");
+            }
+            break;
+        default:
+            return Status(ErrorCodes::InvalidSSLConfiguration, "Unknown DER tag");
+    }
+
+    // Do we have at least 1 byte for the length
+    if (cdrc.length() < kTagLengthAndInitialLengthByteLength) {
+        return Status(ErrorCodes::InvalidSSLConfiguration, "Invalid DER length");
+    }
+
+    // Read length
+    // Depending on the high bit, either read 1 byte or N bytes
+    auto swInitialLengthByte = cdrc.readAndAdvance<char>();
+    if (!swInitialLengthByte.getStatus().isOK()) {
+        return swInitialLengthByte.getStatus();
+    }
+
+    const char initialLengthByte = swInitialLengthByte.getValue();
+
+
+    uint64_t derLength = 0;
+
+    // How many bytes does it take to encode the length?
+    size_t encodedLengthBytesCount = 1;
+
+    if (initialLengthByte & 0x80) {
+        // Length is > 127 bytes, i.e. Long form of length
+        const size_t lengthBytesCount = 0x7f & initialLengthByte;
+
+        // If length is encoded in more then 8 bytes, we disallow it
+        if (lengthBytesCount > 8) {
+            return Status(ErrorCodes::InvalidSSLConfiguration, "Invalid DER length");
+        }
+
+        // Ensure we have enough data for the length bytes
+        const char* lengthLongFormPtr = cdrc.data();
+
+        Status statusLength = cdrc.advance(lengthBytesCount);
+        if (!statusLength.isOK()) {
+            return statusLength;
+        }
+
+        encodedLengthBytesCount = 1 + lengthBytesCount;
+
+        std::array<char, 8> lengthBuffer;
+        lengthBuffer.fill(0);
+
+        // Copy the length into the end of the buffer
+        memcpy(lengthBuffer.data() + (8 - lengthBytesCount), lengthLongFormPtr, lengthBytesCount);
+
+        // We now have 0x00..NN in the buffer and it can be properly decoded as BigEndian
+        derLength = ConstDataView(lengthBuffer.data()).read<BigEndian<uint64_t>>();
+    } else {
+        // Length is <= 127 bytes, i.e. short form of length
+        derLength = initialLengthByte;
+    }
+
+    // This is the total length of the TLV and all data
+    // This will not overflow since encodedLengthBytesCount <= 9
+    const uint64_t tagAndLengthByteCount = kTagLength + encodedLengthBytesCount;
+
+    // This may overflow since derLength is from user data so check our arithmetic carefully.
+    if (mongoUnsignedAddOverflow64(tagAndLengthByteCount, derLength, outLength) ||
+        *outLength > cdr.length()) {
+        return Status(ErrorCodes::InvalidSSLConfiguration, "Invalid DER length");
+    }
+
+    return DERToken(static_cast<DERType>(tag), derLength, cdr.data() + tagAndLengthByteCount);
+}
+}  // namespace
+
+StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExtension) {
+    stdx::unordered_set<RoleName> roles;
+
+    ConstDataRangeCursor cdcExtension(cdrExtension);
+
+    /**
+     * MongoDBAuthorizationGrants ::= SET OF MongoDBAuthorizationGrant
+     *
+     * MongoDBAuthorizationGrant ::= CHOICE {
+     *  MongoDBRole,
+     *  ...!UTF8String:"Unrecognized entity in MongoDBAuthorizationGrant"
+     * }
+     */
+    auto swSet = cdcExtension.readAndAdvance<DERToken>();
+    if (!swSet.isOK()) {
+        return swSet.getStatus();
+    }
+
+    if (swSet.getValue().getType() != DERType::SET) {
+        return Status(ErrorCodes::InvalidSSLConfiguration,
+                      str::stream() << "Unexpected DER Tag, Got "
+                                    << static_cast<char>(swSet.getValue().getType())
+                                    << ", Expected SET");
+    }
+
+    ConstDataRangeCursor cdcSet(swSet.getValue().getSetRange());
+
+    while (!cdcSet.empty()) {
+        /**
+         * MongoDBRole ::= SEQUENCE {
+         *  role     UTF8String,
+         *  database UTF8String
+         * }
+         */
+        auto swSequence = cdcSet.readAndAdvance<DERToken>();
+        if (!swSequence.isOK()) {
+            return swSequence.getStatus();
+        }
+
+        auto sequenceStart = swSequence.getValue();
+
+        if (sequenceStart.getType() != DERType::SEQUENCE) {
+            return Status(ErrorCodes::InvalidSSLConfiguration,
+                          str::stream() << "Unexpected DER Tag, Got "
+                                        << static_cast<char>(sequenceStart.getType())
+                                        << ", Expected SEQUENCE");
+        }
+
+        ConstDataRangeCursor cdcSequence(sequenceStart.getSequenceRange());
+
+        auto swRole = readDERString(cdcSequence);
+        if (!swRole.isOK()) {
+            return swRole.getStatus();
+        }
+
+        auto swDatabase = readDERString(cdcSequence);
+        if (!swDatabase.isOK()) {
+            return swDatabase.getStatus();
+        }
+
+        roles.emplace(swRole.getValue(), swDatabase.getValue());
+    }
+
+    return roles;
+}
 #endif
 
 }  // namespace mongo

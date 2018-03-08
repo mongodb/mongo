@@ -211,5 +211,11 @@ const SSLParams& getSSLGlobalParams();
  * x.509 certificate.  Matches a remote host name to an x.509 host name, including wildcards.
  */
 bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName);
+
+/**
+ * Parse a binary blob of DER encoded ASN.1 into a set of RoleNames.
+ */
+StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExtension);
+
 }  // namespace mongo
 #endif  // #ifdef MONGO_CONFIG_SSL
